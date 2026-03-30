@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>mfrmr Workflow</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">mfrmr Workflow</h1>
+
+
+
+<p>This vignette outlines a reproducible workflow for:</p>
+<ul>
+<li>loading packaged simulation data</li>
+<li>fitting an MFRM with flexible facets</li>
+<li>running diagnostics and residual PCA</li>
+<li>generating APA and visual summary outputs</li>
+<li>moving from fitted models into design simulation and
+fixed-calibration prediction</li>
+</ul>
+<p>For a plot-first companion guide, see the separate
+<code>mfrmr-visual-diagnostics</code> vignette.</p>
+<p>For speed-sensitive work, a useful pattern is:</p>
+<ul>
+<li>start with <code>method = &quot;JML&quot;</code> or
+<code>quad_points = 7</code></li>
+<li>use <code>diagnose_mfrm(..., residual_pca = &quot;none&quot;)</code> for the
+first pass</li>
+<li>reuse the same diagnostics object in downstream reports and
+plots</li>
+</ul>
+<div id="load-data" class="section level2">
+<h2>Load Data</h2>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="fu">list_mfrmr_data</span>()</span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a><span class="co">#&gt; [1] &quot;example_core&quot;     &quot;example_bias&quot;     &quot;study1&quot;           &quot;study2&quot;          </span></span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="co">#&gt; [5] &quot;combined&quot;         &quot;study1_itercal&quot;   &quot;study2_itercal&quot;   &quot;combined_itercal&quot;</span></span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a><span class="fu">data</span>(<span class="st">&quot;ej2021_study1&quot;</span>, <span class="at">package =</span> <span class="st">&quot;mfrmr&quot;</span>)</span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a><span class="fu">head</span>(ej2021_study1)</span>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a><span class="co">#&gt;    Study Person Rater              Criterion Score</span></span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a><span class="co">#&gt; 1 Study1   P001   R08      Global_Impression     4</span></span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a><span class="co">#&gt; 2 Study1   P001   R08 Linguistic_Realization     3</span></span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a><span class="co">#&gt; 3 Study1   P001   R08       Task_Fulfillment     3</span></span>
+<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a><span class="co">#&gt; 4 Study1   P001   R10      Global_Impression     4</span></span>
+<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a><span class="co">#&gt; 5 Study1   P001   R10 Linguistic_Realization     3</span></span>
+<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a><span class="co">#&gt; 6 Study1   P001   R10       Task_Fulfillment     2</span></span>
+<span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a></span>
+<span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a>study1_alt <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;study1&quot;</span>)</span>
+<span id="cb1-18"><a href="#cb1-18" tabindex="-1"></a><span class="fu">identical</span>(<span class="fu">names</span>(ej2021_study1), <span class="fu">names</span>(study1_alt))</span>
+<span id="cb1-19"><a href="#cb1-19" tabindex="-1"></a><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
+</div>
+<div id="minimal-runnable-example" class="section level2">
+<h2>Minimal Runnable Example</h2>
+<p>We start with the packaged <code>example_core</code> dataset. It is
+intentionally compact, category-complete, and generated from a single
+latent trait plus facet main effects so that help-page examples stay
+fast without relying on undersized toy data. The same object is also
+available via
+<code>data(&quot;mfrmr_example_core&quot;, package = &quot;mfrmr&quot;)</code>:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">data</span>(<span class="st">&quot;mfrmr_example_core&quot;</span>, <span class="at">package =</span> <span class="st">&quot;mfrmr&quot;</span>)</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>toy <span class="ot">&lt;-</span> mfrmr_example_core</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>fit_toy <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>  <span class="at">data =</span> toy,</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;JML&quot;</span>,</span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
+<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a>  <span class="at">maxit =</span> <span class="dv">15</span></span>
+<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a>)</span>
+<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a><span class="co">#&gt; Warning: Optimizer did not fully converge (code = 1). Consider increasing maxit</span></span>
+<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a><span class="co">#&gt; (current: 15) or relaxing reltol (current: 1e-06).</span></span>
+<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a>diag_toy <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit_toy, <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>)</span>
+<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a></span>
+<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a><span class="fu">summary</span>(fit_toy)<span class="sc">$</span>overview</span>
+<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a><span class="co">#&gt; # A tibble: 1 × 11</span></span>
+<span id="cb2-19"><a href="#cb2-19" tabindex="-1"></a><span class="co">#&gt;   Model Method     N Persons Facets Categories LogLik   AIC   BIC Converged</span></span>
+<span id="cb2-20"><a href="#cb2-20" tabindex="-1"></a><span class="co">#&gt;   &lt;chr&gt; &lt;chr&gt;  &lt;int&gt;   &lt;int&gt;  &lt;int&gt;      &lt;dbl&gt;  &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;lgl&gt;    </span></span>
+<span id="cb2-21"><a href="#cb2-21" tabindex="-1"></a><span class="co">#&gt; 1 RSM   JMLE     768      48      2          4  -822. 1758. 2022. FALSE    </span></span>
+<span id="cb2-22"><a href="#cb2-22" tabindex="-1"></a><span class="co">#&gt; # ℹ 1 more variable: Iterations &lt;int&gt;</span></span>
+<span id="cb2-23"><a href="#cb2-23" tabindex="-1"></a><span class="fu">summary</span>(diag_toy)<span class="sc">$</span>overview</span>
+<span id="cb2-24"><a href="#cb2-24" tabindex="-1"></a><span class="co">#&gt; # A tibble: 1 × 8</span></span>
+<span id="cb2-25"><a href="#cb2-25" tabindex="-1"></a><span class="co">#&gt;   Observations Persons Facets Categories Subsets ResidualPCA Method</span></span>
+<span id="cb2-26"><a href="#cb2-26" tabindex="-1"></a><span class="co">#&gt;          &lt;int&gt;   &lt;int&gt;  &lt;int&gt;      &lt;int&gt;   &lt;int&gt; &lt;chr&gt;       &lt;chr&gt; </span></span>
+<span id="cb2-27"><a href="#cb2-27" tabindex="-1"></a><span class="co">#&gt; 1          768      48      2          4       1 none        JML   </span></span>
+<span id="cb2-28"><a href="#cb2-28" tabindex="-1"></a><span class="co">#&gt; # ℹ 1 more variable: PrecisionTier &lt;chr&gt;</span></span>
+<span id="cb2-29"><a href="#cb2-29" tabindex="-1"></a><span class="fu">names</span>(<span class="fu">plot</span>(fit_toy, <span class="at">draw =</span> <span class="cn">FALSE</span>))</span>
+<span id="cb2-30"><a href="#cb2-30" tabindex="-1"></a><span class="co">#&gt; [1] &quot;wright_map&quot;                     &quot;pathway_map&quot;                   </span></span>
+<span id="cb2-31"><a href="#cb2-31" tabindex="-1"></a><span class="co">#&gt; [3] &quot;category_characteristic_curves&quot;</span></span></code></pre></div>
+</div>
+<div id="diagnostics-and-reporting" class="section level2">
+<h2>Diagnostics and Reporting</h2>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>t4_toy <span class="ot">&lt;-</span> <span class="fu">unexpected_response_table</span>(</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>  fit_toy,</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag_toy,</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  <span class="at">abs_z_min =</span> <span class="fl">1.5</span>,</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>  <span class="at">prob_max =</span> <span class="fl">0.4</span>,</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>  <span class="at">top_n =</span> <span class="dv">10</span></span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>)</span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>t12_toy <span class="ot">&lt;-</span> <span class="fu">fair_average_table</span>(fit_toy, <span class="at">diagnostics =</span> diag_toy)</span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>t13_toy <span class="ot">&lt;-</span> <span class="fu">bias_interaction_report</span>(</span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>  <span class="fu">estimate_bias</span>(fit_toy, diag_toy,</span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a>                <span class="at">facet_a =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">facet_b =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a>                <span class="at">max_iter =</span> <span class="dv">2</span>),</span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a>  <span class="at">top_n =</span> <span class="dv">10</span></span>
+<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a>)</span>
+<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a></span>
+<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a><span class="fu">class</span>(<span class="fu">summary</span>(t4_toy))</span>
+<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a><span class="co">#&gt; [1] &quot;summary.mfrm_bundle&quot;</span></span>
+<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a><span class="fu">class</span>(<span class="fu">summary</span>(t12_toy))</span>
+<span id="cb3-19"><a href="#cb3-19" tabindex="-1"></a><span class="co">#&gt; [1] &quot;summary.mfrm_bundle&quot;</span></span>
+<span id="cb3-20"><a href="#cb3-20" tabindex="-1"></a><span class="fu">class</span>(<span class="fu">summary</span>(t13_toy))</span>
+<span id="cb3-21"><a href="#cb3-21" tabindex="-1"></a><span class="co">#&gt; [1] &quot;summary.mfrm_bundle&quot;</span></span>
+<span id="cb3-22"><a href="#cb3-22" tabindex="-1"></a></span>
+<span id="cb3-23"><a href="#cb3-23" tabindex="-1"></a><span class="fu">names</span>(<span class="fu">plot</span>(t4_toy, <span class="at">draw =</span> <span class="cn">FALSE</span>))</span>
+<span id="cb3-24"><a href="#cb3-24" tabindex="-1"></a><span class="co">#&gt; [1] &quot;name&quot; &quot;data&quot;</span></span>
+<span id="cb3-25"><a href="#cb3-25" tabindex="-1"></a><span class="fu">names</span>(<span class="fu">plot</span>(t12_toy, <span class="at">draw =</span> <span class="cn">FALSE</span>))</span>
+<span id="cb3-26"><a href="#cb3-26" tabindex="-1"></a><span class="co">#&gt; [1] &quot;name&quot; &quot;data&quot;</span></span>
+<span id="cb3-27"><a href="#cb3-27" tabindex="-1"></a><span class="fu">names</span>(<span class="fu">plot</span>(t13_toy, <span class="at">draw =</span> <span class="cn">FALSE</span>))</span>
+<span id="cb3-28"><a href="#cb3-28" tabindex="-1"></a><span class="co">#&gt; [1] &quot;name&quot; &quot;data&quot;</span></span></code></pre></div>
+</div>
+<div id="fit-and-diagnose-with-full-data" class="section level2">
+<h2>Fit and Diagnose with Full Data</h2>
+<p>For a realistic analysis, we use the packaged Study 1 dataset:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>  <span class="at">data =</span> ej2021_study1,</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">7</span></span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>)</span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a></span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>diag <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(</span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>  fit,</span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>  <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span></span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a>)</span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a></span>
+<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a><span class="fu">summary</span>(fit)</span>
+<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a><span class="co">#&gt; Many-Facet Rasch Model Summary</span></span>
+<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a><span class="co">#&gt;   Model: RSM | Method: MML</span></span>
+<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a><span class="co">#&gt;   N: 1842 | Persons: 307 | Facets: 2 | Categories: 4</span></span>
+<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a><span class="co">#&gt;   LogLik: -2102.737 | AIC: 4249.475 | BIC: 4370.884</span></span>
+<span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a><span class="co">#&gt;   Converged: Yes | Iterations: 80</span></span>
+<span id="cb4-22"><a href="#cb4-22" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb4-23"><a href="#cb4-23" tabindex="-1"></a><span class="co">#&gt; Facet overview</span></span>
+<span id="cb4-24"><a href="#cb4-24" tabindex="-1"></a><span class="co">#&gt;      Facet Levels MeanEstimate SDEstimate MinEstimate MaxEstimate  Span</span></span>
+<span id="cb4-25"><a href="#cb4-25" tabindex="-1"></a><span class="co">#&gt;  Criterion      3            0      0.692      -0.799       0.430 1.229</span></span>
+<span id="cb4-26"><a href="#cb4-26" tabindex="-1"></a><span class="co">#&gt;      Rater     18            0      0.665      -0.946       1.619 2.565</span></span>
+<span id="cb4-27"><a href="#cb4-27" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb4-28"><a href="#cb4-28" tabindex="-1"></a><span class="co">#&gt; Person measure distribution</span></span>
+<span id="cb4-29"><a href="#cb4-29" tabindex="-1"></a><span class="co">#&gt;  Persons  Mean    SD Median    Min   Max  Span MeanPosteriorSD</span></span>
+<span id="cb4-30"><a href="#cb4-30" tabindex="-1"></a><span class="co">#&gt;      307 0.414 0.812  0.439 -1.451 2.384 3.834           0.482</span></span>
+<span id="cb4-31"><a href="#cb4-31" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb4-32"><a href="#cb4-32" tabindex="-1"></a><span class="co">#&gt; Step parameter summary</span></span>
+<span id="cb4-33"><a href="#cb4-33" tabindex="-1"></a><span class="co">#&gt;  Steps    Min   Max Span Monotonic</span></span>
+<span id="cb4-34"><a href="#cb4-34" tabindex="-1"></a><span class="co">#&gt;      3 -1.092 0.957 2.05      TRUE</span></span>
+<span id="cb4-35"><a href="#cb4-35" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb4-36"><a href="#cb4-36" tabindex="-1"></a><span class="co">#&gt; Most extreme facet levels (|estimate|)</span></span>
+<span id="cb4-37"><a href="#cb4-37" tabindex="-1"></a><span class="co">#&gt;      Facet             Level Estimate</span></span>
+<span id="cb4-38"><a href="#cb4-38" tabindex="-1"></a><span class="co">#&gt;      Rater               R13    1.619</span></span>
+<span id="cb4-39"><a href="#cb4-39" tabindex="-1"></a><span class="co">#&gt;      Rater               R08   -0.946</span></span>
+<span id="cb4-40"><a href="#cb4-40" tabindex="-1"></a><span class="co">#&gt;      Rater               R09   -0.918</span></span>
+<span id="cb4-41"><a href="#cb4-41" tabindex="-1"></a><span class="co">#&gt;      Rater               R06    0.886</span></span>
+<span id="cb4-42"><a href="#cb4-42" tabindex="-1"></a><span class="co">#&gt;  Criterion Global_Impression   -0.799</span></span>
+<span id="cb4-43"><a href="#cb4-43" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb4-44"><a href="#cb4-44" tabindex="-1"></a><span class="co">#&gt; Highest person measures</span></span>
+<span id="cb4-45"><a href="#cb4-45" tabindex="-1"></a><span class="co">#&gt;  Person Estimate    SD</span></span>
+<span id="cb4-46"><a href="#cb4-46" tabindex="-1"></a><span class="co">#&gt;    P157    2.384 0.466</span></span>
+<span id="cb4-47"><a href="#cb4-47" tabindex="-1"></a><span class="co">#&gt;    P239    2.346 0.543</span></span>
+<span id="cb4-48"><a href="#cb4-48" tabindex="-1"></a><span class="co">#&gt;    P135    2.263 0.470</span></span>
+<span id="cb4-49"><a href="#cb4-49" tabindex="-1"></a><span class="co">#&gt;    P018    2.121 0.612</span></span>
+<span id="cb4-50"><a href="#cb4-50" tabindex="-1"></a><span class="co">#&gt;    P209    2.014 0.644</span></span>
+<span id="cb4-51"><a href="#cb4-51" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb4-52"><a href="#cb4-52" tabindex="-1"></a><span class="co">#&gt; Lowest person measures</span></span>
+<span id="cb4-53"><a href="#cb4-53" tabindex="-1"></a><span class="co">#&gt;  Person Estimate    SD</span></span>
+<span id="cb4-54"><a href="#cb4-54" tabindex="-1"></a><span class="co">#&gt;    P136   -1.451 0.555</span></span>
+<span id="cb4-55"><a href="#cb4-55" tabindex="-1"></a><span class="co">#&gt;    P173   -1.399 0.526</span></span>
+<span id="cb4-56"><a href="#cb4-56" tabindex="-1"></a><span class="co">#&gt;    P159   -1.349 0.579</span></span>
+<span id="cb4-57"><a href="#cb4-57" tabindex="-1"></a><span class="co">#&gt;    P048   -1.330 0.466</span></span>
+<span id="cb4-58"><a href="#cb4-58" tabindex="-1"></a><span class="co">#&gt;    P089   -1.274 0.395</span></span>
+<span id="cb4-59"><a href="#cb4-59" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb4-60"><a href="#cb4-60" tabindex="-1"></a><span class="co">#&gt; Notes</span></span>
+<span id="cb4-61"><a href="#cb4-61" tabindex="-1"></a><span class="co">#&gt;  - No immediate warnings from fit-level summary checks.</span></span>
+<span id="cb4-62"><a href="#cb4-62" tabindex="-1"></a><span class="fu">summary</span>(diag)</span>
+<span id="cb4-63"><a href="#cb4-63" tabindex="-1"></a><span class="co">#&gt; Many-Facet Rasch Diagnostics Summary</span></span>
+<span id="cb4-64"><a href="#cb4-64" tabindex="-1"></a><span class="co">#&gt;   Observations: 1842 | Persons: 307 | Facets: 2 | Categories: 4 | Subsets: 1</span></span>
+<span id="cb4-65"><a href="#cb4-65" tabindex="-1"></a><span class="co">#&gt;   Residual PCA mode: none</span></span>
+<span id="cb4-66"><a href="#cb4-66" tabindex="-1"></a><span class="co">#&gt;   Method: MML | Precision tier: model_based</span></span>
+<span id="cb4-67"><a href="#cb4-67" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb4-68"><a href="#cb4-68" tabindex="-1"></a><span class="co">#&gt; Overall fit</span></span>
+<span id="cb4-69"><a href="#cb4-69" tabindex="-1"></a><span class="co">#&gt;  Infit Outfit InfitZSTD OutfitZSTD DF_Infit DF_Outfit</span></span>
+<span id="cb4-70"><a href="#cb4-70" tabindex="-1"></a><span class="co">#&gt;  0.811  0.786    -4.643     -7.029 1059.444      1842</span></span>
+<span id="cb4-71"><a href="#cb4-71" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb4-72"><a href="#cb4-72" tabindex="-1"></a><span class="co">#&gt; Precision basis</span></span>
+<span id="cb4-73"><a href="#cb4-73" tabindex="-1"></a><span class="co">#&gt;  Method Converged PrecisionTier SupportsFormalInference HasFallbackSE</span></span>
+<span id="cb4-74"><a href="#cb4-74" tabindex="-1"></a><span class="co">#&gt;     MML      TRUE   model_based                    TRUE         FALSE</span></span>
+<span id="cb4-75"><a href="#cb4-75" tabindex="-1"></a><span class="co">#&gt;       PersonSEBasis           NonPersonSEBasis</span></span>
+<span id="cb4-76"><a href="#cb4-76" tabindex="-1"></a><span class="co">#&gt;  Posterior SD (EAP) Observed information (MML)</span></span>
+<span id="cb4-77"><a href="#cb4-77" tabindex="-1"></a><span class="co">#&gt;                              CIBasis</span></span>
+<span id="cb4-78"><a href="#cb4-78" tabindex="-1"></a><span class="co">#&gt;  Normal interval from model-based SE</span></span>
+<span id="cb4-79"><a href="#cb4-79" tabindex="-1"></a><span class="co">#&gt;                                                  ReliabilityBasis</span></span>
+<span id="cb4-80"><a href="#cb4-80" tabindex="-1"></a><span class="co">#&gt;  Observed variance with model-based and fit-adjusted error bounds</span></span>
+<span id="cb4-81"><a href="#cb4-81" tabindex="-1"></a><span class="co">#&gt;  HasFitAdjustedSE HasSamplePopulationCoverage</span></span>
+<span id="cb4-82"><a href="#cb4-82" tabindex="-1"></a><span class="co">#&gt;              TRUE                        TRUE</span></span>
+<span id="cb4-83"><a href="#cb4-83" tabindex="-1"></a><span class="co">#&gt;                                                         RecommendedUse</span></span>
+<span id="cb4-84"><a href="#cb4-84" tabindex="-1"></a><span class="co">#&gt;  Use for primary reporting of SE, CI, and reliability in this package.</span></span>
+<span id="cb4-85"><a href="#cb4-85" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb4-86"><a href="#cb4-86" tabindex="-1"></a><span class="co">#&gt; Facet precision and spread</span></span>
+<span id="cb4-87"><a href="#cb4-87" tabindex="-1"></a><span class="co">#&gt;      Facet Levels Separation Strata Reliability RealSeparation RealStrata</span></span>
+<span id="cb4-88"><a href="#cb4-88" tabindex="-1"></a><span class="co">#&gt;  Criterion      3     14.910 20.214       0.996         14.910     20.214</span></span>
+<span id="cb4-89"><a href="#cb4-89" tabindex="-1"></a><span class="co">#&gt;     Person    307      1.322  2.096       0.636          1.225      1.967</span></span>
+<span id="cb4-90"><a href="#cb4-90" tabindex="-1"></a><span class="co">#&gt;      Rater     18      3.118  4.490       0.907          3.107      4.476</span></span>
+<span id="cb4-91"><a href="#cb4-91" tabindex="-1"></a><span class="co">#&gt;  RealReliability MeanInfit MeanOutfit</span></span>
+<span id="cb4-92"><a href="#cb4-92" tabindex="-1"></a><span class="co">#&gt;            0.996     0.810      0.786</span></span>
+<span id="cb4-93"><a href="#cb4-93" tabindex="-1"></a><span class="co">#&gt;            0.600     0.798      0.786</span></span>
+<span id="cb4-94"><a href="#cb4-94" tabindex="-1"></a><span class="co">#&gt;            0.906     0.813      0.786</span></span>
+<span id="cb4-95"><a href="#cb4-95" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb4-96"><a href="#cb4-96" tabindex="-1"></a><span class="co">#&gt; Largest |ZSTD| rows</span></span>
+<span id="cb4-97"><a href="#cb4-97" tabindex="-1"></a><span class="co">#&gt;      Facet                  Level Infit Outfit InfitZSTD OutfitZSTD  AbsZ</span></span>
+<span id="cb4-98"><a href="#cb4-98" tabindex="-1"></a><span class="co">#&gt;  Criterion      Global_Impression 0.798  0.744    -2.596     -4.922 4.922</span></span>
+<span id="cb4-99"><a href="#cb4-99" tabindex="-1"></a><span class="co">#&gt;      Rater                    R08 0.702  0.660    -2.439     -4.107 4.107</span></span>
+<span id="cb4-100"><a href="#cb4-100" tabindex="-1"></a><span class="co">#&gt;  Criterion Linguistic_Realization 0.802  0.797    -2.918     -3.817 3.817</span></span>
+<span id="cb4-101"><a href="#cb4-101" tabindex="-1"></a><span class="co">#&gt;     Person                   P020 0.027  0.026    -2.768     -3.464 3.464</span></span>
+<span id="cb4-102"><a href="#cb4-102" tabindex="-1"></a><span class="co">#&gt;  Criterion       Task_Fulfillment 0.829  0.816    -2.488     -3.422 3.422</span></span>
+<span id="cb4-103"><a href="#cb4-103" tabindex="-1"></a><span class="co">#&gt;      Rater                    R10 0.737  0.726    -2.189     -2.939 2.939</span></span>
+<span id="cb4-104"><a href="#cb4-104" tabindex="-1"></a><span class="co">#&gt;     Person                   P203 0.041  0.073    -2.497     -2.832 2.832</span></span>
+<span id="cb4-105"><a href="#cb4-105" tabindex="-1"></a><span class="co">#&gt;     Person                   P098 2.314  3.361     1.539      2.780 2.780</span></span>
+<span id="cb4-106"><a href="#cb4-106" tabindex="-1"></a><span class="co">#&gt;      Rater                    R05 0.744  0.749    -1.923     -2.535 2.535</span></span>
+<span id="cb4-107"><a href="#cb4-107" tabindex="-1"></a><span class="co">#&gt;     Person                   P056 0.075  0.125    -1.727     -2.405 2.405</span></span>
+<span id="cb4-108"><a href="#cb4-108" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb4-109"><a href="#cb4-109" tabindex="-1"></a><span class="co">#&gt; Flag counts</span></span>
+<span id="cb4-110"><a href="#cb4-110" tabindex="-1"></a><span class="co">#&gt;                       Metric Count</span></span>
+<span id="cb4-111"><a href="#cb4-111" tabindex="-1"></a><span class="co">#&gt;         Unexpected responses   100</span></span>
+<span id="cb4-112"><a href="#cb4-112" tabindex="-1"></a><span class="co">#&gt;  Flagged displacement levels    40</span></span>
+<span id="cb4-113"><a href="#cb4-113" tabindex="-1"></a><span class="co">#&gt;             Interaction rows    20</span></span>
+<span id="cb4-114"><a href="#cb4-114" tabindex="-1"></a><span class="co">#&gt;            Inter-rater pairs   153</span></span>
+<span id="cb4-115"><a href="#cb4-115" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb4-116"><a href="#cb4-116" tabindex="-1"></a><span class="co">#&gt; Notes</span></span>
+<span id="cb4-117"><a href="#cb4-117" tabindex="-1"></a><span class="co">#&gt;  - Unexpected responses were flagged under current thresholds.</span></span>
+<span id="cb4-118"><a href="#cb4-118" tabindex="-1"></a><span class="co">#&gt;  - SE/ModelSE, CI, and reliability conventions depend on the estimation path; see diagnostics$approximation_notes for MML-vs-JML details.</span></span></code></pre></div>
+<p>If you need dimensionality evidence for a final report, you can add
+residual PCA after the initial diagnostic pass:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>diag_pca <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>  fit,</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  <span class="at">residual_pca =</span> <span class="st">&quot;both&quot;</span>,</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>  <span class="at">pca_max_factors =</span> <span class="dv">6</span></span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>)</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a></span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="fu">summary</span>(diag_pca)</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a><span class="co">#&gt; Many-Facet Rasch Diagnostics Summary</span></span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a><span class="co">#&gt;   Observations: 1842 | Persons: 307 | Facets: 2 | Categories: 4 | Subsets: 1</span></span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="co">#&gt;   Residual PCA mode: both</span></span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a><span class="co">#&gt;   Method: MML | Precision tier: model_based</span></span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a><span class="co">#&gt; Overall fit</span></span>
+<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a><span class="co">#&gt;  Infit Outfit InfitZSTD OutfitZSTD DF_Infit DF_Outfit</span></span>
+<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a><span class="co">#&gt;  0.811  0.786    -4.643     -7.029 1059.444      1842</span></span>
+<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a><span class="co">#&gt; Precision basis</span></span>
+<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a><span class="co">#&gt;  Method Converged PrecisionTier SupportsFormalInference HasFallbackSE</span></span>
+<span id="cb5-19"><a href="#cb5-19" tabindex="-1"></a><span class="co">#&gt;     MML      TRUE   model_based                    TRUE         FALSE</span></span>
+<span id="cb5-20"><a href="#cb5-20" tabindex="-1"></a><span class="co">#&gt;       PersonSEBasis           NonPersonSEBasis</span></span>
+<span id="cb5-21"><a href="#cb5-21" tabindex="-1"></a><span class="co">#&gt;  Posterior SD (EAP) Observed information (MML)</span></span>
+<span id="cb5-22"><a href="#cb5-22" tabindex="-1"></a><span class="co">#&gt;                              CIBasis</span></span>
+<span id="cb5-23"><a href="#cb5-23" tabindex="-1"></a><span class="co">#&gt;  Normal interval from model-based SE</span></span>
+<span id="cb5-24"><a href="#cb5-24" tabindex="-1"></a><span class="co">#&gt;                                                  ReliabilityBasis</span></span>
+<span id="cb5-25"><a href="#cb5-25" tabindex="-1"></a><span class="co">#&gt;  Observed variance with model-based and fit-adjusted error bounds</span></span>
+<span id="cb5-26"><a href="#cb5-26" tabindex="-1"></a><span class="co">#&gt;  HasFitAdjustedSE HasSamplePopulationCoverage</span></span>
+<span id="cb5-27"><a href="#cb5-27" tabindex="-1"></a><span class="co">#&gt;              TRUE                        TRUE</span></span>
+<span id="cb5-28"><a href="#cb5-28" tabindex="-1"></a><span class="co">#&gt;                                                         RecommendedUse</span></span>
+<span id="cb5-29"><a href="#cb5-29" tabindex="-1"></a><span class="co">#&gt;  Use for primary reporting of SE, CI, and reliability in this package.</span></span>
+<span id="cb5-30"><a href="#cb5-30" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb5-31"><a href="#cb5-31" tabindex="-1"></a><span class="co">#&gt; Facet precision and spread</span></span>
+<span id="cb5-32"><a href="#cb5-32" tabindex="-1"></a><span class="co">#&gt;      Facet Levels Separation Strata Reliability RealSeparation RealStrata</span></span>
+<span id="cb5-33"><a href="#cb5-33" tabindex="-1"></a><span class="co">#&gt;  Criterion      3     14.910 20.214       0.996         14.910     20.214</span></span>
+<span id="cb5-34"><a href="#cb5-34" tabindex="-1"></a><span class="co">#&gt;     Person    307      1.322  2.096       0.636          1.225      1.967</span></span>
+<span id="cb5-35"><a href="#cb5-35" tabindex="-1"></a><span class="co">#&gt;      Rater     18      3.118  4.490       0.907          3.107      4.476</span></span>
+<span id="cb5-36"><a href="#cb5-36" tabindex="-1"></a><span class="co">#&gt;  RealReliability MeanInfit MeanOutfit</span></span>
+<span id="cb5-37"><a href="#cb5-37" tabindex="-1"></a><span class="co">#&gt;            0.996     0.810      0.786</span></span>
+<span id="cb5-38"><a href="#cb5-38" tabindex="-1"></a><span class="co">#&gt;            0.600     0.798      0.786</span></span>
+<span id="cb5-39"><a href="#cb5-39" tabindex="-1"></a><span class="co">#&gt;            0.906     0.813      0.786</span></span>
+<span id="cb5-40"><a href="#cb5-40" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb5-41"><a href="#cb5-41" tabindex="-1"></a><span class="co">#&gt; Largest |ZSTD| rows</span></span>
+<span id="cb5-42"><a href="#cb5-42" tabindex="-1"></a><span class="co">#&gt;      Facet                  Level Infit Outfit InfitZSTD OutfitZSTD  AbsZ</span></span>
+<span id="cb5-43"><a href="#cb5-43" tabindex="-1"></a><span class="co">#&gt;  Criterion      Global_Impression 0.798  0.744    -2.596     -4.922 4.922</span></span>
+<span id="cb5-44"><a href="#cb5-44" tabindex="-1"></a><span class="co">#&gt;      Rater                    R08 0.702  0.660    -2.439     -4.107 4.107</span></span>
+<span id="cb5-45"><a href="#cb5-45" tabindex="-1"></a><span class="co">#&gt;  Criterion Linguistic_Realization 0.802  0.797    -2.918     -3.817 3.817</span></span>
+<span id="cb5-46"><a href="#cb5-46" tabindex="-1"></a><span class="co">#&gt;     Person                   P020 0.027  0.026    -2.768     -3.464 3.464</span></span>
+<span id="cb5-47"><a href="#cb5-47" tabindex="-1"></a><span class="co">#&gt;  Criterion       Task_Fulfillment 0.829  0.816    -2.488     -3.422 3.422</span></span>
+<span id="cb5-48"><a href="#cb5-48" tabindex="-1"></a><span class="co">#&gt;      Rater                    R10 0.737  0.726    -2.189     -2.939 2.939</span></span>
+<span id="cb5-49"><a href="#cb5-49" tabindex="-1"></a><span class="co">#&gt;     Person                   P203 0.041  0.073    -2.497     -2.832 2.832</span></span>
+<span id="cb5-50"><a href="#cb5-50" tabindex="-1"></a><span class="co">#&gt;     Person                   P098 2.314  3.361     1.539      2.780 2.780</span></span>
+<span id="cb5-51"><a href="#cb5-51" tabindex="-1"></a><span class="co">#&gt;      Rater                    R05 0.744  0.749    -1.923     -2.535 2.535</span></span>
+<span id="cb5-52"><a href="#cb5-52" tabindex="-1"></a><span class="co">#&gt;     Person                   P056 0.075  0.125    -1.727     -2.405 2.405</span></span>
+<span id="cb5-53"><a href="#cb5-53" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb5-54"><a href="#cb5-54" tabindex="-1"></a><span class="co">#&gt; Flag counts</span></span>
+<span id="cb5-55"><a href="#cb5-55" tabindex="-1"></a><span class="co">#&gt;                       Metric Count</span></span>
+<span id="cb5-56"><a href="#cb5-56" tabindex="-1"></a><span class="co">#&gt;         Unexpected responses   100</span></span>
+<span id="cb5-57"><a href="#cb5-57" tabindex="-1"></a><span class="co">#&gt;  Flagged displacement levels    40</span></span>
+<span id="cb5-58"><a href="#cb5-58" tabindex="-1"></a><span class="co">#&gt;             Interaction rows    20</span></span>
+<span id="cb5-59"><a href="#cb5-59" tabindex="-1"></a><span class="co">#&gt;            Inter-rater pairs   153</span></span>
+<span id="cb5-60"><a href="#cb5-60" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb5-61"><a href="#cb5-61" tabindex="-1"></a><span class="co">#&gt; Notes</span></span>
+<span id="cb5-62"><a href="#cb5-62" tabindex="-1"></a><span class="co">#&gt;  - Unexpected responses were flagged under current thresholds.</span></span>
+<span id="cb5-63"><a href="#cb5-63" tabindex="-1"></a><span class="co">#&gt;  - SE/ModelSE, CI, and reliability conventions depend on the estimation path; see diagnostics$approximation_notes for MML-vs-JML details.</span></span></code></pre></div>
+</div>
+<div id="residual-pca-and-reporting" class="section level2">
+<h2>Residual PCA and Reporting</h2>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>pca <span class="ot">&lt;-</span> <span class="fu">analyze_residual_pca</span>(diag_pca, <span class="at">mode =</span> <span class="st">&quot;both&quot;</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="fu">plot_residual_pca</span>(pca, <span class="at">mode =</span> <span class="st">&quot;overall&quot;</span>, <span class="at">plot_type =</span> <span class="st">&quot;scree&quot;</span>)</span></code></pre></div>
+<p><img role="img" src="data:image/png;base64,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" /><!-- --></p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="fu">data</span>(<span class="st">&quot;mfrmr_example_bias&quot;</span>, <span class="at">package =</span> <span class="st">&quot;mfrmr&quot;</span>)</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>bias_df <span class="ot">&lt;-</span> mfrmr_example_bias</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>fit_bias <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>  bias_df,</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">7</span></span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>)</span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a>diag_bias <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit_bias, <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>)</span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a>bias <span class="ot">&lt;-</span> <span class="fu">estimate_bias</span>(fit_bias, diag_bias, <span class="at">facet_a =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">facet_b =</span> <span class="st">&quot;Criterion&quot;</span>)</span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a>fixed <span class="ot">&lt;-</span> <span class="fu">build_fixed_reports</span>(bias)</span>
+<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a>apa <span class="ot">&lt;-</span> <span class="fu">build_apa_outputs</span>(fit_bias, diag_bias, <span class="at">bias_results =</span> bias)</span>
+<span id="cb7-16"><a href="#cb7-16" tabindex="-1"></a></span>
+<span id="cb7-17"><a href="#cb7-17" tabindex="-1"></a><span class="fu">mfrm_threshold_profiles</span>()</span>
+<span id="cb7-18"><a href="#cb7-18" tabindex="-1"></a><span class="co">#&gt; $profiles</span></span>
+<span id="cb7-19"><a href="#cb7-19" tabindex="-1"></a><span class="co">#&gt; $profiles$strict</span></span>
+<span id="cb7-20"><a href="#cb7-20" tabindex="-1"></a><span class="co">#&gt; $profiles$strict$n_obs_min</span></span>
+<span id="cb7-21"><a href="#cb7-21" tabindex="-1"></a><span class="co">#&gt; [1] 200</span></span>
+<span id="cb7-22"><a href="#cb7-22" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-23"><a href="#cb7-23" tabindex="-1"></a><span class="co">#&gt; $profiles$strict$n_person_min</span></span>
+<span id="cb7-24"><a href="#cb7-24" tabindex="-1"></a><span class="co">#&gt; [1] 50</span></span>
+<span id="cb7-25"><a href="#cb7-25" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-26"><a href="#cb7-26" tabindex="-1"></a><span class="co">#&gt; $profiles$strict$low_cat_min</span></span>
+<span id="cb7-27"><a href="#cb7-27" tabindex="-1"></a><span class="co">#&gt; [1] 15</span></span>
+<span id="cb7-28"><a href="#cb7-28" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-29"><a href="#cb7-29" tabindex="-1"></a><span class="co">#&gt; $profiles$strict$min_facet_levels</span></span>
+<span id="cb7-30"><a href="#cb7-30" tabindex="-1"></a><span class="co">#&gt; [1] 4</span></span>
+<span id="cb7-31"><a href="#cb7-31" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-32"><a href="#cb7-32" tabindex="-1"></a><span class="co">#&gt; $profiles$strict$misfit_ratio_warn</span></span>
+<span id="cb7-33"><a href="#cb7-33" tabindex="-1"></a><span class="co">#&gt; [1] 0.08</span></span>
+<span id="cb7-34"><a href="#cb7-34" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-35"><a href="#cb7-35" tabindex="-1"></a><span class="co">#&gt; $profiles$strict$missing_fit_ratio_warn</span></span>
+<span id="cb7-36"><a href="#cb7-36" tabindex="-1"></a><span class="co">#&gt; [1] 0.15</span></span>
+<span id="cb7-37"><a href="#cb7-37" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-38"><a href="#cb7-38" tabindex="-1"></a><span class="co">#&gt; $profiles$strict$zstd2_ratio_warn</span></span>
+<span id="cb7-39"><a href="#cb7-39" tabindex="-1"></a><span class="co">#&gt; [1] 0.08</span></span>
+<span id="cb7-40"><a href="#cb7-40" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-41"><a href="#cb7-41" tabindex="-1"></a><span class="co">#&gt; $profiles$strict$zstd3_ratio_warn</span></span>
+<span id="cb7-42"><a href="#cb7-42" tabindex="-1"></a><span class="co">#&gt; [1] 0.03</span></span>
+<span id="cb7-43"><a href="#cb7-43" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-44"><a href="#cb7-44" tabindex="-1"></a><span class="co">#&gt; $profiles$strict$expected_var_min</span></span>
+<span id="cb7-45"><a href="#cb7-45" tabindex="-1"></a><span class="co">#&gt; [1] 0.3</span></span>
+<span id="cb7-46"><a href="#cb7-46" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-47"><a href="#cb7-47" tabindex="-1"></a><span class="co">#&gt; $profiles$strict$pca_first_eigen_warn</span></span>
+<span id="cb7-48"><a href="#cb7-48" tabindex="-1"></a><span class="co">#&gt; [1] 1.5</span></span>
+<span id="cb7-49"><a href="#cb7-49" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-50"><a href="#cb7-50" tabindex="-1"></a><span class="co">#&gt; $profiles$strict$pca_first_prop_warn</span></span>
+<span id="cb7-51"><a href="#cb7-51" tabindex="-1"></a><span class="co">#&gt; [1] 0.1</span></span>
+<span id="cb7-52"><a href="#cb7-52" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-53"><a href="#cb7-53" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-54"><a href="#cb7-54" tabindex="-1"></a><span class="co">#&gt; $profiles$standard</span></span>
+<span id="cb7-55"><a href="#cb7-55" tabindex="-1"></a><span class="co">#&gt; $profiles$standard$n_obs_min</span></span>
+<span id="cb7-56"><a href="#cb7-56" tabindex="-1"></a><span class="co">#&gt; [1] 100</span></span>
+<span id="cb7-57"><a href="#cb7-57" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-58"><a href="#cb7-58" tabindex="-1"></a><span class="co">#&gt; $profiles$standard$n_person_min</span></span>
+<span id="cb7-59"><a href="#cb7-59" tabindex="-1"></a><span class="co">#&gt; [1] 30</span></span>
+<span id="cb7-60"><a href="#cb7-60" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-61"><a href="#cb7-61" tabindex="-1"></a><span class="co">#&gt; $profiles$standard$low_cat_min</span></span>
+<span id="cb7-62"><a href="#cb7-62" tabindex="-1"></a><span class="co">#&gt; [1] 10</span></span>
+<span id="cb7-63"><a href="#cb7-63" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-64"><a href="#cb7-64" tabindex="-1"></a><span class="co">#&gt; $profiles$standard$min_facet_levels</span></span>
+<span id="cb7-65"><a href="#cb7-65" tabindex="-1"></a><span class="co">#&gt; [1] 3</span></span>
+<span id="cb7-66"><a href="#cb7-66" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-67"><a href="#cb7-67" tabindex="-1"></a><span class="co">#&gt; $profiles$standard$misfit_ratio_warn</span></span>
+<span id="cb7-68"><a href="#cb7-68" tabindex="-1"></a><span class="co">#&gt; [1] 0.1</span></span>
+<span id="cb7-69"><a href="#cb7-69" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-70"><a href="#cb7-70" tabindex="-1"></a><span class="co">#&gt; $profiles$standard$missing_fit_ratio_warn</span></span>
+<span id="cb7-71"><a href="#cb7-71" tabindex="-1"></a><span class="co">#&gt; [1] 0.2</span></span>
+<span id="cb7-72"><a href="#cb7-72" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-73"><a href="#cb7-73" tabindex="-1"></a><span class="co">#&gt; $profiles$standard$zstd2_ratio_warn</span></span>
+<span id="cb7-74"><a href="#cb7-74" tabindex="-1"></a><span class="co">#&gt; [1] 0.1</span></span>
+<span id="cb7-75"><a href="#cb7-75" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-76"><a href="#cb7-76" tabindex="-1"></a><span class="co">#&gt; $profiles$standard$zstd3_ratio_warn</span></span>
+<span id="cb7-77"><a href="#cb7-77" tabindex="-1"></a><span class="co">#&gt; [1] 0.05</span></span>
+<span id="cb7-78"><a href="#cb7-78" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-79"><a href="#cb7-79" tabindex="-1"></a><span class="co">#&gt; $profiles$standard$expected_var_min</span></span>
+<span id="cb7-80"><a href="#cb7-80" tabindex="-1"></a><span class="co">#&gt; [1] 0.2</span></span>
+<span id="cb7-81"><a href="#cb7-81" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-82"><a href="#cb7-82" tabindex="-1"></a><span class="co">#&gt; $profiles$standard$pca_first_eigen_warn</span></span>
+<span id="cb7-83"><a href="#cb7-83" tabindex="-1"></a><span class="co">#&gt; [1] 2</span></span>
+<span id="cb7-84"><a href="#cb7-84" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-85"><a href="#cb7-85" tabindex="-1"></a><span class="co">#&gt; $profiles$standard$pca_first_prop_warn</span></span>
+<span id="cb7-86"><a href="#cb7-86" tabindex="-1"></a><span class="co">#&gt; [1] 0.1</span></span>
+<span id="cb7-87"><a href="#cb7-87" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-88"><a href="#cb7-88" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-89"><a href="#cb7-89" tabindex="-1"></a><span class="co">#&gt; $profiles$lenient</span></span>
+<span id="cb7-90"><a href="#cb7-90" tabindex="-1"></a><span class="co">#&gt; $profiles$lenient$n_obs_min</span></span>
+<span id="cb7-91"><a href="#cb7-91" tabindex="-1"></a><span class="co">#&gt; [1] 60</span></span>
+<span id="cb7-92"><a href="#cb7-92" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-93"><a href="#cb7-93" tabindex="-1"></a><span class="co">#&gt; $profiles$lenient$n_person_min</span></span>
+<span id="cb7-94"><a href="#cb7-94" tabindex="-1"></a><span class="co">#&gt; [1] 20</span></span>
+<span id="cb7-95"><a href="#cb7-95" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-96"><a href="#cb7-96" tabindex="-1"></a><span class="co">#&gt; $profiles$lenient$low_cat_min</span></span>
+<span id="cb7-97"><a href="#cb7-97" tabindex="-1"></a><span class="co">#&gt; [1] 5</span></span>
+<span id="cb7-98"><a href="#cb7-98" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-99"><a href="#cb7-99" tabindex="-1"></a><span class="co">#&gt; $profiles$lenient$min_facet_levels</span></span>
+<span id="cb7-100"><a href="#cb7-100" tabindex="-1"></a><span class="co">#&gt; [1] 2</span></span>
+<span id="cb7-101"><a href="#cb7-101" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-102"><a href="#cb7-102" tabindex="-1"></a><span class="co">#&gt; $profiles$lenient$misfit_ratio_warn</span></span>
+<span id="cb7-103"><a href="#cb7-103" tabindex="-1"></a><span class="co">#&gt; [1] 0.15</span></span>
+<span id="cb7-104"><a href="#cb7-104" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-105"><a href="#cb7-105" tabindex="-1"></a><span class="co">#&gt; $profiles$lenient$missing_fit_ratio_warn</span></span>
+<span id="cb7-106"><a href="#cb7-106" tabindex="-1"></a><span class="co">#&gt; [1] 0.3</span></span>
+<span id="cb7-107"><a href="#cb7-107" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-108"><a href="#cb7-108" tabindex="-1"></a><span class="co">#&gt; $profiles$lenient$zstd2_ratio_warn</span></span>
+<span id="cb7-109"><a href="#cb7-109" tabindex="-1"></a><span class="co">#&gt; [1] 0.15</span></span>
+<span id="cb7-110"><a href="#cb7-110" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-111"><a href="#cb7-111" tabindex="-1"></a><span class="co">#&gt; $profiles$lenient$zstd3_ratio_warn</span></span>
+<span id="cb7-112"><a href="#cb7-112" tabindex="-1"></a><span class="co">#&gt; [1] 0.08</span></span>
+<span id="cb7-113"><a href="#cb7-113" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-114"><a href="#cb7-114" tabindex="-1"></a><span class="co">#&gt; $profiles$lenient$expected_var_min</span></span>
+<span id="cb7-115"><a href="#cb7-115" tabindex="-1"></a><span class="co">#&gt; [1] 0.1</span></span>
+<span id="cb7-116"><a href="#cb7-116" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-117"><a href="#cb7-117" tabindex="-1"></a><span class="co">#&gt; $profiles$lenient$pca_first_eigen_warn</span></span>
+<span id="cb7-118"><a href="#cb7-118" tabindex="-1"></a><span class="co">#&gt; [1] 3</span></span>
+<span id="cb7-119"><a href="#cb7-119" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-120"><a href="#cb7-120" tabindex="-1"></a><span class="co">#&gt; $profiles$lenient$pca_first_prop_warn</span></span>
+<span id="cb7-121"><a href="#cb7-121" tabindex="-1"></a><span class="co">#&gt; [1] 0.2</span></span>
+<span id="cb7-122"><a href="#cb7-122" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-123"><a href="#cb7-123" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-124"><a href="#cb7-124" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-125"><a href="#cb7-125" tabindex="-1"></a><span class="co">#&gt; $pca_reference_bands</span></span>
+<span id="cb7-126"><a href="#cb7-126" tabindex="-1"></a><span class="co">#&gt; $pca_reference_bands$eigenvalue</span></span>
+<span id="cb7-127"><a href="#cb7-127" tabindex="-1"></a><span class="co">#&gt; critical_minimum          caution           common           strong </span></span>
+<span id="cb7-128"><a href="#cb7-128" tabindex="-1"></a><span class="co">#&gt;              1.4              1.5              2.0              3.0 </span></span>
+<span id="cb7-129"><a href="#cb7-129" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-130"><a href="#cb7-130" tabindex="-1"></a><span class="co">#&gt; $pca_reference_bands$proportion</span></span>
+<span id="cb7-131"><a href="#cb7-131" tabindex="-1"></a><span class="co">#&gt;   minor caution  strong </span></span>
+<span id="cb7-132"><a href="#cb7-132" tabindex="-1"></a><span class="co">#&gt;    0.05    0.10    0.20 </span></span>
+<span id="cb7-133"><a href="#cb7-133" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-134"><a href="#cb7-134" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-135"><a href="#cb7-135" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;class&quot;)</span></span>
+<span id="cb7-136"><a href="#cb7-136" tabindex="-1"></a><span class="co">#&gt; [1] &quot;mfrm_threshold_profiles&quot; &quot;list&quot;</span></span>
+<span id="cb7-137"><a href="#cb7-137" tabindex="-1"></a>vis <span class="ot">&lt;-</span> <span class="fu">build_visual_summaries</span>(fit_bias, diag_bias, <span class="at">threshold_profile =</span> <span class="st">&quot;standard&quot;</span>)</span>
+<span id="cb7-138"><a href="#cb7-138" tabindex="-1"></a>vis<span class="sc">$</span>warning_map<span class="sc">$</span>residual_pca_overall</span>
+<span id="cb7-139"><a href="#cb7-139" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Threshold profile: standard (PC1 EV &gt;= 2.0, variance &gt;= 10%).&quot;                                                                                                          </span></span>
+<span id="cb7-140"><a href="#cb7-140" tabindex="-1"></a><span class="co">#&gt; [2] &quot;Heuristic reference bands: EV &gt;= 1.4 (critical minimum), &gt;= 1.5 (caution), &gt;= 2.0 (common), &gt;= 3.0 (strong); variance &gt;= 5% (minor), &gt;= 10% (caution), &gt;= 20% (strong).&quot;</span></span>
+<span id="cb7-141"><a href="#cb7-141" tabindex="-1"></a><span class="co">#&gt; [3] &quot;Current exploratory PC1 checks: EV&gt;=1.5:Y, EV&gt;=2.0:Y, EV&gt;=3.0:Y, Var&gt;=10%:Y, Var&gt;=20%:Y.&quot;                                                                               </span></span>
+<span id="cb7-142"><a href="#cb7-142" tabindex="-1"></a><span class="co">#&gt; [4] &quot;Overall residual PCA PC1 exceeds the current heuristic eigenvalue band (3.22).&quot;                                                                                         </span></span>
+<span id="cb7-143"><a href="#cb7-143" tabindex="-1"></a><span class="co">#&gt; [5] &quot;Overall residual PCA PC1 explains 20.1% variance.&quot;</span></span></code></pre></div>
+<p>The same <code>example_bias</code> dataset also carries a
+<code>Group</code> variable so DIF-oriented examples can show a non-null
+pattern instead of a fully clean result. It can be loaded either with
+<code>load_mfrmr_data(&quot;example_bias&quot;)</code> or
+<code>data(&quot;mfrmr_example_bias&quot;, package = &quot;mfrmr&quot;)</code>.</p>
+</div>
+<div id="human-readable-reporting-api" class="section level2">
+<h2>Human-Readable Reporting API</h2>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>spec <span class="ot">&lt;-</span> <span class="fu">specifications_report</span>(fit, <span class="at">title =</span> <span class="st">&quot;Study run&quot;</span>)</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>data_qc <span class="ot">&lt;-</span> <span class="fu">data_quality_report</span>(</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  fit,</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>  <span class="at">data =</span> ej2021_study1,</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span></span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>)</span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a>iter <span class="ot">&lt;-</span> <span class="fu">estimation_iteration_report</span>(fit, <span class="at">max_iter =</span> <span class="dv">8</span>)</span>
+<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a>subset_rep <span class="ot">&lt;-</span> <span class="fu">subset_connectivity_report</span>(fit, <span class="at">diagnostics =</span> diag)</span>
+<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a>facet_stats <span class="ot">&lt;-</span> <span class="fu">facet_statistics_report</span>(fit, <span class="at">diagnostics =</span> diag)</span>
+<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a>cat_structure <span class="ot">&lt;-</span> <span class="fu">category_structure_report</span>(fit, <span class="at">diagnostics =</span> diag)</span>
+<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a>cat_curves <span class="ot">&lt;-</span> <span class="fu">category_curves_report</span>(fit, <span class="at">theta_points =</span> <span class="dv">101</span>)</span>
+<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a>bias_rep <span class="ot">&lt;-</span> <span class="fu">bias_interaction_report</span>(bias, <span class="at">top_n =</span> <span class="dv">20</span>)</span>
+<span id="cb8-15"><a href="#cb8-15" tabindex="-1"></a><span class="fu">plot_bias_interaction</span>(bias_rep, <span class="at">plot =</span> <span class="st">&quot;scatter&quot;</span>)</span></code></pre></div>
+<p><img role="img" src="data:image/png;base64,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" /><!-- --></p>
+</div>
+<div id="design-simulation-and-prediction" class="section level2">
+<h2>Design Simulation and Prediction</h2>
+<p>The package also supports a separate simulation/prediction layer. The
+key distinction is:</p>
+<ul>
+<li><code>evaluate_mfrm_design()</code> and
+<code>predict_mfrm_population()</code> are design-level helpers that
+summarize expected operating characteristics under an explicit
+simulation specification.</li>
+<li><code>predict_mfrm_units()</code> and
+<code>sample_mfrm_plausible_values()</code> score future or partially
+observed persons under a fixed <code>MML</code> calibration.</li>
+</ul>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>sim_spec <span class="ot">&lt;-</span> <span class="fu">build_mfrm_sim_spec</span>(</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>  <span class="at">n_person =</span> <span class="dv">30</span>,</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>  <span class="at">n_rater =</span> <span class="dv">4</span>,</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>  <span class="at">n_criterion =</span> <span class="dv">4</span>,</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>  <span class="at">raters_per_person =</span> <span class="dv">2</span>,</span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>  <span class="at">assignment =</span> <span class="st">&quot;rotating&quot;</span></span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>)</span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a></span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a>pred_pop <span class="ot">&lt;-</span> <span class="fu">predict_mfrm_population</span>(</span>
+<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a>  <span class="at">sim_spec =</span> sim_spec,</span>
+<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a>  <span class="at">reps =</span> <span class="dv">2</span>,</span>
+<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a>  <span class="at">maxit =</span> <span class="dv">10</span>,</span>
+<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a>  <span class="at">seed =</span> <span class="dv">1</span></span>
+<span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a>)</span>
+<span id="cb9-15"><a href="#cb9-15" tabindex="-1"></a><span class="co">#&gt; Warning: Optimizer did not fully converge (code = 1). Consider increasing maxit</span></span>
+<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a><span class="co">#&gt; (current: 10) or relaxing reltol (current: 1e-06).</span></span>
+<span id="cb9-17"><a href="#cb9-17" tabindex="-1"></a><span class="co">#&gt; Warning: Optimizer did not fully converge (code = 1). Consider increasing maxit</span></span>
+<span id="cb9-18"><a href="#cb9-18" tabindex="-1"></a><span class="co">#&gt; (current: 10) or relaxing reltol (current: 1e-06).</span></span>
+<span id="cb9-19"><a href="#cb9-19" tabindex="-1"></a></span>
+<span id="cb9-20"><a href="#cb9-20" tabindex="-1"></a><span class="fu">summary</span>(pred_pop)<span class="sc">$</span>forecast[, <span class="fu">c</span>(<span class="st">&quot;Facet&quot;</span>, <span class="st">&quot;MeanSeparation&quot;</span>, <span class="st">&quot;McseSeparation&quot;</span>)]</span>
+<span id="cb9-21"><a href="#cb9-21" tabindex="-1"></a><span class="co">#&gt; # A tibble: 3 × 3</span></span>
+<span id="cb9-22"><a href="#cb9-22" tabindex="-1"></a><span class="co">#&gt;   Facet     MeanSeparation McseSeparation</span></span>
+<span id="cb9-23"><a href="#cb9-23" tabindex="-1"></a><span class="co">#&gt;   &lt;chr&gt;              &lt;dbl&gt;          &lt;dbl&gt;</span></span>
+<span id="cb9-24"><a href="#cb9-24" tabindex="-1"></a><span class="co">#&gt; 1 Criterion          1.87           0.076</span></span>
+<span id="cb9-25"><a href="#cb9-25" tabindex="-1"></a><span class="co">#&gt; 2 Person             2.03           0.027</span></span>
+<span id="cb9-26"><a href="#cb9-26" tabindex="-1"></a><span class="co">#&gt; 3 Rater              0.728          0.728</span></span>
+<span id="cb9-27"><a href="#cb9-27" tabindex="-1"></a></span>
+<span id="cb9-28"><a href="#cb9-28" tabindex="-1"></a>keep_people <span class="ot">&lt;-</span> <span class="fu">unique</span>(toy<span class="sc">$</span>Person)[<span class="dv">1</span><span class="sc">:</span><span class="dv">18</span>]</span>
+<span id="cb9-29"><a href="#cb9-29" tabindex="-1"></a>toy_mml <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(</span>
+<span id="cb9-30"><a href="#cb9-30" tabindex="-1"></a>  <span class="fu">fit_mfrm</span>(</span>
+<span id="cb9-31"><a href="#cb9-31" tabindex="-1"></a>    toy[toy<span class="sc">$</span>Person <span class="sc">%in%</span> keep_people, , <span class="at">drop =</span> <span class="cn">FALSE</span>],</span>
+<span id="cb9-32"><a href="#cb9-32" tabindex="-1"></a>    <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb9-33"><a href="#cb9-33" tabindex="-1"></a>    <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb9-34"><a href="#cb9-34" tabindex="-1"></a>    <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb9-35"><a href="#cb9-35" tabindex="-1"></a>    <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
+<span id="cb9-36"><a href="#cb9-36" tabindex="-1"></a>    <span class="at">quad_points =</span> <span class="dv">5</span>,</span>
+<span id="cb9-37"><a href="#cb9-37" tabindex="-1"></a>    <span class="at">maxit =</span> <span class="dv">15</span></span>
+<span id="cb9-38"><a href="#cb9-38" tabindex="-1"></a>  )</span>
+<span id="cb9-39"><a href="#cb9-39" tabindex="-1"></a>)</span>
+<span id="cb9-40"><a href="#cb9-40" tabindex="-1"></a></span>
+<span id="cb9-41"><a href="#cb9-41" tabindex="-1"></a>new_units <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb9-42"><a href="#cb9-42" tabindex="-1"></a>  <span class="at">Person =</span> <span class="fu">c</span>(<span class="st">&quot;NEW01&quot;</span>, <span class="st">&quot;NEW01&quot;</span>),</span>
+<span id="cb9-43"><a href="#cb9-43" tabindex="-1"></a>  <span class="at">Rater =</span> <span class="fu">unique</span>(toy<span class="sc">$</span>Rater)[<span class="dv">1</span>],</span>
+<span id="cb9-44"><a href="#cb9-44" tabindex="-1"></a>  <span class="at">Criterion =</span> <span class="fu">unique</span>(toy<span class="sc">$</span>Criterion)[<span class="dv">1</span><span class="sc">:</span><span class="dv">2</span>],</span>
+<span id="cb9-45"><a href="#cb9-45" tabindex="-1"></a>  <span class="at">Score =</span> <span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">3</span>)</span>
+<span id="cb9-46"><a href="#cb9-46" tabindex="-1"></a>)</span>
+<span id="cb9-47"><a href="#cb9-47" tabindex="-1"></a></span>
+<span id="cb9-48"><a href="#cb9-48" tabindex="-1"></a>pred_units <span class="ot">&lt;-</span> <span class="fu">predict_mfrm_units</span>(toy_mml, new_units, <span class="at">n_draws =</span> <span class="dv">0</span>)</span>
+<span id="cb9-49"><a href="#cb9-49" tabindex="-1"></a>pv_units <span class="ot">&lt;-</span> <span class="fu">sample_mfrm_plausible_values</span>(toy_mml, new_units, <span class="at">n_draws =</span> <span class="dv">2</span>, <span class="at">seed =</span> <span class="dv">1</span>)</span>
+<span id="cb9-50"><a href="#cb9-50" tabindex="-1"></a></span>
+<span id="cb9-51"><a href="#cb9-51" tabindex="-1"></a><span class="fu">summary</span>(pred_units)<span class="sc">$</span>estimates[, <span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Estimate&quot;</span>, <span class="st">&quot;Lower&quot;</span>, <span class="st">&quot;Upper&quot;</span>)]</span>
+<span id="cb9-52"><a href="#cb9-52" tabindex="-1"></a><span class="co">#&gt; # A tibble: 1 × 4</span></span>
+<span id="cb9-53"><a href="#cb9-53" tabindex="-1"></a><span class="co">#&gt;   Person Estimate Lower Upper</span></span>
+<span id="cb9-54"><a href="#cb9-54" tabindex="-1"></a><span class="co">#&gt;   &lt;chr&gt;     &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;</span></span>
+<span id="cb9-55"><a href="#cb9-55" tabindex="-1"></a><span class="co">#&gt; 1 NEW01    -0.097 -1.36  1.36</span></span>
+<span id="cb9-56"><a href="#cb9-56" tabindex="-1"></a><span class="fu">summary</span>(pv_units)<span class="sc">$</span>draw_summary[, <span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Draws&quot;</span>, <span class="st">&quot;MeanValue&quot;</span>)]</span>
+<span id="cb9-57"><a href="#cb9-57" tabindex="-1"></a><span class="co">#&gt; # A tibble: 1 × 3</span></span>
+<span id="cb9-58"><a href="#cb9-58" tabindex="-1"></a><span class="co">#&gt;   Person Draws MeanValue</span></span>
+<span id="cb9-59"><a href="#cb9-59" tabindex="-1"></a><span class="co">#&gt;   &lt;chr&gt;  &lt;dbl&gt;     &lt;dbl&gt;</span></span>
+<span id="cb9-60"><a href="#cb9-60" tabindex="-1"></a><span class="co">#&gt; 1 NEW01      2         0</span></span></code></pre></div>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

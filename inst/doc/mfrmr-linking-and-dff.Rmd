@@ -1,0 +1,193 @@
+---
+title: "mfrmr Linking and DFF"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{mfrmr Linking and DFF}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5
+)
+```
+
+This vignette covers the package-native route for:
+
+- checking whether a design is connected enough for a common scale
+- exporting anchor candidates from an existing fit
+- screening differential facet functioning (DFF)
+- deciding when subgroup contrasts are descriptive versus formally comparable
+
+For a broader workflow guide, see `vignette("mfrmr-workflow", package = "mfrmr")`.
+For the shorter help-page map, see
+`help("mfrmr_linking_and_dff", package = "mfrmr")`.
+
+## Minimal setup
+
+```{r setup}
+library(mfrmr)
+
+bias_df <- load_mfrmr_data("example_bias")
+
+fit <- fit_mfrm(
+  bias_df,
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  score = "Score",
+  method = "MML",
+  model = "RSM",
+  quad_points = 7
+)
+
+diag <- diagnose_mfrm(fit, residual_pca = "none")
+```
+
+## 1. Check connectedness first
+
+Use `subset_connectivity_report()` before interpreting subgroup or cross-form
+contrasts.
+
+```{r connectivity}
+sc <- subset_connectivity_report(fit, diagnostics = diag)
+
+sc$summary[, c("Subset", "Observations", "ObservationPercent")]
+plot(sc, type = "design_matrix", preset = "publication")
+```
+
+Interpretation:
+
+- Sparse rows or columns indicate weaker design coverage.
+- Weak coverage should lower confidence in subgroup comparisons.
+
+## 2. Export anchor candidates
+
+`make_anchor_table()` is the shortest route when you need reusable anchor
+elements from an existing calibration.
+
+```{r anchors}
+anchors <- make_anchor_table(fit, facets = "Criterion")
+head(anchors)
+```
+
+Use `audit_mfrm_anchors()` when you want a stricter review of anchor quality.
+
+## 3. Residual DFF as a screening layer
+
+Residual DFF is the fast screening route. It is useful for triage, but it is
+not automatically a logit-scale inferential contrast.
+
+```{r dff-residual}
+dff_resid <- analyze_dff(
+  fit,
+  diag,
+  facet = "Criterion",
+  group = "Group",
+  data = bias_df,
+  method = "residual"
+)
+
+dff_resid$summary
+head(
+  dff_resid$dif_table[, c("Level", "Group1", "Group2", "Classification", "ClassificationSystem")],
+  8
+)
+plot_dif_heatmap(dff_resid)
+```
+
+Interpretation:
+
+- Treat `residual` output as screening evidence.
+- Check `ClassificationSystem` to see how the current residual screen was labeled.
+- Reserve `ScaleLinkStatus` and `ContrastComparable` for refit-based contrasts.
+
+## 4. Refit DFF when subgroup comparisons are defensible
+
+The refit route can support logit-scale contrasts only when subgroup linking is
+adequate and the precision layer supports it.
+
+```{r dff-refit}
+dff_refit <- analyze_dff(
+  fit,
+  diag,
+  facet = "Criterion",
+  group = "Group",
+  data = bias_df,
+  method = "refit"
+)
+
+dff_refit$summary
+head(
+  dff_refit$dif_table[, c("Level", "Group1", "Group2", "Classification", "ContrastComparable")],
+  8
+)
+```
+
+## 5. Cell-level follow-up
+
+If the level-wise screen points to a specific facet, follow up with the
+interaction table and narrative report.
+
+```{r dff-follow-up}
+dit <- dif_interaction_table(
+  fit,
+  diag,
+  facet = "Criterion",
+  group = "Group",
+  data = bias_df
+)
+
+head(dit$table)
+
+dr <- dif_report(dff_resid)
+cat(dr$narrative)
+```
+
+## 6. Multi-wave anchor review
+
+When you work across administrations, the route usually moves from anchor
+export to anchored fitting and then to drift review.
+
+```{r drift-route, eval = FALSE}
+d1 <- load_mfrmr_data("study1")
+d2 <- load_mfrmr_data("study2")
+
+fit1 <- fit_mfrm(d1, "Person", c("Rater", "Criterion"), "Score",
+                 method = "JML", maxit = 25)
+fit2 <- fit_mfrm(d2, "Person", c("Rater", "Criterion"), "Score",
+                 method = "JML", maxit = 25)
+
+anchored <- anchor_to_baseline(
+  d2,
+  fit1,
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  score = "Score"
+)
+
+drift <- detect_anchor_drift(list(Wave1 = fit1, Wave2 = fit2))
+plot_anchor_drift(drift, type = "drift", preset = "publication")
+```
+
+## Recommended sequence
+
+For a compact linking route:
+
+1. `fit_mfrm()`
+2. `diagnose_mfrm()`
+3. `subset_connectivity_report()`
+4. `make_anchor_table()` or `audit_mfrm_anchors()`
+5. `analyze_dff()`
+6. `dif_report()` and `plot_dif_heatmap()`
+7. `anchor_to_baseline()` / `detect_anchor_drift()` when working across waves
+
+## Related help
+
+- `help("mfrmr_linking_and_dff", package = "mfrmr")`
+- `help("subset_connectivity_report", package = "mfrmr")`
+- `help("analyze_dff", package = "mfrmr")`
+- `help("detect_anchor_drift", package = "mfrmr")`

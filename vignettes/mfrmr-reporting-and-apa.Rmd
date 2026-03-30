@@ -1,0 +1,199 @@
+---
+title: "mfrmr Reporting and APA"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{mfrmr Reporting and APA}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5
+)
+```
+
+This vignette shows the package-native route from a fitted many-facet Rasch
+model to manuscript-oriented prose, tables, figure notes, and revision checks.
+
+The reporting stack in `mfrmr` is organized around four objects:
+
+- `fit`: the fitted model from `fit_mfrm()`
+- `diag`: diagnostics from `diagnose_mfrm()`
+- `chk`: the revision guide from `reporting_checklist()`
+- `apa`: structured manuscript outputs from `build_apa_outputs()`
+
+For a broader workflow view, see `vignette("mfrmr-workflow", package = "mfrmr")`.
+For a plot-first route, see
+`vignette("mfrmr-visual-diagnostics", package = "mfrmr")`.
+
+## Minimal setup
+
+```{r setup}
+library(mfrmr)
+
+toy <- load_mfrmr_data("example_core")
+
+fit <- fit_mfrm(
+  toy,
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  score = "Score",
+  method = "MML",
+  model = "RSM",
+  quad_points = 7
+)
+
+diag <- diagnose_mfrm(fit, residual_pca = "none")
+```
+
+## 1. Start with the revision guide
+
+Use `reporting_checklist()` first when the question is "what is still missing?"
+rather than "how do I phrase the results?"
+
+```{r checklist}
+chk <- reporting_checklist(fit, diagnostics = diag)
+
+head(
+  chk$checklist[, c("Section", "Item", "DraftReady", "Priority", "NextAction")],
+  10
+)
+```
+
+Interpretation:
+
+- `DraftReady` flags whether the current objects already support a section for
+  drafting with the package's documented caveats.
+- `Priority` shows what to resolve first.
+- `NextAction` is the shortest package-native instruction for closing the gap.
+
+## 2. Check the precision layer before strong claims
+
+`mfrmr` intentionally distinguishes `model_based`, `hybrid`, and
+`exploratory` precision tiers.
+
+```{r precision}
+prec <- precision_audit_report(fit, diagnostics = diag)
+
+prec$profile
+prec$checks
+```
+
+Interpretation:
+
+- Use stronger inferential phrasing only when the reported tier is
+  `model_based`.
+- Treat `hybrid` and `exploratory` outputs more conservatively, especially for
+  SE-, CI-, and reliability-heavy prose.
+
+## 3. Build structured manuscript outputs
+
+`build_apa_outputs()` is the writing engine. It returns report text plus a
+section map, note map, and caption map that all share the same internal
+contract.
+
+```{r apa}
+apa <- build_apa_outputs(
+  fit,
+  diagnostics = diag,
+  context = list(
+    assessment = "Writing assessment",
+    setting = "Local scoring study",
+    scale_desc = "0-4 rubric scale",
+    rater_facet = "Rater"
+  )
+)
+
+cat(apa$report_text)
+```
+
+```{r section-map}
+apa$section_map[, c("SectionId", "Heading", "Available")]
+```
+
+Interpretation:
+
+- `report_text` is the compact narrative output.
+- `section_map` is the machine-readable map of what text blocks are available.
+- The same contract also feeds captions and notes, which reduces wording drift.
+
+## 4. Build tables from the same contract
+
+Use `apa_table()` when you want reproducible handoff tables without rebuilding
+captions or notes by hand.
+
+```{r apa-tables}
+tbl_summary <- apa_table(fit, which = "summary")
+tbl_reliability <- apa_table(fit, which = "reliability", diagnostics = diag)
+
+tbl_summary$caption
+tbl_reliability$note
+```
+
+The actual table data are stored in `tbl_summary$table` and
+`tbl_reliability$table`.
+
+## 5. Add figure-ready visual payloads
+
+For reporting workflows, `build_visual_summaries()` is the bridge between
+statistical results and figure-ready plot payloads.
+
+```{r visuals}
+vis <- build_visual_summaries(
+  fit,
+  diagnostics = diag,
+  threshold_profile = "standard"
+)
+
+names(vis)
+names(vis$warning_map)
+```
+
+## 6. Reporting route when interaction screening matters
+
+When bias or local interaction screens matter, keep the wording conservative.
+The package treats these outputs as screening-oriented unless the current
+precision and design evidence justify stronger claims.
+
+```{r bias-screen}
+bias_df <- load_mfrmr_data("example_bias")
+
+fit_bias <- fit_mfrm(
+  bias_df,
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  score = "Score",
+  method = "MML",
+  model = "RSM",
+  quad_points = 7
+)
+
+diag_bias <- diagnose_mfrm(fit_bias, residual_pca = "none")
+bias <- estimate_bias(fit_bias, diag_bias, facet_a = "Rater", facet_b = "Criterion")
+apa_bias <- build_apa_outputs(fit_bias, diagnostics = diag_bias, bias_results = bias)
+
+apa_bias$section_map[, c("SectionId", "Available", "Heading")]
+```
+
+## Recommended sequence
+
+For a compact manuscript-oriented route:
+
+1. `fit_mfrm()`
+2. `diagnose_mfrm()`
+3. `precision_audit_report()`
+4. `reporting_checklist()`
+5. `build_apa_outputs()`
+6. `apa_table()`
+7. `build_visual_summaries()`
+
+## Related help
+
+- `help("mfrmr_reporting_and_apa", package = "mfrmr")`
+- `help("mfrmr_reports_and_tables", package = "mfrmr")`
+- `help("reporting_checklist", package = "mfrmr")`
+- `help("build_apa_outputs", package = "mfrmr")`

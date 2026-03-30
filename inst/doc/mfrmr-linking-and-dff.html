@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>mfrmr Linking and DFF</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">mfrmr Linking and DFF</h1>
+
+
+
+<p>This vignette covers the package-native route for:</p>
+<ul>
+<li>checking whether a design is connected enough for a common
+scale</li>
+<li>exporting anchor candidates from an existing fit</li>
+<li>screening differential facet functioning (DFF)</li>
+<li>deciding when subgroup contrasts are descriptive versus formally
+comparable</li>
+</ul>
+<p>For a broader workflow guide, see
+<code>vignette(&quot;mfrmr-workflow&quot;, package = &quot;mfrmr&quot;)</code>. For the
+shorter help-page map, see
+<code>help(&quot;mfrmr_linking_and_dff&quot;, package = &quot;mfrmr&quot;)</code>.</p>
+<div id="minimal-setup" class="section level2">
+<h2>Minimal setup</h2>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>bias_df <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_bias&quot;</span>)</span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>  bias_df,</span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">7</span></span>
+<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a>)</span>
+<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a></span>
+<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a>diag <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit, <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>)</span></code></pre></div>
+</div>
+<div id="check-connectedness-first" class="section level2">
+<h2>1. Check connectedness first</h2>
+<p>Use <code>subset_connectivity_report()</code> before interpreting
+subgroup or cross-form contrasts.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>sc <span class="ot">&lt;-</span> <span class="fu">subset_connectivity_report</span>(fit, <span class="at">diagnostics =</span> diag)</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>sc<span class="sc">$</span>summary[, <span class="fu">c</span>(<span class="st">&quot;Subset&quot;</span>, <span class="st">&quot;Observations&quot;</span>, <span class="st">&quot;ObservationPercent&quot;</span>)]</span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co">#&gt;   Subset Observations ObservationPercent</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="co">#&gt; 1      1          384                100</span></span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="fu">plot</span>(sc, <span class="at">type =</span> <span class="st">&quot;design_matrix&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
+<p><img role="img" src="data:image/png;base64,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" /><!-- --></p>
+<p>Interpretation:</p>
+<ul>
+<li>Sparse rows or columns indicate weaker design coverage.</li>
+<li>Weak coverage should lower confidence in subgroup comparisons.</li>
+</ul>
+</div>
+<div id="export-anchor-candidates" class="section level2">
+<h2>2. Export anchor candidates</h2>
+<p><code>make_anchor_table()</code> is the shortest route when you need
+reusable anchor elements from an existing calibration.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>anchors <span class="ot">&lt;-</span> <span class="fu">make_anchor_table</span>(fit, <span class="at">facets =</span> <span class="st">&quot;Criterion&quot;</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="fu">head</span>(anchors)</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="co">#&gt; # A tibble: 4 × 3</span></span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a><span class="co">#&gt;   Facet     Level         Anchor</span></span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="co">#&gt;   &lt;chr&gt;     &lt;chr&gt;          &lt;dbl&gt;</span></span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a><span class="co">#&gt; 1 Criterion Accuracy      0.524 </span></span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a><span class="co">#&gt; 2 Criterion Content      -0.199 </span></span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="co">#&gt; 3 Criterion Language     -0.275 </span></span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a><span class="co">#&gt; 4 Criterion Organization -0.0498</span></span></code></pre></div>
+<p>Use <code>audit_mfrm_anchors()</code> when you want a stricter review
+of anchor quality.</p>
+</div>
+<div id="residual-dff-as-a-screening-layer" class="section level2">
+<h2>3. Residual DFF as a screening layer</h2>
+<p>Residual DFF is the fast screening route. It is useful for triage,
+but it is not automatically a logit-scale inferential contrast.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>dff_resid <span class="ot">&lt;-</span> <span class="fu">analyze_dff</span>(</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>  fit,</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  diag,</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  <span class="at">facet =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>  <span class="at">group =</span> <span class="st">&quot;Group&quot;</span>,</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>  <span class="at">data =</span> bias_df,</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;residual&quot;</span></span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>)</span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a></span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>dff_resid<span class="sc">$</span>summary</span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a><span class="co">#&gt; # A tibble: 3 × 2</span></span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a><span class="co">#&gt;   Classification  Count</span></span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a><span class="co">#&gt;   &lt;chr&gt;           &lt;int&gt;</span></span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a><span class="co">#&gt; 1 Screen positive     2</span></span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a><span class="co">#&gt; 2 Screen negative     2</span></span>
+<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a><span class="co">#&gt; 3 Unclassified        0</span></span>
+<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a><span class="fu">head</span>(</span>
+<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a>  dff_resid<span class="sc">$</span>dif_table[, <span class="fu">c</span>(<span class="st">&quot;Level&quot;</span>, <span class="st">&quot;Group1&quot;</span>, <span class="st">&quot;Group2&quot;</span>, <span class="st">&quot;Classification&quot;</span>, <span class="st">&quot;ClassificationSystem&quot;</span>)],</span>
+<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a>  <span class="dv">8</span></span>
+<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a>)</span>
+<span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a><span class="co">#&gt; # A tibble: 4 × 5</span></span>
+<span id="cb4-22"><a href="#cb4-22" tabindex="-1"></a><span class="co">#&gt;   Level        Group1 Group2 Classification  ClassificationSystem</span></span>
+<span id="cb4-23"><a href="#cb4-23" tabindex="-1"></a><span class="co">#&gt;   &lt;chr&gt;        &lt;chr&gt;  &lt;chr&gt;  &lt;chr&gt;           &lt;chr&gt;               </span></span>
+<span id="cb4-24"><a href="#cb4-24" tabindex="-1"></a><span class="co">#&gt; 1 Accuracy     A      B      Screen positive screening           </span></span>
+<span id="cb4-25"><a href="#cb4-25" tabindex="-1"></a><span class="co">#&gt; 2 Content      A      B      Screen negative screening           </span></span>
+<span id="cb4-26"><a href="#cb4-26" tabindex="-1"></a><span class="co">#&gt; 3 Language     A      B      Screen positive screening           </span></span>
+<span id="cb4-27"><a href="#cb4-27" tabindex="-1"></a><span class="co">#&gt; 4 Organization A      B      Screen negative screening</span></span>
+<span id="cb4-28"><a href="#cb4-28" tabindex="-1"></a><span class="fu">plot_dif_heatmap</span>(dff_resid)</span></code></pre></div>
+<p><img role="img" src="data:image/png;base64,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" /><!-- --></p>
+<p>Interpretation:</p>
+<ul>
+<li>Treat <code>residual</code> output as screening evidence.</li>
+<li>Check <code>ClassificationSystem</code> to see how the current
+residual screen was labeled.</li>
+<li>Reserve <code>ScaleLinkStatus</code> and
+<code>ContrastComparable</code> for refit-based contrasts.</li>
+</ul>
+</div>
+<div id="refit-dff-when-subgroup-comparisons-are-defensible" class="section level2">
+<h2>4. Refit DFF when subgroup comparisons are defensible</h2>
+<p>The refit route can support logit-scale contrasts only when subgroup
+linking is adequate and the precision layer supports it.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>dff_refit <span class="ot">&lt;-</span> <span class="fu">analyze_dff</span>(</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>  fit,</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  diag,</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>  <span class="at">facet =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>  <span class="at">group =</span> <span class="st">&quot;Group&quot;</span>,</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>  <span class="at">data =</span> bias_df,</span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;refit&quot;</span></span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>)</span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a></span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a>dff_refit<span class="sc">$</span>summary</span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a><span class="co">#&gt; # A tibble: 5 × 2</span></span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a><span class="co">#&gt;   Classification                      Count</span></span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a><span class="co">#&gt;   &lt;chr&gt;                               &lt;int&gt;</span></span>
+<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a><span class="co">#&gt; 1 A (Negligible)                          0</span></span>
+<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a><span class="co">#&gt; 2 B (Moderate)                            0</span></span>
+<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a><span class="co">#&gt; 3 C (Large)                               0</span></span>
+<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a><span class="co">#&gt; 4 Linked contrast (screening only)        0</span></span>
+<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a><span class="co">#&gt; 5 Unclassified (insufficient linking)     4</span></span>
+<span id="cb5-19"><a href="#cb5-19" tabindex="-1"></a><span class="fu">head</span>(</span>
+<span id="cb5-20"><a href="#cb5-20" tabindex="-1"></a>  dff_refit<span class="sc">$</span>dif_table[, <span class="fu">c</span>(<span class="st">&quot;Level&quot;</span>, <span class="st">&quot;Group1&quot;</span>, <span class="st">&quot;Group2&quot;</span>, <span class="st">&quot;Classification&quot;</span>, <span class="st">&quot;ContrastComparable&quot;</span>)],</span>
+<span id="cb5-21"><a href="#cb5-21" tabindex="-1"></a>  <span class="dv">8</span></span>
+<span id="cb5-22"><a href="#cb5-22" tabindex="-1"></a>)</span>
+<span id="cb5-23"><a href="#cb5-23" tabindex="-1"></a><span class="co">#&gt; # A tibble: 4 × 5</span></span>
+<span id="cb5-24"><a href="#cb5-24" tabindex="-1"></a><span class="co">#&gt;   Level        Group1 Group2 Classification                   ContrastComparable</span></span>
+<span id="cb5-25"><a href="#cb5-25" tabindex="-1"></a><span class="co">#&gt;   &lt;chr&gt;        &lt;chr&gt;  &lt;chr&gt;  &lt;chr&gt;                            &lt;lgl&gt;             </span></span>
+<span id="cb5-26"><a href="#cb5-26" tabindex="-1"></a><span class="co">#&gt; 1 Accuracy     A      B      Unclassified (insufficient link… FALSE             </span></span>
+<span id="cb5-27"><a href="#cb5-27" tabindex="-1"></a><span class="co">#&gt; 2 Content      A      B      Unclassified (insufficient link… FALSE             </span></span>
+<span id="cb5-28"><a href="#cb5-28" tabindex="-1"></a><span class="co">#&gt; 3 Language     A      B      Unclassified (insufficient link… FALSE             </span></span>
+<span id="cb5-29"><a href="#cb5-29" tabindex="-1"></a><span class="co">#&gt; 4 Organization A      B      Unclassified (insufficient link… FALSE</span></span></code></pre></div>
+</div>
+<div id="cell-level-follow-up" class="section level2">
+<h2>5. Cell-level follow-up</h2>
+<p>If the level-wise screen points to a specific facet, follow up with
+the interaction table and narrative report.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>dit <span class="ot">&lt;-</span> <span class="fu">dif_interaction_table</span>(</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  fit,</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  diag,</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="at">facet =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  <span class="at">group =</span> <span class="st">&quot;Group&quot;</span>,</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>  <span class="at">data =</span> bias_df</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>)</span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a></span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a><span class="fu">head</span>(dit<span class="sc">$</span>table)</span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a><span class="co">#&gt; # A tibble: 6 × 15</span></span>
+<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a><span class="co">#&gt;   Level  GroupValue     N ObsScore ExpScore ObsExpAvg Var_sum sparse StdResidual</span></span>
+<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a><span class="co">#&gt;   &lt;chr&gt;  &lt;chr&gt;      &lt;int&gt;    &lt;int&gt;    &lt;dbl&gt;     &lt;dbl&gt;   &lt;dbl&gt; &lt;lgl&gt;        &lt;dbl&gt;</span></span>
+<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a><span class="co">#&gt; 1 Accur… A             48      125     113.   0.251      28.5 FALSE       2.26  </span></span>
+<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a><span class="co">#&gt; 2 Accur… B             48      117     124.  -0.150      29.2 FALSE      -1.33  </span></span>
+<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a><span class="co">#&gt; 3 Conte… A             48      134     134.   0.00969    27.8 FALSE       0.0882</span></span>
+<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a><span class="co">#&gt; 4 Conte… B             48      148     144.   0.0745     26.1 FALSE       0.700 </span></span>
+<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a><span class="co">#&gt; 5 Langu… A             48      128     136.  -0.159      27.5 FALSE      -1.46  </span></span>
+<span id="cb6-18"><a href="#cb6-18" tabindex="-1"></a><span class="co">#&gt; 6 Langu… B             48      158     146.   0.242      25.6 FALSE       2.30  </span></span>
+<span id="cb6-19"><a href="#cb6-19" tabindex="-1"></a><span class="co">#&gt; # ℹ 6 more variables: t &lt;dbl&gt;, df &lt;dbl&gt;, p_value &lt;dbl&gt;, p_adjusted &lt;dbl&gt;,</span></span>
+<span id="cb6-20"><a href="#cb6-20" tabindex="-1"></a><span class="co">#&gt; #   flag_t &lt;lgl&gt;, flag_bias &lt;lgl&gt;</span></span>
+<span id="cb6-21"><a href="#cb6-21" tabindex="-1"></a></span>
+<span id="cb6-22"><a href="#cb6-22" tabindex="-1"></a>dr <span class="ot">&lt;-</span> <span class="fu">dif_report</span>(dff_resid)</span>
+<span id="cb6-23"><a href="#cb6-23" tabindex="-1"></a><span class="fu">cat</span>(dr<span class="sc">$</span>narrative)</span>
+<span id="cb6-24"><a href="#cb6-24" tabindex="-1"></a><span class="co">#&gt; DIF screening was conducted for the Criterion facet across levels of Group using the residual method. A total of 4 pairwise facet-level comparisons were evaluated. 2 comparison(s) were screening-positive and 2 were screening-negative based on the residual-contrast test. </span></span>
+<span id="cb6-25"><a href="#cb6-25" tabindex="-1"></a><span class="co">#&gt; The following Criterion level(s) showed screening-positive residual contrasts: Accuracy, Language.   - Accuracy: A vs B (contrast = 0.401 on the residual scale; A was higher).   - Language: A vs B (contrast = -0.401 on the residual scale; A was lower). </span></span>
+<span id="cb6-26"><a href="#cb6-26" tabindex="-1"></a><span class="co">#&gt; Note: The presence of differential functioning does not necessarily indicate measurement bias. Differential functioning may reflect construct-relevant variation (e.g., true group differences in the attribute being measured) rather than unwanted measurement bias. Substantive review is recommended to distinguish between these possibilities (cf. Eckes, 2011; McNamara &amp; Knoch, 2012).</span></span></code></pre></div>
+</div>
+<div id="multi-wave-anchor-review" class="section level2">
+<h2>6. Multi-wave anchor review</h2>
+<p>When you work across administrations, the route usually moves from
+anchor export to anchored fitting and then to drift review.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>d1 <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;study1&quot;</span>)</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>d2 <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;study2&quot;</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>fit1 <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(d1, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>                 <span class="at">method =</span> <span class="st">&quot;JML&quot;</span>, <span class="at">maxit =</span> <span class="dv">25</span>)</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>fit2 <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(d2, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>                 <span class="at">method =</span> <span class="st">&quot;JML&quot;</span>, <span class="at">maxit =</span> <span class="dv">25</span>)</span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a></span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>anchored <span class="ot">&lt;-</span> <span class="fu">anchor_to_baseline</span>(</span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>  d2,</span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>  fit1,</span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span></span>
+<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a>)</span>
+<span id="cb7-16"><a href="#cb7-16" tabindex="-1"></a></span>
+<span id="cb7-17"><a href="#cb7-17" tabindex="-1"></a>drift <span class="ot">&lt;-</span> <span class="fu">detect_anchor_drift</span>(<span class="fu">list</span>(<span class="at">Wave1 =</span> fit1, <span class="at">Wave2 =</span> fit2))</span>
+<span id="cb7-18"><a href="#cb7-18" tabindex="-1"></a><span class="fu">plot_anchor_drift</span>(drift, <span class="at">type =</span> <span class="st">&quot;drift&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
+</div>
+<div id="recommended-sequence" class="section level2">
+<h2>Recommended sequence</h2>
+<p>For a compact linking route:</p>
+<ol style="list-style-type: decimal">
+<li><code>fit_mfrm()</code></li>
+<li><code>diagnose_mfrm()</code></li>
+<li><code>subset_connectivity_report()</code></li>
+<li><code>make_anchor_table()</code> or
+<code>audit_mfrm_anchors()</code></li>
+<li><code>analyze_dff()</code></li>
+<li><code>dif_report()</code> and <code>plot_dif_heatmap()</code></li>
+<li><code>anchor_to_baseline()</code> /
+<code>detect_anchor_drift()</code> when working across waves</li>
+</ol>
+</div>
+<div id="related-help" class="section level2">
+<h2>Related help</h2>
+<ul>
+<li><code>help(&quot;mfrmr_linking_and_dff&quot;, package = &quot;mfrmr&quot;)</code></li>
+<li><code>help(&quot;subset_connectivity_report&quot;, package = &quot;mfrmr&quot;)</code></li>
+<li><code>help(&quot;analyze_dff&quot;, package = &quot;mfrmr&quot;)</code></li>
+<li><code>help(&quot;detect_anchor_drift&quot;, package = &quot;mfrmr&quot;)</code></li>
+</ul>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

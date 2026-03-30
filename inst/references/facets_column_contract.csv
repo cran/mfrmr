@@ -1,0 +1,55 @@
+table_id,function_name,object_id,component,required_columns
+Table 1,specifications_report,t1,header,Engine|Title|DataFile|OutputFile|Model|Method
+Table 1,specifications_report,t1,data_spec,Setting|Value
+Table 1,specifications_report,t1,facet_labels,FacetIndex|Facet|Elements
+Table 1,specifications_report,t1,output_spec,Setting|Value
+Table 1,specifications_report,t1,convergence_control,Setting|Value
+Table 1,specifications_report,t1,anchor_summary,Facet|AnchoredLevels|GroupAnchors|DummyFacet
+Table 2,data_quality_report,t2,summary,TotalLinesInData|TotalDataLines|TotalNonBlankResponsesFound|MissingScoreRows|MissingFacetRows|MissingPersonRows|InvalidWeightRows|OutOfRangeScoreRows|ValidResponsesUsedForEstimation
+Table 2,data_quality_report,t2,model_match,Model|MatchedResponses|ValidResponses
+Table 2,data_quality_report,t2,row_audit,Status|N
+Table 2,data_quality_report,t2,category_counts,Score|Count|WeightedCount
+Table 3,estimation_iteration_report,t3,table,Method|Iteration|MaxScoreResidual*|MaxLogitChange*|Objective
+Table 3,estimation_iteration_report,t3,summary,FinalConverged|FinalIterations|ReplayRows|ConnectedSubset
+Table 4,unexpected_response_table,t4,table,Row|Person|Rater|Task|Criterion|Weight|Score|Observed|Expected|Residual|StdResidual|ObsProb|MostLikely|MostLikelyProb|CategoryGap|Surprise|Direction|FlagLowProbability|FlagLargeResidual|Severity
+Table 4,unexpected_response_table,t4,summary,TotalObservations|UnexpectedN|UnexpectedPercent|LowProbabilityN|LargeResidualN|Rule|AbsZThreshold|ProbThreshold
+Table 5,measurable_summary_table,t5,summary,Observations|TotalWeight|Persons|Facets|Categories|ConnectedSubsets|LargestSubsetObs|LargestSubsetPct
+Table 5,measurable_summary_table,t5,facet_coverage,Facet|Levels|MeanSE|MeanInfit|MeanOutfit|MinEstimate|MaxEstimate
+Table 5,measurable_summary_table,t5,category_stats,Category|Count|AvgPersonMeasure|ExpectedAverage|Infit|Outfit|MeanResidual|DF_Infit|DF_Outfit|Percent|InfitZSTD|OutfitZSTD|ExpectedCount|ExpectedPercent|DiffCount|DiffPercent|LowCount|InfitFlag|OutfitFlag|ZSTDFlag
+Table 5,measurable_summary_table,t5,subsets,Subset|Criterion|Person|Rater|Task|Observations
+Table 6,subset_connectivity_report,t6,summary,Subset|Criterion|Person|Rater|Task|Observations|ObservationPercent
+Table 6,subset_connectivity_report,t6,listing,Subset|Facet|LevelsN|Levels|Observations|ObservationPercent|Ruler
+Table 6,subset_connectivity_report,t6,nodes,Node|Component|Subset|Facet|Level
+Table 6.2,facet_statistics_report,t62,table,Metric|GlobalMin|GlobalMax|Ruler|Facet|Levels|Mean|SD|Min|Max
+Table 6.2,facet_statistics_report,t62,ranges,Metric|GlobalMin|GlobalMax
+Table 7,facets_chisq_table,t7chisq,table,Facet|Levels|MeanMeasure|SD|FixedChiSq|FixedDF|RandomVar|FixedProb|RandomChiSq|RandomDF|RandomProb|FixedFlag|RandomFlag
+Table 7,facets_chisq_table,t7chisq,summary,Facets|FixedSignificant|RandomSignificant|MeanRandomVar|MaxFixedChiSq|MaxRandomChiSq
+Table 7,interrater_agreement_table,t7agree,summary,RaterFacet|Raters|Pairs|Contexts|TotalPairs|ExactAgreements|ExpectedAgreements|ExactAgreement|ExpectedExactAgreement|AdjacentAgreement|MeanAbsDiff|MeanCorr|FlaggedPairs|FlaggedShare
+Table 7,interrater_agreement_table,t7agree,pairs,Rater1|Rater2|N|Exact|ExpectedExact|Adjacent|MeanDiff|MAD|Corr|Pair|ExactGap|LowExactFlag|LowCorrFlag|Flag
+Table 8.1,rating_scale_table,t81,category_table,Category|Count|AvgPersonMeasure|ExpectedAverage|Infit|Outfit|MeanResidual|DF_Infit|DF_Outfit|Percent|InfitZSTD|OutfitZSTD|ExpectedCount|ExpectedPercent|DiffCount|DiffPercent|LowCount|InfitFlag|OutfitFlag|ZSTDFlag
+Table 8.1,rating_scale_table,t81,threshold_table,Step|Estimate|GapFromPrev
+Table 8.1,rating_scale_table,t81,summary,Categories|UsedCategories|MinCategoryCount|MaxCategoryCount|MeanCategoryInfit|MeanCategoryOutfit|ThresholdMonotonic
+Table 8,category_structure_report,t8bar,category_table,Category|Count|AvgPersonMeasure|ExpectedAverage|Infit|Outfit|MeanResidual|DF_Infit|DF_Outfit|Percent|InfitZSTD|OutfitZSTD|ExpectedCount|ExpectedPercent|DiffCount|DiffPercent|LowCount|InfitFlag|OutfitFlag|ZSTDFlag
+Table 8,category_structure_report,t8bar,mode_peaks,CurveGroup|Category|PeakTheta|PeakProbability
+Table 8,category_structure_report,t8bar,mode_boundaries,CurveGroup|LowerCategory|UpperCategory|ModeBoundaryTheta
+Table 8,category_structure_report,t8bar,median_thresholds,CurveGroup|Step|StepIndex|LowerCategory|UpperCategory|MedianThreshold
+Table 8,category_structure_report,t8bar,mean_halfscore_points,CurveGroup|LowerCategory|UpperCategory|MeanHalfScore|MeanBoundaryTheta
+Table 8,category_curves_report,t8curves,graphfile,Scale|CurveGroup|Measure|Expected|ExpCat|Prob:*
+Table 8,category_curves_report,t8curves,graphfile_syntactic,Scale|CurveGroup|Measure|Expected|ExpCat|Prob_*
+Table 8,category_curves_report,t8curves,probabilities,Theta|Probability|Category|CurveGroup
+Table 8,category_curves_report,t8curves,expected_ogive,Theta|ExpectedScore|CurveGroup
+Output,facets_output_file_bundle,out,graphfile,Scale|CurveGroup|Measure|Expected|ExpCat|Prob:*
+Output,facets_output_file_bundle,out,graphfile_syntactic,Scale|CurveGroup|Measure|Expected|ExpCat|Prob_*
+Output,facets_output_file_bundle,out,scorefile,Person|Rater|Task|Criterion|Observed|Expected|Residual|StdResidual|Var|Weight|score_k|PersonMeasure|ObsProb
+Table 14,build_fixed_reports,t14,pairwise_table,Target|Target N|Target Measure|Target S.E.|Context*|Contrast|SE|t|d.f.|Prob.
+Table 10,unexpected_after_bias_table,t10,table,Row|Person|Rater|Task|Criterion|Weight|Score|Observed|Expected|Residual|StdResidual|ObsProb|MostLikely|MostLikelyProb|CategoryGap|Surprise|Direction|FlagLowProbability|FlagLargeResidual|Severity|BiasAdjustment
+Table 10,unexpected_after_bias_table,t10,summary,TotalObservations|UnexpectedN|UnexpectedPercent|LowProbabilityN|LargeResidualN|Rule|AbsZThreshold|ProbThreshold|BaselineUnexpectedN|AfterBiasUnexpectedN|ReducedBy|ReducedPercent
+Table 11,bias_count_table,t11,table,Facet1|Facet2|Sq|Observd Count|Obs-Exp Average|Model S.E.|Infit|Outfit|LowCountFlag
+Table 11,bias_count_table,t11,by_facet_a,Facet|Level|Cells|TotalCount|MeanCount|MinCount|LowCountCells
+Table 11,bias_count_table,t11,by_facet_b,Facet|Level|Cells|TotalCount|MeanCount|MinCount|LowCountCells
+Table 11,bias_count_table,t11,summary,InteractionFacets|InteractionOrder|InteractionMode|Branch|Style|FacetA|FacetB|Cells|TotalCount|MeanCount|MedianCount|MinCount|MaxCount|LowCountCells|LowCountPercent
+Table 12,fair_average_table,t12,stacked,Facet|Total Score|Total Count|Weightd Score|Weightd Count|Obsvd Average|Fair(M) Average|Fair(Z) Average|Measure|Model S.E.|Real S.E.|Infit MnSq|Infit ZStd|Outfit MnSq|Outfit ZStd|PtMea Corr|Anch|Status|Element
+Table 13,bias_interaction_report,t13,ranked_table,InteractionFacets|InteractionOrder|InteractionMode|FacetA|FacetB|Level1|Level2|ObsExpAverage|BiasSize|SE|t|Prob|ObservedCount|Pair|AbsT|AbsBias|TFlag|BiasFlag|PFlag|Flag|Facet1|Facet1_Level|Facet2|Facet2_Level|FacetA_Level|FacetB_Level
+Table 13,bias_interaction_report,t13,scatter_data,InteractionFacets|InteractionOrder|InteractionMode|FacetA|FacetA_Level|FacetB|FacetB_Level|Facet1|Facet2|Facet1_Level|Facet2_Level|Pair|ObsExpAverage|BiasSize|SE|t|Prob|ObservedCount|Flag|TFlag|BiasFlag|PFlag
+Table 13,bias_interaction_report,t13,facet_profile,Facet|Level|Cells|MeanAbsBias|MeanAbsT|Flagged|FlagRate
+Table 13,bias_interaction_report,t13,summary,InteractionFacets|InteractionOrder|InteractionMode|FacetA|FacetB|Cells|Flagged|FlaggedPercent|MeanAbsT|MeanAbsBias
