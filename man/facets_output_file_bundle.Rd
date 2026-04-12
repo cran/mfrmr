@@ -110,7 +110,7 @@ fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML",
 out <- facets_output_file_bundle(fit, diagnostics = diagnose_mfrm(fit, residual_pca = "none"))
 summary(out)
 p_out <- plot(out, draw = FALSE)
-class(p_out)
+p_out$data$plot
 }
 \seealso{
 \code{\link[=category_curves_report]{category_curves_report()}}, \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=unexpected_response_table]{unexpected_response_table()}},

@@ -47,7 +47,7 @@ Additional class-aware summaries are provided for:
 \item \code{mfrm_measurable}, \code{mfrm_unexpected_after_bias}, \code{mfrm_output_bundle}
 \item \code{mfrm_residual_pca}, \code{mfrm_specifications}, \code{mfrm_data_quality}
 \item \code{mfrm_iteration_report}, \code{mfrm_subset_connectivity}, \code{mfrm_facet_statistics}
-\item \code{mfrm_parity_report}
+\item \code{mfrm_parity_report}, \code{mfrm_reference_benchmark}
 }
 }
 \section{Interpreting output}{
@@ -57,6 +57,18 @@ Additional class-aware summaries are provided for:
 \item \code{summary}: one-row aggregate block when supplied by the bundle.
 \item \code{preview}: first \code{top_n} rows from the main table-like component.
 \item \code{settings}: resolved option values if available.
+\item \code{validation_scope}: internal-versus-external validation scope when
+summarizing \code{mfrm_reference_benchmark}.
+\item \code{conquest_command_scope}: ConQuest command-template scope when summarizing
+\code{mfrm_conquest_overlap_bundle}.
+\item \code{conquest_output_contract}: requested ConQuest outputs and audit handoff
+when summarizing \code{mfrm_conquest_overlap_bundle}.
+\item \code{normalization_scope}: extracted-table normalization scope when summarizing
+\code{mfrm_conquest_overlap_tables}.
+\item \code{audit_scope}: supplied-table audit scope when summarizing
+\code{mfrm_conquest_overlap_audit}.
+\item \code{conquest_overlap_checks} / \code{population_policy_checks}: specialized
+benchmark check previews when summarizing \code{mfrm_reference_benchmark}.
 }
 }
 

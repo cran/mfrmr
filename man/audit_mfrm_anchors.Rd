@@ -141,7 +141,7 @@ aud <- audit_mfrm_anchors(
 aud$issue_counts
 summary(aud)
 p_aud <- plot(aud, draw = FALSE)
-class(p_aud)
+p_aud$data$plot
 }
 \seealso{
 \code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=describe_mfrm_data]{describe_mfrm_data()}}, \code{\link[=make_anchor_table]{make_anchor_table()}}

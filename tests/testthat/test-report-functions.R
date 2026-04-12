@@ -460,6 +460,9 @@ test_that("build_visual_summaries produces warning and summary maps", {
   vs <- build_visual_summaries(.fit, diagnostics = .diag)
   expect_true(is.list(vs))
   expect_true("warning_map" %in% names(vs) || "summary_map" %in% names(vs))
+  expect_true("category_probability_surface" %in% names(vs$plot_payloads))
+  expect_s3_class(vs$plot_payloads$category_probability_surface, "mfrm_plot_data")
+  expect_true("category_probability_surface" %in% vs$public_plot_routes$Visual)
 })
 
 # ---- apa_table ----

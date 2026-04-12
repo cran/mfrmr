@@ -70,9 +70,9 @@ toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
 out <- category_curves_report(fit, theta_points = 101)
 summary(out)
-names(out)
+head(out$probabilities[, c("CurveGroup", "Theta", "Category", "Probability")])
 p_cc <- plot(out, draw = FALSE)
-class(p_cc)
+p_cc$data$plot
 }
 \seealso{
 \code{\link[=category_structure_report]{category_structure_report()}}, \code{\link[=rating_scale_table]{rating_scale_table()}}, \code{\link[=plot.mfrm_fit]{plot.mfrm_fit()}},

@@ -7,6 +7,18 @@
 Guide to the legacy-compatible wrappers and text/file exports in \code{mfrmr}.
 Use this page when you need continuity with older compatibility-oriented workflows,
 fixed-width reports, or graph/score file style outputs.
+
+This compatibility layer currently applies mainly to diagnostics-based
+\code{RSM} / \code{PCM} workflows. First-release \code{GPCM} fits now also support
+graph-only compatibility-style exports, while scorefile and
+diagnostics-driven compatibility outputs remain limited to \code{RSM} / \code{PCM}.
+Treat this layer as a presentation/contract surface, not as a claim of
+FACETS or ConQuest numerical equivalence.
+
+SPSS is treated differently from FACETS and ConQuest: \code{mfrmr} currently
+supports table/data-frame/CSV handoff for SPSS-oriented reporting workflows,
+but it does not generate SPSS syntax, write native SPSS system files, execute
+SPSS estimators, or claim SPSS numerical parity.
 }
 \section{When to use this layer}{
 
@@ -14,7 +26,8 @@ fixed-width reports, or graph/score file style outputs.
 \item You are reproducing an older workflow that expects one-shot wrappers.
 \item You need fixed-width text blocks for console, logs, or archival handoff.
 \item You need graphfile or scorefile style outputs for downstream legacy tools.
-\item You are checking column/metric parity against a compatibility contract.
+\item You are checking column coverage and metric consistency against a
+compatibility contract.
 }
 }
 
@@ -39,8 +52,9 @@ blocks. Best when a text-only compatibility artifact is required.}
 \item{\code{\link[=facets_output_file_bundle]{facets_output_file_bundle()}}}{Graphfile/scorefile style CSV and
 fixed-width exports for legacy pipelines.}
 \item{\code{\link[=facets_parity_report]{facets_parity_report()}}}{Column and metric contract audit against
-the compatibility specification. Use only when explicit parity checking is
-part of the task.}
+the compatibility specification. Use only when an explicit compatibility
+contract audit is part of the task; the function name is historical and does
+not by itself imply external FACETS equivalence.}
 }
 }
 
@@ -69,6 +83,10 @@ the old layout or fixed-width format.
 outputs only at the export boundary.
 \item Treat compatibility outputs as presentation contracts, not as the primary
 analysis objects.
+\item Use \code{\link[=compatibility_alias_table]{compatibility_alias_table()}} when you need to check which aliases are
+still retained and which package-native names should be used in new code.
+\item Use \code{reporting_checklist(fit)$software_scope} to review the current
+FACETS, ConQuest, and SPSS relationship wording for a fitted analysis.
 }
 }
 
@@ -79,9 +97,14 @@ analysis objects.
 \code{\link[=run_mfrm_facets]{run_mfrm_facets()}} -> \code{\link[=build_fixed_reports]{build_fixed_reports()}} ->
 \code{\link[=facets_output_file_bundle]{facets_output_file_bundle()}}.
 \item Mixed workflow:
+\code{RSM} / \code{PCM}:
 \code{\link[=fit_mfrm]{fit_mfrm()}} -> \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} -> \code{\link[=build_apa_outputs]{build_apa_outputs()}} ->
 compatibility export only if required.
-\item Contract audit:
+bounded \code{GPCM}:
+\code{\link[=fit_mfrm]{fit_mfrm()}} -> \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} -> \code{\link[=reporting_checklist]{reporting_checklist()}} ->
+graph-only compatibility export only when a legacy handoff truly requires
+it.
+\item Compatibility-contract audit:
 \code{\link[=fit_mfrm]{fit_mfrm()}} -> \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} -> \code{\link[=facets_parity_report]{facets_parity_report()}}.
 }
 }
@@ -110,6 +133,7 @@ run <- run_mfrm_facets(
   maxit = 10
 )
 summary(run)
+compatibility_alias_table("functions")
 
 fixed <- build_fixed_reports(
   estimate_bias(

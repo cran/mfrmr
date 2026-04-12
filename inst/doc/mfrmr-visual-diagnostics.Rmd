@@ -27,6 +27,10 @@ It is organized around four practical questions:
 All examples use packaged data and `preset = "publication"` so the same code
 is suitable for manuscript-oriented graphics.
 
+If you are selecting figures for a report, use `reporting_checklist()` before
+or alongside this vignette. Its `"Visual Displays"` rows now mirror the
+public plotting family shown here.
+
 ## Minimal setup
 
 ```{r setup}
@@ -45,6 +49,12 @@ fit <- fit_mfrm(
 )
 
 diag <- diagnose_mfrm(fit, residual_pca = "none")
+checklist <- reporting_checklist(fit, diagnostics = diag)
+subset(
+  checklist$checklist,
+  Section == "Visual Displays",
+  c("Item", "Available", "NextAction")
+)
 ```
 
 ## 1. Targeting and scale structure
@@ -111,6 +121,51 @@ Interpretation:
 
 - Large absolute displacement indicates stronger tension between observed data and current calibration.
 - For anchored runs, this is especially useful as an anchor-robustness screen.
+
+### Strict marginal follow-up
+
+When you need the package's latent-integrated follow-up path, switch to `MML`
+and request `diagnostic_mode = "both"` so the legacy and strict branches stay
+visible side by side.
+
+```{r strict-marginal}
+fit_strict <- fit_mfrm(
+  toy,
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  score = "Score",
+  method = "MML",
+  model = "RSM",
+  quad_points = 7,
+  maxit = 40
+)
+
+diag_strict <- diagnose_mfrm(
+  fit_strict,
+  residual_pca = "none",
+  diagnostic_mode = "both"
+)
+
+strict_checklist <- reporting_checklist(fit_strict, diagnostics = diag_strict)
+subset(
+  strict_checklist$checklist,
+  Section == "Visual Displays" &
+    Item %in% c("QC / facet dashboard", "Strict marginal visuals"),
+  c("Item", "Available", "NextAction")
+)
+
+plot_marginal_fit(
+  diag_strict,
+  top_n = 12,
+  preset = "publication"
+)
+```
+
+Interpretation:
+
+- Treat strict marginal plots as exploratory corroboration screens, not as standalone inferential tests.
+- Use the checklist rows to confirm that the current run actually supports the strict branch before routing figures into a report.
+- When pairwise follow-up is needed, continue with `plot_marginal_pairwise(diag_strict, preset = "publication")`.
 
 ## 3. Linking and coverage
 
@@ -183,10 +238,11 @@ Interpretation:
 
 For a compact visual workflow:
 
-1. `plot_qc_dashboard()` for one-page triage.
-2. `plot_unexpected()`, `plot_displacement()`, and `plot_interrater_agreement()` for local follow-up.
-3. `plot(fit, type = "wright")` and `plot(fit, type = "pathway")` for targeting and scale interpretation.
-4. `plot_residual_pca()` and `plot_bias_interaction()` for deeper structural review.
+1. `reporting_checklist()` when you want the package to route which figures are already supported.
+2. `plot_qc_dashboard()` for one-page triage.
+3. `plot_unexpected()`, `plot_displacement()`, `plot_marginal_fit()`, and `plot_interrater_agreement()` for local follow-up.
+4. `plot(fit, type = "wright")` and `plot(fit, type = "pathway")` for targeting and scale interpretation.
+5. `plot_residual_pca()`, `plot_bias_interaction()`, and `plot_information()` for deeper structural review.
 
 ## Related help
 

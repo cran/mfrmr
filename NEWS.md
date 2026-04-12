@@ -1,3 +1,53 @@
+# mfrmr 0.1.5
+
+## Maintenance release
+
+### First-use workflow
+
+- Reworked `print(fit)`, `summary(fit)`, and
+  `summary(diagnose_mfrm(...))` so results start with `Status`,
+  `Key warnings`, and `Next actions`.
+- Added a clearer recommended workflow in the README and help pages: fit with
+  `MML`, review diagnostics with `diagnostic_mode = "both"`, then move to
+  reporting helpers.
+- Improved ordered-score handling and guidance, including binary
+  two-category use, rejection of fractional score values, non-consecutive
+  score-code mapping through `score_map`, and clearer warnings for retained
+  zero-count categories.
+
+### Estimation and scoring
+
+- Added the first public latent-regression `MML` branch for ordered `RSM` /
+  `PCM` fits with person covariates, including simulation and scoring support
+  for the fitted population model.
+- Added bounded `GPCM` support for the documented direct route, including core
+  summaries, diagnostics, plots, posterior scoring, and information checks,
+  while keeping unsupported downstream routes explicit.
+- Extended ordered-response support and documentation for binary `RSM` / `PCM`
+  use, fixed-calibration scoring after `JML`, and `PCM` information curves.
+
+### Diagnostics, reporting, and visualization
+
+- Added strict marginal follow-up plots through `plot_marginal_fit()` and
+  `plot_marginal_pairwise()`.
+- Strengthened the reporting surface with `reporting_checklist()`,
+  `build_summary_table_bundle()`, `export_summary_appendix()`, and
+  `visual_reporting_template()` for manuscript-oriented tables, appendix
+  artifacts, and figure-placement guidance.
+- Added structured caveats in summaries and appendix tables for retained
+  zero-count score categories and latent-regression population-model
+  omission/design issues.
+- Added exploratory `plot(fit, type = "ccc_surface", draw = FALSE)` output
+  for advanced visualization while keeping 2D Wright/pathway/category plots as
+  the default reporting route.
+
+### External-software scope
+
+- Added scoped ConQuest overlap helpers and concise software-scope summaries
+  for FACETS, ConQuest, and SPSS handoffs.
+- Clarified latent-regression reporting outputs so coefficient reporting is
+  kept separate from post hoc score regression.
+
 # mfrmr 0.1.4
 
 ## CRAN resubmission

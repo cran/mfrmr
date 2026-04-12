@@ -17,6 +17,18 @@
 }
 \value{
 An object of class \code{summary.mfrm_data_description}.
+\itemize{
+\item \code{overview}: design/sample counts
+\item \code{missing}: top columns by missingness
+\item \code{score_distribution}: compact score-usage table, including zero-count
+categories retained by the prepared score support
+\item \code{facet_overview}: facet-level coverage summary
+\item \code{agreement}: inter-rater agreement summary when available
+\item \code{reporting_map}: manuscript-oriented guide to what is covered here versus
+which companion outputs should be consulted
+\item \code{caveats}: structured warning/review rows for score-support issues;
+\code{print(summary(ds))} shows a compact \code{Caveats} block when rows are present
+}
 }
 \description{
 Summarize a data-description object
@@ -32,6 +44,9 @@ Recommended read order:
 \item \code{overview}: sample size, persons/facets/categories.
 \item \code{missing}: missingness hotspots by selected input columns.
 \item \code{score_distribution}: category usage balance.
+\item \code{notes} / printed \code{Caveats}: retained zero-count score categories and
+related score-support caveats; intermediate unused categories should be
+treated as threshold-functioning warnings before model fitting.
 \item \code{facet_overview}: coverage per facet (minimum/maximum weighted counts).
 \item \code{agreement}: observed-score inter-rater agreement (when available).
 }

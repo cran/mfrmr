@@ -31,7 +31,7 @@
 #' out <- specifications_report(fit, title = "Toy run")
 #' summary(out)
 #' p_spec <- plot(out, draw = FALSE)
-#' class(p_spec)
+#' p_spec$data$plot
 #' @export
 specifications_report <- function(fit,
                                   title = NULL,
@@ -89,7 +89,7 @@ specifications_report <- function(fit,
 #' )
 #' summary(out)
 #' p_dq <- plot(out, draw = FALSE)
-#' class(p_dq)
+#' p_dq$data$plot
 #' @export
 data_quality_report <- function(fit,
                                 data = NULL,
@@ -145,7 +145,7 @@ data_quality_report <- function(fit,
 #' out <- estimation_iteration_report(fit, max_iter = 5)
 #' summary(out)
 #' p_iter <- plot(out, draw = FALSE)
-#' class(p_iter)
+#' p_iter$data$plot
 #' @export
 estimation_iteration_report <- function(fit,
                                         max_iter = 20,
@@ -197,8 +197,8 @@ estimation_iteration_report <- function(fit,
 #' summary(out)
 #' p_sub <- plot(out, draw = FALSE)
 #' p_design <- plot(out, type = "design_matrix", draw = FALSE)
-#' class(p_sub)
-#' class(p_design)
+#' p_sub$data$plot
+#' p_design$data$plot
 #' out$summary[, c("Subset", "Observations", "ObservationPercent")]
 #' @export
 subset_connectivity_report <- function(fit,
@@ -255,7 +255,7 @@ subset_connectivity_report <- function(fit,
 #' out <- facet_statistics_report(fit)
 #' summary(out)
 #' p_fs <- plot(out, draw = FALSE)
-#' class(p_fs)
+#' p_fs$data$plot
 #' @export
 facet_statistics_report <- function(fit,
                                     diagnostics = NULL,
@@ -380,7 +380,11 @@ precision_audit_report <- function(fit, diagnostics = NULL) {
   notes_tbl <- as.data.frame(diagnostics$approximation_notes %||% data.frame(), stringsAsFactors = FALSE)
   settings <- list(
     model = as.character(fit$summary$Model[1] %||% fit$config$model %||% NA_character_),
-    method = as.character(fit$summary$Method[1] %||% fit$config$method %||% NA_character_),
+    method = resolve_public_mfrm_method(
+      summary_method = fit$summary$Method[1] %||% NA_character_,
+      method_input = fit$config$method_input %||% NA_character_,
+      method_used = fit$config$method %||% NA_character_
+    ),
     precision_tier = as.character(profile_tbl$PrecisionTier[1] %||% NA_character_)
   )
 
@@ -418,7 +422,8 @@ precision_audit_report <- function(fit, diagnostics = NULL) {
 #' Practical read order:
 #' 1. `summary(out)` for compact warnings and threshold ordering.
 #' 2. `out$category_table` for sparse/misfitting categories.
-#' 3. `out$transition_points` to inspect crossing structure.
+#' 3. `out$median_thresholds` for adjacent-threshold caveats when zero-count
+#'    categories are retained.
 #' 4. `plot(out)` for quick visual check.
 #'
 #' @section Typical workflow:
@@ -435,9 +440,9 @@ precision_audit_report <- function(fit, diagnostics = NULL) {
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
 #' out <- category_structure_report(fit)
 #' summary(out)
-#' names(out)
+#' head(out$category_table[, c("Category", "Count", "Infit", "Outfit")])
 #' p_cs <- plot(out, draw = FALSE)
-#' class(p_cs)
+#' p_cs$data$plot
 #' @export
 category_structure_report <- function(fit,
                                       diagnostics = NULL,
@@ -499,9 +504,9 @@ category_structure_report <- function(fit,
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
 #' out <- category_curves_report(fit, theta_points = 101)
 #' summary(out)
-#' names(out)
+#' head(out$probabilities[, c("CurveGroup", "Theta", "Category", "Probability")])
 #' p_cc <- plot(out, draw = FALSE)
-#' class(p_cc)
+#' p_cc$data$plot
 #' @export
 category_curves_report <- function(fit,
                                    theta_range = c(-6, 6),
@@ -570,7 +575,7 @@ category_curves_report <- function(fit,
 #' out <- bias_interaction_report(bias, top_n = 10)
 #' summary(out)
 #' p_bi <- plot(out, draw = FALSE)
-#' class(p_bi)
+#' p_bi$data$plot
 #' @export
 bias_interaction_report <- function(x,
                                     diagnostics = NULL,
@@ -929,10 +934,17 @@ plot_bias_interaction <- function(x,
 #' Output text includes residual-PCA screening commentary if PCA diagnostics are
 #' available in `diagnostics`.
 #'
+#' For bounded `GPCM`, this helper is intentionally unavailable. Use
+#' [reporting_checklist()], [precision_audit_report()], and the direct
+#' table/plot helpers instead, and treat [gpcm_capability_matrix()] as the
+#' formal boundary statement for that branch.
+#'
 #' By default, `report_text` includes:
 #' - model/data design summary (N, facet counts, scale range)
 #' - optimization/convergence metrics (`Converged`, `Iterations`, `LogLik`, `AIC`, `BIC`)
 #' - anchor/constraint summary (`noncenter_facet`, anchored levels, group anchors, dummy facets)
+#' - latent-regression population-model wording when `fit` has an active
+#'   `population_formula`
 #' - category/threshold diagnostics (including disordered-step details when present)
 #' - overall fit, misfit count, and top misfit levels
 #' - facet reliability/separation, residual PCA summary, and bias-screen counts
@@ -945,12 +957,17 @@ plot_bias_interaction <- function(x,
 #'   following APA 7th edition conventions, but still intended for human review.
 #' - `table_figure_notes`: reusable draft note blocks for table/figure appendices.
 #' - `table_figure_captions`: draft caption candidates aligned to generated outputs.
+#' - active latent-regression fits add a population-model section and Table 5
+#'   notes/captions that distinguish conditional-normal coefficient reporting
+#'   from post hoc regression on EAP/MLE scores.
 #'
 #' When bias results or PCA diagnostics are not supplied, those sections
 #' are omitted from the narrative rather than producing placeholder text.
 #'
 #' @section Typical workflow:
-#' 1. Build diagnostics (and optional bias results).
+#' 1. Build diagnostics (and optional bias results). For `RSM` / `PCM`
+#'    reporting runs, prefer an `MML` fit and
+#'    `diagnose_mfrm(..., diagnostic_mode = "both")`.
 #' 2. Run `build_apa_outputs(...)`.
 #' 3. Check `summary(apa)` for completeness.
 #' 4. Insert `apa$report_text` and note/caption fields into manuscript drafts
@@ -974,9 +991,11 @@ plot_bias_interaction <- function(x,
 #' @seealso [build_visual_summaries()], [estimate_bias()],
 #'   [reporting_checklist()], [mfrmr_reporting_and_apa]
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
-#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
-#' diag <- diagnose_mfrm(fit, residual_pca = "both")
+#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
+#'                 method = "MML", maxit = 200)
+#' diag <- diagnose_mfrm(fit, residual_pca = "both", diagnostic_mode = "both")
 #' apa <- build_apa_outputs(
 #'   fit,
 #'   diag,
@@ -987,20 +1006,38 @@ plot_bias_interaction <- function(x,
 #'     rater_facet = "Rater"
 #'   )
 #' )
-#' names(apa)
-#' class(apa)
 #' s_apa <- summary(apa)
 #' s_apa$overview
 #' chk <- reporting_checklist(fit, diagnostics = diag)
 #' head(chk$checklist[, c("Section", "Item", "DraftReady", "NextAction")])
 #' cat(apa$report_text)
 #' apa$section_map[, c("SectionId", "Available")]
+#' }
+#'
+#' @section Input validation:
+#' `fit` must be an `mfrm_fit` object from [fit_mfrm()].
+#' `diagnostics` must be an `mfrm_diagnostics` object from [diagnose_mfrm()].
+#' `context` must be a list (use `NULL` or `list()` for no extra context).
+#' If supplied, `bias_results` must come from [estimate_bias()] or another
+#' package-native bias helper that provides a table component.
 #' @export
 build_apa_outputs <- function(fit,
                               diagnostics,
                               bias_results = NULL,
                               context = list(),
                               whexact = FALSE) {
+  validated <- validate_apa_builder_inputs(
+    fit = fit,
+    diagnostics = diagnostics,
+    bias_results = bias_results,
+    context = context,
+    helper = "build_apa_outputs()"
+  )
+  fit <- validated$fit
+  diagnostics <- validated$diagnostics
+  bias_results <- validated$bias_results
+  context <- validated$context
+  stop_if_gpcm_out_of_scope(fit, "build_apa_outputs()")
   contract <- build_apa_reporting_contract(
     res = fit,
     diagnostics = diagnostics,
@@ -1021,6 +1058,57 @@ build_apa_outputs <- function(fit,
   )
   class(out) <- c("mfrm_apa_outputs", "list")
   out
+}
+
+# Internal input validator shared by APA/report helpers that build the
+# package-native reporting contract.
+validate_apa_builder_inputs <- function(fit,
+                                        diagnostics,
+                                        bias_results = NULL,
+                                        context = list(),
+                                        helper = "build_apa_outputs()") {
+  if (!inherits(fit, "mfrm_fit")) {
+    stop(
+      "`", helper, "` requires `fit` to be an `mfrm_fit` object returned by `fit_mfrm()`.",
+      call. = FALSE
+    )
+  }
+  if (missing(diagnostics) || is.null(diagnostics) || !inherits(diagnostics, "mfrm_diagnostics")) {
+    stop(
+      "`", helper, "` requires `diagnostics` to be an `mfrm_diagnostics` object returned by `diagnose_mfrm()`.",
+      call. = FALSE
+    )
+  }
+
+  context <- context %||% list()
+  if (!is.list(context)) {
+    stop(
+      "`", helper, "` requires `context` to be a list. Use `NULL` or `list()` when no extra reporting context is needed.",
+      call. = FALSE
+    )
+  }
+
+  if (!is.null(bias_results)) {
+    has_bias_table <- FALSE
+    if (is.data.frame(bias_results)) {
+      has_bias_table <- TRUE
+    } else if (is.list(bias_results)) {
+      has_bias_table <- is.data.frame(bias_results$table) || is.data.frame(bias_results$bias_table)
+    }
+    if (!isTRUE(has_bias_table)) {
+      stop(
+        "`", helper, "` requires `bias_results` to be `NULL` or a package-native bias result with a data-frame table component, such as `estimate_bias()` output.",
+        call. = FALSE
+      )
+    }
+  }
+
+  list(
+    fit = fit,
+    diagnostics = diagnostics,
+    bias_results = bias_results,
+    context = context
+  )
 }
 
 normalize_apa_component_text <- function(text) {
@@ -1140,6 +1228,22 @@ resolve_apa_output_checks <- function(object) {
           apa_text_has_fragment(report_text, contract$summaries$interrater_sentence) ||
             apa_text_has_fragment(note_text, contract$summaries$interrater_sentence),
           "Interrater agreement wording should appear in the report text or notes."
+        )
+      )
+    )
+  }
+
+  if (isTRUE(contract$availability$has_population_model)) {
+    population_summary <- contract$summaries$population_model %||% list()
+    checks <- c(
+      checks,
+      list(
+        add_check(
+          "Latent-regression wording alignment",
+          apa_text_has_fragment(report_text, population_summary$caution_sentence %||% "") &&
+            grepl("Latent-regression population model", note_text, fixed = TRUE) &&
+            grepl("documented latent-regression MML comparison scope", normalize_apa_component_text(report_text), fixed = TRUE),
+          "Active latent-regression runs should state conditional-normal population-model interpretation, avoid post hoc score-regression wording, and keep ConQuest scope wording explicit."
         )
       )
     )
@@ -1367,9 +1471,2994 @@ print.summary.mfrm_apa_outputs <- function(x, ...) {
   invisible(x)
 }
 
+summary_table_bundle_df <- function(x) {
+  if (is.null(x)) return(data.frame())
+  if (inherits(x, "tbl_df")) {
+    return(as.data.frame(x, stringsAsFactors = FALSE))
+  }
+  if (is.data.frame(x)) {
+    return(as.data.frame(x, stringsAsFactors = FALSE))
+  }
+  data.frame()
+}
+
+summary_table_bundle_text_df <- function(x, column = "Note") {
+  if (is.null(x) || length(x) == 0L) return(data.frame())
+  data.frame(
+    stats::setNames(list(as.character(x)), column),
+    stringsAsFactors = FALSE,
+    check.names = FALSE
+  )
+}
+
+summary_table_bundle_settings_df <- function(x) {
+  if (is.null(x)) return(data.frame())
+  bundle_settings_table(x)
+}
+
+summary_table_bundle_supported_summary_classes <- function() {
+  c(
+    "summary.mfrm_fit",
+    "summary.mfrm_diagnostics",
+    "summary.mfrm_data_description",
+    "summary.mfrm_reporting_checklist",
+    "summary.mfrm_apa_outputs",
+    "summary.mfrm_design_evaluation",
+    "summary.mfrm_signal_detection",
+    "summary.mfrm_population_prediction",
+    "summary.mfrm_future_branch_active_branch",
+    "summary.mfrm_facets_run",
+    "summary.mfrm_bias",
+    "summary.mfrm_anchor_audit",
+    "summary.mfrm_linking_review",
+    "summary.mfrm_misfit_casebook",
+    "summary.mfrm_weighting_audit",
+    "summary.mfrm_unit_prediction",
+    "summary.mfrm_plausible_values"
+  )
+}
+
+summary_table_bundle_is_empty <- function(x) {
+  is.data.frame(x) && nrow(x) == 0L && ncol(x) == 0L
+}
+
+resolve_summary_table_bundle_input <- function(x,
+                                               digits = 3,
+                                               top_n = 10,
+                                               preview_chars = 160) {
+  summary_classes <- summary_table_bundle_supported_summary_classes()
+  if (inherits(x, summary_classes)) {
+    cls <- class(x)
+    cls <- cls[startsWith(cls, "summary.mfrm_")][1]
+    return(list(
+      summary = x,
+      source_class = cls,
+      summary_class = cls
+    ))
+  }
+
+  if (inherits(x, "mfrm_fit")) {
+    return(list(
+      summary = summary(x, digits = digits, top_n = top_n),
+      source_class = "mfrm_fit",
+      summary_class = "summary.mfrm_fit"
+    ))
+  }
+  if (inherits(x, "mfrm_diagnostics")) {
+    return(list(
+      summary = summary(x, digits = digits, top_n = top_n),
+      source_class = "mfrm_diagnostics",
+      summary_class = "summary.mfrm_diagnostics"
+    ))
+  }
+  if (inherits(x, "mfrm_data_description")) {
+    return(list(
+      summary = summary(x, digits = digits, top_n = top_n),
+      source_class = "mfrm_data_description",
+      summary_class = "summary.mfrm_data_description"
+    ))
+  }
+  if (inherits(x, "mfrm_reporting_checklist")) {
+    return(list(
+      summary = summary(x, top_n = top_n),
+      source_class = "mfrm_reporting_checklist",
+      summary_class = "summary.mfrm_reporting_checklist"
+    ))
+  }
+  if (inherits(x, "mfrm_apa_outputs")) {
+    return(list(
+      summary = summary(x, top_n = top_n, preview_chars = preview_chars),
+      source_class = "mfrm_apa_outputs",
+      summary_class = "summary.mfrm_apa_outputs"
+    ))
+  }
+  if (inherits(x, "mfrm_design_evaluation")) {
+    return(list(
+      summary = summary(x, digits = digits),
+      source_class = "mfrm_design_evaluation",
+      summary_class = "summary.mfrm_design_evaluation"
+    ))
+  }
+  if (inherits(x, "mfrm_signal_detection")) {
+    return(list(
+      summary = summary(x, digits = digits),
+      source_class = "mfrm_signal_detection",
+      summary_class = "summary.mfrm_signal_detection"
+    ))
+  }
+  if (inherits(x, "mfrm_population_prediction")) {
+    return(list(
+      summary = summary(x, digits = digits),
+      source_class = "mfrm_population_prediction",
+      summary_class = "summary.mfrm_population_prediction"
+    ))
+  }
+  if (inherits(x, "mfrm_future_branch_active_branch")) {
+    return(list(
+      summary = summary(x, digits = digits, top_n = top_n),
+      source_class = "mfrm_future_branch_active_branch",
+      summary_class = "summary.mfrm_future_branch_active_branch"
+    ))
+  }
+  if (inherits(x, "mfrm_facets_run")) {
+    return(list(
+      summary = summary(x, digits = digits, top_n = top_n),
+      source_class = "mfrm_facets_run",
+      summary_class = "summary.mfrm_facets_run"
+    ))
+  }
+  if (inherits(x, "mfrm_bias")) {
+    return(list(
+      summary = summary(x, digits = digits, top_n = top_n),
+      source_class = "mfrm_bias",
+      summary_class = "summary.mfrm_bias"
+    ))
+  }
+  if (inherits(x, "mfrm_anchor_audit")) {
+    return(list(
+      summary = summary(x, digits = digits, top_n = top_n),
+      source_class = "mfrm_anchor_audit",
+      summary_class = "summary.mfrm_anchor_audit"
+    ))
+  }
+  if (inherits(x, "mfrm_linking_review")) {
+    return(list(
+      summary = summary(x, digits = digits, top_n = top_n),
+      source_class = "mfrm_linking_review",
+      summary_class = "summary.mfrm_linking_review"
+    ))
+  }
+  if (inherits(x, "mfrm_misfit_casebook")) {
+    return(list(
+      summary = summary(x, digits = digits, top_n = top_n),
+      source_class = "mfrm_misfit_casebook",
+      summary_class = "summary.mfrm_misfit_casebook"
+    ))
+  }
+  if (inherits(x, "mfrm_weighting_audit")) {
+    return(list(
+      summary = summary(x, digits = digits, top_n = top_n),
+      source_class = "mfrm_weighting_audit",
+      summary_class = "summary.mfrm_weighting_audit"
+    ))
+  }
+  if (inherits(x, "mfrm_unit_prediction")) {
+    return(list(
+      summary = summary(x, digits = digits),
+      source_class = "mfrm_unit_prediction",
+      summary_class = "summary.mfrm_unit_prediction"
+    ))
+  }
+  if (inherits(x, "mfrm_plausible_values")) {
+    return(list(
+      summary = summary(x, digits = digits),
+      source_class = "mfrm_plausible_values",
+      summary_class = "summary.mfrm_plausible_values"
+    ))
+  }
+
+  stop(
+    "`x` must be an mfrm_fit, mfrm_diagnostics, mfrm_data_description, ",
+    "mfrm_reporting_checklist, mfrm_apa_outputs, mfrm_design_evaluation, ",
+    "mfrm_signal_detection, mfrm_population_prediction, mfrm_future_branch_active_branch, ",
+    "mfrm_facets_run, mfrm_bias, mfrm_anchor_audit, mfrm_linking_review, mfrm_misfit_casebook, ",
+    "mfrm_weighting_audit, mfrm_unit_prediction, or ",
+    "mfrm_plausible_values object, or one of their summary() outputs.",
+    call. = FALSE
+  )
+}
+
+summary_table_bundle_required_components <- function(summary_class) {
+  switch(
+    as.character(summary_class %||% NA_character_),
+    "summary.mfrm_fit" = c("overview", "reporting_map"),
+    "summary.mfrm_diagnostics" = c("overview", "reporting_map", "flags"),
+    "summary.mfrm_data_description" = c("overview", "score_distribution"),
+    "summary.mfrm_reporting_checklist" = c("overview", "action_items"),
+    "summary.mfrm_apa_outputs" = c("overview", "components", "preview"),
+    "summary.mfrm_design_evaluation" = c("overview", "design_summary"),
+    "summary.mfrm_signal_detection" = c("overview", "detection_summary"),
+    "summary.mfrm_population_prediction" = c("overview", "design", "forecast"),
+    "summary.mfrm_future_branch_active_branch" = c("overview", "profile_summary", "recommendation_table"),
+    "summary.mfrm_facets_run" = c("overview", "mapping", "run_info", "fit", "diagnostics"),
+    "summary.mfrm_bias" = c("overview", "top_rows"),
+    "summary.mfrm_anchor_audit" = c("facet_summary", "recommendations"),
+    "summary.mfrm_linking_review" = c("overview", "top_linking_risks", "group_view_index", "reporting_map"),
+    "summary.mfrm_misfit_casebook" = c("overview", "top_cases", "case_rollup", "group_view_index", "reporting_map"),
+    "summary.mfrm_weighting_audit" = c("overview", "top_reweighted_levels", "reporting_map"),
+    "summary.mfrm_unit_prediction" = c("estimates", "settings"),
+    "summary.mfrm_plausible_values" = c("draw_summary", "settings"),
+    character(0)
+  )
+}
+
+validate_summary_table_bundle_summary <- function(summary_obj,
+                                                 summary_class,
+                                                 helper = "build_summary_table_bundle()") {
+  if (!is.list(summary_obj)) {
+    stop(
+      "`", helper, "` requires a supported package object or a package-native `summary()` output. ",
+      "The supplied summary object for class `", as.character(summary_class %||% "unknown"),
+      "` is not a list and does not match the package summary contract.",
+      call. = FALSE
+    )
+  }
+
+  required <- summary_table_bundle_required_components(summary_class)
+  if (length(required) == 0L) {
+    return(invisible(summary_obj))
+  }
+
+  missing_components <- required[
+    !vapply(required, function(nm) {
+      nm %in% names(summary_obj) && !is.null(summary_obj[[nm]])
+    }, logical(1))
+  ]
+
+  if (length(missing_components) > 0L) {
+    stop(
+      "`", helper, "` received a malformed `", as.character(summary_class),
+      "` object. Missing required component(s): ",
+      paste(missing_components, collapse = ", "),
+      ". Rebuild the source object with the package helper, then call `summary()` again.",
+      call. = FALSE
+    )
+  }
+
+  invisible(summary_obj)
+}
+
+validate_summary_table_bundle_inputs <- function(x,
+                                                 which = NULL,
+                                                 appendix_preset = NULL,
+                                                 include_empty = FALSE,
+                                                 digits = 3,
+                                                 top_n = 10,
+                                                 preview_chars = 160,
+                                                 helper = "build_summary_table_bundle()") {
+  if (missing(x) || is.null(x)) {
+    stop(
+      "`", helper, "` requires `x` to be a supported package object or one of its `summary()` outputs.",
+      call. = FALSE
+    )
+  }
+
+  if (!is.null(which)) {
+    if (!is.character(which) || length(which) == 0L) {
+      stop(
+        "`", helper, "` requires `which` to be `NULL` or a non-empty character vector of table names.",
+        call. = FALSE
+      )
+    }
+    which <- trimws(which)
+    if (anyNA(which) || any(!nzchar(which))) {
+      stop(
+        "`", helper, "` requires every `which` entry to be a non-empty table name.",
+        call. = FALSE
+      )
+    }
+    which <- unique(which)
+  }
+
+  if (!is.logical(include_empty) || length(include_empty) != 1L || is.na(include_empty)) {
+    stop(
+      "`", helper, "` requires `include_empty` to be either `TRUE` or `FALSE`.",
+      call. = FALSE
+    )
+  }
+
+  if (!is.numeric(digits) || length(digits) != 1L || !is.finite(digits) || digits < 0) {
+    stop(
+      "`", helper, "` requires `digits` to be a single non-negative number.",
+      call. = FALSE
+    )
+  }
+  digits <- as.integer(digits)
+
+  if (!is.numeric(top_n) || length(top_n) != 1L || !is.finite(top_n) || top_n < 1) {
+    stop(
+      "`", helper, "` requires `top_n` to be a single positive number.",
+      call. = FALSE
+    )
+  }
+  top_n <- as.integer(top_n)
+
+  if (!is.numeric(preview_chars) || length(preview_chars) != 1L || !is.finite(preview_chars) || preview_chars < 1) {
+    stop(
+      "`", helper, "` requires `preview_chars` to be a single positive number.",
+      call. = FALSE
+    )
+  }
+  preview_chars <- as.integer(preview_chars)
+
+  if (!is.null(appendix_preset)) {
+    if (!is.character(appendix_preset) || length(appendix_preset) != 1L ||
+        is.na(appendix_preset) || !nzchar(trimws(appendix_preset))) {
+      stop(
+        "`", helper, "` requires `appendix_preset` to be `NULL` or a single preset name.",
+        call. = FALSE
+      )
+    }
+    appendix_preset <- match.arg(
+      tolower(trimws(as.character(appendix_preset[1]))),
+      c("all", "recommended", "compact", "methods", "results", "diagnostics", "reporting")
+    )
+  }
+
+  resolved <- resolve_summary_table_bundle_input(
+    x,
+    digits = digits,
+    top_n = top_n,
+    preview_chars = preview_chars
+  )
+  validate_summary_table_bundle_summary(
+    summary_obj = resolved$summary,
+    summary_class = resolved$summary_class,
+    helper = helper
+  )
+
+  list(
+    resolved = resolved,
+    which = which,
+    appendix_preset = appendix_preset,
+    include_empty = include_empty,
+    digits = digits,
+    top_n = top_n,
+    preview_chars = preview_chars
+  )
+}
+
+summary_table_bundle_resolve_future_branch_summary <- function(summary_obj) {
+  if (inherits(summary_obj, "summary.mfrm_future_branch_active_branch")) {
+    return(summary_obj)
+  }
+  summary_obj$future_branch_active_summary %||% NULL
+}
+
+summary_table_bundle_future_branch_spec <- function(summary_obj,
+                                                    embedded = TRUE) {
+  future <- summary_table_bundle_resolve_future_branch_summary(summary_obj)
+  if (!inherits(future, "summary.mfrm_future_branch_active_branch")) {
+    future <- NULL
+  }
+  overview_desc <- if (isTRUE(embedded)) {
+    "Deterministic overview of the embedded future arbitrary-facet planning scaffold."
+  } else {
+    "Deterministic overview of the future arbitrary-facet planning active branch."
+  }
+  profile_desc <- if (isTRUE(embedded)) {
+    "Exact-count and balanced-expectation design metrics from the embedded future-branch scaffold."
+  } else {
+    "Exact-count and balanced-expectation design metrics from the future arbitrary-facet planning active branch."
+  }
+  load_balance_desc <- if (isTRUE(embedded)) {
+    "Deterministic rater-load and integer-balance diagnostics from the embedded future-branch scaffold."
+  } else {
+    "Deterministic rater-load and integer-balance diagnostics from the future arbitrary-facet planning active branch."
+  }
+  coverage_desc <- if (isTRUE(embedded)) {
+    "Deterministic coverage and connectivity summaries from the embedded future-branch scaffold."
+  } else {
+    "Deterministic coverage and connectivity summaries from the future arbitrary-facet planning active branch."
+  }
+  guardrail_desc <- if (isTRUE(embedded)) {
+    "Exact structural guardrail classifications from the embedded future-branch scaffold."
+  } else {
+    "Exact structural guardrail classifications from the future arbitrary-facet planning active branch."
+  }
+  readiness_desc <- if (isTRUE(embedded)) {
+    "Structural readiness tiers indicating which overlap/balance conditions currently hold."
+  } else {
+    "Structural readiness tiers for the future arbitrary-facet planning active branch."
+  }
+  recommendation_desc <- if (isTRUE(embedded)) {
+    "Conservative structural recommendation derived from the embedded future-branch scaffold."
+  } else {
+    "Conservative structural recommendation derived from the future arbitrary-facet planning active branch."
+  }
+  list(
+    tables = list(
+      future_branch_overview = summary_table_bundle_df(future$overview),
+      future_branch_profile = summary_table_bundle_df(future$profile_summary),
+      future_branch_load_balance = summary_table_bundle_df(future$load_balance_summary),
+      future_branch_coverage = summary_table_bundle_df(future$coverage_summary),
+      future_branch_guardrails = summary_table_bundle_df(future$guardrail_summary),
+      future_branch_readiness = summary_table_bundle_df(future$readiness_summary),
+      future_branch_recommendation = summary_table_bundle_df(future$recommendation_table),
+      future_branch_appendix_presets = summary_table_bundle_df(future$appendix_presets),
+      future_branch_appendix_roles = summary_table_bundle_df(future$appendix_role_summary),
+      future_branch_appendix_sections = summary_table_bundle_df(future$appendix_section_summary),
+      future_branch_selection_table_presets = summary_table_bundle_df(future$selection_table_preset_summary),
+      future_branch_selection_handoff_tables = summary_table_bundle_df(future$selection_handoff_table_summary),
+      future_branch_selection_handoff_presets = summary_table_bundle_df(future$selection_handoff_preset_summary),
+      future_branch_selection_handoff = summary_table_bundle_df(future$selection_handoff_summary),
+      future_branch_selection_handoff_bundles = summary_table_bundle_df(future$selection_handoff_bundle_summary),
+      future_branch_selection_handoff_roles = summary_table_bundle_df(future$selection_handoff_role_summary),
+      future_branch_selection_handoff_role_sections = summary_table_bundle_df(future$selection_handoff_role_section_summary),
+      future_branch_selection_tables = summary_table_bundle_df(future$selection_table_summary),
+      future_branch_selection_summary = summary_table_bundle_df(future$selection_summary),
+      future_branch_selection_roles = summary_table_bundle_df(future$selection_role_summary),
+      future_branch_selection_sections = summary_table_bundle_df(future$selection_section_summary),
+      future_branch_selection_catalog = summary_table_bundle_df(future$selection_catalog),
+      future_branch_reporting_map = summary_table_bundle_df(future$reporting_map)
+    ),
+    roles = c(
+      future_branch_overview = "future_branch_overview",
+      future_branch_profile = "future_branch_profile",
+      future_branch_load_balance = "future_branch_load_balance",
+      future_branch_coverage = "future_branch_coverage",
+      future_branch_guardrails = "future_branch_guardrails",
+      future_branch_readiness = "future_branch_readiness",
+      future_branch_recommendation = "future_branch_recommendation",
+      future_branch_appendix_presets = "future_branch_appendix_presets",
+      future_branch_appendix_roles = "future_branch_appendix_roles",
+      future_branch_appendix_sections = "future_branch_appendix_sections",
+      future_branch_selection_table_presets = "future_branch_selection_table_presets",
+      future_branch_selection_handoff_tables = "future_branch_selection_handoff_tables",
+      future_branch_selection_handoff_presets = "future_branch_selection_handoff_presets",
+      future_branch_selection_handoff = "future_branch_selection_handoff",
+      future_branch_selection_handoff_bundles = "future_branch_selection_handoff_bundles",
+      future_branch_selection_handoff_roles = "future_branch_selection_handoff_roles",
+      future_branch_selection_handoff_role_sections = "future_branch_selection_handoff_role_sections",
+      future_branch_selection_tables = "future_branch_selection_tables",
+      future_branch_selection_summary = "future_branch_selection_summary",
+      future_branch_selection_roles = "future_branch_selection_roles",
+      future_branch_selection_sections = "future_branch_selection_sections",
+      future_branch_selection_catalog = "future_branch_selection_catalog",
+      future_branch_reporting_map = "future_branch_reporting_map"
+    ),
+    descriptions = c(
+      future_branch_overview = overview_desc,
+      future_branch_profile = profile_desc,
+      future_branch_load_balance = load_balance_desc,
+      future_branch_coverage = coverage_desc,
+      future_branch_guardrails = guardrail_desc,
+      future_branch_readiness = readiness_desc,
+      future_branch_recommendation = recommendation_desc,
+      future_branch_appendix_presets = "Preset-level appendix routing counts for the future arbitrary-facet planning surface.",
+      future_branch_appendix_roles = "Appendix routing counts by reporting role for the future arbitrary-facet planning surface.",
+      future_branch_appendix_sections = "Appendix routing counts by manuscript section for the future arbitrary-facet planning surface.",
+      future_branch_selection_table_presets = "Preset-specific appendix table selections for the future arbitrary-facet planning surface.",
+      future_branch_selection_handoff_tables = "Preset-specific table-level appendix handoff crosswalk for the future arbitrary-facet planning surface.",
+      future_branch_selection_handoff_presets = "Preset-level appendix handoff overview for the future arbitrary-facet planning surface.",
+      future_branch_selection_handoff = "Section-aware appendix handoff summary for the future arbitrary-facet planning surface.",
+      future_branch_selection_handoff_bundles = "Bundle-aware appendix handoff summary for the future arbitrary-facet planning surface.",
+      future_branch_selection_handoff_roles = "Role-aware appendix handoff summary for the future arbitrary-facet planning surface.",
+      future_branch_selection_handoff_role_sections = "Role-by-section appendix handoff summary for the future arbitrary-facet planning surface.",
+      future_branch_selection_tables = "Preset-aware appendix table selections for the future arbitrary-facet planning surface.",
+      future_branch_selection_summary = "Preset-filtered appendix selection counts for the future arbitrary-facet planning surface.",
+      future_branch_selection_roles = "Preset-filtered appendix selection counts by reporting role for the future arbitrary-facet planning surface.",
+      future_branch_selection_sections = "Preset-filtered appendix selection counts by manuscript section for the future arbitrary-facet planning surface.",
+      future_branch_selection_catalog = "Full appendix selection catalog for the future arbitrary-facet planning surface.",
+      future_branch_reporting_map = "Direct reporting-map bridge for the future arbitrary-facet planning surface."
+    )
+  )
+}
+
+summary_table_bundle_spec <- function(summary_obj) {
+  cls <- class(summary_obj)[1]
+  switch(
+    cls,
+    "summary.mfrm_fit" = list(
+      title = "Model Summary Tables",
+      tables = list(
+        overview = summary_table_bundle_df(summary_obj$overview),
+        population_overview = summary_table_bundle_df(summary_obj$population_overview),
+        population_design = summary_table_bundle_df(summary_obj$population_design),
+        population_coefficients = summary_table_bundle_df(summary_obj$population_coefficients),
+        population_coding = summary_table_bundle_df(summary_obj$population_coding),
+        facet_overview = summary_table_bundle_df(summary_obj$facet_overview),
+        person_overview = summary_table_bundle_df(summary_obj$person_overview),
+        step_overview = summary_table_bundle_df(summary_obj$step_overview),
+        slope_overview = summary_table_bundle_df(summary_obj$slope_overview),
+        settings_overview = summary_table_bundle_df(summary_obj$settings_overview),
+        reporting_map = summary_table_bundle_df(summary_obj$reporting_map),
+        caveats = summary_table_bundle_df(summary_obj$caveats),
+        facet_extremes = summary_table_bundle_df(summary_obj$facet_extremes),
+        person_high = summary_table_bundle_df(summary_obj$person_high),
+        person_low = summary_table_bundle_df(summary_obj$person_low)
+      ),
+      roles = c(
+        overview = "run_overview",
+        population_overview = "population_basis",
+        population_design = "population_design",
+        population_coefficients = "population_coefficients",
+        population_coding = "population_coding",
+        facet_overview = "facet_distribution",
+        person_overview = "person_distribution",
+        step_overview = "category_structure",
+        slope_overview = "gpcm_discrimination",
+        settings_overview = "estimation_settings",
+        reporting_map = "reporting_map",
+        caveats = "analysis_caveats",
+        facet_extremes = "extreme_facet_levels",
+        person_high = "extreme_person_high",
+        person_low = "extreme_person_low"
+      ),
+      descriptions = c(
+        overview = "One-row model fit, convergence, and information-criteria overview.",
+        population_overview = "Population-model basis, posterior basis, and omission audit.",
+        population_design = "Population-model design-matrix columns and numeric audit statistics.",
+        population_coefficients = "Latent-regression coefficients when the population model is active.",
+        population_coding = "Latent-regression categorical covariate levels, contrasts, and encoded model-matrix columns.",
+        facet_overview = "Per-facet spread, range, and level-count summary.",
+        person_overview = "Distribution of person measures and posterior SD summaries.",
+        step_overview = "Threshold range and monotonicity summary.",
+        slope_overview = "GPCM discrimination summary under the current identification.",
+        settings_overview = "Estimation settings that affect identification and interpretation.",
+        reporting_map = "Companion outputs to cite for manuscript-oriented reporting.",
+        caveats = "Structured fit-level caveats such as retained zero-count categories, score-category recoding, and latent-regression population-model warnings.",
+        facet_extremes = "Facet levels with the largest absolute estimates.",
+        person_high = "Highest person measures from the current fit.",
+        person_low = "Lowest person measures from the current fit."
+      )
+    ),
+    "summary.mfrm_diagnostics" = list(
+      title = "Diagnostics Summary Tables",
+      tables = list(
+        overview = summary_table_bundle_df(summary_obj$overview),
+        overall_fit = summary_table_bundle_df(summary_obj$overall_fit),
+        precision_profile = summary_table_bundle_df(summary_obj$precision_profile),
+        precision_audit = summary_table_bundle_df(summary_obj$precision_audit),
+        reliability = summary_table_bundle_df(summary_obj$reliability),
+        top_fit = summary_table_bundle_df(summary_obj$top_fit),
+        reporting_map = summary_table_bundle_df(summary_obj$reporting_map),
+        flags = summary_table_bundle_df(summary_obj$flags)
+      ),
+      roles = c(
+        overview = "run_overview",
+        overall_fit = "overall_fit",
+        precision_profile = "precision_basis",
+        precision_audit = "precision_audit",
+        reliability = "facet_precision",
+        top_fit = "extreme_fit_rows",
+        reporting_map = "reporting_map",
+        flags = "flag_counts"
+      ),
+      descriptions = c(
+        overview = "Run-level diagnostic coverage and precision tier.",
+        overall_fit = "Global fit statistics from the current diagnostic run.",
+        precision_profile = "Precision basis and recommended interpretation tier.",
+        precision_audit = "Precision checks marked review/warn for manuscript caution.",
+        reliability = "Facet-level separation, strata, and reliability summary.",
+        top_fit = "Rows with the largest absolute fit Z statistics.",
+        reporting_map = "Companion outputs for manuscript reporting beyond summary(diag).",
+        flags = "Counts of unexpected responses, displacement, interactions, and inter-rater pairs."
+      )
+    ),
+    "summary.mfrm_data_description" = list(
+      title = "Data Description Tables",
+      tables = list(
+        overview = summary_table_bundle_df(summary_obj$overview),
+        missing = summary_table_bundle_df(summary_obj$missing),
+        score_distribution = summary_table_bundle_df(summary_obj$score_distribution),
+        facet_overview = summary_table_bundle_df(summary_obj$facet_overview),
+        agreement = summary_table_bundle_df(summary_obj$agreement),
+        reporting_map = summary_table_bundle_df(summary_obj$reporting_map),
+        caveats = summary_table_bundle_df(summary_obj$caveats)
+      ),
+      roles = c(
+        overview = "run_overview",
+        missing = "missingness",
+        score_distribution = "score_usage",
+        facet_overview = "facet_coverage",
+        agreement = "agreement",
+        reporting_map = "reporting_map",
+        caveats = "score_category_caveats"
+      ),
+      descriptions = c(
+        overview = "One-row sample, design, and rating-span overview.",
+        missing = "Missing-value counts by selected input column.",
+        score_distribution = "Observed score distribution for category-usage reporting.",
+        facet_overview = "Facet-level coverage and weighted counts.",
+        agreement = "Observed inter-rater agreement summary when available.",
+        reporting_map = "Companion outputs for fit, reliability, and residual follow-up.",
+        caveats = "Structured pre-fit score-support caveats such as retained zero-count categories."
+      )
+    ),
+    "summary.mfrm_reporting_checklist" = list(
+      title = "Reporting Checklist Tables",
+      tables = list(
+        overview = summary_table_bundle_df(summary_obj$overview),
+        section_summary = summary_table_bundle_df(summary_obj$section_summary),
+        priority_summary = summary_table_bundle_df(summary_obj$priority_summary),
+        action_items = summary_table_bundle_df(summary_obj$action_items),
+        settings = summary_table_bundle_df(summary_obj$settings)
+      ),
+      roles = c(
+        overview = "checklist_overview",
+        section_summary = "section_coverage",
+        priority_summary = "priority_distribution",
+        action_items = "draft_actions",
+        settings = "checklist_settings"
+      ),
+      descriptions = c(
+        overview = "Overall checklist coverage across sections and draft-readiness flags.",
+        section_summary = "Coverage summary by reporting section.",
+        priority_summary = "High/medium/low/ready counts by severity.",
+        action_items = "Top unresolved manuscript-drafting actions.",
+        settings = "Checklist settings used to build the reporting contract."
+      )
+    ),
+    "summary.mfrm_apa_outputs" = list(
+      title = "APA Output Tables",
+      tables = list(
+        overview = summary_table_bundle_df(summary_obj$overview),
+        components = summary_table_bundle_df(summary_obj$components),
+        sections = summary_table_bundle_df(summary_obj$sections),
+        content_checks = summary_table_bundle_df(summary_obj$content_checks),
+        preview = summary_table_bundle_df(summary_obj$preview)
+      ),
+      roles = c(
+        overview = "draft_overview",
+        components = "component_stats",
+        sections = "section_coverage",
+        content_checks = "draft_checks",
+        preview = "text_preview"
+      ),
+      descriptions = c(
+        overview = "Overall coverage for manuscript draft text products.",
+        components = "Per-component line, character, and mention counts.",
+        sections = "Availability of the package-native section map.",
+        content_checks = "Contract-based checks for APA drafting completeness.",
+        preview = "Compact preview of the first non-empty lines in each draft component."
+      )
+    ),
+    "summary.mfrm_design_evaluation" = {
+      future_spec <- summary_table_bundle_future_branch_spec(summary_obj)
+      list(
+        title = "Design Evaluation Tables",
+        tables = c(
+          list(
+            overview = summary_table_bundle_df(summary_obj$overview),
+            design_summary = summary_table_bundle_df(summary_obj$design_summary)
+          ),
+          future_spec$tables
+        ),
+        roles = c(
+          overview = "run_overview",
+          design_summary = "design_performance",
+          future_spec$roles
+        ),
+        descriptions = c(
+          overview = "Run-level overview for the current design-evaluation study.",
+          design_summary = "Aggregated Monte Carlo design summaries for the active two-role planner.",
+          future_spec$descriptions
+        )
+      )
+    },
+    "summary.mfrm_signal_detection" = {
+      future_spec <- summary_table_bundle_future_branch_spec(summary_obj)
+      list(
+        title = "Signal Detection Tables",
+        tables = c(
+          list(
+            overview = summary_table_bundle_df(summary_obj$overview),
+            detection_summary = summary_table_bundle_df(summary_obj$detection_summary)
+          ),
+          future_spec$tables
+        ),
+        roles = c(
+          overview = "run_overview",
+          detection_summary = "signal_detection",
+          future_spec$roles
+        ),
+        descriptions = c(
+          overview = "Run-level overview for the current signal-detection study.",
+          detection_summary = "Aggregated DIF/bias screening summaries for the active two-role planner.",
+          future_spec$descriptions
+        )
+      )
+    },
+    "summary.mfrm_population_prediction" = {
+      future_spec <- summary_table_bundle_future_branch_spec(summary_obj)
+      list(
+        title = "Population Prediction Tables",
+        tables = c(
+          list(
+            design = summary_table_bundle_df(summary_obj$design),
+            overview = summary_table_bundle_df(summary_obj$overview),
+            forecast = summary_table_bundle_df(summary_obj$forecast)
+          ),
+          future_spec$tables
+        ),
+        roles = c(
+          design = "design_grid",
+          overview = "run_overview",
+          forecast = "forecast_summary",
+          future_spec$roles
+        ),
+        descriptions = c(
+          design = "Requested future design grid used for the current forecast run.",
+          overview = "Run-level overview for the current population forecast.",
+          forecast = "Facet-level forecast summary for the active two-role planner.",
+          future_spec$descriptions
+        )
+      )
+    },
+    "summary.mfrm_future_branch_active_branch" = {
+      future_spec <- summary_table_bundle_future_branch_spec(
+        summary_obj,
+        embedded = FALSE
+      )
+      list(
+        title = "Future Arbitrary-Facet Planning Tables",
+        tables = future_spec$tables,
+        roles = future_spec$roles,
+        descriptions = future_spec$descriptions
+      )
+    },
+    "summary.mfrm_facets_run" = list(
+      title = "Workflow Summary Tables",
+      tables = list(
+        overview = summary_table_bundle_df(summary_obj$overview),
+        mapping = summary_table_bundle_df(summary_obj$mapping),
+        run_info = summary_table_bundle_df(summary_obj$run_info),
+        fit_overview = summary_table_bundle_df(summary_obj$fit$overview),
+        fit_reporting_map = summary_table_bundle_df(summary_obj$fit$reporting_map),
+        diagnostic_overview = summary_table_bundle_df(summary_obj$diagnostics$overview),
+        diagnostic_flags = summary_table_bundle_df(summary_obj$diagnostics$flags),
+        diagnostic_reporting_map = summary_table_bundle_df(summary_obj$diagnostics$reporting_map)
+      ),
+      roles = c(
+        overview = "workflow_overview",
+        mapping = "column_mapping",
+        run_info = "workflow_settings",
+        fit_overview = "run_overview",
+        fit_reporting_map = "reporting_map",
+        diagnostic_overview = "run_overview",
+        diagnostic_flags = "flag_counts",
+        diagnostic_reporting_map = "reporting_map"
+      ),
+      descriptions = c(
+        overview = "Legacy-compatible workflow overview with fit metadata.",
+        mapping = "Resolved column mapping for the one-shot workflow run.",
+        run_info = "Workflow settings and pipeline metadata recorded by run_mfrm_facets().",
+        fit_overview = "Nested model-fit overview routed from summary(out$fit).",
+        fit_reporting_map = "Nested reporting-map follow-up routed from summary(out$fit).",
+        diagnostic_overview = "Nested diagnostic overview routed from summary(out$diagnostics).",
+        diagnostic_flags = "Nested diagnostic flag counts routed from summary(out$diagnostics).",
+        diagnostic_reporting_map = "Nested reporting-map follow-up routed from summary(out$diagnostics)."
+      )
+    ),
+    "summary.mfrm_bias" = list(
+      title = "Bias Summary Tables",
+      tables = list(
+        overview = summary_table_bundle_df(summary_obj$overview),
+        chi_sq = summary_table_bundle_df(summary_obj$chi_sq),
+        final_iteration = summary_table_bundle_df(summary_obj$final_iteration),
+        top_rows = summary_table_bundle_df(summary_obj$top_rows),
+        notes = summary_table_bundle_text_df(summary_obj$notes, column = "Note")
+      ),
+      roles = c(
+        overview = "bias_overview",
+        chi_sq = "bias_chi_square",
+        final_iteration = "bias_iteration_status",
+        top_rows = "bias_screening_rows",
+        notes = "interpretation_notes"
+      ),
+      descriptions = c(
+        overview = "Interaction-order overview and screening counts for the current bias run.",
+        chi_sq = "Fixed-effect chi-square block from the current bias run.",
+        final_iteration = "Final bias-iteration status row for stabilization checks.",
+        top_rows = "Highest-|t| interaction rows for immediate follow-up.",
+        notes = "Compact interpretation notes for screening-oriented bias reporting."
+      )
+    ),
+    "summary.mfrm_anchor_audit" = {
+      issue_tbl <- summary_table_bundle_df(summary_obj$issue_counts)
+      facet_tbl <- summary_table_bundle_df(summary_obj$facet_summary)
+      level_tbl <- summary_table_bundle_df(summary_obj$level_observation_summary)
+      category_tbl <- summary_table_bundle_df(summary_obj$category_counts)
+      rec_tbl <- summary_table_bundle_text_df(summary_obj$recommendations, column = "Recommendation")
+      notes_tbl <- summary_table_bundle_text_df(summary_obj$notes, column = "Note")
+      overview_tbl <- data.frame(
+        IssueRows = nrow(issue_tbl),
+        Facets = nrow(facet_tbl),
+        LevelRows = nrow(level_tbl),
+        CategoryRows = nrow(category_tbl),
+        Recommendations = nrow(rec_tbl),
+        stringsAsFactors = FALSE
+      )
+      list(
+        title = "Anchor Audit Tables",
+        tables = list(
+          overview = overview_tbl,
+          issue_counts = issue_tbl,
+          facet_summary = facet_tbl,
+          level_observation_summary = level_tbl,
+          category_counts = category_tbl,
+          recommendations = rec_tbl,
+          notes = notes_tbl
+        ),
+        roles = c(
+          overview = "anchor_audit_overview",
+          issue_counts = "anchor_issue_counts",
+          facet_summary = "facet_coverage",
+          level_observation_summary = "level_observation_audit",
+          category_counts = "category_usage",
+          recommendations = "repair_recommendations",
+          notes = "interpretation_notes"
+        ),
+        descriptions = c(
+          overview = "Anchor-audit overview with issue, facet, and recommendation counts.",
+          issue_counts = "Observed anchor-audit issue counts ranked by frequency.",
+          facet_summary = "Facet-level counts and anchor-table coverage summary.",
+          level_observation_summary = "Observation counts by facet level for anchor viability checks.",
+          category_counts = "Observed score-category usage for anchor-audit screening.",
+          recommendations = "Compact action list for anchor repair or review.",
+          notes = "One-line interpretation note from the anchor audit."
+        )
+      )
+    },
+    "summary.mfrm_linking_review" = {
+      overview_tbl <- summary_table_bundle_df(summary_obj$overview)
+      status_tbl <- summary_table_bundle_df(summary_obj$status)
+      top_tbl <- summary_table_bundle_df(summary_obj$top_linking_risks)
+      group_view_index_tbl <- summary_table_bundle_df(summary_obj$group_view_index)
+      prefit_tbl <- summary_table_bundle_df(summary_obj$prefit_anchor_risks)
+      drift_tbl <- summary_table_bundle_df(summary_obj$drift_risks)
+      chain_tbl <- summary_table_bundle_df(summary_obj$chain_risks)
+      plot_tbl <- summary_table_bundle_df(summary_obj$plot_map)
+      reporting_tbl <- summary_table_bundle_df(summary_obj$reporting_map)
+      support_tbl <- summary_table_bundle_df(summary_obj$support_status)
+      actions_tbl <- summary_table_bundle_text_df(summary_obj$next_actions, column = "Action")
+      notes_tbl <- summary_table_bundle_text_df(summary_obj$notes, column = "Note")
+      settings_tbl <- summary_table_bundle_settings_df(summary_obj$settings)
+      list(
+        title = "Linking Review Tables",
+        tables = list(
+          overview = overview_tbl,
+          status = status_tbl,
+          top_linking_risks = top_tbl,
+          group_view_index = group_view_index_tbl,
+          prefit_anchor_risks = prefit_tbl,
+          drift_risks = drift_tbl,
+          chain_risks = chain_tbl,
+          plot_map = plot_tbl,
+          reporting_map = reporting_tbl,
+          support_status = support_tbl,
+          next_actions = actions_tbl,
+          notes = notes_tbl,
+          settings = settings_tbl
+        ),
+        roles = c(
+          overview = "linking_review_overview",
+          status = "review_status",
+          top_linking_risks = "linking_risk_screen",
+          group_view_index = "linking_risk_group_index",
+          prefit_anchor_risks = "prefit_anchor_risks",
+          drift_risks = "drift_risks",
+          chain_risks = "chain_risks",
+          plot_map = "plot_routing",
+          reporting_map = "reporting_map",
+          support_status = "capability_boundary",
+          next_actions = "repair_recommendations",
+          notes = "interpretation_notes",
+          settings = "review_settings"
+        ),
+        descriptions = c(
+          overview = "Overview of evidence sources and current operational linking status.",
+          status = "Compact front-door status block for linking review.",
+          top_linking_risks = "Highest-priority linking risks across anchor, drift, and chain evidence.",
+          group_view_index = "Index of stable wave/link/facet/source-family grouping views available for operational linking triage.",
+          prefit_anchor_risks = "Pre-fit anchor adequacy issues and overlap-support warnings.",
+          drift_risks = "Wave-level drift and retained-common-element support warnings.",
+          chain_risks = "Adjacent-link instability rows from the screened equating chain.",
+          plot_map = "Routing map to existing plotting helpers for operational follow-up.",
+          reporting_map = "Map from operational review outputs to manuscript/reporting companions.",
+          support_status = "Current support contract for RSM/PCM versus bounded GPCM use.",
+          next_actions = "Top next-step actions for anchor repair or linking follow-up.",
+          notes = "Compact interpretation notes for operational linking review.",
+          settings = "Settings and provenance recorded by build_linking_review()."
+        )
+      )
+    },
+    "summary.mfrm_misfit_casebook" = {
+      overview_tbl <- summary_table_bundle_df(summary_obj$overview)
+      status_tbl <- summary_table_bundle_df(summary_obj$status)
+      top_cases_tbl <- summary_table_bundle_df(summary_obj$top_cases)
+      case_rollup_tbl <- summary_table_bundle_df(summary_obj$case_rollup)
+      group_view_index_tbl <- summary_table_bundle_df(summary_obj$group_view_index)
+      source_summary_tbl <- summary_table_bundle_df(summary_obj$source_summary)
+      plot_tbl <- summary_table_bundle_df(summary_obj$plot_map)
+      reporting_tbl <- summary_table_bundle_df(summary_obj$reporting_map)
+      support_tbl <- summary_table_bundle_df(summary_obj$support_status)
+      warning_tbl <- summary_table_bundle_text_df(summary_obj$key_warnings, column = "Warning")
+      actions_tbl <- summary_table_bundle_text_df(summary_obj$next_actions, column = "Action")
+      notes_tbl <- summary_table_bundle_text_df(summary_obj$notes, column = "Note")
+      settings_tbl <- summary_table_bundle_settings_df(summary_obj$settings)
+      list(
+        title = "Misfit Casebook Tables",
+        tables = list(
+          overview = overview_tbl,
+          status = status_tbl,
+          top_cases = top_cases_tbl,
+          case_rollup = case_rollup_tbl,
+          group_view_index = group_view_index_tbl,
+          source_summary = source_summary_tbl,
+          plot_map = plot_tbl,
+          reporting_map = reporting_tbl,
+          support_status = support_tbl,
+          key_warnings = warning_tbl,
+          next_actions = actions_tbl,
+          notes = notes_tbl,
+          settings = settings_tbl
+        ),
+        roles = c(
+          overview = "misfit_casebook_overview",
+          status = "review_status",
+          top_cases = "misfit_case_rows",
+          case_rollup = "misfit_case_rollup",
+          group_view_index = "misfit_case_rollup",
+          source_summary = "misfit_case_sources",
+          plot_map = "plot_routing",
+          reporting_map = "reporting_map",
+          support_status = "capability_boundary",
+          key_warnings = "review_status",
+          next_actions = "repair_recommendations",
+          notes = "interpretation_notes",
+          settings = "review_settings"
+        ),
+        descriptions = c(
+          overview = "Overview of the current operational misfit case-review queue.",
+          status = "Compact front-door status block for the misfit casebook.",
+          top_cases = "Highest-priority case rows preserved by source family without collapsing evidence into one opaque score.",
+          case_rollup = "Secondary grouping view that summarizes where flagged cases concentrate by person, facet level, pair, or source family.",
+          group_view_index = "Index of stable grouping views available for operational triage on top of the raw case rows.",
+          source_summary = "Counts and maximum priority by source family for the current casebook.",
+          plot_map = "Routing map from casebook source families to dedicated follow-up plotting helpers.",
+          reporting_map = "Map from operational case review to reporting and appendix companions.",
+          support_status = "Current support contract for Rasch-family versus bounded GPCM case review.",
+          key_warnings = "Top warning lines for the current casebook build.",
+          next_actions = "Top next-step actions for misfit case follow-up.",
+          notes = "Compact interpretation notes for the misfit casebook.",
+          settings = "Casebook settings and source-family provenance."
+        )
+      )
+    },
+    "summary.mfrm_weighting_audit" = {
+      overview_tbl <- summary_table_bundle_df(summary_obj$overview)
+      status_tbl <- summary_table_bundle_df(summary_obj$status)
+      top_shift_tbl <- summary_table_bundle_df(summary_obj$top_measure_shifts)
+      top_reweighted_tbl <- summary_table_bundle_df(summary_obj$top_reweighted_levels)
+      plot_tbl <- summary_table_bundle_df(summary_obj$plot_map)
+      reporting_tbl <- summary_table_bundle_df(summary_obj$reporting_map)
+      support_tbl <- summary_table_bundle_df(summary_obj$support_status)
+      warning_tbl <- summary_table_bundle_text_df(summary_obj$key_warnings, column = "Warning")
+      actions_tbl <- summary_table_bundle_text_df(summary_obj$next_actions, column = "Action")
+      notes_tbl <- summary_table_bundle_text_df(summary_obj$notes, column = "Note")
+      settings_tbl <- summary_table_bundle_settings_df(summary_obj$settings)
+      list(
+        title = "Weighting Audit Tables",
+        tables = list(
+          overview = overview_tbl,
+          status = status_tbl,
+          top_measure_shifts = top_shift_tbl,
+          top_reweighted_levels = top_reweighted_tbl,
+          plot_map = plot_tbl,
+          reporting_map = reporting_tbl,
+          support_status = support_tbl,
+          key_warnings = warning_tbl,
+          next_actions = actions_tbl,
+          notes = notes_tbl,
+          settings = settings_tbl
+        ),
+        roles = c(
+          overview = "weighting_review_overview",
+          status = "review_status",
+          top_measure_shifts = "reweighting_measure_shift",
+          top_reweighted_levels = "gpcm_discrimination",
+          plot_map = "plot_routing",
+          reporting_map = "reporting_map",
+          support_status = "capability_boundary",
+          key_warnings = "review_status",
+          next_actions = "repair_recommendations",
+          notes = "interpretation_notes",
+          settings = "estimation_settings"
+        ),
+        descriptions = c(
+          overview = "Overview of the equal-weighting versus bounded GPCM weighting audit.",
+          status = "Compact status block for the weighting-policy review.",
+          top_measure_shifts = "Largest non-person facet-measure shifts between the Rasch-family reference and bounded GPCM.",
+          top_reweighted_levels = "Largest slope-facet reweighting signals under bounded GPCM.",
+          plot_map = "Public plot routes for precision redistribution and comparison follow-up.",
+          reporting_map = "Bundle/report handoff map for weighting-policy review outputs.",
+          support_status = "Capability-boundary statement for the bounded GPCM weighting audit.",
+          key_warnings = "Top warning lines for weighting-policy review.",
+          next_actions = "Recommended next-step actions after weighting-policy review.",
+          notes = "Interpretation notes for the weighting audit.",
+          settings = "Weighting-audit settings and theta-grid parameters."
+        )
+      )
+    },
+    "summary.mfrm_unit_prediction" = {
+      estimate_tbl <- summary_table_bundle_df(summary_obj$estimates)
+      audit_tbl <- summary_table_bundle_df(summary_obj$audit)
+      pop_audit_tbl <- summary_table_bundle_df(summary_obj$population_audit)
+      settings_tbl <- summary_table_bundle_settings_df(summary_obj$settings)
+      notes_tbl <- summary_table_bundle_text_df(summary_obj$notes, column = "Note")
+      overview_tbl <- data.frame(
+        Units = nrow(estimate_tbl),
+        AuditRows = nrow(audit_tbl),
+        PopulationAuditRows = nrow(pop_audit_tbl),
+        Settings = nrow(settings_tbl),
+        Notes = nrow(notes_tbl),
+        stringsAsFactors = FALSE
+      )
+      list(
+        title = "Unit Prediction Tables",
+        tables = list(
+          overview = overview_tbl,
+          estimates = estimate_tbl,
+          audit = audit_tbl,
+          population_audit = pop_audit_tbl,
+          settings = settings_tbl,
+          notes = notes_tbl
+        ),
+        roles = c(
+          overview = "prediction_overview",
+          estimates = "unit_estimates",
+          audit = "prediction_audit",
+          population_audit = "population_audit",
+          settings = "scoring_settings",
+          notes = "interpretation_notes"
+        ),
+        descriptions = c(
+          overview = "Posterior-scoring overview for the current unit-prediction run.",
+          estimates = "Posterior summaries for the scored persons.",
+          audit = "Row-level preparation audit for the supplied scoring data.",
+          population_audit = "Optional person-level omission audit for latent-regression scoring.",
+          settings = "Scoring settings carried into posterior unit prediction.",
+          notes = "Compact interpretation notes for posterior scoring output."
+        )
+      )
+    },
+    "summary.mfrm_plausible_values" = {
+      draw_tbl <- summary_table_bundle_df(summary_obj$draw_summary)
+      estimate_tbl <- summary_table_bundle_df(summary_obj$estimates)
+      audit_tbl <- summary_table_bundle_df(summary_obj$audit)
+      pop_audit_tbl <- summary_table_bundle_df(summary_obj$population_audit)
+      settings_tbl <- summary_table_bundle_settings_df(summary_obj$settings)
+      notes_tbl <- summary_table_bundle_text_df(summary_obj$notes, column = "Note")
+      total_draws <- if ("Draws" %in% names(draw_tbl)) sum(draw_tbl$Draws, na.rm = TRUE) else nrow(draw_tbl)
+      overview_tbl <- data.frame(
+        Persons = nrow(draw_tbl),
+        TotalDraws = total_draws,
+        EstimateRows = nrow(estimate_tbl),
+        AuditRows = nrow(audit_tbl),
+        PopulationAuditRows = nrow(pop_audit_tbl),
+        Settings = nrow(settings_tbl),
+        Notes = nrow(notes_tbl),
+        stringsAsFactors = FALSE
+      )
+      list(
+        title = "Plausible Value Tables",
+        tables = list(
+          overview = overview_tbl,
+          draw_summary = draw_tbl,
+          estimates = estimate_tbl,
+          audit = audit_tbl,
+          population_audit = pop_audit_tbl,
+          settings = settings_tbl,
+          notes = notes_tbl
+        ),
+        roles = c(
+          overview = "plausible_value_overview",
+          draw_summary = "plausible_value_draws",
+          estimates = "unit_estimates",
+          audit = "prediction_audit",
+          population_audit = "population_audit",
+          settings = "scoring_settings",
+          notes = "interpretation_notes"
+        ),
+        descriptions = c(
+          overview = "Approximate plausible-value overview for the current posterior scoring run.",
+          draw_summary = "Empirical summaries of the sampled posterior draws by person.",
+          estimates = "Companion posterior EAP summaries paired with the draw summary.",
+          audit = "Row-level preparation audit for the supplied scoring data.",
+          population_audit = "Optional person-level omission audit for latent-regression scoring.",
+          settings = "Scoring settings used to generate the approximate plausible values.",
+          notes = "Compact interpretation notes for plausible-value reporting."
+        )
+      )
+    },
+    stop("Unsupported summary class for table-bundle conversion: ", cls, call. = FALSE)
+  )
+}
+
+build_summary_table_index <- function(tables, roles, descriptions) {
+  do.call(
+    rbind,
+    lapply(names(tables), function(nm) {
+      tbl <- tables[[nm]]
+      data.frame(
+        Table = nm,
+        Rows = nrow(tbl),
+        Cols = ncol(tbl),
+        Role = as.character(roles[[nm]] %||% ""),
+        Description = as.character(descriptions[[nm]] %||% ""),
+        stringsAsFactors = FALSE
+      )
+    })
+  )
+}
+
+#' Build a manuscript-oriented table bundle from `summary()` outputs
+#'
+#' @param x An `mfrm_fit`, `mfrm_diagnostics`, `mfrm_data_description`,
+#'   `mfrm_reporting_checklist`, `mfrm_apa_outputs`,
+#'   `mfrm_design_evaluation`, `mfrm_signal_detection`,
+#'   `mfrm_population_prediction`, `mfrm_future_branch_active_branch`,
+#'   `mfrm_facets_run`, `mfrm_bias`, `mfrm_anchor_audit`,
+#'   `mfrm_linking_review`, `mfrm_misfit_casebook`, `mfrm_weighting_audit`,
+#'   `mfrm_unit_prediction`, or `mfrm_plausible_values` object, or one of
+#'   their `summary()` outputs.
+#' @param which Optional character vector selecting a subset of named tables.
+#' @param appendix_preset Optional appendix-oriented table preset:
+#'   `"all"`, `"recommended"`, `"compact"`, `"methods"`, `"results"`,
+#'   `"diagnostics"`, or `"reporting"`. Cannot be combined with `which`.
+#'   Section-aware presets keep returned tables whose bundle catalog maps to
+#'   the requested appendix section.
+#' @param include_empty If `TRUE`, retain empty tables in the returned bundle.
+#' @param digits Digits forwarded when `summary()` must be computed from a raw
+#'   object.
+#' @param top_n Row cap forwarded to compact `summary()` methods when `x` is a
+#'   raw object.
+#' @param preview_chars Character cap forwarded to
+#'   `summary.mfrm_apa_outputs()` when `x` is a raw APA-output object.
+#'
+#' @details
+#' This helper turns the package's compact summary objects into a reproducible
+#' table bundle for manuscript drafting, appendix handoff, or downstream
+#' formatting. It does not replace [apa_table()]; instead, it provides a
+#' consistent bridge from `summary()` to named `data.frame` components that can
+#' later be rendered with [apa_table()] or exported directly.
+#'
+#' The public entry point validates `x` and the summary-object contract up
+#' front, so malformed summaries fail with a package-level message instead of
+#' falling through to opaque downstream errors.
+#'
+#' The function first normalizes `x` through the corresponding `summary()`
+#' method when needed, then records a `table_index` describing every available
+#' table and returns the selected tables in `tables`. Optional appendix presets
+#' can be applied at bundle-construction time when you want a conservative
+#' manuscript-facing subset before plotting or export.
+#'
+#' @section Supported inputs:
+#' - [fit_mfrm()] or `summary(fit)`
+#' - [diagnose_mfrm()] or `summary(diag)`
+#' - [describe_mfrm_data()] or `summary(ds)`
+#' - [reporting_checklist()] or `summary(chk)`
+#' - [build_apa_outputs()] or `summary(apa)`
+#' - [evaluate_mfrm_design()] or `summary(sim_eval)`
+#' - [evaluate_mfrm_signal_detection()] or `summary(sig_eval)`
+#' - [predict_mfrm_population()] or `summary(pred)`
+#' - `planning_schema$future_branch_active_branch` or `summary(...)`
+#' - [run_mfrm_facets()] or `summary(out)`
+#' - [estimate_bias()] or `summary(bias)`
+#' - [audit_mfrm_anchors()] or `summary(audit)`
+#' - [build_linking_review()] or `summary(review)`
+#' - [build_misfit_casebook()] or `summary(casebook)`
+#' - [build_weighting_audit()] or `summary(audit)`
+#' - [predict_mfrm_units()] or `summary(pred_units)`
+#' - [sample_mfrm_plausible_values()] or `summary(pv)`
+#'
+#' @section Interpreting output:
+#' - `overview`: one-row metadata about the source summary and table counts.
+#' - `table_index`: table names, dimensions, roles, and manuscript-oriented
+#'   descriptions.
+#' - `plot_index`: which returned tables contain numeric content and which
+#'   bundle-level plot types can use them directly.
+#' - `tables`: named `data.frame` objects ready for formatting or export.
+#' - `appendix_preset`: active appendix subset mode (`"none"` when not used).
+#' - `notes`: short guidance about omitted empty tables or source-level caveats.
+#' - fit-level caveats use the `analysis_caveats` role; pre-fit data
+#'   score-support caveats use the `score_category_caveats` role. Both roles are
+#'   classified as diagnostics and stay in `recommended` appendix subsets.
+#' - latent-regression fit summaries expose `population_coding` in the methods
+#'   appendix role so categorical levels, contrasts, and encoded columns can be
+#'   documented with the coefficient table.
+#'
+#' @section Typical workflow:
+#' 1. Build a compact object with `summary(...)`.
+#' 2. Convert it with `build_summary_table_bundle(...)`.
+#' 3. Use `bundle$tables[[...]]` directly, or hand a selected table to
+#'    [apa_table()] for formatted manuscript output.
+#' 4. If you want a manuscript appendix subset up front, use a preset such as
+#'    `appendix_preset = "recommended"`, `"compact"`, or `"diagnostics"`.
+#'
+#' @return An object of class `mfrm_summary_table_bundle` with:
+#' - `overview`
+#' - `table_index`
+#' - `plot_index`
+#' - `tables`
+#' - `appendix_preset`
+#' - `notes`
+#' - `source_class`
+#' - `summary_class`
+#'
+#' @seealso [summary()], [apa_table()], [reporting_checklist()],
+#'   [build_apa_outputs()]
+#' @examples
+#' \donttest{
+#' toy <- load_mfrmr_data("example_core")
+#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
+#'                 method = "JML", maxit = 25)
+#' bundle <- build_summary_table_bundle(fit)
+#' bundle$table_index
+#' summary(bundle)$role_summary
+#' }
+#' @export
+build_summary_table_bundle <- function(x,
+                                       which = NULL,
+                                       appendix_preset = NULL,
+                                       include_empty = FALSE,
+                                       digits = 3,
+                                       top_n = 10,
+                                       preview_chars = 160) {
+  validated <- validate_summary_table_bundle_inputs(
+    x = x,
+    which = which,
+    appendix_preset = appendix_preset,
+    include_empty = include_empty,
+    digits = digits,
+    top_n = top_n,
+    preview_chars = preview_chars,
+    helper = "build_summary_table_bundle()"
+  )
+  which <- validated$which
+  appendix_preset <- validated$appendix_preset
+  include_empty <- validated$include_empty
+  resolved <- validated$resolved
+
+  if (!is.null(appendix_preset) && !is.null(which)) {
+    stop(
+      "`build_summary_table_bundle()` requires `appendix_preset` and `which` to be used separately.",
+      call. = FALSE
+    )
+  }
+  spec <- summary_table_bundle_spec(resolved$summary)
+  tables <- spec$tables
+  table_index <- build_summary_table_index(tables, spec$roles, spec$descriptions)
+
+  requested <- names(tables)
+  if (!is.null(which)) {
+    which <- unique(as.character(which))
+    unknown <- setdiff(which, names(tables))
+    if (length(unknown) > 0L) {
+      stop(
+        "`build_summary_table_bundle()` received unknown `which` table name(s): ",
+        paste(unknown, collapse = ", "),
+        ". Inspect `build_summary_table_bundle(x)$table_index$Table` for supported names.",
+        call. = FALSE
+      )
+    }
+    requested <- which
+  }
+
+  if (is.null(which) && !isTRUE(include_empty)) {
+    keep <- vapply(tables[requested], function(tbl) !summary_table_bundle_is_empty(tbl), logical(1))
+    requested <- requested[keep]
+  }
+
+  selected_tables <- tables[requested]
+  selected_index <- table_index[match(requested, table_index$Table), , drop = FALSE]
+  plot_index <- summary_table_bundle_plot_index(selected_tables)
+  dropped_empty <- sum(vapply(tables, summary_table_bundle_is_empty, logical(1))) -
+    sum(vapply(selected_tables, summary_table_bundle_is_empty, logical(1)))
+  notes <- as.character(resolved$summary$notes %||% character(0))
+  if (is.null(which) && !isTRUE(include_empty) && dropped_empty > 0L) {
+    notes <- c(notes, sprintf("%d empty table(s) were omitted from `tables`; use `include_empty = TRUE` to retain them.", dropped_empty))
+  }
+  if (!is.null(which)) {
+    notes <- c(notes, sprintf("Returned %d requested table(s): %s.", length(requested), paste(requested, collapse = ", ")))
+  }
+
+  overview <- data.frame(
+    Title = spec$title,
+    SourceClass = resolved$source_class,
+    SummaryClass = resolved$summary_class,
+    TablesAvailable = nrow(table_index),
+    TablesReturned = length(selected_tables),
+    AppendixPreset = if (is.null(appendix_preset)) "none" else appendix_preset,
+    stringsAsFactors = FALSE
+  )
+
+  out <- list(
+    overview = overview,
+    table_index = selected_index,
+    plot_index = plot_index,
+    tables = selected_tables,
+    notes = unique(notes[nzchar(notes)]),
+    appendix_preset = appendix_preset %||% "none",
+    source_class = resolved$source_class,
+    summary_class = resolved$summary_class
+  )
+  class(out) <- "mfrm_summary_table_bundle"
+  if (!is.null(appendix_preset)) {
+    out <- summary_table_bundle_select_for_appendix(out, preset = appendix_preset)
+    out$appendix_preset <- appendix_preset
+    if (!is.null(out$overview) && nrow(out$overview) > 0L) {
+      out$overview$AppendixPreset <- appendix_preset
+    }
+  }
+  out
+}
+
+#' @export
+print.mfrm_summary_table_bundle <- function(x, ...) {
+  cat("mfrmr Summary Table Bundle\n")
+  if (!is.null(x$overview) && nrow(x$overview) > 0) {
+    cat("\nOverview\n")
+    print(as.data.frame(x$overview), row.names = FALSE)
+  }
+  if (!is.null(x$table_index) && nrow(x$table_index) > 0) {
+    cat("\nTable index\n")
+    print(as.data.frame(x$table_index), row.names = FALSE)
+  }
+  if (!is.null(x$plot_index) && nrow(x$plot_index) > 0) {
+    cat("\nPlot index\n")
+    print(as.data.frame(x$plot_index), row.names = FALSE)
+  }
+  if (length(x$notes %||% character(0)) > 0L) {
+    cat("\nNotes\n")
+    for (line in x$notes) cat(" - ", line, "\n", sep = "")
+  }
+  invisible(x)
+}
+
+summary_table_bundle_first_numeric_table <- function(bundle) {
+  plot_idx <- as.data.frame(bundle$plot_index %||% data.frame(), stringsAsFactors = FALSE)
+  if (nrow(plot_idx) > 0L && all(c("Table", "PlotReady") %in% names(plot_idx))) {
+    ready <- plot_idx[plot_idx$PlotReady %in% TRUE, , drop = FALSE]
+    if (nrow(ready) > 0L) {
+      return(as.character(ready$Table[1]))
+    }
+  }
+  tbls <- bundle$tables %||% list()
+  if (length(tbls) == 0L) return(NULL)
+  for (nm in names(tbls)) {
+    tbl <- as.data.frame(tbls[[nm]], stringsAsFactors = FALSE)
+    if (nrow(tbl) == 0L) next
+    if (any(vapply(tbl, is.numeric, logical(1)))) {
+      return(nm)
+    }
+  }
+  NULL
+}
+
+summary_table_bundle_profile <- function(bundle) {
+  tbls <- bundle$tables %||% list()
+  if (length(tbls) == 0L) {
+    return(data.frame())
+  }
+  idx <- as.data.frame(bundle$table_index %||% data.frame(), stringsAsFactors = FALSE)
+  do.call(
+    rbind,
+    lapply(names(tbls), function(nm) {
+      tbl <- as.data.frame(tbls[[nm]], stringsAsFactors = FALSE)
+      idx_row <- if (nrow(idx) > 0L && "Table" %in% names(idx)) {
+        idx[idx$Table %in% nm, , drop = FALSE]
+      } else {
+        data.frame()
+      }
+      data.frame(
+        Table = nm,
+        Rows = nrow(tbl),
+        Cols = ncol(tbl),
+        NumericColumns = sum(vapply(tbl, is.numeric, logical(1))),
+        MissingValues = sum(is.na(tbl)),
+        Role = if (nrow(idx_row) > 0L && "Role" %in% names(idx_row)) as.character(idx_row$Role[1]) else "",
+        Description = if (nrow(idx_row) > 0L && "Description" %in% names(idx_row)) as.character(idx_row$Description[1]) else "",
+        stringsAsFactors = FALSE
+      )
+    })
+  )
+}
+
+summary_table_bundle_plot_index <- function(tables) {
+  tbls <- tables %||% list()
+  if (length(tbls) == 0L) {
+    return(data.frame())
+  }
+  do.call(
+    rbind,
+    lapply(names(tbls), function(nm) {
+      tbl <- as.data.frame(tbls[[nm]], stringsAsFactors = FALSE)
+      numeric_cols <- names(tbl)[vapply(tbl, is.numeric, logical(1))]
+      plot_ready <- nrow(tbl) > 0L && length(numeric_cols) > 0L
+      data.frame(
+        Table = nm,
+        PlotReady = plot_ready,
+        NumericColumns = length(numeric_cols),
+        DefaultPlotTypes = if (plot_ready) "numeric_profile, first_numeric" else "",
+        stringsAsFactors = FALSE
+      )
+    })
+  )
+}
+
+summary_table_bundle_compact_labels <- function(x, max_n = 4L) {
+  vals <- unique(as.character(x %||% character(0)))
+  vals <- vals[nzchar(vals)]
+  if (length(vals) == 0L) return("")
+  max_n <- max(1L, as.integer(max_n))
+  if (length(vals) <= max_n) {
+    return(paste(vals, collapse = ", "))
+  }
+  paste(c(vals[seq_len(max_n)], "..."), collapse = ", ")
+}
+
+summary_table_bundle_appendix_role_registry <- function() {
+  out <- data.frame(
+    Role = c(
+      "run_overview",
+      "population_basis",
+      "population_coefficients",
+      "population_design",
+      "population_coding",
+      "facet_distribution",
+      "person_distribution",
+      "category_structure",
+      "gpcm_discrimination",
+      "estimation_settings",
+      "overall_fit",
+      "precision_basis",
+      "precision_audit",
+      "facet_precision",
+      "flag_counts",
+      "missingness",
+      "score_usage",
+      "facet_coverage",
+      "agreement",
+      "checklist_overview",
+      "section_coverage",
+      "priority_distribution",
+      "draft_overview",
+      "component_stats",
+      "draft_checks",
+      "text_preview",
+      "reporting_map",
+      "extreme_facet_levels",
+      "extreme_person_high",
+      "extreme_person_low",
+      "extreme_fit_rows",
+      "draft_actions",
+      "checklist_settings",
+      "future_branch_overview",
+      "future_branch_profile",
+      "future_branch_load_balance",
+      "future_branch_coverage",
+      "future_branch_guardrails",
+      "future_branch_readiness",
+      "future_branch_recommendation",
+      "future_branch_appendix_presets",
+      "future_branch_appendix_roles",
+      "future_branch_appendix_sections",
+      "future_branch_selection_table_presets",
+      "future_branch_selection_handoff_tables",
+      "future_branch_selection_handoff_presets",
+      "future_branch_selection_handoff",
+      "future_branch_selection_handoff_bundles",
+      "future_branch_selection_handoff_roles",
+      "future_branch_selection_handoff_role_sections",
+      "future_branch_selection_tables",
+      "future_branch_selection_summary",
+      "future_branch_selection_roles",
+      "future_branch_selection_sections",
+      "future_branch_selection_catalog",
+      "future_branch_reporting_map",
+      "linking_review_overview",
+      "linking_risk_screen",
+      "linking_risk_group_index",
+      "misfit_casebook_overview",
+      "misfit_case_rows",
+      "misfit_case_rollup",
+      "misfit_case_sources",
+      "weighting_review_overview",
+      "review_status",
+      "plot_routing",
+      "capability_boundary",
+      "repair_recommendations",
+      "interpretation_notes",
+      "reweighting_measure_shift",
+      "score_category_caveats",
+      "analysis_caveats",
+      "prediction_overview",
+      "unit_estimates",
+      "prediction_audit",
+      "population_audit",
+      "scoring_settings",
+      "plausible_value_overview",
+      "plausible_value_draws",
+      "design_performance",
+      "signal_detection",
+      "design_grid",
+      "forecast_summary",
+      "workflow_overview",
+      "column_mapping",
+      "workflow_settings",
+      "bias_overview",
+      "bias_chi_square",
+      "bias_iteration_status",
+      "bias_screening_rows",
+      "anchor_audit_overview",
+      "anchor_issue_counts",
+      "level_observation_audit",
+      "category_usage",
+      "prefit_anchor_risks",
+      "drift_risks",
+      "chain_risks",
+      "review_settings"
+    ),
+    AppendixSection = c(
+      "methods",
+      "methods",
+      "methods",
+      "methods",
+      "methods",
+      "results",
+      "results",
+      "results",
+      "results",
+      "methods",
+      "results",
+      "results",
+      "diagnostics",
+      "results",
+      "diagnostics",
+      "methods",
+      "methods",
+      "results",
+      "reporting",
+      "reporting",
+      "reporting",
+      "reporting",
+      "reporting",
+      "reporting",
+      "workflow",
+      "workflow",
+      "workflow",
+      "exploratory",
+      "exploratory",
+      "exploratory",
+      "exploratory",
+      "workflow",
+      "workflow",
+      "methods",
+      "methods",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "methods",
+      "workflow",
+      "workflow",
+      "workflow",
+      "workflow",
+      "workflow",
+      "workflow",
+      "workflow",
+      "workflow",
+      "workflow",
+      "workflow",
+      "workflow",
+      "workflow",
+      "workflow",
+      "workflow",
+      "workflow",
+      "workflow",
+      "diagnostics",
+      "workflow",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "methods",
+      "methods",
+      "diagnostics",
+      "workflow",
+      "methods",
+      "reporting",
+      "reporting",
+      "results",
+      "diagnostics",
+      "diagnostics",
+      "results",
+      "results",
+      "diagnostics",
+      "diagnostics",
+      "methods",
+      "results",
+      "results",
+      "results",
+      "diagnostics",
+      "methods",
+      "results",
+      "workflow",
+      "workflow",
+      "workflow",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "methods"
+    ),
+    RecommendedAppendix = c(
+      TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE,
+      TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE,
+      TRUE, TRUE, TRUE, TRUE, TRUE,
+      FALSE, FALSE, FALSE,
+      FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
+      TRUE, TRUE, FALSE, FALSE, FALSE, TRUE, TRUE,
+      FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
+      TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE,
+      TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE,
+      TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE,
+      TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE
+    ),
+    CompactAppendix = c(
+      TRUE, TRUE, FALSE, FALSE, FALSE, TRUE, FALSE, TRUE, FALSE, FALSE,
+      TRUE, TRUE, FALSE, TRUE, FALSE, TRUE, TRUE, TRUE, FALSE,
+      TRUE, TRUE, TRUE, TRUE, TRUE,
+      FALSE, FALSE, FALSE,
+      FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
+      TRUE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE,
+      FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
+      TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, FALSE, FALSE, TRUE, FALSE, FALSE, TRUE, TRUE,
+      TRUE, TRUE, FALSE, TRUE, FALSE, TRUE, TRUE,
+      TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, TRUE, TRUE, FALSE, TRUE,
+      TRUE, TRUE, FALSE, FALSE, TRUE, TRUE, TRUE, FALSE
+    ),
+    PreferredAppendixOrder = c(
+      10L, 20L, 30L, 35L, 36L, 40L, 50L, 60L, 70L, 80L,
+      90L, 100L, 110L, 120L, 130L, 140L, 150L, 160L, 170L,
+      180L, 190L, 200L, 210L, 220L,
+      990L, 991L, 900L,
+      910L, 920L, 930L, 940L, 950L, 960L,
+      225L, 226L, 227L, 228L, 229L, 230L, 231L,
+      970L, 971L, 972L, 973L, 974L, 975L, 976L, 977L, 978L, 979L, 980L, 981L, 982L, 983L, 984L, 985L,
+      232L, 233L, 234L, 235L, 236L, 237L, 238L, 239L, 240L, 986L, 987L, 988L, 989L, 125L, 131L, 132L,
+      133L, 134L, 135L, 136L, 137L, 138L, 139L,
+      241L, 242L, 243L, 244L, 245L, 246L, 247L, 248L, 249L, 250L, 251L,
+      252L, 253L, 254L, 255L, 256L, 257L, 258L, 259L
+    ),
+    AppendixRationale = c(
+      "Always include the main run-identification table.",
+      "Include whenever population-model interpretation is part of the report.",
+      "Include when latent-regression coefficients were estimated.",
+      "Include to audit latent-regression design-matrix columns and variance screening.",
+      "Include when categorical population covariates were encoded through the model matrix.",
+      "Core facet spread and scale-location appendix table.",
+      "Useful for full appendices but omitted from compact presets.",
+      "Core threshold/category appendix table.",
+      "Useful when GPCM discrimination is active.",
+      "Methods/settings appendix table; recommended but not compact.",
+      "Core fit summary table for results appendices.",
+      "Core precision-basis table for cautious interpretation.",
+      "Recommended when precision caveats need explicit documentation.",
+      "Core reliability/separation appendix table.",
+      "Recommended diagnostic count surface for QC appendices.",
+      "Core missing-data appendix table.",
+      "Core score-usage appendix table.",
+      "Core facet-coverage appendix table.",
+      "Optional agreement appendix surface.",
+      "Recommended checklist overview for reporting QA appendices.",
+      "Core section-coverage appendix table.",
+      "Core priority distribution for reporting follow-up.",
+      "Core manuscript-draft coverage overview.",
+      "Core APA component inventory.",
+      "Internal draft QA surface; keep out of recommended presets.",
+      "Preview-only draft text; keep out of recommended presets.",
+      "Bridge metadata, useful for workflow but not manuscript appendix.",
+      "Exploratory extreme table; available only in full exports.",
+      "Exploratory extreme table; available only in full exports.",
+      "Exploratory extreme table; available only in full exports.",
+      "Exploratory extreme table; available only in full exports.",
+      "Internal drafting action list; keep out of recommended presets.",
+      "Internal checklist settings; keep out of recommended presets.",
+      "Recommended methods appendix overview for the future arbitrary-facet planning scaffold.",
+      "Recommended exact-count profile for future arbitrary-facet planning methods appendices.",
+      "Detailed load-balance diagnostics; retain for full exports but omit from recommended presets.",
+      "Detailed coverage/connectivity diagnostics; retain for full exports but omit from recommended presets.",
+      "Detailed guardrail classifications; retain for full exports but omit from recommended presets.",
+      "Core structural readiness table for future arbitrary-facet planning review.",
+      "Core conservative future-branch recommendation table for methods appendices.",
+      "Workflow-only appendix preset counts for direct future-branch review.",
+      "Workflow-only appendix role counts for direct future-branch review.",
+      "Workflow-only appendix section counts for direct future-branch review.",
+      "Workflow-only preset-specific appendix table selections for direct future-branch review.",
+      "Workflow-only table-level appendix handoff crosswalk for direct future-branch review.",
+      "Workflow-only preset-level appendix handoff overview for direct future-branch review.",
+      "Workflow-only manuscript-section handoff summary for direct future-branch review.",
+      "Workflow-only bundle-aware appendix handoff summary for direct future-branch review.",
+      "Workflow-only role-aware appendix handoff summary for direct future-branch review.",
+      "Workflow-only role-by-section appendix handoff summary for direct future-branch review.",
+      "Workflow-only preset-aware appendix table selections for direct future-branch review.",
+      "Workflow-only preset-filtered appendix bundle counts for direct future-branch review.",
+      "Workflow-only preset-filtered appendix role counts for direct future-branch review.",
+      "Workflow-only preset-filtered appendix section counts for direct future-branch review.",
+      "Workflow-only preset-filtered appendix selection catalog for direct future-branch review.",
+      "Workflow-only reporting bridge metadata for the direct future-branch surface.",
+      "Recommended overview table for linking-review appendix handoff.",
+      "Recommended top-risk table for operational linking-review follow-up appendices.",
+      "Recommended grouping-view index for operational linking-review triage.",
+      "Recommended overview table for operational misfit-case review appendix handoff.",
+      "Recommended top-case table for operational misfit follow-up appendices.",
+      "Recommended rollup table showing where flagged cases concentrate across review groupings.",
+      "Recommended source-family count table for operational misfit follow-up appendices.",
+      "Recommended overview table for weighting-policy review appendix handoff.",
+      "Recommended compact status table for review-oriented appendix handoff.",
+      "Plot-routing metadata; keep out of recommended appendix presets.",
+      "Capability-boundary statement for supported-with-caveat review helpers.",
+      "Recommended action-oriented table for repair or follow-up planning.",
+      "Interpretation notes; retain mainly in full reporting exports.",
+      "Recommended reweighting-change table for bounded GPCM comparison review.",
+      "Recommended caveat table for retained zero-count score categories and related score-support warnings.",
+      "Recommended fit-level caveat table for score-support, population-model, and other analysis warnings.",
+      "Recommended overview table for posterior unit-scoring appendix handoff.",
+      "Recommended posterior estimate table for scored-person appendix handoff.",
+      "Row-level scoring audit; retain for full exports but omit from compact presets.",
+      "Recommended latent-regression scoring omission audit when population-model scoring is active.",
+      "Methods/settings appendix table for posterior scoring inputs; recommended but not compact.",
+      "Recommended overview table for plausible-value appendix handoff.",
+      "Recommended plausible-value draw summary table for posterior-scoring appendices.",
+      "Recommended design-performance table for simulation design appendices.",
+      "Recommended signal-detection table for simulation diagnostics appendices.",
+      "Recommended design-grid table documenting requested forecast inputs.",
+      "Recommended forecast-summary table for population prediction appendices.",
+      "Workflow-only overview for one-shot run handoff; omit from manuscript presets.",
+      "Workflow-only column mapping for replay and audit handoff.",
+      "Workflow-only run settings for one-shot workflow provenance.",
+      "Recommended overview table for bias-screening appendix handoff.",
+      "Recommended fixed-effect chi-square table for bias-screening appendices.",
+      "Bias iteration status table; retain for full exports but omit from compact presets.",
+      "Recommended ranked bias-screening row table for immediate follow-up.",
+      "Recommended overview table for anchor-audit appendix handoff.",
+      "Recommended anchor issue-count table for pre-fit audit appendices.",
+      "Recommended level-observation audit table; retain for full appendices but omit from compact presets.",
+      "Recommended score-category usage table for anchor-audit support review.",
+      "Recommended pre-fit anchor-risk table for linking-review appendices.",
+      "Recommended drift-risk table for linking-review appendices.",
+      "Recommended chain-risk table for linking-review appendices.",
+      "Methods/settings table for operational review helpers; recommended but not compact."
+    ),
+    stringsAsFactors = FALSE
+  )
+  capability_boundary <- out$Role %in% "capability_boundary"
+  out$CompactAppendix[capability_boundary] <- TRUE
+  out$PreferredAppendixOrder[capability_boundary] <- 240.5
+  out
+}
+
+summary_table_bundle_catalog <- function(bundle) {
+  idx <- as.data.frame(bundle$table_index %||% data.frame(), stringsAsFactors = FALSE)
+  if (nrow(idx) == 0L) {
+    return(data.frame())
+  }
+
+  plot_idx <- as.data.frame(bundle$plot_index %||% data.frame(), stringsAsFactors = FALSE)
+  plot_keep <- intersect(c("Table", "PlotReady", "NumericColumns", "DefaultPlotTypes"), names(plot_idx))
+  if (length(plot_keep) > 0L) {
+    plot_idx <- plot_idx[, plot_keep, drop = FALSE]
+    idx <- merge(idx, plot_idx, by = "Table", all.x = TRUE, sort = FALSE)
+  }
+
+  if (!"PlotReady" %in% names(idx)) idx$PlotReady <- FALSE
+  if (!"NumericColumns" %in% names(idx)) idx$NumericColumns <- 0L
+  if (!"DefaultPlotTypes" %in% names(idx)) idx$DefaultPlotTypes <- ""
+
+  idx$PlotReady[is.na(idx$PlotReady)] <- FALSE
+  idx$NumericColumns[is.na(idx$NumericColumns)] <- 0L
+  idx$DefaultPlotTypes[is.na(idx$DefaultPlotTypes)] <- ""
+  idx$ExportReady <- TRUE
+  idx$ApaTableReady <- TRUE
+  idx$RecommendedBridge <- ifelse(
+    idx$PlotReady %in% TRUE,
+    "apa_table() / plot(bundle)",
+    "apa_table() / export_summary_appendix()"
+  )
+  appendix_registry <- summary_table_bundle_appendix_role_registry()
+  appendix_idx <- match(as.character(idx$Role), appendix_registry$Role)
+  idx$RecommendedAppendix <- appendix_registry$RecommendedAppendix[appendix_idx]
+  idx$CompactAppendix <- appendix_registry$CompactAppendix[appendix_idx]
+  idx$PreferredAppendixOrder <- appendix_registry$PreferredAppendixOrder[appendix_idx]
+  idx$AppendixRationale <- appendix_registry$AppendixRationale[appendix_idx]
+  idx$AppendixSection <- appendix_registry$AppendixSection[appendix_idx]
+  idx$RecommendedAppendix[is.na(idx$RecommendedAppendix)] <- FALSE
+  idx$CompactAppendix[is.na(idx$CompactAppendix)] <- FALSE
+  idx$PreferredAppendixOrder[is.na(idx$PreferredAppendixOrder)] <- 999L
+  idx$AppendixRationale[is.na(idx$AppendixRationale)] <- "Available only through full appendix export."
+  idx$AppendixSection[is.na(idx$AppendixSection)] <- "workflow"
+
+  idx[, c(
+    "Table", "Rows", "Cols", "Role", "Description",
+    "PlotReady", "NumericColumns", "DefaultPlotTypes",
+    "ExportReady", "ApaTableReady", "RecommendedBridge",
+    "AppendixSection",
+    "RecommendedAppendix", "CompactAppendix",
+    "PreferredAppendixOrder", "AppendixRationale"
+  ), drop = FALSE]
+}
+
+summary_table_bundle_appendix_presets <- function(catalog) {
+  catalog <- as.data.frame(catalog %||% data.frame(), stringsAsFactors = FALSE)
+  if (nrow(catalog) == 0L) {
+    return(data.frame())
+  }
+
+  preset_defs <- list(
+    all = rep(TRUE, nrow(catalog)),
+    recommended = catalog$RecommendedAppendix %in% TRUE,
+    compact = catalog$CompactAppendix %in% TRUE,
+    methods = catalog$AppendixSection %in% "methods",
+    results = catalog$AppendixSection %in% "results",
+    diagnostics = catalog$AppendixSection %in% "diagnostics",
+    reporting = catalog$AppendixSection %in% "reporting"
+  )
+  preset_uses <- c(
+    all = "Complete appendix handoff with every returned summary table.",
+    recommended = "Manuscript appendix without bridge-only or preview-only surfaces.",
+    compact = "Reviewer-facing compact appendix focused on core design and fit summaries.",
+    methods = "Methods appendix subset focused on design, scoring basis, and settings.",
+    results = "Results appendix subset focused on fit, precision, and scale summaries.",
+    diagnostics = "Diagnostics appendix subset focused on caveats, flags, and precision checks.",
+    reporting = "Reporting appendix subset focused on manuscript/checklist coverage surfaces."
+  )
+
+  out <- do.call(
+    rbind,
+    lapply(names(preset_defs), function(preset_nm) {
+      part <- catalog[preset_defs[[preset_nm]], , drop = FALSE]
+      data.frame(
+        Preset = preset_nm,
+        Tables = nrow(part),
+        PlotReadyTables = sum(part$PlotReady %in% TRUE, na.rm = TRUE),
+        RolesCovered = length(unique(as.character(part$Role))),
+        SectionsCovered = summary_table_bundle_compact_labels(unique(as.character(part$AppendixSection)), max_n = 4L),
+        KeyTables = summary_table_bundle_compact_labels(part$Table, max_n = 4L),
+        PrimaryUse = unname(preset_uses[[preset_nm]]),
+        stringsAsFactors = FALSE
+      )
+    })
+  )
+  rownames(out) <- NULL
+  out
+}
+
+summary_table_bundle_selection_surface <- function(bundle, surface) {
+  tables <- bundle$tables %||% list()
+  if (!is.list(tables) || length(tables) == 0L) {
+    return(data.frame())
+  }
+
+  candidates <- switch(
+    as.character(surface[1] %||% ""),
+    selection_summary = c("future_branch_selection_summary", "appendix_selection_summary", "selection_summary"),
+    selection_table_summary = c("future_branch_selection_tables", "appendix_selection_table_summary", "selection_table_summary"),
+    selection_table_preset_summary = c("future_branch_selection_table_presets", "selection_table_preset_summary"),
+    selection_handoff_table_summary = c("future_branch_selection_handoff_tables", "appendix_selection_handoff_table_summary", "selection_handoff_table_summary"),
+    selection_handoff_preset_summary = c("future_branch_selection_handoff_presets", "appendix_selection_handoff_preset_summary", "selection_handoff_preset_summary"),
+    selection_handoff_summary = c("future_branch_selection_handoff", "appendix_selection_handoff_summary", "selection_handoff_summary"),
+    selection_handoff_bundle_summary = c("future_branch_selection_handoff_bundles", "appendix_selection_handoff_bundle_summary", "selection_handoff_bundle_summary"),
+    selection_handoff_role_summary = c("future_branch_selection_handoff_roles", "appendix_selection_handoff_role_summary", "selection_handoff_role_summary"),
+    selection_handoff_role_section_summary = c("future_branch_selection_handoff_role_sections", "appendix_selection_handoff_role_section_summary", "selection_handoff_role_section_summary"),
+    selection_role_summary = c("future_branch_selection_roles", "appendix_selection_role_summary", "selection_role_summary"),
+    selection_section_summary = c("future_branch_selection_sections", "appendix_selection_section_summary", "selection_section_summary"),
+    selection_catalog = c("future_branch_selection_catalog", "appendix_selection_catalog", "selection_catalog"),
+    character(0)
+  )
+
+  hit <- candidates[candidates %in% names(tables)]
+  if (length(hit) == 0L) {
+    return(data.frame())
+  }
+
+  as.data.frame(tables[[hit[1]]], stringsAsFactors = FALSE)
+}
+
+summary_table_bundle_appendix_role_summary <- function(catalog) {
+  catalog <- as.data.frame(catalog %||% data.frame(), stringsAsFactors = FALSE)
+  if (nrow(catalog) == 0L || !"Role" %in% names(catalog)) {
+    return(data.frame())
+  }
+
+  split_tbl <- split(catalog, as.character(catalog$Role %||% ""))
+  out <- do.call(
+    rbind,
+    lapply(names(split_tbl), function(role_nm) {
+      part <- split_tbl[[role_nm]]
+      data.frame(
+        Role = as.character(role_nm),
+        Tables = nrow(part),
+        PlotReadyTables = sum(part$PlotReady %in% TRUE, na.rm = TRUE),
+        RecommendedTables = sum(part$RecommendedAppendix %in% TRUE, na.rm = TRUE),
+        CompactTables = sum(part$CompactAppendix %in% TRUE, na.rm = TRUE),
+        SectionsCovered = summary_table_bundle_compact_labels(unique(as.character(part$AppendixSection)), max_n = 4L),
+        KeyTables = summary_table_bundle_compact_labels(as.character(part$Table), max_n = 4L),
+        stringsAsFactors = FALSE
+      )
+    })
+  )
+  rownames(out) <- NULL
+  out[order(out$Tables, out$Role, decreasing = TRUE), , drop = FALSE]
+}
+
+summary_table_bundle_appendix_section_summary <- function(catalog) {
+  catalog <- as.data.frame(catalog %||% data.frame(), stringsAsFactors = FALSE)
+  if (nrow(catalog) == 0L || !"AppendixSection" %in% names(catalog)) {
+    return(data.frame())
+  }
+  sections <- split(catalog, as.character(catalog$AppendixSection))
+  out <- do.call(
+    rbind,
+    lapply(names(sections), function(section_nm) {
+      part <- sections[[section_nm]]
+      data.frame(
+        AppendixSection = section_nm,
+        Tables = nrow(part),
+        PlotReadyTables = sum(part$PlotReady %in% TRUE, na.rm = TRUE),
+        RecommendedTables = sum(part$RecommendedAppendix %in% TRUE, na.rm = TRUE),
+        CompactTables = sum(part$CompactAppendix %in% TRUE, na.rm = TRUE),
+        RolesCovered = length(unique(as.character(part$Role))),
+        stringsAsFactors = FALSE
+      )
+    })
+  )
+  rownames(out) <- NULL
+  out[order(out$Tables, out$AppendixSection, decreasing = TRUE), , drop = FALSE]
+}
+
+summary_table_bundle_subset <- function(bundle, which, note = NULL) {
+  if (!inherits(bundle, "mfrm_summary_table_bundle")) {
+    stop("`bundle` must be an mfrm_summary_table_bundle object.", call. = FALSE)
+  }
+  tables <- bundle$tables %||% list()
+  keep <- intersect(as.character(which %||% character(0)), names(tables))
+  if (length(keep) == 0L) {
+    stop("No matching tables were found in the supplied summary-table bundle.", call. = FALSE)
+  }
+
+  out <- bundle
+  out$tables <- tables[keep]
+
+  idx <- as.data.frame(bundle$table_index %||% data.frame(), stringsAsFactors = FALSE)
+  if (nrow(idx) > 0L && "Table" %in% names(idx)) {
+    keep_idx <- match(keep, idx$Table)
+    keep_idx <- keep_idx[!is.na(keep_idx)]
+    out$table_index <- idx[keep_idx, , drop = FALSE]
+  }
+
+  plot_idx <- as.data.frame(bundle$plot_index %||% data.frame(), stringsAsFactors = FALSE)
+  if (nrow(plot_idx) > 0L && "Table" %in% names(plot_idx)) {
+    keep_plot <- match(keep, plot_idx$Table)
+    keep_plot <- keep_plot[!is.na(keep_plot)]
+    out$plot_index <- plot_idx[keep_plot, , drop = FALSE]
+  }
+
+  out$overview <- as.data.frame(bundle$overview %||% data.frame(), stringsAsFactors = FALSE)
+  if (nrow(out$overview) > 0L && "TablesReturned" %in% names(out$overview)) {
+    out$overview$TablesReturned <- length(keep)
+  }
+
+  if (!is.null(note) && nzchar(as.character(note[1] %||% ""))) {
+    out$notes <- unique(c(bundle$notes %||% character(0), as.character(note[1])))
+  }
+  out$appendix_preset <- as.character(bundle$appendix_preset %||% "none")
+
+  out
+}
+
+summary_table_bundle_empty_subset <- function(bundle, note = NULL) {
+  if (!inherits(bundle, "mfrm_summary_table_bundle")) {
+    stop("`bundle` must be an mfrm_summary_table_bundle object.", call. = FALSE)
+  }
+  out <- bundle
+  out$tables <- list()
+  out$table_index <- as.data.frame(bundle$table_index %||% data.frame(), stringsAsFactors = FALSE)[0, , drop = FALSE]
+  out$plot_index <- as.data.frame(bundle$plot_index %||% data.frame(), stringsAsFactors = FALSE)[0, , drop = FALSE]
+  out$overview <- as.data.frame(bundle$overview %||% data.frame(), stringsAsFactors = FALSE)
+  if (nrow(out$overview) > 0L && "TablesReturned" %in% names(out$overview)) {
+    out$overview$TablesReturned <- 0L
+  }
+  if (!is.null(note) && nzchar(as.character(note[1] %||% ""))) {
+    out$notes <- unique(c(bundle$notes %||% character(0), as.character(note[1])))
+  }
+  out$appendix_preset <- as.character(bundle$appendix_preset %||% "none")
+  out
+}
+
+summary_table_bundle_select_for_appendix <- function(bundle,
+                                                     preset = c("all", "recommended", "compact", "methods", "results", "diagnostics", "reporting")) {
+  preset <- match.arg(preset)
+  if (!inherits(bundle, "mfrm_summary_table_bundle")) {
+    stop("`bundle` must be an mfrm_summary_table_bundle object.", call. = FALSE)
+  }
+  if (identical(preset, "all")) {
+    return(bundle)
+  }
+
+  catalog <- summary_table_bundle_catalog(bundle)
+  keep <- switch(
+    preset,
+    recommended = as.character(catalog$Table[catalog$RecommendedAppendix %in% TRUE]),
+    compact = as.character(catalog$Table[catalog$CompactAppendix %in% TRUE]),
+    methods = as.character(catalog$Table[catalog$AppendixSection %in% "methods"]),
+    results = as.character(catalog$Table[catalog$AppendixSection %in% "results"]),
+    diagnostics = as.character(catalog$Table[catalog$AppendixSection %in% "diagnostics"]),
+    reporting = as.character(catalog$Table[catalog$AppendixSection %in% "reporting"])
+  )
+  keep <- keep[nzchar(keep)]
+  if (length(keep) == 0L) {
+    if (preset %in% c("methods", "results", "diagnostics", "reporting")) {
+      return(summary_table_bundle_empty_subset(
+        bundle,
+        note = sprintf("Appendix preset `%s` matched no tables in this bundle.", preset)
+      ))
+    }
+    keep <- if ("overview" %in% names(bundle$tables)) "overview" else names(bundle$tables)[1]
+  }
+
+  note <- sprintf(
+    "Appendix preset `%s` selected %d table(s): %s.",
+    preset,
+    length(keep),
+    paste(keep, collapse = ", ")
+  )
+  summary_table_bundle_subset(bundle, keep, note = note)
+}
+
+summary_table_bundle_reporting_map <- function(bundle, catalog) {
+  numeric_ready <- if (nrow(catalog) > 0L) sum(catalog$PlotReady %in% TRUE, na.rm = TRUE) else 0L
+  data.frame(
+    Area = c(
+      "Coverage overview",
+      "Table catalog / manuscript selection",
+      "Numeric QC and quick plotting",
+      "APA / appendix bridge",
+      "Source-level caveats"
+    ),
+    CoveredHere = c("yes", "yes", "yes", "yes", "partial"),
+    CompanionOutput = c(
+      "summary(bundle)$overview / role_summary",
+      "summary(bundle)$table_catalog / bundle$table_index",
+      "summary(bundle)$plot_index / plot(bundle, ...)",
+      "apa_table(bundle, which = ...) / export_summary_appendix(bundle, preset = \"recommended\")",
+      "bundle$notes and the originating summary()/diagnostics output"
+    ),
+    stringsAsFactors = FALSE
+  )
+}
+
+#' Summarize a summary-table bundle for manuscript QC
+#'
+#' @param object Output from [build_summary_table_bundle()].
+#' @param digits Number of digits used for numeric summaries.
+#' @param top_n Maximum number of table-profile rows to keep.
+#' @param ... Reserved for generic compatibility.
+#'
+#' @details
+#' This summary is designed to answer a manuscript-facing question: which
+#' reporting tables are available, how large are they, which roles do they
+#' serve, and which of them contain numeric content suitable for quick plotting
+#' or appendix export.
+#'
+#' @section Interpreting output:
+#' - `overview`: source class, returned-table count, note count, and whether a
+#'   numeric table is available for plotting.
+#' - `role_summary`: counts and total size by reporting role.
+#' - `table_catalog`: complete returned-table registry with plot/export bridges.
+#' - `table_profile`: table-level dimensions, numeric-column counts, and missing
+#'   values for the largest returned tables.
+#' - `plot_index`: which returned tables are plot-ready and which bundle-level
+#'   numeric QC routes they support.
+#' - `appendix_presets`: conservative `all` / `recommended` / `compact`
+#'   plus section-aware `methods` / `results` / `diagnostics` / `reporting`
+#'   appendix-export presets derived from table roles.
+#' - `appendix_role_summary`: counts of returned tables by reporting role under
+#'   the same conservative appendix routing used by the bundle catalog.
+#' - `appendix_section_summary`: counts of returned tables by manuscript-facing
+#'   appendix section.
+#' - `selection_handoff_table_summary`: workflow-only table-level appendix
+#'   handoff crosswalk when present in the bundle.
+#' - `selection_handoff_preset_summary`: workflow-only appendix handoff overview
+#'   aggregated at the preset level when present in the bundle.
+#' - `selection_handoff_bundle_summary`: workflow-only appendix handoff
+#'   overview aggregated at the bundle-by-section level when present in the
+#'   bundle.
+#' - `selection_handoff_role_summary`: workflow-only appendix handoff overview
+#'   aggregated at the reporting-role level when present in the bundle.
+#' - `selection_handoff_role_section_summary`: workflow-only appendix handoff
+#'   overview aggregated at the reporting-role by appendix-section level when
+#'   present in the bundle.
+#' - `selection_summary`, `selection_table_summary`,
+#'   `selection_table_preset_summary`, `selection_role_summary`,
+#'   `selection_section_summary`, and `selection_catalog`: preset-filtered
+#'   appendix selection surfaces when workflow-only handoff tables are embedded
+#'   in the bundle.
+#' - `reporting_map`: where to go next for plotting, APA formatting, and export.
+#' - `notes`: carried forward source-level caveats from the originating summary.
+#'
+#' @section Typical workflow:
+#' 1. Build `bundle <- build_summary_table_bundle(summary(...))`.
+#' 2. Run `summary(bundle)` to see reporting coverage.
+#' 3. Use `plot(bundle, type = "table_rows")` or
+#'    `plot(bundle, type = "numeric_profile", which = ...)` for quick QC.
+#'
+#' @return An object of class `summary.mfrm_summary_table_bundle`.
+#' @seealso [build_summary_table_bundle()], [apa_table()], [plot()]
+#' @examples
+#' \donttest{
+#' toy <- load_mfrmr_data("example_core")
+#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
+#'                 method = "JML", maxit = 25)
+#' bundle <- build_summary_table_bundle(fit)
+#' summary(bundle)
+#' }
+#' @export
+summary.mfrm_summary_table_bundle <- function(object, digits = 3, top_n = 8, ...) {
+  digits <- max(0L, as.integer(digits))
+  top_n <- max(1L, as.integer(top_n))
+
+  tbl_index <- as.data.frame(object$table_index %||% data.frame(), stringsAsFactors = FALSE)
+  profile <- summary_table_bundle_profile(object)
+  numeric_available <- !is.null(summary_table_bundle_first_numeric_table(object))
+
+  overview <- as.data.frame(object$overview %||% data.frame(), stringsAsFactors = FALSE)
+  overview$Notes <- length(object$notes %||% character(0))
+  overview$NumericTables <- sum(profile$NumericColumns > 0, na.rm = TRUE)
+  overview$AnyNumericTable <- numeric_available
+
+  if (nrow(profile) > 0L) {
+    ord <- order(profile$Rows, profile$Cols, decreasing = TRUE, na.last = TRUE)
+    profile <- profile[ord, , drop = FALSE]
+    profile <- utils::head(profile, n = top_n)
+  }
+
+  role_summary <- data.frame()
+  plot_index <- as.data.frame(object$plot_index %||% data.frame(), stringsAsFactors = FALSE)
+  table_catalog <- summary_table_bundle_catalog(object)
+  selection_summary <- summary_table_bundle_selection_surface(object, "selection_summary")
+  selection_table_summary <- summary_table_bundle_selection_surface(object, "selection_table_summary")
+  selection_table_preset_summary <- summary_table_bundle_selection_surface(object, "selection_table_preset_summary")
+  selection_handoff_table_summary <- summary_table_bundle_selection_surface(object, "selection_handoff_table_summary")
+  selection_handoff_preset_summary <- summary_table_bundle_selection_surface(object, "selection_handoff_preset_summary")
+  selection_handoff_summary <- summary_table_bundle_selection_surface(object, "selection_handoff_summary")
+  selection_handoff_bundle_summary <- summary_table_bundle_selection_surface(object, "selection_handoff_bundle_summary")
+  selection_handoff_role_summary <- summary_table_bundle_selection_surface(object, "selection_handoff_role_summary")
+  selection_handoff_role_section_summary <- summary_table_bundle_selection_surface(object, "selection_handoff_role_section_summary")
+  selection_role_summary <- summary_table_bundle_selection_surface(object, "selection_role_summary")
+  selection_section_summary <- summary_table_bundle_selection_surface(object, "selection_section_summary")
+  selection_catalog <- summary_table_bundle_selection_surface(object, "selection_catalog")
+  appendix_presets <- summary_table_bundle_appendix_presets(table_catalog)
+  appendix_role_summary <- summary_table_bundle_appendix_role_summary(table_catalog)
+  appendix_section_summary <- summary_table_bundle_appendix_section_summary(table_catalog)
+  overview$RecommendedAppendixTables <- sum(table_catalog$RecommendedAppendix %in% TRUE, na.rm = TRUE)
+  overview$CompactAppendixTables <- sum(table_catalog$CompactAppendix %in% TRUE, na.rm = TRUE)
+  if (nrow(tbl_index) > 0L && "Role" %in% names(tbl_index)) {
+    roles <- split(tbl_index, tbl_index$Role %||% "")
+    role_summary <- do.call(
+      rbind,
+      lapply(names(roles), function(role_nm) {
+        part <- roles[[role_nm]]
+        data.frame(
+          Role = as.character(role_nm),
+          Tables = nrow(part),
+          TotalRows = sum(suppressWarnings(as.numeric(part$Rows)), na.rm = TRUE),
+          TotalCols = sum(suppressWarnings(as.numeric(part$Cols)), na.rm = TRUE),
+          stringsAsFactors = FALSE
+        )
+      })
+    )
+    role_summary <- role_summary[order(role_summary$Tables, role_summary$Role, decreasing = TRUE), , drop = FALSE]
+  }
+  reporting_map <- summary_table_bundle_reporting_map(object, table_catalog)
+
+  out <- list(
+    overview = overview,
+    role_summary = role_summary,
+    table_catalog = table_catalog,
+    table_profile = profile,
+    plot_index = plot_index,
+    appendix_presets = appendix_presets,
+    appendix_role_summary = appendix_role_summary,
+    appendix_section_summary = appendix_section_summary,
+    selection_summary = selection_summary,
+    selection_table_summary = selection_table_summary,
+    selection_table_preset_summary = selection_table_preset_summary,
+    selection_handoff_table_summary = selection_handoff_table_summary,
+    selection_handoff_preset_summary = selection_handoff_preset_summary,
+    selection_handoff_summary = selection_handoff_summary,
+    selection_handoff_bundle_summary = selection_handoff_bundle_summary,
+    selection_handoff_role_summary = selection_handoff_role_summary,
+    selection_handoff_role_section_summary = selection_handoff_role_section_summary,
+    selection_role_summary = selection_role_summary,
+    selection_section_summary = selection_section_summary,
+    selection_catalog = selection_catalog,
+    reporting_map = reporting_map,
+    notes = as.character(object$notes %||% character(0)),
+    digits = digits
+  )
+  class(out) <- "summary.mfrm_summary_table_bundle"
+  out
+}
+
+#' @export
+print.summary.mfrm_summary_table_bundle <- function(x, ...) {
+  digits <- as.integer(x$digits %||% 3L)
+  if (!is.finite(digits)) digits <- 3L
+
+  cat("Summary Table Bundle Summary\n")
+  if (!is.null(x$overview) && nrow(x$overview) > 0L) {
+    cat("\nOverview\n")
+    print(round_numeric_df(as.data.frame(x$overview), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$role_summary) && nrow(x$role_summary) > 0L) {
+    cat("\nRole summary\n")
+    print(round_numeric_df(as.data.frame(x$role_summary), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$table_catalog) && nrow(x$table_catalog) > 0L) {
+    cat("\nTable catalog\n")
+    print(round_numeric_df(as.data.frame(x$table_catalog), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$table_profile) && nrow(x$table_profile) > 0L) {
+    cat("\nTable profile\n")
+    print(round_numeric_df(as.data.frame(x$table_profile), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$plot_index) && nrow(x$plot_index) > 0L) {
+    cat("\nPlot index\n")
+    print(round_numeric_df(as.data.frame(x$plot_index), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$appendix_presets) && nrow(x$appendix_presets) > 0L) {
+    cat("\nAppendix presets\n")
+    print(round_numeric_df(as.data.frame(x$appendix_presets), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$appendix_role_summary) && nrow(x$appendix_role_summary) > 0L) {
+    cat("\nAppendix role summary\n")
+    print(round_numeric_df(as.data.frame(x$appendix_role_summary), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$appendix_section_summary) && nrow(x$appendix_section_summary) > 0L) {
+    cat("\nAppendix section summary\n")
+    print(round_numeric_df(as.data.frame(x$appendix_section_summary), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$selection_summary) && nrow(x$selection_summary) > 0L) {
+    cat("\nSelection summary\n")
+    print(round_numeric_df(as.data.frame(x$selection_summary), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$selection_table_summary) && nrow(x$selection_table_summary) > 0L) {
+    cat("\nSelection table summary\n")
+    print(round_numeric_df(as.data.frame(x$selection_table_summary), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$selection_table_preset_summary) && nrow(x$selection_table_preset_summary) > 0L) {
+    cat("\nSelection table preset summary\n")
+    print(round_numeric_df(as.data.frame(x$selection_table_preset_summary), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$selection_handoff_table_summary) && nrow(x$selection_handoff_table_summary) > 0L) {
+    cat("\nSelection handoff table summary\n")
+    print(round_numeric_df(as.data.frame(x$selection_handoff_table_summary), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$selection_handoff_preset_summary) && nrow(x$selection_handoff_preset_summary) > 0L) {
+    cat("\nSelection handoff preset summary\n")
+    print(round_numeric_df(as.data.frame(x$selection_handoff_preset_summary), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$selection_handoff_summary) && nrow(x$selection_handoff_summary) > 0L) {
+    cat("\nSelection handoff summary\n")
+    print(round_numeric_df(as.data.frame(x$selection_handoff_summary), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$selection_handoff_bundle_summary) && nrow(x$selection_handoff_bundle_summary) > 0L) {
+    cat("\nSelection handoff bundle summary\n")
+    print(round_numeric_df(as.data.frame(x$selection_handoff_bundle_summary), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$selection_handoff_role_summary) && nrow(x$selection_handoff_role_summary) > 0L) {
+    cat("\nSelection handoff role summary\n")
+    print(round_numeric_df(as.data.frame(x$selection_handoff_role_summary), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$selection_handoff_role_section_summary) && nrow(x$selection_handoff_role_section_summary) > 0L) {
+    cat("\nSelection handoff role-section summary\n")
+    print(round_numeric_df(as.data.frame(x$selection_handoff_role_section_summary), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$selection_role_summary) && nrow(x$selection_role_summary) > 0L) {
+    cat("\nSelection role summary\n")
+    print(round_numeric_df(as.data.frame(x$selection_role_summary), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$selection_section_summary) && nrow(x$selection_section_summary) > 0L) {
+    cat("\nSelection section summary\n")
+    print(round_numeric_df(as.data.frame(x$selection_section_summary), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$selection_catalog) && nrow(x$selection_catalog) > 0L) {
+    cat("\nSelection catalog\n")
+    print(round_numeric_df(as.data.frame(x$selection_catalog), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$reporting_map) && nrow(x$reporting_map) > 0L) {
+    cat("\nReporting map\n")
+    print(as.data.frame(x$reporting_map), row.names = FALSE)
+  }
+  if (length(x$notes %||% character(0)) > 0L) {
+    cat("\nNotes\n")
+    for (line in x$notes) cat(" - ", line, "\n", sep = "")
+  }
+  invisible(x)
+}
+
+resolve_selection_plot_measure <- function(tbl,
+                                           type,
+                                           selection_value = c("count", "fraction")) {
+  selection_value <- match.arg(selection_value)
+  tbl <- as.data.frame(tbl %||% data.frame(), stringsAsFactors = FALSE)
+
+  if (identical(type, "selection_tables")) {
+    if (identical(selection_value, "fraction")) {
+      stop("`selection_value = \"fraction\"` is not available for `type = \"selection_tables\"`; this surface only exposes table row counts.", call. = FALSE)
+    }
+    return(list(
+      values = suppressWarnings(as.numeric(tbl$Rows)),
+      ylab = "Rows",
+      legend_label = "Rows",
+      selection_value = "count"
+    ))
+  }
+
+  if (identical(type, "selection_bundles")) {
+    if (identical(selection_value, "count")) {
+      return(list(
+        values = suppressWarnings(as.numeric(tbl$TablesSelected)),
+        ylab = "Tables",
+        legend_label = "Tables selected",
+        selection_value = "count"
+      ))
+    }
+    if (!"SelectionFraction" %in% names(tbl)) {
+      stop("`selection_value = \"fraction\"` is not available because `SelectionFraction` is missing from this surface.", call. = FALSE)
+    }
+    return(list(
+      values = suppressWarnings(as.numeric(tbl$SelectionFraction)),
+      ylab = "Selection fraction",
+      legend_label = "Selection fraction",
+      selection_value = "fraction"
+    ))
+  }
+
+  if (identical(selection_value, "count")) {
+    count_col <- if (type %in% c("selection_handoff_presets", "selection_handoff", "selection_handoff_bundles", "selection_handoff_roles", "selection_handoff_role_sections")) {
+      "PlotReadyTables"
+    } else {
+      "Tables"
+    }
+    count_label <- if (identical(count_col, "PlotReadyTables")) "Plot-ready tables" else "Tables"
+    if (!count_col %in% names(tbl)) {
+      stop("`selection_value = \"count\"` is not available because `", count_col, "` is missing from this surface.", call. = FALSE)
+    }
+    return(list(
+      values = suppressWarnings(as.numeric(tbl[[count_col]])),
+      ylab = count_label,
+      legend_label = count_label,
+      selection_value = "count"
+    ))
+  }
+
+  if (!"PlotReadyFraction" %in% names(tbl)) {
+    stop("`selection_value = \"fraction\"` is not available because `PlotReadyFraction` is missing from this surface.", call. = FALSE)
+  }
+  list(
+    values = suppressWarnings(as.numeric(tbl$PlotReadyFraction)),
+    ylab = "Plot-ready fraction",
+    legend_label = "Plot-ready fraction",
+    selection_value = "fraction"
+  )
+}
+
+summary_table_bundle_filter_selection_tables <- function(tbl, appendix_preset) {
+  tbl <- as.data.frame(tbl %||% data.frame(), stringsAsFactors = FALSE)
+  if (nrow(tbl) == 0L) {
+    return(tbl)
+  }
+  if ("Preset" %in% names(tbl)) {
+    keep <- as.character(tbl$Preset %||% "") %in% appendix_preset
+    return(tbl[keep, , drop = FALSE])
+  }
+  if (!"Presets" %in% names(tbl)) {
+    return(tbl)
+  }
+  keep <- vapply(as.character(tbl$Presets %||% ""), function(x) {
+    tokens <- trimws(strsplit(x, ",", fixed = TRUE)[[1]])
+    any(tokens %in% appendix_preset)
+  }, logical(1))
+  tbl[keep, , drop = FALSE]
+}
+
+#' Plot a summary-table bundle for manuscript QC
+#'
+#' @param x Output from [build_summary_table_bundle()].
+#' @param y Reserved for generic compatibility.
+#' @param type Plot type: `"table_rows"` for returned-table sizes,
+#'   `"role_tables"` for returned-table counts by reporting role,
+#'   `"appendix_roles"` for returned-table counts by reporting role under the
+#'   bundle's appendix-routing contract,
+#'   `"appendix_sections"` for returned-table counts by manuscript-facing
+#'   appendix section,
+#'   `"appendix_presets"` for conservative appendix-preset counts,
+#'   `"selection_handoff_presets"` for workflow-only preset-level appendix
+#'   handoff counts,
+#'   `"selection_tables"` / `"selection_handoff"` /
+#'   `"selection_handoff_bundles"` /
+#'   `"selection_handoff_roles"` / `"selection_bundles"` /
+#'   `"selection_roles"` / `"selection_sections"` for workflow-only appendix
+#'   selection surfaces when present in the bundle,
+#'   `"numeric_profile"` for column means from a selected numeric table, or
+#'   `"first_numeric"` for the distribution of the first numeric column in a
+#'   selected table.
+#' @param selection_value For `selection_*` plot types, whether to plot exact
+#'   counts (`"count"`) or the corresponding exact fraction (`"fraction"`)
+#'   when that surface exposes one.
+#' @param appendix_preset Appendix preset used for `selection_*` plot types.
+#' @param which Optional table selector used for numeric plot types.
+#' @param main Optional title override.
+#' @param palette Optional named color overrides.
+#' @param label_angle Axis-label rotation angle for bar-type plots.
+#' @param draw If `TRUE`, draw using base graphics.
+#' @param ... Reserved for generic compatibility.
+#'
+#' @details
+#' This helper keeps summary-bundle plotting conservative. It either visualizes
+#' the bundle's own bundle-level indexes (`"table_rows"`, `"role_tables"`,
+#' `"appendix_roles"`, `"appendix_sections"`, `"appendix_presets"`) or routes a
+#' selected table through [apa_table()] and [plot.apa_table()] for numeric QC.
+#'
+#' @section Interpreting output:
+#' - `"table_rows"`: compares returned table sizes to show where reporting mass sits.
+#' - `"role_tables"`: shows how many returned tables belong to each reporting role.
+#' - `"appendix_roles"`: shows how returned tables contribute to conservative
+#'   appendix routing by reporting role.
+#' - `"appendix_sections"`: shows how returned tables are distributed across
+#'   methods/results/diagnostics/reporting sections.
+#' - `"appendix_presets"`: shows how many tables the current bundle contributes
+#'   to the conservative appendix presets.
+#' - `"selection_handoff_presets"`: shows plot-ready appendix handoff counts by
+#'   preset for workflow-only appendix routing surfaces in the bundle.
+#' - `"selection_tables"` / `"selection_handoff"` /
+#'   `"selection_handoff_bundles"` /
+#'   `"selection_handoff_roles"` / `"selection_handoff_role_sections"` /
+#'   `"selection_bundles"` /
+#'   `"selection_roles"` / `"selection_sections"`: show workflow-only appendix
+#'   selection surfaces already materialized inside the bundle.
+#' - `"numeric_profile"` / `"first_numeric"`: reuse the same numeric QC logic as
+#'   [plot.apa_table()] but start from a summary-table bundle.
+#'
+#' @return A plotting-data object of class `mfrm_plot_data`.
+#' @seealso [build_summary_table_bundle()], [apa_table()], [plot.apa_table()]
+#' @examples
+#' \donttest{
+#' toy <- load_mfrmr_data("example_core")
+#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
+#'                 method = "JML", maxit = 25)
+#' bundle <- build_summary_table_bundle(fit)
+#' plot(bundle, draw = FALSE)
+#' plot(bundle, type = "numeric_profile", which = "facet_overview", draw = FALSE)
+#' }
+#' @export
+plot.mfrm_summary_table_bundle <- function(x,
+                                           y = NULL,
+                                           type = c("table_rows", "role_tables", "appendix_roles", "appendix_sections", "appendix_presets", "selection_handoff_presets", "selection_tables", "selection_handoff", "selection_handoff_bundles", "selection_handoff_roles", "selection_handoff_role_sections", "selection_bundles", "selection_roles", "selection_sections", "numeric_profile", "first_numeric"),
+                                           which = NULL,
+                                           selection_value = c("count", "fraction"),
+                                           appendix_preset = c("recommended", "compact", "all", "methods", "results", "diagnostics", "reporting"),
+                                           main = NULL,
+                                           palette = NULL,
+                                           label_angle = 45,
+                                           draw = TRUE,
+                                           ...) {
+  type <- match.arg(
+    tolower(as.character(type[1])),
+    c("table_rows", "role_tables", "appendix_roles", "appendix_sections", "appendix_presets", "selection_handoff_presets", "selection_tables", "selection_handoff", "selection_handoff_bundles", "selection_handoff_roles", "selection_handoff_role_sections", "selection_bundles", "selection_roles", "selection_sections", "numeric_profile", "first_numeric")
+  )
+  appendix_preset <- match.arg(
+    tolower(as.character(appendix_preset[1])),
+    c("recommended", "compact", "all", "methods", "results", "diagnostics", "reporting")
+  )
+  selection_value <- match.arg(selection_value)
+
+  if (type == "table_rows") {
+    idx <- as.data.frame(x$table_index %||% data.frame(), stringsAsFactors = FALSE)
+    if (nrow(idx) == 0L || !"Table" %in% names(idx) || !"Rows" %in% names(idx)) {
+      stop("`x$table_index` does not contain plottable table-row information.")
+    }
+    rows <- suppressWarnings(as.numeric(idx$Rows))
+    keep <- is.finite(rows)
+    if (!any(keep)) {
+      stop("`x$table_index` does not contain finite row counts to plot.")
+    }
+    rows <- rows[keep]
+    labels <- as.character(idx$Table[keep])
+    ord <- order(rows, decreasing = TRUE, na.last = NA)
+    rows <- rows[ord]
+    labels <- labels[ord]
+    pal <- resolve_palette(
+      palette = palette,
+      defaults = c(table_rows = "#6a4c93", grid = "#ececec")
+    )
+    plot_title <- if (is.null(main)) "Summary bundle table sizes" else as.character(main[1])
+    if (isTRUE(draw)) {
+      barplot_rot45(
+        height = rows,
+        labels = labels,
+        col = pal["table_rows"],
+        main = plot_title,
+        ylab = "Rows",
+        label_angle = label_angle,
+        mar_bottom = 8.8
+      )
+      graphics::abline(h = 0, col = pal["grid"], lty = 2)
+    }
+    return(invisible(new_mfrm_plot_data(
+      "summary_table_bundle",
+      list(
+        plot = "table_rows",
+        table = labels,
+        rows = rows,
+        title = plot_title,
+        subtitle = "Returned summary tables ranked by row count",
+        legend = new_plot_legend("Table rows", "summary_table", "bar", pal["table_rows"]),
+        reference_lines = new_reference_lines("h", 0, "Zero-row reference", "dashed", "reference")
+      )
+    )))
+  }
+
+  if (type == "role_tables") {
+    idx <- as.data.frame(x$table_index %||% data.frame(), stringsAsFactors = FALSE)
+    if (nrow(idx) == 0L || !"Role" %in% names(idx)) {
+      stop("`x$table_index` does not contain plottable role information.")
+    }
+    roles <- as.character(idx$Role)
+    roles <- roles[nzchar(roles)]
+    if (length(roles) == 0L) {
+      stop("`x$table_index` does not contain non-empty role labels to plot.")
+    }
+    counts <- sort(table(roles), decreasing = TRUE)
+    labels <- names(counts)
+    values <- as.numeric(counts)
+    pal <- resolve_palette(
+      palette = palette,
+      defaults = c(role_tables = "#3a7ca5", grid = "#ececec")
+    )
+    plot_title <- if (is.null(main)) "Summary bundle role coverage" else as.character(main[1])
+    if (isTRUE(draw)) {
+      barplot_rot45(
+        height = values,
+        labels = labels,
+        col = pal["role_tables"],
+        main = plot_title,
+        ylab = "Tables",
+        label_angle = label_angle,
+        mar_bottom = 8.8
+      )
+      graphics::abline(h = 0, col = pal["grid"], lty = 2)
+    }
+    return(invisible(new_mfrm_plot_data(
+      "summary_table_bundle",
+      list(
+        plot = "role_tables",
+        role = labels,
+        tables = values,
+        title = plot_title,
+        subtitle = "Returned summary tables grouped by reporting role",
+        legend = new_plot_legend("Role table count", "summary_table", "bar", pal["role_tables"]),
+        reference_lines = new_reference_lines("h", 0, "Zero-table reference", "dashed", "reference")
+      )
+    )))
+  }
+
+  if (type == "appendix_roles") {
+    role_tbl <- summary_table_bundle_appendix_role_summary(summary_table_bundle_catalog(x))
+    if (nrow(role_tbl) == 0L || !"Role" %in% names(role_tbl) ||
+        !"RecommendedTables" %in% names(role_tbl) ||
+        !"CompactTables" %in% names(role_tbl)) {
+      stop("`x` does not contain plottable appendix-role information.")
+    }
+    labels <- as.character(role_tbl$Role)
+    recommended <- suppressWarnings(as.numeric(role_tbl$RecommendedTables))
+    compact <- suppressWarnings(as.numeric(role_tbl$CompactTables))
+    keep <- nzchar(labels) & is.finite(recommended) & is.finite(compact)
+    if (!any(keep)) {
+      stop("`x` does not contain finite appendix-role table counts to plot.")
+    }
+    labels <- labels[keep]
+    recommended <- recommended[keep]
+    compact <- compact[keep]
+    values <- rbind(Recommended = recommended, Compact = compact)
+    pal <- resolve_palette(
+      palette = palette,
+      defaults = c(appendix_role_recommended = "#2a9d8f", appendix_role_compact = "#8d99ae", grid = "#ececec")
+    )
+    plot_title <- if (is.null(main)) "Summary bundle appendix roles" else as.character(main[1])
+    if (isTRUE(draw)) {
+      graphics::barplot(
+        height = values,
+        beside = TRUE,
+        names.arg = labels,
+        col = c(pal["appendix_role_recommended"], pal["appendix_role_compact"]),
+        main = plot_title,
+        ylab = "Tables",
+        las = 2,
+        cex.names = 0.8
+      )
+      graphics::abline(h = 0, col = pal["grid"], lty = 2)
+      graphics::legend(
+        "topright",
+        legend = c("Recommended", "Compact"),
+        fill = c(pal["appendix_role_recommended"], pal["appendix_role_compact"]),
+        bty = "n"
+      )
+    }
+    return(invisible(new_mfrm_plot_data(
+      "summary_table_bundle",
+      list(
+        plot = "appendix_roles",
+        role = labels,
+        recommended_tables = recommended,
+        compact_tables = compact,
+        title = plot_title,
+        subtitle = "Appendix-routed table counts by reporting role",
+        legend = list(
+          new_plot_legend("Recommended", "summary_table", "bar", pal["appendix_role_recommended"]),
+          new_plot_legend("Compact", "summary_table", "bar", pal["appendix_role_compact"])
+        ),
+        reference_lines = new_reference_lines("h", 0, "Zero-table reference", "dashed", "reference")
+      )
+    )))
+  }
+
+  if (type == "appendix_sections") {
+    section_tbl <- summary_table_bundle_appendix_section_summary(summary_table_bundle_catalog(x))
+    if (nrow(section_tbl) == 0L || !"AppendixSection" %in% names(section_tbl) || !"Tables" %in% names(section_tbl)) {
+      stop("`x` does not contain plottable appendix-section information.")
+    }
+    labels <- as.character(section_tbl$AppendixSection)
+    values <- suppressWarnings(as.numeric(section_tbl$Tables))
+    keep <- is.finite(values) & nzchar(labels)
+    if (!any(keep)) {
+      stop("`x` does not contain finite appendix-section table counts to plot.")
+    }
+    labels <- labels[keep]
+    values <- values[keep]
+    pal <- resolve_palette(
+      palette = palette,
+      defaults = c(appendix_sections = "#457b9d", grid = "#ececec")
+    )
+    plot_title <- if (is.null(main)) "Summary bundle appendix sections" else as.character(main[1])
+    if (isTRUE(draw)) {
+      barplot_rot45(
+        height = values,
+        labels = labels,
+        col = pal["appendix_sections"],
+        main = plot_title,
+        ylab = "Tables",
+        label_angle = label_angle,
+        mar_bottom = 8.8
+      )
+      graphics::abline(h = 0, col = pal["grid"], lty = 2)
+    }
+    return(invisible(new_mfrm_plot_data(
+      "summary_table_bundle",
+      list(
+        plot = "appendix_sections",
+        appendix_section = labels,
+        tables = values,
+        title = plot_title,
+        subtitle = "Returned summary tables grouped by manuscript appendix section",
+        legend = new_plot_legend("Appendix section count", "summary_table", "bar", pal["appendix_sections"]),
+        reference_lines = new_reference_lines("h", 0, "Zero-table reference", "dashed", "reference")
+      )
+    )))
+  }
+
+  if (type == "appendix_presets") {
+    preset_tbl <- summary_table_bundle_appendix_presets(summary_table_bundle_catalog(x))
+    if (nrow(preset_tbl) == 0L || !"Preset" %in% names(preset_tbl) || !"Tables" %in% names(preset_tbl)) {
+      stop("`x` does not contain plottable appendix-preset information.")
+    }
+    labels <- as.character(preset_tbl$Preset)
+    values <- suppressWarnings(as.numeric(preset_tbl$Tables))
+    keep <- is.finite(values) & nzchar(labels)
+    if (!any(keep)) {
+      stop("`x` does not contain finite appendix-preset table counts to plot.")
+    }
+    labels <- labels[keep]
+    values <- values[keep]
+    pal <- resolve_palette(
+      palette = palette,
+      defaults = c(appendix_presets = "#2a9d8f", grid = "#ececec")
+    )
+    plot_title <- if (is.null(main)) "Summary bundle appendix presets" else as.character(main[1])
+    if (isTRUE(draw)) {
+      barplot_rot45(
+        height = values,
+        labels = labels,
+        col = pal["appendix_presets"],
+        main = plot_title,
+        ylab = "Tables",
+        label_angle = label_angle,
+        mar_bottom = 8.8
+      )
+      graphics::abline(h = 0, col = pal["grid"], lty = 2)
+    }
+    return(invisible(new_mfrm_plot_data(
+      "summary_table_bundle",
+      list(
+        plot = "appendix_presets",
+        preset = labels,
+        tables = values,
+        title = plot_title,
+        subtitle = "Current bundle size under conservative appendix presets",
+        legend = new_plot_legend("Appendix preset count", "summary_table", "bar", pal["appendix_presets"]),
+        reference_lines = new_reference_lines("h", 0, "Zero-table reference", "dashed", "reference")
+      )
+    )))
+  }
+
+  if (type %in% c("selection_handoff_presets", "selection_tables", "selection_handoff", "selection_handoff_bundles", "selection_handoff_roles", "selection_handoff_role_sections", "selection_bundles", "selection_roles", "selection_sections")) {
+    sx <- summary(x)
+    measure <- NULL
+    if (type == "selection_handoff_presets") {
+      tbl <- as.data.frame(sx$selection_handoff_preset_summary %||% data.frame(), stringsAsFactors = FALSE)
+      tbl <- tbl[as.character(tbl$Preset %||% "") %in% appendix_preset, , drop = FALSE]
+      if (nrow(tbl) == 0L || !all(c("Preset", "PlotReadyTables") %in% names(tbl))) {
+        stop("`x` does not contain appendix handoff-preset rows for preset `", appendix_preset, "`.")
+      }
+      labels <- as.character(tbl$Preset)
+      measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
+      values <- measure$values
+      pal <- resolve_palette(palette = palette, defaults = c(selection_handoff_presets = "#f4a261", grid = "#ececec"))
+      plot_name <- "selection_handoff_presets"
+      plot_title <- if (is.null(main)) paste0("Summary bundle handoff presets (", appendix_preset, ")") else as.character(main[1])
+      subtitle <- paste0("Preset-level plot-ready appendix handoff for `", appendix_preset, "`")
+      ylab <- measure$ylab
+      legend_label <- measure$legend_label
+    } else if (type == "selection_tables") {
+      tbl <- as.data.frame(sx$selection_table_summary %||% data.frame(), stringsAsFactors = FALSE)
+      tbl <- summary_table_bundle_filter_selection_tables(tbl, appendix_preset = appendix_preset)
+      if (nrow(tbl) == 0L || !all(c("Table", "Rows") %in% names(tbl))) {
+        stop("`x` does not contain appendix table-selection rows for preset `", appendix_preset, "`.")
+      }
+      labels <- as.character(tbl$Table)
+      measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
+      values <- measure$values
+      pal <- resolve_palette(palette = palette, defaults = c(selection_tables = "#e76f51", grid = "#ececec"))
+      plot_name <- "selection_tables"
+      plot_title <- if (is.null(main)) paste0("Summary bundle selection tables (", appendix_preset, ")") else as.character(main[1])
+      subtitle <- paste0("Selected appendix tables for preset `", appendix_preset, "`")
+      ylab <- measure$ylab
+      legend_label <- measure$legend_label
+    } else if (type == "selection_handoff") {
+      tbl <- as.data.frame(sx$selection_handoff_summary %||% data.frame(), stringsAsFactors = FALSE)
+      tbl <- tbl[as.character(tbl$Preset %||% "") %in% appendix_preset, , drop = FALSE]
+      if (nrow(tbl) == 0L || !all(c("AppendixSection", "PlotReadyTables") %in% names(tbl))) {
+        stop("`x` does not contain appendix handoff rows for preset `", appendix_preset, "`.")
+      }
+      labels <- as.character(tbl$AppendixSection)
+      measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
+      values <- measure$values
+      pal <- resolve_palette(palette = palette, defaults = c(selection_handoff = "#ff9f1c", grid = "#ececec"))
+      plot_name <- "selection_handoff"
+      plot_title <- if (is.null(main)) paste0("Summary bundle selection handoff (", appendix_preset, ")") else as.character(main[1])
+      subtitle <- paste0("Plot-ready appendix handoff by section for preset `", appendix_preset, "`")
+      ylab <- measure$ylab
+      legend_label <- measure$legend_label
+    } else if (type == "selection_handoff_bundles") {
+      tbl <- as.data.frame(sx$selection_handoff_bundle_summary %||% data.frame(), stringsAsFactors = FALSE)
+      tbl <- tbl[as.character(tbl$Preset %||% "") %in% appendix_preset, , drop = FALSE]
+      if (nrow(tbl) == 0L || !all(c("AppendixSection", "Bundle", "PlotReadyTables") %in% names(tbl))) {
+        stop("`x` does not contain appendix handoff-bundle rows for preset `", appendix_preset, "`.")
+      }
+      labels <- paste0(as.character(tbl$AppendixSection), " :: ", as.character(tbl$Bundle))
+      measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
+      values <- measure$values
+      pal <- resolve_palette(palette = palette, defaults = c(selection_handoff_bundles = "#5c677d", grid = "#ececec"))
+      plot_name <- "selection_handoff_bundles"
+      plot_title <- if (is.null(main)) paste0("Summary bundle handoff bundles (", appendix_preset, ")") else as.character(main[1])
+      subtitle <- paste0("Plot-ready appendix handoff by section and bundle for preset `", appendix_preset, "`")
+      ylab <- measure$ylab
+      legend_label <- measure$legend_label
+    } else if (type == "selection_handoff_roles") {
+      tbl <- as.data.frame(sx$selection_handoff_role_summary %||% data.frame(), stringsAsFactors = FALSE)
+      tbl <- tbl[as.character(tbl$Preset %||% "") %in% appendix_preset, , drop = FALSE]
+      if (nrow(tbl) == 0L || !all(c("Role", "PlotReadyTables") %in% names(tbl))) {
+        stop("`x` does not contain appendix handoff-role rows for preset `", appendix_preset, "`.")
+      }
+      labels <- as.character(tbl$Role)
+      measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
+      values <- measure$values
+      pal <- resolve_palette(palette = palette, defaults = c(selection_handoff_roles = "#9c6644", grid = "#ececec"))
+      plot_name <- "selection_handoff_roles"
+      plot_title <- if (is.null(main)) paste0("Summary bundle handoff roles (", appendix_preset, ")") else as.character(main[1])
+      subtitle <- paste0("Plot-ready appendix handoff by role for preset `", appendix_preset, "`")
+      ylab <- measure$ylab
+      legend_label <- measure$legend_label
+    } else if (type == "selection_handoff_role_sections") {
+      tbl <- as.data.frame(sx$selection_handoff_role_section_summary %||% data.frame(), stringsAsFactors = FALSE)
+      tbl <- tbl[as.character(tbl$Preset %||% "") %in% appendix_preset, , drop = FALSE]
+      if (nrow(tbl) == 0L || !all(c("AppendixSection", "Role", "PlotReadyTables") %in% names(tbl))) {
+        stop("`x` does not contain appendix handoff role-section rows for preset `", appendix_preset, "`.")
+      }
+      labels <- paste0(as.character(tbl$AppendixSection), " :: ", as.character(tbl$Role))
+      measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
+      values <- measure$values
+      pal <- resolve_palette(palette = palette, defaults = c(selection_handoff_role_sections = "#7f5539", grid = "#ececec"))
+      plot_name <- "selection_handoff_role_sections"
+      plot_title <- if (is.null(main)) paste0("Summary bundle handoff role-sections (", appendix_preset, ")") else as.character(main[1])
+      subtitle <- paste0("Plot-ready appendix handoff by section and role for preset `", appendix_preset, "`")
+      ylab <- measure$ylab
+      legend_label <- measure$legend_label
+    } else if (type == "selection_bundles") {
+      tbl <- as.data.frame(sx$selection_summary %||% data.frame(), stringsAsFactors = FALSE)
+      tbl <- tbl[as.character(tbl$Preset %||% "") %in% appendix_preset, , drop = FALSE]
+      if (nrow(tbl) == 0L || !all(c("Bundle", "TablesSelected") %in% names(tbl))) {
+        stop("`x` does not contain appendix bundle-selection rows for preset `", appendix_preset, "`.")
+      }
+      labels <- as.character(tbl$Bundle)
+      measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
+      values <- measure$values
+      pal <- resolve_palette(palette = palette, defaults = c(selection_bundles = "#54a24b", grid = "#ececec"))
+      plot_name <- "selection_bundles"
+      plot_title <- if (is.null(main)) paste0("Summary bundle appendix bundles (", appendix_preset, ")") else as.character(main[1])
+      subtitle <- paste0("Appendix tables by source bundle for preset `", appendix_preset, "`")
+      ylab <- measure$ylab
+      legend_label <- measure$legend_label
+    } else if (type == "selection_roles") {
+      tbl <- as.data.frame(sx$selection_role_summary %||% data.frame(), stringsAsFactors = FALSE)
+      tbl <- tbl[as.character(tbl$Preset %||% "") %in% appendix_preset, , drop = FALSE]
+      if (nrow(tbl) == 0L || !all(c("Role", "Tables") %in% names(tbl))) {
+        stop("`x` does not contain appendix role-selection rows for preset `", appendix_preset, "`.")
+      }
+      labels <- as.character(tbl$Role)
+      measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
+      values <- measure$values
+      pal <- resolve_palette(palette = palette, defaults = c(selection_roles = "#b279a2", grid = "#ececec"))
+      plot_name <- "selection_roles"
+      plot_title <- if (is.null(main)) paste0("Summary bundle appendix roles (", appendix_preset, ")") else as.character(main[1])
+      subtitle <- paste0("Selected appendix roles for preset `", appendix_preset, "`")
+      ylab <- measure$ylab
+      legend_label <- measure$legend_label
+    } else {
+      tbl <- as.data.frame(sx$selection_section_summary %||% data.frame(), stringsAsFactors = FALSE)
+      tbl <- tbl[as.character(tbl$Preset %||% "") %in% appendix_preset, , drop = FALSE]
+      if (nrow(tbl) == 0L || !all(c("AppendixSection", "Tables") %in% names(tbl))) {
+        stop("`x` does not contain appendix section-selection rows for preset `", appendix_preset, "`.")
+      }
+      labels <- as.character(tbl$AppendixSection)
+      measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
+      values <- measure$values
+      pal <- resolve_palette(palette = palette, defaults = c(selection_sections = "#2a9d8f", grid = "#ececec"))
+      plot_name <- "selection_sections"
+      plot_title <- if (is.null(main)) paste0("Summary bundle appendix sections (", appendix_preset, ")") else as.character(main[1])
+      subtitle <- paste0("Selected appendix sections for preset `", appendix_preset, "`")
+      ylab <- measure$ylab
+      legend_label <- measure$legend_label
+    }
+
+    keep <- is.finite(values) & nzchar(labels)
+    if (!any(keep)) {
+      stop("`x` does not contain finite appendix-selection values for plot type `", type, "`.")
+    }
+    tbl <- tbl[keep, , drop = FALSE]
+    labels <- labels[keep]
+    values <- values[keep]
+
+    if (isTRUE(draw)) {
+      barplot_rot45(
+        height = values,
+        labels = labels,
+        col = pal[plot_name],
+        main = plot_title,
+        ylab = ylab,
+        label_angle = label_angle,
+        mar_bottom = 8.8
+      )
+      graphics::abline(h = 0, col = pal["grid"], lty = 2)
+    }
+    return(invisible(new_mfrm_plot_data(
+      "summary_table_bundle",
+      list(
+        plot = plot_name,
+        selection_value = measure$selection_value,
+        appendix_preset = appendix_preset,
+        table = tbl,
+        title = plot_title,
+        subtitle = subtitle,
+        legend = new_plot_legend(legend_label, "summary_table", "bar", pal[plot_name]),
+        reference_lines = new_reference_lines("h", 0, "Zero-table reference", "dashed", "reference")
+      )
+    )))
+  }
+
+  if (is.null(which) || !nzchar(as.character(which[1] %||% ""))) {
+    which <- summary_table_bundle_first_numeric_table(x)
+  }
+  if (is.null(which)) {
+    stop("No numeric summary table is available for plot type `", type, "`.", call. = FALSE)
+  }
+
+  apa_obj <- apa_table(x, which = which)
+  apa_plot <- plot.apa_table(
+    apa_obj,
+    type = type,
+    main = main,
+    palette = palette,
+    label_angle = label_angle,
+    draw = draw,
+    ...
+  )
+  payload <- apa_plot$data
+  payload$source_table <- as.character(which[1])
+  payload$source_bundle_class <- as.character(x$source_class %||% "mfrm_summary_table_bundle")
+  invisible(new_mfrm_plot_data("summary_table_bundle", payload))
+}
+
+resolve_summary_bundle_table_selection <- function(bundle, which = NULL) {
+  if (!inherits(bundle, "mfrm_summary_table_bundle")) {
+    stop("`bundle` must be an mfrm_summary_table_bundle object.", call. = FALSE)
+  }
+  available <- names(bundle$tables %||% list())
+  if (length(available) == 0L) {
+    stop("`bundle` does not contain any tables.", call. = FALSE)
+  }
+  if (is.null(which) || !nzchar(as.character(which[1] %||% ""))) {
+    which <- if ("overview" %in% available) "overview" else available[1]
+  } else {
+    which <- as.character(which[1])
+  }
+  if (!which %in% available) {
+    stop(
+      "Requested `which` not found in summary table bundle. Available tables: ",
+      paste(available, collapse = ", "),
+      call. = FALSE
+    )
+  }
+  idx <- as.data.frame(bundle$table_index %||% data.frame(), stringsAsFactors = FALSE)
+  idx_row <- if (nrow(idx) > 0 && "Table" %in% names(idx)) {
+    idx[idx$Table %in% which, , drop = FALSE]
+  } else {
+    data.frame()
+  }
+  list(
+    which = which,
+    table = as.data.frame(bundle$tables[[which]], stringsAsFactors = FALSE),
+    index_row = idx_row
+  )
+}
+
 #' Build APA-style table output using base R structures
 #'
-#' @param x A data.frame, `mfrm_fit`, diagnostics list, or bias-result list.
+#' @param x A data.frame, `mfrm_fit`, `summary()` output supported by
+#'   [build_summary_table_bundle()], an `mfrm_summary_table_bundle`, diagnostics
+#'   list, or bias-result list.
 #' @param which Optional table selector when `x` has multiple tables.
 #' @param diagnostics Optional diagnostics from [diagnose_mfrm()] (used when
 #'   `x` is `mfrm_fit` and `which` targets diagnostics tables).
@@ -1390,6 +4479,8 @@ print.summary.mfrm_apa_outputs <- function(x, ...) {
 #'
 #' Supported `which` values:
 #' - For `mfrm_fit`: `"summary"`, `"person"`, `"facets"`, `"steps"`
+#' - For `summary()` outputs or `mfrm_summary_table_bundle`:
+#'   names listed in `build_summary_table_bundle(x)$table_index`
 #' - For diagnostics list: `"overall_fit"`, `"measures"`, `"fit"`,
 #'   `"reliability"`, `"facets_chisq"`, `"bias"`, `"interactions"`,
 #'   `"interrater_summary"`, `"interrater_pairs"`, `"obs"`
@@ -1419,9 +4510,13 @@ print.summary.mfrm_apa_outputs <- function(x, ...) {
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
 #' tbl <- apa_table(fit, which = "summary", caption = "Model summary", note = "Toy example")
 #' tbl_facets <- apa_table(fit, which = "summary", branch = "facets")
+#' fit_bundle <- build_summary_table_bundle(summary(fit))
+#' tbl_from_summary <- apa_table(fit_bundle, which = "facet_overview")
 #' summary(tbl)
 #' p <- plot(tbl, draw = FALSE)
 #' p_facets <- plot(tbl_facets, type = "numeric_profile", draw = FALSE)
+#' p$data$plot
+#' p_facets$data$plot
 #' if (interactive()) {
 #'   plot(
 #'     tbl,
@@ -1431,7 +4526,6 @@ print.summary.mfrm_apa_outputs <- function(x, ...) {
 #'     label_angle = 45
 #'   )
 #' }
-#' class(tbl)
 #' tbl$note
 #' @export
 apa_table <- function(x,
@@ -1451,7 +4545,34 @@ apa_table <- function(x,
   source_type <- "data.frame"
   resolved_which <- NULL
 
-  if (is.data.frame(x)) {
+  summary_bundle_classes <- summary_table_bundle_supported_summary_classes()
+
+  if (inherits(x, "mfrm_summary_table_bundle")) {
+    source_type <- "mfrm_summary_table_bundle"
+    selected <- resolve_summary_bundle_table_selection(x, which = which)
+    resolved_which <- selected$which
+    table_out <- selected$table
+    idx_row <- selected$index_row
+    if (is.null(caption) && nrow(idx_row) > 0 && "Description" %in% names(idx_row)) {
+      caption <- as.character(idx_row$Description[1])
+    }
+    if (is.null(note) && length(x$notes %||% character(0)) > 0L) {
+      note <- paste(as.character(x$notes), collapse = " ")
+    }
+  } else if (inherits(x, summary_bundle_classes)) {
+    source_type <- class(x)[1]
+    bundle <- build_summary_table_bundle(x, include_empty = TRUE)
+    selected <- resolve_summary_bundle_table_selection(bundle, which = which)
+    resolved_which <- selected$which
+    table_out <- selected$table
+    idx_row <- selected$index_row
+    if (is.null(caption) && nrow(idx_row) > 0 && "Description" %in% names(idx_row)) {
+      caption <- as.character(idx_row$Description[1])
+    }
+    if (is.null(note) && length(bundle$notes %||% character(0)) > 0L) {
+      note <- paste(as.character(bundle$notes), collapse = " ")
+    }
+  } else if (is.data.frame(x)) {
     table_out <- x
     source_type <- "data.frame"
   } else if (inherits(x, "mfrm_fit")) {
@@ -1516,7 +4637,7 @@ apa_table <- function(x,
     }
     table_out <- x[[which]]
   } else {
-    stop("`x` must be a data.frame, mfrm_fit, or named list.")
+    stop("`x` must be a data.frame, mfrm_fit, supported summary/table-bundle object, or named list.")
   }
 
   if (is.null(table_out)) {
@@ -1557,6 +4678,17 @@ apa_table <- function(x,
     if (is.null(diag_for_contract)) {
       diag_for_contract <- diagnose_mfrm(x, residual_pca = "none")
     }
+    validated <- validate_apa_builder_inputs(
+      fit = x,
+      diagnostics = diag_for_contract,
+      bias_results = bias_results,
+      context = context,
+      helper = "apa_table()"
+    )
+    x <- validated$fit
+    diag_for_contract <- validated$diagnostics
+    bias_results <- validated$bias_results
+    context <- validated$context
     contract <- build_apa_reporting_contract(
       res = x,
       diagnostics = diag_for_contract,
@@ -1879,9 +5011,6 @@ plot.apa_table <- function(x,
 #' @seealso [build_visual_summaries()]
 #' @examples
 #' profiles <- mfrm_threshold_profiles()
-#' names(profiles)
-#' names(profiles$profiles)
-#' class(profiles)
 #' s_profiles <- summary(profiles)
 #' s_profiles$overview
 #' @export
@@ -2082,10 +5211,24 @@ print.summary.mfrm_threshold_profiles <- function(x, ...) {
 #' - `max_facet_ranges`: max facet-range snippets shown in visual summaries
 #' - `top_misfit_n`: number of top misfit entries included
 #'
+#' For bounded `GPCM`, this helper is intentionally unavailable. Use
+#' [reporting_checklist()], [plot_qc_dashboard()], the residual/category table
+#' helpers, and [compute_information()] / [plot_information()] instead.
+#'
 #' @section Interpreting output:
 #' - `warning_map`: rule-triggered warning text by visual key.
 #' - `summary_map`: descriptive narrative text by visual key.
+#' - strict marginal keys appear when `diagnose_mfrm(..., diagnostic_mode = "both")`
+#'   supplies latent-integrated first-order and pairwise screening summaries.
 #' - `warning_counts` / `summary_counts`: message-count tables for QA checks.
+#' - `plot_payloads`: ready-to-reuse `mfrm_plot_data` payloads for the bundle's
+#'   own comparison/count plots and, when step estimates are available, the
+#'   exploratory `category_probability_surface` payload from
+#'   `plot(fit, type = "ccc_surface", draw = FALSE)`. The surface payload
+#'   carries `category_support`, `interpretation_guide`, and `reporting_policy`
+#'   tables for zero-frequency category and reporting-boundary checks.
+#' - `public_plot_routes`: draw-free helper routes for the dedicated public plot
+#'   functions behind each visual family.
 #'
 #' @section Typical workflow:
 #' 1. inspect defaults with [mfrm_threshold_profiles()]
@@ -2098,15 +5241,23 @@ print.summary.mfrm_threshold_profiles <- function(x, ...) {
 #' - `warning_map`: visual-level warning text vectors
 #' - `summary_map`: visual-level descriptive text vectors
 #' - `warning_counts`, `summary_counts`: message counts by visual key
+#' - `plot_payloads`: reusable draw-free payloads for `comparison`,
+#'   `warning_counts`, `summary_counts`, and optionally
+#'   `category_probability_surface`
+#' - `public_plot_routes`: public helper / draw-free route map for follow-up
 #' - `crosswalk`: FACETS-reference mapping for main visual keys
 #' - `branch`, `style`, `threshold_profile`: branch metadata
 #'
-#' @seealso [mfrm_threshold_profiles()], [build_apa_outputs()]
+#' @seealso [mfrm_threshold_profiles()], [build_apa_outputs()],
+#'   [plot_marginal_fit()], [plot_marginal_pairwise()]
 #' @examples
 #' \donttest{
 #' toy <- load_mfrmr_data("example_core")
-#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
-#' diag <- diagnose_mfrm(fit, residual_pca = "both")
+#' fit <- fit_mfrm(
+#'   toy, "Person", c("Rater", "Criterion"), "Score",
+#'   method = "MML", model = "RSM", maxit = 200
+#' )
+#' diag <- diagnose_mfrm(fit, residual_pca = "both", diagnostic_mode = "both")
 #' vis <- build_visual_summaries(fit, diag, threshold_profile = "strict")
 #' vis2 <- build_visual_summaries(
 #'   fit,
@@ -2120,6 +5271,8 @@ print.summary.mfrm_threshold_profiles <- function(x, ...) {
 #' summary(vis)
 #' p <- plot(vis, type = "comparison", draw = FALSE)
 #' p2 <- plot(vis, type = "warning_counts", draw = FALSE)
+#' vis$plot_payloads$comparison$data$plot
+#' vis$public_plot_routes[, c("Visual", "PlotHelper", "DrawFreeRoute")]
 #' if (interactive()) {
 #'   plot(
 #'     vis,
@@ -2139,6 +5292,7 @@ build_visual_summaries <- function(fit,
                                    summary_options = NULL,
                                    whexact = FALSE,
                                    branch = c("original", "facets")) {
+  stop_if_gpcm_out_of_scope(fit, "build_visual_summaries()")
   branch <- match.arg(tolower(as.character(branch[1])), c("original", "facets"))
   style <- ifelse(branch == "facets", "facets_manual", "original")
 
@@ -2183,8 +5337,11 @@ build_visual_summaries <- function(fit,
       "displacement",
       "interrater",
       "facets_chisq",
+      "strict_marginal_fit",
+      "strict_pairwise_local_dependence",
       "residual_pca_overall",
-      "residual_pca_by_facet"
+      "residual_pca_by_facet",
+      "category_probability_surface"
     ),
     FACETS = c(
       "Table 4 / Table 10",
@@ -2192,8 +5349,11 @@ build_visual_summaries <- function(fit,
       "Table 9",
       "Inter-rater outputs",
       "Facet fixed/random chi-square",
+      "No direct FACETS equivalent (package-native strict marginal screen)",
+      "No direct FACETS equivalent (package-native strict pairwise screen)",
       "Residual PCA (overall)",
-      "Residual PCA (by facet)"
+      "Residual PCA (by facet)",
+      "No direct FACETS equivalent (exploratory category-probability surface payload)"
     )
   )
 
@@ -2202,14 +5362,103 @@ build_visual_summaries <- function(fit,
     summary_map = summary_map,
     warning_counts = to_count_table(warning_map),
     summary_counts = to_count_table(summary_map),
+    plot_payloads = NULL,
+    public_plot_routes = NULL,
     crosswalk = crosswalk,
     branch = branch,
     style = style,
     threshold_profile = as.character(threshold_profile[1])
   )
+  out$plot_payloads <- build_visual_plot_payloads(out, fit = fit)
+  out$public_plot_routes <- build_visual_plot_route_table()
   out <- as_mfrm_bundle(out, "mfrm_visual_summaries")
   class(out) <- unique(c(paste0("mfrm_visual_summaries_", branch), class(out)))
   out
+}
+
+build_visual_plot_route_table <- function() {
+  tibble::tibble(
+    Visual = c(
+      "comparison",
+      "warning_counts",
+      "summary_counts",
+      "unexpected",
+      "fair_average",
+      "displacement",
+      "interrater",
+      "facets_chisq",
+      "strict_marginal_fit",
+      "strict_pairwise_local_dependence",
+      "residual_pca_overall",
+      "residual_pca_by_facet",
+      "category_probability_surface"
+    ),
+    PlotHelper = c(
+      "plot.mfrm_bundle()",
+      "plot.mfrm_bundle()",
+      "plot.mfrm_bundle()",
+      "plot_unexpected()",
+      "plot_fair_average()",
+      "plot_displacement()",
+      "plot_interrater_agreement()",
+      "plot_facets_chisq()",
+      "plot_marginal_fit()",
+      "plot_marginal_pairwise()",
+      "plot_residual_pca()",
+      "plot_residual_pca()",
+      "plot.mfrm_fit()"
+    ),
+    DrawFreeRoute = c(
+      "plot(vis, type = \"comparison\", draw = FALSE)",
+      "plot(vis, type = \"warning_counts\", draw = FALSE)",
+      "plot(vis, type = \"summary_counts\", draw = FALSE)",
+      "plot_unexpected(unexpected_response_table(fit, diagnostics = diagnostics), draw = FALSE)",
+      "plot_fair_average(fair_average_table(fit, diagnostics = diagnostics), draw = FALSE)",
+      "plot_displacement(displacement_table(fit, diagnostics = diagnostics), draw = FALSE)",
+      "plot_interrater_agreement(interrater_agreement_table(fit, diagnostics = diagnostics), draw = FALSE)",
+      "plot_facets_chisq(facets_chisq_table(fit, diagnostics = diagnostics), draw = FALSE)",
+      "plot_marginal_fit(diagnostics, draw = FALSE)",
+      "plot_marginal_pairwise(diagnostics, draw = FALSE)",
+      "plot_residual_pca(analyze_residual_pca(diagnostics, mode = \"overall\"), mode = \"overall\", plot_type = \"scree\", draw = FALSE)",
+      "plot_residual_pca(analyze_residual_pca(diagnostics, mode = \"both\"), mode = \"facet\", facet = \"<facet>\", plot_type = \"loadings\", draw = FALSE)",
+      "plot(fit, type = \"ccc_surface\", draw = FALSE)"
+    ),
+    PlotReturnClass = rep("mfrm_plot_data", 13L),
+    Scope = c(
+      "bundle overview",
+      "bundle overview",
+      "bundle overview",
+      "unexpected-response follow-up",
+      "fair-average follow-up",
+      "displacement follow-up",
+      "inter-rater follow-up",
+      "facet chi-square follow-up",
+      "strict marginal follow-up",
+      "strict pairwise follow-up",
+      "overall residual-structure follow-up",
+      "facet-level residual-structure follow-up",
+      "exploratory category-probability surface handoff"
+    )
+  )
+}
+
+build_visual_plot_payloads <- function(x, fit = NULL) {
+  payloads <- list(
+    comparison = plot_visual_summaries_bundle(x, plot_type = "comparison", draw = FALSE),
+    warning_counts = plot_visual_summaries_bundle(x, plot_type = "warning_counts", draw = FALSE),
+    summary_counts = plot_visual_summaries_bundle(x, plot_type = "summary_counts", draw = FALSE)
+  )
+  if (inherits(fit, "mfrm_fit")) {
+    surface <- tryCatch(
+      plot(fit, type = "ccc_surface", draw = FALSE),
+      error = function(e) NULL,
+      warning = function(w) NULL
+    )
+    if (inherits(surface, "mfrm_plot_data")) {
+      payloads$category_probability_surface <- surface
+    }
+  }
+  payloads
 }
 
 resolve_facets_contract_path <- function(contract_file = NULL) {
@@ -2443,7 +5692,7 @@ build_parity_metric_audit <- function(outputs, tol = 1e-8) {
 #'
 #' @section Typical workflow:
 #' 1. Run `facets_parity_report(fit, branch = "facets")`.
-#' 2. Inspect `summary(parity)` and `missing_preview`.
+#' 2. Inspect `summary(contract_audit)` and `missing_preview`.
 #' 3. Patch upstream table builders, then rerun the compatibility audit.
 #'
 #' @return
@@ -2464,9 +5713,9 @@ build_parity_metric_audit <- function(outputs, tol = 1e-8) {
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
 #' diag <- diagnose_mfrm(fit, residual_pca = "none")
-#' parity <- facets_parity_report(fit, diagnostics = diag, branch = "facets")
-#' summary(parity)
-#' p <- plot(parity, draw = FALSE)
+#' contract_audit <- facets_parity_report(fit, diagnostics = diag, branch = "facets")
+#' summary(contract_audit)
+#' p <- plot(contract_audit, draw = FALSE)
 #' }
 #' @export
 facets_parity_report <- function(fit,
@@ -2479,6 +5728,7 @@ facets_parity_report <- function(fit,
   if (!inherits(fit, "mfrm_fit")) {
     stop("`fit` must be an mfrm_fit object from fit_mfrm().")
   }
+  stop_if_gpcm_out_of_scope(fit, "facets_parity_report()")
   branch <- match.arg(tolower(as.character(branch[1])), c("facets", "original"))
   include_metrics <- isTRUE(include_metrics)
   top_n_missing <- max(1L, as.integer(top_n_missing))
@@ -3357,6 +6607,10 @@ print.summary.mfrm_dif_report <- function(x, ...) {
 #' Individual thresholds can be overridden via the `thresholds` argument
 #' (a named list keyed by the internal threshold names shown above).
 #'
+#' For bounded `GPCM`, this pipeline is intentionally unavailable because the
+#' current validated route stops before bundled pass/warn/fail synthesis for
+#' the free-discrimination branch.
+#'
 #' @section QC checks:
 #' The 10 checks are:
 #' \enumerate{
@@ -3427,6 +6681,7 @@ run_qc_pipeline <- function(fit,
     stop("`fit` must be an mfrm_fit object from fit_mfrm(). ",
          "Got: ", paste(class(fit), collapse = "/"), ".", call. = FALSE)
   }
+  stop_if_gpcm_out_of_scope(fit, "run_qc_pipeline()")
 
   # -- compute diagnostics if needed --
   if (is.null(diagnostics)) {

@@ -118,7 +118,9 @@ test_that("describe_mfrm_data works with minimal data", {
     Rater = c("R1", "R2", "R1"),
     Score = c(0, 1, 2)
   )
-  ds <- describe_mfrm_data(d, "Person", "Rater", "Score")
+  expect_no_warning({
+    ds <- describe_mfrm_data(d, "Person", "Rater", "Score")
+  })
   expect_s3_class(ds, "mfrm_data_description")
   expect_equal(ds$overview$Observations, 3)
 })

@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>MML estimation and marginal-fit diagnostics</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">MML estimation and marginal-fit
+diagnostics</h1>
+
+
+
+<p>This vignette explains how <code>mfrmr</code> fits <code>MML</code>
+models and how to interpret the newer strict marginal diagnostics.</p>
+<div id="why-the-mml-calculations-are-shared" class="section level2">
+<h2>Why the MML calculations are shared</h2>
+<p>Earlier versions computed closely related quantities multiple times
+in separate paths:</p>
+<ul>
+<li>marginal log-likelihood evaluation</li>
+<li>optimization-time gradient calculation</li>
+<li>posterior weights for EAP summaries</li>
+<li>strict marginal expected counts used in diagnostics</li>
+</ul>
+<p>The current implementation reuses the same latent-integrated
+quantities across estimation and diagnostics. This keeps EAP summaries,
+gradients, and strict marginal expected counts aligned.</p>
+</div>
+<div id="mathematical-core" class="section level2">
+<h2>Mathematical Core</h2>
+<p>For a response vector <span class="math inline">\(\mathbf{x}_n\)</span> and parameter vector <span class="math inline">\(\beta\)</span>, the current <code>MML</code> path
+targets the marginal likelihood</p>
+<p><span class="math display">\[
+L(\beta) = \prod_{n=1}^{N} \int p(\mathbf{x}_n \mid \theta, \beta)
+g(\theta) \, d\theta
+\approx
+\prod_{n=1}^{N} \sum_{q=1}^{Q} w_q \, p(\mathbf{x}_n \mid \theta_q,
+\beta),
+\]</span></p>
+<p>where <span class="math inline">\((\theta_q, w_q)\)</span> are
+Gauss-Hermite nodes and weights. In <code>mfrmr</code>, the integral is
+approximated with Gauss-Hermite quadrature, the marginal log-likelihood
+is optimized from the same shared kernel, and person summaries are
+computed post hoc from the posterior bundle. When a latent-regression
+population model is active, the package uses person-specific transformed
+nodes derived from the same quadrature basis rather than one
+unconditional fixed grid.</p>
+<p>The posterior weight for person <span class="math inline">\(n\)</span> at node <span class="math inline">\(q\)</span> is</p>
+<p><span class="math display">\[
+\omega_{nq} =
+\frac{w_q \, p(\mathbf{x}_n \mid \theta_q, \hat{\beta})}
+{\sum_{r=1}^{Q} w_r \, p(\mathbf{x}_n \mid \theta_r, \hat{\beta})}.
+\]</span></p>
+<p>Expected a posteriori (EAP) scoring then uses</p>
+<p><span class="math display">\[
+\hat{\theta}_n^{\mathrm{EAP}} = \sum_{q=1}^{Q} \theta_q \, \omega_{nq}.
+\]</span></p>
+<p>This is the kernel that now feeds <code>logLik</code>, the gradient,
+EAP summaries, and strict marginal expected values.</p>
+</div>
+<div id="current-mml-scope" class="section level2">
+<h2>Current MML scope</h2>
+<p>For the current public <code>RSM</code> / <code>PCM</code>
+release:</p>
+<ul>
+<li>the person distribution is integrated with Gauss-Hermite
+quadrature</li>
+<li><code>mml_engine = &quot;direct&quot;</code> uses gradient-based direct
+optimization of the marginal log-likelihood</li>
+<li><code>mml_engine = &quot;em&quot;</code> and
+<code>mml_engine = &quot;hybrid&quot;</code> are also available for
+<code>RSM</code> / <code>PCM</code>, while unsupported branches fall
+back to <code>direct</code></li>
+<li>person summaries are reported post-hoc from the integrated
+posterior</li>
+</ul>
+<p>This is the implemented scope for the current release.</p>
+</div>
+<div id="strict-marginal-diagnostic-target" class="section level2">
+<h2>Strict Marginal Diagnostic Target</h2>
+<p>The strict marginal branch is not based on plugging <span class="math inline">\(\hat{\theta}_n^{EAP}\)</span> back into the
+response model. Instead, it works with posterior-integrated
+expectations. For a grouped summary <span class="math inline">\(g\)</span> and category <span class="math inline">\(c\)</span>,</p>
+<p><span class="math display">\[
+\mathbb{E}_{\hat{\beta}}(N_{gc}) =
+\sum_{n=1}^{N} \sum_{q=1}^{Q}
+\omega_{nq} \, I(n \in g) \, P(X_n = c \mid \theta_q, \hat{\beta}).
+\]</span></p>
+<p>The corresponding residual compares the observed count to that
+latent-integrated expectation rather than to an <code>EAP</code> plug-in
+prediction.</p>
+<p>For pairwise local-dependence follow-up, the package keeps the same
+posterior weights but replaces the one-category event with agreement or
+adjacency events for the relevant pair of facet levels. That is why
+<code>top_marginal_cells</code> and <code>top_marginal_pairs</code> are
+conceptually related but not numerically comparable.</p>
+</div>
+<div id="diagnostic-basis-in-the-package" class="section level2">
+<h2>Diagnostic Basis In The Package</h2>
+<p><code>diagnose_mfrm()</code> now keeps two evidence paths
+explicit:</p>
+<ul>
+<li><code>legacy</code>: residual/EAP-oriented diagnostics inherited
+from the earlier stack</li>
+<li><code>marginal_fit</code>: strict latent-integrated first-order and
+pairwise screens</li>
+<li><code>both</code>: returns both without collapsing them into one
+decision rule</li>
+</ul>
+<p>The object returned by <code>summary(diag)</code> exposes
+<code>diagnostic_basis</code> so the two paths can be interpreted
+separately.</p>
+</div>
+<div id="literature-positioning" class="section level2">
+<h2>Literature Positioning</h2>
+<p>The current design is deliberately aligned with five strands of the
+IRT fit literature.</p>
+<ol style="list-style-type: decimal">
+<li><p>Limited-information item-fit logic. Orlando and Thissen (2000,
+2003) show why grouped or score-conditioned comparisons can be more
+stable than full-information contingency-table statistics in realistic
+IRT settings. The current package borrows that limited-information
+logic, but it does not implement <code>S-X2</code> or <code>S-G2</code>
+literally. Instead, it applies posterior-integrated grouped residual
+screens to many-facet cells and levels.</p></li>
+<li><p>Generalized residual logic. Haberman and Sinharay (2013) define a
+generalized residual for a summary statistic <span class="math inline">\(T\)</span> as</p></li>
+</ol>
+<p><span class="math display">\[
+r = \frac{T - \hat{\mathbb{E}}(T)}{\hat{s}_D},
+\]</span></p>
+<p>where <span class="math inline">\(\hat{\mathbb{E}}(T)\)</span> and
+<span class="math inline">\(\hat{s}_D\)</span> are computed under the
+fitted model. This is the clearest template for thinking about the
+current <code>marginal_fit</code> outputs. The current pairwise
+local-dependence summaries are informed by the same
+observed-versus-expected logic, but they should still be read as
+exploratory agreement screens rather than as formal Haberman- Sinharay
+generalized residual tests.</p>
+<ol start="3" style="list-style-type: decimal">
+<li><p>Multi-method fit assessment and practical significance. Sinharay
+and Monroe (2025) review limited-information statistics, generalized
+residuals, posterior predictive checking, and practical significance,
+and recommend prioritizing fit procedures by intended use rather than
+treating one index as universally decisive.</p></li>
+<li><p>Posterior predictive follow-up. Sinharay et al. (2006) treat
+posterior predictive checking as a separate model-checking family built
+around replicated datasets and discrepancy measures. That is the
+intended follow-up role of the package’s currently scaffolded
+<code>posterior_predictive_follow_up</code> path.</p></li>
+<li><p>Many-facet reporting context. Linacre’s FACETS framework and
+applied MFRM studies such as Eckes (2005) remain the primary references
+for severity/leniency, mean-square fit, separation, and inter-rater
+agreement. The current strict marginal branch is designed to sit
+alongside that many-facet toolkit, not to replace it.</p></li>
+</ol>
+</div>
+<div id="interpretation-boundaries" class="section level2">
+<h2>Interpretation Boundaries</h2>
+<p>The strict marginal branch is currently a screening layer, not a
+fully calibrated inferential test battery.</p>
+<ul>
+<li>well-specified simulation rows are interpreted as Type I
+proxies</li>
+<li>misspecified rows are interpreted as sensitivity proxies</li>
+<li>posterior-predictive checks remain a follow-up path rather than a
+completed default computation</li>
+</ul>
+<p>This package therefore treats strict marginal diagnostics as
+structured evidence about possible misfit, not as a single definitive
+accept/reject rule. That design choice follows the broader review logic
+in Sinharay and Monroe (2025): use several complementary diagnostics,
+match them to the intended use of the scores, and examine practical
+significance before making strong claims.</p>
+<p>For many-facet reporting, one additional boundary matters.
+Facet-level separation/reliability and inter-rater agreement answer
+different questions. High rater separation reliability can coexist with
+weak observed agreement, and strong observed agreement does not imply
+that raters are interchangeable on the latent severity scale. That is
+why <code>mfrmr</code> reports <code>diagnostics$reliability</code> and
+<code>diagnostics$interrater</code> as separate objects.</p>
+</div>
+<div id="validation-scope-in-the-current-release" class="section level2">
+<h2>Validation Scope In The Current Release</h2>
+<p>The current simulation-based validation covers:</p>
+<ul>
+<li>well-specified baselines</li>
+<li>local dependence misspecification</li>
+<li>latent distribution misspecification</li>
+<li>step-structure misspecification</li>
+</ul>
+<p>These checks target <code>RSM</code> and <code>PCM</code>.
+<code>GPCM</code> is now supported only within a bounded core route:
+fitting, slope summaries, posterior scoring, information curves, direct
+curve/category reports, and exploratory residual-based follow-up.
+Broader APA/report bundles, fair-average semantics, and
+planning/forecasting helpers remain out of scope for <code>GPCM</code>
+in this release.</p>
+</div>
+<div id="why-gpcm-is-the-current-upper-scope" class="section level2">
+<h2>Why GPCM Is The Current Upper Scope</h2>
+<p><code>GPCM</code> is the current upper supported scope for three
+reasons.</p>
+<ol style="list-style-type: decimal">
+<li>The shared <code>MML</code> kernel and the response-probability core
+already generalize to the bounded <code>GPCM</code> branch without
+changing the main package architecture.</li>
+<li>The package has direct checks for that bounded route.</li>
+<li>The helpers that still depend on Rasch-family score semantics or on
+the role-based planning layer are already blocked explicitly, so formal
+support does not require pretending that every downstream helper has
+full coverage.</li>
+</ol>
+<p>This is a narrower but more defensible claim than saying the whole
+package is uniformly generalized to free-discrimination many-facet
+work.</p>
+</div>
+<div id="equal-weighting-as-a-model-choice-principle" class="section level2">
+<h2>Equal weighting as a model-choice principle</h2>
+<p>Robitzsch and Steinfeld (2018) are helpful because they separate two
+arguments that are often conflated in applied many-facet work.</p>
+<ol style="list-style-type: decimal">
+<li>A generalized many-facet model with discrimination parameters will
+often fit empirical data better than a Rasch-MFRM.</li>
+<li>That fit advantage does not, by itself, settle the operational
+scoring question.</li>
+</ol>
+<p>If the intended score interpretation requires equal contributions of
+items and raters, then the Rasch-family route remains substantively
+attractive even when a slope-aware model fits better. <code>mfrmr</code>
+therefore treats <code>RSM</code> / <code>PCM</code> as the
+equal-weighting reference models and bounded <code>GPCM</code> as a
+supported alternative for users who explicitly want to inspect or allow
+discrimination-based reweighting.</p>
+<p>This is also why some score-side helpers remain out of scope for
+bounded <code>GPCM</code>. FACETS-style fair averages are Rasch-family
+score transformations, and a slope-aware analogue should not silently
+reuse the Rasch-family calculation.</p>
+<p>One additional distinction matters for implementation. The
+<code>weight</code> argument in <code>fit_mfrm()</code> is an
+observation-weight column. It changes how rating events enter estimation
+and summaries, but it is not the same thing as the equal-weighting
+versus discrimination-weighting question discussed above.</p>
+</div>
+<div id="future-extensions" class="section level2">
+<h2>Future extensions</h2>
+<p>Posterior-predictive checking, <code>MCMC</code> engines, and heavier
+runtime infrastructure remain future extensions. They are not required
+for the current quadrature-based <code>MML</code> route or for the
+bounded <code>GPCM</code> support described here.</p>
+</div>
+<div id="recommended-expert-reading-of-package-output" class="section level2">
+<h2>Recommended Expert Reading Of Package Output</h2>
+<p>For the current release, the most defensible interpretation sequence
+is:</p>
+<ol style="list-style-type: decimal">
+<li>Read <code>summary(fit)</code> for estimation status and precision
+basis.</li>
+<li>Read <code>summary(diag)</code> with
+<code>diagnostic_mode = &quot;both&quot;</code> to keep legacy and strict evidence
+separate.</li>
+<li>Treat <code>marginal_fit</code> and <code>marginal_pairwise</code>
+as screening layers for first-order and local-dependence follow-up.</li>
+<li>Use plots and tables to judge magnitude and practical importance,
+not only presence/absence of a flag.</li>
+<li>If a use case demands stronger confirmation, treat posterior
+predictive checking as the next methodological step rather than
+over-reading the current screening statistics.</li>
+</ol>
+</div>
+<div id="key-references" class="section level2">
+<h2>Key References</h2>
+<ul>
+<li>Andrich, D. (1978). <em>A rating formulation for ordered response
+categories</em>. Psychometrika, 43, 561-573.</li>
+<li>Bock, R. D., &amp; Aitkin, M. (1981). <em>Marginal maximum
+likelihood estimation of item parameters: Application of an EM
+algorithm</em>. Psychometrika, 46, 443-459.</li>
+<li>Haberman, S. J., &amp; Sinharay, S. (2013). <em>Generalized
+residuals for general models for contingency tables with application to
+item response theory</em>. Journal of the American Statistical
+Association, 108, 1435-1444.</li>
+<li>Eckes, T. (2005). <em>Examining rater effects in TestDaF writing and
+speaking performance assessments: A many-facet Rasch analysis</em>.
+Language Assessment Quarterly, 2, 197-221.</li>
+<li>Linacre, J. M. (1989). <em>Many-facet Rasch measurement</em>. MESA
+Press.</li>
+<li>Masters, G. N. (1982). <em>A Rasch model for partial credit
+scoring</em>. Psychometrika, 47, 149-174.</li>
+<li>Orlando, M., &amp; Thissen, D. (2000). <em>Likelihood-based item-fit
+indices for dichotomous item response theory models</em>. Applied
+Psychological Measurement, 24, 50-64.</li>
+<li>Orlando, M., &amp; Thissen, D. (2003). <em>Further investigation of
+the performance of S-X2: An item fit index for use with dichotomous item
+response theory models</em>. Applied Psychological Measurement, 27,
+289-298.</li>
+<li>Robitzsch, A., &amp; Steinfeld, J. (2018). <em>Modeling rater
+effects in achievement tests by item response models: Facets,
+generalized linear mixed models, or signal detection models?</em>
+Journal of Educational and Behavioral Statistics, 43, 218-244.</li>
+<li>Sinharay, S., &amp; Monroe, S. (2025). <em>Assessment of fit of item
+response theory models: A critical review of the status quo and some
+future directions</em>. British Journal of Mathematical and Statistical
+Psychology, 78, 711-733.</li>
+<li>Sinharay, S., Johnson, M. S., &amp; Stern, H. S. (2006).
+<em>Posterior predictive assessment of item response theory models</em>.
+Applied Psychological Measurement, 30, 298-321.</li>
+</ul>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

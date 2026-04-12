@@ -11,6 +11,7 @@ predict_mfrm_population(
   n_rater = NULL,
   n_criterion = NULL,
   raters_per_person = NULL,
+  design = NULL,
   reps = 50,
   fit_method = NULL,
   model = NULL,
@@ -40,6 +41,15 @@ design. Defaults to the value stored in the base simulation specification.}
 future design. Defaults to the value stored in the base simulation
 specification.}
 
+\item{design}{Optional named design override supplied as a named list,
+named vector, or one-row data frame. Names may use canonical variables
+(\code{n_person}, \code{n_rater}, \code{n_criterion}, \code{raters_per_person}), current
+public aliases (for example \code{n_judge}, \code{n_task}, \code{judge_per_person}), or
+role keywords (\code{person}, \code{rater}, \code{criterion}, \code{assignment}). The
+schema-only future branch input \code{design$facets = c(person = ..., judge = ..., task = ...)} is also accepted for the currently exposed facet keys.
+Do not specify the same variable through both \code{design} and the scalar
+count arguments.}
+
 \item{reps}{Number of replications used in the forecast simulation.}
 
 \item{fit_method}{Estimation method used inside the forecast simulation. When
@@ -65,6 +75,18 @@ An object of class \code{mfrm_population_prediction} with components:
 \item \code{overview}: run-level overview
 \item \code{simulation}: underlying \code{\link[=evaluate_mfrm_design]{evaluate_mfrm_design()}} result
 \item \code{sim_spec}: simulation specification used for the forecast
+\item \code{facet_names}: public non-person facet names carried by the simulation
+specification
+\item \code{design_variable_aliases}: public aliases for
+\code{n_person}/\code{n_rater}/\code{n_criterion}/\code{raters_per_person}
+\item \code{design_descriptor}: role-based description of design variables carried
+from the underlying planning object
+\item \code{planning_scope}: explicit record of the current planning contract,
+including a \code{facet_manifest} and future-planner scaffold marker
+\item \code{planning_constraints}: explicit record of mutable/locked design variables
+\item \code{planning_schema}: combined planner-schema contract carrying the role
+table, current boundary, mutability map, facet manifest, and a
+schema-only future facet-count table
 \item \code{settings}: forecasting settings
 \item \code{ademp}: simulation-study metadata
 \item \code{notes}: interpretation notes
@@ -91,6 +113,19 @@ starting point with \code{\link[=extract_mfrm_sim_spec]{extract_mfrm_sim_spec()}
 requested future design under that explicit data-generating mechanism. This
 should be interpreted as a fit-based forecast under modeling assumptions, not
 as a guaranteed out-of-sample prediction.
+
+When that fit-derived or manually built simulation specification stores an
+active latent-regression population generator, the helper still operates at
+the \strong{design / operating-characteristic} level. It repeatedly simulates
+person-level covariates and responses, refits the MML population-model
+branch, and summarizes the resulting facet-level behavior. This is distinct
+from the fitted-model posterior scoring provided by \code{\link[=predict_mfrm_units]{predict_mfrm_units()}}.
+
+The current bounded \code{GPCM} branch is not yet supported here. In the
+present package state, scenario-level simulation/planning remains validated
+only for the ordered Rasch-family \code{RSM} / \code{PCM} workflow. More broadly, the
+current planning layer still targets the role-based person x rater-like x
+criterion-like design contract rather than a fully arbitrary-facet planner.
 }
 \section{Interpreting output}{
 
@@ -99,6 +134,14 @@ as a guaranteed out-of-sample prediction.
 future design.
 \item \verb{Mcse*} columns quantify Monte Carlo uncertainty from using a finite number
 of replications.
+\item \code{design_variable_aliases} and \code{design_descriptor} carry the same public
+naming metadata used by the underlying planning object. They rename the
+standard two non-person facet roles for presentation, but they do not turn
+the current planner into a fully arbitrary-facet simulator.
+\item If \code{sim_spec$population$active = TRUE}, the forecast summarizes repeated
+latent-regression MML refits under that stored person-level generator; it
+is still a scenario forecast rather than direct posterior scoring for one
+observed sample.
 \item \code{simulation} stores the full design-evaluation object in case you want to
 inspect replicate-level behavior.
 }
@@ -131,19 +174,19 @@ reporting}. Psychological Methods.
 }
 
 \examples{
-\donttest{
+\dontrun{
 spec <- build_mfrm_sim_spec(
-  n_person = 40,
-  n_rater = 4,
-  n_criterion = 4,
+  n_person = 16,
+  n_rater = 3,
+  n_criterion = 2,
   raters_per_person = 2,
   assignment = "rotating"
 )
 pred <- predict_mfrm_population(
   sim_spec = spec,
-  n_person = 60,
-  reps = 2,
-  maxit = 10,
+  design = list(person = 18),
+  reps = 1,
+  maxit = 5,
   seed = 123
 )
 s_pred <- summary(pred)

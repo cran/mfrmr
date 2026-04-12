@@ -18,7 +18,9 @@ apa_table(
 )
 }
 \arguments{
-\item{x}{A data.frame, \code{mfrm_fit}, diagnostics list, or bias-result list.}
+\item{x}{A data.frame, \code{mfrm_fit}, \code{summary()} output supported by
+\code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}}, an \code{mfrm_summary_table_bundle}, diagnostics
+list, or bias-result list.}
 
 \item{which}{Optional table selector when \code{x} has multiple tables.}
 
@@ -63,6 +65,8 @@ This helper avoids styling dependencies and returns a reproducible base
 Supported \code{which} values:
 \itemize{
 \item For \code{mfrm_fit}: \code{"summary"}, \code{"person"}, \code{"facets"}, \code{"steps"}
+\item For \code{summary()} outputs or \code{mfrm_summary_table_bundle}:
+names listed in \code{build_summary_table_bundle(x)$table_index}
 \item For diagnostics list: \code{"overall_fit"}, \code{"measures"}, \code{"fit"},
 \code{"reliability"}, \code{"facets_chisq"}, \code{"bias"}, \code{"interactions"},
 \code{"interrater_summary"}, \code{"interrater_pairs"}, \code{"obs"}
@@ -92,9 +96,13 @@ toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
 tbl <- apa_table(fit, which = "summary", caption = "Model summary", note = "Toy example")
 tbl_facets <- apa_table(fit, which = "summary", branch = "facets")
+fit_bundle <- build_summary_table_bundle(summary(fit))
+tbl_from_summary <- apa_table(fit_bundle, which = "facet_overview")
 summary(tbl)
 p <- plot(tbl, draw = FALSE)
 p_facets <- plot(tbl_facets, type = "numeric_profile", draw = FALSE)
+p$data$plot
+p_facets$data$plot
 if (interactive()) {
   plot(
     tbl,
@@ -104,7 +112,6 @@ if (interactive()) {
     label_angle = 45
   )
 }
-class(tbl)
 tbl$note
 }
 \seealso{

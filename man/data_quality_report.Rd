@@ -71,7 +71,7 @@ out <- data_quality_report(
 )
 summary(out)
 p_dq <- plot(out, draw = FALSE)
-class(p_dq)
+p_dq$data$plot
 }
 \seealso{
 \code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=describe_mfrm_data]{describe_mfrm_data()}}, \code{\link[=specifications_report]{specifications_report()}},

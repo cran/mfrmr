@@ -18,7 +18,8 @@ bundle_preview_table <- function(object, top_n = 10L) {
   keys <- c(
     "table", "pairs", "stacked", "ranked_table", "facet_profile", "graphfile",
     "category_table", "facet_coverage", "listing", "overall_table", "by_facet_table",
-    "missing_preview", "column_audit", "metric_audit", "column_summary", "metric_summary"
+    "missing_preview", "column_audit", "metric_audit", "column_summary", "metric_summary",
+    "conquest_population", "conquest_item_estimates", "conquest_case_eap"
   )
   nm <- names(object)
   if (is.null(nm) || length(nm) == 0) {
@@ -140,6 +141,8 @@ summarize_visual_summaries_bundle <- function(object, digits = 3, top_n = 10) {
   warning_counts <- as.data.frame(object$warning_counts %||% data.frame(), stringsAsFactors = FALSE)
   summary_counts <- as.data.frame(object$summary_counts %||% data.frame(), stringsAsFactors = FALSE)
   crosswalk <- as.data.frame(object$crosswalk %||% data.frame(), stringsAsFactors = FALSE)
+  plot_routes <- as.data.frame(object$public_plot_routes %||% data.frame(), stringsAsFactors = FALSE)
+  payload_names <- names(object$plot_payloads %||% list())
 
   overview <- data.frame(
     Branch = as.character(object$branch %||% "original"),
@@ -159,6 +162,16 @@ summarize_visual_summaries_bundle <- function(object, digits = 3, top_n = 10) {
   } else {
     "Original branch keeps package-native warning/summary map organization."
   }
+  if (length(payload_names) > 0) {
+    notes <- c(
+      notes,
+      paste0(
+        "Reusable draw-free payloads are available in `plot_payloads`: ",
+        paste(payload_names, collapse = ", "),
+        "."
+      )
+    )
+  }
 
   out <- list(
     summary_kind = "visual_summaries",
@@ -167,12 +180,198 @@ summarize_visual_summaries_bundle <- function(object, digits = 3, top_n = 10) {
     preview_name = if (nrow(preview_tbl) > 0) "warning_counts" else "",
     preview = preview_tbl,
     settings = crosswalk,
+    plot_routes = utils::head(plot_routes, n = top_n),
     notes = notes,
     digits = digits,
     summary_counts = summary_counts
   )
   class(out) <- "summary.mfrm_bundle"
   out
+}
+
+summarize_export_bundle <- function(object, digits = 3, top_n = 10) {
+  written <- bundle_component_table(object, "written_files")
+  summary_tbl <- bundle_component_table(object, "summary")
+  settings <- bundle_settings_table(object$settings)
+  format_summary <- bundle_export_format_summary(written)
+  artifact_catalog <- bundle_export_artifact_catalog(written)
+  artifact_preview <- utils::head(artifact_catalog, n = top_n)
+  reporting_map <- bundle_export_reporting_map("bundle")
+
+  out <- list(
+    summary_kind = "export_bundle",
+    overview = bundle_known_overview(
+      object,
+      obj_class = "mfrm_export_bundle",
+      preview_name = if (nrow(written) > 0) "written_files" else NA_character_,
+      preview_rows = min(nrow(written), top_n)
+    ),
+    summary = summary_tbl,
+    preview_name = if (nrow(written) > 0) "written_files" else "",
+    preview = utils::head(written, n = top_n),
+    settings = settings,
+    format_summary = format_summary,
+    artifact_catalog = artifact_catalog,
+    artifact_preview = artifact_preview,
+    reporting_map = reporting_map,
+    notes = as.character(object$notes %||% "Bundle export completed successfully."),
+    digits = digits
+  )
+  class(out) <- "summary.mfrm_bundle"
+  out
+}
+
+summarize_summary_appendix_export <- function(object, digits = 3, top_n = 10) {
+  written <- bundle_component_table(object, "written_files")
+  summary_tbl <- bundle_component_table(object, "summary")
+  selection_summary <- bundle_component_table(object, "selection_summary")
+  selection_table_summary <- bundle_component_table(object, "selection_table_summary")
+  selection_handoff_table_summary <- bundle_component_table(object, "selection_handoff_table_summary")
+  selection_handoff_preset_summary <- bundle_component_table(object, "selection_handoff_preset_summary")
+  selection_handoff_summary <- bundle_component_table(object, "selection_handoff_summary")
+  selection_handoff_bundle_summary <- bundle_component_table(object, "selection_handoff_bundle_summary")
+  selection_handoff_role_summary <- bundle_component_table(object, "selection_handoff_role_summary")
+  selection_handoff_role_section_summary <- bundle_component_table(object, "selection_handoff_role_section_summary")
+  selection_role_summary <- bundle_component_table(object, "selection_role_summary")
+  selection_section_summary <- bundle_component_table(object, "selection_section_summary")
+  selection_catalog <- bundle_component_table(object, "selection_catalog")
+  settings <- bundle_settings_table(object$settings)
+  format_summary <- bundle_export_format_summary(written)
+  artifact_catalog <- bundle_export_artifact_catalog(written)
+  artifact_preview <- utils::head(artifact_catalog, n = top_n)
+  reporting_map <- bundle_export_reporting_map("appendix")
+
+  out <- list(
+    summary_kind = "summary_appendix_export",
+    overview = bundle_known_overview(
+      object,
+      obj_class = "mfrm_summary_appendix_export",
+      preview_name = if (nrow(written) > 0) "written_files" else NA_character_,
+      preview_rows = min(nrow(written), top_n)
+    ),
+    summary = summary_tbl,
+    preview_name = if (nrow(written) > 0) "written_files" else "",
+    preview = utils::head(written, n = top_n),
+    settings = settings,
+    format_summary = format_summary,
+    artifact_catalog = artifact_catalog,
+    artifact_preview = artifact_preview,
+    selection_summary = selection_summary,
+    selection_table_summary = selection_table_summary,
+    selection_handoff_table_summary = selection_handoff_table_summary,
+    selection_handoff_preset_summary = selection_handoff_preset_summary,
+    selection_handoff_summary = selection_handoff_summary,
+    selection_handoff_bundle_summary = selection_handoff_bundle_summary,
+    selection_handoff_role_summary = selection_handoff_role_summary,
+    selection_handoff_role_section_summary = selection_handoff_role_section_summary,
+    selection_role_summary = selection_role_summary,
+    selection_section_summary = selection_section_summary,
+    selection_catalog = utils::head(selection_catalog, n = top_n),
+    reporting_map = reporting_map,
+    notes = as.character(object$notes %||% "Appendix export completed successfully."),
+    digits = digits
+  )
+  class(out) <- "summary.mfrm_bundle"
+  out
+}
+
+bundle_export_format_summary <- function(written_files) {
+  written_files <- as.data.frame(written_files %||% data.frame(), stringsAsFactors = FALSE)
+  if (nrow(written_files) == 0L || !"Format" %in% names(written_files)) {
+    return(data.frame())
+  }
+
+  formats <- sort(table(as.character(written_files$Format)), decreasing = TRUE)
+  data.frame(
+    Format = names(formats),
+    Files = as.integer(formats),
+    stringsAsFactors = FALSE
+  )
+}
+
+bundle_export_artifact_catalog <- function(written_files) {
+  written_files <- as.data.frame(written_files %||% data.frame(), stringsAsFactors = FALSE)
+  if (nrow(written_files) == 0L) {
+    return(data.frame())
+  }
+
+  component <- as.character(written_files$Component %||% "")
+  format <- as.character(written_files$Format %||% "")
+  path_base <- basename(as.character(written_files$Path %||% ""))
+  artifact_group <- ifelse(
+    startsWith(component, "summary_"),
+    "summary_surface",
+    ifelse(
+      grepl("_html$", component),
+      "html_review",
+      ifelse(
+        grepl("_zip$", component),
+        "archive",
+        "analysis_bundle"
+      )
+    )
+  )
+  recommended_use <- ifelse(
+    artifact_group == "summary_surface",
+    "manuscript / appendix handoff",
+    ifelse(
+      artifact_group == "html_review",
+      "human-readable review",
+      ifelse(
+        artifact_group == "archive",
+        "single-file transfer",
+        "analysis export"
+      )
+    )
+  )
+
+  data.frame(
+    Component = component,
+    Format = format,
+    ArtifactGroup = artifact_group,
+    RecommendedUse = recommended_use,
+    File = path_base,
+    stringsAsFactors = FALSE
+  )
+}
+
+bundle_export_reporting_map <- function(kind = c("bundle", "appendix")) {
+  kind <- match.arg(kind)
+  if (identical(kind, "appendix")) {
+    return(data.frame(
+      Area = c(
+        "Export counts",
+        "Artifact catalog / handoff",
+        "Human-readable review",
+        "Downstream manuscript bridge"
+      ),
+      CoveredHere = c("yes", "yes", "yes", "yes"),
+      CompanionOutput = c(
+        "summary(appendix)$summary / format_summary",
+        "summary(appendix)$artifact_catalog",
+        "appendix HTML artifact when include_html = TRUE",
+        "CSV appendix tables + apa_table() / manuscript QA"
+      ),
+      stringsAsFactors = FALSE
+    ))
+  }
+
+  data.frame(
+    Area = c(
+      "Export counts",
+      "Artifact catalog / file inventory",
+      "Human-readable review",
+      "Replay / archival bridge"
+    ),
+    CoveredHere = c("yes", "yes", "yes", "yes"),
+    CompanionOutput = c(
+      "summary(bundle)$summary / format_summary",
+      "summary(bundle)$artifact_catalog",
+      "bundle HTML artifact when requested",
+      "manifest / replay script / zip bundle"
+    ),
+    stringsAsFactors = FALSE
+  )
 }
 
 bundle_component_table <- function(object, name) {
@@ -268,6 +467,7 @@ summarize_known_bundle <- function(object,
       notes <- "No populated table components were found in this bundle."
     }
   }
+  caveats_tbl <- as.data.frame(object$caveats %||% data.frame(), stringsAsFactors = FALSE)
 
   out <- list(
     summary_kind = obj_class,
@@ -281,6 +481,7 @@ summarize_known_bundle <- function(object,
     preview_name = preview_pick$name,
     preview = preview_pick$table,
     settings = settings_tbl,
+    caveats = caveats_tbl,
     notes = notes,
     digits = digits
   )
@@ -464,7 +665,9 @@ summarize_precision_audit_bundle <- function(object, digits = 3, top_n = 10) {
   }
 
   summary_tbl <- data.frame(
-    Method = as.character(profile_tbl$Method[1] %||% NA_character_),
+    Method = resolve_public_mfrm_method(
+      summary_method = profile_tbl$Method[1] %||% NA_character_
+    ),
     PrecisionTier = as.character(profile_tbl$PrecisionTier[1] %||% NA_character_),
     SupportsFormalInference = isTRUE(profile_tbl$SupportsFormalInference[1] %||% FALSE),
     Checks = nrow(checks_tbl),
@@ -517,7 +720,7 @@ summarize_parity_bundle <- function(object, digits = 3, top_n = 10) {
     }
   }
   if (length(notes) == 0) {
-    notes <- "Parity checks completed."
+    notes <- "Compatibility checks completed."
   }
 
   summarize_known_bundle(
@@ -531,6 +734,263 @@ summarize_parity_bundle <- function(object, digits = 3, top_n = 10) {
     top_n = top_n,
     summary_override = overall_tbl
   )
+}
+
+reference_benchmark_validation_scope <- function(object) {
+  settings <- object$settings %||% list()
+  cases <- as.character(settings$cases %||% character(0))
+  has_conquest_dry_run <- "synthetic_conquest_overlap_dry_run" %in% cases ||
+    nrow(bundle_component_table(object, "conquest_overlap_checks")) > 0L
+  has_population_policy <- "synthetic_latent_regression_omit" %in% cases ||
+    nrow(bundle_component_table(object, "population_policy_checks")) > 0L
+  external_validation <- isTRUE(settings$external_validation %||% FALSE)
+
+  data.frame(
+    Area = c(
+      "Package reference check",
+      "Latent-regression omission policy",
+      "ConQuest-overlap package-side check",
+      "External ConQuest validation"
+    ),
+    Status = c(
+      "active",
+      if (has_population_policy) "checked" else "not requested",
+      if (has_conquest_dry_run) "package-side check only" else "not requested",
+      if (external_validation) "claimed" else "not performed"
+    ),
+    Evidence = c(
+      "case_summary and component check tables",
+      if (has_population_policy) "`population_policy_checks`" else "request `synthetic_latent_regression_omit`",
+      if (has_conquest_dry_run) "`conquest_overlap_checks`" else "request `synthetic_conquest_overlap_dry_run`",
+      if (external_validation) "settings$external_validation is TRUE" else "settings$external_validation is FALSE"
+    ),
+    Interpretation = c(
+      "Use as a package reference check.",
+      "Complete-case omission behavior is audited only when the omission case is requested.",
+      "The check covers package-side export, normalization, and audit plumbing only.",
+      "Actual external ConQuest output tables are required before making an external validation claim."
+    ),
+    stringsAsFactors = FALSE
+  )
+}
+
+summarize_reference_benchmark_bundle <- function(object, digits = 3, top_n = 10) {
+  case_summary <- bundle_component_table(object, "case_summary")
+  if (nrow(case_summary) == 0L && ncol(case_summary) == 0L) {
+    case_summary <- bundle_component_table(object, "summary")
+  }
+  out <- summarize_known_bundle(
+    object = object,
+    obj_class = "mfrm_reference_benchmark",
+    summary_candidates = character(0),
+    preview_candidates = c("fit_runs", "table"),
+    settings_candidates = "settings",
+    notes = object$notes %||% "Reference-case check; not an external validation study.",
+    digits = digits,
+    top_n = top_n,
+    summary_override = utils::head(case_summary, n = top_n)
+  )
+  out$validation_scope <- reference_benchmark_validation_scope(object)
+  out$conquest_overlap_checks <- utils::head(
+    bundle_component_table(object, "conquest_overlap_checks"),
+    n = top_n
+  )
+  out$population_policy_checks <- utils::head(
+    bundle_component_table(object, "population_policy_checks"),
+    n = top_n
+  )
+  out
+}
+
+conquest_overlap_command_scope <- function(object) {
+  command <- paste(as.character(object$conquest_command %||% ""), collapse = "\n")
+  summary_tbl <- bundle_component_table(object, "summary")
+  facet <- as.character(summary_tbl$Facet[1] %||% "item")
+  covariate <- as.character(summary_tbl$Covariate[1] %||% "")
+  has_widths <- grepl("pidwidth=", command, fixed = TRUE) &&
+    grepl("keepswidth=", command, fixed = TRUE)
+  has_block_comment <- grepl("^\\s*/\\*", command) &&
+    grepl("\\*/", command)
+  has_exports <- all(vapply(
+    c(
+      "export parameters ! filetype=csv",
+      "export reg_coefficients ! filetype=csv",
+      "export covariance ! filetype=csv",
+      "show cases ! estimates=eap, filetype=csv"
+    ),
+    function(pattern) grepl(pattern, command, fixed = TRUE),
+    logical(1)
+  ))
+
+  data.frame(
+    Area = c(
+      "ConQuest command template",
+      "Command-comment syntax",
+      "Official command-reference alignment",
+      "Overlap model scope",
+      "External output requirements",
+      "External comparison scope"
+    ),
+    Status = c(
+      "template only",
+      if (has_block_comment) "block comments" else "review required",
+      if (has_widths) "explicit CSV widths" else "review required",
+      "narrow overlap only",
+      if (has_exports) "requested" else "review required",
+      "not claimed"
+    ),
+    Evidence = c(
+      "bundle$conquest_command",
+      if (has_block_comment) "command text starts with /* and closes with */" else "ConQuest block comment markers not detected",
+      if (has_widths) "pidwidth and keepswidth are present" else "pidwidth or keepswidth is missing",
+      paste0("binary ", facet, " facet with numeric covariate `", covariate, "`"),
+      "parameters, reg_coefficients, covariance, and cases EAP CSV outputs",
+      "requires external ConQuest execution and extracted output-table audit"
+    ),
+    Interpretation = c(
+      "Use the command text as a starting point for a local ConQuest run, not as an executed benchmark.",
+      "Generated comments follow the documented ConQuest block-comment style rather than FACETS-style leading asterisks.",
+      "CSV input with PID/keeps variables needs explicit widths in the command template.",
+      "The bundle does not generalize to full many-facet or polytomous ConQuest workflows.",
+      "Review and combine external parameter, beta, sigma, and case outputs before audit normalization.",
+      "External comparison remains scoped until external outputs are audited and tolerances are justified."
+    ),
+    stringsAsFactors = FALSE
+  )
+}
+
+summarize_conquest_overlap_bundle <- function(object, digits = 3, top_n = 10) {
+  out <- summarize_known_bundle(
+    object = object,
+    obj_class = "mfrm_conquest_overlap_bundle",
+    summary_candidates = "summary",
+    preview_candidates = c("comparison_targets", "item_map", "mfrmr_population", "mfrmr_case_eap"),
+    settings_candidates = "settings",
+    notes = object$notes %||% "ConQuest-overlap bundle prepared.",
+    digits = digits,
+    top_n = top_n
+  )
+  out$conquest_command_scope <- conquest_overlap_command_scope(object)
+  out$conquest_output_contract <- utils::head(
+    bundle_component_table(object, "conquest_output_contract"),
+    n = top_n
+  )
+  out
+}
+
+conquest_overlap_normalization_scope <- function(object) {
+  summary_tbl <- bundle_component_table(object, "summary")
+  first_numeric_sum <- function(cols) {
+    vals <- numeric(0)
+    for (nm in cols) {
+      if (!nm %in% names(summary_tbl) || nrow(summary_tbl) == 0L) next
+      vals <- c(vals, suppressWarnings(as.numeric(summary_tbl[[nm]][1])))
+    }
+    vals <- vals[is.finite(vals)]
+    if (length(vals) == 0L) 0L else as.integer(sum(vals))
+  }
+
+  row_n <- first_numeric_sum(c("PopulationRows", "ItemRows", "CaseRows"))
+  duplicate_n <- first_numeric_sum(c("PopulationDuplicateIDs", "ItemDuplicateIDs", "CaseDuplicateIDs"))
+  non_numeric_n <- first_numeric_sum(c("PopulationNonNumeric", "ItemNonNumeric", "CaseNonNumeric"))
+  review_n <- duplicate_n + non_numeric_n
+
+  data.frame(
+    Area = c(
+      "Extracted table normalization",
+      "Raw ConQuest text parsing",
+      "Bundle matching",
+      "Pre-audit table review"
+    ),
+    Status = c(
+      "active",
+      "not performed",
+      "deferred to audit",
+      if (review_n > 0L) "review required" else "none detected"
+    ),
+    Evidence = c(
+      paste0(row_n, " standardized row(s)"),
+      "already extracted CSV/TSV/TXT or data.frame inputs only",
+      "audit_conquest_overlap() matches rows against the exported bundle",
+      paste0(duplicate_n, " duplicate ID(s); ", non_numeric_n, " non-numeric estimate cell(s)")
+    ),
+    Interpretation = c(
+      "Population, item, and case tables have been converted to the mfrmr audit contract.",
+      "This object does not prove that raw ConQuest report text was parsed correctly.",
+      "Identifier matching and numerical comparison are intentionally handled by the audit step.",
+      "Resolve duplicate IDs or non-numeric estimates before treating the audit as clean."
+    ),
+    stringsAsFactors = FALSE
+  )
+}
+
+summarize_conquest_overlap_tables_bundle <- function(object, digits = 3, top_n = 10) {
+  out <- summarize_known_bundle(
+    object = object,
+    obj_class = "mfrm_conquest_overlap_tables",
+    summary_candidates = "summary",
+    preview_candidates = c("conquest_population", "conquest_item_estimates", "conquest_case_eap"),
+    settings_candidates = "settings",
+    notes = object$notes %||% "ConQuest-overlap extracted tables normalized.",
+    digits = digits,
+    top_n = top_n
+  )
+  out$normalization_scope <- conquest_overlap_normalization_scope(object)
+  out
+}
+
+conquest_overlap_audit_scope <- function(object) {
+  overall <- bundle_component_table(object, "overall")
+  attention <- bundle_component_table(object, "attention_items")
+  attention_n <- if ("AttentionItems" %in% names(overall)) {
+    suppressWarnings(as.integer(overall$AttentionItems[1]))
+  } else {
+    nrow(attention)
+  }
+  if (!is.finite(attention_n)) attention_n <- nrow(attention)
+
+  data.frame(
+    Area = c(
+      "User-supplied table audit",
+      "Raw ConQuest text parsing",
+      "External comparison scope",
+      "Attention items"
+    ),
+    Status = c(
+      "active",
+      "not performed",
+      "not claimed",
+      if (attention_n > 0L) "review required" else "none detected"
+    ),
+    Evidence = c(
+      "population, item, and case comparison tables",
+      "use normalize_conquest_overlap_files() / normalize_conquest_overlap_tables() first",
+      "inspect differences, attention items, extraction steps, and tolerances",
+      paste0(attention_n, " attention item(s)")
+    ),
+    Interpretation = c(
+      "The audit compares supplied normalized tables against the mfrmr overlap bundle.",
+      "This helper does not parse raw ConQuest report text.",
+      "Numerical agreement is limited to the documented overlap and supplied tables.",
+      "Nonzero attention items indicate missing, duplicate, non-numeric, or unmatched rows to resolve."
+    ),
+    stringsAsFactors = FALSE
+  )
+}
+
+summarize_conquest_overlap_audit_bundle <- function(object, digits = 3, top_n = 10) {
+  out <- summarize_known_bundle(
+    object = object,
+    obj_class = "mfrm_conquest_overlap_audit",
+    summary_candidates = "overall",
+    preview_candidates = "attention_items",
+    settings_candidates = "settings",
+    notes = object$notes %||% "ConQuest-overlap audit completed.",
+    digits = digits,
+    top_n = top_n
+  )
+  out$audit_scope <- conquest_overlap_audit_scope(object)
+  out
 }
 
 summarize_unexpected_bundle <- function(object, digits = 3, top_n = 10) {
@@ -628,13 +1088,25 @@ summarize_bias_interaction_bundle <- function(object, digits = 3, top_n = 10) {
 }
 
 summarize_rating_scale_bundle <- function(object, digits = 3, top_n = 10) {
+  summary_tbl <- bundle_component_table(object, "summary")
+  base_note <- if ("MarginalFitAvailable" %in% names(summary_tbl) &&
+    isTRUE(summary_tbl$MarginalFitAvailable[1] %||% FALSE)) {
+    "Rating-scale diagnostics with category usage, fit, threshold ordering, and strict marginal-fit companions."
+  } else {
+    "Rating-scale diagnostics with category usage, fit, and threshold ordering."
+  }
+  caveats <- as.data.frame(object$caveats %||% data.frame(), stringsAsFactors = FALSE)
+  notes <- c(
+    base_note,
+    if (nrow(caveats) > 0 && "Message" %in% names(caveats)) as.character(caveats$Message) else character(0)
+  )
   summarize_known_bundle(
     object = object,
     obj_class = "mfrm_rating_scale",
     summary_candidates = "summary",
     preview_candidates = c("category_table", "threshold_table"),
     settings_candidates = character(0),
-    notes = "Rating-scale diagnostics with category usage, fit, and threshold ordering.",
+    notes = notes,
     digits = digits,
     top_n = top_n
   )
@@ -642,6 +1114,8 @@ summarize_rating_scale_bundle <- function(object, digits = 3, top_n = 10) {
 
 summarize_category_structure_bundle <- function(object, digits = 3, top_n = 10) {
   cat_tbl <- bundle_component_table(object, "category_table")
+  marginal_available <- is.list(object$marginal_fit) && isTRUE(object$marginal_fit$available)
+  marginal_summary <- as.data.frame(object$marginal_fit$summary %||% data.frame(), stringsAsFactors = FALSE)
   flags <- integer(0)
   for (nm in c("LowCount", "InfitFlag", "OutfitFlag", "ZSTDFlag")) {
     if (nm %in% names(cat_tbl)) {
@@ -655,7 +1129,26 @@ summarize_category_structure_bundle <- function(object, digits = 3, top_n = 10) 
     FlaggedStats = if (length(flags) > 0) sum(flags, na.rm = TRUE) else NA_integer_,
     ModeBoundaries = nrow(bundle_component_table(object, "mode_boundaries")),
     MeanHalfscorePoints = nrow(bundle_component_table(object, "mean_halfscore_points")),
+    DiagnosticMode = as.character(object$diagnostic_mode %||% "legacy"),
+    MarginalFitAvailable = marginal_available,
+    MarginalFlaggedCategories = if ("MarginalFitFlag" %in% names(cat_tbl)) {
+      sum(as.logical(cat_tbl$MarginalFitFlag), na.rm = TRUE)
+    } else {
+      NA_integer_
+    },
+    MarginalOverallRMSD = if (marginal_available) marginal_summary$OverallRMSD[1] %||% NA_real_ else NA_real_,
+    MarginalMaxAbsStdResidual = if (marginal_available) marginal_summary$OverallMaxAbsStdResidual[1] %||% NA_real_ else NA_real_,
     stringsAsFactors = FALSE
+  )
+  base_note <- if (marginal_available) {
+    "Category-structure diagnostics with mode boundaries, half-score reference points, and strict marginal-fit companions."
+  } else {
+    "Category-structure diagnostics with mode boundaries and half-score reference points."
+  }
+  caveats <- as.data.frame(object$caveats %||% data.frame(), stringsAsFactors = FALSE)
+  notes <- c(
+    base_note,
+    if (nrow(caveats) > 0 && "Message" %in% names(caveats)) as.character(caveats$Message) else character(0)
   )
   summarize_known_bundle(
     object = object,
@@ -663,7 +1156,7 @@ summarize_category_structure_bundle <- function(object, digits = 3, top_n = 10) 
     summary_candidates = character(0),
     preview_candidates = c("category_table", "mode_boundaries", "mean_halfscore_points"),
     settings_candidates = "settings",
-    notes = "Category-structure diagnostics with mode boundaries and half-score reference points.",
+    notes = notes,
     digits = digits,
     top_n = top_n,
     summary_override = summary_tbl
@@ -721,13 +1214,25 @@ summarize_category_curves_bundle <- function(object, digits = 3, top_n = 10) {
 #' - `mfrm_measurable`, `mfrm_unexpected_after_bias`, `mfrm_output_bundle`
 #' - `mfrm_residual_pca`, `mfrm_specifications`, `mfrm_data_quality`
 #' - `mfrm_iteration_report`, `mfrm_subset_connectivity`, `mfrm_facet_statistics`
-#' - `mfrm_parity_report`
+#' - `mfrm_parity_report`, `mfrm_reference_benchmark`
 #'
 #' @section Interpreting output:
 #' - `overview`: class, component count, and selected preview component.
 #' - `summary`: one-row aggregate block when supplied by the bundle.
 #' - `preview`: first `top_n` rows from the main table-like component.
 #' - `settings`: resolved option values if available.
+#' - `validation_scope`: internal-versus-external validation scope when
+#'   summarizing `mfrm_reference_benchmark`.
+#' - `conquest_command_scope`: ConQuest command-template scope when summarizing
+#'   `mfrm_conquest_overlap_bundle`.
+#' - `conquest_output_contract`: requested ConQuest outputs and audit handoff
+#'   when summarizing `mfrm_conquest_overlap_bundle`.
+#' - `normalization_scope`: extracted-table normalization scope when summarizing
+#'   `mfrm_conquest_overlap_tables`.
+#' - `audit_scope`: supplied-table audit scope when summarizing
+#'   `mfrm_conquest_overlap_audit`.
+#' - `conquest_overlap_checks` / `population_policy_checks`: specialized
+#'   benchmark check previews when summarizing `mfrm_reference_benchmark`.
 #'
 #' @section Typical workflow:
 #' 1. Generate a bundle table/report helper output.
@@ -828,6 +1333,24 @@ summary.mfrm_bundle <- function(object, digits = 3, top_n = 10, ...) {
   if (inherits(object, "mfrm_parity_report")) {
     return(summarize_parity_bundle(object, digits = digits, top_n = top_n))
   }
+  if (inherits(object, "mfrm_reference_benchmark")) {
+    return(summarize_reference_benchmark_bundle(object, digits = digits, top_n = top_n))
+  }
+  if (inherits(object, "mfrm_conquest_overlap_bundle")) {
+    return(summarize_conquest_overlap_bundle(object, digits = digits, top_n = top_n))
+  }
+  if (inherits(object, "mfrm_conquest_overlap_tables")) {
+    return(summarize_conquest_overlap_tables_bundle(object, digits = digits, top_n = top_n))
+  }
+  if (inherits(object, "mfrm_conquest_overlap_audit")) {
+    return(summarize_conquest_overlap_audit_bundle(object, digits = digits, top_n = top_n))
+  }
+  if (inherits(object, "mfrm_export_bundle")) {
+    return(summarize_export_bundle(object, digits = digits, top_n = top_n))
+  }
+  if (inherits(object, "mfrm_summary_appendix_export")) {
+    return(summarize_summary_appendix_export(object, digits = digits, top_n = top_n))
+  }
 
   cls <- class(object)
   cls <- cls[!cls %in% c("list", "mfrm_bundle")]
@@ -911,14 +1434,20 @@ bundle_summary_labels <- function(summary_kind, overview = NULL) {
     mfrm_subset_connectivity = list(title = "mfrmr Subset Connectivity Summary", summary = "Subset overview", preview = "Subset/node rows"),
     mfrm_facet_statistics = list(title = "mfrmr Facet Profile Summary", summary = "Facet-profile overview", preview = "Facet-profile rows"),
     mfrm_precision_audit = list(title = "mfrmr Precision Audit Summary", summary = "Precision overview", preview = "Audit checks"),
-    mfrm_parity_report = list(title = "mfrmr Compatibility Contract Audit Summary", summary = "Compatibility audit overview", preview = "Lowest-coverage contract items"),
-    mfrm_reference_audit = list(title = "mfrmr Internal Reference Audit Summary", summary = "Internal audit overview", preview = "Attention items"),
-    mfrm_reference_benchmark = list(title = "mfrmr Internal Benchmark Summary", summary = "Case audit summary", preview = "Internal benchmark fit runs"),
+    mfrm_parity_report = list(title = "mfrmr Compatibility Output Check Summary", summary = "Compatibility check overview", preview = "Lowest-coverage items"),
+    mfrm_reference_audit = list(title = "mfrmr Reference Audit Summary", summary = "Reference audit overview", preview = "Attention items"),
+    mfrm_reference_benchmark = list(title = "mfrmr Reference Case Check Summary", summary = "Case check summary", preview = "Reference-case fit runs"),
     mfrm_reporting_checklist = list(title = "mfrmr Reporting Checklist Summary", summary = "Checklist coverage", preview = "Checklist items"),
     mfrm_bias_collection = list(title = "mfrmr Bias Collection Summary", summary = "Interaction summary", preview = "Per-pair results"),
     mfrm_manifest = list(title = "mfrmr Manifest Summary", summary = "Analysis overview", preview = "Manifest tables"),
     mfrm_replay_script = list(title = "mfrmr Replay Script Summary", summary = "Replay settings", preview = "Script text"),
+    mfrm_conquest_overlap_bundle = list(title = "mfrmr ConQuest Overlap Bundle Summary", summary = "Overlap scope summary", preview = "Comparison targets"),
+    mfrm_conquest_overlap_tables = list(title = "mfrmr ConQuest Overlap Table Normalization Summary", summary = "Normalization overview", preview = "Standardized tables"),
+    mfrm_conquest_overlap_audit = list(title = "mfrmr ConQuest Overlap Audit Summary", summary = "Comparison overview", preview = "Attention items"),
+    export_bundle = list(title = "mfrmr Export Bundle Summary", summary = "Export overview", preview = "Written files"),
     mfrm_export_bundle = list(title = "mfrmr Export Bundle Summary", summary = "Export overview", preview = "Written files"),
+    summary_appendix_export = list(title = "mfrmr Summary Appendix Export Summary", summary = "Appendix export overview", preview = "Written appendix files"),
+    mfrm_summary_appendix_export = list(title = "mfrmr Summary Appendix Export Summary", summary = "Appendix export overview", preview = "Written appendix files"),
     mfrm_facet_equivalence = list(title = "mfrmr Facet Equivalence Summary", summary = "Equivalence overview", preview = "Pairwise / ROPE rows")
   )
 
@@ -939,6 +1468,188 @@ print_bundle_section <- function(title, table, digits = 3, round_numeric = TRUE)
     print(as.data.frame(table), row.names = FALSE)
   }
   invisible(NULL)
+}
+
+collect_mfrm_population_caveats <- function(population_overview = NULL,
+                                            population_design = NULL,
+                                            population_coefficients = NULL) {
+  out <- empty_mfrm_caveats()
+  population_overview <- as.data.frame(population_overview %||% data.frame(), stringsAsFactors = FALSE)
+  population_design <- as.data.frame(population_design %||% data.frame(), stringsAsFactors = FALSE)
+  population_coefficients <- as.data.frame(population_coefficients %||% data.frame(), stringsAsFactors = FALSE)
+  if (nrow(population_overview) == 0L || !"PopulationModel" %in% names(population_overview) ||
+      !isTRUE(population_overview$PopulationModel[1])) {
+    return(out)
+  }
+
+  add_caveat <- function(severity, condition, details, message, action) {
+    out <<- rbind(
+      out,
+      data.frame(
+        Area = "population_model",
+        Severity = severity,
+        Condition = condition,
+        Categories = "",
+        CategoryType = "",
+        Message = message,
+        RecommendedAction = action,
+        Details = details,
+        stringsAsFactors = FALSE
+      )
+    )
+    invisible(NULL)
+  }
+
+  omitted_persons <- suppressWarnings(as.integer(population_overview$OmittedPersons[1] %||% 0L))
+  omitted_rows <- suppressWarnings(as.integer(population_overview$OmittedRows[1] %||% NA_integer_))
+  if (is.finite(omitted_persons) && omitted_persons > 0L) {
+    add_caveat(
+      severity = "warning",
+      condition = "population_complete_case_omission",
+      details = paste0("OmittedPersons=", omitted_persons, "; OmittedRows=", omitted_rows),
+      message = paste0(
+        "Latent-regression fit omitted ",
+        omitted_persons,
+        " person(s) and ",
+        if (is.finite(omitted_rows)) omitted_rows else NA_integer_,
+        " response row(s) under the population-data policy."
+      ),
+      action = "Document the complete-case policy and verify that omitted persons do not change the intended estimation population."
+    )
+  }
+
+  if (nrow(population_design) > 0L && all(c("Column", "IsIntercept", "ZeroVariance") %in% names(population_design))) {
+    is_intercept <- as.logical(population_design$IsIntercept %||% FALSE)
+    zero_variance <- as.logical(population_design$ZeroVariance %||% FALSE)
+    flagged <- population_design$Column[zero_variance & !is_intercept]
+    flagged <- flagged[!is.na(flagged) & nzchar(as.character(flagged))]
+    if (length(flagged) > 0L) {
+      add_caveat(
+        severity = "warning",
+        condition = "population_design_zero_variance",
+        details = paste(as.character(flagged), collapse = ", "),
+        message = paste0(
+          "Latent-regression design matrix contains non-intercept zero-variance column(s): ",
+          paste(as.character(flagged), collapse = ", "),
+          "."
+        ),
+        action = "Remove or recode zero-variance background variables before interpreting population-model coefficients."
+      )
+    }
+  }
+
+  if (nrow(population_design) > 0L && all(c("Column", "Complete") %in% names(population_design))) {
+    incomplete <- population_design$Column[!as.logical(population_design$Complete %||% TRUE)]
+    incomplete <- incomplete[!is.na(incomplete) & nzchar(as.character(incomplete))]
+    if (length(incomplete) > 0L) {
+      add_caveat(
+        severity = "warning",
+        condition = "population_design_incomplete",
+        details = paste(as.character(incomplete), collapse = ", "),
+        message = paste0(
+          "Latent-regression design matrix still has incomplete column(s): ",
+          paste(as.character(incomplete), collapse = ", "),
+          "."
+        ),
+        action = "Review `population_policy`, person-level background data, and complete-case filtering before reporting the population model."
+      )
+    }
+  }
+
+  residual_variance <- suppressWarnings(as.numeric(population_overview$ResidualVariance[1] %||% NA_real_))
+  if (!is.finite(residual_variance) || residual_variance <= 0) {
+    add_caveat(
+      severity = "warning",
+      condition = "population_residual_variance_unstable",
+      details = paste0("ResidualVariance=", residual_variance),
+      message = "Latent-regression residual variance is non-finite or non-positive.",
+      action = "Review population-model convergence and covariate design before using population-model posterior scoring."
+    )
+  }
+
+  if (nrow(population_coefficients) == 0L) {
+    add_caveat(
+      severity = "warning",
+      condition = "population_coefficients_missing",
+      details = "",
+      message = "Population model is marked active but no population coefficients are available in the summary.",
+      action = "Inspect `fit$population$coefficients` before reporting latent-regression effects."
+    )
+  }
+
+  out
+}
+
+format_population_coding_value <- function(x) {
+  if (is.null(x) || length(x) == 0L) return("")
+  if (is.function(x)) return("<function>")
+  if (is.matrix(x) || is.data.frame(x)) {
+    return(paste0(class(x)[1], "[", nrow(x), "x", ncol(x), "]"))
+  }
+  vals <- as.character(x)
+  vals <- vals[!is.na(vals) & nzchar(vals)]
+  if (length(vals) == 0L) return("")
+  paste(vals, collapse = ", ")
+}
+
+population_coding_summary_table <- function(population) {
+  population <- population %||% list()
+  xlevels <- population$xlevels %||% list()
+  contrasts <- population$contrasts %||% list()
+  if (is.null(xlevels)) xlevels <- list()
+  if (!is.list(xlevels)) {
+    xlevel_names <- names(xlevels)
+    xlevels <- as.list(xlevels)
+    names(xlevels) <- xlevel_names
+  }
+  if (is.null(contrasts)) contrasts <- list()
+  if (!is.list(contrasts)) {
+    contrast_names <- names(contrasts)
+    contrasts <- as.list(contrasts)
+    names(contrasts) <- contrast_names
+  }
+  xlevel_names <- names(xlevels) %||% character(0)
+  contrast_names <- names(contrasts) %||% character(0)
+  vars <- unique(c(xlevel_names[nzchar(xlevel_names)], contrast_names[nzchar(contrast_names)]))
+  if (length(vars) == 0L) {
+    return(tibble::tibble(
+      Variable = character(0),
+      LevelCount = integer(0),
+      Levels = character(0),
+      Contrast = character(0),
+      EncodedColumns = character(0),
+      CodingNote = character(0)
+    ))
+  }
+
+  design_columns <- as.character(population$design_columns %||% character(0))
+  if (length(design_columns) == 0L && !is.null(population$design_matrix)) {
+    design_columns <- as.character(colnames(population$design_matrix) %||% character(0))
+  }
+  design_columns <- design_columns[!is.na(design_columns) & nzchar(design_columns)]
+
+  encoded_columns <- vapply(vars, function(var) {
+    cols <- design_columns[design_columns == var | startsWith(design_columns, var)]
+    paste(cols, collapse = ", ")
+  }, character(1))
+  level_text <- vapply(vars, function(var) format_population_coding_value(xlevels[[var]]), character(1))
+  level_count <- vapply(vars, function(var) length(xlevels[[var]] %||% character(0)), integer(1))
+  contrast_text <- vapply(vars, function(var) format_population_coding_value(contrasts[[var]]), character(1))
+  has_xlevels <- nzchar(level_text)
+  has_contrasts <- nzchar(contrast_text)
+  tibble::tibble(
+    Variable = as.character(vars),
+    LevelCount = as.integer(level_count),
+    Levels = level_text,
+    Contrast = contrast_text,
+    EncodedColumns = encoded_columns,
+    CodingNote = dplyr::case_when(
+      has_xlevels & has_contrasts ~ "stored levels and contrast",
+      has_xlevels ~ "stored levels",
+      has_contrasts ~ "stored contrast",
+      TRUE ~ "not recorded"
+    )
+  )
 }
 
 #' @export
@@ -966,7 +1677,7 @@ print.summary.mfrm_bundle <- function(x, ...) {
     }
     if (length(x$notes) > 0) {
       cat("\nNotes\n")
-      cat(" - ", x$notes, "\n", sep = "")
+      for (line in x$notes) cat(" - ", line, "\n", sep = "")
     }
     return(invisible(x))
   }
@@ -989,9 +1700,13 @@ print.summary.mfrm_bundle <- function(x, ...) {
       cat("\nFACETS crosswalk\n")
       print(as.data.frame(x$settings), row.names = FALSE)
     }
+    if (!is.null(x$plot_routes) && nrow(x$plot_routes) > 0) {
+      cat("\nPublic plot routes\n")
+      print(as.data.frame(x$plot_routes), row.names = FALSE)
+    }
     if (length(x$notes) > 0) {
       cat("\nNotes\n")
-      cat(" - ", x$notes, "\n", sep = "")
+      for (line in x$notes) cat(" - ", line, "\n", sep = "")
     }
     return(invisible(x))
   }
@@ -1008,7 +1723,7 @@ print.summary.mfrm_bundle <- function(x, ...) {
     }
     if (length(x$notes) > 0) {
       cat("\nNotes\n")
-      cat(" - ", x$notes, "\n", sep = "")
+      for (line in x$notes) cat(" - ", line, "\n", sep = "")
     }
     return(invisible(x))
   }
@@ -1021,6 +1736,14 @@ print.summary.mfrm_bundle <- function(x, ...) {
     cat(sprintf("  Components (%s): %s\n", ov$Components, ov$ComponentNames))
   }
   print_bundle_section(labels$summary, x$summary, digits = digits, round_numeric = TRUE)
+  if (!is.null(x$format_summary) && nrow(x$format_summary) > 0) {
+    print_bundle_section("Format summary", x$format_summary, digits = digits, round_numeric = TRUE)
+  }
+  if (!is.null(x$artifact_preview) && nrow(x$artifact_preview) > 0) {
+    print_bundle_section("Artifact catalog", x$artifact_preview, digits = digits, round_numeric = FALSE)
+  } else if (!is.null(x$artifact_catalog) && nrow(x$artifact_catalog) > 0) {
+    print_bundle_section("Artifact catalog", x$artifact_catalog, digits = digits, round_numeric = FALSE)
+  }
   if (!is.null(x$preview) && nrow(x$preview) > 0) {
     preview_title <- labels$preview
     if (!is.null(x$preview_name) && !is.na(x$preview_name) && nzchar(x$preview_name)) {
@@ -1028,14 +1751,280 @@ print.summary.mfrm_bundle <- function(x, ...) {
     }
     print_bundle_section(preview_title, x$preview, digits = digits, round_numeric = TRUE)
   }
+  if (!is.null(x$validation_scope) && nrow(x$validation_scope) > 0) {
+    print_bundle_section("Validation scope", x$validation_scope, digits = digits, round_numeric = FALSE)
+  }
+  if (!is.null(x$conquest_command_scope) && nrow(x$conquest_command_scope) > 0) {
+    print_bundle_section("ConQuest command scope", x$conquest_command_scope, digits = digits, round_numeric = FALSE)
+  }
+  if (!is.null(x$conquest_output_contract) && nrow(x$conquest_output_contract) > 0) {
+    print_bundle_section("ConQuest output contract", x$conquest_output_contract, digits = digits, round_numeric = FALSE)
+  }
+  if (!is.null(x$normalization_scope) && nrow(x$normalization_scope) > 0) {
+    print_bundle_section("Normalization scope", x$normalization_scope, digits = digits, round_numeric = FALSE)
+  }
+  if (!is.null(x$audit_scope) && nrow(x$audit_scope) > 0) {
+    print_bundle_section("Audit scope", x$audit_scope, digits = digits, round_numeric = FALSE)
+  }
+  if (!is.null(x$conquest_overlap_checks) && nrow(x$conquest_overlap_checks) > 0) {
+    print_bundle_section("ConQuest-overlap checks", x$conquest_overlap_checks, digits = digits, round_numeric = TRUE)
+  }
+  if (!is.null(x$population_policy_checks) && nrow(x$population_policy_checks) > 0) {
+    print_bundle_section("Population-policy checks", x$population_policy_checks, digits = digits, round_numeric = TRUE)
+  }
   if (!is.null(x$settings) && nrow(x$settings) > 0) {
     print_bundle_section(labels$settings, x$settings, digits = digits, round_numeric = FALSE)
   }
+  if (!is.null(x$selection_summary) && nrow(x$selection_summary) > 0) {
+    print_bundle_section("Selection summary", x$selection_summary, digits = digits, round_numeric = TRUE)
+  }
+  if (!is.null(x$selection_table_summary) && nrow(x$selection_table_summary) > 0) {
+    print_bundle_section("Selection tables", x$selection_table_summary, digits = digits, round_numeric = TRUE)
+  }
+  if (!is.null(x$selection_handoff_table_summary) && nrow(x$selection_handoff_table_summary) > 0) {
+    print_bundle_section("Selection handoff tables", x$selection_handoff_table_summary, digits = digits, round_numeric = TRUE)
+  }
+  if (!is.null(x$selection_handoff_preset_summary) && nrow(x$selection_handoff_preset_summary) > 0) {
+    print_bundle_section("Selection handoff presets", x$selection_handoff_preset_summary, digits = digits, round_numeric = TRUE)
+  }
+  if (!is.null(x$selection_handoff_summary) && nrow(x$selection_handoff_summary) > 0) {
+    print_bundle_section("Selection handoff", x$selection_handoff_summary, digits = digits, round_numeric = TRUE)
+  }
+  if (!is.null(x$selection_handoff_bundle_summary) && nrow(x$selection_handoff_bundle_summary) > 0) {
+    print_bundle_section("Selection handoff bundles", x$selection_handoff_bundle_summary, digits = digits, round_numeric = TRUE)
+  }
+  if (!is.null(x$selection_handoff_role_summary) && nrow(x$selection_handoff_role_summary) > 0) {
+    print_bundle_section("Selection handoff roles", x$selection_handoff_role_summary, digits = digits, round_numeric = TRUE)
+  }
+  if (!is.null(x$selection_handoff_role_section_summary) && nrow(x$selection_handoff_role_section_summary) > 0) {
+    print_bundle_section("Selection handoff role-sections", x$selection_handoff_role_section_summary, digits = digits, round_numeric = TRUE)
+  }
+  if (!is.null(x$selection_role_summary) && nrow(x$selection_role_summary) > 0) {
+    print_bundle_section("Selection roles", x$selection_role_summary, digits = digits, round_numeric = TRUE)
+  }
+  if (!is.null(x$selection_section_summary) && nrow(x$selection_section_summary) > 0) {
+    print_bundle_section("Selection sections", x$selection_section_summary, digits = digits, round_numeric = TRUE)
+  }
+  if (!is.null(x$selection_catalog) && nrow(x$selection_catalog) > 0) {
+    print_bundle_section("Selection catalog", x$selection_catalog, digits = digits, round_numeric = FALSE)
+  }
+  if (!is.null(x$reporting_map) && nrow(x$reporting_map) > 0) {
+    print_bundle_section("Reporting map", x$reporting_map, digits = digits, round_numeric = FALSE)
+  }
+  if (!is.null(x$caveats) && nrow(x$caveats) > 0) {
+    print_bundle_section("Caveats", x$caveats, digits = digits, round_numeric = FALSE)
+  }
   if (length(x$notes) > 0) {
     cat("\nNotes\n")
-    cat(" - ", x$notes, "\n", sep = "")
+    for (line in x$notes) cat(" - ", line, "\n", sep = "")
   }
   invisible(x)
+}
+
+draw_export_handoff_bundle <- function(x,
+                                       type = c("formats", "artifact_groups", "selection_handoff_presets", "selection_tables", "selection_handoff", "selection_handoff_bundles", "selection_handoff_roles", "selection_handoff_role_sections", "selection_bundles", "selection_roles", "selection_sections"),
+                                       selection_value = c("count", "fraction"),
+                                       draw = TRUE,
+                                       main = NULL,
+                                       palette = NULL,
+                                       label_angle = 45) {
+  type <- match.arg(tolower(type), c("formats", "artifact_groups", "selection_handoff_presets", "selection_tables", "selection_handoff", "selection_handoff_bundles", "selection_handoff_roles", "selection_handoff_role_sections", "selection_bundles", "selection_roles", "selection_sections"))
+  selection_value <- match.arg(selection_value)
+  measure <- NULL
+  sx <- summary(x, digits = 6)
+  pal <- resolve_palette(
+    palette = palette,
+    defaults = c(
+      formats = "#4c78a8",
+      artifact_groups = "#f58518",
+      selection_handoff_presets = "#f4a261",
+      selection_tables = "#e76f51",
+      selection_handoff = "#ff9f1c",
+      selection_handoff_bundles = "#5c677d",
+      selection_handoff_roles = "#9c6644",
+      selection_handoff_role_sections = "#7f5539",
+      selection_bundles = "#54a24b",
+      selection_roles = "#b279a2",
+      selection_sections = "#2a9d8f"
+    )
+  )
+
+  if (type == "formats") {
+    tbl <- as.data.frame(sx$format_summary %||% data.frame(), stringsAsFactors = FALSE)
+    if (nrow(tbl) == 0L || !all(c("Format", "Files") %in% names(tbl))) {
+      stop("No export format summary is available for plotting.", call. = FALSE)
+    }
+    labels <- as.character(tbl$Format)
+    values <- suppressWarnings(as.numeric(tbl$Files))
+    cols <- pal["formats"]
+    plot_title <- if (is.null(main)) "Export formats" else as.character(main[1])
+  } else if (type == "artifact_groups") {
+    catalog <- as.data.frame(sx$artifact_catalog %||% data.frame(), stringsAsFactors = FALSE)
+    if (nrow(catalog) == 0L || !"ArtifactGroup" %in% names(catalog)) {
+      stop("No export artifact catalog is available for plotting.", call. = FALSE)
+    }
+    counts <- sort(table(as.character(catalog$ArtifactGroup)), decreasing = TRUE)
+    labels <- names(counts)
+    values <- as.numeric(counts)
+    cols <- pal["artifact_groups"]
+    tbl <- data.frame(ArtifactGroup = labels, Files = values, stringsAsFactors = FALSE)
+    plot_title <- if (is.null(main)) "Export artifact groups" else as.character(main[1])
+  } else if (type == "selection_handoff_presets") {
+    tbl <- as.data.frame(sx$selection_handoff_preset_summary %||% data.frame(), stringsAsFactors = FALSE)
+    if (nrow(tbl) == 0L || !all(c("Preset", "PlotReadyTables") %in% names(tbl))) {
+      stop("No appendix handoff-preset summary is available for plotting.", call. = FALSE)
+    }
+    labels <- as.character(tbl$Preset)
+    measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
+    values <- measure$values
+    cols <- pal["selection_handoff_presets"]
+    plot_title <- if (is.null(main)) "Appendix handoff by preset" else as.character(main[1])
+  } else if (type == "selection_tables") {
+    tbl <- as.data.frame(sx$selection_table_summary %||% data.frame(), stringsAsFactors = FALSE)
+    if (nrow(tbl) == 0L || !all(c("Table", "Rows") %in% names(tbl))) {
+      stop("No appendix table selection summary is available for plotting.", call. = FALSE)
+    }
+    labels <- as.character(tbl$Table)
+    measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
+    values <- measure$values
+    cols <- pal["selection_tables"]
+    plot_title <- if (is.null(main)) "Selected appendix tables" else as.character(main[1])
+  } else if (type == "selection_bundles") {
+    tbl <- as.data.frame(sx$selection_summary %||% data.frame(), stringsAsFactors = FALSE)
+    if (nrow(tbl) == 0L || !all(c("Bundle", "TablesSelected") %in% names(tbl))) {
+      stop("No appendix selection summary is available for plotting.", call. = FALSE)
+    }
+    labels <- as.character(tbl$Bundle)
+    measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
+    values <- measure$values
+    cols <- pal["selection_bundles"]
+    plot_title <- if (is.null(main)) "Appendix tables by bundle" else as.character(main[1])
+  } else if (type == "selection_roles") {
+    tbl <- as.data.frame(sx$selection_role_summary %||% data.frame(), stringsAsFactors = FALSE)
+    if (nrow(tbl) == 0L || !all(c("Role", "Tables") %in% names(tbl))) {
+      stop("No appendix role-selection summary is available for plotting.", call. = FALSE)
+    }
+    labels <- as.character(tbl$Role)
+    measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
+    values <- measure$values
+    cols <- pal["selection_roles"]
+    plot_title <- if (is.null(main)) "Selected appendix roles" else as.character(main[1])
+  } else if (type == "selection_handoff") {
+    tbl <- as.data.frame(sx$selection_handoff_summary %||% data.frame(), stringsAsFactors = FALSE)
+    if (nrow(tbl) == 0L || !all(c("AppendixSection", "PlotReadyTables") %in% names(tbl))) {
+      stop("No appendix handoff summary is available for plotting.", call. = FALSE)
+    }
+    labels <- as.character(tbl$AppendixSection)
+    measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
+    values <- measure$values
+    cols <- pal["selection_handoff"]
+    plot_title <- if (is.null(main)) "Appendix handoff by section" else as.character(main[1])
+  } else if (type == "selection_handoff_bundles") {
+    tbl <- as.data.frame(sx$selection_handoff_bundle_summary %||% data.frame(), stringsAsFactors = FALSE)
+    if (nrow(tbl) == 0L || !all(c("AppendixSection", "Bundle", "PlotReadyTables") %in% names(tbl))) {
+      stop("No appendix handoff-bundle summary is available for plotting.", call. = FALSE)
+    }
+    labels <- paste0(as.character(tbl$AppendixSection), " :: ", as.character(tbl$Bundle))
+    measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
+    values <- measure$values
+    cols <- pal["selection_handoff_bundles"]
+    plot_title <- if (is.null(main)) "Appendix handoff by section and bundle" else as.character(main[1])
+  } else if (type == "selection_handoff_roles") {
+    tbl <- as.data.frame(sx$selection_handoff_role_summary %||% data.frame(), stringsAsFactors = FALSE)
+    if (nrow(tbl) == 0L || !all(c("Role", "PlotReadyTables") %in% names(tbl))) {
+      stop("No appendix handoff-role summary is available for plotting.", call. = FALSE)
+    }
+    labels <- as.character(tbl$Role)
+    measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
+    values <- measure$values
+    cols <- pal["selection_handoff_roles"]
+    plot_title <- if (is.null(main)) "Appendix handoff by role" else as.character(main[1])
+  } else if (type == "selection_handoff_role_sections") {
+    tbl <- as.data.frame(sx$selection_handoff_role_section_summary %||% data.frame(), stringsAsFactors = FALSE)
+    if (nrow(tbl) == 0L || !all(c("AppendixSection", "Role", "PlotReadyTables") %in% names(tbl))) {
+      stop("No appendix handoff role-section summary is available for plotting.", call. = FALSE)
+    }
+    labels <- paste0(as.character(tbl$AppendixSection), " :: ", as.character(tbl$Role))
+    measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
+    values <- measure$values
+    cols <- pal["selection_handoff_role_sections"]
+    plot_title <- if (is.null(main)) "Appendix handoff by role and section" else as.character(main[1])
+  } else {
+    tbl <- as.data.frame(sx$selection_section_summary %||% data.frame(), stringsAsFactors = FALSE)
+    if (nrow(tbl) == 0L || !all(c("AppendixSection", "Tables") %in% names(tbl))) {
+      stop("No appendix section summary is available for plotting.", call. = FALSE)
+    }
+    labels <- as.character(tbl$AppendixSection)
+    measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
+    values <- measure$values
+    cols <- pal["selection_sections"]
+    plot_title <- if (is.null(main)) "Selected appendix sections" else as.character(main[1])
+  }
+
+  if (isTRUE(draw)) {
+      barplot_rot45(
+        height = values,
+        labels = labels,
+        col = cols,
+        main = plot_title,
+        ylab = if (type == "selection_tables") {
+          measure$ylab
+        } else if (type %in% c("selection_handoff", "selection_handoff_presets", "selection_handoff_bundles", "selection_handoff_roles", "selection_handoff_role_sections")) {
+          measure$ylab
+        } else if (type %in% c("selection_bundles", "selection_roles", "selection_sections")) {
+          measure$ylab
+        } else {
+          "Files"
+        },
+        label_angle = label_angle,
+        mar_bottom = 8.2
+      )
+  }
+
+  new_mfrm_plot_data(
+    "export_bundle",
+    list(
+      plot = type,
+      selection_value = if (exists("measure")) measure$selection_value else NULL,
+      table = tbl,
+      title = plot_title,
+      legend = new_plot_legend(
+        if (type == "formats") {
+          "Export format counts"
+        } else if (type == "artifact_groups") {
+          "Export artifact-group counts"
+        } else if (!is.null(measure)) {
+          measure$legend_label
+        } else {
+          "Appendix selection surface"
+        },
+        if (type == "formats") {
+          "format"
+        } else if (type == "artifact_groups") {
+          "artifact_group"
+        } else if (type == "selection_tables") {
+          "table"
+        } else if (type == "selection_handoff") {
+          "appendix_section"
+        } else if (type == "selection_handoff_bundles") {
+          "appendix_bundle_section"
+        } else if (type == "selection_handoff_roles") {
+          "role"
+        } else if (type == "selection_handoff_role_sections") {
+          "appendix_role_section"
+        } else if (type == "selection_bundles") {
+          "bundle"
+        } else if (type == "selection_roles") {
+          "role"
+        } else {
+          "section"
+        },
+        "bar",
+        cols
+      ),
+      reference_lines = new_reference_lines()
+    )
+  )
 }
 
 draw_category_structure_bundle <- function(x,
@@ -2720,6 +3709,12 @@ plot_visual_summaries_bundle <- function(x,
 #' - `mfrm_iteration_report` -> replayed-iteration trajectories
 #' - `mfrm_subset_connectivity` -> subset-observation/connectivity plots
 #' - `mfrm_facet_statistics` -> facet statistic profile plots
+#' - `mfrm_export_bundle` / `mfrm_summary_appendix_export` -> export handoff
+#'   plots (`formats`, `artifact_groups`, `selection_tables`,
+#'   `selection_handoff`, `selection_handoff_bundles`,
+#'   `selection_handoff_roles`,
+#'   `selection_handoff_role_sections`, `selection_bundles`,
+#'   `selection_roles`, `selection_sections`)
 #'
 #' If a class is outside these families, use dedicated plotting helpers
 #' or custom base R graphics on component tables.
@@ -3014,6 +4009,23 @@ plot.mfrm_bundle <- function(x, y = NULL, type = NULL, ...) {
       label_angle = label_angle
     )))
   }
+  if (inherits(x, "mfrm_export_bundle") || inherits(x, "mfrm_summary_appendix_export")) {
+    draw <- if ("draw" %in% names(dots)) isTRUE(dots$draw) else TRUE
+    ptype <- if (is.null(type)) "formats" else as.character(type[1])
+    main <- dots$main %||% NULL
+    palette <- dots$palette %||% NULL
+    label_angle <- as.numeric(dots$label_angle %||% 45)
+    selection_value <- as.character(dots$selection_value %||% "count")
+    return(invisible(draw_export_handoff_bundle(
+      x,
+      type = ptype,
+      selection_value = selection_value,
+      draw = draw,
+      main = main,
+      palette = palette,
+      label_angle = label_angle
+    )))
+  }
 
   stop(
     "No default plot method for class `", class(x)[1], "`.\n",
@@ -3031,6 +4043,7 @@ plot.mfrm_bundle <- function(x, y = NULL, type = NULL, ...) {
 #' @details
 #' This method returns a compact diagnostics summary designed for quick review:
 #' - design overview (observations, persons, facets, categories, subsets)
+#' - diagnostic-basis guide for legacy versus strict fit paths
 #' - global fit statistics
 #' - approximate reliability/separation by facet
 #' - top facet/person fit rows by absolute ZSTD
@@ -3038,6 +4051,8 @@ plot.mfrm_bundle <- function(x, y = NULL, type = NULL, ...) {
 #'
 #' @section Interpreting output:
 #' - `overview`: analysis scale, subset count, and residual-PCA mode.
+#' - `diagnostic_basis`: plain-language map of which fit path was computed and
+#'   what each path means statistically.
 #' - `overall_fit`: global fit indices.
 #' - `reliability`: facet separation/reliability block, including model and
 #'   real bounds when available.
@@ -3045,23 +4060,37 @@ plot.mfrm_bundle <- function(x, y = NULL, type = NULL, ...) {
 #' - `flags`: compact counts for key warning domains.
 #'
 #' @section Typical workflow:
-#' 1. Run diagnostics with [diagnose_mfrm()].
-#' 2. Review `summary(diag)` for major warnings.
+#' 1. Run diagnostics with [diagnose_mfrm()], using `diagnostic_mode = "both"`
+#'    for `RSM` / `PCM` when you want legacy continuity plus strict marginal screening.
+#' 2. Review `summary(diag)` for major warnings and inspect `diagnostic_basis`
+#'    before comparing legacy and strict outputs.
 #' 3. Follow up with dedicated tables/plots for flagged domains.
 #'
 #' @return An object of class `summary.mfrm_diagnostics` with:
 #' - `overview`: design-level counts and residual-PCA mode
+#' - `status`: concise front-door status block for quick review
+#' - `key_warnings`: highest-priority warnings to review first
+#' - `next_actions`: recommended follow-up helpers
+#' - `diagnostic_basis`: guide to legacy versus strict diagnostic targets
 #' - `overall_fit`: global fit block
 #' - `reliability`: facet-level separation/reliability summary
 #' - `top_fit`: top `|ZSTD|` rows
+#' - `marginal_fit`: optional strict marginal-fit overview when requested
+#' - `top_marginal_cells`: largest strict marginal residual cells when requested
+#' - `marginal_pairwise`: optional strict pairwise local-dependence overview
+#' - `top_marginal_pairs`: largest strict pairwise residual summaries
+#' - `marginal_guidance`: interpretation labels for strict marginal diagnostics
+#' - `reporting_map`: manuscript-oriented guide to what is covered here versus
+#'   which companion outputs should be consulted
 #' - `flags`: compact flag counts for major diagnostics
 #' - `notes`: short interpretation notes
 #' @seealso [diagnose_mfrm()], [summary.mfrm_fit()]
 #' @examples
 #' toy <- load_mfrmr_data("example_core")
-#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+#' toy <- toy[toy$Person %in% unique(toy$Person)[1:4], ]
+#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 50)
 #' diag <- diagnose_mfrm(fit, residual_pca = "none")
-#' summary(diag)
+#' summary(diag, top_n = 3)
 #' @export
 summary.mfrm_diagnostics <- function(object, digits = 3, top_n = 10, ...) {
   if (!is.list(object) || is.null(object$obs)) {
@@ -3079,6 +4108,18 @@ summary.mfrm_diagnostics <- function(object, digits = 3, top_n = 10, ...) {
   overall_fit <- tibble::as_tibble(object$overall_fit %||% tibble::tibble())
   subset_summary <- tibble::as_tibble(object$subsets$summary %||% tibble::tibble())
   approximation_tbl <- tibble::as_tibble(object$approximation_notes %||% tibble::tibble())
+  diagnostic_basis_tbl <- tibble::as_tibble(object$diagnostic_basis %||% tibble::tibble())
+  marginal_fit_tbl <- tibble::as_tibble(object$marginal_fit$summary %||% tibble::tibble())
+  marginal_step_summary <- tibble::as_tibble(object$marginal_fit$step_or_scale$summary_stats %||% tibble::tibble())
+  marginal_facet_summary <- tibble::as_tibble(object$marginal_fit$facet_level$summary_stats %||% tibble::tibble())
+  marginal_top_cells <- tibble::as_tibble(object$marginal_fit$top_cells %||% tibble::tibble())
+  marginal_pairwise_tbl <- tibble::as_tibble(object$marginal_fit$pairwise$facet_summary %||% tibble::tibble())
+  marginal_top_pairs_src <- tibble::as_tibble(object$marginal_fit$pairwise$top_pairs %||% tibble::tibble())
+  marginal_guidance_tbl <- tibble::as_tibble(object$marginal_fit$guidance %||% tibble::tibble())
+  interrater_summary_tbl <- tibble::as_tibble(object$interrater$summary %||% tibble::tibble())
+  marginal_available <- isTRUE(object$marginal_fit$available)
+  marginal_pairwise_available <- isTRUE(object$marginal_fit$pairwise$available)
+  diagnostic_mode <- as.character(object$diagnostic_mode %||% "legacy")
 
   n_obs <- nrow(obs_tbl)
   n_person <- if ("Person" %in% names(obs_tbl)) dplyr::n_distinct(obs_tbl$Person) else NA_integer_
@@ -3092,8 +4133,12 @@ summary.mfrm_diagnostics <- function(object, digits = 3, top_n = 10, ...) {
     Categories = n_cat,
     Subsets = n_subsets,
     ResidualPCA = as.character(object$residual_pca_mode %||% "none"),
-    Method = as.character(precision_profile_tbl$Method[1] %||% NA_character_),
-    PrecisionTier = as.character(precision_profile_tbl$PrecisionTier[1] %||% NA_character_)
+    DiagnosticMode = diagnostic_mode,
+    Method = resolve_public_mfrm_method(
+      summary_method = precision_profile_tbl$Method[1] %||% NA_character_
+    ),
+    PrecisionTier = as.character(precision_profile_tbl$PrecisionTier[1] %||% NA_character_),
+    MarginalFit = if (marginal_available) "available" else "not_available"
   )
 
   reliability_overview <- tibble::tibble()
@@ -3122,19 +4167,203 @@ summary.mfrm_diagnostics <- function(object, digits = 3, top_n = 10, ...) {
       dplyr::select("Facet", "Level", "Infit", "Outfit", "InfitZSTD", "OutfitZSTD", "AbsZ")
   }
 
+  top_marginal_cells <- tibble::tibble()
+  if (nrow(marginal_top_cells) > 0) {
+    keep_marginal <- intersect(
+      c(
+        "CellType", "StepFacet", "Facet", "Level", "Category",
+        "ObservedCount", "ExpectedCount", "PropDiff", "StdResidual", "AbsStdResidual"
+      ),
+      names(marginal_top_cells)
+    )
+    top_marginal_cells <- marginal_top_cells |>
+      dplyr::slice_head(n = top_n) |>
+      dplyr::select(dplyr::all_of(keep_marginal))
+  }
+
+  top_marginal_pairs <- tibble::tibble()
+  if (nrow(marginal_top_pairs_src) > 0) {
+    keep_pairwise <- intersect(
+      c(
+        "Facet", "Level1", "Level2", "LevelPairCount", "OpportunityWeight",
+        "ExactAgreement", "ExpectedExactAgreement", "ExactGap", "ExactStdResidual",
+        "AdjacentAgreement", "ExpectedAdjacentAgreement", "AdjacentGap", "AdjacentStdResidual",
+        "Flagged"
+      ),
+      names(marginal_top_pairs_src)
+    )
+    top_marginal_pairs <- marginal_top_pairs_src |>
+      dplyr::slice_head(n = top_n) |>
+      dplyr::select(dplyr::all_of(keep_pairwise))
+  }
+
   unexpected_n <- suppressWarnings(as.integer(object$unexpected$summary$UnexpectedN[1] %||% NA_integer_))
   displacement_flagged <- suppressWarnings(as.integer(object$displacement$summary$FlaggedLevels[1] %||% NA_integer_))
   interaction_n <- if (!is.null(object$interactions)) nrow(object$interactions) else NA_integer_
   interrater_pairs <- suppressWarnings(as.integer(object$interrater$summary$Pairs[1] %||% NA_integer_))
+  marginal_flagged_groups <- if (marginal_available) {
+    sum(as.logical(marginal_step_summary$Flagged %||% logical(0)), na.rm = TRUE) +
+      sum(as.logical(marginal_facet_summary$Flagged %||% logical(0)), na.rm = TRUE)
+  } else {
+    NA_integer_
+  }
+  marginal_flagged_pairs <- if (marginal_pairwise_available) {
+    sum(as.logical(object$marginal_fit$pairwise$pair_stats$Flagged %||% logical(0)), na.rm = TRUE)
+  } else {
+    NA_integer_
+  }
 
   flags <- tibble::tibble(
     Metric = c(
       "Unexpected responses",
       "Flagged displacement levels",
       "Interaction rows",
-      "Inter-rater pairs"
+      "Inter-rater pairs",
+      "Marginal fit flagged groups",
+      "Marginal pairwise flagged level pairs"
     ),
-    Count = c(unexpected_n, displacement_flagged, interaction_n, interrater_pairs)
+    Count = c(unexpected_n, displacement_flagged, interaction_n, interrater_pairs, marginal_flagged_groups, marginal_flagged_pairs)
+  )
+
+  precision_tier <- as.character(precision_profile_tbl$PrecisionTier[1] %||% NA_character_)
+  strict_path_status <- if (marginal_available) {
+    "available"
+  } else if (identical(diagnostic_mode, "legacy")) {
+    "not_requested"
+  } else {
+    "requested_not_available"
+  }
+  primary_screen <- dplyr::case_when(
+    identical(diagnostic_mode, "both") && marginal_available ~
+      "Read strict marginal fit first; use legacy residuals for continuity and follow-up.",
+    identical(diagnostic_mode, "marginal_fit") && marginal_available ~
+      "Use strict marginal fit as the primary screen for first-order and pairwise follow-up.",
+    identical(diagnostic_mode, "legacy") ~
+      "Legacy residual diagnostics only; no strict marginal screen was requested.",
+    TRUE ~
+      "Requested strict marginal fit is not available for this run; fall back to the legacy path with caution."
+  )
+
+  key_warnings <- character(0)
+  if (nrow(precision_audit_tbl) > 0 && "Status" %in% names(precision_audit_tbl)) {
+    flagged_checks <- precision_audit_tbl |>
+      dplyr::filter(.data$Status %in% c("review", "warn"))
+    if (nrow(flagged_checks) > 0) {
+      key_warnings <- c(
+        key_warnings,
+        paste0("Precision audit flagged ", nrow(flagged_checks), " review/warn checks.")
+      )
+    }
+  }
+  if (isTRUE(n_subsets > 1L)) {
+    key_warnings <- c(key_warnings, "Multiple disconnected subsets were detected.")
+  }
+  if (isTRUE(!is.na(unexpected_n) && unexpected_n > 0L)) {
+    key_warnings <- c(key_warnings, paste0("Unexpected responses flagged: ", unexpected_n, "."))
+  }
+  if (isTRUE(!is.na(displacement_flagged) && displacement_flagged > 0L)) {
+    key_warnings <- c(key_warnings, paste0("Flagged displacement levels: ", displacement_flagged, "."))
+  }
+  if (isTRUE(marginal_available) && isTRUE(!is.na(marginal_flagged_groups) && marginal_flagged_groups > 0L)) {
+    key_warnings <- c(
+      key_warnings,
+      paste0("Strict marginal fit flagged ", marginal_flagged_groups, " group-level summaries.")
+    )
+  }
+  if (isTRUE(marginal_pairwise_available) && isTRUE(!is.na(marginal_flagged_pairs) && marginal_flagged_pairs > 0L)) {
+    key_warnings <- c(
+      key_warnings,
+      paste0("Strict pairwise local dependence flagged ", marginal_flagged_pairs, " level pairs.")
+    )
+  }
+  if (!marginal_available && !identical(diagnostic_mode, "legacy") && nrow(marginal_fit_tbl) > 0 && "Reason" %in% names(marginal_fit_tbl)) {
+    key_warnings <- c(key_warnings, as.character(marginal_fit_tbl$Reason[1]))
+  }
+  key_warnings <- clean_summary_lines(key_warnings, max_n = 5L)
+  if (length(key_warnings) == 0) {
+    key_warnings <- "No immediate warnings from diagnostics summary."
+  }
+
+  next_actions <- c(
+    "Inspect `diagnostic_basis` before comparing legacy residual evidence with strict marginal evidence."
+  )
+  if (!identical(as.character(precision_profile_tbl$Method[1] %||% NA_character_), "MML")) {
+    next_actions <- c(
+      next_actions,
+      "Re-fit with `method = \"MML\"` if strict marginal diagnostics or formal SE/CI are required."
+    )
+  }
+  if (marginal_available) {
+    next_actions <- c(
+      next_actions,
+      "Review `top_marginal_cells` and `rating_scale_table(..., diagnostics = diag)` for first-order strict marginal follow-up."
+    )
+  }
+  if (marginal_pairwise_available) {
+    next_actions <- c(
+      next_actions,
+      "Review `top_marginal_pairs` for pairwise local-dependence follow-up."
+    )
+  }
+  if (isTRUE(!is.na(unexpected_n) && unexpected_n > 0L) || isTRUE(!is.na(displacement_flagged) && displacement_flagged > 0L)) {
+    next_actions <- c(
+      next_actions,
+      "Use `unexpected_response_table()` / `plot_unexpected()` and `displacement_table()` / `plot_displacement()` for case-level follow-up."
+    )
+  }
+  if (!identical(as.character(object$residual_pca_mode %||% "none"), "none")) {
+    next_actions <- c(
+      next_actions,
+      "Use `analyze_residual_pca()` if residual structure needs deeper follow-up."
+    )
+  }
+  next_actions <- clean_summary_lines(next_actions, max_n = 4L)
+
+  overall_status <- dplyr::case_when(
+    any(key_warnings != "No immediate warnings from diagnostics summary.") ~ "follow_up_needed",
+    identical(precision_tier, "exploratory") ~ "exploratory_screen_only",
+    TRUE ~ "no_major_screening_flags"
+  )
+  status <- make_summary_block(
+    "Overall status" = overall_status,
+    "Diagnostic path" = diagnostic_mode,
+    "Strict marginal fit" = strict_path_status,
+    "Precision tier" = precision_tier,
+    "Primary screen" = primary_screen
+  )
+
+  reporting_map <- tibble::tibble(
+    Area = c(
+      "Overall fit / reliability",
+      "Precision basis / inferential caveats",
+      "Strict marginal fit",
+      "Residual PCA / local structure",
+      "Unexpected responses / displacement",
+      "Connectivity / subsets",
+      "Manuscript checklist / export"
+    ),
+    CoveredHere = c(
+      "yes",
+      "yes",
+      if (marginal_available) "yes" else if (identical(diagnostic_mode, "legacy")) "no" else "requested_not_available",
+      "partial",
+      "partial",
+      "partial",
+      "no"
+    ),
+    CompanionOutput = c(
+      "summary(diagnostics)",
+      "summary(diagnostics)",
+      if (marginal_available) {
+        "diagnostics$marginal_fit / rating_scale_table(..., diagnostics = diagnostics)"
+      } else {
+        "diagnose_mfrm(..., diagnostic_mode = \"both\")"
+      },
+      "analyze_residual_pca() / diagnostics$pca details",
+      "unexpected_response_table() / displacement_table() / interaction tables",
+      "subset_connectivity_report() / measurable_summary_table()",
+      "reporting_checklist() / summary(build_apa_outputs(...))"
+    )
   )
 
   notes <- character(0)
@@ -3156,6 +4385,12 @@ summary.mfrm_diagnostics <- function(object, digits = 3, top_n = 10, ...) {
       "SE/ModelSE, CI, and reliability conventions depend on the estimation path; see diagnostics$approximation_notes for MML-vs-JML details."
     )
   }
+  if (nrow(reliability_tbl) > 0) {
+    notes <- c(
+      notes,
+      "Use `diagnostics$reliability` for facet-level separation/reliability. Use `diagnostics$interrater` only for observed agreement across matched rater contexts."
+    )
+  }
   if (nrow(precision_audit_tbl) > 0 && "Status" %in% names(precision_audit_tbl)) {
     flagged_checks <- precision_audit_tbl |>
       dplyr::filter(.data$Status %in% c("review", "warn"))
@@ -3163,17 +4398,57 @@ summary.mfrm_diagnostics <- function(object, digits = 3, top_n = 10, ...) {
       notes <- c(notes, paste0("Precision audit flagged ", nrow(flagged_checks), " review/warn checks."))
     }
   }
+  if (nrow(interrater_summary_tbl) == 0) {
+    notes <- c(
+      notes,
+      "No inter-rater agreement block was produced for this run. Facet-level reliability summarizes separation/precision, not observed rater agreement."
+    )
+  }
+  if (marginal_available) {
+    notes <- c(
+      notes,
+      "Strict marginal fit was computed from latent-integrated first-order category counts."
+    )
+    if (marginal_pairwise_available) {
+      notes <- c(
+        notes,
+        "Strict pairwise local-dependence checks were computed from posterior-integrated expected exact and adjacent agreement and should be read as exploratory screening summaries."
+      )
+    }
+    notes <- c(
+      notes,
+      "Posterior predictive checking remains a planned corroborating follow-up for strict marginal flags and practical-significance review."
+    )
+    if (identical(diagnostic_mode, "both")) {
+      notes <- c(
+        notes,
+        "Legacy residual diagnostics and strict marginal diagnostics target different quantities; do not compare their residual magnitudes directly."
+      )
+    }
+  } else if (!identical(diagnostic_mode, "legacy") && nrow(marginal_fit_tbl) > 0 && "Reason" %in% names(marginal_fit_tbl)) {
+    notes <- c(notes, as.character(marginal_fit_tbl$Reason[1]))
+  }
   if (length(notes) == 0) {
     notes <- "No immediate warnings from diagnostics summary."
   }
 
   out <- list(
     overview = overview,
+    status = status,
+    key_warnings = key_warnings,
+    next_actions = next_actions,
+    diagnostic_basis = diagnostic_basis_tbl,
     overall_fit = overall_fit,
     precision_profile = precision_profile_tbl,
     precision_audit = precision_audit_tbl,
     reliability = reliability_overview,
     top_fit = top_fit,
+    marginal_fit = marginal_fit_tbl,
+    top_marginal_cells = top_marginal_cells,
+    marginal_pairwise = marginal_pairwise_tbl,
+    top_marginal_pairs = top_marginal_pairs,
+    marginal_guidance = marginal_guidance_tbl,
+    reporting_map = reporting_map,
     flags = flags,
     notes = notes,
     digits = digits
@@ -3186,6 +4461,14 @@ summary.mfrm_diagnostics <- function(object, digits = 3, top_n = 10, ...) {
 print.summary.mfrm_diagnostics <- function(x, ...) {
   digits <- as.integer(x$digits %||% 3L)
   if (!is.finite(digits)) digits <- 3L
+  key_warning_lines <- if (summary_lines_are_default(
+    x$key_warnings,
+    "No immediate warnings from diagnostics summary."
+  )) {
+    "None."
+  } else {
+    x$key_warnings
+  }
 
   cat("Many-Facet Rasch Diagnostics Summary\n")
   if (!is.null(x$overview) && nrow(x$overview) > 0) {
@@ -3198,11 +4481,26 @@ print.summary.mfrm_diagnostics <- function(x, ...) {
     if ("Method" %in% names(ov) && "PrecisionTier" %in% names(ov)) {
       cat(sprintf("  Method: %s | Precision tier: %s\n", ov$Method, ov$PrecisionTier))
     }
+    if ("DiagnosticMode" %in% names(ov) && "MarginalFit" %in% names(ov)) {
+      cat(sprintf("  Diagnostic mode: %s | Strict marginal fit: %s\n", ov$DiagnosticMode, ov$MarginalFit))
+    }
   }
+  if (!is.null(x$status) && nrow(x$status) > 0) {
+    cat("\nStatus\n")
+    for (i in seq_len(nrow(x$status))) {
+      cat(" - ", x$status$Item[i], ": ", x$status$Value[i], "\n", sep = "")
+    }
+  }
+  print_bullet_section("Key warnings", key_warning_lines)
+  print_bullet_section("Next actions", x$next_actions)
 
   if (!is.null(x$overall_fit) && nrow(x$overall_fit) > 0) {
     cat("\nOverall fit\n")
     print(round_numeric_df(as.data.frame(x$overall_fit), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$diagnostic_basis) && nrow(x$diagnostic_basis) > 0) {
+    cat("\nDiagnostic basis guide\n")
+    print(as.data.frame(x$diagnostic_basis), row.names = FALSE)
   }
   if (!is.null(x$precision_profile) && nrow(x$precision_profile) > 0) {
     cat("\nPrecision basis\n")
@@ -3226,12 +4524,37 @@ print.summary.mfrm_diagnostics <- function(x, ...) {
     cat("\nLargest |ZSTD| rows\n")
     print(round_numeric_df(as.data.frame(x$top_fit), digits = digits), row.names = FALSE)
   }
+  if (!is.null(x$marginal_fit) && nrow(x$marginal_fit) > 0) {
+    cat("\nStrict marginal fit\n")
+    print(round_numeric_df(as.data.frame(x$marginal_fit), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$top_marginal_cells) && nrow(x$top_marginal_cells) > 0) {
+    cat("\nLargest marginal residual cells\n")
+    print(round_numeric_df(as.data.frame(x$top_marginal_cells), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$marginal_pairwise) && nrow(x$marginal_pairwise) > 0) {
+    cat("\nStrict pairwise local dependence\n")
+    print(round_numeric_df(as.data.frame(x$marginal_pairwise), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$top_marginal_pairs) && nrow(x$top_marginal_pairs) > 0) {
+    cat("\nLargest marginal pairwise residuals\n")
+    print(round_numeric_df(as.data.frame(x$top_marginal_pairs), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$marginal_guidance) && nrow(x$marginal_guidance) > 0) {
+    cat("\nStrict marginal guidance\n")
+    print(as.data.frame(x$marginal_guidance), row.names = FALSE)
+  }
+  if (!is.null(x$reporting_map) && nrow(x$reporting_map) > 0) {
+    cat("\nPaper reporting map\n")
+    print(as.data.frame(x$reporting_map), row.names = FALSE)
+  }
   if (!is.null(x$flags) && nrow(x$flags) > 0) {
     cat("\nFlag counts\n")
     print(as.data.frame(x$flags), row.names = FALSE)
   }
 
-  if (length(x$notes) > 0) {
+  if (length(x$notes) > 0 &&
+      !summary_lines_are_default(x$notes, "No immediate warnings from diagnostics summary.")) {
     cat("\nNotes\n")
     for (line in x$notes) cat(" - ", line, "\n", sep = "")
   }
@@ -3274,9 +4597,10 @@ print.summary.mfrm_diagnostics <- function(x, ...) {
 #' @seealso [estimate_bias()], [bias_interaction_report()]
 #' @examples
 #' toy <- load_mfrmr_data("example_bias")
-#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+#' toy <- toy[toy$Person %in% unique(toy$Person)[1:8], ]
+#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 50)
 #' diag <- diagnose_mfrm(fit, residual_pca = "none")
-#' bias <- estimate_bias(fit, diag, facet_a = "Rater", facet_b = "Criterion", max_iter = 2)
+#' bias <- estimate_bias(fit, diag, facet_a = "Rater", facet_b = "Criterion", max_iter = 1)
 #' summary(bias)
 #' @export
 summary.mfrm_bias <- function(object, digits = 3, top_n = 10, p_cut = 0.05, ...) {
@@ -3429,9 +4753,13 @@ print.summary.mfrm_bias <- function(x, ...) {
 #' This method provides a compact, human-readable summary oriented to reporting.
 #' It returns a structured object and prints:
 #' - model fit overview (N, LogLik, AIC/BIC, convergence)
+#' - estimation settings that affect identification/scoring interpretation
 #' - facet-level estimate distribution (mean/SD/range)
 #' - person measure distribution
 #' - step/threshold checks
+#' - a reporting map showing which companion summaries/tables should be used for
+#'   manuscript-oriented data description, diagnostics, category checks, and draft
+#'   reporting
 #' - high/low person measures and extreme facet levels
 #'
 #' @section Interpreting output:
@@ -3439,25 +4767,57 @@ print.summary.mfrm_bias <- function(x, ...) {
 #' - `facet_overview`: per-facet spread and range of estimates.
 #' - `person_overview`: distribution of person measures.
 #' - `step_overview`: threshold spread and monotonicity checks.
+#' - `settings_overview`: estimation settings that affect interpretation.
+#' - `population_coding`: fitted categorical levels and contrasts that must be
+#'   reused when scoring new persons under the population-model posterior.
+#' - `key_warnings` / `notes`: short triage subset of retained zero-count score
+#'   categories and latent-regression population-model caveats such as
+#'   complete-case omissions, zero-variance design columns, missing
+#'   coefficients, or unstable residual variance when present. Incomplete or
+#'   non-finite covariates are normally handled before fitting as input errors
+#'   or complete-case omissions; they appear here only if retained in a
+#'   population-design audit row.
+#' - `caveats`: structured rows behind those warnings for appendix/export use;
+#'   `print(summary(fit))` shows a compact `Caveats` block when rows are present.
+#' - `reporting_map`: where to get companion outputs for manuscript reporting.
 #' - `top_person` / `top_facet`: extreme estimates for quick triage.
 #'
 #' @section Typical workflow:
 #' 1. Fit model with [fit_mfrm()].
 #' 2. Run `summary(fit)` for first-pass diagnostics.
-#' 3. Continue with [diagnose_mfrm()] for element-level fit checks.
+#' 3. For `RSM` / `PCM`, continue with [diagnose_mfrm()] for element-level fit
+#'    checks. For bounded `GPCM`, continue with [compute_information()] /
+#'    [plot_information()] or the fixed-calibration posterior scoring helpers.
 #'
 #' @return An object of class `summary.mfrm_fit` with:
 #' - `overview`: global model/fit indicators
+#' - `status`: concise front-door status block for quick review
+#' - `key_warnings`: highest-priority warnings to review first
+#' - `next_actions`: recommended follow-up helpers
+#' - `population_overview`: current population-model basis, residual variance,
+#'   and omission audit
+#' - `population_coefficients`: fitted latent-regression coefficients when a
+#'   population model is active
+#' - `population_design`: latent-regression design-matrix column audit when a
+#'   population model is active
+#' - `population_coding`: categorical covariate levels and contrast provenance
+#'   when a population model uses model-matrix coding
 #' - `facet_overview`: per-facet estimate distribution summary
 #' - `person_overview`: person-measure distribution summary
 #' - `step_overview`: threshold/step diagnostics
-#' - `top_person`: highest/lowest person measures
-#' - `top_facet`: extreme facet-level estimates
+#' - `slope_overview`: discrimination summary for `GPCM` fits
+#' - `person_high` / `person_low`: highest and lowest person measures
+#' - `facet_extremes`: extreme facet-level estimates
+#' - `caveats`: structured warning/review rows for score-support and
+#'   latent-regression population-model issues
 #' - `notes`: short interpretation notes
 #' @seealso [fit_mfrm()], [diagnose_mfrm()]
 #' @examples
 #' toy <- load_mfrmr_data("example_core")
-#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+#' fit <- fit_mfrm(
+#'   toy, "Person", c("Rater", "Criterion"), "Score",
+#'   method = "MML", quad_points = 15
+#' )
 #' summary(fit)
 #' @export
 summary.mfrm_fit <- function(object, digits = 3, top_n = 5, ...) {
@@ -3468,17 +4828,108 @@ summary.mfrm_fit <- function(object, digits = 3, top_n = 5, ...) {
   digits <- max(0L, as.integer(digits))
   top_n <- max(1L, as.integer(top_n))
 
+  config <- object$config %||% list()
   overview <- tibble::as_tibble(object$summary)
+  if ("Method" %in% names(overview)) {
+    overview$Method <- public_mfrm_method_label(overview$Method)
+  }
+  if (!"MethodUsed" %in% names(overview)) {
+    overview$MethodUsed <- as.character(config$method %||% NA_character_)
+  } else {
+    missing_used <- is.na(overview$MethodUsed) | !nzchar(trimws(as.character(overview$MethodUsed)))
+    overview$MethodUsed[missing_used] <- as.character(config$method %||% NA_character_)
+  }
+  prep <- object$prep %||% list()
+  population_raw <- object$population %||% list()
   person_raw <- object$facets$person
   if (is.null(person_raw)) person_raw <- tibble::tibble()
   other_raw <- object$facets$others
   if (is.null(other_raw)) other_raw <- tibble::tibble()
   step_raw <- object$steps
   if (is.null(step_raw)) step_raw <- tibble::tibble()
+  slope_raw <- object$slopes
+  if (is.null(slope_raw)) slope_raw <- tibble::tibble()
 
   person_tbl <- tibble::as_tibble(person_raw)
   other_tbl <- tibble::as_tibble(other_raw)
   step_tbl <- tibble::as_tibble(step_raw)
+  slope_tbl <- tibble::as_tibble(slope_raw)
+  population_coding <- population_coding_summary_table(population_raw)
+  population_coding_variables <- if (nrow(population_coding) > 0L) {
+    paste(population_coding$Variable, collapse = ", ")
+  } else {
+    ""
+  }
+  population_contrast_variables <- if (nrow(population_coding) > 0L) {
+    paste(population_coding$Variable[nzchar(population_coding$Contrast)], collapse = ", ")
+  } else {
+    ""
+  }
+  population_overview <- tibble::tibble(
+    PopulationModel = isTRUE(population_raw$active),
+    PosteriorBasis = as.character(population_raw$posterior_basis %||% "legacy_mml"),
+    Formula = if (!is.null(population_raw$formula)) paste(deparse(population_raw$formula), collapse = " ") else NA_character_,
+    PersonRows = if (!is.null(population_raw$person_table)) nrow(as.data.frame(population_raw$person_table, stringsAsFactors = FALSE)) else NA_integer_,
+    DesignColumns = if (!is.null(population_raw$design_matrix)) ncol(population_raw$design_matrix) else NA_integer_,
+    CodingVariables = population_coding_variables,
+    ContrastVariables = population_contrast_variables,
+    Policy = as.character(population_raw$policy %||% NA_character_),
+    ResidualVariance = as.numeric(population_raw$sigma2 %||% NA_real_),
+    OmittedPersons = length(population_raw$omitted_persons %||% character(0)),
+    OmittedRows = as.integer(population_raw$response_rows_omitted %||% NA_integer_)
+  )
+  population_coefficients <- tibble::tibble()
+  if (isTRUE(population_raw$active) && length(population_raw$coefficients %||% numeric(0)) > 0) {
+    coeff <- as.numeric(population_raw$coefficients)
+    coeff_names <- names(population_raw$coefficients)
+    if (is.null(coeff_names) || length(coeff_names) != length(coeff)) {
+      coeff_names <- paste0("beta_", seq_along(coeff))
+    }
+    population_coefficients <- tibble::tibble(
+      Term = as.character(coeff_names),
+      Estimate = coeff
+    )
+  }
+  population_design <- tibble::tibble()
+  if (isTRUE(population_raw$active) && !is.null(population_raw$design_matrix)) {
+    design_matrix <- as.matrix(population_raw$design_matrix)
+    storage.mode(design_matrix) <- "double"
+    if (ncol(design_matrix) > 0L) {
+      design_columns <- colnames(design_matrix)
+      if (is.null(design_columns) || length(design_columns) != ncol(design_matrix)) {
+        design_columns <- paste0("X", seq_len(ncol(design_matrix)))
+      }
+      col_finite <- function(j) {
+        vals <- as.numeric(design_matrix[, j])
+        vals[is.finite(vals)]
+      }
+      col_stat <- function(j, fn) {
+        vals <- col_finite(j)
+        if (length(vals) == 0L) return(NA_real_)
+        fn(vals)
+      }
+      col_sd <- function(j) {
+        vals <- col_finite(j)
+        if (length(vals) <= 1L) return(0)
+        stats::sd(vals)
+      }
+      col_seq <- seq_len(ncol(design_matrix))
+      non_missing <- vapply(col_seq, function(j) length(col_finite(j)), integer(1))
+      sd_values <- vapply(col_seq, col_sd, numeric(1))
+      population_design <- tibble::tibble(
+        Column = as.character(design_columns),
+        IsIntercept = as.character(design_columns) == "(Intercept)",
+        PersonRows = nrow(design_matrix),
+        NonMissing = non_missing,
+        Complete = non_missing == nrow(design_matrix),
+        Mean = vapply(col_seq, col_stat, numeric(1), fn = mean),
+        SD = sd_values,
+        Min = vapply(col_seq, col_stat, numeric(1), fn = min),
+        Max = vapply(col_seq, col_stat, numeric(1), fn = max),
+        ZeroVariance = non_missing <= 1L | sd_values <= sqrt(.Machine$double.eps)
+      )
+    }
+  }
 
   facet_overview <- tibble::tibble()
   if (nrow(other_tbl) > 0 && all(c("Facet", "Estimate") %in% names(other_tbl))) {
@@ -3527,6 +4978,88 @@ summary.mfrm_fit <- function(object, digits = 3, top_n = 5, ...) {
     )
   }
 
+  slope_overview <- tibble::tibble()
+  if (nrow(slope_tbl) > 0 && "Estimate" %in% names(slope_tbl)) {
+    slope_overview <- tibble::tibble(
+      Slopes = nrow(slope_tbl),
+      Min = min(slope_tbl$Estimate, na.rm = TRUE),
+      Max = max(slope_tbl$Estimate, na.rm = TRUE),
+      GeometricMean = exp(mean(log(slope_tbl$Estimate), na.rm = TRUE)),
+      Positive = all(is.finite(slope_tbl$Estimate) & slope_tbl$Estimate > 0)
+    )
+  }
+
+  settings_overview <- tibble::tibble(
+    StepFacet = as.character(config$step_facet %||% NA_character_),
+    SlopeFacet = as.character(config$slope_facet %||% NA_character_),
+    NoncenterFacet = as.character(config$noncenter_facet %||% "Person"),
+    WeightColumn = as.character(config$weight_col %||% NA_character_),
+    QuadPoints = as.integer(config$estimation_control$quad_points %||% NA_integer_),
+    RatingMin = as.numeric(config$rating_min %||% prep$rating_min %||% NA_real_),
+    RatingMax = as.numeric(config$rating_max %||% prep$rating_max %||% NA_real_),
+    DummyFacets = if (length(config$dummy_facets %||% character(0)) > 0L) {
+      paste(sort(as.character(config$dummy_facets)), collapse = ", ")
+    } else {
+      ""
+    },
+    PositiveFacets = if (length(config$positive_facets %||% character(0)) > 0L) {
+      paste(sort(as.character(config$positive_facets)), collapse = ", ")
+    } else {
+      ""
+    },
+    UnusedScoreCategories = "",
+    UnusedScoreCategoryCount = 0L,
+    UnusedScoreCategoryType = "none"
+  )
+
+  score_category_profile <- score_category_support_profile(prep = prep)
+  score_category_caveats <- collect_mfrm_caveats(fit = object)
+  population_caveats <- collect_mfrm_population_caveats(
+    population_overview = population_overview,
+    population_design = population_design,
+    population_coefficients = population_coefficients
+  )
+  fit_caveats <- dplyr::bind_rows(score_category_caveats, population_caveats)
+  unused_rows <- if (nrow(score_category_profile) > 0 && "ZeroCount" %in% names(score_category_profile)) {
+    score_category_profile[as.logical(score_category_profile$ZeroCount), , drop = FALSE]
+  } else {
+    data.frame()
+  }
+  unused_score_categories <- sort(unique(as.integer(unused_rows$Category %||% integer(0))))
+  unused_score_categories <- unused_score_categories[is.finite(unused_score_categories)]
+  unused_score_category_type <- "none"
+  if (nrow(unused_rows) > 0L && "UnusedCategoryType" %in% names(unused_rows)) {
+    internal_unused <- unused_rows$UnusedCategoryType == "internal"
+    unused_score_category_type <- dplyr::case_when(
+      any(internal_unused) && any(!internal_unused) ~ "mixed",
+      any(internal_unused) ~ "internal",
+      TRUE ~ "boundary"
+    )
+    settings_overview$UnusedScoreCategories[1] <- paste(unused_score_categories, collapse = ", ")
+    settings_overview$UnusedScoreCategoryCount[1] <- length(unused_score_categories)
+    settings_overview$UnusedScoreCategoryType[1] <- unused_score_category_type
+  }
+
+  reporting_map <- tibble::tibble(
+    Area = c(
+      "Model identification / convergence",
+      "Data structure / missingness",
+      "Reliability / fit / residual PCA",
+      "Category functioning",
+      "Bias / DIF / interaction checks",
+      "Draft reporting / checklist"
+    ),
+    CoveredHere = c("yes", "no", "no", "partial", "no", "no"),
+    CompanionOutput = c(
+      "summary(fit)",
+      "summary(describe_mfrm_data(...))",
+      "summary(diagnose_mfrm(fit))",
+      "rating_scale_table() / category_structure_report() / category_curves_report()",
+      "summary(estimate_bias(...)) / analyze_dff() / related bundle summaries",
+      "reporting_checklist() / summary(build_apa_outputs(...))"
+    )
+  )
+
   facet_extremes <- tibble::tibble()
   if (nrow(other_tbl) > 0 && all(c("Facet", "Level", "Estimate") %in% names(other_tbl))) {
     facet_extremes <- other_tbl |>
@@ -3549,20 +5082,161 @@ summary.mfrm_fit <- function(object, digits = 3, top_n = 5, ...) {
 
   notes <- character(0)
   if ("Converged" %in% names(overview) && !isTRUE(overview$Converged[1])) {
-    notes <- c(notes, "Optimization did not converge; interpret parameter estimates cautiously.")
+    status <- as.character(overview$ConvergenceStatus[1] %||% NA_character_)
+    if (identical(status, "reviewable_warning")) {
+      notes <- c(
+        notes,
+        "Optimizer returned a nonzero code, but the terminal gradient was already small; treat the fit as reviewable rather than an immediate hard failure."
+      )
+    } else {
+      notes <- c(notes, "Optimization did not converge; interpret parameter estimates cautiously.")
+    }
+  }
+  if (identical(as.character(overview$Method[1] %||% NA_character_), "MML")) {
+    engine_requested <- as.character(overview$MMLEngineRequested[1] %||% NA_character_)
+    engine_used <- as.character(overview$MMLEngineUsed[1] %||% NA_character_)
+    if (!is.na(engine_requested) && !is.na(engine_used) && !identical(engine_requested, engine_used)) {
+      notes <- c(
+        notes,
+        paste0("Requested mml_engine = '", engine_requested,
+               "' was not available for this fit; the run used '", engine_used, "' instead.")
+      )
+    }
+  }
+  if (nrow(population_overview) > 0 && !isTRUE(population_overview$PopulationModel[1])) {
+    fit_method <- as.character(overview$Method[1] %||% NA_character_)
+    if (identical(fit_method, "MML")) {
+      notes <- c(notes, "No population model was requested; current MML output uses the package's legacy unconditional prior.")
+    }
+  } else if (nrow(population_overview) > 0 && isTRUE(population_overview$PopulationModel[1])) {
+    notes <- c(
+      notes,
+      "Population-model coefficients and residual variance describe the conditional normal prior used in the latent-regression MML branch."
+    )
+    if (nrow(population_coding) > 0L) {
+      notes <- c(
+        notes,
+        "Categorical population-model coding is stored in `population_coding`; reuse those fitted levels and contrasts when scoring new persons."
+      )
+    }
   }
   if (nrow(step_overview) > 0 && !isTRUE(step_overview$Monotonic[1])) {
     notes <- c(notes, "Step estimates are not monotonic; verify category functioning.")
+  }
+  fit_caveat_messages <- if (nrow(fit_caveats) > 0 && "Message" %in% names(fit_caveats)) {
+    as.character(fit_caveats$Message)
+  } else {
+    character(0)
+  }
+  if (length(fit_caveat_messages) > 0L) {
+    notes <- c(notes, fit_caveat_messages)
+  }
+  if (nrow(slope_overview) > 0) {
+    notes <- c(
+      notes,
+      "GPCM discriminations are reported under the package's positive log-slope identification with geometric-mean-one scaling."
+    )
   }
   if (length(notes) == 0) {
     notes <- "No immediate warnings from fit-level summary checks."
   }
 
+  method_label <- as.character(overview$Method[1] %||% NA_character_)
+  model_label <- as.character(overview$Model[1] %||% NA_character_)
+  convergence_status <- as.character(overview$ConvergenceStatus[1] %||% NA_character_)
+  convergence_severity <- as.character(overview$ConvergenceSeverity[1] %||% NA_character_)
+  converged <- isTRUE(overview$Converged[1])
+  engine_requested <- as.character(overview$MMLEngineRequested[1] %||% NA_character_)
+  engine_used <- as.character(overview$MMLEngineUsed[1] %||% NA_character_)
+
+  reporting_readiness <- dplyr::case_when(
+    !converged && !identical(convergence_status, "reviewable_warning") ~ "review_before_reporting",
+    identical(method_label, "MML") ~ "ready_for_diagnostics_and_reporting_follow_up",
+    TRUE ~ "exploratory_fit_ready_for_diagnostics"
+  )
+  overall_status <- dplyr::case_when(
+    converged ~ "usable_fit",
+    identical(convergence_status, "reviewable_warning") ~ "reviewable_fit",
+    TRUE ~ "fit_needs_review"
+  )
+  convergence_line <- if (isTRUE(is.finite(overview$TerminalGradientSupNorm[1] %||% NA_real_))) {
+    paste0(
+      convergence_status,
+      " (severity: ", convergence_severity,
+      ", sup-norm: ", round(as.numeric(overview$TerminalGradientSupNorm[1]), digits = digits), ")"
+    )
+  } else {
+    paste0(convergence_status, " (severity: ", convergence_severity, ")")
+  }
+  engine_line <- if (identical(method_label, "MML") && !is.na(engine_used)) {
+    if (!is.na(engine_requested) && !identical(engine_requested, engine_used)) {
+      paste0(engine_used, " (requested ", engine_requested, ")")
+    } else {
+      engine_used
+    }
+  } else if (!is.na(method_label)) {
+    method_label
+  } else {
+    NA_character_
+  }
+  status <- make_summary_block(
+    "Overall status" = overall_status,
+    "Convergence" = convergence_line,
+    "Estimation path" = paste(model_label, "/", engine_line),
+    "Reporting readiness" = reporting_readiness
+  )
+
+  key_warnings <- clean_summary_lines(c(fit_caveat_messages, notes), max_n = 4L)
+  next_actions <- character(0)
+  if (!identical(method_label, "MML")) {
+    next_actions <- c(
+      next_actions,
+      "If formal SE/CI or strict marginal diagnostics are needed, re-fit with `method = \"MML\"`."
+    )
+  }
+  if (nrow(population_overview) > 0 && isTRUE(population_overview$PopulationModel[1])) {
+    next_actions <- c(
+      next_actions,
+      "Inspect `summary(fit)$population_coefficients` and `summary(fit)$population_coding` before reporting latent-regression effects.",
+      "For new persons, use `predict_mfrm_units(..., person_data = ...)` or `sample_mfrm_plausible_values(..., person_data = ...)` so scoring reuses the fitted population-model coding.",
+      "Report population coefficients as conditional-normal latent-regression parameters, not as a post hoc regression on EAP/MLE scores."
+    )
+  }
+  if (identical(model_label, "GPCM")) {
+    next_actions <- c(
+      next_actions,
+      "Run `diagnose_mfrm(fit, diagnostic_mode = \"both\")` for exploratory residual and strict-marginal screening.",
+      "Use `compute_information()` / `plot_information()` for reporting-oriented precision follow-up."
+    )
+  } else {
+    next_actions <- c(
+      next_actions,
+      "Run `diagnose_mfrm(fit, diagnostic_mode = \"both\")` for element-level fit review."
+    )
+  }
+  next_actions <- c(
+    next_actions,
+    "Use `plot(fit, type = \"wright\", preset = \"publication\")` for targeting and scale review.",
+    "After diagnostics, use `reporting_checklist(fit, diagnostics = diagnostics)` for reporting readiness."
+  )
+  next_actions <- clean_summary_lines(next_actions, max_n = 6L)
+
   out <- list(
     overview = overview,
+    status = status,
+    key_warnings = key_warnings,
+    next_actions = next_actions,
+    population_overview = population_overview,
+    population_design = population_design,
+    population_coefficients = population_coefficients,
+    population_coding = population_coding,
     facet_overview = facet_overview,
     person_overview = person_overview,
     step_overview = step_overview,
+    slope_overview = slope_overview,
+    settings_overview = settings_overview,
+    reporting_map = reporting_map,
+    caveats = fit_caveats,
     facet_extremes = facet_extremes,
     person_high = person_high,
     person_low = person_low,
@@ -3581,19 +5255,164 @@ round_numeric_df <- function(df, digits = 3L) {
   out
 }
 
+clean_summary_lines <- function(lines, max_n = Inf) {
+  if (length(lines) == 0) return(character(0))
+  lines <- trimws(as.character(lines))
+  lines <- lines[!is.na(lines) & nzchar(lines)]
+  lines <- unique(lines)
+  if (is.finite(max_n) && length(lines) > max_n) {
+    lines <- lines[seq_len(max_n)]
+  }
+  lines
+}
+
+make_summary_block <- function(...) {
+  vals <- list(...)
+  keys <- names(vals)
+  if (is.null(keys)) {
+    keys <- rep.int("", length(vals))
+  }
+  keep <- vapply(vals, function(x) {
+    if (length(x) == 0) return(FALSE)
+    if (all(is.na(x))) return(FALSE)
+    if (is.character(x)) return(any(nzchar(trimws(x))))
+    TRUE
+  }, logical(1))
+  if (!any(keep)) {
+    return(tibble::tibble(Item = character(0), Value = character(0)))
+  }
+  tibble::tibble(
+    Item = keys[keep],
+    Value = vapply(vals[keep], function(x) paste(x, collapse = " "), character(1))
+  )
+}
+
+summary_lines_are_default <- function(lines, default_line) {
+  lines <- clean_summary_lines(lines)
+  length(lines) == 1L && identical(lines, default_line)
+}
+
+print_bullet_section <- function(title, lines, prefix = " - ") {
+  lines <- clean_summary_lines(lines)
+  if (length(lines) == 0) return(invisible(NULL))
+  cat("\n", title, "\n", sep = "")
+  for (line in lines) cat(prefix, line, "\n", sep = "")
+  invisible(NULL)
+}
+
+summary_caveat_display_table <- function(caveats) {
+  caveats <- as.data.frame(caveats %||% data.frame(), stringsAsFactors = FALSE)
+  if (nrow(caveats) == 0L) return(caveats)
+  keep <- intersect(
+    c("Area", "Severity", "Condition", "Categories", "Message", "RecommendedAction"),
+    names(caveats)
+  )
+  if (length(keep) == 0L) return(caveats)
+  caveats[, keep, drop = FALSE]
+}
+
+print_caveat_section <- function(caveats, title = "Caveats") {
+  caveats <- summary_caveat_display_table(caveats)
+  if (nrow(caveats) == 0L) return(invisible(NULL))
+  cat("\n", title, "\n", sep = "")
+  print(caveats, row.names = FALSE)
+  invisible(NULL)
+}
+
 #' @export
 print.summary.mfrm_fit <- function(x, ...) {
   digits <- x$digits
   if (is.null(digits) || !is.finite(digits)) digits <- 3L
   overview <- round_numeric_df(as.data.frame(x$overview), digits = digits)
+  key_warning_lines <- if (summary_lines_are_default(
+    x$key_warnings,
+    "No immediate warnings from fit-level summary checks."
+  )) {
+    "None."
+  } else {
+    x$key_warnings
+  }
 
   cat("Many-Facet Rasch Model Summary\n")
   if (nrow(overview) > 0) {
     ov <- overview[1, , drop = FALSE]
-    cat(sprintf("  Model: %s | Method: %s\n", ov$Model, ov$Method))
-    cat(sprintf("  N: %s | Persons: %s | Facets: %s | Categories: %s\n", ov$N, ov$Persons, ov$Facets, ov$Categories))
+    cat(sprintf(
+      "  Model: %s | Method: %s | N: %s | Persons: %s | Facets: %s | Categories: %s\n",
+      ov$Model, ov$Method, ov$N, ov$Persons, ov$Facets, ov$Categories
+    ))
+    used_public <- public_mfrm_method_label(ov$MethodUsed %||% NA_character_)
+    if (!is.na(ov$MethodUsed %||% NA_character_) &&
+        nzchar(as.character(ov$MethodUsed %||% "")) &&
+        !identical(as.character(used_public), as.character(ov$Method))) {
+      cat(sprintf("  Internal method label: %s\n", ov$MethodUsed))
+    }
+    if (identical(as.character(ov$Method %||% NA_character_), "MML") &&
+        !is.na(ov$MMLEngineUsed %||% NA_character_)) {
+      cat(sprintf(
+        "  MML engine: %s (requested: %s)\n",
+        ov$MMLEngineUsed %||% NA_character_,
+        ov$MMLEngineRequested %||% NA_character_
+      ))
+      if (is.finite(ov$EMIterations %||% NA_real_)) {
+        cat(sprintf(
+          "  EM iterations: %s | EM converged: %s | Last relative change: %s\n",
+          ov$EMIterations %||% NA,
+          ifelse(isTRUE(ov$EMConverged), "Yes", "No"),
+          ov$EMRelativeChange %||% NA_real_
+        ))
+      }
+    }
+  }
+  if (nrow(x$status %||% data.frame()) > 0) {
+    cat("\nStatus\n")
+    for (i in seq_len(nrow(x$status))) {
+      cat(" - ", x$status$Item[i], ": ", x$status$Value[i], "\n", sep = "")
+    }
+  }
+  print_bullet_section("Key warnings", key_warning_lines)
+  print_bullet_section("Next actions", x$next_actions)
+  print_caveat_section(x$caveats)
+
+  if (nrow(overview) > 0) {
+    ov <- overview[1, , drop = FALSE]
+    cat("\nFit overview\n")
     cat(sprintf("  LogLik: %s | AIC: %s | BIC: %s\n", ov$LogLik, ov$AIC, ov$BIC))
-    cat(sprintf("  Converged: %s | Iterations: %s\n", ifelse(isTRUE(ov$Converged), "Yes", "No"), ov$Iterations))
+    cat(sprintf(
+      "  Converged: %s | Status: %s | Basis: %s | Fn evals: %s | Gr evals: %s\n",
+      ifelse(isTRUE(ov$Converged), "Yes", "No"),
+      ov$ConvergenceStatus %||% NA_character_,
+      ov$ConvergenceBasis %||% NA_character_,
+      ov$FunctionEvaluations %||% ov$Iterations %||% NA,
+      ov$GradientEvaluations %||% NA
+    ))
+    if (is.finite(ov$TerminalGradientSupNorm %||% NA_real_)) {
+      cat(sprintf(
+        "  Terminal gradient: sup-norm = %s | RMS = %s | Review tol = %s\n",
+        ov$TerminalGradientSupNorm,
+        ov$TerminalGradientRMS %||% NA_real_,
+        ov$GradientReviewTolerance %||% NA_real_
+      ))
+    }
+    if (!is.na(ov$ConvergenceDetail %||% NA_character_) && nzchar(ov$ConvergenceDetail %||% "")) {
+      cat(sprintf("  Optimization note: %s\n", ov$ConvergenceDetail))
+    }
+  }
+
+  if (nrow(x$population_overview) > 0) {
+    cat("\nPopulation basis\n")
+    print(round_numeric_df(as.data.frame(x$population_overview), digits = digits), row.names = FALSE)
+  }
+  if (nrow(x$population_design %||% data.frame()) > 0) {
+    cat("\nPopulation design matrix\n")
+    print(round_numeric_df(as.data.frame(x$population_design), digits = digits), row.names = FALSE)
+  }
+  if (nrow(x$population_coding %||% data.frame()) > 0) {
+    cat("\nPopulation covariate coding\n")
+    print(as.data.frame(x$population_coding), row.names = FALSE)
+  }
+  if (nrow(x$population_coefficients) > 0) {
+    cat("\nPopulation coefficients\n")
+    print(round_numeric_df(as.data.frame(x$population_coefficients), digits = digits), row.names = FALSE)
   }
 
   if (nrow(x$facet_overview) > 0) {
@@ -3609,6 +5428,14 @@ print.summary.mfrm_fit <- function(x, ...) {
   if (nrow(x$step_overview) > 0) {
     cat("\nStep parameter summary\n")
     print(round_numeric_df(as.data.frame(x$step_overview), digits = digits), row.names = FALSE)
+  }
+  if (nrow(x$slope_overview %||% data.frame()) > 0) {
+    cat("\nSlope summary\n")
+    print(round_numeric_df(as.data.frame(x$slope_overview), digits = digits), row.names = FALSE)
+  }
+  if (nrow(x$settings_overview %||% data.frame()) > 0) {
+    cat("\nEstimation settings\n")
+    print(round_numeric_df(as.data.frame(x$settings_overview), digits = digits), row.names = FALSE)
   }
 
   if (nrow(x$facet_extremes) > 0) {
@@ -3626,7 +5453,13 @@ print.summary.mfrm_fit <- function(x, ...) {
     print(round_numeric_df(as.data.frame(x$person_low), digits = digits), row.names = FALSE)
   }
 
-  if (length(x$notes) > 0) {
+  if (nrow(x$reporting_map %||% data.frame()) > 0) {
+    cat("\nPaper reporting map\n")
+    print(as.data.frame(x$reporting_map), row.names = FALSE)
+  }
+
+  if (length(x$notes) > 0 &&
+      !summary_lines_are_default(x$notes, "No immediate warnings from fit-level summary checks.")) {
     cat("\nNotes\n")
     for (line in x$notes) cat(" - ", line, "\n", sep = "")
   }

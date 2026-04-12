@@ -34,6 +34,27 @@ For speed-sensitive work, a useful pattern is:
 - use `diagnose_mfrm(..., residual_pca = "none")` for the first pass
 - reuse the same diagnostics object in downstream reports and plots
 
+## MML and Diagnostic Modes
+
+`mfrmr` treats `MML` and `JML` differently on purpose.
+
+- `MML` integrates over the person distribution with Gauss-Hermite quadrature.
+- The current `MML` branch optimizes the quadrature-based marginal
+  log-likelihood directly; it is not an EM implementation.
+- `JML` is often useful for quick exploratory passes, but `MML` remains the
+  preferred route for final estimation and fixed-calibration follow-up.
+
+For `RSM` and `PCM`, diagnostics now expose two distinct evidence paths:
+
+- `diagnostic_mode = "legacy"` keeps the residual/EAP-based stack.
+- `diagnostic_mode = "marginal_fit"` adds the strict latent-integrated screen.
+- `diagnostic_mode = "both"` is the safest default when you want to inspect
+  both views side by side.
+
+The strict marginal branch is still screening-oriented in the current release.
+Use `summary(diag)$diagnostic_basis` to separate the legacy residual evidence
+from the strict marginal evidence rather than pooling them into one decision.
+
 ## Load Data
 
 ```{r load-data}
@@ -101,6 +122,13 @@ class(summary(t13_toy))
 names(plot(t4_toy, draw = FALSE))
 names(plot(t12_toy, draw = FALSE))
 names(plot(t13_toy, draw = FALSE))
+
+chk_toy <- reporting_checklist(fit_toy, diagnostics = diag_toy)
+subset(
+  chk_toy$checklist,
+  Section == "Visual Displays",
+  c("Item", "DraftReady", "NextAction")
+)
 ```
 
 ## Fit and Diagnose with Full Data
@@ -138,6 +166,88 @@ diag_pca <- diagnose_mfrm(
 )
 
 summary(diag_pca)
+```
+
+## Strict Diagnostics for RSM and PCM
+
+For `RSM` and `PCM`, the package can now keep the legacy residual path and the
+strict marginal path side by side:
+
+```{r strict-rsm-pcm}
+fit_rsm_strict <- fit_mfrm(
+  data = toy,
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  score = "Score",
+  method = "MML",
+  model = "RSM",
+  quad_points = 7,
+  maxit = 10
+)
+diag_rsm_strict <- diagnose_mfrm(
+  fit_rsm_strict,
+  diagnostic_mode = "both",
+  residual_pca = "none"
+)
+
+fit_pcm_strict <- fit_mfrm(
+  data = toy,
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  score = "Score",
+  method = "MML",
+  model = "PCM",
+  step_facet = "Criterion",
+  quad_points = 7,
+  maxit = 10
+)
+diag_pcm_strict <- diagnose_mfrm(
+  fit_pcm_strict,
+  diagnostic_mode = "both",
+  residual_pca = "none"
+)
+
+summary(diag_rsm_strict)$diagnostic_basis[, c("DiagnosticPath", "Status", "Basis")]
+summary(diag_pcm_strict)$diagnostic_basis[, c("DiagnosticPath", "Status", "Basis")]
+```
+
+When you want a compact simulation-based screening check for the strict branch,
+use `evaluate_mfrm_diagnostic_screening()` on a small design:
+
+```{r strict-screening}
+screen_rsm <- evaluate_mfrm_diagnostic_screening(
+  design = list(person = 18, rater = 3, criterion = 3, assignment = 3),
+  reps = 1,
+  scenarios = c("well_specified", "local_dependence"),
+  model = "RSM",
+  maxit = 8,
+  quad_points = 7,
+  seed = 123
+)
+screen_pcm <- evaluate_mfrm_diagnostic_screening(
+  design = list(person = 18, rater = 3, criterion = 3, assignment = 3),
+  reps = 1,
+  scenarios = c("well_specified", "step_structure_misspecification"),
+  model = "PCM",
+  maxit = 8,
+  quad_points = 7,
+  seed = 123
+)
+
+screen_rsm$performance_summary[, c("Scenario", "EvaluationUse", "LegacyAnyFlagRate", "StrictAnyFlagRate")]
+screen_pcm$performance_summary[, c("Scenario", "EvaluationUse", "LegacySensitivityProxy", "StrictSensitivityProxy", "DeltaStrictMinusLegacyFlagRate")]
+```
+
+The same strict branch is now reflected in the reporting router:
+
+```{r strict-reporting-route}
+chk_rsm_strict <- reporting_checklist(fit_rsm_strict, diagnostics = diag_rsm_strict)
+subset(
+  chk_rsm_strict$checklist,
+  Section == "Visual Displays" &
+    Item %in% c("QC / facet dashboard", "Strict marginal visuals", "Precision / information curves"),
+  c("Item", "Available", "DraftReady", "NextAction")
+)
 ```
 
 ## Residual PCA and Reporting

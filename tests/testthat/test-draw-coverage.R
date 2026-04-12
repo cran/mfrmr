@@ -38,6 +38,30 @@ test_that("plot.mfrm_fit draws CCC", {
   with_null_device(plot(.fit, type = "ccc", draw = TRUE))
 })
 
+test_that("plot.mfrm_fit returns 3D-ready CCC surface payload", {
+  surface <- plot(.fit, type = "ccc_surface", draw = FALSE, theta_points = 55)
+  expect_s3_class(surface, "mfrm_plot_data")
+  expect_identical(surface$name, "category_probability_surface")
+  expect_true(all(c(
+    "Theta", "Category", "CategoryIndex", "Probability",
+    "SurfaceX", "SurfaceY", "SurfaceZ", "CurveGroup"
+  ) %in% names(surface$data$surface)))
+  expect_true(is.data.frame(surface$data$renderer_contract))
+  expect_match(surface$data$renderer_contract$Status[2], "payload only", fixed = TRUE)
+  expect_true(is.data.frame(surface$data$category_support))
+  expect_true(is.data.frame(surface$data$interpretation_guide))
+  expect_true(is.data.frame(surface$data$reporting_policy))
+  expect_true(all(c("Category", "ObservedCount", "ZeroObserved") %in% names(surface$data$category_support)))
+  expect_true("Reporting use" %in% surface$data$interpretation_guide$Topic)
+  expect_match(
+    surface$data$reporting_policy$Recommendation[
+      surface$data$reporting_policy$UseCase == "Manuscript core figure"
+    ][1],
+    "pathway",
+    fixed = TRUE
+  )
+})
+
 test_that("plot.mfrm_fit draws person distribution", {
   with_null_device(plot(.fit, type = "person", draw = TRUE))
 })
@@ -256,7 +280,7 @@ test_that("summary.mfrm_bundle prints for various bundle types", {
   }
 })
 
-# ---- FACETS parity report ----
+# ---- FACETS compatibility-contract report ----
 
 test_that("facets_parity_report produces output", {
   pr <- facets_parity_report(.fit, diagnostics = .diag, bias_results = .bias)
@@ -304,6 +328,14 @@ test_that("print.mfrm_apa_text works", {
 test_that("plot.apa_table draws", {
   at <- apa_table(.fit, diagnostics = .diag)
   with_null_device(plot(at, draw = TRUE))
+})
+
+test_that("plot.mfrm_summary_table_bundle draws", {
+  bundle <- build_summary_table_bundle(summary(.fit))
+  with_null_device(plot(bundle, type = "table_rows", draw = TRUE))
+  with_null_device(plot(bundle, type = "role_tables", draw = TRUE))
+  with_null_device(plot(bundle, type = "appendix_sections", draw = TRUE))
+  with_null_device(plot(bundle, type = "appendix_presets", draw = TRUE))
 })
 
 # ---- plot.mfrm_bundle for various types ----

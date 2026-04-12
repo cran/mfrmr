@@ -53,12 +53,22 @@ for later simulation studies. It extracts:
 \item either a simplified assignment summary (\code{"crossed"} / \code{"rotating"}),
 empirical resampled assignment profiles (\code{"resampled"}), or an observed
 response skeleton (\code{"skeleton"}, optionally carrying \code{Group}/\code{Weight})
+\item when the fit used the latent-regression branch, the fitted
+\code{population_formula}, coefficient vector, residual variance, and the
+stored person-level covariate table, including model-matrix xlevel and
+contrast provenance for categorical covariates
 }
 
 This is intended as a \strong{fit-derived parametric starting point}, not as a
 claim that the fitted object perfectly recovers the true data-generating
 mechanism. Users should review and, if necessary, edit the returned
 specification before using it for design planning.
+
+First-release \code{GPCM} fits are now supported here for direct data generation,
+provided that the returned simulation specification stores both a threshold
+table and a parallel slope table. The broader planning/reporting helpers
+still remain restricted until slope-aware downstream contracts are widened
+explicitly.
 
 If you want to carry person-level group labels into a fit-derived observed
 response skeleton, provide the original \code{source_data} together with
@@ -73,12 +83,19 @@ design and estimated spread in the fitted run.
 }
 
 \examples{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 15)
+\dontrun{
+toy <- simulate_mfrm_data(
+  n_person = 8,
+  n_rater = 3,
+  n_criterion = 2,
+  seed = 123
+)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 5)
 spec <- extract_mfrm_sim_spec(fit, latent_distribution = "empirical")
 spec$assignment
 spec$model
 head(spec$threshold_table)
+}
 }
 \seealso{
 \code{\link[=build_mfrm_sim_spec]{build_mfrm_sim_spec()}}, \code{\link[=simulate_mfrm_data]{simulate_mfrm_data()}}

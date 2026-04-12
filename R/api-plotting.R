@@ -404,6 +404,532 @@ resolve_facets_chisq_bundle <- function(x,
   stop("`x` must be an mfrm_fit object or output from facets_chisq_table().")
 }
 
+resolve_strict_marginal_plot_bundle <- function(x,
+                                                diagnostics = NULL,
+                                                require_pairwise = FALSE) {
+  if (inherits(x, "mfrm_fit")) {
+    diagnostics <- diagnostics %||%
+      diagnose_mfrm(x, residual_pca = "none", diagnostic_mode = "both")
+  } else if (inherits(x, "mfrm_diagnostics") || (is.list(x) && !is.null(x$marginal_fit))) {
+    diagnostics <- x
+  } else {
+    stop("`x` must be an mfrm_fit object or output from diagnose_mfrm().", call. = FALSE)
+  }
+
+  marginal_fit <- diagnostics$marginal_fit %||% NULL
+  if (!is.list(marginal_fit)) {
+    stop(
+      "Strict marginal diagnostics are not available. Run diagnose_mfrm(..., diagnostic_mode = \"both\") first.",
+      call. = FALSE
+    )
+  }
+  if (!isTRUE(marginal_fit$available)) {
+    reason <- as.character(
+      marginal_fit$summary$Reason[1] %||%
+        marginal_fit$notes[1] %||%
+        "Strict marginal diagnostics are not available for this run."
+    )
+    stop(
+      paste0("Strict marginal diagnostics are not available: ", reason),
+      call. = FALSE
+    )
+  }
+  if (isTRUE(require_pairwise) && !isTRUE(marginal_fit$pairwise$available)) {
+    stop(
+      paste0(
+        "Strict pairwise local-dependence diagnostics are not available: ",
+        as.character(
+          marginal_fit$pairwise$summary$Reason[1] %||%
+            marginal_fit$notes[1] %||%
+            "Pairwise diagnostics were not computed for this run."
+        )
+      ),
+      call. = FALSE
+    )
+  }
+
+  list(
+    diagnostics = diagnostics,
+    marginal_fit = marginal_fit
+  )
+}
+
+format_marginal_cell_label <- function(cell_type, step_facet, facet, level, category) {
+  if (identical(as.character(cell_type %||% ""), "facet_level")) {
+    return(paste0(
+      as.character(facet %||% "Facet"),
+      ": ",
+      as.character(level %||% "Level"),
+      " | Cat ",
+      as.character(category %||% "?")
+    ))
+  }
+  step_label <- if (!is.na(step_facet) && nzchar(as.character(step_facet))) {
+    paste0("Step facet: ", as.character(step_facet))
+  } else {
+    "Common scale"
+  }
+  paste0(step_label, " | Cat ", as.character(category %||% "?"))
+}
+
+format_marginal_pair_label <- function(facet, level1, level2) {
+  paste0(
+    as.character(facet %||% "Facet"),
+    ": ",
+    as.character(level1 %||% "Level 1"),
+    " vs ",
+    as.character(level2 %||% "Level 2")
+  )
+}
+
+#' Plot strict marginal-fit follow-up cells using base R
+#'
+#' @param x Output from [fit_mfrm()] or [diagnose_mfrm()].
+#' @param diagnostics Optional output from [diagnose_mfrm()] when `x` is `mfrm_fit`.
+#' @param plot_type `"std_residual"` or `"prop_diff"`.
+#' @param top_n Maximum cells shown.
+#' @param facet Optional facet name used to keep only matching facet-level rows.
+#'   When `NULL`, the plot uses the mixed top-cell table returned by the strict
+#'   marginal screen.
+#' @param main Optional custom plot title.
+#' @param palette Optional named color overrides. Recognized names:
+#'   `positive`, `negative`, `flag`.
+#' @param label_angle X-axis label angle.
+#' @param preset Visual preset (`"standard"`, `"publication"`, or `"compact"`).
+#' @param draw If `TRUE`, draw with base graphics.
+#'
+#' @details
+#' This helper visualizes the largest first-order strict marginal-fit cells from
+#' `diagnose_mfrm(..., diagnostic_mode = "both")` or
+#' `diagnostic_mode = "marginal_fit"`.
+#'
+#' The `"std_residual"` view ranks cells by the absolute standardized residual
+#' from posterior-integrated expected category counts. The `"prop_diff"` view
+#' ranks the same cells by the signed observed-minus-expected proportion gap.
+#'
+#' Use this plot after `summary(diagnostics)` indicates strict marginal flags.
+#' The display is exploratory: it highlights which facet/category cells deserve
+#' follow-up, but it is not a standalone inferential test.
+#'
+#' @section Interpreting output:
+#' - Positive bars mean the observed category usage exceeded the posterior-
+#'   expected marginal usage for that cell.
+#' - Negative bars mean the observed usage fell below the posterior-expected
+#'   marginal usage.
+#' - Red bars indicate the current strict marginal warning rule was triggered by
+#'   `|StdResidual| >= abs_z_warn`.
+#'
+#' @section Typical workflow:
+#' 1. Fit with [fit_mfrm()] using `method = "MML"` for `RSM` / `PCM`.
+#' 2. Run [diagnose_mfrm()] with `diagnostic_mode = "both"`.
+#' 3. Use `plot_marginal_fit()` to inspect the largest strict marginal cells.
+#' 4. Follow up with [rating_scale_table()] or substantive design review.
+#'
+#' @section Further guidance:
+#' For a plot-selection guide and a longer walkthrough, see
+#' [mfrmr_visual_diagnostics] and
+#' `vignette("mfrmr-visual-diagnostics", package = "mfrmr")`.
+#'
+#' @return A plotting-data object of class `mfrm_plot_data`.
+#' @seealso [diagnose_mfrm()], [rating_scale_table()], [plot_marginal_pairwise()],
+#'   [mfrmr_visual_diagnostics]
+#' @examples
+#' \donttest{
+#' toy <- load_mfrmr_data("example_core")
+#' fit <- fit_mfrm(
+#'   toy,
+#'   "Person",
+#'   c("Rater", "Criterion"),
+#'   "Score",
+#'   method = "MML",
+#'   maxit = 200
+#' )
+#' diag <- diagnose_mfrm(fit, residual_pca = "none", diagnostic_mode = "both")
+#' p <- plot_marginal_fit(diag, draw = FALSE, preset = "publication")
+#' p$data$preset
+#' if (interactive()) {
+#'   plot_marginal_fit(
+#'     diag,
+#'     plot_type = "prop_diff",
+#'     draw = TRUE,
+#'     preset = "publication"
+#'   )
+#' }
+#' }
+#' @export
+plot_marginal_fit <- function(x,
+                              diagnostics = NULL,
+                              plot_type = c("std_residual", "prop_diff"),
+                              top_n = 20,
+                              facet = NULL,
+                              main = NULL,
+                              palette = NULL,
+                              label_angle = 45,
+                              preset = c("standard", "publication", "compact"),
+                              draw = TRUE) {
+  plot_type <- match.arg(tolower(plot_type), c("std_residual", "prop_diff"))
+  top_n <- max(1L, as.integer(top_n))
+  style <- resolve_plot_preset(preset)
+  pal <- resolve_palette(
+    palette = palette,
+    defaults = c(
+      positive = style$accent_secondary,
+      negative = style$accent_tertiary,
+      flag = style$fail
+    )
+  )
+
+  bundle <- resolve_strict_marginal_plot_bundle(x, diagnostics = diagnostics, require_pairwise = FALSE)
+  tbl <- as.data.frame(bundle$marginal_fit$top_cells %||% data.frame(), stringsAsFactors = FALSE)
+  if (nrow(tbl) == 0) {
+    stop("No strict marginal cell rows are available for plotting.", call. = FALSE)
+  }
+  if (!is.null(facet)) {
+    facet <- as.character(facet[1])
+    tbl <- tbl[as.character(tbl$Facet %||% "") == facet, , drop = FALSE]
+  }
+  if (nrow(tbl) == 0) {
+    stop("No strict marginal cell rows matched the requested `facet` filter.", call. = FALSE)
+  }
+
+  metric_vals <- if (identical(plot_type, "std_residual")) {
+    abs(suppressWarnings(as.numeric(tbl$StdResidual)))
+  } else {
+    abs(suppressWarnings(as.numeric(tbl$PropDiff)))
+  }
+  ord <- order(metric_vals, decreasing = TRUE, na.last = NA)
+  use <- ord[seq_len(min(length(ord), top_n))]
+  sub <- tbl[use, , drop = FALSE]
+  sub$CellLabel <- mapply(
+    format_marginal_cell_label,
+    cell_type = sub$CellType,
+    step_facet = sub$StepFacet,
+    facet = sub$Facet,
+    level = sub$Level,
+    category = sub$Category,
+    USE.NAMES = FALSE
+  )
+
+  values <- if (identical(plot_type, "std_residual")) {
+    suppressWarnings(as.numeric(sub$StdResidual))
+  } else {
+    suppressWarnings(as.numeric(sub$PropDiff))
+  }
+  flagged <- as.logical(sub$FlaggedAbsZ %||% FALSE)
+  cols <- ifelse(
+    flagged,
+    pal["flag"],
+    ifelse(values >= 0, pal["positive"], pal["negative"])
+  )
+
+  abs_z_warn <- as.numeric(bundle$marginal_fit$thresholds$abs_z_warn %||% 2)
+  plot_title <- switch(
+    plot_type,
+    std_residual = "Strict marginal category screening scores",
+    prop_diff = "Strict marginal category gaps"
+  )
+  if (!is.null(main)) plot_title <- as.character(main[1])
+  plot_subtitle <- if (identical(plot_type, "std_residual")) {
+    sprintf(
+      "Latent-integrated first-order counts; exploratory screen; top %d cells by |StdResidual|.",
+      nrow(sub)
+    )
+  } else {
+    sprintf(
+      "Latent-integrated first-order counts; exploratory screen; top %d cells by |Observed - Expected| proportion gap.",
+      nrow(sub)
+    )
+  }
+  plot_legend <- if (identical(plot_type, "std_residual")) {
+    new_plot_legend(
+      label = c("Positive residual", "Negative residual", "Flagged cell"),
+      role = c("direction", "direction", "warning"),
+      aesthetic = c("bar", "bar", "bar"),
+      value = c(pal["positive"], pal["negative"], pal["flag"])
+    )
+  } else {
+    new_plot_legend(
+      label = c("Positive gap", "Negative gap", "Strict-warning cell"),
+      role = c("direction", "direction", "warning"),
+      aesthetic = c("bar", "bar", "bar"),
+      value = c(pal["positive"], pal["negative"], pal["flag"])
+    )
+  }
+  plot_reference <- if (identical(plot_type, "std_residual")) {
+    new_reference_lines(
+      axis = c("h", "h", "h"),
+      value = c(-abs_z_warn, 0, abs_z_warn),
+      label = c("Negative review threshold", "Centered reference", "Positive review threshold"),
+      linetype = c("dashed", "solid", "dashed"),
+      role = c("threshold", "reference", "threshold")
+    )
+  } else {
+    new_reference_lines(
+      axis = "h",
+      value = 0,
+      label = "Centered reference",
+      linetype = "solid",
+      role = "reference"
+    )
+  }
+
+  if (isTRUE(draw)) {
+    apply_plot_preset(style)
+    barplot_rot45(
+      height = values,
+      labels = sub$CellLabel,
+      col = cols,
+      main = plot_title,
+      ylab = if (identical(plot_type, "std_residual")) {
+        "Standardized residual"
+      } else {
+        "Observed - expected proportion"
+      },
+      label_angle = label_angle,
+      mar_bottom = 10.2,
+      label_width = 28L,
+      add_grid = TRUE
+    )
+    graphics::abline(h = 0, lty = 1, col = grDevices::adjustcolor(style$foreground, alpha.f = 0.75))
+    if (identical(plot_type, "std_residual")) {
+      graphics::abline(h = c(-abs_z_warn, abs_z_warn), lty = 2, col = grDevices::adjustcolor(style$neutral, alpha.f = 0.9))
+    }
+    graphics::legend(
+      "topleft",
+      legend = as.character(plot_legend$label),
+      fill = as.character(plot_legend$value),
+      bty = "n",
+      cex = 0.82
+    )
+  }
+
+  out <- new_mfrm_plot_data(
+    "marginal_fit",
+    list(
+      plot = plot_type,
+      table = sub,
+      full_table = tbl,
+      summary = bundle$marginal_fit$summary,
+      facet_summary = bundle$marginal_fit$facet_level$summary_stats,
+      step_summary = bundle$marginal_fit$step_or_scale$summary_stats,
+      guidance = bundle$marginal_fit$guidance,
+      thresholds = bundle$marginal_fit$thresholds,
+      notes = bundle$marginal_fit$notes,
+      title = plot_title,
+      subtitle = plot_subtitle,
+      legend = plot_legend,
+      reference_lines = plot_reference,
+      preset = style$name
+    )
+  )
+  invisible(out)
+}
+
+#' Plot strict pairwise local-dependence follow-up using base R
+#'
+#' @param x Output from [fit_mfrm()] or [diagnose_mfrm()].
+#' @param diagnostics Optional output from [diagnose_mfrm()] when `x` is `mfrm_fit`.
+#' @param metric `"exact"` or `"adjacent"`.
+#' @param top_n Maximum level pairs shown.
+#' @param facet Optional facet name used to keep only matching pairwise rows.
+#' @param main Optional custom plot title.
+#' @param palette Optional named color overrides. Recognized names: `ok`, `flag`.
+#' @param label_angle X-axis label angle.
+#' @param preset Visual preset (`"standard"`, `"publication"`, or `"compact"`).
+#' @param draw If `TRUE`, draw with base graphics.
+#'
+#' @details
+#' This helper visualizes the strict pairwise local-dependence follow-up derived
+#' from posterior-integrated expected exact and adjacent agreement.
+#'
+#' The `"exact"` view ranks level pairs by the absolute exact-agreement
+#' standardized residual. The `"adjacent"` view uses the adjacent-agreement
+#' standardized residual instead. Both are exploratory corroboration screens for
+#' strict marginal-fit flags.
+#'
+#' @section Interpreting output:
+#' - Positive bars mean the observed agreement exceeded the posterior-expected
+#'   agreement for that level pair.
+#' - Negative bars mean the observed agreement fell below the posterior-expected
+#'   agreement.
+#' - Red bars indicate the pair exceeded the current strict-warning threshold.
+#'
+#' @section Typical workflow:
+#' 1. Fit with [fit_mfrm()] using `method = "MML"` for `RSM` / `PCM`.
+#' 2. Run [diagnose_mfrm()] with `diagnostic_mode = "both"`.
+#' 3. Use `plot_marginal_pairwise()` to inspect level pairs behind pairwise
+#'    local-dependence flags.
+#' 4. Corroborate with legacy diagnostics, design review, and substantive
+#'    interpretation before making claims.
+#'
+#' @section Further guidance:
+#' For a plot-selection guide and a longer walkthrough, see
+#' [mfrmr_visual_diagnostics] and
+#' `vignette("mfrmr-visual-diagnostics", package = "mfrmr")`.
+#'
+#' @return A plotting-data object of class `mfrm_plot_data`.
+#' @seealso [diagnose_mfrm()], [plot_marginal_fit()], [mfrmr_visual_diagnostics]
+#' @examples
+#' \donttest{
+#' toy <- load_mfrmr_data("example_core")
+#' fit <- fit_mfrm(
+#'   toy,
+#'   "Person",
+#'   c("Rater", "Criterion"),
+#'   "Score",
+#'   method = "MML",
+#'   maxit = 200
+#' )
+#' diag <- diagnose_mfrm(fit, residual_pca = "none", diagnostic_mode = "both")
+#' p <- plot_marginal_pairwise(diag, draw = FALSE, preset = "publication")
+#' p$data$preset
+#' if (interactive()) {
+#'   plot_marginal_pairwise(
+#'     diag,
+#'     metric = "adjacent",
+#'     draw = TRUE,
+#'     preset = "publication"
+#'   )
+#' }
+#' }
+#' @export
+plot_marginal_pairwise <- function(x,
+                                   diagnostics = NULL,
+                                   metric = c("exact", "adjacent"),
+                                   top_n = 20,
+                                   facet = NULL,
+                                   main = NULL,
+                                   palette = NULL,
+                                   label_angle = 45,
+                                   preset = c("standard", "publication", "compact"),
+                                   draw = TRUE) {
+  metric <- match.arg(tolower(metric), c("exact", "adjacent"))
+  top_n <- max(1L, as.integer(top_n))
+  style <- resolve_plot_preset(preset)
+  pal <- resolve_palette(
+    palette = palette,
+    defaults = c(
+      ok = style$accent_primary,
+      flag = style$fail
+    )
+  )
+
+  bundle <- resolve_strict_marginal_plot_bundle(x, diagnostics = diagnostics, require_pairwise = TRUE)
+  tbl <- as.data.frame(bundle$marginal_fit$pairwise$top_pairs %||% data.frame(), stringsAsFactors = FALSE)
+  if (nrow(tbl) == 0) {
+    stop("No strict pairwise local-dependence rows are available for plotting.", call. = FALSE)
+  }
+  if (!is.null(facet)) {
+    facet <- as.character(facet[1])
+    tbl <- tbl[as.character(tbl$Facet %||% "") == facet, , drop = FALSE]
+  }
+  if (nrow(tbl) == 0) {
+    stop("No strict pairwise rows matched the requested `facet` filter.", call. = FALSE)
+  }
+
+  metric_vals <- if (identical(metric, "exact")) {
+    abs(suppressWarnings(as.numeric(tbl$ExactStdResidual)))
+  } else {
+    abs(suppressWarnings(as.numeric(tbl$AdjacentStdResidual)))
+  }
+  ord <- order(metric_vals, decreasing = TRUE, na.last = NA)
+  use <- ord[seq_len(min(length(ord), top_n))]
+  sub <- tbl[use, , drop = FALSE]
+  sub$PairLabel <- mapply(
+    format_marginal_pair_label,
+    facet = sub$Facet,
+    level1 = sub$Level1,
+    level2 = sub$Level2,
+    USE.NAMES = FALSE
+  )
+
+  values <- if (identical(metric, "exact")) {
+    suppressWarnings(as.numeric(sub$ExactStdResidual))
+  } else {
+    suppressWarnings(as.numeric(sub$AdjacentStdResidual))
+  }
+  flagged <- if (identical(metric, "exact")) {
+    as.logical(sub$FlaggedExact %||% FALSE)
+  } else {
+    as.logical(sub$FlaggedAdjacent %||% FALSE)
+  }
+  cols <- ifelse(flagged, pal["flag"], pal["ok"])
+  abs_z_warn <- as.numeric(bundle$marginal_fit$thresholds$abs_z_warn %||% 2)
+
+  plot_title <- switch(
+    metric,
+    exact = "Strict pairwise exact-agreement screening scores",
+    adjacent = "Strict pairwise adjacent-agreement screening scores"
+  )
+  if (!is.null(main)) plot_title <- as.character(main[1])
+  plot_subtitle <- sprintf(
+    "Exploratory local-dependence follow-up; top %d level pairs by |%s StdResidual|.",
+    nrow(sub),
+    if (identical(metric, "exact")) "Exact" else "Adjacent"
+  )
+  plot_legend <- new_plot_legend(
+    label = c("Within current warning band", "Flagged level pair"),
+    role = c("status", "status"),
+    aesthetic = c("bar", "bar"),
+    value = c(pal["ok"], pal["flag"])
+  )
+  plot_reference <- new_reference_lines(
+    axis = c("h", "h", "h"),
+    value = c(-abs_z_warn, 0, abs_z_warn),
+    label = c("Negative review threshold", "Centered reference", "Positive review threshold"),
+    linetype = c("dashed", "solid", "dashed"),
+    role = c("threshold", "reference", "threshold")
+  )
+
+  if (isTRUE(draw)) {
+    apply_plot_preset(style)
+    barplot_rot45(
+      height = values,
+      labels = sub$PairLabel,
+      col = cols,
+      main = plot_title,
+      ylab = if (identical(metric, "exact")) {
+        "Exact-agreement standardized residual"
+      } else {
+        "Adjacent-agreement standardized residual"
+      },
+      label_angle = label_angle,
+      mar_bottom = 10.2,
+      label_width = 30L,
+      add_grid = TRUE
+    )
+    graphics::abline(h = 0, lty = 1, col = grDevices::adjustcolor(style$foreground, alpha.f = 0.75))
+    graphics::abline(h = c(-abs_z_warn, abs_z_warn), lty = 2, col = grDevices::adjustcolor(style$neutral, alpha.f = 0.9))
+    graphics::legend(
+      "topleft",
+      legend = as.character(plot_legend$label),
+      fill = as.character(plot_legend$value),
+      bty = "n",
+      cex = 0.82
+    )
+  }
+
+  out <- new_mfrm_plot_data(
+    "marginal_pairwise",
+    list(
+      plot = metric,
+      table = sub,
+      full_table = tbl,
+      summary = bundle$marginal_fit$pairwise$facet_summary,
+      pair_stats = bundle$marginal_fit$pairwise$pair_stats,
+      guidance = bundle$marginal_fit$guidance,
+      thresholds = bundle$marginal_fit$thresholds,
+      notes = bundle$marginal_fit$notes,
+      title = plot_title,
+      subtitle = plot_subtitle,
+      legend = plot_legend,
+      reference_lines = plot_reference,
+      preset = style$name
+    )
+  )
+  invisible(out)
+}
+
 #' Plot unexpected responses using base R
 #'
 #' @param x Output from [fit_mfrm()] or [unexpected_response_table()].
@@ -703,8 +1229,12 @@ plot_unexpected <- function(x,
 #' @seealso [fair_average_table()], [plot_unexpected()], [plot_displacement()],
 #'   [plot_qc_dashboard()], [mfrmr_visual_diagnostics]
 #' @examples
-#' toy <- load_mfrmr_data("example_core")
-#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+#' toy_full <- load_mfrmr_data("example_core")
+#' toy_people <- unique(toy_full$Person)[1:12]
+#' toy <- toy_full[toy_full$Person %in% toy_people, , drop = FALSE]
+#' fit <- suppressWarnings(
+#'   fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 10)
+#' )
 #' p <- plot_fair_average(fit, metric = "AdjustedAverage", draw = FALSE)
 #' if (interactive()) {
 #'   plot_fair_average(fit, metric = "AdjustedAverage", plot_type = "difference")
@@ -1535,6 +2065,11 @@ plot_facets_chisq <- function(x,
 #' are available: `"strict"`, `"standard"` (default), and `"lenient"`.
 #' Use `thresholds` to override any profile value with named entries.
 #'
+#' For bounded `GPCM`, the dashboard now reuses the residual-based
+#' diagnostics stack and leaves the fair-average panel as an explicit
+#' unavailable placeholder rather than silently reusing the Rasch-only
+#' compatibility calculation.
+#'
 #' @section Plot types:
 #' This function draws a fixed 3\eqn{\times}3 panel grid (no `plot_type`
 #' argument).  For individual panel control, use the dedicated helpers:
@@ -1621,7 +2156,18 @@ plot_qc_dashboard <- function(fit,
     top_n = max(top_n, 20),
     rule = "either"
   )
-  fair <- fair_average_table(fit = fit, diagnostics = diagnostics)
+  fit_model <- as.character(fit$summary$Model[1] %||% fit$config$model %||% "RSM")
+  fair <- if (identical(fit_model, "GPCM")) {
+    diagnostics$fair_average %||% list(
+      raw_by_facet = list(),
+      by_facet = list(),
+      stacked = tibble::tibble(),
+      available = FALSE,
+      reason = gpcm_fair_average_rationale()
+    )
+  } else {
+    fair_average_table(fit = fit, diagnostics = diagnostics)
+  }
   fair_df <- stack_fair_raw_tables(fair$raw_by_facet)
   fair_gap <- if (nrow(fair_df) > 0 && all(c("ObservedAverage", "FairM") %in% names(fair_df))) {
     fair_df$ObservedAverage - fair_df$FairM
@@ -1771,7 +2317,8 @@ plot_qc_dashboard <- function(fit,
     } else {
       graphics::plot.new()
       graphics::title(main = "QC: Observed - Fair(M)")
-      graphics::text(0.5, 0.5, "No data")
+      fair_msg <- as.character(fair$reason %||% "No data")
+      graphics::text(0.5, 0.5, fair_msg)
     }
 
     # 6) Displacement lollipop
@@ -2332,8 +2879,37 @@ print.mfrm_plot_bundle <- function(x, ...) {
 #' @export
 print.mfrm_fit <- function(x, ...) {
   if (is.list(x) && !is.null(x$summary) && nrow(x$summary) > 0) {
+    ov <- round_numeric_df(as.data.frame(x$summary), digits = 3L)[1, , drop = FALSE]
+    fit_summary <- tryCatch(summary(x), error = function(e) NULL)
     cat("mfrm_fit object\n")
-    print(x$summary)
+    cat(sprintf("  Model: %s | Method: %s\n", ov$Model %||% NA_character_, ov$Method %||% NA_character_))
+    cat(sprintf("  N: %s | Persons: %s | Facets: %s | Categories: %s\n",
+                ov$N %||% NA, ov$Persons %||% NA, ov$Facets %||% NA, ov$Categories %||% NA))
+    cat(sprintf("  LogLik: %s | AIC: %s | BIC: %s\n",
+                ov$LogLik %||% NA, ov$AIC %||% NA, ov$BIC %||% NA))
+    if ("Converged" %in% names(ov) && "ConvergenceStatus" %in% names(ov)) {
+      cat(sprintf("  Converged: %s | Status: %s\n",
+                  ifelse(isTRUE(ov$Converged), "Yes", "No"),
+                  ov$ConvergenceStatus %||% NA_character_))
+    }
+    if (!is.null(fit_summary) && nrow(fit_summary$status %||% data.frame()) > 0) {
+      first_status <- fit_summary$status[1, , drop = FALSE]
+      cat(sprintf("  Summary status: %s\n", first_status$Value[1] %||% NA_character_))
+    }
+    if (!is.null(fit_summary) &&
+        length(fit_summary$key_warnings) > 0 &&
+        !summary_lines_are_default(
+          fit_summary$key_warnings,
+          "No immediate warnings from fit-level summary checks."
+        )) {
+      cat(sprintf("  Key warning: %s\n", fit_summary$key_warnings[1]))
+    }
+    if (!is.null(fit_summary) && length(fit_summary$next_actions) > 0) {
+      cat(sprintf("  Next: %s\n", fit_summary$next_actions[1]))
+    } else {
+      cat("  Next: use `summary(x)` for details.\n")
+    }
+    cat("  Use `summary(x)` for the full fit summary.\n")
   } else {
     cat("mfrm_fit object (empty summary)\n")
   }

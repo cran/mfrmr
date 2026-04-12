@@ -55,7 +55,8 @@ Practical read order:
 \enumerate{
 \item \code{summary(out)} for compact warnings and threshold ordering.
 \item \code{out$category_table} for sparse/misfitting categories.
-\item \code{out$transition_points} to inspect crossing structure.
+\item \code{out$median_thresholds} for adjacent-threshold caveats when zero-count
+categories are retained.
 \item \code{plot(out)} for quick visual check.
 }
 }
@@ -75,9 +76,9 @@ toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
 out <- category_structure_report(fit)
 summary(out)
-names(out)
+head(out$category_table[, c("Category", "Count", "Infit", "Outfit")])
 p_cs <- plot(out, draw = FALSE)
-class(p_cs)
+p_cs$data$plot
 }
 \seealso{
 \code{\link[=rating_scale_table]{rating_scale_table()}}, \code{\link[=category_curves_report]{category_curves_report()}}, \code{\link[=plot.mfrm_fit]{plot.mfrm_fit()}},

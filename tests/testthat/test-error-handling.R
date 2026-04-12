@@ -81,7 +81,22 @@ test_that("fit_mfrm rejects missing columns in data", {
   toy <- data.frame(A = 1:5, B = 1:5, C = 1:5)
   expect_error(
     fit_mfrm(toy, "Person", "Rater", "Score"),
-    "not found in data.*Person"
+    "expects long-format data"
+  )
+})
+
+test_that("fit_mfrm surfaces long-format guidance for wide-like inputs", {
+  toy_wide <- data.frame(
+    Person = paste0("P", 1:3),
+    Item1 = c(1, 0, 1),
+    Item2 = c(0, 1, 1),
+    stringsAsFactors = FALSE
+  )
+
+  expect_error(
+    fit_mfrm(toy_wide, "Person", "Rater", "Score"),
+    "expects long-format data",
+    fixed = TRUE
   )
 })
 

@@ -19,11 +19,25 @@
 An object of class \code{summary.mfrm_fit} with:
 \itemize{
 \item \code{overview}: global model/fit indicators
+\item \code{status}: concise front-door status block for quick review
+\item \code{key_warnings}: highest-priority warnings to review first
+\item \code{next_actions}: recommended follow-up helpers
+\item \code{population_overview}: current population-model basis, residual variance,
+and omission audit
+\item \code{population_coefficients}: fitted latent-regression coefficients when a
+population model is active
+\item \code{population_design}: latent-regression design-matrix column audit when a
+population model is active
+\item \code{population_coding}: categorical covariate levels and contrast provenance
+when a population model uses model-matrix coding
 \item \code{facet_overview}: per-facet estimate distribution summary
 \item \code{person_overview}: person-measure distribution summary
 \item \code{step_overview}: threshold/step diagnostics
-\item \code{top_person}: highest/lowest person measures
-\item \code{top_facet}: extreme facet-level estimates
+\item \code{slope_overview}: discrimination summary for \code{GPCM} fits
+\item \code{person_high} / \code{person_low}: highest and lowest person measures
+\item \code{facet_extremes}: extreme facet-level estimates
+\item \code{caveats}: structured warning/review rows for score-support and
+latent-regression population-model issues
 \item \code{notes}: short interpretation notes
 }
 }
@@ -35,9 +49,13 @@ This method provides a compact, human-readable summary oriented to reporting.
 It returns a structured object and prints:
 \itemize{
 \item model fit overview (N, LogLik, AIC/BIC, convergence)
+\item estimation settings that affect identification/scoring interpretation
 \item facet-level estimate distribution (mean/SD/range)
 \item person measure distribution
 \item step/threshold checks
+\item a reporting map showing which companion summaries/tables should be used for
+manuscript-oriented data description, diagnostics, category checks, and draft
+reporting
 \item high/low person measures and extreme facet levels
 }
 }
@@ -48,6 +66,19 @@ It returns a structured object and prints:
 \item \code{facet_overview}: per-facet spread and range of estimates.
 \item \code{person_overview}: distribution of person measures.
 \item \code{step_overview}: threshold spread and monotonicity checks.
+\item \code{settings_overview}: estimation settings that affect interpretation.
+\item \code{population_coding}: fitted categorical levels and contrasts that must be
+reused when scoring new persons under the population-model posterior.
+\item \code{key_warnings} / \code{notes}: short triage subset of retained zero-count score
+categories and latent-regression population-model caveats such as
+complete-case omissions, zero-variance design columns, missing
+coefficients, or unstable residual variance when present. Incomplete or
+non-finite covariates are normally handled before fitting as input errors
+or complete-case omissions; they appear here only if retained in a
+population-design audit row.
+\item \code{caveats}: structured rows behind those warnings for appendix/export use;
+\code{print(summary(fit))} shows a compact \code{Caveats} block when rows are present.
+\item \code{reporting_map}: where to get companion outputs for manuscript reporting.
 \item \code{top_person} / \code{top_facet}: extreme estimates for quick triage.
 }
 }
@@ -57,13 +88,18 @@ It returns a structured object and prints:
 \enumerate{
 \item Fit model with \code{\link[=fit_mfrm]{fit_mfrm()}}.
 \item Run \code{summary(fit)} for first-pass diagnostics.
-\item Continue with \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} for element-level fit checks.
+\item For \code{RSM} / \code{PCM}, continue with \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} for element-level fit
+checks. For bounded \code{GPCM}, continue with \code{\link[=compute_information]{compute_information()}} /
+\code{\link[=plot_information]{plot_information()}} or the fixed-calibration posterior scoring helpers.
 }
 }
 
 \examples{
 toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+fit <- fit_mfrm(
+  toy, "Person", c("Rater", "Criterion"), "Score",
+  method = "MML", quad_points = 15
+)
 summary(fit)
 }
 \seealso{

@@ -19,6 +19,8 @@ Use \code{\link[=make_anchor_table]{make_anchor_table()}} and \code{\link[=audit
 Use \code{\link[=anchor_to_baseline]{anchor_to_baseline()}}.
 \item "Have common elements drifted across separately fitted waves?"
 Use \code{\link[=detect_anchor_drift]{detect_anchor_drift()}} and \code{\link[=plot_anchor_drift]{plot_anchor_drift()}}.
+\item "Can I synthesize anchor audit, drift, and chain evidence into one review?"
+Use \code{\link[=build_linking_review]{build_linking_review()}}.
 \item "Do specific facet levels function differently across groups?"
 Use \code{\link[=analyze_dff]{analyze_dff()}} and \code{\link[=plot_dif_heatmap]{plot_dif_heatmap()}}.
 }
@@ -37,6 +39,8 @@ baseline scale.
 already fitted waves.
 \item Use \code{\link[=detect_anchor_drift]{detect_anchor_drift()}} for stability monitoring on separately fitted
 waves.
+\item Use \code{\link[=build_linking_review]{build_linking_review()}} when you need one operational synthesis
+object rather than separate anchor/drift/chain tables.
 \item Run \code{\link[=analyze_dff]{analyze_dff()}} only after checking connectivity and common-scale
 evidence.
 }
@@ -55,6 +59,8 @@ scale.}
 unstable anchor elements.}
 \item{\code{\link[=build_equating_chain]{build_equating_chain()}}}{Accumulates screened pairwise links across
 a series of administrations or forms.}
+\item{\code{\link[=build_linking_review]{build_linking_review()}}}{Synthesizes anchor-audit, drift, and
+screened-chain evidence into one operational review surface.}
 \item{\code{\link[=analyze_dff]{analyze_dff()}}}{Screens differential facet functioning with residual
 or refit methods, using screening-only language unless linking and
 precision support stronger interpretation.}
@@ -84,7 +90,8 @@ links by hand.
 \item Baseline placement review:
 \code{\link[=make_anchor_table]{make_anchor_table()}} -> \code{\link[=anchor_to_baseline]{anchor_to_baseline()}} -> \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.
 \item Multi-wave drift review:
-fit each wave separately -> \code{\link[=detect_anchor_drift]{detect_anchor_drift()}} -> \code{\link[=plot_anchor_drift]{plot_anchor_drift()}}.
+fit each wave separately -> \code{\link[=detect_anchor_drift]{detect_anchor_drift()}} ->
+\code{\link[=build_linking_review]{build_linking_review()}} -> \code{\link[=plot_anchor_drift]{plot_anchor_drift()}}.
 \item Group comparison route:
 \code{\link[=subset_connectivity_report]{subset_connectivity_report()}} -> \code{\link[=analyze_dff]{analyze_dff()}} ->
 \code{\link[=dif_report]{dif_report()}} -> \code{\link[=plot_dif_heatmap]{plot_dif_heatmap()}}.
@@ -103,21 +110,23 @@ fit each wave separately -> \code{\link[=detect_anchor_drift]{detect_anchor_drif
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_bias")
 fit <- fit_mfrm(
   toy,
   person = "Person",
   facets = c("Rater", "Criterion"),
   score = "Score",
-  method = "JML",
-  maxit = 10
+  method = "MML",
+  maxit = 200
 )
-diag <- diagnose_mfrm(fit, residual_pca = "none")
+diag <- diagnose_mfrm(fit, residual_pca = "none", diagnostic_mode = "both")
 
 subsets <- subset_connectivity_report(fit, diagnostics = diag)
 subsets$summary[, c("Subset", "Observations", "ObservationPercent")]
 
 dff <- analyze_dff(fit, diag, facet = "Rater", group = "Group", data = toy)
 head(dff$dif_table[, c("Level", "Group1", "Group2", "Classification")])
+}
 
 }

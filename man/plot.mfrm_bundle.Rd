@@ -45,6 +45,12 @@ Plot report/table bundles with base R defaults
 \item \code{mfrm_iteration_report} -> replayed-iteration trajectories
 \item \code{mfrm_subset_connectivity} -> subset-observation/connectivity plots
 \item \code{mfrm_facet_statistics} -> facet statistic profile plots
+\item \code{mfrm_export_bundle} / \code{mfrm_summary_appendix_export} -> export handoff
+plots (\code{formats}, \code{artifact_groups}, \code{selection_tables},
+\code{selection_handoff}, \code{selection_handoff_bundles},
+\code{selection_handoff_roles},
+\code{selection_handoff_role_sections}, \code{selection_bundles},
+\code{selection_roles}, \code{selection_sections})
 }
 
 If a class is outside these families, use dedicated plotting helpers

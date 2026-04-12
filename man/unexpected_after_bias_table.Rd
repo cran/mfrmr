@@ -102,7 +102,7 @@ bias <- estimate_bias(fit, diag, facet_a = "Rater", facet_b = "Criterion", max_i
 t10 <- unexpected_after_bias_table(fit, bias, diagnostics = diag, top_n = 20)
 summary(t10)
 p_t10 <- plot(t10, draw = FALSE)
-class(p_t10)
+p_t10$data$plot
 }
 \seealso{
 \code{\link[=estimate_bias]{estimate_bias()}}, \code{\link[=unexpected_response_table]{unexpected_response_table()}}, \code{\link[=bias_count_table]{bias_count_table()}},

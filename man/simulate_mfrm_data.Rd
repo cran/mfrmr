@@ -9,6 +9,7 @@ simulate_mfrm_data(
   n_rater = 4,
   n_criterion = 4,
   raters_per_person = n_rater,
+  design = NULL,
   score_levels = 4,
   theta_sd = 1,
   rater_sd = 0.35,
@@ -19,9 +20,11 @@ simulate_mfrm_data(
   dif_effects = NULL,
   interaction_effects = NULL,
   seed = NULL,
-  model = c("RSM", "PCM"),
+  model = c("RSM", "PCM", "GPCM"),
   step_facet = "Criterion",
+  slope_facet = NULL,
   thresholds = NULL,
+  slopes = NULL,
   assignment = NULL,
   sim_spec = NULL
 )
@@ -34,6 +37,14 @@ simulate_mfrm_data(
 \item{n_criterion}{Number of criterion/item facet levels.}
 
 \item{raters_per_person}{Number of raters assigned to each person.}
+
+\item{design}{Optional named design override supplied as a named list,
+named vector, or one-row data frame. When \code{sim_spec = NULL}, names may use
+canonical variables (\code{n_person}, \code{n_rater}, \code{n_criterion},
+\code{raters_per_person}) or role keywords (\code{person}, \code{rater}, \code{criterion},
+\code{assignment}). For the currently exposed facet keys, the schema-only
+future branch input \code{design$facets = c(person = ..., rater = ..., criterion = ...)} is also accepted. Do not specify the same variable
+through both \code{design} and the scalar count arguments.}
 
 \item{score_levels}{Number of ordered score categories.}
 
@@ -60,14 +71,24 @@ interaction effects. Must include at least one design column such as
 
 \item{seed}{Optional random seed.}
 
-\item{model}{Measurement model recorded in the simulation setup.}
+\item{model}{Measurement model recorded in the simulation setup. The current
+public generator supports \code{RSM}, \code{PCM}, and bounded \code{GPCM}.}
 
 \item{step_facet}{Step facet used when \code{model = "PCM"} and threshold values
 vary across levels. Currently \code{"Criterion"} and \code{"Rater"} are supported.}
 
+\item{slope_facet}{Slope facet used when \code{model = "GPCM"}. The current
+bounded \code{GPCM} branch requires \code{slope_facet == step_facet}.}
+
 \item{thresholds}{Optional threshold specification. Use either a numeric
 vector of common thresholds or a data frame with columns \code{StepFacet},
 \code{Step}/\code{StepIndex}, and \code{Estimate}.}
+
+\item{slopes}{Optional slope specification used when \code{model = "GPCM"}.
+Use either a numeric vector aligned to the generated slope-facet levels or
+a data frame with columns \code{SlopeFacet} and \code{Estimate}. When omitted,
+slopes default to 1 for every slope-facet level, giving an exact \code{PCM}
+reduction.}
 
 \item{assignment}{Assignment design. \code{"crossed"} means every person sees
 every rater; \code{"rotating"} uses a balanced rotating subset; \code{"resampled"}
@@ -80,14 +101,21 @@ the function chooses \code{"crossed"} if
 \item{sim_spec}{Optional output from \code{\link[=build_mfrm_sim_spec]{build_mfrm_sim_spec()}} or
 \code{\link[=extract_mfrm_sim_spec]{extract_mfrm_sim_spec()}}. When supplied, it defines the generator setup;
 direct scalar arguments are treated as legacy inputs and should generally
-be left at their defaults except for \code{seed}.}
+be left at their defaults except for \code{seed}. Any custom public two-facet
+names recorded in \code{sim_spec$facet_names} are also carried into the
+simulated output and downstream planning helpers. If \code{sim_spec} stores an
+active latent-regression population generator, the returned object also
+carries the generated one-row-per-person background-data table needed to
+refit that population model later.}
 }
 \value{
 A long-format \code{data.frame} with core columns \code{Study}, \code{Person},
-\code{Rater}, \code{Criterion}, and \code{Score}. If group labels are simulated or
-reused from an observed response skeleton, a \code{Group} column is included.
-If a weighted response skeleton is reused, a \code{Weight} column is also
-included.
+two simulated non-person facet columns, and \code{Score}. By default those
+facet columns are \code{Rater} and \code{Criterion}; when \code{sim_spec} records custom
+public names, those names are used instead. If group labels are simulated
+or reused from an observed response skeleton, a \code{Group} column is
+included. If a weighted response skeleton is reused, a \code{Weight} column is
+also included.
 }
 \description{
 Simulate long-format many-facet Rasch data for design studies
@@ -104,7 +132,7 @@ The data-generating process is:
 \eqn{\eta = \theta_n - \delta_j - \beta_i + \epsilon} where
 \eqn{\epsilon \sim N(0, \texttt{noise\_sd}^2)} (optional)
 \item Compute category probabilities under the recorded measurement model
-(\code{RSM} or \code{PCM}) and sample the response
+(\code{RSM}, \code{PCM}, or bounded \code{GPCM}) and sample the response
 }
 
 Latent-value generation is explicit:
@@ -113,6 +141,9 @@ Latent-value generation is explicit:
 criterion values using the supplied standard deviations
 \item \code{latent_distribution = "empirical"} resamples centered support values
 recorded in \code{sim_spec$empirical_support}
+\item if \code{sim_spec$population$active = TRUE}, person measures are generated from
+the stored latent-regression population model and template person
+covariates rather than from \code{theta_sd}
 }
 
 When \code{dif_effects} is supplied, the specified logit shift is added to
@@ -135,6 +166,13 @@ from \code{step_span}
 (currently \code{Criterion} or \code{Rater})
 }
 
+For bounded \code{GPCM}, the generator now requires an explicit slope
+contract in parallel with the threshold table. The current public branch
+keeps \code{slope_facet == step_facet} and uses the internal \code{category_prob_gpcm()}
+helper for
+response sampling. Broader design-planning helpers remain restricted until
+that slope-aware contract is generalized beyond direct data generation.
+
 Assignment handling is also explicit:
 \itemize{
 \item \code{"crossed"} uses the full person x rater x criterion design
@@ -155,6 +193,12 @@ Returned data include attributes:
 \itemize{
 \item \code{mfrm_truth}: simulated true parameters (for parameter-recovery checks)
 \item \code{mfrm_truth$signals}: injected DIF and interaction signal tables
+\item \code{mfrm_truth$slope_table}: simulated discrimination table for bounded
+\code{GPCM}
+\item \code{mfrm_population_data}: generated one-row-per-person background data when
+the simulation specification stores an active latent-regression generator,
+including model-matrix xlevel and contrast provenance for categorical
+covariates
 \item \code{mfrm_simulation_spec}: generation settings (for reproducibility)
 }
 }

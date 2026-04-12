@@ -9,6 +9,7 @@ build_mfrm_sim_spec(
   n_rater = 4,
   n_criterion = 4,
   raters_per_person = n_rater,
+  design = NULL,
   score_levels = 4,
   theta_sd = 1,
   rater_sd = 0.35,
@@ -16,8 +17,11 @@ build_mfrm_sim_spec(
   noise_sd = 0,
   step_span = 1.4,
   thresholds = NULL,
-  model = c("RSM", "PCM"),
-  step_facet = "Criterion",
+  model = c("RSM", "PCM", "GPCM"),
+  step_facet = NULL,
+  slope_facet = NULL,
+  slopes = NULL,
+  facet_names = NULL,
   assignment = c("crossed", "rotating", "resampled", "skeleton"),
   latent_distribution = c("normal", "empirical"),
   empirical_person = NULL,
@@ -27,7 +31,11 @@ build_mfrm_sim_spec(
   design_skeleton = NULL,
   group_levels = NULL,
   dif_effects = NULL,
-  interaction_effects = NULL
+  interaction_effects = NULL,
+  population_formula = NULL,
+  population_coefficients = NULL,
+  population_sigma2 = NULL,
+  population_covariates = NULL
 )
 }
 \arguments{
@@ -38,6 +46,16 @@ build_mfrm_sim_spec(
 \item{n_criterion}{Number of criterion/item facet levels to generate.}
 
 \item{raters_per_person}{Number of raters assigned to each person.}
+
+\item{design}{Optional named design override supplied as a named list,
+named vector, or one-row data frame. Names may use canonical variables
+(\code{n_person}, \code{n_rater}, \code{n_criterion}, \code{raters_per_person}), current
+public aliases implied by \code{facet_names} (for example \code{n_judge},
+\code{n_task}, \code{judge_per_person}), or role keywords (\code{person}, \code{rater},
+\code{criterion}, \code{assignment}). The schema-only future branch input
+\code{design$facets = c(person = ..., judge = ..., task = ...)} is also
+accepted for the currently exposed facet keys. Do not specify the same
+variable through both \code{design} and the scalar count arguments.}
 
 \item{score_levels}{Number of ordered score categories.}
 
@@ -61,6 +79,20 @@ vector of common thresholds or a data frame with columns \code{StepFacet},
 \item{step_facet}{Step facet used when \code{model = "PCM"} and threshold values
 vary across levels.}
 
+\item{slope_facet}{Slope facet used when \code{model = "GPCM"}. The current
+bounded \code{GPCM} branch requires \code{slope_facet == step_facet}.}
+
+\item{slopes}{Optional slope specification for \code{model = "GPCM"}. Use either
+a numeric vector aligned to the generated slope-facet levels or a data
+frame with columns \code{SlopeFacet} and \code{Estimate}. When omitted, slopes
+default to 1 for every slope-facet level, giving an exact \code{PCM}
+reduction.}
+
+\item{facet_names}{Optional public names for the two simulated non-person
+facet columns. Supply either an unnamed character vector of length 2
+in rater-like / criterion-like order, or a named vector with names
+\code{c("rater", "criterion")}.}
+
 \item{assignment}{Assignment design. \code{"crossed"} means every person sees
 every rater; \code{"rotating"} uses a balanced rotating subset; \code{"resampled"}
 reuses empirical person-level rater-assignment profiles; \code{"skeleton"}
@@ -81,18 +113,41 @@ centered normal distributions using the supplied standard deviations.
 \code{latent_distribution = "empirical"}.}
 
 \item{assignment_profiles}{Optional data frame with columns
-\code{TemplatePerson} and \code{Rater} (optionally \code{Group}) describing empirical
-person-level rater-assignment profiles used when \code{assignment = "resampled"}.}
+\code{TemplatePerson} and the public rater-like facet column (optionally
+\code{Group}) describing empirical person-level rater-assignment profiles used
+when \code{assignment = "resampled"}. The canonical name \code{Rater} is also
+accepted.}
 
 \item{design_skeleton}{Optional data frame with columns \code{TemplatePerson},
-\code{Rater}, and \code{Criterion} (optionally \code{Group} and \code{Weight}) describing an
-observed response skeleton used when \code{assignment = "skeleton"}.}
+the public rater-like facet column, and the public criterion-like facet
+column (optionally \code{Group} and \code{Weight}) describing an observed response
+skeleton used when \code{assignment = "skeleton"}. The canonical names
+\code{Rater} and \code{Criterion} are also accepted.}
 
 \item{group_levels}{Optional character vector of group labels.}
 
 \item{dif_effects}{Optional data frame of true group-linked DIF effects.}
 
 \item{interaction_effects}{Optional data frame of true interaction effects.}
+
+\item{population_formula}{Optional one-sided formula describing a
+person-level latent-regression population model used when generating
+person measures, for example \code{~ X + G}. When supplied, person measures are
+generated from \code{X \%*\% beta + e} rather than from \code{N(0, theta_sd^2)}.}
+
+\item{population_coefficients}{Optional numeric vector of latent-regression
+coefficients corresponding to the design matrix implied by
+\code{population_formula}.}
+
+\item{population_sigma2}{Optional residual variance for the latent-regression
+person distribution.}
+
+\item{population_covariates}{Optional template data frame containing one row
+per template person and the background variables referenced by
+\code{population_formula}. Numeric/logical and categorical factor/character
+variables are expanded through the same \code{stats::model.matrix()} contract
+used by latent-regression fitting. During simulation, template rows are
+resampled to the requested \code{n_person}.}
 }
 \value{
 An object of class \code{mfrm_sim_spec}.
@@ -112,18 +167,54 @@ The resulting object records:
 \item latent spread assumptions (\code{theta_sd}, \code{rater_sd}, \code{criterion_sd})
 \item optional empirical latent support values for semi-parametric simulation
 \item threshold structure (\code{threshold_table})
+\item optional discrimination structure for bounded \code{GPCM}
+(\code{slope_table})
 \item assignment design (\code{assignment})
 \item optional empirical assignment profiles (\code{assignment_profiles}) with
 optional person-level \code{Group} labels
 \item optional observed response skeleton (\code{design_skeleton})
 with optional person-level \code{Group} labels and observation-level \code{Weight}
 values
+\item optional person-level latent-regression population metadata including
+\code{population_formula}, \code{population_coefficients}, \code{population_sigma2}, and
+a reusable template of person-level covariates, including model-matrix
+xlevel/contrast provenance for categorical covariates
+\item \code{planning_scope}, an explicit record that the current planning/forecasting
+helpers still target the role-based person x rater-like x criterion-like
+design contract rather than a fully arbitrary-facet planner
+\item \code{planning_constraints}, an explicit record of which design variables can
+currently be changed from that specification without rebuilding it
+\item \code{planning_schema}, a combined schema contract bundling the role descriptor,
+scope boundary, current mutability map, a \code{facet_manifest}, a
+schema-only \code{future_facet_table}, and a matching
+\code{future_design_template}, plus a nested \code{future_branch_schema} scaffold
+for a future arbitrary-facet planning branch
+\item the current \code{design$facets(...)} parser now normalizes nested facet-count
+input through that bundled \code{future_branch_schema}, whose nested
+\code{design_schema} is now the authoritative schema-only branch object
 \item optional signal tables for DIF and interaction bias
 }
 
 The current generator still targets the package's standard person x rater x
-criterion workflow. When threshold values are provided by \code{StepFacet}, the
-supported step facets are the generated \code{Rater} or \code{Criterion} levels.
+criterion workflow, but the public output names for those two facet roles
+can now be customized with \code{facet_names}. This naming layer improves public
+ergonomics; it does not yet turn the generator into a fully arbitrary-facet
+simulator. Internally, helper objects still keep canonical role mappings so
+that planning functions can treat the first non-person facet as rater-like
+and the second as criterion-like. When threshold values are provided by
+\code{StepFacet}, the supported step facets are the generated levels of the
+chosen public rater-like or criterion-like column.
+When \code{model = "GPCM"}, the same public facet naming rules apply to the
+slope table; the current bounded branch keeps \code{slope_facet} equal to
+\code{step_facet}.
+
+If \code{population_formula} is supplied, the simulation specification carries a
+first-version person-level latent-regression generator. This affects only the
+person distribution. The current implementation keeps the non-person facets
+in the existing many-facet Rasch generator and resamples rows from
+\code{population_covariates} to the requested design size before computing
+\eqn{\theta_n = x_n^\top \beta + \varepsilon_n} with
+\eqn{\varepsilon_n \sim N(0, \sigma^2)}.
 }
 \section{Interpreting output}{
 
@@ -132,16 +223,15 @@ specification that tells \code{\link[=simulate_mfrm_data]{simulate_mfrm_data()}}
 }
 
 \examples{
+\donttest{
 spec <- build_mfrm_sim_spec(
-  n_person = 30,
-  n_rater = 4,
-  n_criterion = 3,
-  raters_per_person = 2,
+  design = list(person = 8, rater = 2, criterion = 2, assignment = 1),
   assignment = "rotating"
 )
 spec$model
 spec$assignment
-spec$threshold_table
+nrow(spec$threshold_table)
+}
 }
 \seealso{
 \code{\link[=extract_mfrm_sim_spec]{extract_mfrm_sim_spec()}}, \code{\link[=simulate_mfrm_data]{simulate_mfrm_data()}}

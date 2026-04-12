@@ -96,7 +96,7 @@ bias <- estimate_bias(fit, diag, facet_a = "Rater", facet_b = "Criterion", max_i
 out <- bias_interaction_report(bias, top_n = 10)
 summary(out)
 p_bi <- plot(out, draw = FALSE)
-class(p_bi)
+p_bi$data$plot
 }
 \seealso{
 \code{\link[=estimate_bias]{estimate_bias()}}, \code{\link[=build_fixed_reports]{build_fixed_reports()}}, \code{\link[=plot_bias_interaction]{plot_bias_interaction()}}

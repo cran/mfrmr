@@ -69,7 +69,7 @@ test_that("facets_parity_report integrates with summary() and plot()", {
   expect_identical(s$summary_kind, "mfrm_parity_report")
 
   printed <- paste(capture.output(print(s)), collapse = "\n")
-  expect_match(printed, "mfrmr Compatibility Contract Audit Summary", fixed = TRUE)
+  expect_match(printed, "mfrmr Compatibility Output Check Summary", fixed = TRUE)
 
   p1 <- plot(parity, draw = FALSE)
   p2 <- plot(parity, type = "table_coverage", draw = FALSE)
@@ -146,5 +146,5 @@ test_that("reference_case_audit exposes package-native audit wording", {
   expect_identical(as.character(s$overview$Class[1]), "mfrm_reference_audit")
 
   printed <- paste(capture.output(print(s)), collapse = "\n")
-  expect_match(printed, "mfrmr Internal Reference Audit Summary", fixed = TRUE)
+  expect_match(printed, "mfrmr Reference Audit Summary", fixed = TRUE)
 })

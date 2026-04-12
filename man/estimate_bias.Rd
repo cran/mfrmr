@@ -160,7 +160,7 @@ diag <- diagnose_mfrm(fit, residual_pca = "none")
 bias <- estimate_bias(fit, diag, facet_a = "Rater", facet_b = "Criterion", max_iter = 2)
 summary(bias)
 p_bias <- plot_bias_interaction(bias, draw = FALSE)
-class(p_bias)
+p_bias$data$plot
 }
 \seealso{
 \code{\link[=build_fixed_reports]{build_fixed_reports()}}, \code{\link[=build_apa_outputs]{build_apa_outputs()}}

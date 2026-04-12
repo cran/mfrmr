@@ -31,15 +31,24 @@ recommend_mfrm_design(
 \item{min_convergence_rate}{Minimum acceptable convergence rate.}
 
 \item{prefer}{Ranking priority among design variables. Earlier entries are
-optimized first when multiple designs pass.}
+optimized first when multiple designs pass. Custom public aliases from
+\code{sim_spec} are also accepted, as are the role keywords \code{person}, \code{rater},
+\code{criterion}, and \code{assignment}.}
 }
 \value{
 A list of class \code{mfrm_design_recommendation} with:
 \itemize{
-\item \code{facet_table}: facet-level threshold checks
-\item \code{design_table}: design-level aggregated checks
+\item \code{facet_table}: facet-level threshold checks, including design-variable
+alias columns when applicable
+\item \code{design_table}: design-level aggregated checks, including design-variable
+alias columns when applicable
 \item \code{recommended}: the first passing design after ranking
 \item \code{thresholds}: thresholds used in the recommendation
+\item \code{design_variable_aliases}: accepted public aliases for design variables
+\item \code{design_descriptor}: role-based design-variable metadata
+\item \code{planning_scope}: explicit record of the current planning contract
+\item \code{planning_constraints}: explicit record of mutable/locked design variables
+\item \code{planning_schema}: combined planner-schema contract
 }
 }
 \description{
@@ -65,15 +74,15 @@ then fewer raters, then fewer criteria).
 
 \examples{
 \donttest{
-sim_eval <- evaluate_mfrm_design(
-  n_person = c(30, 50),
-  n_rater = 4,
-  n_criterion = 4,
-  raters_per_person = 2,
+sim_eval <- suppressWarnings(evaluate_mfrm_design(
+  n_person = c(8, 12),
+  n_rater = 2,
+  n_criterion = 2,
+  raters_per_person = 1,
   reps = 1,
-  maxit = 15,
+  maxit = 8,
   seed = 123
-)
+))
 rec <- recommend_mfrm_design(sim_eval)
 rec$recommended
 }

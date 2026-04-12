@@ -49,11 +49,18 @@ Frequently used fields include:
 Output text includes residual-PCA screening commentary if PCA diagnostics are
 available in \code{diagnostics}.
 
+For bounded \code{GPCM}, this helper is intentionally unavailable. Use
+\code{\link[=reporting_checklist]{reporting_checklist()}}, \code{\link[=precision_audit_report]{precision_audit_report()}}, and the direct
+table/plot helpers instead, and treat \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}} as the
+formal boundary statement for that branch.
+
 By default, \code{report_text} includes:
 \itemize{
 \item model/data design summary (N, facet counts, scale range)
 \item optimization/convergence metrics (\code{Converged}, \code{Iterations}, \code{LogLik}, \code{AIC}, \code{BIC})
 \item anchor/constraint summary (\code{noncenter_facet}, anchored levels, group anchors, dummy facets)
+\item latent-regression population-model wording when \code{fit} has an active
+\code{population_formula}
 \item category/threshold diagnostics (including disordered-step details when present)
 \item overall fit, misfit count, and top misfit levels
 \item facet reliability/separation, residual PCA summary, and bias-screen counts
@@ -69,6 +76,9 @@ residual-PCA screening, bias screening).  Written in third-person past tense
 following APA 7th edition conventions, but still intended for human review.
 \item \code{table_figure_notes}: reusable draft note blocks for table/figure appendices.
 \item \code{table_figure_captions}: draft caption candidates aligned to generated outputs.
+\item active latent-regression fits add a population-model section and Table 5
+notes/captions that distinguish conditional-normal coefficient reporting
+from post hoc regression on EAP/MLE scores.
 }
 
 When bias results or PCA diagnostics are not supplied, those sections
@@ -78,7 +88,9 @@ are omitted from the narrative rather than producing placeholder text.
 \section{Typical workflow}{
 
 \enumerate{
-\item Build diagnostics (and optional bias results).
+\item Build diagnostics (and optional bias results). For \code{RSM} / \code{PCM}
+reporting runs, prefer an \code{MML} fit and
+\code{diagnose_mfrm(..., diagnostic_mode = "both")}.
 \item Run \code{build_apa_outputs(...)}.
 \item Check \code{summary(apa)} for completeness.
 \item Insert \code{apa$report_text} and note/caption fields into manuscript drafts
@@ -97,10 +109,21 @@ A minimal \code{context} list can include fields such as:
 }
 }
 
+\section{Input validation}{
+
+\code{fit} must be an \code{mfrm_fit} object from \code{\link[=fit_mfrm]{fit_mfrm()}}.
+\code{diagnostics} must be an \code{mfrm_diagnostics} object from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.
+\code{context} must be a list (use \code{NULL} or \code{list()} for no extra context).
+If supplied, \code{bias_results} must come from \code{\link[=estimate_bias]{estimate_bias()}} or another
+package-native bias helper that provides a table component.
+}
+
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
-diag <- diagnose_mfrm(fit, residual_pca = "both")
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
+                method = "MML", maxit = 200)
+diag <- diagnose_mfrm(fit, residual_pca = "both", diagnostic_mode = "both")
 apa <- build_apa_outputs(
   fit,
   diag,
@@ -111,14 +134,14 @@ apa <- build_apa_outputs(
     rater_facet = "Rater"
   )
 )
-names(apa)
-class(apa)
 s_apa <- summary(apa)
 s_apa$overview
 chk <- reporting_checklist(fit, diagnostics = diag)
 head(chk$checklist[, c("Section", "Item", "DraftReady", "NextAction")])
 cat(apa$report_text)
 apa$section_map[, c("SectionId", "Available")]
+}
+
 }
 \seealso{
 \code{\link[=build_visual_summaries]{build_visual_summaries()}}, \code{\link[=estimate_bias]{estimate_bias()}},

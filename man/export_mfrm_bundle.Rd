@@ -11,10 +11,11 @@ export_mfrm_bundle(
   population_prediction = NULL,
   unit_prediction = NULL,
   plausible_values = NULL,
+  summary_tables = NULL,
   output_dir = ".",
   prefix = "mfrmr_bundle",
   include = c("core_tables", "checklist", "dashboard", "apa", "anchors", "manifest",
-    "visual_summaries", "predictions", "script", "html"),
+    "visual_summaries", "predictions", "summary_tables", "script", "html"),
   facet = NULL,
   include_person_anchors = FALSE,
   overwrite = FALSE,
@@ -40,14 +41,21 @@ bias bundles.}
 
 \item{plausible_values}{Optional output from \code{\link[=sample_mfrm_plausible_values]{sample_mfrm_plausible_values()}}.}
 
+\item{summary_tables}{Optional manuscript-summary bundle input. Can be
+\code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}} output, any object supported by
+\code{build_summary_table_bundle()}, or a named list of such objects. When
+\code{NULL} and \code{"summary_tables"} is requested in \code{include}, a default set is
+built from \code{fit}, \code{diagnostics}, \code{\link[=reporting_checklist]{reporting_checklist()}}, and
+\code{\link[=build_apa_outputs]{build_apa_outputs()}}.}
+
 \item{output_dir}{Directory where files will be written.}
 
 \item{prefix}{File-name prefix.}
 
 \item{include}{Components to export. Supported values are
 \code{"core_tables"}, \code{"checklist"}, \code{"dashboard"}, \code{"apa"}, \code{"anchors"},
-\code{"manifest"}, \code{"visual_summaries"}, \code{"predictions"}, \code{"script"}, and
-\code{"html"}.}
+\code{"manifest"}, \code{"visual_summaries"}, \code{"predictions"}, \code{"summary_tables"},
+\code{"script"}, and \code{"html"}.}
 
 \item{facet}{Optional facet for \code{\link[=facet_quality_dashboard]{facet_quality_dashboard()}}.}
 
@@ -79,8 +87,13 @@ The \code{include} argument lets you assemble a bundle for different audiences:
 \itemize{
 \item \code{"core_tables"} for analysts who mainly want CSV output.
 \item \code{"manifest"} for a compact analysis record.
-\item \code{"script"} for reproducibility and reruns.
-\item \code{"html"} for a light, shareable summary page.
+\item \code{"script"} for reproducibility and reruns. For latent-regression fits,
+this also writes the fit-level replay person-data sidecar when available.
+\item \code{"html"} for a light, shareable summary page. When replay sidecars are
+present, the HTML shows an artifact index for them rather than embedding
+the raw person-level replay table.
+\item \code{"summary_tables"} for manuscript-facing CSV exports of validated
+\code{summary()} surfaces and their compact indexes.
 \item \code{"visual_summaries"} when you want warning maps or residual PCA summaries
 to travel with the bundle.
 }
@@ -91,7 +104,7 @@ to travel with the bundle.
 Common starting points are:
 \itemize{
 \item minimal tables: \code{include = c("core_tables", "manifest")}
-\item reporting bundle: \code{include = c("core_tables", "checklist", "dashboard", "html")}
+\item reporting bundle: \code{include = c("core_tables", "checklist", "dashboard", "summary_tables", "html")}
 \item archival bundle: \code{include = c("core_tables", "manifest", "script", "visual_summaries", "html")}
 }
 }
@@ -104,14 +117,32 @@ Depending on \code{include}, the exporter can write:
 \item checklist CSVs via \code{\link[=reporting_checklist]{reporting_checklist()}}
 \item facet-dashboard CSVs via \code{\link[=facet_quality_dashboard]{facet_quality_dashboard()}}
 \item APA text files via \code{\link[=build_apa_outputs]{build_apa_outputs()}}
+\item manuscript-summary CSVs via \code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}}
 \item anchor CSV via \code{\link[=make_anchor_table]{make_anchor_table()}}
 \item manifest CSV/TXT via \code{\link[=build_mfrm_manifest]{build_mfrm_manifest()}}
 \item visual warning/summary artifacts via \code{\link[=build_visual_summaries]{build_visual_summaries()}}
 \item prediction/forecast CSVs via \code{\link[=predict_mfrm_population]{predict_mfrm_population()}},
 \code{\link[=predict_mfrm_units]{predict_mfrm_units()}}, and \code{\link[=sample_mfrm_plausible_values]{sample_mfrm_plausible_values()}}
 \item a package-native replay script via \code{\link[=build_mfrm_replay_script]{build_mfrm_replay_script()}}
-\item a lightweight HTML report that bundles the exported tables/text
+\item for latent-regression fits, a replay-side person-data CSV paired with the
+replay script
+\item a lightweight HTML report that bundles the exported tables/text and, for
+replay sidecars, an artifact summary instead of raw person-level rows
 }
+
+For latent-regression fits, prediction-side artifacts can carry the fitted
+population-model scoring basis when you explicitly supply the corresponding
+prediction objects. \code{\link[=predict_mfrm_population]{predict_mfrm_population()}} remains the scenario-level
+forecast helper, whereas \code{\link[=predict_mfrm_units]{predict_mfrm_units()}} and
+\code{\link[=sample_mfrm_plausible_values]{sample_mfrm_plausible_values()}} are the scoring layer.
+To keep exports and replay scripts practical, large future-planning schemas
+from scenario-level population predictions are not flattened into
+\verb{*_population_prediction_settings.csv} or ADeMP CSVs; the compact simulation
+specification files carry the replay-relevant settings instead.
+
+This exporter is intentionally unavailable for bounded \code{GPCM}, because the
+current bundle surface would otherwise depend on blocked narrative/QC/export
+semantics from the free-discrimination branch.
 }
 
 \section{Interpreting output}{
@@ -151,5 +182,5 @@ head(bundle$written_files)
 }
 \seealso{
 \code{\link[=build_mfrm_manifest]{build_mfrm_manifest()}}, \code{\link[=build_mfrm_replay_script]{build_mfrm_replay_script()}},
-\code{\link[=export_mfrm]{export_mfrm()}}, \code{\link[=reporting_checklist]{reporting_checklist()}}
+\code{\link[=export_mfrm]{export_mfrm()}}, \code{\link[=reporting_checklist]{reporting_checklist()}}, \code{\link[=export_summary_appendix]{export_summary_appendix()}}
 }

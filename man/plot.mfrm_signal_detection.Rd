@@ -20,12 +20,19 @@
 
 \item{signal}{Whether to plot DIF or bias screening results.}
 
-\item{metric}{Metric to plot. For \code{signal = "bias"}, \code{metric = "power"}
-maps to the screening hit rate (\code{BiasScreenRate}).}
+\item{metric}{Metric to plot. For \code{signal = "bias"}, prefer
+\code{metric = "screen_rate"} for the screening hit rate. The older
+\code{metric = "power"} spelling is retained as a backwards-compatible alias
+that maps to \code{BiasScreenRate}.}
 
-\item{x_var}{Design variable used on the x-axis.}
+\item{x_var}{Design variable used on the x-axis. When \code{x} was generated from
+a \code{sim_spec} with custom public facet names, the corresponding aliases
+(for example \code{n_judge}, \code{n_task}, \code{judge_per_person}) are also accepted.
+Role keywords (\code{person}, \code{rater}, \code{criterion}, \code{assignment}) are accepted
+as an abstraction over the current two-facet schema.}
 
-\item{group_var}{Optional design variable used for separate lines.}
+\item{group_var}{Optional design variable used for separate lines. The same
+alias rules as \code{x_var} apply.}
 
 \item{draw}{If \code{TRUE}, draw with base graphics; otherwise return plotting data.}
 
@@ -34,24 +41,31 @@ maps to the screening hit rate (\code{BiasScreenRate}).}
 \value{
 If \code{draw = TRUE}, invisibly returns plotting data. If \code{draw = FALSE},
 returns that plotting-data list directly. The returned list includes
-\code{display_metric} and \code{interpretation_note} so callers can label bias-side
-plots as screening summaries rather than formal power/error-rate displays.
+resolved canonical variables (\code{x_var}, \code{group_var}) together with public
+labels (\code{x_label}, \code{group_label}), \code{design_variable_aliases},
+\code{design_descriptor}, \code{planning_scope}, \code{planning_constraints},
+\code{planning_schema},
+\code{display_metric}, and \code{interpretation_note} so
+callers can label bias-side plots as screening summaries rather than
+formal power/error-rate displays.
 }
 \description{
 Plot DIF/bias screening simulation results
 }
 \examples{
+\dontrun{
 sig_eval <- suppressWarnings(evaluate_mfrm_signal_detection(
-  n_person = 20,
-  n_rater = 3,
-  n_criterion = 3,
-  raters_per_person = 2,
+  n_person = 8,
+  n_rater = 2,
+  n_criterion = 2,
+  raters_per_person = 1,
   reps = 1,
-  maxit = 10,
+  maxit = 5,
   bias_max_iter = 1,
   seed = 123
 ))
 plot(sig_eval, signal = "dif", metric = "power", x_var = "n_person", draw = FALSE)
+}
 }
 \seealso{
 \code{\link[=evaluate_mfrm_signal_detection]{evaluate_mfrm_signal_detection()}}, \link{summary.mfrm_signal_detection}

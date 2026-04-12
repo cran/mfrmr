@@ -117,7 +117,7 @@ pca <- analyze_residual_pca(diag, mode = "both")
 pca2 <- analyze_residual_pca(fit, mode = "both")
 summary(pca)
 p <- plot_residual_pca(pca, mode = "overall", plot_type = "scree", draw = FALSE)
-class(p)
+p$data$plot
 head(p$data)
 head(pca$overall_table)
 }

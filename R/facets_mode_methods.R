@@ -39,13 +39,13 @@ round_numeric_frame <- function(df, digits = 3L) {
 #'
 #' @examples
 #' toy <- load_mfrmr_data("example_core")
-#' toy_small <- toy[toy$Person %in% unique(toy$Person)[1:12], , drop = FALSE]
+#' toy_small <- toy[toy$Person %in% unique(toy$Person)[1:8], , drop = FALSE]
 #' out <- run_mfrm_facets(
 #'   data = toy_small,
 #'   person = "Person",
 #'   facets = c("Rater", "Criterion"),
 #'   score = "Score",
-#'   maxit = 10
+#'   maxit = 25
 #' )
 #' s <- summary(out)
 #' s$overview[, c("Model", "Method", "Converged")]
@@ -152,9 +152,9 @@ print.mfrm_facets_run <- function(x, ...) {
 #'   maxit = 10
 #' )
 #' p_fit <- plot(out, type = "fit", draw = FALSE)
-#' class(p_fit)
+#' p_fit$wright_map$data$plot
 #' p_qc <- plot(out, type = "qc", draw = FALSE)
-#' class(p_qc)
+#' p_qc$data$plot
 #' }
 #'
 #' @export

@@ -59,8 +59,8 @@ out <- subset_connectivity_report(fit)
 summary(out)
 p_sub <- plot(out, draw = FALSE)
 p_design <- plot(out, type = "design_matrix", draw = FALSE)
-class(p_sub)
-class(p_design)
+p_sub$data$plot
+p_design$data$plot
 out$summary[, c("Subset", "Observations", "ObservationPercent")]
 }
 \seealso{

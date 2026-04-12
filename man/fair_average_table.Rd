@@ -63,6 +63,15 @@ both facet-wise and stacked tables. Historical display columns such as
 package-native aliases such as \code{AdjustedAverage},
 \code{StandardizedAdjustedAverage}, \code{ModelBasedSE}, and \code{FitAdjustedSE} are
 appended to the formatted outputs.
+
+In the current release, these tables are source-backed only for the
+Rasch-family \code{RSM} / \code{PCM} branch. FACETS documents fair averages as
+Rasch-measure-to-score transformations evaluated in a standardized
+mean/zero-facet environment. The bounded \code{GPCM} branch already has a
+generalized ordered-category probability kernel, but this package has not
+yet validated a slope-aware analogue of that fair-average score contract.
+\code{fair_average_table()} therefore stops for \code{GPCM} fits instead of silently
+reusing the Rasch-only calculation.
 }
 \section{Interpreting output}{
 
@@ -111,7 +120,7 @@ t12 <- fair_average_table(fit, udecimals = 2)
 t12_native <- fair_average_table(fit, reference = "mean", label_style = "native")
 summary(t12)
 p_t12 <- plot(t12, draw = FALSE)
-class(p_t12)
+p_t12$data$plot
 }
 }
 \seealso{

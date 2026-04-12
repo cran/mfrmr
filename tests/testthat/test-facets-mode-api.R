@@ -19,7 +19,8 @@ test_that("run_mfrm_facets returns legacy-compatible workflow bundle", {
   expect_true(all(c("fit", "diagnostics", "iteration", "fair_average", "rating_scale", "run_info", "mapping") %in% names(out)))
   expect_true(is.data.frame(out$run_info))
   expect_equal(out$fit$summary$Model[[1]], "RSM")
-  expect_equal(out$fit$summary$Method[[1]], "JMLE")
+  expect_equal(out$fit$summary$Method[[1]], "JML")
+  expect_equal(out$fit$summary$MethodUsed[[1]], "JMLE")
 
   out_summary <- summary(out, top_n = 5)
   expect_s3_class(out_summary, "summary.mfrm_facets_run")
@@ -82,4 +83,5 @@ test_that("run_mfrm_facets accepts method/model options", {
 
   expect_equal(out_mml$fit$summary$Model[[1]], "RSM")
   expect_equal(out_mml$fit$summary$Method[[1]], "MML")
+  expect_equal(out_mml$fit$summary$MethodUsed[[1]], "MML")
 })

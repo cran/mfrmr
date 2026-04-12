@@ -300,6 +300,27 @@ test_that("build_fixed_reports handles NULL and empty bias", {
   expect_true(inherits(fixed_orig, "mfrm_bundle"))
 })
 
+test_that("build_fixed_reports validates malformed bias inputs early", {
+  expect_error(
+    mfrmr::build_fixed_reports(123),
+    "`bias_results` must be NULL, output from estimate_bias\\(\\), or a list-like bias bundle"
+  )
+
+  malformed_bias <- list(
+    table = data.frame(foo = 1:2, bar = 3:4),
+    summary = data.frame()
+  )
+  expect_error(
+    mfrmr::build_fixed_reports(malformed_bias),
+    "recognizable interaction facet columns"
+  )
+
+  expect_error(
+    mfrmr::build_fixed_reports(bias, target_facet = "NotAFacet"),
+    "`target_facet` must be one of the interaction facets"
+  )
+})
+
 # ==========================================================================
 # 10. plot_bias_interaction multiple plot types (lines 5472-5548)
 # ==========================================================================
@@ -599,6 +620,7 @@ test_that("print.mfrm_fit handles empty summary", {
   # Normal path
   out <- capture.output(print(fit))
   expect_true(any(grepl("mfrm_fit object", out, fixed = TRUE)))
+  expect_true(any(grepl("Next:", out, fixed = TRUE)))
 
   # Fake empty-summary object
   fake_fit <- list(summary = data.frame())

@@ -41,9 +41,6 @@ summary text.
 
 \examples{
 profiles <- mfrm_threshold_profiles()
-names(profiles)
-names(profiles$profiles)
-class(profiles)
 s_profiles <- summary(profiles)
 s_profiles$overview
 }

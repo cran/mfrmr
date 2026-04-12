@@ -6,24 +6,64 @@ reference_benchmark_dataset_specs <- function() {
       "example_core", "example_bias",
       "study1", "study2", "combined",
       "study1_itercal", "study2_itercal", "combined_itercal",
-      "synthetic_truth"
+      "synthetic_truth", "synthetic_latent_regression", "synthetic_latent_regression_omit", "synthetic_gpcm"
     ),
-    Persons = c(48L, 48L, 307L, 206L, 307L, 307L, 206L, 307L, 36L),
-    Raters = c(4L, 4L, 18L, 12L, 18L, 18L, 12L, 18L, 3L),
-    Criteria = c(4L, 4L, 3L, 9L, 12L, 3L, 9L, 12L, 3L),
-    Tasks = c(NA_integer_, NA_integer_, NA_integer_, NA_integer_, NA_integer_, NA_integer_, NA_integer_, NA_integer_, 4L),
-    Rows = c(768L, 384L, 1842L, 3287L, 5129L, 1842L, 3341L, 5183L, 1296L),
-    ScoreMin = c(1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L),
-    ScoreMax = c(4L, 4L, 4L, 4L, 4L, 4L, 4L, 4L, 5L)
+    Persons = c(48L, 48L, 307L, 206L, 307L, 307L, 206L, 307L, 36L, 60L, 60L, 600L),
+    Raters = c(4L, 4L, 18L, 12L, 18L, 18L, 12L, 18L, 3L, NA_integer_, NA_integer_, NA_integer_),
+    Criteria = c(4L, 4L, 3L, 9L, 12L, 3L, 9L, 12L, 3L, 6L, 6L, 4L),
+    Tasks = c(NA_integer_, NA_integer_, NA_integer_, NA_integer_, NA_integer_, NA_integer_, NA_integer_, NA_integer_, 4L, NA_integer_, NA_integer_, NA_integer_),
+    Rows = c(768L, 384L, 1842L, 3287L, 5129L, 1842L, 3341L, 5183L, 1296L, 360L, 360L, 2400L),
+    ScoreMin = c(1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 0L, 0L, 0L),
+    ScoreMax = c(4L, 4L, 4L, 4L, 4L, 4L, 4L, 4L, 5L, 1L, 1L, 3L)
   )
 }
 
 reference_benchmark_case_specs <- function() {
   tibble::tibble(
-    Case = c("synthetic_truth", "synthetic_bias_contract", "study1_itercal_pair", "study2_itercal_pair", "combined_itercal_pair"),
-    CaseType = c("truth_recovery", "bias_contract", "pair_stability", "pair_stability", "pair_stability"),
-    PrimaryDataset = c("synthetic_truth", "synthetic_truth", "study1", "study2", "combined"),
-    ReferenceDataset = c(NA_character_, NA_character_, "study1_itercal", "study2_itercal", "combined_itercal")
+    Case = c(
+      "synthetic_truth",
+      "synthetic_latent_regression",
+      "synthetic_latent_regression_omit",
+      "synthetic_conquest_overlap_dry_run",
+      "synthetic_gpcm",
+      "synthetic_bias_contract",
+      "study1_itercal_pair",
+      "study2_itercal_pair",
+      "combined_itercal_pair"
+    ),
+    CaseType = c(
+      "truth_recovery",
+      "latent_recovery",
+      "latent_omission_contract",
+      "conquest_overlap_dry_run",
+      "gpcm_recovery",
+      "bias_contract",
+      "pair_stability",
+      "pair_stability",
+      "pair_stability"
+    ),
+    PrimaryDataset = c(
+      "synthetic_truth",
+      "synthetic_latent_regression",
+      "synthetic_latent_regression_omit",
+      "synthetic_latent_regression",
+      "synthetic_gpcm",
+      "synthetic_truth",
+      "study1",
+      "study2",
+      "combined"
+    ),
+    ReferenceDataset = c(
+      NA_character_,
+      NA_character_,
+      NA_character_,
+      NA_character_,
+      NA_character_,
+      NA_character_,
+      "study1_itercal",
+      "study2_itercal",
+      "combined_itercal"
+    )
   )
 }
 
@@ -35,32 +75,139 @@ synthetic_truth_targets <- function() {
   )
 }
 
+sample_mfrm_latent_benchmark_data <- function(seed = 20240403) {
+  with_preserved_rng_seed(seed, {
+    persons <- paste0("P", sprintf("%03d", seq_len(60L)))
+    criteria <- paste0("C", seq_len(6L))
+    x <- seq(-1.5, 1.5, length.out = length(persons))
+    beta <- c(`(Intercept)` = 0.25, X = 0.80)
+    sigma2 <- 0.36
+    theta <- beta[["(Intercept)"]] + beta[["X"]] * x + stats::rnorm(length(persons), sd = sqrt(sigma2))
+    criterion_eff <- seq(-1.0, 1.0, length.out = length(criteria))
+
+    dat <- expand.grid(Person = persons, Criterion = criteria, stringsAsFactors = FALSE)
+    eta <- theta[match(dat$Person, persons)] - criterion_eff[match(dat$Criterion, criteria)]
+    dat$Score <- stats::rbinom(nrow(dat), 1, stats::plogis(eta))
+
+    list(
+      data = dat,
+      person = "Person",
+      facets = "Criterion",
+      score = "Score",
+      person_data = data.frame(Person = persons, X = x, stringsAsFactors = FALSE),
+      person_id = "Person",
+      population_formula = ~ X,
+      truth = list(
+        coefficients = beta,
+        sigma2 = sigma2,
+        criterion = stats::setNames(criterion_eff, criteria)
+      )
+    )
+  })
+}
+
+sample_mfrm_latent_omit_benchmark_data <- function(seed = 20240403) {
+  cfg <- sample_mfrm_latent_benchmark_data(seed = seed)
+  omitted_person <- as.character(cfg$person_data$Person[1])
+  cfg$person_data$X[match(omitted_person, cfg$person_data$Person)] <- NA_real_
+  rows_omitted <- sum(as.character(cfg$data$Person) == omitted_person)
+  cfg$population_policy <- "omit"
+  cfg$truth$omitted_persons <- omitted_person
+  cfg$truth$response_rows_omitted <- as.integer(rows_omitted)
+  cfg$truth$response_rows_retained <- as.integer(nrow(cfg$data) - rows_omitted)
+  cfg
+}
+
+sample_mfrm_gpcm_benchmark_data <- function(seed = 20260404) {
+  with_preserved_rng_seed(seed, {
+    persons <- paste0("P", sprintf("%03d", seq_len(600L)))
+    criteria <- paste0("C", seq_len(4L))
+    theta <- stats::rnorm(length(persons), mean = 0, sd = 1)
+    criterion_eff <- c(C1 = -0.8, C2 = -0.2, C3 = 0.3, C4 = 0.7)
+    slope_raw <- c(C1 = 0.55, C2 = 0.85, C3 = 1.20, C4 = 1.75)
+    slope_truth <- slope_raw / exp(mean(log(slope_raw)))
+    step_mat <- rbind(
+      C1 = c(-1.30, -0.20, 1.50),
+      C2 = c(-1.00, 0.00, 1.00),
+      C3 = c(-1.45, -0.15, 1.60),
+      C4 = c(-0.70, 0.10, 0.60)
+    )
+    step_mat <- t(apply(step_mat, 1, center_sum_zero))
+    step_cum_mat <- t(apply(step_mat, 1, function(x) c(0, cumsum(x))))
+
+    dat <- expand.grid(Person = persons, Criterion = criteria, stringsAsFactors = FALSE)
+    criterion_idx <- match(dat$Criterion, criteria)
+    eta <- theta[match(dat$Person, persons)] - criterion_eff[dat$Criterion]
+    prob_mat <- category_prob_gpcm(
+      eta = eta,
+      step_cum_mat = step_cum_mat,
+      criterion_idx = criterion_idx,
+      slopes = unname(slope_truth),
+      slope_idx = criterion_idx
+    )
+    dat$Score <- apply(prob_mat, 1, function(p) sample.int(4L, size = 1L, prob = p) - 1L)
+
+    step_truth <- expand.grid(
+      StepFacet = criteria,
+      Step = paste0("Step_", seq_len(ncol(step_mat))),
+      stringsAsFactors = FALSE
+    )
+    step_truth$Estimate <- as.vector(step_mat)
+
+    list(
+      data = dat,
+      person = "Person",
+      facets = "Criterion",
+      score = "Score",
+      step_facet = "Criterion",
+      slope_facet = "Criterion",
+      truth = list(
+        slopes = slope_truth,
+        steps = step_truth,
+        criterion = criterion_eff
+      )
+    )
+  })
+}
+
 reference_benchmark_source_profile <- function() {
   tibble::tibble(
     RuleID = c(
       "bias_obs_exp_average",
       "bias_local_measure",
       "bias_pairwise_welch",
-      "linking_common_elements"
+      "linking_common_elements",
+      "latent_population_omission_check",
+      "conquest_overlap_bundle_check",
+      "conquest_overlap_audit_check"
     ),
-    Domain = c("bias", "bias", "bias", "linking"),
+    Domain = c("bias", "bias", "bias", "linking", "latent_regression", "conquest_overlap", "conquest_overlap"),
     SourceLabel = c(
       "Facets Tutorial 3",
       "FACETS Table 14",
       "FACETS Table 14 / change log",
-      "FACETS equating guidance"
+      "FACETS equating guidance",
+      "mfrmr population-policy check",
+      "ACER ConQuest Command Reference / mfrmr overlap boundary",
+      "ACER ConQuest show-cases workflow / mfrmr audit workflow"
     ),
     SourceURL = c(
       "https://www.winsteps.com/a/ftutorial3.pdf",
       "https://www.winsteps.com/facetman/table14.htm",
       "https://www.winsteps.com/facetman/table14.htm",
-      "https://www.winsteps.com/facetman/equating.htm"
+      "https://www.winsteps.com/facetman/equating.htm",
+      NA_character_,
+      "https://conquestmanual.acer.org/s4-00.html",
+      "https://conquestmanual.acer.org/s4-00.html"
     ),
     Detail = c(
       "Observed-minus-expected average should equal (Observed Score - Expected Score) / Observed Count.",
       "Local target measure in a context should equal the target's overall measure plus the context-specific bias term.",
       "Pairwise local contrasts are reported with a Rasch-Welch t statistic and approximate degrees of freedom.",
-      "A practical linking audit should confirm at least 5 common elements per linking facet when equating forms or datasets."
+      "A practical linking audit should confirm at least 5 common elements per linking facet when equating forms or datasets.",
+      "Population-model complete-case omission should be explicit in fitted metadata, response-row counts, and active person estimates.",
+      "The ConQuest-overlap package-side fixture checks bundle, normalized-table, and audit preparation without claiming an executed ConQuest comparison.",
+      "Case-level EAP and item/population tables must be normalized before numerical audit against the exact-overlap bundle."
     )
   )
 }
@@ -73,6 +220,15 @@ resolve_reference_benchmark_data <- function(dataset) {
       facets = c("Rater", "Task", "Criterion"),
       score = "Score"
     ))
+  }
+  if (identical(dataset, "synthetic_latent_regression")) {
+    return(sample_mfrm_latent_benchmark_data(seed = 20240403))
+  }
+  if (identical(dataset, "synthetic_latent_regression_omit")) {
+    return(sample_mfrm_latent_omit_benchmark_data(seed = 20240403))
+  }
+  if (identical(dataset, "synthetic_gpcm")) {
+    return(sample_mfrm_gpcm_benchmark_data(seed = 20260404))
   }
   list(
     data = load_mfrmr_data(dataset),
@@ -142,7 +298,8 @@ fit_reference_benchmark_dataset <- function(dataset,
                                             model = "RSM",
                                             quad_points = 7,
                                             maxit = 40,
-                                            reltol = 1e-6) {
+                                            reltol = 1e-6,
+                                            mml_engine = "direct") {
   cfg <- resolve_reference_benchmark_data(dataset)
   fit_args <- list(
     data = cfg$data,
@@ -156,12 +313,36 @@ fit_reference_benchmark_dataset <- function(dataset,
   )
   if (identical(toupper(method), "MML")) {
     fit_args$quad_points <- quad_points
+    fit_args$mml_engine <- mml_engine
+  }
+  if (!is.null(cfg$population_formula)) {
+    fit_args$population_formula <- cfg$population_formula
+    fit_args$person_data <- cfg$person_data
+    fit_args$person_id <- cfg$person_id %||% cfg$person
+    fit_args$population_policy <- cfg$population_policy %||% "error"
+  }
+  if (!is.null(cfg$step_facet)) {
+    fit_args$step_facet <- cfg$step_facet
+  }
+  if (!is.null(cfg$slope_facet)) {
+    fit_args$slope_facet <- cfg$slope_facet
   }
   fit <- suppressWarnings(do.call(fit_mfrm, fit_args))
-  diag <- suppressWarnings(diagnose_mfrm(fit, residual_pca = "none"))
+  diag <- if (identical(toupper(as.character(model)), "GPCM")) {
+    list(
+      overall_fit = tibble::tibble(Infit = NA_real_, Outfit = NA_real_),
+      precision_profile = tibble::tibble(
+        PrecisionTier = if (identical(toupper(as.character(method)), "MML")) "model_based" else "exploratory",
+        SupportsFormalInference = identical(toupper(as.character(method)), "MML")
+      )
+    )
+  } else {
+    suppressWarnings(diagnose_mfrm(fit, residual_pca = "none"))
+  }
   list(
     dataset = dataset,
     data = cfg$data,
+    truth = cfg$truth %||% NULL,
     fit = fit,
     diagnostics = diag,
     design = collect_reference_dataset_design(dataset, cfg$data)
@@ -172,6 +353,17 @@ collect_reference_fit_run <- function(case_id, fit_obj) {
   fit <- fit_obj$fit
   diag <- fit_obj$diagnostics
   design <- fit_obj$design
+  population <- fit$population %||% list()
+  population_formula <- population$formula %||% fit$config$population_formula %||% NULL
+  population_formula_label <- if (is.null(population_formula)) {
+    NA_character_
+  } else {
+    paste(deparse(population_formula), collapse = " ")
+  }
+  population_design_columns <- as.character(population$design_columns %||% character(0))
+  population_coefficients <- population$coefficients %||% numeric(0)
+  population_xlevel_variables <- compact_population_coding_variables(population$xlevels)
+  population_contrast_variables <- compact_population_coding_variables(population$contrasts)
   tibble::tibble(
     Case = case_id,
     Dataset = fit_obj$dataset,
@@ -184,6 +376,26 @@ collect_reference_fit_run <- function(case_id, fit_obj) {
     Tasks = if ("Tasks" %in% names(design)) as.integer(design$Tasks[1]) else NA_integer_,
     Converged = isTRUE(fit$summary$Converged),
     LogLik = suppressWarnings(as.numeric(fit$summary$LogLik %||% NA_real_)),
+    MMLEngineRequested = as.character(fit$summary$MMLEngineRequested[1] %||% NA_character_),
+    MMLEngineUsed = as.character(fit$summary$MMLEngineUsed[1] %||% NA_character_),
+    EMIterations = suppressWarnings(as.integer(fit$summary$EMIterations[1] %||% NA_integer_)),
+    PosteriorBasis = as.character(
+      fit$config$posterior_basis %||%
+        population$posterior_basis %||%
+        if (isTRUE(population$active)) "population_model" else "legacy_mml"
+    ),
+    PopulationModelActive = isTRUE(population$active),
+    PopulationFormula = population_formula_label,
+    PopulationPolicy = as.character(population$policy %||% NA_character_),
+    PopulationDesignColumns = paste(population_design_columns, collapse = ", "),
+    PopulationXlevelVariables = population_xlevel_variables,
+    PopulationContrastVariables = population_contrast_variables,
+    PopulationCoefficientCount = as.integer(length(population_coefficients)),
+    PopulationResidualVariance = suppressWarnings(as.numeric(population$sigma2 %||% NA_real_)),
+    PopulationIncludedPersons = as.integer(length(population$included_persons %||% character(0))),
+    PopulationOmittedPersons = as.integer(length(population$omitted_persons %||% character(0))),
+    PopulationResponseRowsRetained = suppressWarnings(as.integer(population$response_rows_retained %||% NA_integer_)),
+    PopulationResponseRowsOmitted = suppressWarnings(as.integer(population$response_rows_omitted %||% NA_integer_)),
     Infit = suppressWarnings(as.numeric(diag$overall_fit$Infit[1] %||% NA_real_)),
     Outfit = suppressWarnings(as.numeric(diag$overall_fit$Outfit[1] %||% NA_real_)),
     PrecisionTier = as.character(diag$precision_profile$PrecisionTier[1] %||% NA_character_),
@@ -230,6 +442,192 @@ build_truth_recovery_checks <- function(case_id, fit_obj) {
   })
 
   dplyr::bind_rows(rows)
+}
+
+build_latent_recovery_checks <- function(case_id, fit_obj) {
+  truth <- fit_obj$truth %||% NULL
+  if (is.null(truth)) {
+    return(tibble::tibble())
+  }
+
+  coeff_est <- as.numeric(fit_obj$fit$population$coefficients %||% numeric(0))
+  names(coeff_est) <- names(fit_obj$fit$population$coefficients %||% NULL)
+  coeff_truth <- truth$coefficients %||% numeric(0)
+  coeff_names <- intersect(names(coeff_truth), names(coeff_est))
+
+  coeff_rows <- lapply(coeff_names, function(term) {
+    err <- abs(as.numeric(coeff_est[term]) - as.numeric(coeff_truth[term]))
+    status <- if (err <= 0.20) {
+      "Pass"
+    } else if (err <= 0.35) {
+      "Warn"
+    } else {
+      "Fail"
+    }
+    tibble::tibble(
+      Case = case_id,
+      Facet = paste0("Population:", term),
+      Correlation = NA_real_,
+      MeanAbsoluteDeviation = err,
+      Status = status,
+      Detail = "Population-model coefficient recovery is monitored by absolute error against the known generating value."
+    )
+  })
+
+  sigma_err <- abs(as.numeric(fit_obj$fit$population$sigma2) - as.numeric(truth$sigma2))
+  sigma_row <- tibble::tibble(
+    Case = case_id,
+    Facet = "Population:sigma2",
+    Correlation = NA_real_,
+    MeanAbsoluteDeviation = sigma_err,
+    Status = if (sigma_err <= 0.20) {
+      "Pass"
+    } else if (sigma_err <= 0.35) {
+      "Warn"
+    } else {
+      "Fail"
+    },
+    Detail = "Residual latent-variance recovery is monitored by absolute error against the known generating value."
+  )
+
+  criterion_tbl <- as.data.frame(fit_obj$fit$facets$others, stringsAsFactors = FALSE)
+  criterion_tbl <- criterion_tbl[criterion_tbl$Facet == "Criterion", c("Level", "Estimate"), drop = FALSE]
+  criterion_tbl <- criterion_tbl[order(criterion_tbl$Level), , drop = FALSE]
+  truth_criterion <- truth$criterion[criterion_tbl$Level]
+  est_centered <- suppressWarnings(as.numeric(criterion_tbl$Estimate))
+  est_centered <- est_centered - mean(est_centered, na.rm = TRUE)
+  truth_centered <- as.numeric(truth_criterion) - mean(as.numeric(truth_criterion), na.rm = TRUE)
+  criterion_corr <- suppressWarnings(stats::cor(est_centered, truth_centered))
+  criterion_mae <- mean(abs(est_centered - truth_centered), na.rm = TRUE)
+  criterion_row <- tibble::tibble(
+    Case = case_id,
+    Facet = "Criterion",
+    Correlation = criterion_corr,
+    MeanAbsoluteDeviation = criterion_mae,
+    Status = if (is.finite(criterion_corr) && criterion_corr >= 0.95 && criterion_mae <= 0.20) {
+      "Pass"
+    } else if (is.finite(criterion_corr) && criterion_corr >= 0.90 && criterion_mae <= 0.30) {
+      "Warn"
+    } else {
+      "Fail"
+    },
+    Detail = "Criterion recovery is reviewed after centering because the Rasch location origin remains unidentified."
+  )
+
+  pred_new <- dplyr::bind_rows(lapply(c("LOW", "HIGH"), function(id) {
+    data.frame(
+      Person = id,
+      Criterion = names(truth$criterion),
+      Score = c(0L, 0L, 0L, 1L, 1L, 1L),
+      stringsAsFactors = FALSE
+    )
+  }))
+  pred_person <- data.frame(Person = c("LOW", "HIGH"), X = c(-1.5, 1.5), stringsAsFactors = FALSE)
+  pred_obj <- predict_mfrm_units(
+    fit = fit_obj$fit,
+    new_data = pred_new,
+    person_data = pred_person,
+    n_draws = 0
+  )
+  pred_tbl <- as.data.frame(pred_obj$estimates, stringsAsFactors = FALSE)
+  shift <- with(pred_tbl, Estimate[Person == "HIGH"][1] - Estimate[Person == "LOW"][1])
+  shift_row <- tibble::tibble(
+    Case = case_id,
+    Facet = "Population:posterior_shift",
+    Correlation = NA_real_,
+    MeanAbsoluteDeviation = NA_real_,
+    Status = if (is.finite(shift) && shift > 0) "Pass" else "Fail",
+    Detail = "Posterior scoring for matched response patterns should shift upward when the scored covariate value is higher."
+  )
+
+  dplyr::bind_rows(dplyr::bind_rows(coeff_rows), sigma_row, criterion_row, shift_row)
+}
+
+build_gpcm_recovery_checks <- function(case_id, fit_obj) {
+  truth <- fit_obj$truth %||% NULL
+  if (is.null(truth)) {
+    return(tibble::tibble())
+  }
+
+  slope_truth <- truth$slopes %||% numeric(0)
+  slope_est_tbl <- as.data.frame(fit_obj$fit$slopes %||% data.frame(), stringsAsFactors = FALSE)
+  slope_est_tbl <- slope_est_tbl[, c("SlopeFacet", "Estimate"), drop = FALSE]
+  slope_tbl <- merge(
+    data.frame(SlopeFacet = names(slope_truth), Truth = as.numeric(slope_truth), stringsAsFactors = FALSE),
+    slope_est_tbl,
+    by = "SlopeFacet",
+    sort = FALSE
+  )
+  slope_truth_log <- log(slope_tbl$Truth) - mean(log(slope_tbl$Truth), na.rm = TRUE)
+  slope_est_log <- log(slope_tbl$Estimate) - mean(log(slope_tbl$Estimate), na.rm = TRUE)
+  slope_corr <- suppressWarnings(stats::cor(slope_truth_log, slope_est_log))
+  slope_mae <- mean(abs(slope_truth_log - slope_est_log), na.rm = TRUE)
+  slope_row <- tibble::tibble(
+    Case = case_id,
+    Facet = "GPCM:slopes",
+    Correlation = slope_corr,
+    MeanAbsoluteDeviation = slope_mae,
+    Status = if (is.finite(slope_corr) && slope_corr >= 0.95 && slope_mae <= 0.15) {
+      "Pass"
+    } else if (is.finite(slope_corr) && slope_corr >= 0.85 && slope_mae <= 0.25) {
+      "Warn"
+    } else {
+      "Fail"
+    },
+    Detail = "Slope recovery is compared on the centered log-discrimination scale implied by the package's geometric-mean-one identification."
+  )
+
+  step_truth_tbl <- as.data.frame(truth$steps %||% data.frame(), stringsAsFactors = FALSE)
+  step_est_tbl <- as.data.frame(fit_obj$fit$steps %||% data.frame(), stringsAsFactors = FALSE)
+  step_tbl <- merge(
+    step_truth_tbl[, c("StepFacet", "Step", "Estimate"), drop = FALSE],
+    step_est_tbl[, c("StepFacet", "Step", "Estimate"), drop = FALSE],
+    by = c("StepFacet", "Step"),
+    sort = FALSE,
+    suffixes = c(".Truth", ".Estimate")
+  )
+  step_corr <- suppressWarnings(stats::cor(step_tbl$Estimate.Truth, step_tbl$Estimate.Estimate))
+  step_mae <- mean(abs(step_tbl$Estimate.Truth - step_tbl$Estimate.Estimate), na.rm = TRUE)
+  step_row <- tibble::tibble(
+    Case = case_id,
+    Facet = "GPCM:steps",
+    Correlation = step_corr,
+    MeanAbsoluteDeviation = step_mae,
+    Status = if (is.finite(step_corr) && step_corr >= 0.98 && step_mae <= 0.20) {
+      "Pass"
+    } else if (is.finite(step_corr) && step_corr >= 0.93 && step_mae <= 0.30) {
+      "Warn"
+    } else {
+      "Fail"
+    },
+    Detail = "Step recovery is reviewed on the row-centered step scale stored by the current bounded GPCM branch."
+  )
+
+  criterion_tbl <- as.data.frame(fit_obj$fit$facets$others, stringsAsFactors = FALSE)
+  criterion_tbl <- criterion_tbl[criterion_tbl$Facet == "Criterion", c("Level", "Estimate"), drop = FALSE]
+  criterion_tbl <- criterion_tbl[order(criterion_tbl$Level), , drop = FALSE]
+  truth_criterion <- truth$criterion[criterion_tbl$Level]
+  est_centered <- suppressWarnings(as.numeric(criterion_tbl$Estimate))
+  est_centered <- est_centered - mean(est_centered, na.rm = TRUE)
+  truth_centered <- as.numeric(truth_criterion) - mean(as.numeric(truth_criterion), na.rm = TRUE)
+  criterion_corr <- suppressWarnings(stats::cor(est_centered, truth_centered))
+  criterion_mae <- mean(abs(est_centered - truth_centered), na.rm = TRUE)
+  criterion_row <- tibble::tibble(
+    Case = case_id,
+    Facet = "Criterion",
+    Correlation = criterion_corr,
+    MeanAbsoluteDeviation = criterion_mae,
+    Status = if (is.finite(criterion_corr) && criterion_corr >= 0.98 && criterion_mae <= 0.15) {
+      "Pass"
+    } else if (is.finite(criterion_corr) && criterion_corr >= 0.93 && criterion_mae <= 0.25) {
+      "Warn"
+    } else {
+      "Fail"
+    },
+    Detail = "Criterion recovery is reviewed after centering because the location origin remains unidentified."
+  )
+
+  dplyr::bind_rows(slope_row, step_row, criterion_row)
 }
 
 build_pair_stability_checks <- function(case_id, primary_fit_obj, reference_fit_obj) {
@@ -516,7 +914,159 @@ build_bias_contract_checks <- function(case_id,
   dplyr::bind_rows(rows)
 }
 
-summarize_reference_benchmark_case <- function(case_id, case_type, fit_runs, design_checks, recovery_checks, pair_checks, bias_checks, linking_checks) {
+build_conquest_overlap_dry_run_checks <- function(case_id, fit_obj) {
+  bundle <- build_conquest_overlap_bundle(fit = fit_obj$fit)
+  normalized <- normalize_conquest_overlap_tables(
+    conquest_population = data.frame(
+      Term = bundle$mfrmr_population$Parameter,
+      Est = bundle$mfrmr_population$Estimate,
+      stringsAsFactors = FALSE
+    ),
+    conquest_item_estimates = data.frame(
+      ItemID = bundle$mfrmr_item_estimates$ResponseVar,
+      Est = bundle$mfrmr_item_estimates$Estimate,
+      stringsAsFactors = FALSE
+    ),
+    conquest_case_eap = data.frame(
+      PID = bundle$mfrmr_case_eap$Person,
+      EAP = bundle$mfrmr_case_eap$Estimate,
+      stringsAsFactors = FALSE
+    ),
+    conquest_population_term = "Term",
+    conquest_population_estimate = "Est",
+    conquest_item_id = "ItemID",
+    conquest_item_estimate = "Est",
+    conquest_case_person = "PID",
+    conquest_case_estimate = "EAP"
+  )
+  audit <- audit_conquest_overlap(bundle, normalized)
+  overall <- as.data.frame(audit$overall, stringsAsFactors = FALSE)
+
+  row_metric <- function(metric, value, pass_max, warn_max, detail) {
+    tibble::tibble(
+      Case = case_id,
+      Metric = metric,
+      Actual = suppressWarnings(as.numeric(value[1] %||% NA_real_)),
+      PassMax = pass_max,
+      WarnMax = warn_max,
+      Status = score_reference_metric(
+        abs(suppressWarnings(as.numeric(value[1] %||% NA_real_))),
+        pass_max = pass_max,
+        warn_max = warn_max
+      ),
+      Detail = detail
+    )
+  }
+
+  dplyr::bind_rows(
+    row_metric(
+      "AttentionItems",
+      overall$AttentionItems[1],
+      pass_max = 0,
+      warn_max = 0,
+      detail = "The package-side check should produce no missing, duplicate, or non-numeric audit attention items."
+    ),
+    row_metric(
+      "PopulationMaxAbsDifference",
+      overall$PopulationMaxAbsDifference[1],
+      pass_max = 1e-10,
+      warn_max = 1e-8,
+      detail = "Copied population parameters should round-trip through the normalized-table audit workflow."
+    ),
+    row_metric(
+      "ItemCenteredMaxAbsDifference",
+      overall$ItemCenteredMaxAbsDifference[1],
+      pass_max = 1e-10,
+      warn_max = 1e-8,
+      detail = "Copied item estimates should agree after centering under the overlap audit workflow."
+    ),
+    row_metric(
+      "CaseMaxAbsDifference",
+      overall$CaseMaxAbsDifference[1],
+      pass_max = 1e-10,
+      warn_max = 1e-8,
+      detail = "Copied case EAP estimates should round-trip through the overlap audit workflow."
+    )
+  )
+}
+
+build_latent_omission_contract_checks <- function(case_id, fit_obj) {
+  fit <- fit_obj$fit
+  pop <- fit$population %||% list()
+  truth <- fit_obj$truth %||% list()
+  expected_omitted <- as.character(truth$omitted_persons %||% character(0))
+  actual_omitted <- as.character(pop$omitted_persons %||% character(0))
+
+  person_tbl <- as.data.frame(fit$facets$person %||% data.frame(), stringsAsFactors = FALSE)
+  fitted_persons <- as.character(person_tbl$Person %||% character(0))
+  replay_tbl <- as.data.frame(pop$person_table_replay %||% data.frame(), stringsAsFactors = FALSE)
+  replay_id <- as.character(pop$person_id %||% "Person")
+  replay_persons <- if (replay_id %in% names(replay_tbl)) as.character(replay_tbl[[replay_id]]) else character(0)
+
+  check_row <- function(metric, actual, expected, pass, detail) {
+    tibble::tibble(
+      Case = case_id,
+      Metric = metric,
+      Actual = paste(as.character(actual), collapse = ", "),
+      Expected = paste(as.character(expected), collapse = ", "),
+      Status = if (isTRUE(pass)) "Pass" else "Fail",
+      Detail = detail
+    )
+  }
+
+  dplyr::bind_rows(
+    check_row(
+      "PopulationPolicy",
+      pop$policy %||% NA_character_,
+      "omit",
+      identical(as.character(pop$policy %||% NA_character_), "omit"),
+      "The omission fixture should run under the documented complete-case omission policy."
+    ),
+    check_row(
+      "PopulationOmittedPersons",
+      length(actual_omitted),
+      length(expected_omitted),
+      setequal(actual_omitted, expected_omitted),
+      "The fitted population scaffold should omit exactly the background-incomplete person(s)."
+    ),
+    check_row(
+      "PopulationResponseRowsOmitted",
+      as.integer(pop$response_rows_omitted %||% NA_integer_),
+      as.integer(truth$response_rows_omitted %||% NA_integer_),
+      identical(
+        as.integer(pop$response_rows_omitted %||% NA_integer_),
+        as.integer(truth$response_rows_omitted %||% NA_integer_)
+      ),
+      "All response rows for omitted persons should be excluded from the active latent-regression fit."
+    ),
+    check_row(
+      "PopulationResponseRowsRetained",
+      as.integer(pop$response_rows_retained %||% NA_integer_),
+      as.integer(truth$response_rows_retained %||% NA_integer_),
+      identical(
+        as.integer(pop$response_rows_retained %||% NA_integer_),
+        as.integer(truth$response_rows_retained %||% NA_integer_)
+      ),
+      "The retained-response count should match the complete-case scaffold after omission."
+    ),
+    check_row(
+      "OmittedPersonExcludedFromEstimates",
+      !any(expected_omitted %in% fitted_persons),
+      TRUE,
+      length(expected_omitted) > 0L && !any(expected_omitted %in% fitted_persons),
+      "Omitted persons should not receive active person estimates from the fitted calibration."
+    ),
+    check_row(
+      "OmittedPersonPreservedForReplay",
+      all(expected_omitted %in% replay_persons),
+      TRUE,
+      length(expected_omitted) > 0L && all(expected_omitted %in% replay_persons),
+      "The replay provenance table should preserve omitted person IDs for auditability."
+    )
+  )
+}
+
+summarize_reference_benchmark_case <- function(case_id, case_type, fit_runs, design_checks, recovery_checks, pair_checks, bias_checks, linking_checks, conquest_overlap_checks, population_policy_checks) {
   subset_reference_case <- function(tbl, case_id, drop_skip = FALSE) {
     if (!is.data.frame(tbl) || !("Case" %in% names(tbl)) || nrow(tbl) == 0L) {
       return(tibble::tibble())
@@ -541,6 +1091,8 @@ summarize_reference_benchmark_case <- function(case_id, case_type, fit_runs, des
   case_pairs <- subset_reference_case(pair_checks, case_id)
   case_bias <- subset_reference_case(bias_checks, case_id)
   case_link <- subset_reference_case(linking_checks, case_id)
+  case_conquest <- subset_reference_case(conquest_overlap_checks, case_id)
+  case_population_policy <- subset_reference_case(population_policy_checks, case_id)
 
   statuses <- c(
     case_fit$Converged == TRUE,
@@ -548,7 +1100,9 @@ summarize_reference_benchmark_case <- function(case_id, case_type, fit_runs, des
     case_statuses(case_recovery),
     case_statuses(case_pairs),
     case_statuses(case_bias),
-    case_statuses(case_link)
+    case_statuses(case_link),
+    case_statuses(case_conquest),
+    case_statuses(case_population_policy)
   )
   normalized <- ifelse(statuses %in% c(TRUE, "Pass"), "Pass",
                        ifelse(statuses %in% c("Warn"), "Warn",
@@ -556,7 +1110,11 @@ summarize_reference_benchmark_case <- function(case_id, case_type, fit_runs, des
   missing_expected_checks <- switch(
     case_type,
     truth_recovery = nrow(case_recovery) == 0L,
+    latent_recovery = nrow(case_recovery) == 0L,
+    gpcm_recovery = nrow(case_recovery) == 0L,
     bias_contract = nrow(case_bias) == 0L,
+    conquest_overlap_dry_run = nrow(case_conquest) == 0L,
+    latent_omission_contract = nrow(case_population_policy) == 0L,
     pair_stability = nrow(case_pairs) == 0L && nrow(case_link) == 0L,
     FALSE
   )
@@ -580,6 +1138,26 @@ summarize_reference_benchmark_case <- function(case_id, case_type, fit_runs, des
     } else {
       "No recovery checks were produced."
     }
+  } else if (identical(case_type, "latent_recovery")) {
+    slope_row <- case_recovery[case_recovery$Facet == "Population:X", , drop = FALSE]
+    if (nrow(slope_row) > 0) {
+      paste0(
+        "Population slope absolute error = ",
+        formatC(slope_row$MeanAbsoluteDeviation[1], format = "f", digits = 3)
+      )
+    } else {
+      "No latent-recovery checks were produced."
+    }
+  } else if (identical(case_type, "gpcm_recovery")) {
+    slope_row <- case_recovery[case_recovery$Facet == "GPCM:slopes", , drop = FALSE]
+    if (nrow(slope_row) > 0) {
+      paste0(
+        "GPCM slope log-scale correlation = ",
+        formatC(slope_row$Correlation[1], format = "f", digits = 3)
+      )
+    } else {
+      "No GPCM-recovery checks were produced."
+    }
   } else if (identical(case_type, "bias_contract")) {
     if (nrow(case_bias) > 0) {
       paste0(
@@ -587,7 +1165,27 @@ summarize_reference_benchmark_case <- function(case_id, case_type, fit_runs, des
         formatC(max(case_bias$MaxError, na.rm = TRUE), format = "f", digits = 6)
       )
     } else {
-      "No bias-contract checks were produced."
+      "No bias checks were produced."
+    }
+  } else if (identical(case_type, "conquest_overlap_dry_run")) {
+    attention_row <- case_conquest[case_conquest$Metric == "AttentionItems", , drop = FALSE]
+    if (nrow(attention_row) > 0) {
+      paste0(
+        "ConQuest-overlap package-side attention items = ",
+        formatC(attention_row$Actual[1], format = "f", digits = 0)
+      )
+    } else {
+      "No ConQuest-overlap package-side checks were produced."
+    }
+  } else if (identical(case_type, "latent_omission_contract")) {
+    omitted_row <- case_population_policy[case_population_policy$Metric == "PopulationResponseRowsOmitted", , drop = FALSE]
+    if (nrow(omitted_row) > 0) {
+      paste0(
+        "Population response rows omitted = ",
+        as.character(omitted_row$Actual[1])
+      )
+    } else {
+      "No latent-regression omission checks were produced."
     }
   } else {
     facet_rows <- case_pairs[case_pairs$Facet != "OverallFit", , drop = FALSE]
@@ -610,6 +1208,8 @@ summarize_reference_benchmark_case <- function(case_id, case_type, fit_runs, des
     RecoveryChecks = nrow(case_recovery),
     BiasChecks = nrow(case_bias),
     LinkingChecks = nrow(case_link),
+    ConQuestOverlapChecks = nrow(case_conquest),
+    PopulationPolicyChecks = nrow(case_population_policy),
     StabilityChecks = nrow(case_pairs),
     KeySignal = key_signal
   )
@@ -617,44 +1217,73 @@ summarize_reference_benchmark_case <- function(case_id, case_type, fit_runs, des
 
 #' Benchmark packaged reference cases
 #'
-#' @param cases Reference cases to run. Defaults to all package-native
-#'   benchmark cases.
+#' @param cases Reference cases to run. Defaults to the standard
+#'   `RSM`-compatible reference suite. Specialized `GPCM` and
+#'   ConQuest-overlap package-side cases can be requested explicitly.
 #' @param method Estimation method passed to [fit_mfrm()]. Defaults to `"MML"`.
 #' @param model Model family passed to [fit_mfrm()]. Defaults to `"RSM"`.
 #' @param quad_points Quadrature points for `method = "MML"`.
 #' @param maxit Maximum optimizer iterations passed to [fit_mfrm()].
 #' @param reltol Convergence tolerance passed to [fit_mfrm()].
+#' @param mml_engine MML optimization engine passed to [fit_mfrm()]. Applies
+#'   only when `method = "MML"`.
 #'
 #' @details
-#' This function audits `mfrmr` against the package's curated internal
-#' benchmark cases in three ways:
+#' This function checks `mfrmr` against the package's curated reference case
+#' families:
 #' - `synthetic_truth`: checks whether recovered facet measures align with the
-#'   known generating values from the package's internal synthetic design.
-#' - `synthetic_bias_contract`: checks whether package-native bias tables and
+#'   known generating values from the package's synthetic design.
+#' - `synthetic_latent_regression`: checks whether the first-version
+#'   latent-regression `MML` branch recovers known population coefficients,
+#'   residual latent variance, criterion ordering, and posterior-shift
+#'   direction from a synthetic overlap case.
+#' - `synthetic_latent_regression_omit`: checks whether the population-model
+#'   complete-case omission policy is reflected in the fitted metadata,
+#'   response-row audit, active person estimates, and replay provenance.
+#' - `synthetic_conquest_overlap_dry_run`: builds the narrow ConQuest-overlap
+#'   bundle for the latent-regression synthetic case, round-trips package tables
+#'   through the normalization/audit helpers, and confirms the package-side
+#'   workflow without claiming that ConQuest itself was executed.
+#' - `synthetic_gpcm`: checks whether the bounded `GPCM` branch recovers
+#'   known criterion-specific slopes, row-centered step parameters, and
+#'   criterion ordering from a synthetic overlap case. This case
+#'   currently requires `model = "GPCM"` and is intended for `method = "MML"`.
+#' - `synthetic_bias_contract`: checks whether package bias tables and
 #'   pairwise local comparisons satisfy the identities documented in the bias
 #'   help workflow.
 #' - `*_itercal_pair`: compares a baseline packaged dataset with its iterative
 #'   recalibration counterpart to review fit stability, facet-measure
 #'   alignment, and linking coverage together.
 #'
-#' The resulting object is intended as an internal benchmark harness for
-#' package QA and regression auditing. It does not by itself establish
+#' The resulting object is intended as a reference-case check for package
+#' behavior. It does not by itself establish
 #' external validity against FACETS, ConQuest, or published calibration
 #' studies, and it does not assume any familiarity with external table
 #' numbering or printer layouts.
+#' When specialized latent-regression omission or ConQuest-overlap package-side
+#' cases are requested, `summary(bench)` prints preview rows from
+#' `population_policy_checks` and `conquest_overlap_checks` alongside the
+#' reference notes so the package-versus-external validation boundary remains
+#' visible.
 #'
 #' @section Interpreting output:
-#' - `overview`: one-row internal-benchmark summary.
+#' - `overview`: one-row reference-case summary.
 #' - `case_summary`: pass/warn/fail triage by reference case.
-#' - `fit_runs`: fitted-run metadata (fit, precision tier, convergence).
+#' - `fit_runs`: fitted-run metadata (fit, precision tier, convergence, and
+#'   latent-regression population-model/posterior-basis fields, including
+#'   categorical-coding details when present).
 #' - `design_checks`: exact design recovery checks for each dataset.
-#' - `recovery_checks`: known-truth recovery metrics for the internal synthetic
-#'   case.
+#' - `recovery_checks`: known-truth recovery metrics for the synthetic cases,
+#'   including the latent-regression reference case.
 #' - `bias_checks`: source-backed bias/local-measure identity checks.
 #' - `pair_checks`: paired-dataset stability screens for the iterated cases.
 #' - `linking_checks`: common-element audits for paired calibration datasets.
-#' - `source_profile`: source-backed rules that define the internal benchmark
-#'   contract.
+#' - `conquest_overlap_checks`: package-side checks for the
+#'   ConQuest-overlap bundle/normalization/audit workflow; this remains a
+#'   package-side check until actual ConQuest output tables are supplied.
+#' - `population_policy_checks`: complete-case omission checks for population
+#'   model benchmark fixtures.
+#' - `source_profile`: source-backed rules used by the reference checks.
 #'
 #' @return An object of class `mfrm_reference_benchmark`.
 #' @examples
@@ -669,6 +1298,7 @@ summarize_reference_benchmark_case <- function(case_id, case_type, fit_runs, des
 #' @export
 reference_case_benchmark <- function(cases = c(
                                        "synthetic_truth",
+                                       "synthetic_latent_regression",
                                        "synthetic_bias_contract",
                                        "study1_itercal_pair",
                                        "study2_itercal_pair",
@@ -678,11 +1308,41 @@ reference_case_benchmark <- function(cases = c(
                                      model = "RSM",
                                      quad_points = 7,
                                      maxit = 40,
-                                     reltol = 1e-6) {
+                                     reltol = 1e-6,
+                                     mml_engine = c("direct", "em", "hybrid")) {
   case_specs <- reference_benchmark_case_specs()
   selected_cases <- match.arg(as.character(cases), choices = case_specs$Case, several.ok = TRUE)
   case_specs <- case_specs[match(selected_cases, case_specs$Case), , drop = FALSE]
   dataset_specs <- reference_benchmark_dataset_specs()
+  mml_engine <- tolower(match.arg(mml_engine))
+  if (any(case_specs$CaseType == "gpcm_recovery")) {
+    if (!identical(toupper(as.character(model)), "GPCM")) {
+      stop(
+        "The `synthetic_gpcm` benchmark case currently requires `model = \"GPCM\"`.",
+        call. = FALSE
+      )
+    }
+    if (!identical(toupper(as.character(method)), "MML")) {
+      stop(
+        "The `synthetic_gpcm` benchmark case is currently validated only for `method = \"MML\"`.",
+        call. = FALSE
+      )
+    }
+  }
+  if (any(case_specs$CaseType == "conquest_overlap_dry_run")) {
+    if (!identical(toupper(as.character(method)), "MML")) {
+      stop(
+        "The `synthetic_conquest_overlap_dry_run` benchmark case requires `method = \"MML\"`.",
+        call. = FALSE
+      )
+    }
+    if (!(toupper(as.character(model)) %in% c("RSM", "PCM"))) {
+      stop(
+        "The `synthetic_conquest_overlap_dry_run` benchmark case requires `model = \"RSM\"` or `model = \"PCM\"`.",
+        call. = FALSE
+      )
+    }
+  }
 
   fit_cache <- list()
   get_fit_obj <- function(dataset) {
@@ -693,7 +1353,8 @@ reference_case_benchmark <- function(cases = c(
         model = model,
         quad_points = quad_points,
         maxit = maxit,
-        reltol = reltol
+        reltol = reltol,
+        mml_engine = mml_engine
       )
     }
     fit_cache[[dataset]]
@@ -705,6 +1366,8 @@ reference_case_benchmark <- function(cases = c(
   bias_checks <- list()
   pair_checks <- list()
   linking_checks <- list()
+  conquest_overlap_checks <- list()
+  population_policy_checks <- list()
 
   for (i in seq_len(nrow(case_specs))) {
     case_id <- as.character(case_specs$Case[i])
@@ -719,8 +1382,16 @@ reference_case_benchmark <- function(cases = c(
 
     if (identical(case_type, "truth_recovery")) {
       recovery_checks[[length(recovery_checks) + 1L]] <- build_truth_recovery_checks(case_id, primary_fit_obj)
+    } else if (identical(case_type, "latent_recovery")) {
+      recovery_checks[[length(recovery_checks) + 1L]] <- build_latent_recovery_checks(case_id, primary_fit_obj)
+    } else if (identical(case_type, "gpcm_recovery")) {
+      recovery_checks[[length(recovery_checks) + 1L]] <- build_gpcm_recovery_checks(case_id, primary_fit_obj)
     } else if (identical(case_type, "bias_contract")) {
       bias_checks[[length(bias_checks) + 1L]] <- build_bias_contract_checks(case_id, primary_fit_obj)
+    } else if (identical(case_type, "conquest_overlap_dry_run")) {
+      conquest_overlap_checks[[length(conquest_overlap_checks) + 1L]] <- build_conquest_overlap_dry_run_checks(case_id, primary_fit_obj)
+    } else if (identical(case_type, "latent_omission_contract")) {
+      population_policy_checks[[length(population_policy_checks) + 1L]] <- build_latent_omission_contract_checks(case_id, primary_fit_obj)
     } else {
       reference_fit_obj <- get_fit_obj(reference_dataset)
       fit_runs[[length(fit_runs) + 1L]] <- collect_reference_fit_run(case_id, reference_fit_obj)
@@ -737,6 +1408,8 @@ reference_case_benchmark <- function(cases = c(
   bias_checks_tbl <- dplyr::bind_rows(bias_checks)
   pair_checks_tbl <- dplyr::bind_rows(pair_checks)
   linking_checks_tbl <- dplyr::bind_rows(linking_checks)
+  conquest_overlap_checks_tbl <- dplyr::bind_rows(conquest_overlap_checks)
+  population_policy_checks_tbl <- dplyr::bind_rows(population_policy_checks)
   source_profile_tbl <- reference_benchmark_source_profile()
 
   case_summary_tbl <- dplyr::bind_rows(lapply(seq_len(nrow(case_specs)), function(i) {
@@ -748,7 +1421,9 @@ reference_case_benchmark <- function(cases = c(
       recovery_checks = recovery_checks_tbl,
       pair_checks = pair_checks_tbl,
       bias_checks = bias_checks_tbl,
-      linking_checks = linking_checks_tbl
+      linking_checks = linking_checks_tbl,
+      conquest_overlap_checks = conquest_overlap_checks_tbl,
+      population_policy_checks = population_policy_checks_tbl
     )
   }))
 
@@ -764,10 +1439,11 @@ reference_case_benchmark <- function(cases = c(
   )
 
   notes <- c(
-    "Synthetic truth checks compare recovered facet measures against known generating values from the package's internal simulation design.",
-    "Bias-contract checks audit package-native identities for observed-minus-expected averages, local measures, and pairwise Rasch-Welch contrasts.",
+    "Synthetic truth checks compare recovered facet measures against known generating values from the package simulation design.",
+    "ConQuest-overlap package-side checks cover only export/normalization/audit preparation; actual external ConQuest output is still required for external validation.",
+    "Bias checks review package identities for observed-minus-expected averages, local measures, and pairwise Rasch-Welch contrasts.",
     "Pair stability checks review baseline and iterative-calibration packaged datasets using facet-measure alignment, fit deltas, reliability deltas, and common-element linking coverage.",
-    "Use this benchmark as an internal regression and contract audit, not as a substitute for external validation against commercial software or published studies."
+    "Use this reference check as package evidence, not as a substitute for external validation against commercial software or published studies."
   )
   if (!identical(toupper(method), "MML")) {
     notes <- c(
@@ -787,11 +1463,14 @@ reference_case_benchmark <- function(cases = c(
     bias_checks = bias_checks_tbl,
     pair_checks = pair_checks_tbl,
     linking_checks = linking_checks_tbl,
+    conquest_overlap_checks = conquest_overlap_checks_tbl,
+    population_policy_checks = population_policy_checks_tbl,
     source_profile = source_profile_tbl,
     settings = list(
       cases = selected_cases,
       method = method,
       model = model,
+      mml_engine = if (identical(toupper(method), "MML")) mml_engine else NA_character_,
       intended_use = "internal_benchmark",
       external_validation = FALSE,
       quad_points = if (identical(toupper(method), "MML")) as.integer(quad_points) else NA_integer_,

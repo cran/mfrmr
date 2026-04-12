@@ -12,6 +12,7 @@ build_mfrm_replay_script(
   unit_prediction = NULL,
   plausible_values = NULL,
   data_file = "your_data.csv",
+  fit_person_data_file = NULL,
   script_mode = c("auto", "fit", "facets"),
   include_bundle = FALSE,
   bundle_dir = "analysis_bundle",
@@ -40,6 +41,11 @@ recreate in the generated script.}
 
 \item{data_file}{Path to the analysis data file used in the generated script.}
 
+\item{fit_person_data_file}{Optional CSV filename to read for the fit-level
+latent-regression replay person table. When \code{NULL}, the replay script
+embeds that table inline. \code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}} uses this to keep replay
+scripts portable while avoiding large inline literals.}
+
 \item{script_mode}{One of \code{"auto"}, \code{"fit"}, or \code{"facets"}. \code{"auto"} uses
 \code{run_mfrm_facets()} when the input object came from that workflow.}
 
@@ -65,6 +71,18 @@ a data file at \code{data_file}.
 Anchor and group-anchor constraints are embedded directly from the fitted
 object's stored configuration, so the script can replay anchored analyses
 without manual table reconstruction.
+
+When the supplied fit uses the latent-regression \code{MML} branch, the generated
+fit-mode script also carries the stored replay-ready person table together
+with the corresponding \code{population_formula} / \code{person_id} /
+\code{population_policy} arguments needed to recreate the population model.
+By default that replay-ready table is embedded inline; when
+\code{fit_person_data_file} is supplied, the generated script reads it from that
+sidecar CSV relative to the replay script location.
+
+This replay layer is intentionally unavailable for bounded \code{GPCM}, because
+the current bundle/export contract still depends on the diagnostics/reporting
+route that remains formalized only for the Rasch-family branch.
 }
 \section{When to use this}{
 

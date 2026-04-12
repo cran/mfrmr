@@ -50,13 +50,13 @@ This method returns a compact cross-object summary that combines:
 
 \examples{
 toy <- load_mfrmr_data("example_core")
-toy_small <- toy[toy$Person \%in\% unique(toy$Person)[1:12], , drop = FALSE]
+toy_small <- toy[toy$Person \%in\% unique(toy$Person)[1:8], , drop = FALSE]
 out <- run_mfrm_facets(
   data = toy_small,
   person = "Person",
   facets = c("Rater", "Criterion"),
   score = "Score",
-  maxit = 10
+  maxit = 25
 )
 s <- summary(out)
 s$overview[, c("Model", "Method", "Converged")]

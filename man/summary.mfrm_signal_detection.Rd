@@ -17,8 +17,18 @@
 An object of class \code{summary.mfrm_signal_detection} with:
 \itemize{
 \item \code{overview}: run-level overview
-\item \code{detection_summary}: aggregated detection rates by design
+\item \code{detection_summary}: aggregated detection rates by design, with
+design-variable alias columns when applicable
 \item \code{ademp}: simulation-study metadata carried forward from the original object
+\item \code{facet_names}: public facet labels carried from the simulation specification
+\item \code{design_variable_aliases}: accepted public aliases for design variables
+\item \code{design_descriptor}: role-based design-variable metadata
+\item \code{planning_scope}: explicit record of the current planning contract
+\item \code{planning_constraints}: explicit record of mutable/locked design variables
+\item \code{planning_schema}: combined planner-schema contract
+\item \code{future_branch_active_summary}: compact deterministic summary of the
+schema-only future arbitrary-facet planning branch embedded in the current
+planning schema
 \item \code{notes}: short interpretation notes, including the bias-side screening caveat
 }
 }
@@ -26,17 +36,19 @@ An object of class \code{summary.mfrm_signal_detection} with:
 Summarize a DIF/bias screening simulation
 }
 \examples{
+\dontrun{
 sig_eval <- suppressWarnings(evaluate_mfrm_signal_detection(
-  n_person = 20,
-  n_rater = 3,
-  n_criterion = 3,
-  raters_per_person = 2,
+  n_person = 8,
+  n_rater = 2,
+  n_criterion = 2,
+  raters_per_person = 1,
   reps = 1,
-  maxit = 10,
+  maxit = 5,
   bias_max_iter = 1,
   seed = 123
 ))
 summary(sig_eval)
+}
 }
 \seealso{
 \code{\link[=evaluate_mfrm_signal_detection]{evaluate_mfrm_signal_detection()}}, \link{plot.mfrm_signal_detection}

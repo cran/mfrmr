@@ -95,6 +95,8 @@ infer_facets_mode_mapping <- function(dat, person = NULL, facets = NULL, score =
 #' @param quad_points Quadrature points for MML; passed to [fit_mfrm()].
 #' @param maxit Maximum optimizer iterations.
 #' @param reltol Optimization tolerance.
+#' @param mml_engine MML optimization engine passed to [fit_mfrm()]. Applies
+#'   only when `method = "MML"`.
 #' @param top_n_interactions Number of rows for interaction diagnostics.
 #'
 #' @return A list with components:
@@ -110,6 +112,8 @@ infer_facets_mode_mapping <- function(dat, person = NULL, facets = NULL, score =
 #' - `method = "JML"` (default): legacy-compatible joint estimation route.
 #' - `method = "JMLE"`: explicit JMLE label; internally equivalent to JML route.
 #' - `method = "MML"`: marginal maximum likelihood route using `quad_points`.
+#'   Use `mml_engine = "em"` or `"hybrid"` only for `RSM` / `PCM` fits when
+#'   you want the staged MML alternatives.
 #'
 #' `model = "PCM"` is supported; set `step_facet` when facet-specific step
 #' structure is needed.
@@ -160,12 +164,11 @@ infer_facets_mode_mapping <- function(dat, person = NULL, facets = NULL, score =
 #'   score = "Score",
 #'   maxit = 6
 #' )
-#' names(out)
-#' out$fit$summary[, c("Model", "Method")]
+#' out$fit$summary[, c("Model", "Method", "MethodUsed")]
 #' s <- summary(out)
 #' s$overview[, c("Model", "Method", "Converged")]
 #' p_fit <- plot(out, type = "fit", draw = FALSE)
-#' class(p_fit)
+#' p_fit$wright_map$data$plot
 #'
 #' # Optional: MML route
 #' if (interactive()) {
@@ -178,7 +181,7 @@ infer_facets_mode_mapping <- function(dat, person = NULL, facets = NULL, score =
 #'     quad_points = 5,
 #'     maxit = 6
 #'   )
-#'   out_mml$fit$summary[, c("Model", "Method")]
+#'   out_mml$fit$summary[, c("Model", "Method", "MethodUsed")]
 #' }
 #' }
 #' @export
@@ -199,9 +202,11 @@ run_mfrm_facets <- function(data,
                             quad_points = 15,
                             maxit = 400,
                             reltol = 1e-6,
+                            mml_engine = c("direct", "em", "hybrid"),
                             top_n_interactions = 20L) {
   model <- toupper(match.arg(model))
   method <- toupper(match.arg(method))
+  mml_engine <- tolower(match.arg(mml_engine))
 
   dat <- normalize_facets_mode_data(data)
   mapping <- infer_facets_mode_mapping(
@@ -232,7 +237,8 @@ run_mfrm_facets <- function(data,
     positive_facets = positive_facets,
     quad_points = as.integer(quad_points),
     maxit = as.integer(maxit),
-    reltol = as.numeric(reltol)
+    reltol = as.numeric(reltol),
+    mml_engine = mml_engine
   )
 
   diagnostics <- diagnose_mfrm(fit, top_n_interactions = as.integer(top_n_interactions))
@@ -245,7 +251,7 @@ run_mfrm_facets <- function(data,
       "person", "score", "facets", "weight",
       "model", "method_input", "method_used", "step_facet", "noncenter_facet",
       "dummy_facets", "positive_facets", "keep_original", "quad_points",
-      "maxit", "reltol", "top_n_interactions"
+      "maxit", "reltol", "mml_engine", "top_n_interactions"
     ),
     value = c(
       mapping$person,
@@ -254,7 +260,7 @@ run_mfrm_facets <- function(data,
       if (is.null(mapping$weight)) "" else mapping$weight,
       model,
       method,
-      as.character(fit$summary$Method[[1]]),
+      as.character(fit$config$method %||% fit$summary$MethodUsed[[1]] %||% fit$summary$Method[[1]]),
       if (is.null(step_facet)) "" else as.character(step_facet),
       noncenter_facet,
       paste(if (is.null(dummy_facets)) character(0) else dummy_facets, collapse = ","),
@@ -263,6 +269,7 @@ run_mfrm_facets <- function(data,
       as.character(as.integer(quad_points)),
       as.character(as.integer(maxit)),
       as.character(as.numeric(reltol)),
+      mml_engine,
       as.character(as.integer(top_n_interactions))
     ),
     stringsAsFactors = FALSE
@@ -303,6 +310,7 @@ mfrmRFacets <- function(data,
                         quad_points = 15,
                         maxit = 400,
                         reltol = 1e-6,
+                        mml_engine = c("direct", "em", "hybrid"),
                         top_n_interactions = 20L) {
   run_mfrm_facets(
     data = data,
@@ -322,6 +330,7 @@ mfrmRFacets <- function(data,
     quad_points = quad_points,
     maxit = maxit,
     reltol = reltol,
+    mml_engine = mml_engine,
     top_n_interactions = top_n_interactions
   )
 }

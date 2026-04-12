@@ -2,7 +2,7 @@
 % Please edit documentation in R/api-prediction.R
 \name{summary.mfrm_plausible_values}
 \alias{summary.mfrm_plausible_values}
-\title{Summarize approximate plausible values from fixed-calibration scoring}
+\title{Summarize approximate plausible values from posterior scoring}
 \usage{
 \method{summary}{mfrm_plausible_values}(object, digits = 3, ...)
 }
@@ -19,12 +19,14 @@ An object of class \code{summary.mfrm_plausible_values} with:
 \item \code{draw_summary}: empirical summaries of the sampled values by person
 \item \code{estimates}: companion posterior EAP summaries
 \item \code{audit}: row-preparation audit
+\item \code{population_audit}: optional person-level omission audit for
+latent-regression scoring
 \item \code{settings}: scoring settings
 \item \code{notes}: interpretation notes
 }
 }
 \description{
-Summarize approximate plausible values from fixed-calibration scoring
+Summarize approximate plausible values from posterior scoring
 }
 \examples{
 toy <- load_mfrmr_data("example_core")

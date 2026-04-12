@@ -6,6 +6,19 @@
 \description{
 Package-native guide to moving from fitted model objects to
 manuscript-draft text, tables, notes, and revision checklists in \code{mfrmr}.
+
+This guide currently applies fully to diagnostics-based \code{RSM} / \code{PCM}
+workflows. First-release \code{GPCM} fits now support \code{\link[=reporting_checklist]{reporting_checklist()}},
+\code{\link[=precision_audit_report]{precision_audit_report()}}, and the direct curve/graph and residual table
+helpers, but the narrative APA writer still requires the broader reporting
+stack used for \code{RSM} / \code{PCM}. Use \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}} when you need
+the formal boundary for the current \code{GPCM} reporting path.
+
+In particular, bounded \code{GPCM} currently stops before
+\code{\link[=build_apa_outputs]{build_apa_outputs()}}, \code{\link[=build_visual_summaries]{build_visual_summaries()}}, and
+\code{\link[=run_qc_pipeline]{run_qc_pipeline()}}. For that branch, use \code{\link[=reporting_checklist]{reporting_checklist()}},
+\code{\link[=precision_audit_report]{precision_audit_report()}}, and the direct table/plot helpers as the
+package-supported reporting route.
 }
 \section{Start with the reporting question}{
 
@@ -13,13 +26,19 @@ manuscript-draft text, tables, notes, and revision checklists in \code{mfrmr}.
 \item "Which parts of this run are draft-complete, and with what caveats?"
 Use \code{\link[=reporting_checklist]{reporting_checklist()}}.
 \item "How should I phrase the model, fit, and precision sections?"
-Use \code{\link[=build_apa_outputs]{build_apa_outputs()}}.
+For \code{RSM} / \code{PCM}, use \code{\link[=build_apa_outputs]{build_apa_outputs()}}.
 \item "Which tables should I hand off to a manuscript or appendix?"
-Use \code{\link[=apa_table]{apa_table()}} and \code{\link[=facet_statistics_report]{facet_statistics_report()}}.
+Use \code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}}, \code{\link[=export_summary_appendix]{export_summary_appendix()}},
+\code{\link[=apa_table]{apa_table()}}, and
+\code{\link[=facet_statistics_report]{facet_statistics_report()}}.
 \item "How do I explain model-based vs exploratory precision?"
 Use \code{\link[=precision_audit_report]{precision_audit_report()}} and \code{summary(diagnose_mfrm(...))}.
 \item "Which caveats need to appear in the write-up?"
 Use \code{\link[=reporting_checklist]{reporting_checklist()}} first, then \code{\link[=build_apa_outputs]{build_apa_outputs()}}.
+\item "How should I start figure captions or visual-results wording?"
+Use \code{\link[=visual_reporting_template]{visual_reporting_template()}} for conservative caption and results
+sentence starters, then verify availability with
+\code{reporting_checklist()$visual_scope}.
 }
 }
 
@@ -31,9 +50,19 @@ Use \code{\link[=reporting_checklist]{reporting_checklist()}} first, then \code{
 \item Review precision strength with \code{\link[=precision_audit_report]{precision_audit_report()}} when
 inferential language matters.
 \item Run \code{\link[=reporting_checklist]{reporting_checklist()}} to identify missing sections, caveats, and
-next actions.
-\item Create manuscript-draft prose and metadata with \code{\link[=build_apa_outputs]{build_apa_outputs()}}.
-\item Convert specific components to handoff tables with \code{\link[=apa_table]{apa_table()}}.
+next actions. Use the \code{"Visual Displays"} rows as the figure-routing
+layer for the current run.
+\item When strict marginal rows are available, follow up with
+\code{\link[=plot_marginal_fit]{plot_marginal_fit()}} and \code{\link[=plot_marginal_pairwise]{plot_marginal_pairwise()}} before finalizing
+the narrative around local misfit.
+\item For \code{RSM} / \code{PCM}, create manuscript-draft prose and metadata with
+\code{\link[=build_apa_outputs]{build_apa_outputs()}}. For bounded \code{GPCM}, stop after the checklist /
+precision / direct-table route while the broader narrative and QC stack
+remains outside scope.
+\item Convert summary outputs to reusable table bundles with
+\code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}}, review the bundle with \code{summary()} /
+\code{plot()}, then convert specific components to handoff tables with
+\code{\link[=apa_table]{apa_table()}} or export them directly with \code{\link[=export_summary_appendix]{export_summary_appendix()}}.
 }
 }
 
@@ -44,9 +73,18 @@ next actions.
 prioritized revision guide with \code{DraftReady}, \code{Priority}, and
 \code{NextAction}. \code{DraftReady} means "ready to draft with the documented
 caveats"; \code{ReadyForAPA} is retained as a backward-compatible alias, and
-neither field means "formal inference is automatically justified".}
+neither field means "formal inference is automatically justified". The
+\code{"Visual Displays"} rows also mirror the public plot family, so the
+checklist doubles as a figure-routing surface.}
 \item{\code{\link[=build_apa_outputs]{build_apa_outputs()}}}{Builds shared-contract prose, table notes,
 captions, and a section map from the current fit and diagnostics.}
+\item{\code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}}}{Turns supported \code{summary()} outputs
+into named \code{data.frame} tables plus an index for manuscript or appendix
+handoff, and now also supports bundle-level \code{summary()} / \code{plot()} for
+role coverage and numeric QC.}
+\item{\code{\link[=export_summary_appendix]{export_summary_appendix()}}}{Writes those validated summary-table
+bundles to CSV and optional HTML appendix artifacts without requiring a
+full fit-based export bundle.}
 \item{\code{\link[=apa_table]{apa_table()}}}{Produces reproducible base-R tables with APA-oriented
 labels, notes, and captions.}
 \item{\code{\link[=precision_audit_report]{precision_audit_report()}}}{Summarizes whether precision claims are
@@ -55,6 +93,9 @@ model-based, hybrid, or exploratory.}
 often feed result tables and appendix material.}
 \item{\code{\link[=build_visual_summaries]{build_visual_summaries()}}}{Prepares publication-oriented figure
 payloads that can be cited from the report text.}
+\item{\code{\link[=visual_reporting_template]{visual_reporting_template()}}}{Provides conservative figure
+placement, caption-starter, results-wording, and overclaim-avoidance
+guidance for public visual helpers.}
 }
 }
 
@@ -63,6 +104,12 @@ payloads that can be cited from the report text.}
 \itemize{
 \item Treat \code{\link[=reporting_checklist]{reporting_checklist()}} as the gap finder and
 \code{\link[=build_apa_outputs]{build_apa_outputs()}} as the writing engine.
+\item Use the checklist's \code{"Visual Displays"} rows to decide whether the next
+follow-up should be \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}}, \code{\link[=plot_marginal_fit]{plot_marginal_fit()}},
+\code{\link[=plot_residual_pca]{plot_residual_pca()}}, \code{\link[=plot_bias_interaction]{plot_bias_interaction()}}, or another public plot.
+\item Use \code{\link[=visual_reporting_template]{visual_reporting_template()}} to draft visual captions and
+results-sentence starters, but do not paste the skeletons without checking
+the actual fit, diagnostics, and study context.
 \item Phrase formal inferential claims only when the precision tier is
 model-based.
 \item Keep bias and differential-functioning outputs in screening language
@@ -72,6 +119,8 @@ claims.
 drafting-readiness flag, not as a substitute for methodological review.
 \item Rebuild APA outputs after major model changes instead of editing old text
 by hand.
+\item For bounded \code{GPCM}, keep reporting on the direct table/plot side and do
+not treat blocked narrative/QC helpers as temporary omissions.
 }
 }
 
@@ -80,13 +129,27 @@ by hand.
 \itemize{
 \item Manuscript-first route:
 \code{\link[=fit_mfrm]{fit_mfrm()}} -> \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} -> \code{\link[=reporting_checklist]{reporting_checklist()}} ->
-\code{\link[=build_apa_outputs]{build_apa_outputs()}} -> \code{\link[=apa_table]{apa_table()}}.
+\code{\link[=build_apa_outputs]{build_apa_outputs()}} -> \code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}} -> \code{summary()} /
+\code{plot()} -> \code{\link[=apa_table]{apa_table()}}, \code{\link[=export_summary_appendix]{export_summary_appendix()}}, or
+\code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}}(include = c("summary_tables", "html")).
+For \code{RSM} / \code{PCM} final reports, prefer \code{method = "MML"} and
+\code{diagnostic_mode = "both"} in the diagnostics step.
+For bounded \code{GPCM}, stop before the fit-based export family and stay on
+the direct table/plot route instead of calling
+\code{\link[=build_apa_outputs]{build_apa_outputs()}}, \code{\link[=build_visual_summaries]{build_visual_summaries()}}, \code{\link[=run_qc_pipeline]{run_qc_pipeline()}},
+\code{\link[=build_mfrm_manifest]{build_mfrm_manifest()}}, \code{\link[=build_mfrm_replay_script]{build_mfrm_replay_script()}}, or
+\code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}}.
 \item Appendix-first route:
 \code{\link[=facet_statistics_report]{facet_statistics_report()}} -> \code{\link[=apa_table]{apa_table()}} ->
 \code{\link[=build_visual_summaries]{build_visual_summaries()}} -> \code{\link[=build_apa_outputs]{build_apa_outputs()}}.
 \item Precision-sensitive route:
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} -> \code{\link[=precision_audit_report]{precision_audit_report()}} ->
 \code{\link[=reporting_checklist]{reporting_checklist()}} -> \code{\link[=build_apa_outputs]{build_apa_outputs()}}.
+\item bounded \code{GPCM} route:
+\code{\link[=diagnose_mfrm]{diagnose_mfrm()}} -> \code{\link[=precision_audit_report]{precision_audit_report()}} ->
+\code{\link[=reporting_checklist]{reporting_checklist()}} -> direct residual/category/information helpers,
+while \code{\link[=build_apa_outputs]{build_apa_outputs()}}, \code{\link[=build_visual_summaries]{build_visual_summaries()}}, and
+\code{\link[=run_qc_pipeline]{run_qc_pipeline()}} remain outside the current validated boundary.
 }
 }
 
@@ -96,6 +159,7 @@ by hand.
 \item For report/table selection, see \link{mfrmr_reports_and_tables}.
 \item For end-to-end analysis routes, see \link{mfrmr_workflow_methods}.
 \item For visual follow-up, see \link{mfrmr_visual_diagnostics}.
+\item For the bounded \code{GPCM} support statement, see \link{gpcm_capability_matrix}.
 \item For a longer walkthrough, see
 \code{vignette("mfrmr-reporting-and-apa", package = "mfrmr")}.
 }
@@ -109,19 +173,29 @@ fit <- fit_mfrm(
   person = "Person",
   facets = c("Rater", "Criterion"),
   score = "Score",
-  method = "JML",
-  maxit = 25
+  method = "MML",
+  maxit = 200
 )
-diag <- diagnose_mfrm(fit, residual_pca = "none")
+diag <- diagnose_mfrm(fit, residual_pca = "none", diagnostic_mode = "both")
 
 checklist <- reporting_checklist(fit, diagnostics = diag)
+visual_reporting_template("manuscript")[, c("FigureFamily", "CaptionSkeleton")]
 head(checklist$checklist[, c("Section", "Item", "DraftReady", "NextAction")])
+subset(
+  checklist$checklist,
+  Section == "Visual Displays",
+  c("Item", "Available", "NextAction")
+)
 
 apa <- build_apa_outputs(fit, diagnostics = diag)
-names(apa$section_map)
+apa$section_map[, c("SectionId", "Available")]
 
 tbl <- apa_table(fit, which = "summary")
 tbl$caption
+bundle <- build_summary_table_bundle(checklist)
+bundle$table_index
+apa_from_bundle <- apa_table(bundle, which = "section_summary")
+apa_from_bundle$caption
 }
 
 }

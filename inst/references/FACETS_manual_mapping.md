@@ -1,6 +1,9 @@
 # FACETS Manual Mapping
 
-This package mirrors FACETS-style workflows while keeping a native R implementation.
+This package documents a FACETS-style compatibility surface while keeping a
+native R implementation. The mapping is a package-output contract reference,
+not evidence that FACETS was executed or that numerical FACETS equivalence has
+been established.
 
 ## Manual References Used
 - Output table index: <https://www.winsteps.com/facetman/outputtableindex.htm>
@@ -19,7 +22,7 @@ This package mirrors FACETS-style workflows while keeping a native R implementat
 - Table 13 DIF/bias detail report: <https://www.winsteps.com/facetman/table13.htm>
 - Table 14 pairwise bias report: <https://www.winsteps.com/facetman/table14.htm>
 
-## Implemented (Direct or Close FACETS Equivalent)
+## Implemented (Direct or Close Compatibility Surface)
 - Core multifacet estimation (RSM/PCM, MML/JML): `fit_mfrm()` / `mfrm_estimate()`
 - Diagnostics core bundle (obs, fit, reliability, interactions, subsets): `diagnose_mfrm()`
 - Table 1-style specification summary: `specifications_report()`
@@ -51,9 +54,12 @@ This package mirrors FACETS-style workflows while keeping a native R implementat
 - QC dashboard (base graphics): `plot_qc_dashboard()`
 - Anchor workflow: `audit_mfrm_anchors()`, `make_anchor_table()`
 - Data packaging/loading helpers: `list_mfrmr_data()`, `load_mfrmr_data()`
-- Automated FACETS parity checks (columns + core metrics): `facets_parity_report()`, `tests/testthat/test-facets-column-contract.R`, `tests/testthat/test-facets-metric-contract.R`, `inst/references/facets_column_contract.csv`
+- Automated FACETS compatibility-contract audits (columns + core metrics):
+  `facets_parity_report()`, `tests/testthat/test-facets-column-contract.R`,
+  `tests/testthat/test-facets-metric-contract.R`,
+  `inst/references/facets_column_contract.csv`
 
-## Partial (Implemented Concept, Not Yet 1:1 FACETS Output)
+## Partial (Implemented Concept, Not Exact FACETS Output)
 - Design policy:
   - structured tables and visualization APIs are primary deliverables
   - fixed-width / line-printer text is optional and secondary (audit/log use)
@@ -64,25 +70,26 @@ This package mirrors FACETS-style workflows while keeping a native R implementat
   - gap: FACETS fixed-width text layout and exact optimizer-internal iteration path are not yet 1:1
 - Table 5 measurable data summary:
   - current: `measurable_summary_table()` and `describe_mfrm_data()` (including observed inter-rater agreement bundle)
-  - gap: FACETS column-by-column textual layout parity is not exact
+  - gap: FACETS column-by-column textual layout matching is not exact
 - Table 8.1 rating-scale report:
   - current: `rating_scale_table()` plus CCC/pathway visualization (`plot.mfrm_fit`, QC category panel)
   - gap: FACETS text layout and all legacy columns/order are not yet 1:1
 - Table 8 bar-chart / probability-curves exporters:
   - current: `category_structure_report()` and `category_curves_report()` including Graphfile-style wide output and optional fixed-width text mirrors
-  - gap: exact FACETS line-printer artwork/fixed-column parity is intentionally not targeted
+  - gap: exact FACETS line-printer artwork/fixed-column matching is intentionally not targeted
 - Table 6.2 graphical facet-statistics report:
   - current: `facet_statistics_report()` with fixed-width `M/S/Q/X` rulers
   - gap: FACETS native table layout and printer-graph formatting are not yet 1:1
 - Output-file emulation (`GRAPH=` / `SCORE=`):
   - current: `facets_output_file_bundle()` with graph coordinates, observation-level modeled score export, optional fixed-width mirrors, and optional file writing
-  - gap: FACETS command-level options and fixed-column file-writing parity are not yet 1:1
+  - gap: FACETS command-level options and fixed-column file-writing compatibility are not yet 1:1
 - Table 14 pairwise contrast report:
   - current: available for 2-way bias runs via `build_fixed_reports()`
   - gap: FACETS native layout and options are broader; higher-order runs intentionally omit pairwise section
 
 ## Not Yet Implemented from Output Index Scope
-- No high-priority items in the current Table 5-14 scope; remaining gaps are mostly formatting/options parity.
+- No high-priority items in the current Table 5-14 scope; remaining gaps are
+  mostly formatting/options compatibility.
 
 ## Anchoring Rules Encoded
 - Direct anchors (`Facet`, `Level`, `Anchor`) are fixed.
@@ -95,6 +102,7 @@ This package mirrors FACETS-style workflows while keeping a native R implementat
   - observations per score category: `>= 10`
 
 ## Pre-release Status (Current)
-- Core estimation and diagnostics: ready
+- Core estimation and diagnostics: available in the current branch
 - New inter-rater and facet-chi-square APIs: implemented and tested
-- Remaining work for closer FACETS parity is mostly report-format completeness, not model-estimation correctness
+- Remaining work for closer FACETS-format compatibility is mostly
+  report-format completeness, not model-estimation correctness

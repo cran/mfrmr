@@ -22,6 +22,12 @@ fit <- fit_mfrm(
 )
 
 diag <- diagnose_mfrm(fit, residual_pca = "none")
+checklist <- reporting_checklist(fit, diagnostics = diag)
+subset(
+  checklist$checklist,
+  Section == "Visual Displays",
+  c("Item", "Available", "NextAction")
+)
 
 ## ----wright-------------------------------------------------------------------
 plot(fit, type = "wright", preset = "publication", show_ci = TRUE)
@@ -45,6 +51,38 @@ plot_displacement(
   diagnostics = diag,
   anchored_only = FALSE,
   plot_type = "lollipop",
+  preset = "publication"
+)
+
+## ----strict-marginal----------------------------------------------------------
+fit_strict <- fit_mfrm(
+  toy,
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  score = "Score",
+  method = "MML",
+  model = "RSM",
+  quad_points = 7,
+  maxit = 40
+)
+
+diag_strict <- diagnose_mfrm(
+  fit_strict,
+  residual_pca = "none",
+  diagnostic_mode = "both"
+)
+
+strict_checklist <- reporting_checklist(fit_strict, diagnostics = diag_strict)
+subset(
+  strict_checklist$checklist,
+  Section == "Visual Displays" &
+    Item %in% c("QC / facet dashboard", "Strict marginal visuals"),
+  c("Item", "Available", "NextAction")
+)
+
+plot_marginal_fit(
+  diag_strict,
+  top_n = 12,
   preset = "publication"
 )
 

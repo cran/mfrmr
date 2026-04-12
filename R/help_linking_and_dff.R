@@ -14,6 +14,8 @@
 #'   Use [anchor_to_baseline()].
 #' - "Have common elements drifted across separately fitted waves?"
 #'   Use [detect_anchor_drift()] and [plot_anchor_drift()].
+#' - "Can I synthesize anchor audit, drift, and chain evidence into one review?"
+#'   Use [build_linking_review()].
 #' - "Do specific facet levels function differently across groups?"
 #'   Use [analyze_dff()] and [plot_dif_heatmap()].
 #'
@@ -28,7 +30,9 @@
 #'    already fitted waves.
 #' 6. Use [detect_anchor_drift()] for stability monitoring on separately fitted
 #'    waves.
-#' 7. Run [analyze_dff()] only after checking connectivity and common-scale
+#' 7. Use [build_linking_review()] when you need one operational synthesis
+#'    object rather than separate anchor/drift/chain tables.
+#' 8. Run [analyze_dff()] only after checking connectivity and common-scale
 #'    evidence.
 #'
 #' @section Which helper answers which task:
@@ -43,6 +47,8 @@
 #'   unstable anchor elements.}
 #'   \item{[build_equating_chain()]}{Accumulates screened pairwise links across
 #'   a series of administrations or forms.}
+#'   \item{[build_linking_review()]}{Synthesizes anchor-audit, drift, and
+#'   screened-chain evidence into one operational review surface.}
 #'   \item{[analyze_dff()]}{Screens differential facet functioning with residual
 #'   or refit methods, using screening-only language unless linking and
 #'   precision support stronger interpretation.}
@@ -65,7 +71,8 @@
 #' - Baseline placement review:
 #'   [make_anchor_table()] -> [anchor_to_baseline()] -> [diagnose_mfrm()].
 #' - Multi-wave drift review:
-#'   fit each wave separately -> [detect_anchor_drift()] -> [plot_anchor_drift()].
+#'   fit each wave separately -> [detect_anchor_drift()] ->
+#'   [build_linking_review()] -> [plot_anchor_drift()].
 #' - Group comparison route:
 #'   [subset_connectivity_report()] -> [analyze_dff()] ->
 #'   [dif_report()] -> [plot_dif_heatmap()].
@@ -78,22 +85,24 @@
 #'   `vignette("mfrmr-linking-and-dff", package = "mfrmr")`.
 #'
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_bias")
 #' fit <- fit_mfrm(
 #'   toy,
 #'   person = "Person",
 #'   facets = c("Rater", "Criterion"),
 #'   score = "Score",
-#'   method = "JML",
-#'   maxit = 10
+#'   method = "MML",
+#'   maxit = 200
 #' )
-#' diag <- diagnose_mfrm(fit, residual_pca = "none")
+#' diag <- diagnose_mfrm(fit, residual_pca = "none", diagnostic_mode = "both")
 #'
 #' subsets <- subset_connectivity_report(fit, diagnostics = diag)
 #' subsets$summary[, c("Subset", "Observations", "ObservationPercent")]
 #'
 #' dff <- analyze_dff(fit, diag, facet = "Rater", group = "Group", data = toy)
 #' head(dff$dif_table[, c("Level", "Group1", "Group2", "Classification")])
+#' }
 #'
 #' @name mfrmr_linking_and_dff
 NULL

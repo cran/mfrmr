@@ -41,7 +41,8 @@ considered comparable. Includes a conservative \code{nesting_audit}.
 \description{
 Produce a side-by-side comparison of multiple \code{\link[=fit_mfrm]{fit_mfrm()}} results using
 information criteria, log-likelihood, and parameter counts. When exactly
-two nested models are supplied, a likelihood-ratio test is included.
+two models are supplied and the current conservative nesting audit passes,
+a likelihood-ratio test is included.
 }
 \details{
 Models should be fit to the \strong{same data} (same rows, same person/facet
@@ -61,6 +62,13 @@ nesting in MFRM is RSM (shared thresholds) inside PCM
 method (MML vs JML) on the same specification are not nested in the
 usual sense---use information criteria rather than LRT for that
 comparison.
+
+In the \strong{current \code{mfrmr} model space}, the automatic nesting audit is
+intentionally conservative: it treats \code{RSM} nested inside \code{PCM} under shared
+data and shared constraints as the only supported automatic relation.
+Same-family comparisons, cross-method comparisons, or comparisons that
+change anchors/dummying/centering are not automatically promoted to LRT
+claims.
 
 The \strong{likelihood-ratio test (LRT)} is reported only when exactly two
 models are supplied, \code{nested = TRUE}, the structural audit passes, and the
@@ -110,6 +118,8 @@ structure.
 \code{table$ICComparable} is \code{FALSE}.
 \item Do not interpret the LRT unless \code{nested = TRUE} and the structural audit
 in \code{comparison_basis$nesting_audit} passes.
+\item Do not assume that \code{nested = TRUE} overrides the package's conservative
+nesting boundary; unsupported relations remain unsupported.
 \item Do not compare models fit to different datasets, different score codings,
 or materially different constraint systems as if they were commensurate.
 }
@@ -136,7 +146,8 @@ cautiously---they do not adjust for multiple comparisons.
 \item \code{table}: first-pass comparison table; start with \code{ICComparable},
 \code{Model}, \code{Method}, \code{AIC}, and \code{BIC}.
 \item \code{comparison_basis}: records whether IC and LRT claims are defensible for
-the supplied models.
+the supplied models. Inspect \code{comparison_basis$nesting_audit$relation}
+and \code{reason} before reading any LRT output.
 \item \code{lrt}: nested-model test summary, present only when the requested and
 audited conditions are met.
 \item \code{preferred}: candidate preferred by each criterion when those summaries

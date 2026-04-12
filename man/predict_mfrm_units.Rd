@@ -2,7 +2,7 @@
 % Please edit documentation in R/api-prediction.R
 \name{predict_mfrm_units}
 \alias{predict_mfrm_units}
-\title{Score future or partially observed units under a fixed MML calibration}
+\title{Score future or partially observed units under the fitted scoring basis}
 \usage{
 predict_mfrm_units(
   fit,
@@ -11,13 +11,19 @@ predict_mfrm_units(
   facets = NULL,
   score = NULL,
   weight = NULL,
+  person_data = NULL,
+  person_id = NULL,
+  population_policy = c("error", "omit"),
   interval_level = 0.95,
   n_draws = 0,
   seed = NULL
 )
 }
 \arguments{
-\item{fit}{Output from \code{\link[=fit_mfrm]{fit_mfrm()}} with \code{method = "MML"}.}
+\item{fit}{Output from \code{\link[=fit_mfrm]{fit_mfrm()}} estimated with \code{method = "MML"} or
+\code{method = "JML"}. When \code{fit} uses the latent-regression MML branch
+(\code{posterior_basis = "population_model"}), score the target persons with
+the same background-variable contract via \code{person_data}.}
 
 \item{new_data}{Long-format data for the future or partially observed units
 to be scored.}
@@ -36,6 +42,26 @@ column recorded in \code{fit}.}
 \item{weight}{Optional weight column in \code{new_data}. Defaults to the weight
 column recorded in \code{fit}, if any.}
 
+\item{person_data}{Optional one-row-per-person data.frame with the
+background variables required by a latent-regression fit. Ignored for
+ordinary fixed-calibration scoring. For intercept-only latent-regression
+fits (\code{population_formula = ~ 1}), \code{mfrmr} reconstructs the minimal
+one-row-per-person table internally from the scored person IDs. This is the
+scoring-time table for \code{new_data}, not the fit object's replay/export
+provenance table. For categorical background variables, supply values on
+the same coding scale used at fit time; the fitted factor levels and
+contrasts are reused when building the scoring design matrix.}
+
+\item{person_id}{Optional person-ID column in \code{person_data}. Defaults to
+\code{person} when that column exists, otherwise \code{"Person"} for the canonical
+scoring layout.}
+
+\item{population_policy}{How missing background data are handled when
+\code{fit} uses the latent-regression branch. \code{"error"} (default) requires
+complete person-level covariates for all scored persons; \code{"omit"} drops
+scored persons lacking complete covariates and records that omission in
+\code{population_audit}.}
+
 \item{interval_level}{Posterior interval level returned in \code{Lower}/\code{Upper}.}
 
 \item{n_draws}{Optional number of quadrature-grid posterior draws to return
@@ -49,19 +75,44 @@ An object of class \code{mfrm_unit_prediction} with components:
 \item \code{estimates}: posterior summaries by person
 \item \code{draws}: optional quadrature-grid posterior draws
 \item \code{audit}: row-level preparation audit for \code{new_data}
+\item \code{population_audit}: optional person-level omission audit for
+latent-regression scoring
 \item \code{input_data}: cleaned canonical scoring rows retained from \code{new_data}
+\item \code{person_data}: cleaned or supplied person-level background data used for
+latent-regression scoring; \code{NULL} otherwise
 \item \code{settings}: scoring settings
 \item \code{notes}: interpretation notes
 }
 }
 \description{
-Score future or partially observed units under a fixed MML calibration
+Score future or partially observed units under the fitted scoring basis
 }
 \details{
 \code{predict_mfrm_units()} is the \strong{individual-unit companion} to
-\code{\link[=predict_mfrm_population]{predict_mfrm_population()}}. It uses a fixed MML calibration and scores new
-or partially observed persons via Expected A Posteriori (EAP) summaries on
-the fitted quadrature grid.
+\code{\link[=predict_mfrm_population]{predict_mfrm_population()}}. It uses the fitted calibration and, when
+available, the fitted one-dimensional population model to score new or
+partially observed persons via Expected A Posteriori (EAP) summaries on a
+quadrature grid.
+
+When the original fit uses ordinary \code{method = "MML"}, the posterior
+summaries are taken under that fitted MML calibration. When the original fit
+uses the latent-regression MML branch, the scoring prior is the fitted
+conditional normal population model \eqn{\theta \mid x \sim
+N(x^\top\hat\beta, \hat\sigma^2)}, so the returned summaries are
+population-model-aware posterior EAP estimates. When the original fit uses
+\code{method = "JML"}, \code{mfrmr} applies the fitted facet/step parameters with a
+standard normal reference prior on the quadrature grid, so the returned
+person scores remain fixed-calibration EAP summaries rather than direct JML
+estimates from the fitting step.
+
+When the fitted population model is intercept-only (\code{population_formula = ~ 1}), \code{predict_mfrm_units()} still uses the fitted population-model basis,
+but it can reconstruct the minimal scored-person table internally because no
+background covariates are needed beyond the person IDs in \code{new_data}.
+
+The current bounded \code{GPCM} branch is included in this scoring layer,
+so fitted \code{GPCM} objects can be used for the same fixed-calibration
+posterior summaries. This does not imply that every downstream diagnostic or
+reporting helper has already been generalized to \code{GPCM}.
 
 This is appropriate for questions such as:
 \itemize{
@@ -78,8 +129,15 @@ being scored.
 
 When \code{n_draws > 0}, the returned \code{draws} component contains discrete
 quadrature-grid posterior draws that can be used as approximate plausible
-values under the fixed calibration. They should be interpreted as posterior
-uncertainty summaries, not as deterministic future truth values.
+values under the fitted scoring basis. They should be interpreted as
+posterior uncertainty summaries, not as deterministic future truth values.
+
+For \code{JML} fits, this scoring stage is intentionally post hoc: \code{mfrmr} uses
+the fitted facet and step parameters from the joint-likelihood fit, then
+adds a standard normal reference prior only for the scoring layer so that
+new or partially observed units can be summarized on a quadrature grid.
+This is a practical fixed-calibration EAP procedure, not a claim that the
+original \code{JML} fit itself estimated a population model.
 }
 \section{Interpreting output}{
 
@@ -88,9 +146,13 @@ uncertainty summaries, not as deterministic future truth values.
 \code{new_data}.
 \item \code{Lower} and \code{Upper} are quadrature-grid posterior interval bounds at the
 requested \code{interval_level}.
-\item \code{SD} is posterior uncertainty under the fixed MML calibration.
+\item \code{SD} is posterior uncertainty under the fitted scoring basis used for
+scoring.
 \item \code{draws}, when requested, contains approximate plausible values on the
 fitted quadrature grid.
+\item \code{population_audit}, when present, records whether scored persons were
+omitted because their background data were incomplete for a
+latent-regression fit.
 }
 }
 
@@ -98,24 +160,32 @@ fitted quadrature grid.
 
 This helper does not update the original calibration, estimate new non-person
 facet levels, or produce deterministic future person true values. It scores
-new response patterns under a fixed calibration model.
+new response patterns under the fitted calibration and, when applicable, the
+fitted one-dimensional population model.
 }
 
 \section{References}{
 
-The posterior summaries follow the usual MML/EAP scoring framework used in
-item response modeling under fixed calibrated parameters (for example Bock &
-Aitkin, 1981). Optional posterior draws are exposed as quadrature-grid
-plausible-value-style summaries in the spirit of Mislevy (1991), but here
-they are offered as practical uncertainty summaries for fixed-calibration
-many-facet scoring rather than as a direct implementation of a published
-many-facet plausible-values procedure.
+The posterior summaries follow the usual quadrature-based EAP scoring
+framework used in item response modeling under calibrated parameters
+(for example Bock & Aitkin, 1981). When \code{fit} uses the latent-regression
+branch, \code{mfrmr} scores under the fitted conditional normal population model
+in the general plausible-values spirit discussed by Mislevy (1991). Optional
+posterior draws are exposed as quadrature-grid plausible-value-style
+summaries for practical many-facet scoring rather than as a claim of full
+ConQuest numerical equivalence. When the source fit is \code{JML}, the same
+literature supports
+the quadrature-based scoring layer, but the standard normal prior is a
+package-level reference prior introduced for post hoc scoring rather than an
+estimated population distribution.
 \itemize{
 \item Bock, R. D., & Aitkin, M. (1981). \emph{Marginal maximum likelihood estimation
 of item parameters: Application of an EM algorithm}. Psychometrika, 46(4),
 443-459.
 \item Mislevy, R. J. (1991). \emph{Randomization-based inference about latent
 variables from complex samples}. Psychometrika, 56(2), 177-196.
+\item Muraki, E. (1992). \emph{A generalized partial credit model: Application of an
+EM algorithm}. Applied Psychological Measurement, 16(2), 159-176.
 }
 }
 

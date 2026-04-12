@@ -157,7 +157,11 @@ subgroup linking diagnostics.
 \section{Typical workflow}{
 
 \enumerate{
-\item Fit a model with \code{\link[=fit_mfrm]{fit_mfrm()}}.
+\item Fit a model with \code{\link[=fit_mfrm]{fit_mfrm()}}. For \code{RSM} / \code{PCM} fairness review, prefer
+\code{method = "MML"}.
+\item Run \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} and, for \code{RSM} / \code{PCM}, prefer
+\code{diagnostic_mode = "both"} so legacy and strict marginal screens remain
+visible together.
 \item Run \code{analyze_dff(fit, diagnostics, facet = "Criterion", group = "Gender", data = my_data)}.
 \item Inspect \verb{$dif_table} for flagged levels and \verb{$summary} for counts.
 \item Use \code{\link[=dif_interaction_table]{dif_interaction_table()}} when you need cell-level diagnostics.
@@ -166,11 +170,12 @@ subgroup linking diagnostics.
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_bias")
 
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                 method = "JML", model = "RSM", maxit = 25)
-diag <- diagnose_mfrm(fit, residual_pca = "none")
+                 method = "MML", model = "RSM", maxit = 200)
+diag <- diagnose_mfrm(fit, residual_pca = "none", diagnostic_mode = "both")
 dff <- analyze_dff(fit, diag, facet = "Rater", group = "Group", data = toy)
 dff$summary
 head(dff$dif_table[, c("Level", "Group1", "Group2", "Contrast", "Classification")])
@@ -178,6 +183,7 @@ sc <- subset_connectivity_report(fit, diagnostics = diag)
 plot(sc, type = "design_matrix", draw = FALSE)
 if ("ScaleLinkStatus" \%in\% names(dff$dif_table)) {
   unique(dff$dif_table$ScaleLinkStatus)
+}
 }
 }
 \seealso{

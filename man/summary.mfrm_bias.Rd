@@ -61,9 +61,10 @@ This method returns a compact interaction-bias summary:
 
 \examples{
 toy <- load_mfrmr_data("example_bias")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+toy <- toy[toy$Person \%in\% unique(toy$Person)[1:8], ]
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 50)
 diag <- diagnose_mfrm(fit, residual_pca = "none")
-bias <- estimate_bias(fit, diag, facet_a = "Rater", facet_b = "Criterion", max_iter = 2)
+bias <- estimate_bias(fit, diag, facet_a = "Rater", facet_b = "Criterion", max_iter = 1)
 summary(bias)
 }
 \seealso{

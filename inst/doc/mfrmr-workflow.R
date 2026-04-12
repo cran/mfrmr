@@ -60,6 +60,13 @@ names(plot(t4_toy, draw = FALSE))
 names(plot(t12_toy, draw = FALSE))
 names(plot(t13_toy, draw = FALSE))
 
+chk_toy <- reporting_checklist(fit_toy, diagnostics = diag_toy)
+subset(
+  chk_toy$checklist,
+  Section == "Visual Displays",
+  c("Item", "DraftReady", "NextAction")
+)
+
 ## ----fit-full-----------------------------------------------------------------
 fit <- fit_mfrm(
   data = ej2021_study1,
@@ -87,6 +94,75 @@ diag_pca <- diagnose_mfrm(
 )
 
 summary(diag_pca)
+
+## ----strict-rsm-pcm-----------------------------------------------------------
+fit_rsm_strict <- fit_mfrm(
+  data = toy,
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  score = "Score",
+  method = "MML",
+  model = "RSM",
+  quad_points = 7,
+  maxit = 10
+)
+diag_rsm_strict <- diagnose_mfrm(
+  fit_rsm_strict,
+  diagnostic_mode = "both",
+  residual_pca = "none"
+)
+
+fit_pcm_strict <- fit_mfrm(
+  data = toy,
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  score = "Score",
+  method = "MML",
+  model = "PCM",
+  step_facet = "Criterion",
+  quad_points = 7,
+  maxit = 10
+)
+diag_pcm_strict <- diagnose_mfrm(
+  fit_pcm_strict,
+  diagnostic_mode = "both",
+  residual_pca = "none"
+)
+
+summary(diag_rsm_strict)$diagnostic_basis[, c("DiagnosticPath", "Status", "Basis")]
+summary(diag_pcm_strict)$diagnostic_basis[, c("DiagnosticPath", "Status", "Basis")]
+
+## ----strict-screening---------------------------------------------------------
+screen_rsm <- evaluate_mfrm_diagnostic_screening(
+  design = list(person = 18, rater = 3, criterion = 3, assignment = 3),
+  reps = 1,
+  scenarios = c("well_specified", "local_dependence"),
+  model = "RSM",
+  maxit = 8,
+  quad_points = 7,
+  seed = 123
+)
+screen_pcm <- evaluate_mfrm_diagnostic_screening(
+  design = list(person = 18, rater = 3, criterion = 3, assignment = 3),
+  reps = 1,
+  scenarios = c("well_specified", "step_structure_misspecification"),
+  model = "PCM",
+  maxit = 8,
+  quad_points = 7,
+  seed = 123
+)
+
+screen_rsm$performance_summary[, c("Scenario", "EvaluationUse", "LegacyAnyFlagRate", "StrictAnyFlagRate")]
+screen_pcm$performance_summary[, c("Scenario", "EvaluationUse", "LegacySensitivityProxy", "StrictSensitivityProxy", "DeltaStrictMinusLegacyFlagRate")]
+
+## ----strict-reporting-route---------------------------------------------------
+chk_rsm_strict <- reporting_checklist(fit_rsm_strict, diagnostics = diag_rsm_strict)
+subset(
+  chk_rsm_strict$checklist,
+  Section == "Visual Displays" &
+    Item %in% c("QC / facet dashboard", "Strict marginal visuals", "Precision / information curves"),
+  c("Item", "Available", "DraftReady", "NextAction")
+)
 
 ## ----residual-pca-------------------------------------------------------------
 pca <- analyze_residual_pca(diag_pca, mode = "both")

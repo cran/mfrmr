@@ -14,7 +14,7 @@
 #' checks whether the fitted object and related diagnostics contain the evidence
 #' typically reported in MFRM write-ups.
 #'
-#' Checklist items are grouped into seven sections:
+#' Checklist items are grouped into seven core sections:
 #' - Method section
 #' - Global fit
 #' - Facet-level statistics
@@ -23,11 +23,16 @@
 #' - Bias/interaction analysis
 #' - Visual displays
 #'
+#' When a fit uses the latent-regression population-model branch, the checklist
+#' also adds a `Population Model` section covering coefficient reporting,
+#' categorical model-matrix coding, complete-case omissions, posterior-basis
+#' wording, and ConQuest scope wording.
+#'
 #' The output is designed for manuscript preparation, audit trails, and
 #' reproducible reporting workflows.
 #'
 #' @section What this checklist means:
-#' `reporting_checklist()` is a content-availability contract. It tells you
+#' `reporting_checklist()` is a manuscript-preparation guide. It tells you
 #' which reporting elements are already present in the current analysis
 #' objects and which still need to be generated or documented. The primary
 #' draft-status column is `DraftReady`; `ReadyForAPA` is retained as a
@@ -45,29 +50,53 @@
 #'   package's documented caveats. `ReadyForAPA` is a backward-compatible alias
 #'   of the same flag; neither field certifies formal inferential adequacy.
 #' - `section_summary`: available items by section.
+#' - `software_scope`: external-software relationship summary for `mfrmr`,
+#'   FACETS, ConQuest, and SPSS-style tabular handoffs.
+#' - `visual_scope`: plotting-route summary that separates report-default
+#'   2D figures from exploratory surface/3D-ready payloads, including a short
+#'   `InterpretationCheck` for the main user-facing caveat.
 #' - `references`: core background references when requested.
 #'
 #' @section Recommended next step:
 #' Review the rows with `Available = FALSE` or `DraftReady = FALSE`, then add
 #' the missing diagnostics, bias results, or narrative context before calling
-#' [build_apa_outputs()] for draft text generation.
+#' [build_apa_outputs()] for draft text generation. For `RSM` / `PCM`
+#' reporting runs, the preferred route is an `MML` fit plus
+#' `diagnose_mfrm(..., diagnostic_mode = "both")` so the checklist can see the
+#' legacy and strict marginal screens together.
+#'
+#' @section How this differs from operational review:
+#' `reporting_checklist()` is the manuscript/reporting branch of the package.
+#' Use it when the question is "what is still missing from the report?" rather
+#' than "which observations or links need follow-up?" For operational review:
+#' - Use [build_misfit_casebook()] after [diagnose_mfrm()] when you need ranked
+#'   misfit cases and grouping views for local follow-up.
+#' - Use [build_linking_review()] after anchor/drift/chain helpers when you
+#'   need operational linking triage rather than manuscript-oriented reporting
+#'   tables.
 #'
 #' @section Typical workflow:
-#' 1. Fit with [fit_mfrm()].
-#' 2. Compute diagnostics with [diagnose_mfrm()].
+#' 1. Fit with [fit_mfrm()]. For `RSM` / `PCM` reporting runs, prefer
+#'    `method = "MML"`.
+#' 2. Compute diagnostics with [diagnose_mfrm()]. For `RSM` / `PCM`, prefer
+#'    `diagnostic_mode = "both"`.
 #' 3. Run `reporting_checklist()` to see which reporting elements are already
 #'    available from the current analysis objects.
+#' 4. If the issue is operational rather than manuscript-facing, branch to
+#'    [build_misfit_casebook()] or [build_linking_review()] instead of treating
+#'    `reporting_checklist()` as the single review hub.
 #'
 #' @return A named list with checklist tables. Class:
 #'   `mfrm_reporting_checklist`.
 #' @seealso [build_apa_outputs()], [build_visual_summaries()],
-#'   [specifications_report()], [data_quality_report()]
+#'   [specifications_report()], [data_quality_report()],
+#'   [build_misfit_casebook()], [build_linking_review()]
 #' @examples
 #' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-#'                 method = "JML", maxit = 25)
-#' diag <- diagnose_mfrm(fit, residual_pca = "both")
+#'                 method = "MML", maxit = 200)
+#' diag <- diagnose_mfrm(fit, residual_pca = "both", diagnostic_mode = "both")
 #' chk <- reporting_checklist(fit, diagnostics = diag)
 #' summary(chk)
 #' apa <- build_apa_outputs(fit, diag)
@@ -148,6 +177,40 @@ reporting_checklist <- function(fit,
   has_pca <- !is.null(pca_obj) && length(pca_obj) > 0
   has_counts <- has_resid && "Observed" %in% names(obs_df)
   has_person_measure <- has_resid && "PersonMeasure" %in% names(obs_df)
+  has_subsets <- !is.null(diagnostics$subsets)
+  marginal_fit_bundle <- diagnostics$marginal_fit %||% list()
+  strict_marginal_available <- isTRUE(marginal_fit_bundle$available)
+  strict_pairwise_available <- isTRUE(marginal_fit_bundle$pairwise$available)
+  strict_marginal_reason <- if (strict_marginal_available) {
+    if (strict_pairwise_available) {
+      "Strict marginal first-order and pairwise bundles are available for plotting."
+    } else {
+      "Strict marginal first-order bundle is available, but pairwise follow-up is unavailable."
+    }
+  } else {
+    as.character(
+      marginal_fit_bundle$summary$Reason[1] %||%
+        marginal_fit_bundle$notes[1] %||%
+        "Strict marginal diagnostics are unavailable for the current run."
+    )
+  }
+  population <- fit$population %||% list()
+  population_active <- isTRUE(population$active)
+  population_coefficients <- as.numeric(population$coefficients %||% numeric(0))
+  population_coefficients_finite <- length(population_coefficients) > 0L &&
+    all(is.finite(population_coefficients))
+  population_sigma2 <- suppressWarnings(as.numeric(population$sigma2 %||% NA_real_))
+  population_formula <- if (!is.null(population$formula)) {
+    paste(deparse(population$formula), collapse = " ")
+  } else {
+    ""
+  }
+  population_posterior_basis <- as.character(population$posterior_basis %||% "legacy_mml")
+  population_coding <- population_coding_summary_table(population)
+  population_design_columns <- as.character(population$design_columns %||% character(0))
+  population_omitted_persons <- length(population$omitted_persons %||% character(0))
+  population_omitted_rows <- suppressWarnings(as.integer(population$response_rows_omitted %||% 0L))
+  if (!is.finite(population_omitted_rows)) population_omitted_rows <- 0L
 
   add_item <- function(section,
                        item,
@@ -157,7 +220,10 @@ reporting_checklist <- function(fit,
                        severity = c("required", "recommended", "optional"),
                        ready_for_apa = available,
                        missing_action = "Compute or document this component before manuscript export.",
-                       available_action = NULL) {
+                       available_action = NULL,
+                       plot_helper = NA_character_,
+                       draw_free_route = NA_character_,
+                       plot_return_class = NA_character_) {
     severity <- match.arg(severity)
     ready_for_apa <- isTRUE(ready_for_apa)
     priority <- if (ready_for_apa) {
@@ -188,14 +254,118 @@ reporting_checklist <- function(fit,
       Priority = as.character(priority),
       SourceComponent = as.character(source_component),
       Detail = as.character(detail),
+      PlotHelper = as.character(plot_helper),
+      DrawFreeRoute = as.character(draw_free_route),
+      PlotReturnClass = as.character(plot_return_class),
       NextAction = as.character(if (isTRUE(available)) available_action else missing_action),
       stringsAsFactors = FALSE
     )
   }
 
+  population_items <- list()
+  if (population_active) {
+    coding_detail <- if (nrow(population_coding) > 0L) {
+      paste0(
+        "Stored coding for ",
+        paste(population_coding$Variable, collapse = ", "),
+        "; encoded columns: ",
+        paste(population_coding$EncodedColumns[nzchar(population_coding$EncodedColumns)], collapse = ", ")
+      )
+    } else {
+      "No categorical coding was recorded; formula appears intercept-only, numeric, or logical."
+    }
+    if (!nzchar(coding_detail)) {
+      coding_detail <- "No encoded categorical columns recorded."
+    }
+    omission_detail <- paste0(
+      "Omitted persons = ", population_omitted_persons,
+      "; omitted response rows = ", population_omitted_rows,
+      "; policy = ", as.character(population$policy %||% NA_character_)
+    )
+    population_items <- list(
+      add_item(
+        "Population Model",
+        "Latent-regression basis",
+        population_active && identical(population_posterior_basis, "population_model"),
+        detail = paste0(
+          "Formula=", population_formula,
+          "; posterior basis=", population_posterior_basis,
+          "; model=", as.character(config$model %||% NA_character_),
+          "; method=", as.character(config$method %||% NA_character_)
+        ),
+        source_component = "fit$population",
+        severity = "required",
+        ready_for_apa = population_active && identical(population_posterior_basis, "population_model"),
+        missing_action = "Fit with `method = \"MML\"`, `population_formula`, and one-row-per-person `person_data` before reporting latent regression.",
+        available_action = "Describe the fit as a first-version conditional-normal latent-regression MML model, not as a post hoc regression on EAP/MLE scores."
+      ),
+      add_item(
+        "Population Model",
+        "Population coefficients and residual variance",
+        population_coefficients_finite && is.finite(population_sigma2),
+        detail = paste0(
+          length(population_coefficients), " coefficient(s); residual variance = ",
+          if (is.finite(population_sigma2)) signif(population_sigma2, 4) else NA_real_
+        ),
+        source_component = "summary(fit)$population_coefficients + summary(fit)$population_overview",
+        severity = "required",
+        ready_for_apa = population_coefficients_finite && is.finite(population_sigma2) && population_sigma2 > 0,
+        missing_action = "Inspect `summary(fit)$population_coefficients` and `summary(fit)$population_overview` before reporting latent-regression effects.",
+        available_action = "Report coefficients and residual variance as conditional-normal population-model parameters, with scale/coding notes."
+      ),
+      add_item(
+        "Population Model",
+        "Model-matrix covariate coding",
+        length(population_design_columns) > 0L,
+        detail = coding_detail,
+        source_component = "summary(fit)$population_coding + fit$population$xlevels + fit$population$contrasts",
+        severity = "required",
+        ready_for_apa = length(population_design_columns) > 0L,
+        missing_action = "Inspect `summary(fit)$population_coding` and document categorical levels/contrasts before scoring or reporting the population model.",
+        available_action = "Use `summary(fit)$population_coding` to document categorical levels, contrasts, and encoded columns used by scoring/replay."
+      ),
+      add_item(
+        "Population Model",
+        "Complete-case omission audit",
+        TRUE,
+        detail = omission_detail,
+        source_component = "summary(fit)$population_overview + summary(fit)$caveats",
+        severity = "required",
+        ready_for_apa = population_omitted_persons == 0L && population_omitted_rows == 0L,
+        missing_action = "Review omitted persons/rows and the population-data policy before reporting the population model.",
+        available_action = if (population_omitted_persons == 0L && population_omitted_rows == 0L) {
+          "State that no persons were omitted by the population-model covariate policy."
+        } else {
+          "Document the complete-case policy and omitted-person/row counts before reporting latent-regression results."
+        }
+      ),
+      add_item(
+        "Population Model",
+        "Population-model posterior scoring wording",
+        TRUE,
+        detail = "Active latent-regression scoring should condition on the fitted population model; new-person scoring requires matching `person_data` when covariates are present.",
+        source_component = "predict_mfrm_units() / sample_mfrm_plausible_values()",
+        severity = "recommended",
+        ready_for_apa = TRUE,
+        available_action = "When reporting EAP/PV outputs, state whether they use the fitted population-model posterior and document the required `person_data` input."
+      ),
+      add_item(
+        "Population Model",
+        "ConQuest overlap wording",
+        TRUE,
+        detail = "Current overlap is narrow RSM/PCM unidimensional conditional-normal latent regression; ConQuest comparison is scoped to the documented external-table workflow.",
+        source_component = "README latent-regression status + audit_conquest_overlap()",
+        severity = "recommended",
+        ready_for_apa = FALSE,
+        available_action = "Use conservative wording: ConQuest overlap is limited to the documented latent-regression MML comparison scope."
+      )
+    )
+  }
+
   checklist <- do.call(
     rbind,
-    list(
+    c(
+      list(
       add_item(
         "Method Section",
         "Model specification",
@@ -479,7 +649,134 @@ reporting_checklist <- function(fit,
         detail = "Supported by plot.mfrm_fit() / plot_wright_unified()",
         source_component = "plot.mfrm_fit",
         severity = "recommended",
-        available_action = "Include a Wright map if the manuscript benefits from a scale-location display."
+        plot_helper = "plot.mfrm_fit() / plot_wright_unified()",
+        draw_free_route = "plot(fit, type = \"wright\", draw = FALSE)",
+        plot_return_class = "mfrm_plot_data",
+        available_action = "Include a Wright map when the manuscript benefits from a shared-scale targeting display."
+      ),
+      add_item(
+        "Visual Displays",
+        "QC / facet dashboard",
+        nrow(obs_df) > 0,
+        detail = if (nrow(obs_df) > 0) {
+          "plot_qc_dashboard() / plot_facet_quality_dashboard() can use the current diagnostics bundle"
+        } else {
+          "No observation-level diagnostics for dashboard plotting"
+        },
+        source_component = "diagnostics$obs + diagnostics$fit",
+        severity = "recommended",
+        plot_helper = "plot_qc_dashboard() / plot_facet_quality_dashboard()",
+        draw_free_route = "plot_qc_dashboard(fit, diagnostics = diagnostics, draw = FALSE)",
+        plot_return_class = "mfrm_plot_data",
+        missing_action = "Run diagnose_mfrm() so the QC and facet dashboards can be rendered from the current analysis bundle.",
+        available_action = "Use the dashboard as a first-pass triage view, then move to the specific follow-up plot behind each flag."
+      ),
+      add_item(
+        "Visual Displays",
+        "Residual PCA visuals",
+        has_pca,
+        detail = if (has_pca) {
+          "plot_residual_pca() can render scree/loadings from the current residual PCA bundle"
+        } else {
+          "Residual PCA not computed"
+        },
+        source_component = "diagnostics$pca",
+        severity = "recommended",
+        plot_helper = "plot_residual_pca()",
+        draw_free_route = "plot_residual_pca(analyze_residual_pca(diagnostics, mode = \"overall\"), mode = \"overall\", plot_type = \"scree\", draw = FALSE)",
+        plot_return_class = "mfrm_plot_data",
+        missing_action = "Run residual PCA if you want scree/loadings visuals for residual-structure follow-up.",
+        available_action = "Use residual PCA plots as exploratory structure follow-up, not as standalone dimensionality proof."
+      ),
+      add_item(
+        "Visual Displays",
+        "Connectivity / design-matrix visual",
+        has_subsets,
+        detail = if (has_subsets) {
+          "subset_connectivity_report() and plot(..., type = \"design_matrix\") can use the current subset bundle"
+        } else {
+          "No subset/connectivity bundle available"
+        },
+        source_component = "diagnostics$subsets",
+        severity = "recommended",
+        plot_helper = "plot.mfrm_subset_connectivity()",
+        draw_free_route = "plot(subset_connectivity_report(fit, diagnostics = diagnostics), type = \"design_matrix\", draw = FALSE)",
+        plot_return_class = "mfrm_plot_data",
+        missing_action = "Run subset/connectivity diagnostics before showing design-matrix or linkage visuals.",
+        available_action = "Use the design-matrix view to support linkage and comparability claims."
+      ),
+      add_item(
+        "Visual Displays",
+        "Inter-rater / displacement visuals",
+        has_fit || has_resid,
+        detail = if (has_fit || has_resid) {
+          "plot_displacement() is available; plot_interrater_agreement() is available when a rater facet is present"
+        } else {
+          "No fit/residual inputs for displacement or inter-rater visuals"
+        },
+        source_component = "diagnostics$obs + diagnostics$measures",
+        severity = "recommended",
+        plot_helper = "plot_displacement() / plot_interrater_agreement()",
+        draw_free_route = "plot_displacement(displacement_table(fit, diagnostics = diagnostics), draw = FALSE)",
+        plot_return_class = "mfrm_plot_data",
+        missing_action = "Retain fit and residual outputs if you want displacement or inter-rater follow-up figures.",
+        available_action = "Use displacement and inter-rater views to localize QC issues after dashboard screening."
+      ),
+      add_item(
+        "Visual Displays",
+        "Strict marginal visuals",
+        strict_marginal_available,
+        detail = strict_marginal_reason,
+        source_component = "diagnostics$marginal_fit",
+        severity = "recommended",
+        ready_for_apa = FALSE,
+        plot_helper = "plot_marginal_fit() / plot_marginal_pairwise()",
+        draw_free_route = "plot_marginal_fit(diagnostics, draw = FALSE)",
+        plot_return_class = "mfrm_plot_data",
+        missing_action = "For MML reporting runs, call diagnose_mfrm(..., diagnostic_mode = \"both\") to enable strict marginal follow-up visuals where supported.",
+        available_action = "Treat strict marginal plots as exploratory corroboration screens, then corroborate with design review and legacy diagnostics."
+      ),
+      add_item(
+        "Visual Displays",
+        "Bias / DIF visuals",
+        n_bias_pairs > 0 || n_bias_errors > 0,
+        detail = if (n_bias_errors > 0) {
+          "plot_bias_interaction() can use the current bias bundle, but failed pair requests should be reviewed before interpretation"
+        } else if (n_bias_pairs > 0) {
+          "plot_bias_interaction() can use the current bias bundle; use plot_dif_heatmap() when a DIF result is available"
+        } else {
+          "No bias screening bundle available"
+        },
+        source_component = "bias_results",
+        severity = "recommended",
+        ready_for_apa = FALSE,
+        plot_helper = "plot_bias_interaction() / plot_dif_heatmap()",
+        draw_free_route = "plot_bias_interaction(bias_results[[1]], draw = FALSE)",
+        plot_return_class = "mfrm_plot_data",
+        missing_action = "Run bias or DIF screening before discussing interaction-level visuals.",
+        available_action = "Use bias/DIF plots as screening follow-up, not as formal hypothesis tests."
+      ),
+      add_item(
+        "Visual Displays",
+        "Precision / information curves",
+        converged,
+        detail = if (converged) {
+          "compute_information() / plot_information() are available for the current fitted model"
+        } else {
+          "Information curves are not recommended until convergence is resolved"
+        },
+        source_component = "fit + compute_information()",
+        severity = "recommended",
+        ready_for_apa = converged && formal_precision,
+        plot_helper = "plot_information()",
+        draw_free_route = "plot_information(compute_information(fit), draw = FALSE)",
+        plot_return_class = "mfrm_plot_data",
+        missing_action = "Resolve convergence before using information or precision curves in reporting.",
+        available_action = if (formal_precision) {
+          "Use information curves to describe precision across theta when that is the reporting question."
+        } else {
+          "Use information curves descriptively and keep the current precision-tier caveat in the narrative."
+        }
       ),
       add_item(
         "Visual Displays",
@@ -488,8 +785,14 @@ reporting_checklist <- function(fit,
         detail = if (has_fit || has_steps) "Plotting inputs available for fit/category visuals" else "No fit or step visuals available",
         source_component = "diagnostics$fit + fit$steps",
         severity = "optional",
-        missing_action = "Add fit or threshold inputs if you want figure-ready diagnostics."
+        plot_helper = "plot.mfrm_fit() / plot.mfrm_category_curves()",
+        draw_free_route = "plot(fit, type = \"ccc\", draw = FALSE)",
+        plot_return_class = "mfrm_plot_data",
+        missing_action = "Add fit or threshold inputs if you want figure-ready diagnostics.",
+        available_action = "Use category curves and fit visuals as local descriptive follow-up after QC screening."
       )
+      ),
+      population_items
     )
   )
 
@@ -540,13 +843,325 @@ reporting_checklist <- function(fit,
     checklist = checklist,
     summary = as.data.frame(section_summary, stringsAsFactors = FALSE),
     section_summary = as.data.frame(section_summary, stringsAsFactors = FALSE),
+    software_scope = external_software_scope_table(fit),
+    visual_scope = visual_scope_table(fit, checklist),
     references = references,
     settings = settings
   )
   as_mfrm_bundle(out, "mfrm_reporting_checklist")
 }
 
+external_software_scope_table <- function(fit) {
+  cfg <- fit$config %||% list()
+  population <- fit$population %||% list()
+  model <- toupper(as.character(cfg$model %||% NA_character_))[1]
+  method <- toupper(as.character(cfg$method %||% cfg$method_input %||% NA_character_))
+  population_active <- isTRUE(population$active)
+  conquest_candidate <- population_active &&
+    identical(method, "MML") &&
+    model %in% c("RSM", "PCM")
+
+  data.frame(
+    Software = c("mfrmr native", "FACETS", "ConQuest", "SPSS"),
+    Relationship = c(
+      "primary estimation/reporting surface",
+      "compatibility-style wrappers and exports for handoff",
+      "scoped external-table comparison for latent-regression overlap",
+      "downstream table/report handoff only"
+    ),
+    CurrentSupport = c(
+      "active",
+      "active compatibility layer",
+      if (conquest_candidate) "candidate fit; additional exact-overlap restrictions apply" else "not active for this fit",
+      "CSV/data.frame outputs only"
+    ),
+    PrimaryHelpers = c(
+      "fit_mfrm() -> diagnose_mfrm() -> reporting_checklist() -> build_apa_outputs()",
+      "run_mfrm_facets(), mfrmRFacets(), facets_output_file_bundle(), facets_parity_report()",
+      "build_conquest_overlap_bundle() -> normalize_conquest_overlap_*() -> audit_conquest_overlap()",
+      "export_mfrm_bundle(), export_summary_appendix(), as.data.frame()"
+    ),
+    Boundary = c(
+      "Package-native results are the authoritative analysis objects.",
+      "Results remain mfrmr estimates unless a separate external FACETS audit is performed.",
+      "Requires an external ConQuest run and extracted output tables for the documented overlap case.",
+      "CSV/data-frame outputs support reporting handoff; native SPSS integration is not implemented."
+    ),
+    RecommendedWording = c(
+      "Estimated with mfrmr under the stated model/method settings.",
+      "FACETS-style handoff outputs were generated; estimates were produced by mfrmr.",
+      "ConQuest overlap is limited to the documented latent-regression MML comparison scope.",
+      "Tables were exported for possible SPSS/reporting use; analysis was not performed in SPSS."
+    ),
+    stringsAsFactors = FALSE
+  )
+}
+
+visual_scope_table <- function(fit, checklist) {
+  cfg <- fit$config %||% list()
+  model <- toupper(as.character(cfg$model %||% NA_character_))[1]
+  steps <- as.data.frame(fit$steps %||% data.frame(), stringsAsFactors = FALSE)
+  has_steps <- nrow(steps) > 0 && "Estimate" %in% names(steps)
+
+  visual_status <- function(item) {
+    row <- checklist[checklist$Section == "Visual Displays" & checklist$Item == item, , drop = FALSE]
+    if (nrow(row) == 0) return("not listed in reporting checklist")
+    if (isTRUE(row$Available[1])) return("available for current fit")
+    paste0("not ready for current fit: ", as.character(row$NextAction[1]))
+  }
+
+  surface_status <- if (has_steps && model %in% c("RSM", "PCM", "GPCM")) {
+    "active payload route for current fit"
+  } else if (!(model %in% c("RSM", "PCM", "GPCM"))) {
+    paste0("not active for current model: ", model)
+  } else {
+    "not ready for current fit: step/threshold estimates are required"
+  }
+
+  data.frame(
+    Visualization = c(
+      "QC dashboard",
+      "Wright map",
+      "Pathway / CCC",
+      "Category probability surface",
+      "Information curves",
+      "Strict marginal visuals",
+      "Bias / DIF visuals",
+      "Residual PCA visuals"
+    ),
+    Role = c(
+      "first-pass diagnostic triage",
+      "shared-scale targeting and spread",
+      "ordered-category structure and category dominance",
+      "exploratory theta x category x probability review",
+      "precision and targeting across theta",
+      "strict marginal fit follow-up",
+      "interaction and group-functioning screening",
+      "exploratory residual-structure follow-up"
+    ),
+    CurrentSupport = c(
+      visual_status("QC / facet dashboard"),
+      visual_status("Wright map"),
+      visual_status("Fit/category visuals"),
+      surface_status,
+      visual_status("Precision / information curves"),
+      visual_status("Strict marginal visuals"),
+      visual_status("Bias / DIF visuals"),
+      visual_status("Residual PCA visuals")
+    ),
+    SupportedModels = c(
+      "RSM/PCM; GPCM residual stack with documented fair-average boundary",
+      "RSM/PCM/GPCM when person, facet, and step locations are available",
+      "RSM/PCM/GPCM when step/threshold estimates are available",
+      "RSM/PCM/GPCM when step/threshold estimates are available",
+      "RSM/PCM/GPCM where compute_information() supports the fitted object",
+      "RSM/PCM MML diagnostic_mode = \"both\" where strict marginal bundles are available",
+      "Model-dependent; requires supplied bias/DIF screening results",
+      "Model-dependent; requires residual PCA computation"
+    ),
+    PrimaryHelper = c(
+      "plot_qc_dashboard() / plot_facet_quality_dashboard()",
+      "plot(fit, type = \"wright\") / plot_wright_unified()",
+      "plot(fit, type = \"pathway\") / plot(fit, type = \"ccc\")",
+      "plot(fit, type = \"ccc_surface\")",
+      "compute_information() -> plot_information()",
+      "plot_marginal_fit() / plot_marginal_pairwise()",
+      "plot_bias_interaction() / plot_dif_heatmap()",
+      "analyze_residual_pca() -> plot_residual_pca()"
+    ),
+    DrawFreeRoute = c(
+      "plot_qc_dashboard(fit, diagnostics = diagnostics, draw = FALSE)",
+      "plot(fit, type = \"wright\", draw = FALSE)",
+      "plot(fit, type = \"ccc\", draw = FALSE)",
+      "plot(fit, type = \"ccc_surface\", draw = FALSE)",
+      "plot_information(compute_information(fit), draw = FALSE)",
+      "plot_marginal_fit(diagnostics, draw = FALSE)",
+      "plot_bias_interaction(bias_results[[1]], draw = FALSE)",
+      "plot_residual_pca(analyze_residual_pca(diagnostics, mode = \"overall\"), draw = FALSE)"
+    ),
+    ReportUse = c(
+      "triage figure; usually not the final manuscript figure by itself",
+      "good candidate for reports when targeting/spread is the point",
+      "good candidate for reports as descriptive category-functioning evidence",
+      "exploratory or teaching appendix only; not a default APA figure",
+      "report when precision/targeting is a substantive question and precision tier supports the wording",
+      "exploratory follow-up, not a standalone inferential test",
+      "screening follow-up, not a formal hypothesis-test figure by itself",
+      "exploratory follow-up, not a standalone dimensionality test"
+    ),
+    ThreeDStatus = c(
+      "2D dashboard only; 3D not recommended",
+      "2D recommended; 3D Wright maps are discouraged",
+      "2D report default; surface payload available through the category route",
+      "advanced surface data only; no package-native interactive renderer",
+      "2D curve route active; 3D information surface is a future payload candidate",
+      "2D heatmap/bar style preferred; 3D not recommended",
+      "2D heatmap/profile preferred; 3D not recommended",
+      "2D scree/loadings preferred; 3D not recommended"
+    ),
+    Boundary = c(
+      "Summarizes flags; inspect the component plots before making claims.",
+      "Shows common-scale locations but does not prove model fit.",
+      "Descriptive category-functioning evidence, not proof of rating-scale validity.",
+      "Returned data are exploratory mfrmr output for advanced visualization.",
+      "Depends on the fitted model and precision tier; interpret with checklist caveats.",
+      "Requires strict marginal diagnostics; use as corroborating evidence.",
+      "Requires a bias/DIF result object; treat as screening unless separately justified.",
+      "Residual PCA is exploratory residual-structure review, not a formal dimensionality decision."
+    ),
+    InterpretationCheck = c(
+      "Review component warnings before citing the dashboard.",
+      "Report targeting/spread, then check fit diagnostics separately.",
+      "Check ordered peaks and dominance bands in the 2D CCC/pathway views.",
+      "Inspect category_support before using the surface in an appendix or downstream renderer.",
+      "State whether the curve is model-based, design-weighted, or approximate.",
+      "Confirm diagnostic_mode = \"both\" and describe this as follow-up evidence.",
+      "Confirm the tested pair, low-count cells, and screening threshold.",
+      "Use scree/loadings as exploratory residual-structure evidence only."
+    ),
+    stringsAsFactors = FALSE
+  )
+}
+
+#' Summarize a reporting-checklist bundle for manuscript work
+#'
+#' @param object Output from [reporting_checklist()].
+#' @param top_n Maximum number of draft-action rows shown in the compact action
+#'   table.
+#' @param ... Reserved for generic compatibility.
+#'
+#' @return An object of class `summary.mfrm_reporting_checklist` with:
+#' - `overview`: run-level counts of available and draft-ready items
+#' - `section_summary`: section-level checklist coverage
+#' - `software_scope`: external-software relationship summary
+#' - `visual_scope`: plotting-route and 3D-ready payload summary, including
+#'   the main `InterpretationCheck` caveat for each visual family
+#' - `priority_summary`: counts by priority/severity
+#' - `action_items`: highest-priority rows that still need draft work
+#' - `settings`: checklist settings rendered as a compact table
+#' - `notes`: interpretation notes
+#' @seealso [reporting_checklist()], [summary.mfrm_apa_outputs]
+#' @examples
+#' \donttest{
+#' toy <- load_mfrmr_data("example_core")
+#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
+#'                 method = "MML", maxit = 200)
+#' diag <- diagnose_mfrm(fit, residual_pca = "both", diagnostic_mode = "both")
+#' chk <- reporting_checklist(fit, diagnostics = diag)
+#' summary(chk)
+#' }
+#' @method summary mfrm_reporting_checklist
+#' @export
+summary.mfrm_reporting_checklist <- function(object, top_n = 10, ...) {
+  if (!inherits(object, "mfrm_reporting_checklist")) {
+    stop("`object` must be output from reporting_checklist().", call. = FALSE)
+  }
+
+  top_n <- max(1L, as.integer(top_n[1]))
+  checklist <- as.data.frame(object$checklist %||% data.frame(), stringsAsFactors = FALSE)
+  section_summary <- as.data.frame(object$section_summary %||% object$summary %||% data.frame(), stringsAsFactors = FALSE)
+  software_scope <- as.data.frame(object$software_scope %||% data.frame(), stringsAsFactors = FALSE)
+  visual_scope <- as.data.frame(object$visual_scope %||% data.frame(), stringsAsFactors = FALSE)
+
+  overview <- data.frame(
+    Sections = if (nrow(checklist) > 0) length(unique(checklist$Section)) else 0L,
+    Items = nrow(checklist),
+    Available = if (nrow(checklist) > 0) sum(checklist$Available %in% TRUE, na.rm = TRUE) else 0L,
+    DraftReady = if (nrow(checklist) > 0) sum(checklist$DraftReady %in% TRUE, na.rm = TRUE) else 0L,
+    Missing = if (nrow(checklist) > 0) sum(checklist$Available %in% FALSE, na.rm = TRUE) else 0L,
+    NeedsDraftWork = if (nrow(checklist) > 0) sum(checklist$DraftReady %in% FALSE, na.rm = TRUE) else 0L,
+    stringsAsFactors = FALSE
+  )
+
+  priority_summary <- data.frame()
+  if (nrow(checklist) > 0 && all(c("Priority", "Severity") %in% names(checklist))) {
+    priority_summary <- checklist |>
+      dplyr::count(.data$Priority, .data$Severity, name = "Items") |>
+      dplyr::arrange(
+        factor(.data$Priority, levels = c("high", "medium", "low", "ready")),
+        factor(.data$Severity, levels = c("required", "recommended", "optional"))
+      ) |>
+      as.data.frame(stringsAsFactors = FALSE)
+  }
+
+  action_items <- data.frame()
+  if (nrow(checklist) > 0) {
+    action_items <- checklist |>
+      dplyr::filter(.data$DraftReady %in% FALSE | .data$Available %in% FALSE) |>
+      dplyr::arrange(
+        factor(.data$Priority, levels = c("high", "medium", "low", "ready")),
+        .data$Section,
+        .data$Item
+      ) |>
+      dplyr::select(
+        "Section", "Item", "Available", "DraftReady", "Severity",
+        "Priority", "NextAction"
+      ) |>
+      utils::head(n = top_n) |>
+      as.data.frame(stringsAsFactors = FALSE)
+  }
+
+  settings_tbl <- bundle_settings_table(object$settings)
+  notes <- c(
+    "This summary is a manuscript-preparation guide.",
+    "DraftReady indicates that the corresponding reporting element can be drafted with the package's documented caveats; it does not certify inferential adequacy.",
+    "Detailed software and visual scope tables are available in `$software_scope` and `$visual_scope`."
+  )
+  if (nrow(action_items) == 0) {
+    notes <- c(notes, "No remaining draft-action rows were detected in the current checklist.")
+  }
+
+  out <- list(
+    overview = overview,
+    section_summary = section_summary,
+    software_scope = software_scope,
+    visual_scope = visual_scope,
+    priority_summary = priority_summary,
+    action_items = action_items,
+    settings = settings_tbl,
+    notes = notes,
+    top_n = top_n
+  )
+  class(out) <- "summary.mfrm_reporting_checklist"
+  out
+}
+
+#' @export
+print.summary.mfrm_reporting_checklist <- function(x, ...) {
+  cat("mfrmr Reporting Checklist Summary\n")
+
+  if (!is.null(x$overview) && nrow(x$overview) > 0) {
+    cat("\nOverview\n")
+    print(as.data.frame(x$overview), row.names = FALSE)
+  }
+  if (!is.null(x$section_summary) && nrow(x$section_summary) > 0) {
+    cat("\nSection summary\n")
+    print(as.data.frame(x$section_summary), row.names = FALSE)
+  }
+  if (!is.null(x$priority_summary) && nrow(x$priority_summary) > 0) {
+    cat("\nPriority summary\n")
+    print(as.data.frame(x$priority_summary), row.names = FALSE)
+  }
+  if (!is.null(x$action_items) && nrow(x$action_items) > 0) {
+    cat("\nAction items (preview)\n")
+    print(as.data.frame(x$action_items), row.names = FALSE)
+  }
+  if (!is.null(x$settings) && nrow(x$settings) > 0) {
+    cat("\nSettings\n")
+    print(as.data.frame(x$settings), row.names = FALSE)
+  }
+  if (length(x$notes %||% character(0)) > 0L) {
+    cat("\nNotes\n")
+    for (line in x$notes) cat(" - ", line, "\n", sep = "")
+  }
+  invisible(x)
+}
+
 collect_bias_tables_for_checklist <- function(bias_results) {
+  bias_results <- validate_bias_results_input(
+    bias_results,
+    helper = "reporting_checklist()"
+  )
   if (is.null(bias_results)) return(list())
   error_tbl <- data.frame()
   if (inherits(bias_results, "mfrm_bias_collection")) {

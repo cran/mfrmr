@@ -17,8 +17,18 @@
 An object of class \code{summary.mfrm_design_evaluation} with components:
 \itemize{
 \item \code{overview}: run-level overview
-\item \code{design_summary}: aggregated design-by-facet metrics
+\item \code{design_summary}: aggregated design-by-facet metrics, with design-variable
+alias columns when applicable
 \item \code{ademp}: simulation-study metadata carried forward from the original object
+\item \code{facet_names}: public facet labels carried from the simulation specification
+\item \code{design_variable_aliases}: accepted public aliases for design variables
+\item \code{design_descriptor}: role-based design-variable metadata
+\item \code{planning_scope}: explicit record of the current planning contract
+\item \code{planning_constraints}: explicit record of mutable/locked design variables
+\item \code{planning_schema}: combined planner-schema contract
+\item \code{future_branch_active_summary}: compact deterministic summary of the
+schema-only future arbitrary-facet planning branch embedded in the current
+planning schema
 \item \code{notes}: short interpretation notes
 }
 }
@@ -37,16 +47,18 @@ design planning, especially:
 }
 \examples{
 \donttest{
-sim_eval <- evaluate_mfrm_design(
-  n_person = c(30, 50),
-  n_rater = 4,
-  n_criterion = 4,
-  raters_per_person = 2,
+sim_eval <- suppressWarnings(evaluate_mfrm_design(
+  n_person = c(8, 12),
+  n_rater = 2,
+  n_criterion = 2,
+  raters_per_person = 1,
   reps = 1,
-  maxit = 15,
+  maxit = 8,
   seed = 123
-)
-summary(sim_eval)
+))
+s <- summary(sim_eval)
+s$overview
+head(s$design_summary)
 }
 }
 \seealso{

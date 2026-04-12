@@ -26,17 +26,19 @@
 
 \item{type}{Plot type. Use \code{NULL}, \code{"bundle"}, or \code{"all"} for the
 three-part fit bundle; otherwise choose one of \code{"facet"}, \code{"person"},
-\code{"step"}, \code{"wright"}, \code{"pathway"}, or \code{"ccc"}.}
+\code{"step"}, \code{"wright"}, \code{"pathway"}, \code{"ccc"}, \code{"ccc_surface"}, or
+\code{"category_surface"}.}
 
 \item{facet}{Optional facet name for \code{type = "facet"}.}
 
 \item{top_n}{Maximum number of facet/step locations retained for
 compact displays.}
 
-\item{theta_range}{Numeric length-2 range for pathway and CCC plots.}
+\item{theta_range}{Numeric length-2 range for pathway, CCC, and
+category-surface payloads.}
 
-\item{theta_points}{Number of theta grid points used for pathway and
-CCC plots.}
+\item{theta_points}{Number of theta grid points used for pathway, CCC, and
+category-surface payloads.}
 
 \item{title}{Optional custom title.}
 
@@ -73,8 +75,14 @@ returned object still carries machine-readable metadata through the
 \code{type = "wright"} shows persons, facet levels, and step thresholds on
 a shared logit scale. \code{type = "pathway"} shows expected score traces
 and dominant-category regions across theta. \code{type = "ccc"} shows
-category response probabilities. The remaining types provide compact
-person, step, or facet-specific displays.
+category response probabilities. \code{type = "ccc_surface"} or
+\code{type = "category_surface"} returns a 3D-ready category-probability
+surface payload for external rendering; it deliberately does not add a
+plotly/rgl dependency or replace the 2D CCC/pathway reporting figures. The
+payload includes \code{category_support}, \code{interpretation_guide}, and
+\code{reporting_policy} tables so retained zero-frequency categories and
+manuscript-use boundaries remain visible to beginners. The remaining types
+provide compact person, step, or facet-specific displays.
 }
 \section{Typical workflow}{
 
@@ -105,7 +113,11 @@ fit <- fit_mfrm(
   maxit = 25
 )
 bundle <- plot(fit, draw = FALSE)
-names(bundle)
+bundle$wright_map$data$plot
+surface <- plot(fit, type = "ccc_surface", draw = FALSE)
+head(surface$data$surface)
+surface$data$category_support
+surface$data$interpretation_guide
 if (interactive()) {
   plot(
     fit,

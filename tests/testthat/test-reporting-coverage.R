@@ -22,6 +22,16 @@ local({
   )
   .diag <<- diagnose_mfrm(.fit, residual_pca = "both", pca_max_factors = 3)
   .bias <<- estimate_bias(.fit, .diag, facet_a = "Rater", facet_b = "Task")
+
+  .fit_mml <<- suppressWarnings(
+    fit_mfrm(d, "Person", c("Rater", "Task", "Criterion"), "Score",
+             method = "MML", model = "RSM", maxit = 200, quad_points = 7)
+  )
+  .diag_mml <<- diagnose_mfrm(
+    .fit_mml,
+    residual_pca = "none",
+    diagnostic_mode = "both"
+  )
 })
 
 # ============================================================================
@@ -34,6 +44,7 @@ test_that("build_visual_warning_map returns all expected visual keys", {
     "wright_map", "pathway_map", "facet_distribution", "step_thresholds",
     "category_curves", "observed_expected", "fit_diagnostics",
     "fit_zstd_distribution", "misfit_levels",
+    "strict_marginal_fit", "strict_pairwise_local_dependence",
     "residual_pca_overall", "residual_pca_by_facet"
   )
   expect_true(all(expected_keys %in% names(wmap)))
@@ -72,11 +83,25 @@ test_that("build_visual_summary_map returns summary text for all keys", {
     "wright_map", "pathway_map", "facet_distribution", "step_thresholds",
     "category_curves", "observed_expected", "fit_diagnostics",
     "fit_zstd_distribution", "misfit_levels",
+    "strict_marginal_fit", "strict_pairwise_local_dependence",
     "residual_pca_overall", "residual_pca_by_facet"
   )
   expect_true(all(expected_keys %in% names(smap)))
   # wright_map should always have some text
   expect_true(length(smap$wright_map) > 0)
+})
+
+test_that("build_visual_summary_map includes strict marginal routes for MML diagnostics", {
+  smap_mml <- mfrmr:::build_visual_summary_map(.fit_mml, .diag_mml)
+  expect_true(any(grepl("latent-integrated first-order category screen", smap_mml$strict_marginal_fit, fixed = TRUE)))
+  expect_true(any(grepl("plot_marginal_fit()", smap_mml$strict_marginal_fit, fixed = TRUE)))
+  expect_true(any(grepl("plot_marginal_pairwise()", smap_mml$strict_pairwise_local_dependence, fixed = TRUE)))
+})
+
+test_that("build_visual_warning_map explains when strict marginal diagnostics were not requested", {
+  wmap_legacy <- mfrmr:::build_visual_warning_map(.fit, .diag)
+  expect_true(any(grepl("Strict marginal diagnostics are not available", wmap_legacy$strict_marginal_fit, fixed = TRUE)))
+  expect_true(any(grepl("diagnostic_mode", wmap_legacy$strict_marginal_fit, fixed = TRUE)))
 })
 
 test_that("build_visual_summary_map with detail='detailed' adds extra summaries", {
@@ -129,6 +154,94 @@ test_that("build_apa_report_text with bias_results includes bias summary", {
 test_that("build_apa_report_text without bias mentions no bias data", {
   text <- mfrmr:::build_apa_report_text(.fit, .diag, bias_results = NULL)
   expect_true(nchar(text) > 0)
+})
+
+test_that("build_apa_outputs surfaces latent-regression population-model wording", {
+  set.seed(141)
+  persons <- paste0("P", sprintf("%02d", seq_len(24)))
+  items <- paste0("I", seq_len(4))
+  group <- rep(c("high", "low"), length.out = length(persons))
+  theta <- ifelse(group == "high", 0.7, -0.4) + stats::rnorm(length(persons), sd = 0.5)
+  item_beta <- seq(-0.6, 0.6, length.out = length(items))
+  dat <- expand.grid(Person = persons, Item = items, stringsAsFactors = FALSE)
+  eta <- theta[match(dat$Person, persons)] - item_beta[match(dat$Item, items)]
+  dat$Score <- stats::rbinom(nrow(dat), 1, stats::plogis(eta))
+  dat$Score[c(1, 2)] <- c(0L, 1L)
+  person_data <- data.frame(
+    Person = persons,
+    Group = group,
+    stringsAsFactors = FALSE
+  )
+
+  fit <- suppressWarnings(fit_mfrm(
+    dat,
+    "Person",
+    "Item",
+    "Score",
+    method = "MML",
+    model = "RSM",
+    population_formula = ~ Group,
+    person_data = person_data,
+    quad_points = 5,
+    maxit = 35
+  ))
+  diag <- suppressWarnings(diagnose_mfrm(fit, residual_pca = "none"))
+
+  apa <- build_apa_outputs(fit, diag)
+  text <- as.character(apa$report_text)
+
+  expect_true(isTRUE(apa$contract$availability$has_population_model))
+  expect_true(isTRUE(apa$contract$availability$has_population_coding))
+  expect_true("results_population_model" %in% apa$section_map$SectionId)
+  expect_true(apa$section_map$Available[apa$section_map$SectionId == "results_population_model"][1])
+  expect_true("population_model" %in% names(apa$contract$note_map))
+  expect_true("population_model" %in% apa$contract$ordered_keys)
+  expect_match(text, "conditional-normal latent-regression", fixed = TRUE)
+  expect_match(text, "not as post hoc regression", fixed = TRUE)
+  expect_match(text, "documented latent-regression MML comparison scope", fixed = TRUE)
+  expect_match(apa$table_figure_notes, "Latent-regression population model", fixed = TRUE)
+  expect_match(apa$table_figure_captions, "Latent-Regression Population Model", fixed = TRUE)
+
+  s <- summary(apa)
+  row <- s$content_checks[s$content_checks$Check == "Latent-regression wording alignment", , drop = FALSE]
+  expect_equal(nrow(row), 1L)
+  expect_true(row$Passed[1])
+})
+
+test_that("build_apa_outputs validates fit, diagnostics, context, and bias inputs at the front door", {
+  expect_error(
+    mfrmr::build_apa_outputs(list(), .diag),
+    "requires `fit` to be an `mfrm_fit` object",
+    fixed = TRUE
+  )
+  expect_error(
+    mfrmr::build_apa_outputs(.fit, list()),
+    "requires `diagnostics` to be an `mfrm_diagnostics` object",
+    fixed = TRUE
+  )
+  expect_error(
+    mfrmr::build_apa_outputs(.fit, .diag, context = 1),
+    "requires `context` to be a list",
+    fixed = TRUE
+  )
+  expect_error(
+    mfrmr::build_apa_outputs(.fit, .diag, bias_results = 1),
+    "requires `bias_results` to be `NULL` or a package-native bias result",
+    fixed = TRUE
+  )
+})
+
+test_that("apa_table uses the same APA contract validation when contract metadata is needed", {
+  expect_error(
+    mfrmr::apa_table(.fit, which = "summary", diagnostics = list()),
+    "requires `diagnostics` to be an `mfrm_diagnostics` object",
+    fixed = TRUE
+  )
+  expect_error(
+    mfrmr::apa_table(.fit, which = "summary", diagnostics = .diag, context = 1),
+    "requires `context` to be a list",
+    fixed = TRUE
+  )
 })
 
 # ============================================================================

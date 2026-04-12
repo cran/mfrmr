@@ -91,7 +91,9 @@ The returned object is a bundle-like list with class
 \section{Typical workflow}{
 
 \enumerate{
-\item Fit with \code{\link[=fit_mfrm]{fit_mfrm()}} and diagnose with \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.
+\item Fit with \code{\link[=fit_mfrm]{fit_mfrm()}} and diagnose with \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}. For
+\code{RSM} / \code{PCM} reporting runs, prefer \code{method = "MML"} plus
+\code{diagnostic_mode = "both"} in the diagnostics call.
 \item Run \code{estimate_all_bias()} to compute app-style multi-pair interactions.
 \item Pass the resulting \code{by_pair} list into \code{\link[=reporting_checklist]{reporting_checklist()}} or
 \code{\link[=facet_quality_dashboard]{facet_quality_dashboard()}}.
@@ -99,12 +101,14 @@ The returned object is a bundle-like list with class
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 25)
-diag <- diagnose_mfrm(fit, residual_pca = "none")
+                method = "MML", maxit = 200)
+diag <- diagnose_mfrm(fit, residual_pca = "none", diagnostic_mode = "both")
 bias_all <- estimate_all_bias(fit, diagnostics = diag)
 bias_all$summary[, c("Interaction", "Rows", "Significant")]
+}
 }
 \seealso{
 \code{\link[=estimate_bias]{estimate_bias()}}, \code{\link[=reporting_checklist]{reporting_checklist()}}, \code{\link[=facet_quality_dashboard]{facet_quality_dashboard()}}

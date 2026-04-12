@@ -22,6 +22,7 @@ cran_filter <- paste(
     "core-workflow",
     "coverage-push-95",
     "data-processing",
+    "diagnostic-screening-validation",
     "dif-module",
     "draw-coverage",
     "edge-cases",
@@ -38,6 +39,9 @@ cran_filter <- paste(
     "facets-mode-api",
     "final-coverage-boost",
     "identifiability-constraints",
+    "marginal-fit-diagnostics",
+    "marginal-fit-plots",
+    "misfit-casebook",
     "numerical-validation",
     "output-stability",
     "parameter-recovery",
@@ -50,7 +54,8 @@ cran_filter <- paste(
     "reporting-coverage",
     "reporting-checklist",
     "reporting-gaps",
-    "simulation-design"
+    "simulation-design",
+    "summary-table-bundle"
   ),
   collapse = "|"
 )

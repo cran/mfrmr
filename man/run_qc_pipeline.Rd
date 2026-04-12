@@ -68,6 +68,10 @@ Three threshold presets are available via \code{threshold_profile}:\tabular{llll
 
 Individual thresholds can be overridden via the \code{thresholds} argument
 (a named list keyed by the internal threshold names shown above).
+
+For bounded \code{GPCM}, this pipeline is intentionally unavailable because the
+current validated route stops before bundled pass/warn/fail synthesis for
+the free-discrimination branch.
 }
 \section{QC checks}{
 

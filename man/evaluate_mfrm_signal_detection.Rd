@@ -9,6 +9,7 @@ evaluate_mfrm_signal_detection(
   n_rater = c(4),
   n_criterion = c(4),
   raters_per_person = n_rater,
+  design = NULL,
   reps = 10,
   group_levels = c("A", "B"),
   reference_group = NULL,
@@ -25,7 +26,7 @@ evaluate_mfrm_signal_detection(
   noise_sd = 0,
   step_span = 1.4,
   fit_method = c("JML", "MML"),
-  model = c("RSM", "PCM"),
+  model = c("RSM", "PCM", "GPCM"),
   step_facet = NULL,
   maxit = 25,
   quad_points = 7,
@@ -50,6 +51,16 @@ evaluate_mfrm_signal_detection(
 \item{n_criterion}{Vector of criterion counts to evaluate.}
 
 \item{raters_per_person}{Vector of rater assignments per person.}
+
+\item{design}{Optional named design-grid override supplied as a named list,
+named vector, or one-row data frame. Names may use canonical variables
+(\code{n_person}, \code{n_rater}, \code{n_criterion}, \code{raters_per_person}), current
+public aliases implied by \code{sim_spec} (for example \code{n_judge}, \code{n_task},
+\code{judge_per_person}), or role keywords (\code{person}, \code{rater}, \code{criterion},
+\code{assignment}). Values may be vectors. The schema-only future branch input
+\code{design$facets = c(person = ..., judge = ..., task = ...)} is also
+accepted for the currently exposed facet keys. Do not specify the same
+variable through both \code{design} and the scalar design-grid arguments.}
 
 \item{reps}{Number of replications per design condition.}
 
@@ -94,7 +105,9 @@ criterion level in each design.}
 
 \item{fit_method}{Estimation method passed to \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
-\item{model}{Measurement model passed to \code{\link[=fit_mfrm]{fit_mfrm()}}.}
+\item{model}{Measurement model passed to \code{\link[=fit_mfrm]{fit_mfrm()}}. The current
+signal-detection evaluator supports \code{RSM} and \code{PCM}; bounded \code{GPCM}
+is accepted only to produce an explicit unsupported-path error.}
 
 \item{step_facet}{Step facet passed to \code{\link[=fit_mfrm]{fit_mfrm()}} when \code{model = "PCM"}.
 When left \code{NULL}, the function inherits the generator step facet from
@@ -112,7 +125,9 @@ When supplied, the design grid still varies \code{n_person}, \code{n_rater},
 \code{n_criterion}, and \code{raters_per_person}, but latent spread, thresholds,
 and other generator settings come from \code{sim_spec}. The target DIF and
 interaction-bias signals specified in this function override any signal
-tables stored in \code{sim_spec}.}
+tables stored in \code{sim_spec}. If \code{sim_spec} stores an active
+latent-regression population generator, this helper currently requires
+\code{fit_method = "MML"} so each replication can refit the population model.}
 
 \item{dif_method}{Differential-functioning method passed to \code{\link[=analyze_dff]{analyze_dff()}}.}
 
@@ -138,9 +153,20 @@ target DIF detection. When omitted, the effective default is \code{0.43} for
 \value{
 An object of class \code{mfrm_signal_detection} with:
 \itemize{
-\item \code{design_grid}: evaluated design conditions
-\item \code{results}: replicate-level detection results
-\item \code{rep_overview}: run-level status and timing
+\item \code{design_grid}: evaluated design conditions. When \code{sim_spec} carries custom
+public facet names, matching design-variable alias columns are included
+alongside the canonical internal columns.
+\item \code{results}: replicate-level detection results, with the same
+design-variable alias columns when applicable.
+\item \code{rep_overview}: run-level status and timing, with the same design-variable
+alias columns when applicable.
+\item \code{design_descriptor}: role-based design-variable metadata used by planning
+summaries and plots
+\item \code{planning_scope}: explicit record of the current planning contract
+\item \code{planning_constraints}: explicit record of which design variables remain
+mutable under the current simulation specification
+\item \code{planning_schema}: combined planner-schema contract bundling the role
+descriptor, scope boundary, and current mutability map
 \item \code{settings}: signal-analysis settings
 \item \code{ademp}: simulation-study metadata (aims, DGM, estimands, methods, performance measures)
 }
@@ -178,6 +204,13 @@ Bias results are different: \code{\link[=estimate_bias]{estimate_bias()}} report
 screening metrics rather than formal inferential quantities. Here, a bias
 cell is counted as \strong{screen-positive} only when those screening metrics are
 available and satisfy
+
+First-release \code{GPCM} is not yet available in this helper because its signal-
+detection path still depends on simulation and diagnostics layers validated
+only for \code{RSM} / \code{PCM}. More broadly, the current planning layer is still
+role-based for exactly two non-person facets (\code{rater}-like and
+\code{criterion}-like), even though the estimation core supports arbitrary facet
+counts.
 \eqn{p <} \code{bias_p_cut} \strong{and} \eqn{|t| \ge} \code{bias_abs_t}.
 
 \strong{Power} is the proportion of replications in which the target signal
@@ -212,6 +245,11 @@ When \code{sim_spec} is supplied, the function uses it as the explicit
 data-generating mechanism for the latent spreads, thresholds, and assignment
 archetype, while still injecting the requested target DIF and bias effects
 for each design condition.
+
+If that specification also stores a latent-regression population generator,
+each replication carries simulated one-row-per-person background data into
+the MML fit. This remains a screening-oriented Monte Carlo study; it is not
+a person-level posterior prediction for one observed sample.
 }
 \section{References}{
 
@@ -234,18 +272,17 @@ reporting}. Psychological Methods.
 }
 
 \examples{
+\donttest{
 sig_eval <- suppressWarnings(evaluate_mfrm_signal_detection(
-  n_person = 20,
-  n_rater = 3,
-  n_criterion = 3,
-  raters_per_person = 2,
+  design = list(person = 8, rater = 2, criterion = 2, assignment = 1),
   reps = 1,
-  maxit = 10,
+  maxit = 5,
   bias_max_iter = 1,
   seed = 123
 ))
 s_sig <- summary(sig_eval)
-s_sig$detection_summary[, c("n_person", "DIFPower", "BiasScreenRate")]
+s_sig$overview
+}
 }
 \seealso{
 \code{\link[=simulate_mfrm_data]{simulate_mfrm_data()}}, \code{\link[=evaluate_mfrm_design]{evaluate_mfrm_design()}}, \code{\link[=analyze_dff]{analyze_dff()}}, \code{\link[=analyze_dif]{analyze_dif()}}, \code{\link[=estimate_bias]{estimate_bias()}}

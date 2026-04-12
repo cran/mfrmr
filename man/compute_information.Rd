@@ -2,7 +2,7 @@
 % Please edit documentation in R/api-advanced.R
 \name{compute_information}
 \alias{compute_information}
-\title{Compute design-weighted precision curves for RSM fits}
+\title{Compute design-weighted precision curves for ordered Rasch-family fits}
 \usage{
 compute_information(fit, theta_range = c(-6, 6), theta_points = 201L)
 }
@@ -28,7 +28,7 @@ contribution value retained under that column name for compatibility.
 }
 \description{
 Calculates design-weighted score-variance curves across the latent
-trait (theta) for a fitted RSM many-facet Rasch model. Returns both
+trait (theta) for a fitted ordered-category many-facet Rasch model. Returns both
 an overall precision curve (\verb{$tif}) and per-facet-level contribution
 curves (\verb{$iif}) based on the realized observation pattern.
 }
@@ -45,15 +45,29 @@ The resulting total curve is therefore a design-weighted precision screen
 rather than a pure textbook test-information function for an abstract fixed
 item set. The associated standard error summary is still
 \eqn{SE(\theta) = 1 / \sqrt{I(\theta)}} for positive information values.
+
+In an ordered Rasch-family model, category discrimination is fixed at 1, so
+this score-variance representation is the natural conditional information
+identity rather than a separate approximation. For binary data it reduces to
+the familiar \eqn{p(\theta)\{1 - p(\theta)\}} form. For \code{PCM}, the package
+evaluates each observed design cell using the threshold vector associated
+with that cell's realized \code{step_facet} level. For bounded \code{GPCM}, the
+same design-weighted score variance is scaled by the squared discrimination
+attached to the realized \code{slope_facet} level, matching the standard item-
+information identity for the generalized partial credit model (Muraki, 1993).
 }
 \section{What \code{tif} and \code{iif} mean here}{
 
-In \code{mfrmr}, this helper currently supports only RSM fits. The total
-curve (\verb{$tif}) is the sum of design-weighted cell contributions across all
-non-person facet levels in the fitted model. The facet-level contribution
-curves (\verb{$iif}) keep those weighted contributions separated, so you can see
-which observed rater levels, criteria, or other facet levels are driving
-precision at different parts of the scale.
+In \code{mfrmr}, this helper supports ordered-category \code{RSM}, \code{PCM}, and the
+current bounded \code{GPCM} fit. The total curve (\verb{$tif}) is the sum of
+design-weighted cell contributions across all non-person facet levels in the
+fitted model. The facet-level contribution curves (\verb{$iif}) keep those
+weighted contributions separated, so you can see which observed rater
+levels, criteria, or other facet levels are driving precision at different
+parts of the scale. For \code{PCM}, step-facet-specific thresholds are respected
+when each observed design cell is evaluated. For bounded \code{GPCM}, those
+same cell-level variances are additionally scaled by the squared
+discrimination associated with the realized \code{slope_facet} level.
 }
 
 \section{What this quantity does not justify}{
@@ -63,15 +77,16 @@ precision at different parts of the scale.
 fixed item set.
 \item It should not be used as if it were design-free evidence about a form's
 precision independent of the realized observation pattern.
-\item It does not currently extend to PCM fits; the helper stops for
-\code{model = "PCM"}.
+\item It does not currently extend beyond the ordered-category \code{RSM} / \code{PCM} /
+bounded \code{GPCM} family implemented by \code{\link[=fit_mfrm]{fit_mfrm()}}.
 }
 }
 
 \section{When to use this}{
 
 Use \code{compute_information()} when you want a design-weighted precision screen
-for an RSM fit along the latent continuum. In practice:
+for an \code{RSM}, \code{PCM}, or bounded \code{GPCM} fit along the latent
+continuum. In practice:
 \itemize{
 \item start with the total precision curve for overall targeting across the
 realized observation pattern
@@ -91,11 +106,30 @@ the tails, and increase \code{theta_points} only when you need a smoother grid
 for reporting or custom graphics.
 }
 
+\section{References}{
+
+The ordered-category probability structures come from Andrich's \code{RSM}
+formulation and Masters' \code{PCM}. The general logic linking polytomous
+category probabilities to information functions is discussed by Muraki
+(1993). In \code{mfrmr}, those formulas are applied to the realized many-facet
+observation design, so the output should be read as a design-weighted
+precision summary rather than as a design-free abstract test function.
+\itemize{
+\item Andrich, D. (1978). \emph{A rating formulation for ordered response
+categories}. Psychometrika, 43(4), 561-573.
+\item Masters, G. N. (1982). \emph{A Rasch model for partial credit scoring}.
+Psychometrika, 47(2), 149-174.
+\item Muraki, E. (1993). \emph{Information functions of the generalized partial
+credit model}. ETS Research Report Series, 1993(1), i-12.
+}
+}
+
 \section{Interpreting output}{
 
 \itemize{
 \item \verb{$tif}: design-weighted precision curve data with theta, Information, and SE.
-\item \verb{$iif}: design-weighted facet-level contribution curves for an RSM fit.
+\item \verb{$iif}: design-weighted facet-level contribution curves for the fitted
+non-person facets.
 \item Higher information implies more precise measurement at that theta.
 \item SE is inversely related to information.
 \item Peaks in the total curve show the trait region where the realized

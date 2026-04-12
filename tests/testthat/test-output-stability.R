@@ -11,7 +11,7 @@ test_that("fit_mfrm returns all required components", {
     c("Rater", "Task", "Criterion"), "Score", method = "JML", maxit = 30))
   expect_s3_class(fit, "mfrm_fit")
   # Required top-level components
-  expect_true(all(c("summary", "facets", "steps", "config", "prep", "opt") %in%
+  expect_true(all(c("summary", "facets", "steps", "population", "config", "prep", "opt") %in%
     names(fit)))
   # Person table structure
   expect_true(is.data.frame(fit$facets$person))
@@ -26,10 +26,158 @@ test_that("fit_mfrm returns all required components", {
   # Steps structure
   expect_true(is.data.frame(fit$steps))
   expect_true(all(c("Step", "Estimate") %in% names(fit$steps)))
+  # Population scaffold structure
+  expect_true(is.list(fit$population))
+  expect_false(isTRUE(fit$population$active))
+  expect_identical(fit$population$posterior_basis, "legacy_mml")
+  expect_false(isTRUE(fit$config$population_active))
+  expect_identical(fit$config$posterior_basis, "legacy_mml")
+  expect_true(is.list(fit$config$population_spec))
+  expect_false(isTRUE(fit$config$population_spec$active))
+  expect_identical(fit$config$population_spec$posterior_basis, "legacy_mml")
   # Column types
   expect_type(fit$facets$others$Estimate, "double")
   expect_type(fit$facets$others$Level, "character")
   expect_type(fit$facets$others$Facet, "character")
+})
+
+test_that("summary.mfrm_fit reports legacy population basis for ordinary fits", {
+  d <- mfrmr:::sample_mfrm_data(seed = 42)
+  fit <- suppressWarnings(fit_mfrm(
+    d, "Person", c("Rater", "Task", "Criterion"), "Score",
+    method = "MML", maxit = 30, quad_points = 7
+  ))
+  s <- summary(fit)
+
+  expect_true("population_overview" %in% names(s))
+  expect_true("population_design" %in% names(s))
+  expect_true("population_coding" %in% names(s))
+  expect_true("status" %in% names(s))
+  expect_true("key_warnings" %in% names(s))
+  expect_true("next_actions" %in% names(s))
+  expect_true("settings_overview" %in% names(s))
+  expect_true("reporting_map" %in% names(s))
+  expect_true(is.data.frame(s$population_overview))
+  expect_true(is.data.frame(s$population_design))
+  expect_true(is.data.frame(s$population_coding))
+  expect_true(is.data.frame(s$status))
+  expect_true(is.character(s$key_warnings))
+  expect_true(is.character(s$next_actions))
+  expect_true(is.data.frame(s$settings_overview))
+  expect_true(is.data.frame(s$reporting_map))
+  expect_false(isTRUE(s$population_overview$PopulationModel[1]))
+  expect_equal(nrow(s$population_design), 0L)
+  expect_equal(nrow(s$population_coding), 0L)
+  expect_identical(as.character(s$population_overview$PosteriorBasis[1]), "legacy_mml")
+  expect_true(all(c("StepFacet", "SlopeFacet", "NoncenterFacet", "QuadPoints") %in% names(s$settings_overview)))
+  expect_true(all(c("Area", "CoveredHere", "CompanionOutput") %in% names(s$reporting_map)))
+  expect_true(any(grepl("legacy unconditional prior", s$notes, fixed = TRUE)))
+})
+
+test_that("GPCM summaries expose slope overview and diagnostics are now available", {
+  d <- mfrmr:::sample_mfrm_data(seed = 42)
+  fit <- suppressWarnings(fit_mfrm(
+    d, "Person", c("Rater", "Task", "Criterion"), "Score",
+    model = "GPCM", step_facet = "Criterion",
+    method = "MML", quad_points = 5, maxit = 20
+  ))
+  s <- summary(fit)
+
+  expect_true("slopes" %in% names(fit))
+  expect_true(is.data.frame(fit$slopes))
+  expect_true("slope_overview" %in% names(s))
+  expect_true(is.data.frame(s$slope_overview))
+  expect_true(isTRUE(s$slope_overview$Positive[1]))
+  expect_equal(s$slope_overview$GeometricMean[1], 1, tolerance = 1e-6)
+  dx <- diagnose_mfrm(fit, diagnostic_mode = "both", residual_pca = "overall")
+  pca <- analyze_residual_pca(dx, mode = "overall")
+  unexp <- unexpected_response_table(fit, diagnostics = dx, top_n = 10)
+  disp <- displacement_table(fit, diagnostics = dx, top_n = 10)
+  meas <- measurable_summary_table(fit, diagnostics = dx)
+  rate <- rating_scale_table(fit, diagnostics = dx)
+  ir <- interrater_agreement_table(fit, diagnostics = dx, rater_facet = "Rater", top_n = 5)
+  chk <- reporting_checklist(fit, diagnostics = dx)
+  dash <- facet_quality_dashboard(fit, diagnostics = dx, facet = "Rater")
+  qc <- plot_qc_dashboard(fit, diagnostics = dx, draw = FALSE)
+
+  expect_s3_class(dx, "mfrm_diagnostics")
+  expect_identical(dx$diagnostic_mode, "both")
+  expect_true(isTRUE(dx$marginal_fit$available))
+  expect_identical(as.character(dx$marginal_fit$summary$Model[1]), "GPCM")
+  expect_s3_class(pca, "mfrm_residual_pca")
+  expect_s3_class(unexp, "mfrm_unexpected")
+  expect_s3_class(disp, "mfrm_displacement")
+  expect_s3_class(meas, "mfrm_measurable")
+  expect_s3_class(rate, "mfrm_rating_scale")
+  expect_s3_class(ir, "mfrm_interrater")
+  expect_s3_class(chk, "mfrm_reporting_checklist")
+  expect_s3_class(dash, "mfrm_facet_dashboard")
+  expect_s3_class(qc, "mfrm_plot_data")
+  expect_true(isFALSE(dx$fair_average$available))
+  expect_true(grepl("not yet validated", dx$fair_average$reason, fixed = TRUE))
+  expect_true(grepl("Rasch-family", dx$fair_average$reason, fixed = TRUE))
+  expect_true(isFALSE(qc$data$fair_average$available))
+  expect_true(grepl("Rasch-family", qc$data$fair_average$reason, fixed = TRUE))
+
+  expect_error(
+    run_qc_pipeline(fit),
+    "not yet validated for `GPCM` fits",
+    fixed = TRUE
+  )
+  expect_error(
+    estimate_bias(fit, dx, facet_a = "Rater", facet_b = "Criterion"),
+    "not yet validated for `GPCM` fits",
+    fixed = TRUE
+  )
+  expect_error(
+    fair_average_table(fit),
+    "not yet validated for `GPCM` fits",
+    fixed = TRUE
+  )
+  expect_error(
+    fair_average_table(fit),
+    "Rasch-family",
+    fixed = TRUE
+  )
+  expect_error(
+    facets_parity_report(fit),
+    "not yet validated for `GPCM` fits",
+    fixed = TRUE
+  )
+})
+
+test_that("curve/report GPCM workflows open where the probability kernel is already generalized", {
+  d <- mfrmr:::sample_mfrm_data(seed = 42)
+  fit <- suppressWarnings(fit_mfrm(
+    d, "Person", c("Rater", "Task", "Criterion"), "Score",
+    model = "GPCM", step_facet = "Criterion",
+    method = "MML", quad_points = 5, maxit = 20
+  ))
+
+  p_bundle <- plot(fit, draw = FALSE)
+  p_ccc <- plot(fit, type = "ccc", draw = FALSE)
+  p_path <- plot(fit, type = "pathway", draw = FALSE)
+  cs <- category_structure_report(fit)
+  cc <- category_curves_report(fit)
+  out_graph <- facets_output_file_bundle(fit, include = "graph", write_files = FALSE)
+
+  expect_s3_class(p_bundle, "mfrm_plot_bundle")
+  expect_s3_class(p_ccc, "mfrm_plot_data")
+  expect_s3_class(p_path, "mfrm_plot_data")
+  expect_s3_class(cs, "mfrm_category_structure")
+  expect_s3_class(cc, "mfrm_category_curves")
+  expect_true(all(c("graphfile", "graphfile_syntactic", "settings") %in% names(out_graph)))
+
+  expect_error(
+    estimation_iteration_report(fit, max_iter = 3),
+    "not yet validated for `GPCM` fits",
+    fixed = TRUE
+  )
+  expect_error(
+    facets_output_file_bundle(fit, include = "score", write_files = FALSE),
+    "not yet validated for `GPCM` fits",
+    fixed = TRUE
+  )
 })
 
 # === 5.2 MML output has SD column =========================================
@@ -99,6 +247,29 @@ test_that("diagnose_mfrm returns all required components", {
     names(dx$facet_precision)))
   # obs should be data.frame
   expect_true(is.data.frame(dx$obs))
+})
+
+test_that("diagnostics and data-description summaries expose paper-reporting maps", {
+  d_local <- mfrmr:::sample_mfrm_data(seed = 42)
+  fit_local <- suppressWarnings(fit_mfrm(
+    d_local, "Person",
+    c("Rater", "Task", "Criterion"), "Score",
+    method = "JML", maxit = 30
+  ))
+  dx_local <- diagnose_mfrm(fit_local, residual_pca = "none")
+
+  dx_sum <- summary(dx_local)
+  expect_s3_class(dx_sum, "summary.mfrm_diagnostics")
+  expect_true("reporting_map" %in% names(dx_sum))
+  expect_true(is.data.frame(dx_sum$reporting_map))
+  expect_true(all(c("Area", "CoveredHere", "CompanionOutput") %in% names(dx_sum$reporting_map)))
+
+  ds <- describe_mfrm_data(d_local, "Person", c("Rater", "Task", "Criterion"), "Score")
+  ds_sum <- summary(ds)
+  expect_s3_class(ds_sum, "summary.mfrm_data_description")
+  expect_true("reporting_map" %in% names(ds_sum))
+  expect_true(is.data.frame(ds_sum$reporting_map))
+  expect_true(all(c("Area", "CoveredHere", "CompanionOutput") %in% names(ds_sum$reporting_map)))
 })
 
 # === 5.4 Table builder output stability ====================================

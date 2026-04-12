@@ -37,6 +37,10 @@ An object of class \code{mfrm_visual_summaries} with:
 \item \code{warning_map}: visual-level warning text vectors
 \item \code{summary_map}: visual-level descriptive text vectors
 \item \code{warning_counts}, \code{summary_counts}: message counts by visual key
+\item \code{plot_payloads}: reusable draw-free payloads for \code{comparison},
+\code{warning_counts}, \code{summary_counts}, and optionally
+\code{category_probability_surface}
+\item \code{public_plot_routes}: public helper / draw-free route map for follow-up
 \item \code{crosswalk}: FACETS-reference mapping for main visual keys
 \item \code{branch}, \code{style}, \code{threshold_profile}: branch metadata
 }
@@ -62,13 +66,27 @@ in UI code.
 \item \code{max_facet_ranges}: max facet-range snippets shown in visual summaries
 \item \code{top_misfit_n}: number of top misfit entries included
 }
+
+For bounded \code{GPCM}, this helper is intentionally unavailable. Use
+\code{\link[=reporting_checklist]{reporting_checklist()}}, \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}}, the residual/category table
+helpers, and \code{\link[=compute_information]{compute_information()}} / \code{\link[=plot_information]{plot_information()}} instead.
 }
 \section{Interpreting output}{
 
 \itemize{
 \item \code{warning_map}: rule-triggered warning text by visual key.
 \item \code{summary_map}: descriptive narrative text by visual key.
+\item strict marginal keys appear when \code{diagnose_mfrm(..., diagnostic_mode = "both")}
+supplies latent-integrated first-order and pairwise screening summaries.
 \item \code{warning_counts} / \code{summary_counts}: message-count tables for QA checks.
+\item \code{plot_payloads}: ready-to-reuse \code{mfrm_plot_data} payloads for the bundle's
+own comparison/count plots and, when step estimates are available, the
+exploratory \code{category_probability_surface} payload from
+\code{plot(fit, type = "ccc_surface", draw = FALSE)}. The surface payload
+carries \code{category_support}, \code{interpretation_guide}, and \code{reporting_policy}
+tables for zero-frequency category and reporting-boundary checks.
+\item \code{public_plot_routes}: draw-free helper routes for the dedicated public plot
+functions behind each visual family.
 }
 }
 
@@ -85,8 +103,11 @@ in UI code.
 \examples{
 \donttest{
 toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
-diag <- diagnose_mfrm(fit, residual_pca = "both")
+fit <- fit_mfrm(
+  toy, "Person", c("Rater", "Criterion"), "Score",
+  method = "MML", model = "RSM", maxit = 200
+)
+diag <- diagnose_mfrm(fit, residual_pca = "both", diagnostic_mode = "both")
 vis <- build_visual_summaries(fit, diag, threshold_profile = "strict")
 vis2 <- build_visual_summaries(
   fit,
@@ -100,6 +121,8 @@ vis_facets$branch
 summary(vis)
 p <- plot(vis, type = "comparison", draw = FALSE)
 p2 <- plot(vis, type = "warning_counts", draw = FALSE)
+vis$plot_payloads$comparison$data$plot
+vis$public_plot_routes[, c("Visual", "PlotHelper", "DrawFreeRoute")]
 if (interactive()) {
   plot(
     vis,
@@ -113,5 +136,6 @@ if (interactive()) {
 }
 }
 \seealso{
-\code{\link[=mfrm_threshold_profiles]{mfrm_threshold_profiles()}}, \code{\link[=build_apa_outputs]{build_apa_outputs()}}
+\code{\link[=mfrm_threshold_profiles]{mfrm_threshold_profiles()}}, \code{\link[=build_apa_outputs]{build_apa_outputs()}},
+\code{\link[=plot_marginal_fit]{plot_marginal_fit()}}, \code{\link[=plot_marginal_pairwise]{plot_marginal_pairwise()}}
 }

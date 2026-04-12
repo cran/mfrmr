@@ -22,9 +22,14 @@
 
 \item{metric}{Metric to plot.}
 
-\item{x_var}{Design variable used on the x-axis.}
+\item{x_var}{Design variable used on the x-axis. When \code{x} was generated from
+a \code{sim_spec} with custom public facet names, the corresponding aliases
+(for example \code{n_judge}, \code{n_task}, \code{judge_per_person}) are also accepted.
+Role keywords (\code{person}, \code{rater}, \code{criterion}, \code{assignment}) are accepted
+as an abstraction over the current two-facet schema.}
 
-\item{group_var}{Optional design variable used for separate lines.}
+\item{group_var}{Optional design variable used for separate lines. The same
+alias rules as \code{x_var} apply.}
 
 \item{draw}{If \code{TRUE}, draw with base graphics; otherwise return plotting data.}
 
@@ -32,7 +37,11 @@
 }
 \value{
 If \code{draw = TRUE}, invisibly returns a plotting-data list. If
-\code{draw = FALSE}, returns that list directly.
+\code{draw = FALSE}, returns that list directly. The returned list includes
+resolved canonical variables (\code{x_var}, \code{group_var}) together with public
+labels (\code{x_label}, \code{group_label}), \code{design_variable_aliases}, and
+\code{design_descriptor}, plus \code{planning_scope}, \code{planning_constraints}, and
+\code{planning_schema}.
 }
 \description{
 Plot a design-simulation study
@@ -51,16 +60,17 @@ when you want aligned recovery error rather than raw location shifts
 }
 \examples{
 \donttest{
-sim_eval <- evaluate_mfrm_design(
-  n_person = c(30, 50),
-  n_rater = 4,
-  n_criterion = 4,
-  raters_per_person = 2,
+sim_eval <- suppressWarnings(evaluate_mfrm_design(
+  n_person = c(8, 12),
+  n_rater = 2,
+  n_criterion = 2,
+  raters_per_person = 1,
   reps = 1,
-  maxit = 15,
+  maxit = 8,
   seed = 123
-)
-plot(sim_eval, facet = "Rater", metric = "separation", x_var = "n_person", draw = FALSE)
+))
+p <- plot(sim_eval, facet = "Rater", metric = "separation", x_var = "n_person", draw = FALSE)
+c(p$facet, p$x_var)
 }
 }
 \seealso{

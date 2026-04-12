@@ -83,7 +83,7 @@ fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML",
 chi <- facets_chisq_table(fit)
 summary(chi)
 p_chi <- plot(chi, draw = FALSE)
-class(p_chi)
+p_chi$data$plot
 }
 \seealso{
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=interrater_agreement_table]{interrater_agreement_table()}}, \code{\link[=plot_facets_chisq]{plot_facets_chisq()}}

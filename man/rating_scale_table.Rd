@@ -18,7 +18,9 @@ rating_scale_table(
 
 \item{whexact}{Use exact ZSTD transformation for category fit.}
 
-\item{drop_unused}{If \code{TRUE}, remove categories with zero count.}
+\item{drop_unused}{If \code{TRUE}, remove categories with zero count from the
+displayed category table; \code{summary} and \code{caveats} still retain the omitted
+score-support warning.}
 }
 \value{
 A named list with:
@@ -26,6 +28,7 @@ A named list with:
 \item \code{category_table}: category-level counts, expected counts, fit, and ZSTD
 \item \code{threshold_table}: model step/threshold estimates
 \item \code{summary}: one-row summary (usage and threshold monotonicity)
+\item \code{caveats}: structured score-support warning/review rows
 }
 }
 \description{
@@ -97,6 +100,8 @@ category.}
 difference.}
 \item{LowCount}{Logical; \code{TRUE} if count is below minimum threshold.}
 \item{InfitFlag, OutfitFlag, ZSTDFlag}{Fit-based warning flags.}
+\item{ZeroCount, UnusedCategoryType, WeaklyIdentified, CategoryCaveat}{
+Structured score-support caveats for retained zero-count categories.}
 }
 
 The \code{threshold_table} data.frame contains:
@@ -112,6 +117,9 @@ indicate wide unused regions (Linacre, 2002).}
 \item{ThresholdMonotonic}{Logical flag repeated within each threshold set.
 For PCM fits, read this within \code{StepFacet}, not as a pooled item-bank
 verdict.}
+\item{LowerCategory, UpperCategory, WeaklyIdentified, ThresholdCaveat}{
+Adjacent score-category support metadata. Thresholds adjacent to retained
+zero-count categories are flagged for cautious interpretation.}
 }
 }
 
@@ -122,7 +130,7 @@ t8 <- rating_scale_table(fit)
 summary(t8)
 summary(t8)$summary
 p_t8 <- plot(t8, draw = FALSE)
-class(p_t8)
+p_t8$data$plot
 }
 \seealso{
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=measurable_summary_table]{measurable_summary_table()}}, \code{\link[=plot.mfrm_fit]{plot.mfrm_fit()}},

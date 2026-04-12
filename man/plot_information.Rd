@@ -24,12 +24,12 @@ secondary axis.}
 the first facet is used.}
 
 \item{draw}{If \code{TRUE} (default), draw the plot. If \code{FALSE}, return
-the plot data invisibly.}
+reusable \code{mfrm_plot_data} invisibly.}
 
 \item{...}{Additional graphical parameters.}
 }
 \value{
-Invisibly, the plot data (tibble).
+Invisibly, an \code{mfrm_plot_data} object.
 }
 \description{
 Visualize the design-weighted precision curve and optionally
@@ -41,8 +41,8 @@ per-facet-level contribution curves from \code{\link[=compute_information]{compu
 \item \code{"tif"}: overall design-weighted precision across theta.
 \item \code{"se"}: approximate standard error across theta.
 \item \code{"both"}: precision and approximate SE together, useful for presentations.
-\item \code{"iif"}: facet-level contribution curves for one selected facet in an
-RSM fit.
+\item \code{"iif"}: facet-level contribution curves for one selected facet in a
+supported \code{RSM}, \code{PCM}, or bounded \code{GPCM} fit.
 }
 }
 
@@ -65,6 +65,8 @@ precision curve.
 \item SE is derived as \code{1 / sqrt(precision)}; lower is better.
 \item Facet-level curves show which facet levels contribute most to that
 realized precision at each theta.
+\item For bounded \code{GPCM}, those contributions include the squared
+discrimination scaling implied by the fitted \code{slope_facet}.
 \item If the precision peak sits far from the bulk of person measures, the
 realized design may be poorly targeted.
 }
@@ -72,9 +74,10 @@ realized design may be poorly targeted.
 
 \section{Returned data when draw = FALSE}{
 
-For \code{type = "tif"}, \code{"se"}, or \code{"both"}, the returned data come from
-\code{x$tif}. For \code{type = "iif"}, the returned data are the rows of \code{x$iif}
-filtered to the requested facet.
+\code{draw = FALSE} returns an \code{mfrm_plot_data} object. The underlying plotting
+data are stored in \verb{$data$plot}. For \code{type = "tif"}, \code{"se"}, or \code{"both"},
+those rows come from \code{x$tif}. For \code{type = "iif"}, the returned rows come
+from \code{x$iif} filtered to the requested facet.
 }
 
 \section{Typical workflow}{
@@ -84,7 +87,8 @@ filtered to the requested facet.
 \item Plot with \code{plot_information(info)} for the total precision curve.
 \item Use \code{plot_information(info, type = "iif", facet = "Rater")} for
 facet-level contributions.
-\item Use \code{draw = FALSE} when you want the plotting data for custom graphics.
+\item Use \code{draw = FALSE} when you want reusable plotting payloads for custom
+graphics or reporting helpers.
 }
 }
 
@@ -94,9 +98,9 @@ fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                  method = "JML", model = "RSM", maxit = 25)
 info <- compute_information(fit)
 tif_data <- plot_information(info, type = "tif", draw = FALSE)
-head(tif_data)
+head(tif_data$data$plot)
 iif_data <- plot_information(info, type = "iif", facet = "Rater", draw = FALSE)
-head(iif_data)
+head(iif_data$data$plot)
 }
 \seealso{
 \code{\link[=compute_information]{compute_information()}}, \code{\link[=fit_mfrm]{fit_mfrm()}}

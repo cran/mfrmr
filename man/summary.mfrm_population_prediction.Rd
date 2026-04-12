@@ -19,6 +19,15 @@ An object of class \code{summary.mfrm_population_prediction} with:
 \item \code{design}: requested future design
 \item \code{overview}: run-level overview
 \item \code{forecast}: facet-level forecast table
+\item \code{facet_names}: public non-person facet names used in the forecast
+\item \code{design_variable_aliases}: public aliases for design variables
+\item \code{design_descriptor}: role-based description of design variables
+\item \code{planning_scope}: explicit record of the current planning contract
+\item \code{planning_constraints}: explicit record of mutable/locked design variables
+\item \code{planning_schema}: combined planner-schema contract
+\item \code{future_branch_active_summary}: compact deterministic summary of the
+schema-only future arbitrary-facet planning branch embedded in the current
+planning schema
 \item \code{ademp}: simulation-study metadata
 \item \code{notes}: interpretation notes
 }
@@ -27,22 +36,24 @@ An object of class \code{summary.mfrm_population_prediction} with:
 Summarize a population-level design forecast
 }
 \examples{
-\donttest{
+\dontrun{
 spec <- build_mfrm_sim_spec(
-  n_person = 40,
-  n_rater = 4,
-  n_criterion = 4,
+  n_person = 16,
+  n_rater = 3,
+  n_criterion = 2,
   raters_per_person = 2,
   assignment = "rotating"
 )
 pred <- predict_mfrm_population(
   sim_spec = spec,
-  n_person = 60,
-  reps = 2,
-  maxit = 10,
+  design = list(person = 18),
+  reps = 1,
+  maxit = 5,
   seed = 123
 )
-summary(pred)
+s <- summary(pred)
+s$overview
+s$forecast[, c("Facet", "MeanSeparation", "McseSeparation")]
 }
 }
 \seealso{

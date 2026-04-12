@@ -61,7 +61,7 @@ fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML",
 out <- specifications_report(fit, title = "Toy run")
 summary(out)
 p_spec <- plot(out, draw = FALSE)
-class(p_spec)
+p_spec$data$plot
 }
 \seealso{
 \code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=data_quality_report]{data_quality_report()}}, \code{\link[=estimation_iteration_report]{estimation_iteration_report()}},
