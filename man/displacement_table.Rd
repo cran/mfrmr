@@ -83,7 +83,7 @@ The \code{table} data.frame contains:
 
 \examples{
 toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 disp <- displacement_table(fit, anchored_only = FALSE)
 summary(disp)
 p_disp <- plot(disp, draw = FALSE)

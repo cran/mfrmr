@@ -76,9 +76,8 @@ are available: \code{"strict"}, \code{"standard"} (default), and \code{"lenient"
 Use \code{thresholds} to override any profile value with named entries.
 
 For bounded \code{GPCM}, the dashboard now reuses the residual-based
-diagnostics stack and leaves the fair-average panel as an explicit
-unavailable placeholder rather than silently reusing the Rasch-only
-compatibility calculation.
+diagnostics stack and marks the fair-average panel unavailable rather
+than silently reusing the Rasch-only compatibility calculation.
 }
 \section{Plot types}{
 
@@ -121,10 +120,22 @@ Treat this dashboard as a screening layer; follow up with dedicated helpers
 }
 
 \examples{
-\donttest{
+# Fast smoke run: build the plot data only (no graphics device).
 toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+fit_quick <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
+                      method = "JML", maxit = 30)
+qc_quick <- plot_qc_dashboard(fit_quick, draw = FALSE)
+nrow(qc_quick$data$panels)
+
+\donttest{
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 qc <- plot_qc_dashboard(fit, draw = FALSE)
+qc$data$panels$Status
+# Look for: a row whose `Status` is "OK" for each panel that
+#   the run should support. "WARN" / "REVIEW" rows tell you which
+#   downstream helper to run next (e.g. `plot_unexpected()`,
+#   `plot_residual_pca()`); the dashboard is a triage screen, not
+#   a publication figure on its own.
 if (interactive()) {
   plot_qc_dashboard(fit, rater_facet = "Rater")
 }

@@ -5,12 +5,12 @@
 \title{List retained compatibility aliases and preferred names}
 \usage{
 compatibility_alias_table(
-  scope = c("all", "functions", "arguments", "columns", "plot_metrics")
+  scope = c("all", "functions", "arguments", "fields", "columns", "plot_metrics")
 )
 }
 \arguments{
 \item{scope}{Which alias surface to return: \code{"all"}, \code{"functions"},
-\code{"arguments"}, \code{"columns"}, or \code{"plot_metrics"}.}
+\code{"arguments"}, \code{"fields"}, \code{"columns"}, or \code{"plot_metrics"}.}
 }
 \value{
 A data.frame with one row per retained alias and columns:
@@ -20,6 +20,7 @@ A data.frame with one row per retained alias and columns:
 \item \code{Surface}
 \item \code{Lifecycle}
 \item \code{RetainedFor}
+\item \code{RemovalPlan}
 \item \code{Notes}
 }
 }
@@ -43,14 +44,15 @@ surface.
 
 \enumerate{
 \item Call \code{compatibility_alias_table()} when reading older scripts or reports.
-\item Use \code{PreferredName} when writing new analysis code.
-\item Keep the alias only when an older workflow or external handoff requires it.
+\item Use \code{PreferredName} when updating older analysis code.
+\item Prefer the package-native name in all new outputs and scripts.
 }
 }
 
 \examples{
 compatibility_alias_table()
 compatibility_alias_table("functions")
+compatibility_alias_table("fields")
 compatibility_alias_table("columns")
 }
 \seealso{

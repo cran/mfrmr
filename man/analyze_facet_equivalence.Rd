@@ -9,7 +9,8 @@ analyze_facet_equivalence(
   diagnostics = NULL,
   facet = NULL,
   equivalence_bound = 0.5,
-  conf_level = 0.95
+  ci_level = 0.95,
+  conf_level = NULL
 )
 }
 \arguments{
@@ -23,9 +24,23 @@ diagnostics are computed with \code{residual_pca = "none"}.}
 first model facet.}
 
 \item{equivalence_bound}{Practical-equivalence bound in logits. Default
-\code{0.5}.}
+\code{0.5} is a moderate bound intended as a starting point, not a
+universal threshold. The TOST/ROPE result depends on both the bound
+\emph{and} the per-level standard errors, so in small or high-variance
+designs the test may fail to reject non-equivalence simply because
+the SEs are wide. Choose \code{equivalence_bound} based on the smallest
+difference that would be practically meaningful in your assessment
+context (commonly 0.3 to 0.5 logits for rater-mediated designs) and
+check \verb{$summary} for per-level SE magnitude before drawing
+conclusions.}
 
-\item{conf_level}{Confidence level used for the forest-style interval view.
+\item{ci_level}{Confidence level used for the forest-style interval
+view. Default \code{0.95}.}
+
+\item{conf_level}{Deprecated alias for \code{ci_level}, retained for
+backward compatibility. Supplying a non-\code{NULL} value overrides
+\code{ci_level} and emits a one-time deprecation warning. Will be
+removed in a future release.
 Default \code{0.95}.}
 }
 \value{
@@ -59,8 +74,10 @@ declared "Equivalent" when the TOST p-value < 0.05.
 \item \strong{BIC-based Bayes-factor heuristic}: an approximate screening
 tool (not full Bayesian inference) that compares the evidence for
 a common-facet model (all elements equal) against a heterogeneity
-model (elements differ).  Values > 3 favour the common-facet
-model; < 1/3 favour heterogeneity.
+model (elements differ) via
+\eqn{\mathrm{BF}_{01} \approx \exp((\mathrm{BIC}_{H_1} -
+   \mathrm{BIC}_{H_0}) / 2)} (Kass & Raftery, 1995).  Values > 3
+favour the common-facet model; < 1/3 favour heterogeneity.
 \item \strong{ROPE-style grand-mean proximity}: the proportion of each
 element's normal-approximation confidence distribution that falls
 within \eqn{\pm}\code{equivalence_bound} of the weighted grand mean.
@@ -164,10 +181,19 @@ The returned bundle has class \code{mfrm_facet_equivalence} and includes:
 \examples{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 25)
+                method = "JML", maxit = 30)
 eq <- analyze_facet_equivalence(fit, facet = "Rater")
 eq$summary[, c("Facet", "Elements", "Decision", "MeanROPE")]
 head(eq$pairwise[, c("ElementA", "ElementB", "Equivalent")])
+}
+\references{
+Kass, R. E., & Raftery, A. E. (1995). Bayes factors. \emph{Journal of the
+American Statistical Association, 90}(430), 773-795.
+
+Schuirmann, D. J. (1987). A comparison of the two one-sided tests
+procedure and the power approach for assessing the equivalence of
+average bioavailability. \emph{Journal of Pharmacokinetics and
+Biopharmaceutics, 15}(6), 657-680.
 }
 \seealso{
 \code{\link[=facets_chisq_table]{facets_chisq_table()}}, \code{\link[=fair_average_table]{fair_average_table()}}, \code{\link[=plot_facet_equivalence]{plot_facet_equivalence()}}

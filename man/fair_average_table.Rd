@@ -15,7 +15,9 @@ fair_average_table(
   reference = c("both", "mean", "zero"),
   label_style = c("both", "native", "legacy"),
   omit_unobserved = FALSE,
-  xtreme = 0
+  xtreme = 0,
+  fair_se = FALSE,
+  ci_level = 0.95
 )
 }
 \arguments{
@@ -43,6 +45,17 @@ legacy extreme-row exclusion (\code{FALSE}).}
 \item{omit_unobserved}{If \code{TRUE}, remove unobserved levels.}
 
 \item{xtreme}{Extreme-score adjustment amount.}
+
+\item{fair_se}{Logical. When \code{TRUE} and \code{fit} is an MML bounded-\code{GPCM}
+fit, add structural delta-method standard errors and confidence limits
+for \code{Fair(M)} / \code{AdjustedAverage} and \code{Fair(Z)} /
+\code{StandardizedAdjustedAverage}. Person rows remain \code{NA} because MML
+person EAP estimates are not part of the structural Hessian. For
+\code{RSM}, \code{PCM}, and \code{JML} fits this option leaves fair-average SE columns
+unavailable.}
+
+\item{ci_level}{Confidence level used when \code{fair_se = TRUE}; default
+\code{0.95}.}
 }
 \value{
 A named list with:
@@ -64,14 +77,33 @@ package-native aliases such as \code{AdjustedAverage},
 \code{StandardizedAdjustedAverage}, \code{ModelBasedSE}, and \code{FitAdjustedSE} are
 appended to the formatted outputs.
 
-In the current release, these tables are source-backed only for the
-Rasch-family \code{RSM} / \code{PCM} branch. FACETS documents fair averages as
+For the Rasch-family \code{RSM} / \code{PCM} branch, these tables follow the
+standard FACETS Linacre construction: fair averages are
 Rasch-measure-to-score transformations evaluated in a standardized
-mean/zero-facet environment. The bounded \code{GPCM} branch already has a
-generalized ordered-category probability kernel, but this package has not
-yet validated a slope-aware analogue of that fair-average score contract.
-\code{fair_average_table()} therefore stops for \code{GPCM} fits instead of silently
-reusing the Rasch-only calculation.
+mean/zero-facet environment.
+
+Bounded \code{GPCM} fits are supported under a slope-aware
+element-conditional construction. For each slope-facet element
+\eqn{j^\star} the per-row fair-average is the GPCM expected score
+\deqn{\mathrm{FA}_{p, j^\star} = \sum_k k \cdot P_{GPCM}(X = k \mid \theta_p, a_{j^\star}, \boldsymbol{\delta}_{j^\star})}
+computed at that element's own discrimination \eqn{a_{j^\star}}
+and threshold structure. Rows for non-slope facets (Person, Rater,
+\ldots) use the geometric-mean-one slope by the GPCM
+identification convention, so those rows remain continuous with
+the standard PCM Linacre fair-average and reduce to it exactly
+when all slopes equal one.
+This is an identification-based reporting convention for the package's
+bounded \code{GPCM} route, not a unique free-discrimination score-side analogue
+to FACETS fair averages. Do not report it as FACETS score-side equivalence
+or as an operational scoring rule unless that convention is substantively
+justified.
+
+Standard errors on the fair-average value itself are opt-in for MML
+bounded \code{GPCM} fits via \code{fair_se = TRUE}. The original \code{SE},
+\verb{Model S.E.}, \code{ModelBasedSE}, \verb{Real S.E.}, and \code{FitAdjustedSE} columns
+retain the same meaning as for PCM (scaled facet-measure SEs); fair-average
+uncertainty is reported under distinct columns such as \verb{Fair(M) S.E.},
+\verb{Fair(M) CI Lower}, and \code{AdjustedAverageSE}.
 }
 \section{Interpreting output}{
 
@@ -105,6 +137,8 @@ The \code{stacked} data.frame contains:
 \item{Fair(M) Average}{Model-adjusted reference average on the reported score scale.}
 \item{Fair(Z) Average}{Standardized adjusted reference average.}
 \item{ObservedAverage, AdjustedAverage, StandardizedAdjustedAverage}{Package-native aliases for the three average columns above.}
+\item{AdjustedAverageSE, AdjustedAverageCI_Lower, AdjustedAverageCI_Upper}{Optional structural delta-method uncertainty for \code{AdjustedAverage} when \code{fair_se = TRUE} and available.}
+\item{StandardizedAdjustedAverageSE, StandardizedAdjustedAverageCI_Lower, StandardizedAdjustedAverageCI_Upper}{Optional structural delta-method uncertainty for \code{StandardizedAdjustedAverage} when \code{fair_se = TRUE} and available.}
 \item{Measure}{Estimated logit measure for this level.}
 \item{SE}{Compatibility alias for the model-based standard error.}
 \item{ModelBasedSE, FitAdjustedSE}{Package-native aliases for \verb{Model S.E.} and \verb{Real S.E.}.}
@@ -112,16 +146,61 @@ The \code{stacked} data.frame contains:
 }
 }
 
+\section{Standard-error caveat (read before quoting CIs)}{
+
+The \code{SE}, \verb{Model S.E.}, \code{ModelBasedSE}, \verb{Real S.E.}, and \code{FitAdjustedSE}
+columns in this table are the \strong{measure-level} standard errors of the
+underlying facet element (the same SE that would appear in
+\code{summary(fit)$facets}), rescaled by the fair-average score scale factor
+so the units line up with the reported \verb{Fair(M) Average} / \verb{Fair(Z) Average}
+columns. They are \strong{not} delta-method standard errors of the fair-average
+values themselves. When \code{fair_se = TRUE}, the distinct \verb{Fair(M) S.E.} /
+\verb{Fair(Z) S.E.} columns are computed by
+propagating the joint covariance of the relevant facet element, the
+threshold parameters, and the slope parameters through the gradient of
+\eqn{\mathrm{E}[X \mid \theta_p, j^\star]}. This is a structural
+covariance calculation: MML person EAP estimates are conditioned on rather
+than included in the Hessian, so person rows receive unavailable fair-average
+SEs. \strong{Do not use the measure-level \code{SE} / \verb{Model S.E.} columns as
+\eqn{\pm 1.96 \cdot \mathrm{SE}} confidence-interval bounds on the
+fair-average value.}
+}
+
+\section{References}{
+
+\itemize{
+\item Linacre, J. M. (1989). \emph{Many-Facet Rasch Measurement}. MESA Press.
+\item Linacre, J. M. (1994). \emph{Many-facet Rasch Measurement} (2nd ed.).
+MESA Press.
+\item Linacre, J. M. (2026). \emph{A user's guide to FACETS, version 4.5.0}.
+Winsteps.com. \url{https://www.winsteps.com/facets.htm}
+(FACETS Table 12 corresponds to the fair-average
+construction implemented here for \code{RSM} / \code{PCM} fits; the
+slope-aware element-conditional construction for bounded \code{GPCM}
+is documented in this help page.)
+\item Andrich, D. (1978). A rating formulation for ordered response
+categories. \emph{Psychometrika, 43}(4), 561-573.
+\doi{10.1007/BF02293814}
+\item Masters, G. N. (1982). A Rasch model for partial credit scoring.
+\emph{Psychometrika, 47}(2), 149-174. \doi{10.1007/BF02296272}
+\item Muraki, E. (1992). A generalized partial credit model:
+Application of an EM algorithm. \emph{Applied Psychological
+Measurement, 16}(2), 159-176. (Cited for the bounded \code{GPCM}
+slope-aware extension.)
+}
+}
+
 \examples{
 \donttest{
 toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 t12 <- fair_average_table(fit, udecimals = 2)
 t12_native <- fair_average_table(fit, reference = "mean", label_style = "native")
 summary(t12)
 p_t12 <- plot(t12, draw = FALSE)
 p_t12$data$plot
 }
+
 }
 \seealso{
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=unexpected_response_table]{unexpected_response_table()}}, \code{\link[=displacement_table]{displacement_table()}}

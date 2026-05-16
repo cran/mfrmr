@@ -3,6 +3,7 @@
 \name{build_equating_chain}
 \alias{build_equating_chain}
 \alias{print.mfrm_equating_chain}
+\alias{plot.mfrm_equating_chain}
 \alias{summary.mfrm_equating_chain}
 \alias{print.summary.mfrm_equating_chain}
 \title{Build a screened linking chain across ordered calibrations}
@@ -15,6 +16,15 @@ build_equating_chain(
 )
 
 \method{print}{mfrm_equating_chain}(x, ...)
+
+\method{plot}{mfrm_equating_chain}(
+  x,
+  y = NULL,
+  type = c("common_anchors", "graph", "chain"),
+  preset = c("standard", "publication", "compact"),
+  draw = TRUE,
+  ...
+)
 
 \method{summary}{mfrm_equating_chain}(object, ...)
 
@@ -33,6 +43,16 @@ elements.}
 \item{x}{An \code{mfrm_equating_chain} object.}
 
 \item{...}{Ignored.}
+
+\item{y}{Unused (S3 plot signature requirement).}
+
+\item{type}{One of \code{"graph"} (bipartite Wave x anchor-element graph;
+requires the \code{igraph} package), \code{"common_anchors"} (default; bar
+chart of common-anchor counts per wave pair), or \code{"chain"}.}
+
+\item{preset}{Visual preset.}
+
+\item{draw}{If \code{TRUE}, draw the plot with base graphics.}
 
 \item{object}{An \code{mfrm_equating_chain} object (for \code{summary}).}
 }
@@ -136,9 +156,9 @@ people <- unique(toy$Person)
 d1 <- toy[toy$Person \%in\% people[1:12], , drop = FALSE]
 d2 <- toy[toy$Person \%in\% people[13:24], , drop = FALSE]
 fit1 <- fit_mfrm(d1, "Person", c("Rater", "Criterion"), "Score",
-                 method = "JML", maxit = 10)
+                 method = "JML", maxit = 30)
 fit2 <- fit_mfrm(d2, "Person", c("Rater", "Criterion"), "Score",
-                 method = "JML", maxit = 10)
+                 method = "JML", maxit = 30)
 chain <- build_equating_chain(list(Form1 = fit1, Form2 = fit2))
 summary(chain)
 chain$cumulative

@@ -146,7 +146,7 @@ calibrated inferential power.
 diag_eval <- evaluate_mfrm_diagnostic_screening(
   design = list(person = 10, rater = 2, criterion = 2, assignment = 2),
   reps = 1,
-  maxit = 6,
+  maxit = 30,
   seed = 123
 )
 diag_eval$scenario_summary

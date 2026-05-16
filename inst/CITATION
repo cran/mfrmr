@@ -1,10 +1,22 @@
 citHeader("To cite mfrmr in publications, use:")
 
+release_date <- if (is.null(meta$Date) || !nzchar(meta$Date)) {
+  format(Sys.Date(), "%Y-%m-%d")
+} else {
+  meta$Date
+}
+year <- sub("-.*", "", release_date)
+if (!nzchar(year)) year <- format(Sys.Date(), "%Y")
+
+# DESCRIPTION URL may hold multiple comma-separated URLs; pick the first.
+desc_url <- if (is.null(meta$URL)) "" else meta$URL
+first_url <- sub(",.*", "", gsub("[[:space:]]+", "", desc_url))
+
 bibentry(
   bibtype = "Manual",
-  title = "{mfrmr}: Flexible Many-Facet Rasch Model Estimation Without FACETS",
+  title = paste0("{mfrmr}: ", meta$Title),
   author = person("Ryuya", "Komuro"),
-  year = "2026",
-  note = "R package version 0.1.0",
-  url = "https://github.com/Ryuya-dot-com/R_package_mfrmr"
+  year = year,
+  note = paste("R package version", meta$Version),
+  url = first_url
 )

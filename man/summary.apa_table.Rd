@@ -22,7 +22,7 @@ An object of class \code{summary.apa_table}.
 Summarize an APA/FACETS table object
 }
 \details{
-Compact summary helper for QA of table payloads before manuscript export.
+Compact summary helper for QA of table data before manuscript export.
 }
 \section{Interpreting output}{
 
@@ -44,7 +44,7 @@ Compact summary helper for QA of table payloads before manuscript export.
 
 \examples{
 toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 tbl <- apa_table(fit, which = "summary")
 summary(tbl)
 }

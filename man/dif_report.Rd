@@ -61,11 +61,25 @@ manuscript.
 }
 }
 
+\section{References}{
+
+The narrative caveat about distinguishing construct-relevant variation
+from unwanted measurement bias is grounded in:
+\itemize{
+\item Eckes, T. (2011). \emph{Introduction to Many-Facet Rasch Measurement:
+Analyzing and Evaluating Rater-Mediated Assessments}. Frankfurt am
+Main: Peter Lang. ISBN 978-3-631-61350-4.
+\item McNamara, T., & Knoch, U. (2012). The Rasch wars: The emergence of
+Rasch measurement in language testing. \emph{Language Testing}, 29(4),
+555--576. \doi{10.1177/0265532211430367}
+}
+}
+
 \examples{
 toy <- load_mfrmr_data("example_bias")
 
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                 method = "JML", model = "RSM", maxit = 25)
+                 method = "JML", model = "RSM", maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "none")
 dif <- analyze_dff(fit, diag, facet = "Rater", group = "Group", data = toy)
 rpt <- dif_report(dif)

@@ -22,12 +22,12 @@
 #' @section Canonical operational review route:
 #' When the main question is scale maintenance rather than manuscript reporting,
 #' branch after [diagnose_mfrm()] into:
-#' [audit_mfrm_anchors()] and/or [detect_anchor_drift()] ->
+#' [review_mfrm_anchors()] and/or [detect_anchor_drift()] ->
 #' [build_equating_chain()] when adjacent-link review is needed ->
 #' [build_linking_review()] ->
 #' inspect `review$group_view_index` for stable wave / link / facet rollups and
 #' `summary(review)$plot_routes` for the next plot helper ->
-#' [plot_anchor_drift()] or `plot(anchor_audit, ...)` for the specific flagged
+#' [plot_anchor_drift()] or `plot(anchor_review, ...)` for the specific flagged
 #' evidence family.
 #'
 #' For bounded `GPCM`, keep anchor/drift helpers as direct exploratory support
@@ -93,13 +93,16 @@
 #'    [interrater_agreement_table()], [unexpected_response_table()],
 #'    [displacement_table()], [measurable_summary_table()],
 #'    [rating_scale_table()], [facet_quality_dashboard()],
-#'    [reporting_checklist()], and [plot_qc_dashboard()] with its
-#'    fair-average panel retained as an explicit unavailable placeholder.
-#'    Treat those residual-based summaries as
-#'    exploratory screens because the discrimination parameter is free.
-#'    FACETS-style fair averages are Rasch-family measure-to-score
-#'    transformations, so the score-side fair-average semantics remain blocked
-#'    for bounded `GPCM`.
+#'    [reporting_checklist()], and [plot_qc_dashboard()] -- the
+#'    fair-average panel of the dashboard reports an explicit
+#'    unavailability indicator under GPCM. Use [fair_average_table()] directly
+#'    when you need the supported slope-aware element-conditional fair averages.
+#'    Treat those residual-based
+#'    summaries as exploratory screens because the discrimination
+#'    parameter is free.
+#'    FACETS-style score exports and fit-based reporting bundles remain blocked
+#'    for bounded `GPCM`; direct fair-average and bias-screening tables carry
+#'    their own caveats.
 #'    Posterior scoring with [predict_mfrm_units()] /
 #'    [sample_mfrm_plausible_values()], design-weighted information via
 #'    [compute_information()] / [plot_information()], Wright/pathway/CCC plots
@@ -107,28 +110,33 @@
 #'    [category_structure_report()] / [category_curves_report()], and direct
 #'    data generation through [build_mfrm_sim_spec()], [extract_mfrm_sim_spec()],
 #'    and [simulate_mfrm_data()] are also available when the simulation
-#'    specification stores both thresholds and slopes. Fair-average,
-#'    planning/forecasting, and APA/QC pipelines remain outside the validated
-#'    `GPCM` boundary. Use [gpcm_capability_matrix()] as the formal capability
-#'    map before branching into less common helpers.
-#' 4. (Optional, `RSM` / `PCM`) Estimate interaction bias with [estimate_bias()].
-#' 5. (Optional, `RSM` / `PCM`) Choose a downstream branch:
-#'    [reporting_checklist()] for manuscript/report preparation, or
-#'    [build_weighting_audit()] for Rasch-versus-bounded-`GPCM`
+#'    specification stores both thresholds and slopes. Use
+#'    [evaluate_mfrm_recovery()] and [assess_mfrm_recovery()] for direct
+#'    recovery checks. Planning/forecasting helpers, APA writer/QC pipelines,
+#'    and fit-based export bundles remain outside the validated `GPCM`
+#'    boundary. Use [gpcm_capability_matrix()] as the formal capability map
+#'    before branching into less common helpers.
+#' 4. (Optional, `RSM` / `PCM`; bounded `GPCM` with caveat) Estimate
+#'    interaction bias with [estimate_bias()].
+#' 5. Choose a downstream branch:
+#'    [reporting_checklist()] for direct report preparation, or
+#'    [build_weighting_review()] for Rasch-versus-bounded-`GPCM`
 #'    weighting review, or [build_misfit_casebook()] / [build_linking_review()]
-#'    for operational case review.
-#' 6. (Optional, `RSM` / `PCM`) Generate reporting bundles:
+#'    for operational case review. Keep [build_linking_review()] on the
+#'    `RSM` / `PCM` route; bounded `GPCM` linking synthesis is deferred.
+#' 6. Generate reporting bundles:
 #'    [build_summary_table_bundle()], [apa_table()],
 #'    [export_summary_appendix()], [build_fixed_reports()],
-#'    [build_visual_summaries()]. Weighting-review surfaces can also be routed
-#'    through [build_summary_table_bundle()] -> [apa_table()] /
-#'    [export_summary_appendix()]. Misfit-case review surfaces now use the same
-#'    bundle/export handoff after [build_misfit_casebook()].
-#' 7. (Optional, `RSM` / `PCM`) Audit report completeness with
-#'    [reference_case_audit()]. Use `facets_parity_report()` only when you
+#'    [build_visual_summaries()]. For bounded `GPCM`, use
+#'    [build_summary_table_bundle()] and [export_summary_appendix()] only for
+#'    supported direct outputs; the APA writer, visual-summary bundle, and
+#'    fit-based export bundle remain out of scope. Weighting-review and
+#'    misfit-casebook surfaces can use the same summary-table export handoff.
+#' 7. (Optional, `RSM` / `PCM`) Review report completeness with
+#'    [reference_case_review()]. Use `facets_output_contract_review()` only when you
 #'    explicitly need the compatibility layer.
 #' 8. (Optional, `RSM` / `PCM`) For operational linking follow-up, combine
-#'    [audit_mfrm_anchors()], [detect_anchor_drift()], and
+#'    [review_mfrm_anchors()], [detect_anchor_drift()], and
 #'    [build_equating_chain()] inside [build_linking_review()] before
 #'    exporting appendix-style tables.
 #' 9. (Optional) Check packaged reference cases with
@@ -136,12 +144,13 @@
 #' 10. (Optional) For design planning or future scoring, move to the
 #'    simulation/prediction layer:
 #'    [build_mfrm_sim_spec()] / [extract_mfrm_sim_spec()] ->
+#'    [evaluate_mfrm_recovery()] -> [assess_mfrm_recovery()] /
 #'    [evaluate_mfrm_design()] / [predict_mfrm_population()] ->
 #'    [predict_mfrm_units()] / [sample_mfrm_plausible_values()]. Current
-#'    fit-derived simulation specs include direct `GPCM` data generation, but
-#'    design-evaluation / forecasting helpers still remain `RSM` / `PCM` only
-#'    and still target the role-based person x rater-like x criterion-like
-#'    contract.
+#'    fit-derived simulation specs include direct `GPCM` data generation and
+#'    recovery checks, but design-evaluation / forecasting helpers remain on
+#'    the `RSM` / `PCM` route and target the role-based person x rater-like x
+#'    criterion-like contract.
 #'    Unit scoring can use an ordinary `MML` fit directly, a latent-regression
 #'    `MML` fit when you also supply one-row-per-person background data for the
 #'    scored units, or a `JML` fit when a post hoc reference-prior EAP layer is
@@ -152,7 +161,7 @@
 #'    scenario forecast helper, not the latent-regression estimator itself.
 #'    Prediction export still requires actual prediction objects in addition to
 #'    `include = "predictions"`.
-#' 10. Use `summary()` for compact text checks and `plot()` (or dedicated plot
+#' 11. Use `summary()` for compact text checks and `plot()` (or dedicated plot
 #'    helpers) for base-R visual diagnostics.
 #'
 #' @section Three practical routes:
@@ -163,8 +172,10 @@
 #'   [plot_qc_dashboard()] / [unexpected_response_table()] ->
 #'   [rating_scale_table()] ->
 #'   [compute_information()] -> [plot_information()] ->
-#'   [plot.mfrm_fit()] / [category_curves_report()]. Keep bounded `GPCM`
-#'   routes on the direct table/plot side; the fit-based export family
+#'   [plot.mfrm_fit()] / [category_curves_report()] ->
+#'   [fair_average_table()] / [estimate_bias()] when those screening tables
+#'   answer the question. Keep bounded `GPCM` routes on the direct table/plot
+#'   side; the fit-based export family
 #'   ([build_mfrm_manifest()], [build_mfrm_replay_script()],
 #'   [export_mfrm_bundle()]) remains outside the formal `GPCM` boundary.
 #' - Linking and coverage review:
@@ -177,26 +188,30 @@
 #'   [build_summary_table_bundle()] -> [apa_table()] or
 #'   [export_summary_appendix()].
 #'   First-release `GPCM`:
-#'   [reporting_checklist()] -> direct table/plot helpers while the APA writer
-#'   remains outside scope.
+#'   [reporting_checklist()] -> direct table/plot helpers ->
+#'   [build_summary_table_bundle()] -> [export_summary_appendix()] while the
+#'   APA writer and fit-based export bundle remain outside scope.
 #' - Weighting-policy review:
-#'   [compare_mfrm()] -> [build_weighting_audit()] ->
+#'   [compare_mfrm()] -> [build_weighting_review()] ->
 #'   [compute_information()] / [plot_information()] when you want to inspect
 #'   whether bounded `GPCM` is introducing substantively acceptable
 #'   discrimination-based reweighting relative to the Rasch-family reference.
 #' - Design planning and forecasting:
 #'   [build_mfrm_sim_spec()] or [extract_mfrm_sim_spec()] ->
-#'   [evaluate_mfrm_design()] -> [predict_mfrm_population()] ->
-#'   [predict_mfrm_units()] or [sample_mfrm_plausible_values()] under the
-#'   fitted scoring basis (ordinary `MML`, latent-regression `MML` with
-#'   person-level background data, or `JML` with the documented post hoc EAP
-#'   approximation). Here again, [predict_mfrm_population()] is the
+#'   [evaluate_mfrm_recovery()] -> [assess_mfrm_recovery()] for
+#'   parameter-recovery checks, then [evaluate_mfrm_design()] ->
+#'   [predict_mfrm_population()] ->
+#'   [predict_mfrm_units()] or [sample_mfrm_plausible_values()] under the fitted
+#'   scoring basis (ordinary `MML`, latent-regression `MML` with person-level
+#'   background data, or `JML` with the documented post hoc EAP approximation).
+#'   Here again, [predict_mfrm_population()] is the
 #'   scenario-level forecast helper, whereas [predict_mfrm_units()] /
 #'   [sample_mfrm_plausible_values()] are the scoring layer. Prediction export
 #'   requires actual prediction objects. First-release `GPCM` now supports
 #'   direct data generation via
 #'   [build_mfrm_sim_spec()], [extract_mfrm_sim_spec()], and
-#'   [simulate_mfrm_data()], residual diagnostics, and direct curve/report
+#'   [simulate_mfrm_data()], [evaluate_mfrm_recovery()],
+#'   [assess_mfrm_recovery()], residual diagnostics, and direct curve/report
 #'   helpers, but still stops before planning/forecasting helpers. The current
 #'   planning layer remains role-based for two non-person facets even though
 #'   estimation itself supports arbitrary facet counts; future arbitrary-facet
@@ -217,22 +232,22 @@
 #'   such as [plot_unexpected()], [plot_displacement()], [plot_qc_dashboard()].
 #' - `mfrm_bias`: `summary(bias)` and [plot_bias_interaction()].
 #' - `mfrm_data_description`: `summary(ds)` and `plot(ds, ...)`.
-#' - `mfrm_anchor_audit`: `summary(aud)` and `plot(aud, ...)`.
+#' - `mfrm_anchor_review`: `summary(review)` and `plot(review, ...)`.
 #' - `mfrm_misfit_casebook`: `summary(casebook)` and `print(casebook)`, with
 #'   grouping views available through `casebook$group_view_index` and
 #'   `casebook$group_views`, source-specific plotting routed through
 #'   `summary(casebook)$plot_routes` and `casebook$plot_map`, and
 #'   appendix/report handoff available through
 #'   [build_summary_table_bundle()] and [export_summary_appendix()].
-#' - `mfrm_weighting_audit`: `summary(audit)` and `print(audit)`, with
+#' - `mfrm_weighting_review`: `summary(review)` and `print(review)`, with
 #'   information follow-up routed through [compute_information()] and
-#'   [plot_information()] according to `audit$plot_map`, and appendix/report
+#'   [plot_information()] according to `review$plot_map`, and appendix/report
 #'   handoff available through [build_summary_table_bundle()] and
 #'   [export_summary_appendix()].
 #' - `mfrm_linking_review`: `summary(review)` and `print(review)`, with
 #'   grouping views available through `review$group_view_index` and
 #'   `review$group_views`, and plotting routed through `summary(review)$plot_routes`,
-#'   [plot_anchor_drift()], and `plot(anchor_audit, ...)` according to
+#'   [plot_anchor_drift()], and `plot(anchor_review, ...)` according to
 #'   `review$plot_map`.
 #' - `mfrm_facets_run`: `summary(run)` and `plot(run, type = c("fit", "qc"), ...)`.
 #' - `apa_table`: `summary(tbl)` and `plot(tbl, ...)`.
@@ -257,7 +272,7 @@
 #'   `mfrm_measurable`, `mfrm_unexpected_after_bias`, `mfrm_output_bundle`,
 #'   `mfrm_residual_pca`, `mfrm_specifications`, `mfrm_data_quality`,
 #'   `mfrm_iteration_report`, `mfrm_subset_connectivity`,
-#'   `mfrm_facet_statistics`, `mfrm_parity_report`, `mfrm_reference_audit`,
+#'   `mfrm_facet_statistics`, `mfrm_facets_contract_review`, `mfrm_reference_review`,
 #'   `mfrm_reference_benchmark`.
 #'
 #' @section `plot.mfrm_bundle()` coverage:
@@ -269,7 +284,7 @@
 #' - `mfrm_measurable`, `mfrm_unexpected_after_bias`, `mfrm_output_bundle`
 #' - `mfrm_residual_pca`, `mfrm_specifications`, `mfrm_data_quality`
 #' - `mfrm_iteration_report`, `mfrm_subset_connectivity`, `mfrm_facet_statistics`
-#' - `mfrm_parity_report`, `mfrm_reference_audit`, `mfrm_reference_benchmark`
+#' - `mfrm_facets_contract_review`, `mfrm_reference_review`, `mfrm_reference_benchmark`
 #'
 #' For unknown bundle classes, use dedicated plotting helpers or custom base-R
 #' plots from component tables.
@@ -294,7 +309,8 @@
 #'   facets = c("Rater", "Criterion"),
 #'   score = "Score",
 #'   method = "MML",
-#'   maxit = 200
+#'   quad_points = 7,
+#'   maxit = 30
 #' )
 #' summary(fit)$next_actions
 #'

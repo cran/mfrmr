@@ -66,7 +66,7 @@ sim_eval <- suppressWarnings(evaluate_mfrm_design(
   n_criterion = 2,
   raters_per_person = 1,
   reps = 1,
-  maxit = 8,
+  maxit = 30,
   seed = 123
 ))
 p <- plot(sim_eval, facet = "Rater", metric = "separation", x_var = "n_person", draw = FALSE)

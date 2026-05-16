@@ -2,7 +2,7 @@
 % Please edit documentation in R/api-advanced.R
 \name{compute_information}
 \alias{compute_information}
-\title{Compute design-weighted precision curves for ordered Rasch-family fits}
+\title{Compute design-weighted precision curves for ordered many-facet fits}
 \usage{
 compute_information(fit, theta_range = c(-6, 6), theta_points = 201L)
 }
@@ -28,13 +28,14 @@ contribution value retained under that column name for compatibility.
 }
 \description{
 Calculates design-weighted score-variance curves across the latent
-trait (theta) for a fitted ordered-category many-facet Rasch model. Returns both
-an overall precision curve (\verb{$tif}) and per-facet-level contribution
-curves (\verb{$iif}) based on the realized observation pattern.
+trait (theta) for a fitted ordered-category \code{RSM}, \code{PCM}, or bounded
+\code{GPCM} model. Returns both an overall precision curve (\verb{$tif}) and
+per-facet-level contribution curves (\verb{$iif}) based on the realized
+observation pattern.
 }
 \details{
-For a polytomous Rasch model with K+1 categories, the score variance at
-theta for one observed design cell is:
+For \code{RSM} / \code{PCM}, the score variance at theta for one observed design cell
+is:
 \deqn{I(\theta) = \sum_{k=0}^{K} P_k(\theta) \left(k - E(\theta)\right)^2}
 where \eqn{P_k} is the category probability and \eqn{E(\theta)} is the
 expected score at theta. In \code{mfrmr}, these cell-level variances are then
@@ -53,8 +54,10 @@ the familiar \eqn{p(\theta)\{1 - p(\theta)\}} form. For \code{PCM}, the package
 evaluates each observed design cell using the threshold vector associated
 with that cell's realized \code{step_facet} level. For bounded \code{GPCM}, the
 same design-weighted score variance is scaled by the squared discrimination
-attached to the realized \code{slope_facet} level, matching the standard item-
-information identity for the generalized partial credit model (Muraki, 1993).
+attached to the realized \code{slope_facet} level, which is the
+\eqn{a_j^2 \cdot \mathrm{Var}(T \mid \theta)} item-information identity that
+Muraki (1993, Equation 10) derives by applying Samejima's (1974)
+polytomous information formula to the GPCM kernel of Muraki (1992).
 }
 \section{What \code{tif} and \code{iif} mean here}{
 
@@ -109,18 +112,40 @@ for reporting or custom graphics.
 \section{References}{
 
 The ordered-category probability structures come from Andrich's \code{RSM}
-formulation and Masters' \code{PCM}. The general logic linking polytomous
-category probabilities to information functions is discussed by Muraki
-(1993). In \code{mfrmr}, those formulas are applied to the realized many-facet
-observation design, so the output should be read as a design-weighted
-precision summary rather than as a design-free abstract test function.
+formulation and Masters' \code{PCM}. The bounded \code{GPCM} information identity
+\eqn{a_j^2 \cdot \mathrm{Var}(T \mid \theta)} is derived in Muraki
+(1993, Equation 10) by applying Samejima's (1974) general polytomous
+information formula \eqn{I_j(\theta) = \sum_k P_{jk}(\theta)
+[-\partial^2 \ln P_{jk} / \partial \theta^2]} to the GPCM probability
+kernel of Muraki (1992). For the integer scoring function
+\eqn{T_k = k} used by \code{mfrmr}, this reduces to
+\eqn{a_j^2 \cdot \mathrm{Var}(K \mid \theta)}. In \code{mfrmr}, those formulas
+are applied to the realized many-facet observation design, so the output
+should be read as a design-weighted precision summary rather than as a
+design-free abstract test function.
 \itemize{
 \item Andrich, D. (1978). \emph{A rating formulation for ordered response
 categories}. Psychometrika, 43(4), 561-573.
 \item Masters, G. N. (1982). \emph{A Rasch model for partial credit scoring}.
 Psychometrika, 47(2), 149-174.
-\item Muraki, E. (1993). \emph{Information functions of the generalized partial
-credit model}. ETS Research Report Series, 1993(1), i-12.
+\item Muraki, E. (1992). \emph{A generalized partial credit model: Application
+of an EM algorithm}. Applied Psychological Measurement, 16(2),
+159-176. \doi{10.1177/014662169201600206} (See Equations 6, 10, and
+13 for the probability kernel and the
+\eqn{\partial P_k / \partial \theta = a_j P_k (k - E[K])}
+derivative used by all GPCM helpers in \code{mfrmr}.)
+\item Muraki, E. (1993). \emph{Information functions of the generalized
+partial credit model}. Applied Psychological Measurement, 17(4),
+351-363. \doi{10.1177/014662169301700403} (Equation 10 derives the
+item information function for the GPCM,
+\eqn{I_j(\theta) = D^2 a_j^2 \mathrm{Var}(T \mid \theta)}, by
+applying Samejima's (1974) polytomous information formula to the
+GPCM kernel; this is the canonical reference for \code{compute_information()}
+under bounded \code{GPCM}.)
+\item Samejima, F. (1974). \emph{Normal ogive model on the continuous
+response level in the multidimensional latent space}.
+Psychometrika, 39, 111-121. (Source for the general polytomous
+information formula that Muraki 1993 specializes to the GPCM.)
 }
 }
 
@@ -155,7 +180,7 @@ curve in \verb{$iif}.
 
 Compare the precision peak with person/facet locations from a Wright map or
 related diagnostics. If you need to decide how strongly SE/CI language can
-be used in reporting, follow with \code{\link[=precision_audit_report]{precision_audit_report()}}.
+be used in reporting, follow with \code{\link[=precision_review_report]{precision_review_report()}}.
 }
 
 \section{Typical workflow}{
@@ -172,7 +197,7 @@ be used in reporting, follow with \code{\link[=precision_audit_report]{precision
 \examples{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                 method = "JML", model = "RSM", maxit = 25)
+                 method = "JML", model = "RSM", maxit = 30)
 info <- compute_information(fit)
 head(info$tif)
 info$tif$Theta[which.max(info$tif$Information)]

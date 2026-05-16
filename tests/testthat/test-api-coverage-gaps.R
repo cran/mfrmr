@@ -61,42 +61,42 @@ test_that("print.mfrm_data_description prints overview, score distribution, and 
 })
 
 # ==========================================================================
-# 2. print.mfrm_anchor_audit (lines 962-987)
+# 2. print.mfrm_anchor_review (lines 962-987)
 # ==========================================================================
-test_that("print.mfrm_anchor_audit covers all branches", {
+test_that("print.mfrm_anchor_review covers all branches", {
   anchors <- data.frame(
     Facet  = c("Rater", "Rater"),
     Level  = c("R1", "R2"),
     Anchor = c(0, 0.1),
     stringsAsFactors = FALSE
   )
-  aud <- mfrmr::audit_mfrm_anchors(
+  aud <- mfrmr::review_mfrm_anchors(
     data    = d,
     person  = "Person",
     facets  = c("Rater", "Task", "Criterion"),
     score   = "Score",
     anchors = anchors
   )
-  expect_s3_class(aud, "mfrm_anchor_audit")
+  expect_s3_class(aud, "mfrm_anchor_review")
 
   out <- capture.output(print(aud))
-  expect_true(any(grepl("mfrm anchor audit", out, fixed = TRUE)))
+  expect_true(any(grepl("mfrm anchor review", out, fixed = TRUE)))
   expect_true(any(grepl("issue rows", out, fixed = TRUE)))
   # facet summary branch
   expect_true(any(grepl("Facet summary", out, fixed = TRUE)))
 })
 
 # ==========================================================================
-# 3. plot.mfrm_anchor_audit facet_constraints + level_observations (lines 1216-1239)
+# 3. plot.mfrm_anchor_review facet_constraints + level_observations (lines 1216-1239)
 # ==========================================================================
-test_that("plot.mfrm_anchor_audit draws facet_constraints and level_observations", {
+test_that("plot.mfrm_anchor_review draws facet_constraints and level_observations", {
   anchors <- data.frame(
     Facet  = c("Rater", "Rater"),
     Level  = c("R1", "R2"),
     Anchor = c(0, 0.1),
     stringsAsFactors = FALSE
   )
-  aud <- mfrmr::audit_mfrm_anchors(
+  aud <- mfrmr::review_mfrm_anchors(
     data    = d,
     person  = "Person",
     facets  = c("Rater", "Task", "Criterion"),
@@ -188,7 +188,7 @@ test_that("displacement_table filters by facets, anchored_only, and top_n", {
 # ==========================================================================
 # 6. data_quality_report with external data + include_fixed (lines 3018-3054)
 # ==========================================================================
-test_that("data_quality_report covers include_fixed and row-audit branches", {
+test_that("data_quality_report covers include_fixed and row-review branches", {
   t2_fixed <- mfrmr::data_quality_report(
     fit,
     data         = d,
@@ -213,9 +213,9 @@ test_that("data_quality_report covers include_fixed and row-audit branches", {
     score  = "Score"
   )
   expect_s3_class(t2_bad, "mfrm_data_quality")
-  expect_true(is.data.frame(t2_bad$row_audit))
-  if (nrow(t2_bad$row_audit) > 0) {
-    expect_true(any(t2_bad$row_audit$Status %in% c("missing_score", "out_of_range")))
+  expect_true(is.data.frame(t2_bad$row_review))
+  if (nrow(t2_bad$row_review) > 0) {
+    expect_true(any(t2_bad$row_review$Status %in% c("missing_score", "out_of_range")))
   }
 })
 
@@ -427,37 +427,37 @@ test_that("print.summary.mfrm_threshold_profiles covers all sections", {
 })
 
 # ==========================================================================
-# 14. facets_parity_report rows == 0 branch (lines 7513-7521)
+# 14. facets_output_contract_review rows == 0 branch (lines 7513-7521)
 # ==========================================================================
-test_that("facets_parity_report returns empty data.frame when no checks apply", {
+test_that("facets_output_contract_review returns empty data.frame when no checks apply", {
   # Calling with real fit should produce valid results
-  pr <- suppressWarnings(mfrmr::facets_parity_report(fit, diagnostics = dx))
-  expect_s3_class(pr, "mfrm_parity_report")
-  expect_true(is.data.frame(pr$column_audit))
+  pr <- suppressWarnings(mfrmr::facets_output_contract_review(fit, diagnostics = dx))
+  expect_s3_class(pr, "mfrm_facets_contract_review")
+  expect_true(is.data.frame(pr$column_review))
 })
 
 # ==========================================================================
-# 15. facets_parity_report auto-computes bias_results (lines 7620-7626)
+# 15. facets_output_contract_review auto-computes bias_results (lines 7620-7626)
 # ==========================================================================
-test_that("facets_parity_report auto-computes bias_results when not provided", {
+test_that("facets_output_contract_review auto-computes bias_results when not provided", {
   # bias_results = NULL triggers internal estimate_bias()
-  pr_auto <- suppressWarnings(mfrmr::facets_parity_report(
+  pr_auto <- suppressWarnings(mfrmr::facets_output_contract_review(
     fit,
     diagnostics  = dx,
     bias_results = NULL
   ))
-  expect_s3_class(pr_auto, "mfrm_parity_report")
+  expect_s3_class(pr_auto, "mfrm_facets_contract_review")
 })
 
 # ==========================================================================
-# 16. parity contract missing_component branch (lines 7690-7703)
+# 16. contract-review missing_component branch (lines 7690-7703)
 # ==========================================================================
-test_that("facets_parity_report column_audit has status column", {
-  pr <- suppressWarnings(mfrmr::facets_parity_report(fit, diagnostics = dx))
-  expect_true("status" %in% names(pr$column_audit))
+test_that("facets_output_contract_review column_review has status column", {
+  pr <- suppressWarnings(mfrmr::facets_output_contract_review(fit, diagnostics = dx))
+  expect_true("status" %in% names(pr$column_review))
   # Verify the status column is character and non-empty
-  if (nrow(pr$column_audit) > 0) {
-    expect_true(is.character(pr$column_audit$status))
+  if (nrow(pr$column_review) > 0) {
+    expect_true(is.character(pr$column_review$status))
   }
 })
 
@@ -561,17 +561,17 @@ test_that("summary.mfrm_bundle falls through to generic path", {
 })
 
 # ==========================================================================
-# 21. plot.mfrm_anchor_audit with draw=TRUE for specifications anchor_constraints
+# 21. plot.mfrm_anchor_review with draw=TRUE for specifications anchor_constraints
 #     (lines 9393-9446)
 # ==========================================================================
-test_that("plot.mfrm_anchor_audit issue_counts drawn", {
+test_that("plot.mfrm_anchor_review issue_counts drawn", {
   anchors <- data.frame(
     Facet  = c("Rater", "Rater"),
     Level  = c("R1", "R2"),
     Anchor = c(0, 0.1),
     stringsAsFactors = FALSE
   )
-  aud <- mfrmr::audit_mfrm_anchors(
+  aud <- mfrmr::review_mfrm_anchors(
     data    = d,
     person  = "Person",
     facets  = c("Rater", "Task", "Criterion"),
@@ -857,7 +857,7 @@ test_that("bundle_known_overview builds a one-row overview", {
 # 36. print.mfrm_plot_bundle (lines 13168-13176)
 # ==========================================================================
 test_that("print.mfrm_plot_bundle prints expected lines", {
-  p_bundle <- plot(fit, draw = FALSE)
+  p_bundle <- plot(fit, type = "bundle", draw = FALSE)
   out <- capture.output(print(p_bundle))
   expect_true(any(grepl("mfrm plot bundle", out, fixed = TRUE)))
   expect_true(any(grepl("wright_map", out, fixed = TRUE)))
@@ -898,7 +898,7 @@ test_that("facets_output_file_bundle plot types are drawn", {
 # ==========================================================================
 test_that("plot.mfrm_fit bundle drawn covers all three map types", {
   p_all <- with_null_device(
-    plot(fit, draw = TRUE)
+    plot(fit, type = "bundle", draw = TRUE)
   )
   expect_s3_class(p_all, "mfrm_plot_bundle")
   expect_true(all(c("wright_map", "pathway_map", "category_characteristic_curves") %in% names(p_all)))
@@ -968,16 +968,16 @@ test_that("plot.mfrm_fit type=facet respects top_n", {
 })
 
 # ==========================================================================
-# 43. summary.mfrm_anchor_audit
+# 43. summary.mfrm_anchor_review
 # ==========================================================================
-test_that("summary.mfrm_anchor_audit covers all branches", {
+test_that("summary.mfrm_anchor_review covers all branches", {
   anchors <- data.frame(
     Facet  = c("Rater", "Rater"),
     Level  = c("R1", "R2"),
     Anchor = c(0, 0.1),
     stringsAsFactors = FALSE
   )
-  aud <- mfrmr::audit_mfrm_anchors(
+  aud <- mfrmr::review_mfrm_anchors(
     data    = d,
     person  = "Person",
     facets  = c("Rater", "Task", "Criterion"),
@@ -986,7 +986,7 @@ test_that("summary.mfrm_anchor_audit covers all branches", {
   )
   sm <- summary(aud)
   out <- capture.output(print(sm))
-  expect_true(any(grepl("Anchor Audit Summary", out, fixed = TRUE)))
+  expect_true(any(grepl("Anchor Review Summary", out, fixed = TRUE)))
 })
 
 # ==========================================================================

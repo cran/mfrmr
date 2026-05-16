@@ -46,7 +46,8 @@ This method returns a compact interaction-bias summary:
 \item \code{overview}: interaction order, analyzed cells, and effect-size profile.
 \item \code{chi_sq}: fixed-effect test block.
 \item \code{final_iteration}: end-of-loop status from the bias routine.
-\item \code{top_rows}: strongest bias contrasts by \verb{|t|}.
+\item \code{top_rows}: strongest bias contrasts by \verb{|t|}; bounded \code{GPCM}
+summaries also retain the profile-likelihood review columns when present.
 }
 }
 
@@ -62,7 +63,7 @@ This method returns a compact interaction-bias summary:
 \examples{
 toy <- load_mfrmr_data("example_bias")
 toy <- toy[toy$Person \%in\% unique(toy$Person)[1:8], ]
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 50)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "none")
 bias <- estimate_bias(fit, diag, facet_a = "Rater", facet_b = "Criterion", max_iter = 1)
 summary(bias)

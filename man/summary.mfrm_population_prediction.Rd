@@ -36,7 +36,7 @@ planning schema
 Summarize a population-level design forecast
 }
 \examples{
-\dontrun{
+\donttest{
 spec <- build_mfrm_sim_spec(
   n_person = 16,
   n_rater = 3,
@@ -48,7 +48,7 @@ pred <- predict_mfrm_population(
   sim_spec = spec,
   design = list(person = 18),
   reps = 1,
-  maxit = 5,
+  maxit = 30,
   seed = 123
 )
 s <- summary(pred)

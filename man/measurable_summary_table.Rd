@@ -90,7 +90,7 @@ and low-count flag.}
 
 \examples{
 toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 t5 <- measurable_summary_table(fit)
 summary(t5)
 p_t5 <- plot(t5, draw = FALSE)

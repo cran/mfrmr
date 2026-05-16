@@ -24,6 +24,9 @@ An object of class \code{summary.mfrm_data_description}.
 categories retained by the prepared score support
 \item \code{facet_overview}: facet-level coverage summary
 \item \code{agreement}: inter-rater agreement summary when available
+\item \code{row_retention}: row counts before and after preparation filters
+\item \code{preparation_notes}: structured preparation notes retained from
+\code{\link[=describe_mfrm_data]{describe_mfrm_data()}}
 \item \code{reporting_map}: manuscript-oriented guide to what is covered here versus
 which companion outputs should be consulted
 \item \code{caveats}: structured warning/review rows for score-support issues;

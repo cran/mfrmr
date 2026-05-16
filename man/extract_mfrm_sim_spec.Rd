@@ -64,11 +64,12 @@ claim that the fitted object perfectly recovers the true data-generating
 mechanism. Users should review and, if necessary, edit the returned
 specification before using it for design planning.
 
-First-release \code{GPCM} fits are now supported here for direct data generation,
-provided that the returned simulation specification stores both a threshold
-table and a parallel slope table. The broader planning/reporting helpers
-still remain restricted until slope-aware downstream contracts are widened
-explicitly.
+First-release \code{GPCM} fits are now supported here for direct data generation
+and parameter-recovery checks, provided that the returned simulation
+specification stores both a threshold table and a parallel slope table.
+Design planning, forecasting, and fit-based report/export bundles still
+remain outside the bounded-\code{GPCM} boundary until those downstream contracts
+are widened explicitly.
 
 If you want to carry person-level group labels into a fit-derived observed
 response skeleton, provide the original \code{source_data} together with
@@ -83,14 +84,14 @@ design and estimated spread in the fitted run.
 }
 
 \examples{
-\dontrun{
+\donttest{
 toy <- simulate_mfrm_data(
   n_person = 8,
   n_rater = 3,
   n_criterion = 2,
   seed = 123
 )
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 5)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 spec <- extract_mfrm_sim_spec(fit, latent_distribution = "empirical")
 spec$assignment
 spec$model

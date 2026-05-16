@@ -1,4 +1,4 @@
-# Tests for DIF analysis module (Phase 2) and compare_mfrm enhancements (Phase 3)
+# Tests for DIF analysis module and compare_mfrm enhancements.
 
 # ---------- shared fixtures ----------
 local_dif_fixtures <- function(env = parent.frame()) {
@@ -21,7 +21,7 @@ local_dif_fixtures <- function(env = parent.frame()) {
 }
 
 # ================================================================
-# Phase 2: DIF diagnostic module
+# DIF diagnostic module
 # ================================================================
 
 test_that("analyze_dff residual method returns expected structure", {
@@ -192,6 +192,54 @@ test_that("analyze_dif p_adjust works for all methods", {
   }
 })
 
+test_that("analyze_dif validates DFF control arguments", {
+  local_dif_fixtures()
+
+  expect_error(
+    analyze_dif(fit, diag, facet = "Criterion", group = "Group",
+                data = toy, method = "residual", p_adjust = "not_a_method"),
+    "`p_adjust`"
+  )
+  expect_error(
+    analyze_dif(fit, diag, facet = "Criterion", group = "Group",
+                data = toy, method = "residual", min_obs = 1.5),
+    "`min_obs`"
+  )
+  expect_error(
+    analyze_dif(fit, diag, facet = "Criterion", group = "Group",
+                data = toy, method = "residual", focal = "MissingGroup"),
+    "not found"
+  )
+  expect_error(
+    analyze_dif(fit, diag, facet = "Criterion", group = "Group",
+                data = toy, method = "residual", focal = unique(toy$Group)),
+    "reference group"
+  )
+})
+
+test_that("analyze_dif handles missing and empty group values explicitly", {
+  local_dif_fixtures()
+  toy_bad <- toy
+  toy_bad$Group[1] <- NA_character_
+  toy_bad$Group[2] <- " "
+
+  expect_message(
+    dif <- analyze_dif(fit, diag, facet = "Criterion", group = "Group",
+                       data = toy_bad, method = "residual"),
+    "Dropped 2 row"
+  )
+  expect_false(anyNA(dif$cell_table$GroupValue))
+  expect_false(any(dif$cell_table$GroupValue == ""))
+
+  toy_empty <- toy
+  toy_empty$Group <- NA_character_
+  expect_error(
+    analyze_dif(fit, diag, facet = "Criterion", group = "Group",
+                data = toy_empty, method = "residual"),
+    "no non-missing"
+  )
+})
+
 test_that("residual method uses screening labels instead of ETS categories", {
   local_dif_fixtures()
 
@@ -257,16 +305,74 @@ test_that("dif_interaction_table min_obs filter works", {
   expect_true(all(int$table$sparse))
 })
 
-test_that("plot_dif_heatmap returns matrix when draw = FALSE", {
+test_that("dif_interaction_table validates controls and group missingness", {
+  local_dif_fixtures()
+
+  expect_error(
+    dif_interaction_table(fit, diag, facet = "Criterion", group = "Group",
+                          data = toy, p_adjust = "not_a_method"),
+    "`p_adjust`"
+  )
+  expect_error(
+    dif_interaction_table(fit, diag, facet = "Criterion", group = "Group",
+                          data = toy, min_obs = 2.5),
+    "`min_obs`"
+  )
+  expect_error(
+    dif_interaction_table(fit, diag, facet = "Criterion", group = "Group",
+                          data = toy, abs_t_warn = Inf),
+    "`abs_t_warn`"
+  )
+
+  toy_bad <- toy
+  toy_bad$Group[1] <- NA_character_
+  expect_message(
+    int <- dif_interaction_table(fit, diag, facet = "Criterion",
+                                 group = "Group", data = toy_bad,
+                                 min_obs = 2),
+    "Dropped 1 row"
+  )
+  expect_false(anyNA(int$table$GroupValue))
+})
+
+test_that("plot_dif_heatmap returns mfrm_plot_data with matrix payload (draw = FALSE)", {
   local_dif_fixtures()
 
   dif <- analyze_dif(fit, diag, facet = "Criterion", group = "Group",
                      data = toy, method = "residual")
 
   for (m in c("obs_exp", "t", "contrast")) {
-    mat <- plot_dif_heatmap(dif, metric = m, draw = FALSE)
-    expect_true(is.matrix(mat))
+    p <- plot_dif_heatmap(dif, metric = m, draw = FALSE)
+    expect_s3_class(p, "mfrm_plot_data")
+    expect_true(is.matrix(p$data$matrix))
+    expect_identical(p$data$metric, m)
   }
+})
+
+test_that("plot_dif_heatmap supports interpretive display controls", {
+  local_dif_fixtures()
+
+  dif <- analyze_dif(fit, diag, facet = "Criterion", group = "Group",
+                     data = toy, method = "residual")
+  p <- plot_dif_heatmap(dif, metric = "t", draw = FALSE,
+                        show_values = FALSE, value_digits = 1,
+                        flag_threshold = 2, scale_limit = 3)
+
+  expect_s3_class(p, "mfrm_plot_data")
+  expect_true(is.matrix(p$data$flag_matrix))
+  expect_identical(dim(p$data$flag_matrix), dim(p$data$matrix))
+  expect_equal(p$data$thresholds$Threshold, 2)
+  expect_equal(p$data$settings$scale_limit, 3)
+  expect_true(is.data.frame(p$data$interpretation_guide))
+
+  expect_error(plot_dif_heatmap(dif, draw = FALSE, show_values = NA),
+               "`show_values`")
+  expect_error(plot_dif_heatmap(dif, draw = FALSE, value_digits = -1),
+               "`value_digits`")
+  expect_error(plot_dif_heatmap(dif, draw = FALSE, flag_threshold = -0.1),
+               "`flag_threshold`")
+  expect_error(plot_dif_heatmap(dif, draw = FALSE, scale_limit = 0),
+               "`scale_limit`")
 })
 
 test_that("plot_dif_heatmap works with dif_interaction_table", {
@@ -275,8 +381,9 @@ test_that("plot_dif_heatmap works with dif_interaction_table", {
   int <- dif_interaction_table(fit, diag, facet = "Criterion", group = "Group",
                                data = toy, min_obs = 2)
 
-  mat <- plot_dif_heatmap(int, metric = "obs_exp", draw = FALSE)
-  expect_true(is.matrix(mat))
+  p <- plot_dif_heatmap(int, metric = "obs_exp", draw = FALSE)
+  expect_s3_class(p, "mfrm_plot_data")
+  expect_true(is.matrix(p$data$matrix))
 })
 
 test_that("dif_report produces interpretable output", {
@@ -315,7 +422,7 @@ test_that("print and summary S3 methods work for DIF objects", {
 
 
 # ================================================================
-# Phase 3: compare_mfrm enhancements
+# compare_mfrm enhancements
 # ================================================================
 
 test_that("compare_mfrm reports comparable IC quantities on a common basis", {
@@ -354,6 +461,10 @@ test_that("compare_mfrm reports comparable IC quantities on a common basis", {
   expect_true("Delta_BIC" %in% names(tbl))
   expect_true("AkaikeWeight" %in% names(tbl))
   expect_true("BICWeight" %in% names(tbl))
+  expect_true(all(c("WeightedN", "ICSampleSize", "ICSampleSizeBasis") %in% names(tbl)))
+  expect_equal(tbl$WeightedN, as.numeric(tbl$nobs))
+  expect_equal(tbl$ICSampleSize, as.numeric(tbl$nobs))
+  expect_equal(tbl$ICSampleSizeBasis, rep("row_count", nrow(tbl)))
 
   # Delta should have at least one zero (best model)
   expect_equal(min(tbl$Delta_AIC), 0)
@@ -364,6 +475,33 @@ test_that("compare_mfrm reports comparable IC quantities on a common basis", {
   expect_equal(sum(tbl$BICWeight), 1, tolerance = 1e-10)
   expect_true(isTRUE(comp$comparison_basis$ic_comparable))
   expect_true(isTRUE(comp$comparison_basis$same_data))
+
+  fit_rsm_w <- fit_rsm
+  fit_pcm_w <- fit_pcm
+  w <- rep(c(1, 2), length.out = nrow(fit_rsm_w$prep$data))
+  fit_rsm_w$config$weight_col <- "Weight"
+  fit_pcm_w$config$weight_col <- "Weight"
+  fit_rsm_w$prep$data$Weight <- w
+  fit_pcm_w$prep$data$Weight <- w
+  fit_rsm_w$summary$N[1] <- sum(w)
+  fit_pcm_w$summary$N[1] <- sum(w)
+  comp_w <- compare_mfrm(RSM = fit_rsm_w, PCM = fit_pcm_w)
+  expect_equal(comp_w$table$WeightedN, rep(sum(w), nrow(comp_w$table)))
+  expect_equal(comp_w$table$ICSampleSize, rep(sum(w), nrow(comp_w$table)))
+  expect_equal(comp_w$table$ICSampleSizeBasis, rep("sum_weights", nrow(comp_w$table)))
+
+  comp_lrt <- compare_mfrm(RSM = fit_rsm, PCM = fit_pcm, nested = TRUE)
+  n_steps <- fit_rsm$config$n_cat - 1L
+  step_levels <- length(fit_pcm$config$facet_levels[[fit_pcm$config$step_facet]])
+  expected_df <- (step_levels - 1L) * max(n_steps - 1L, 0L)
+  expect_s3_class(comp_lrt, "mfrm_comparison")
+  expect_true(isTRUE(comp_lrt$comparison_basis$nesting_review$eligible))
+  expect_identical(as.character(comp_lrt$comparison_basis$nesting_review$relation), "RSM_in_PCM")
+  expect_equal(comp_lrt$lrt$df, expected_df)
+  expect_equal(
+    diff(range(comp_lrt$table$npar)),
+    expected_df
+  )
 })
 
 test_that("compare_mfrm evidence_ratios are reciprocal", {
@@ -495,8 +633,10 @@ test_that("compare_mfrm suppresses IC ranking outside the formal MML path and re
   )
   expect_true(isTRUE(comp_lrt$comparison_basis$nested_requested))
   expect_null(comp_lrt$lrt)
-  expect_true(isTRUE(comp_lrt$comparison_basis$nesting_audit$eligible))
-  expect_identical(as.character(comp_lrt$comparison_basis$nesting_audit$relation), "RSM_in_PCM")
+  expect_identical(comp_lrt$comparison_basis$lrt_status, "not_computed")
+  expect_match(comp_lrt$comparison_basis$lrt_reason, "formal MML likelihood basis")
+  expect_true(isTRUE(comp_lrt$comparison_basis$nesting_review$eligible))
+  expect_identical(as.character(comp_lrt$comparison_basis$nesting_review$relation), "RSM_in_PCM")
 
   fit_rsm_2 <- suppressWarnings(fit_mfrm(
     toy_small,
@@ -514,9 +654,68 @@ test_that("compare_mfrm suppresses IC ranking outside the formal MML path and re
     "formal MML likelihood basis"
   )
   expect_null(comp_same$lrt)
+  expect_identical(comp_same$comparison_basis$lrt_status, "not_computed")
+  expect_match(comp_same$comparison_basis$lrt_reason, "formal MML likelihood basis")
   expect_false(isTRUE(comp_same$comparison_basis$ic_comparable))
-  expect_false(isTRUE(comp_same$comparison_basis$nesting_audit$eligible))
-  expect_identical(as.character(comp_same$comparison_basis$nesting_audit$relation), "same_model")
+  expect_false(isTRUE(comp_same$comparison_basis$nesting_review$eligible))
+  expect_identical(as.character(comp_same$comparison_basis$nesting_review$relation), "same_model")
+})
+
+test_that("compare_mfrm records why boundary LRTs are not reported", {
+  toy_small <- load_mfrmr_data("example_core")
+
+  fit_rsm <- suppressWarnings(fit_mfrm(
+    toy_small,
+    person = "Person",
+    facets = c("Rater", "Criterion"),
+    score = "Score",
+    method = "MML",
+    model = "RSM",
+    quad_points = 5,
+    maxit = 15
+  ))
+  fit_pcm <- suppressWarnings(fit_mfrm(
+    toy_small,
+    person = "Person",
+    facets = c("Rater", "Criterion"),
+    score = "Score",
+    method = "MML",
+    model = "PCM",
+    step_facet = "Criterion",
+    quad_points = 5,
+    maxit = 15
+  ))
+  fit_rsm$summary$Converged[1] <- TRUE
+  fit_pcm$summary$Converged[1] <- TRUE
+
+  fit_pcm_worse <- fit_pcm
+  fit_pcm_worse$summary$LogLik[1] <- fit_rsm$summary$LogLik[1] - 1
+  fit_pcm_worse$summary$AIC[1] <- 2 * length(fit_pcm_worse$opt$par) -
+    2 * fit_pcm_worse$summary$LogLik[1]
+  fit_pcm_worse$summary$BIC[1] <- log(nrow(fit_pcm_worse$prep$data)) *
+    length(fit_pcm_worse$opt$par) - 2 * fit_pcm_worse$summary$LogLik[1]
+
+  expect_warning(
+    comp_neg <- compare_mfrm(RSM = fit_rsm, PCM = fit_pcm_worse, nested = TRUE),
+    "not interpretable"
+  )
+  expect_null(comp_neg$lrt)
+  expect_identical(comp_neg$comparison_basis$lrt_status, "not_computed")
+  expect_match(comp_neg$comparison_basis$lrt_reason, "negative likelihood-ratio statistic")
+  expect_output(print(summary(comp_neg)), "LRT status")
+
+  fit_pcm_bad <- fit_pcm
+  fit_pcm_bad$summary$LogLik[1] <- NA_real_
+  fit_pcm_bad$summary$AIC[1] <- NA_real_
+  fit_pcm_bad$summary$BIC[1] <- NA_real_
+
+  expect_warning(
+    comp_na <- compare_mfrm(RSM = fit_rsm, PCM = fit_pcm_bad, nested = TRUE),
+    "non-finite"
+  )
+  expect_null(comp_na$lrt)
+  expect_identical(comp_na$comparison_basis$lrt_status, "not_computed")
+  expect_match(comp_na$comparison_basis$lrt_reason, "non-finite")
 })
 
 test_that("compare_mfrm suppresses IC ranking for JML-only comparisons", {

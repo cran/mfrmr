@@ -1,0 +1,239 @@
+---
+title: "GPCM scope and current limitations"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{GPCM scope and current limitations}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+is_cran_check <- !isTRUE(as.logical(Sys.getenv("NOT_CRAN", "false")))
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5,
+  eval = !is_cran_check
+)
+```
+
+`mfrmr` includes a bounded implementation of the Generalized Partial Credit
+Model (GPCM; Muraki 1992). The estimator is fully functional, but several
+downstream reporting helpers remain restricted because score-side semantics
+under free discrimination differ from the Rasch-family case. This vignette
+documents which helpers are available, which are not, and what to use as a
+substitute when a helper is restricted.
+
+## Before fitting: model-choice triage
+
+Do not choose `GPCM` only because it is the most flexible model in the menu.
+Start with the score interpretation.
+
+| Model | Use when | Main risk if over-used |
+|---|---|---|
+| `RSM` | The rating scale is intended to share one category-threshold structure across the step facet. | Real threshold differences can be hidden in residual diagnostics. |
+| `PCM` | Thresholds may differ by item, criterion, task, or another designated step facet, but rating events should still contribute equally after conditioning on the modeled facets. | It can absorb threshold heterogeneity without asking whether some levels are more discriminating. |
+| bounded `GPCM` | The analysis explicitly allows discrimination-based reweighting and treats slopes as part of the substantive sensitivity question. | Better statistical fit can be mistaken for a better operational scoring rule. |
+
+This ordering matters for reporting. `RSM` and `PCM` are the package's
+equal-weighting reference route; bounded `GPCM` is a slope-aware extension.
+If equal contribution of items, criteria, or raters is part of the validity
+argument, a better-fitting bounded `GPCM` should be reported as sensitivity
+evidence rather than as an automatic replacement.
+
+## Report wording templates
+
+Use wording that matches the model actually fitted:
+
+- `RSM`: "We fit a many-facet rating-scale Rasch model, treating category
+  thresholds as common across the step facet."
+- `PCM`: "We fit a many-facet partial-credit Rasch model, allowing thresholds
+  to vary by the designated step facet while retaining equal discrimination."
+- bounded `GPCM`: "We fit a bounded generalized partial-credit many-facet model
+  as a slope-aware sensitivity analysis; interpretation focused on whether
+  discrimination-based reweighting changed the substantive conclusions."
+
+Avoid wording that says bounded `GPCM` "improves the score" solely because it
+improves log-likelihood, `AIC`, or `BIC`. The model can fit better while changing
+the scoring contract.
+
+## Checking the support boundary
+
+`gpcm_capability_matrix()` is the canonical reference. It returns one row
+per helper family with a `Status` column drawn from `supported`,
+`supported_with_caveat`, `blocked`, and `deferred`, plus the rationale and
+the evidence trail behind each classification.
+
+```{r capability-supported}
+library(mfrmr)
+gpcm_capability_matrix("supported")[, c("Area", "Status")]
+```
+
+```{r capability-with-caveat}
+gpcm_capability_matrix("supported_with_caveat")[, c("Area", "Status")]
+```
+
+```{r capability-blocked}
+gpcm_capability_matrix("blocked")[, c("Area", "Status", "Boundary")]
+```
+
+```{r capability-deferred}
+gpcm_capability_matrix("deferred")[, c("Area", "Status")]
+```
+
+The matrix is intentionally conservative. A row stays in `blocked` or
+`deferred` even when some lower-level component already runs, because the
+scope statement reflects the validation evidence rather than the raw code
+path.
+
+## What works today
+
+The following routes are validated for bounded `GPCM`:
+
+- **Fitting and core summaries** via `fit_mfrm(model = "GPCM", step_facet =
+  ...)`. The validated default keeps `slope_facet == step_facet`, with the
+  direct `MML` engine.
+- **Posterior scoring and information** via `predict_mfrm_units()`,
+  `sample_mfrm_plausible_values()`, `compute_information()`, and
+  `plot_information()`.
+- **Curve and category views** via `plot(fit, type = c("wright",
+  "pathway", "ccc", "ccc_surface"))`, `category_structure_report()`, and
+  `category_curves_report()`.
+- **Slope-aware simulation specifications** via `build_mfrm_sim_spec()`
+  and `simulate_mfrm_data()`.
+- **Direct recovery checks** via `evaluate_mfrm_recovery()` and
+  `assess_mfrm_recovery()`, including fitted bounded-GPCM slope recovery on the
+  log-slope scale.
+
+## What works with caveats
+
+The following are exposed for `GPCM` but should be read as exploratory
+screens rather than as Rasch-style invariance evidence:
+
+- `diagnose_mfrm()` and the residual and unexpected-response stack:
+  `unexpected_response_table()`, `displacement_table()`,
+  `measurable_summary_table()`, `rating_scale_table()`,
+  `interrater_agreement_table()`, `facet_quality_dashboard()`,
+  `plot_qc_dashboard()`, `plot_marginal_fit()`,
+  `plot_marginal_pairwise()`.
+- `reporting_checklist()` and `precision_review_report()` route to the
+  supported direct tables and plots only. They do not imply that the
+  broader APA writer is available.
+- `build_misfit_casebook()` inherits the exploratory screening framing of
+  its underlying sources.
+- `estimate_bias()` now provides bounded-GPCM conditional screening rows with
+  slope-aware information and profile-likelihood columns. Treat these rows as
+  screening evidence for follow-up, not as standalone confirmatory fairness
+  tests.
+
+The dashboard marks the fair-average panel unavailable under `GPCM`; use
+`fair_average_table()` directly for the slope-aware element-conditional table
+and `fair_average_table(fair_se = TRUE)` when you need structural
+fair-average SEs for non-person rows.
+
+## What is intentionally restricted
+
+The slope-aware `fair_average_table()` route is available under `GPCM`, but
+FACETS-style score-side compatibility and full narrative/export bundles remain
+restricted because free discrimination changes the relationship between the
+latent measure and operational score-side summaries. Specifically:
+
+- `facets_output_contract_review()` and
+  `facets_output_file_bundle(include = "score")` still depend on
+  Rasch-family score-side compatibility semantics that are not generalized to
+  free discrimination.
+- `build_apa_outputs()`, `build_visual_summaries()`, `run_qc_pipeline()`,
+  `build_mfrm_manifest()`, `build_mfrm_replay_script()`, and
+  `export_mfrm_bundle()` would convert those score-side outputs into
+  narrative or bundle claims, so they are also restricted.
+
+`build_linking_review()` is deferred under `GPCM` for the same reason. The
+underlying `review_mfrm_anchors()` and `detect_anchor_drift()` helpers can
+still be called directly as exploratory support.
+
+## Recommended substitutes
+
+When a restricted helper is needed for a `GPCM` report, the practical paths
+are:
+
+- Refit with `model = "PCM"` if the discrimination-free assumption is
+  defensible for the data. The full APA / output-contract / fit-based export stack
+  becomes available, and `compare_mfrm()` quantifies the loss in fit.
+- Keep the report on the `GPCM` fit itself but draft the manuscript section
+  manually around the supported tables: `summary(fit)` for parameters,
+  `diagnose_mfrm()` for residual fit, `facet_quality_dashboard()` for the
+  per-facet quality summary, and `compute_information()` for precision
+  evidence.
+- Generate the reproducibility manifest from a parallel `RSM` or `PCM`
+  baseline fit. The two fits can be reported side by side in the same
+  document, with the `GPCM` fit footnoted as the discrimination-aware
+  counterpart.
+
+## A worked example
+
+The `example_core` dataset includes a small synthetic block that supports a
+bounded `GPCM` fit. This example uses compact quadrature and iteration settings
+to keep optional local execution short; for final evidence, rerun with the
+package default or a higher quadrature setting and a larger recovery design.
+
+```r
+library(mfrmr)
+toy <- load_mfrmr_data("example_core")
+
+fit_gpcm <- fit_mfrm(
+  data = toy,
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  step_facet = "Criterion",
+  score = "Score",
+  model = "GPCM",
+  method = "MML",
+  quad_points = 7,
+  maxit = 20
+)
+
+summary(fit_gpcm)
+
+diag_gpcm <- diagnose_mfrm(fit_gpcm)
+summary(diag_gpcm)
+
+info <- compute_information(fit_gpcm)
+plot_information(info)
+
+rec_gpcm <- evaluate_mfrm_recovery(
+  sim_spec = build_mfrm_sim_spec(
+    n_person = 30,
+    n_rater = 3,
+    n_criterion = 4,
+    raters_per_person = 2,
+    model = "GPCM",
+    step_facet = "Criterion",
+    slope_facet = "Criterion",
+    slopes = c(0.8, 1.0, 1.15, 1.05)
+  ),
+  reps = 10,
+  model = "GPCM",
+  fit_method = "MML",
+  quad_points = 7,
+  maxit = 20,
+  seed = 1
+)
+assess_mfrm_recovery(
+  rec_gpcm,
+  max_rmse = c(facet = 0.5, step = 0.5, slope = 0.25),
+  max_abs_bias = c(default = 0.25)
+)
+```
+
+The fit, summary, residual diagnostics, information, recovery, fair-average, and
+conditional bias-screening helpers all run under `GPCM` with the caveats listed
+above. Trying `build_apa_outputs(fit_gpcm)` raises an explicit message pointing
+back at `gpcm_capability_matrix()` rather than producing a partial output.
+
+## Roadmap
+
+The boundary above is a release-scope statement, not a permanent design
+choice. Score-side semantics for free-discrimination polytomous models are
+on the roadmap for a future release. Until then, the matrix returned by
+`gpcm_capability_matrix()` is the binding contract.

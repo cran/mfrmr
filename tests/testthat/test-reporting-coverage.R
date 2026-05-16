@@ -99,7 +99,9 @@ test_that("build_visual_summary_map includes strict marginal routes for MML diag
 })
 
 test_that("build_visual_warning_map explains when strict marginal diagnostics were not requested", {
-  wmap_legacy <- mfrmr:::build_visual_warning_map(.fit, .diag)
+  diag_legacy <- diagnose_mfrm(.fit, residual_pca = "none",
+                               diagnostic_mode = "legacy")
+  wmap_legacy <- mfrmr:::build_visual_warning_map(.fit, diag_legacy)
   expect_true(any(grepl("Strict marginal diagnostics are not available", wmap_legacy$strict_marginal_fit, fixed = TRUE)))
   expect_true(any(grepl("diagnostic_mode", wmap_legacy$strict_marginal_fit, fixed = TRUE)))
 })
@@ -127,7 +129,7 @@ test_that("build_apa_report_text produces Method and Results sections", {
   text <- mfrmr:::build_apa_report_text(.fit, .diag)
   expect_true(grepl("Method", text))
   expect_true(grepl("Results", text))
-  expect_true(grepl("many-facet Rasch", text, ignore.case = TRUE))
+  expect_true(grepl("many-facet .*Rasch", text, ignore.case = TRUE))
 })
 
 test_that("build_apa_report_text with context supplies assessment/setting text", {

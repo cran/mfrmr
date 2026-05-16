@@ -205,9 +205,12 @@ screening metrics rather than formal inferential quantities. Here, a bias
 cell is counted as \strong{screen-positive} only when those screening metrics are
 available and satisfy
 
-First-release \code{GPCM} is not yet available in this helper because its signal-
-detection path still depends on simulation and diagnostics layers validated
-only for \code{RSM} / \code{PCM}. More broadly, the current planning layer is still
+First-release \code{GPCM} is not yet available in this helper because the helper
+estimates design-grid operating characteristics for injected DIF and
+interaction-bias signals. Direct bounded-\code{GPCM} data generation,
+fitted-model bias screening via \code{\link[=estimate_bias]{estimate_bias()}}, and parameter-recovery
+checks are available elsewhere, but this design-grid detection layer remains
+validated only for \code{RSM} / \code{PCM}. More broadly, the current planning layer is
 role-based for exactly two non-person facets (\code{rater}-like and
 \code{criterion}-like), even though the estimation core supports arbitrary facet
 counts.
@@ -276,7 +279,7 @@ reporting}. Psychological Methods.
 sig_eval <- suppressWarnings(evaluate_mfrm_signal_detection(
   design = list(person = 8, rater = 2, criterion = 2, assignment = 1),
   reps = 1,
-  maxit = 5,
+  maxit = 30,
   bias_max_iter = 1,
   seed = 123
 ))

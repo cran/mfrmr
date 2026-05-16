@@ -8,11 +8,13 @@ vignette: >
 ---
 
 ```{r, include = FALSE}
+is_cran_check <- !isTRUE(as.logical(Sys.getenv("NOT_CRAN", "false")))
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
   fig.width = 7,
-  fig.height = 5
+  fig.height = 5,
+  eval = !is_cran_check
 )
 ```
 
@@ -34,6 +36,9 @@ library(mfrmr)
 
 bias_df <- load_mfrmr_data("example_bias")
 
+# The vignette uses compact quadrature so optional local execution stays fast.
+# For final DFF or linking evidence, refit with the package default or a higher
+# quadrature setting and record that setting in the analysis log.
 fit <- fit_mfrm(
   bias_df,
   person = "Person",
@@ -74,7 +79,7 @@ anchors <- make_anchor_table(fit, facets = "Criterion")
 head(anchors)
 ```
 
-Use `audit_mfrm_anchors()` when you want a stricter review of anchor quality.
+Use `review_mfrm_anchors()` when you want a stricter review of anchor quality.
 
 ## 3. Residual DFF as a screening layer
 
@@ -147,7 +152,48 @@ dr <- dif_report(dff_resid)
 cat(dr$narrative)
 ```
 
-## 6. Multi-wave anchor review
+## 6. Model-estimated facet interactions
+
+Residual bias and DFF tools screen for unusual cells after fitting the
+additive model. When the interaction hypothesis is specified in advance, use
+`facet_interactions` to estimate the named two-way non-person facet
+interaction in the model likelihood.
+
+```{r model-estimated-interaction, eval = FALSE}
+fit_add <- fit_mfrm(
+  bias_df,
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  score = "Score",
+  method = "MML",
+  model = "RSM",
+  quad_points = 7
+)
+
+fit_interaction <- fit_mfrm(
+  bias_df,
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  score = "Score",
+  method = "MML",
+  model = "RSM",
+  facet_interactions = "Rater:Criterion",
+  quad_points = 7
+)
+
+interaction_effect_table(fit_interaction)
+compare_mfrm(Additive = fit_add, Interaction = fit_interaction, nested = TRUE)
+```
+
+Interpretation:
+
+- Name the facet pair explicitly before fitting.
+- Treat the interaction estimates as fixed-effect deviations from the
+  additive MFRM under zero marginal-sum constraints.
+- Inspect sparse interaction cells before reporting substantive claims.
+- Keep this route separate from residual screening with `estimate_bias()`.
+
+## 7. Multi-wave anchor review
 
 When you work across administrations, the route usually moves from anchor
 export to anchored fitting and then to drift review.
@@ -180,14 +226,16 @@ For a compact linking route:
 1. `fit_mfrm()`
 2. `diagnose_mfrm()`
 3. `subset_connectivity_report()`
-4. `make_anchor_table()` or `audit_mfrm_anchors()`
+4. `make_anchor_table()` or `review_mfrm_anchors()`
 5. `analyze_dff()`
 6. `dif_report()` and `plot_dif_heatmap()`
-7. `anchor_to_baseline()` / `detect_anchor_drift()` when working across waves
+7. `interaction_effect_table()` after a confirmatory `facet_interactions` fit
+8. `anchor_to_baseline()` / `detect_anchor_drift()` when working across waves
 
 ## Related help
 
 - `help("mfrmr_linking_and_dff", package = "mfrmr")`
 - `help("subset_connectivity_report", package = "mfrmr")`
 - `help("analyze_dff", package = "mfrmr")`
+- `help("interaction_effect_table", package = "mfrmr")`
 - `help("detect_anchor_drift", package = "mfrmr")`

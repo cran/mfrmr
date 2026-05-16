@@ -114,34 +114,38 @@ test_that("GPCM summaries expose slope overview and diagnostics are now availabl
   expect_s3_class(dash, "mfrm_facet_dashboard")
   expect_s3_class(qc, "mfrm_plot_data")
   expect_true(isFALSE(dx$fair_average$available))
-  expect_true(grepl("not yet validated", dx$fair_average$reason, fixed = TRUE))
-  expect_true(grepl("Rasch-family", dx$fair_average$reason, fixed = TRUE))
+  expect_true(grepl("disabled for bounded `GPCM`", dx$fair_average$reason, fixed = TRUE))
+  expect_true(grepl("slope-aware", dx$fair_average$reason, fixed = TRUE))
   expect_true(isFALSE(qc$data$fair_average$available))
-  expect_true(grepl("Rasch-family", qc$data$fair_average$reason, fixed = TRUE))
+  expect_true(grepl("slope-aware", qc$data$fair_average$reason, fixed = TRUE))
 
   expect_error(
     run_qc_pipeline(fit),
-    "not yet validated for `GPCM` fits",
+    "does not support `GPCM` fits",
     fixed = TRUE
   )
+  # `fair_average_table()` and `estimate_bias()` are both unblocked for
+  # GPCM fits in 0.2.0 under the slope-aware element-conditional GPCM
+  # construction. Confirm they return populated bundles with the GPCM
+  # caveat instead of raising the legacy error.
+  fa <- fair_average_table(fit)
+  expect_s3_class(fa, "mfrm_fair_average")
+  expect_true(nrow(fa$stacked) > 0)
+  expect_identical(fa$settings$method, "GPCM-slope-aware")
+  expect_true(!is.null(fa$caveat))
+  expect_true(grepl("slope-aware element-conditional", fa$caveat, fixed = TRUE))
+  expect_true(grepl("Standard errors", fa$caveat, fixed = TRUE))
+
+  bias <- estimate_bias(fit, dx, facet_a = "Rater", facet_b = "Criterion")
+  expect_s3_class(bias, "mfrm_bias")
+  expect_true(nrow(bias$table) > 0)
+  expect_identical(bias$method, "GPCM-slope-aware")
+  expect_true(!is.null(bias$caveat))
+  expect_true(grepl("slope-aware GPCM kernel", bias$caveat, fixed = TRUE))
+
   expect_error(
-    estimate_bias(fit, dx, facet_a = "Rater", facet_b = "Criterion"),
-    "not yet validated for `GPCM` fits",
-    fixed = TRUE
-  )
-  expect_error(
-    fair_average_table(fit),
-    "not yet validated for `GPCM` fits",
-    fixed = TRUE
-  )
-  expect_error(
-    fair_average_table(fit),
-    "Rasch-family",
-    fixed = TRUE
-  )
-  expect_error(
-    facets_parity_report(fit),
-    "not yet validated for `GPCM` fits",
+    facets_output_contract_review(fit),
+    "does not support `GPCM` fits",
     fixed = TRUE
   )
 })
@@ -154,7 +158,7 @@ test_that("curve/report GPCM workflows open where the probability kernel is alre
     method = "MML", quad_points = 5, maxit = 20
   ))
 
-  p_bundle <- plot(fit, draw = FALSE)
+  p_bundle <- plot(fit, type = "bundle", draw = FALSE)
   p_ccc <- plot(fit, type = "ccc", draw = FALSE)
   p_path <- plot(fit, type = "pathway", draw = FALSE)
   cs <- category_structure_report(fit)
@@ -170,12 +174,12 @@ test_that("curve/report GPCM workflows open where the probability kernel is alre
 
   expect_error(
     estimation_iteration_report(fit, max_iter = 3),
-    "not yet validated for `GPCM` fits",
+    "does not support `GPCM` fits",
     fixed = TRUE
   )
   expect_error(
     facets_output_file_bundle(fit, include = "score", write_files = FALSE),
-    "not yet validated for `GPCM` fits",
+    "does not support `GPCM` fits",
     fixed = TRUE
   )
 })
@@ -202,7 +206,7 @@ test_that("MML diagnostics expose model and real precision columns", {
   expect_true(all(c(
     "SE", "ModelSE", "RealSE", "SE_Method", "PrecisionTier",
     "Converged", "SupportsFormalInference", "SEUse", "CIBasis", "CIUse",
-    "CIEligible", "CILabel"
+    "CI_Level", "CI_Method", "CIEligible", "CILabel"
   ) %in% names(dx$measures)))
   expect_true(all(dx$measures$SE[se_mask] == dx$measures$ModelSE[se_mask]))
   expect_true(all(dx$measures$RealSE[real_mask] >= dx$measures$ModelSE[real_mask]))
@@ -212,6 +216,8 @@ test_that("MML diagnostics expose model and real precision columns", {
   ) %in% names(dx$reliability)))
   expect_true(all(dx$reliability$RealReliability[rel_mask] <= dx$reliability$Reliability[rel_mask]))
   expect_true(all(dx$measures$CIEligible == dx$measures$SupportsFormalInference))
+  expect_equal(unique(dx$measures$CI_Level), 0.95)
+  expect_true(all(dx$measures$CI_Method == "Normal approximation"))
   expect_true(all(dx$measures$Converged == fit$summary$Converged[1]))
 })
 
@@ -224,13 +230,15 @@ test_that("diagnose_mfrm returns all required components", {
   dx <- diagnose_mfrm(fit, residual_pca = "none")
   expect_s3_class(dx, "mfrm_diagnostics")
   # Required components
-  required <- c("obs", "measures", "overall_fit", "reliability", "precision_profile", "precision_audit", "facet_precision")
+  required <- c("obs", "measures", "overall_fit", "reliability", "precision_profile", "precision_review", "facet_precision")
   expect_true(all(required %in% names(dx)))
+  expect_false("precision_audit" %in% names(dx))
   # measures columns
   expect_true(all(c(
     "Facet", "Level", "Estimate", "SE", "ModelSE", "RealSE",
     "Converged", "PrecisionTier", "SupportsFormalInference", "SEUse",
-    "CIBasis", "CIUse", "CIEligible", "CILabel", "Infit", "Outfit"
+    "CIBasis", "CIUse", "CI_Level", "CI_Method", "CIEligible", "CILabel",
+    "Infit", "Outfit"
   ) %in%
     names(dx$measures)))
   # reliability columns
@@ -242,7 +250,7 @@ test_that("diagnose_mfrm returns all required components", {
   expect_true(all(c("Method", "Converged", "PrecisionTier", "SupportsFormalInference", "HasFallbackSE", "RecommendedUse") %in%
     names(dx$precision_profile)))
   expect_true(all(c("Check", "Status", "Detail") %in%
-    names(dx$precision_audit)))
+    names(dx$precision_review)))
   expect_true(all(c("Facet", "DistributionBasis", "SEMode", "SEColumn", "Separation", "Reliability") %in%
     names(dx$facet_precision)))
   # obs should be data.frame

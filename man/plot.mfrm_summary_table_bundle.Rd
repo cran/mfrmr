@@ -104,7 +104,7 @@ selection surfaces already materialized inside the bundle.
 \donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 25)
+                method = "JML", maxit = 30)
 bundle <- build_summary_table_bundle(fit)
 plot(bundle, draw = FALSE)
 plot(bundle, type = "numeric_profile", which = "facet_overview", draw = FALSE)

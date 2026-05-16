@@ -51,10 +51,10 @@ residual latent variance, criterion ordering, and posterior-shift
 direction from a synthetic overlap case.
 \item \code{synthetic_latent_regression_omit}: checks whether the population-model
 complete-case omission policy is reflected in the fitted metadata,
-response-row audit, active person estimates, and replay provenance.
+response-row review, active person estimates, and replay provenance.
 \item \code{synthetic_conquest_overlap_dry_run}: builds the narrow ConQuest-overlap
 bundle for the latent-regression synthetic case, round-trips package tables
-through the normalization/audit helpers, and confirms the package-side
+through the normalization/review helpers, and confirms the package-side
 workflow without claiming that ConQuest itself was executed.
 \item \code{synthetic_gpcm}: checks whether the bounded \code{GPCM} branch recovers
 known criterion-specific slopes, row-centered step parameters, and
@@ -92,9 +92,9 @@ categorical-coding details when present).
 including the latent-regression reference case.
 \item \code{bias_checks}: source-backed bias/local-measure identity checks.
 \item \code{pair_checks}: paired-dataset stability screens for the iterated cases.
-\item \code{linking_checks}: common-element audits for paired calibration datasets.
+\item \code{linking_checks}: common-element reviews for paired calibration datasets.
 \item \code{conquest_overlap_checks}: package-side checks for the
-ConQuest-overlap bundle/normalization/audit workflow; this remains a
+ConQuest-overlap bundle/normalization/review workflow; this remains a
 package-side check until actual ConQuest output tables are supplied.
 \item \code{population_policy_checks}: complete-case omission checks for population
 model benchmark fixtures.

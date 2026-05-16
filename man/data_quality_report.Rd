@@ -11,13 +11,15 @@ data_quality_report(
   facets = NULL,
   score = NULL,
   weight = NULL,
+  min_category_count = 10,
+  dominant_category_cutoff = 0.95,
   include_fixed = FALSE
 )
 }
 \arguments{
 \item{fit}{Output from \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
-\item{data}{Optional raw data frame used for row-level audit.}
+\item{data}{Optional raw data frame used for row-level review.}
 
 \item{person}{Optional person column name in \code{data}.}
 
@@ -26,6 +28,13 @@ data_quality_report(
 \item{score}{Optional score column name in \code{data}.}
 
 \item{weight}{Optional weight column name in \code{data}.}
+
+\item{min_category_count}{Minimum raw or weighted count used to label a
+non-zero facet-level score category as sparse. Default \code{10}.}
+
+\item{dominant_category_cutoff}{Proportion in \verb{(0, 1]} used to flag a
+facet level whose responses are dominated by one score category. Default
+\code{0.95}.}
 
 \item{include_fixed}{If \code{TRUE}, include a legacy-compatible fixed-width text
 block.}
@@ -40,15 +49,34 @@ Build a data quality summary report (preferred alias)
 \details{
 \code{summary(out)} is supported through \code{summary()}.
 \code{plot(out)} is dispatched through \code{plot()} for class
-\code{mfrm_data_quality} (\code{type = "row_audit"}, \code{"category_counts"},
+\code{mfrm_data_quality} (\code{type = "dashboard"}, \code{"quality_flags"},
+\code{"row_review"}, \code{"category_counts"}, \code{"score_support"},
+\code{"facet_category_usage"}, \code{"facet_response_patterns"}, \code{"score_map"},
 \code{"missing_rows"}).
 }
 \section{Interpreting output}{
 
 \itemize{
 \item \code{summary}: retained/dropped row overview.
-\item \code{row_audit}: reason-level breakdown for data issues.
-\item \code{category_counts}: post-filter category usage.
+\item \code{quality_overview}: area-level QC status for rows, score support,
+facet-category use, and design matching.
+\item \code{quality_flags}: prioritized QC flags with counts and recommended next
+actions. This is not an item/person/rater table.
+\item \code{row_review}: reason-level breakdown for data issues.
+\item \code{category_counts}: post-filter category usage, including retained
+zero-count score-support categories.
+\item \code{score_support_review}: quick view of zero-count boundary/intermediate
+categories and their threshold-functioning caveats.
+\item \code{category_usage_by_facet}: facet-level category counts over the retained
+score support.
+\item \code{category_usage_summary}: per-facet-level zero/sparse category summary.
+\item \code{facet_response_patterns}: facet-level response-pattern summaries,
+including single-category and dominant-category use.
+\item \code{caveats}: user-facing score-support warnings, including cases where
+non-consecutive original labels such as \verb{1, 2, 4, 5} were recoded because
+\code{keep_original = FALSE}.
+\item \code{score_map}: original-to-internal score mapping used when labels are
+recoded.
 \item \code{unknown_elements}: facet levels in raw data but not in fitted design.
 }
 }
@@ -57,14 +85,17 @@ Build a data quality summary report (preferred alias)
 
 \enumerate{
 \item Run \code{data_quality_report(...)} with raw data.
-\item Check row-audit and missing/unknown element sections.
-\item Resolve issues before final estimation/reporting.
+\item Check \code{summary(out)} and \code{plot(out, type = "dashboard")}, then inspect
+\code{quality_flags}, score-support, score-map, facet-response-pattern, and missing/unknown element
+sections as needed.
+\item Resolve missing values, score-support gaps, and sparse categories before
+final estimation/reporting.
 }
 }
 
 \examples{
 toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 out <- data_quality_report(
   fit, data = toy, person = "Person",
   facets = c("Rater", "Criterion"), score = "Score"

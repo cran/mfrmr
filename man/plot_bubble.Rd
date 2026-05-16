@@ -8,14 +8,15 @@ plot_bubble(
   x,
   diagnostics = NULL,
   fit_stat = c("Infit", "Outfit"),
-  bubble_size = c("SE", "N", "equal"),
+  view = c("measure", "infit_outfit"),
+  bubble_size = NULL,
   facets = NULL,
   fit_range = c(0.5, 1.5),
   top_n = 60,
   main = NULL,
   palette = NULL,
   draw = TRUE,
-  preset = c("standard", "publication", "compact")
+  preset = c("standard", "publication", "compact", "monochrome")
 )
 }
 \arguments{
@@ -26,10 +27,20 @@ plot_bubble(
 computed automatically.}
 
 \item{fit_stat}{Fit statistic for the y-axis: \code{"Infit"} (default) or
-\code{"Outfit"}.}
+\code{"Outfit"}. Ignored when \code{view = "infit_outfit"} because
+that view always plots Infit on x and Outfit on y.}
 
-\item{bubble_size}{Variable controlling bubble radius: \code{"SE"} (default),
-\code{"N"} (observation count), or \code{"equal"} (uniform size).}
+\item{view}{Layout. \code{"measure"} (default, the historical
+mfrmr layout) plots Measure (logit) on x and the chosen
+\code{fit_stat} MnSq on y. \code{"infit_outfit"} plots Infit MnSq
+on x and Outfit MnSq on y, matching the Winsteps Table 30.2
+"Most-misfitting Persons / Items" scatter that many MFRM and
+Rasch users expect, and defaults \code{bubble_size = "N"}.}
+
+\item{bubble_size}{Variable controlling bubble radius: \code{"SE"} (default
+for \code{view = "measure"}), \code{"N"} (observation count;
+default for \code{view = "infit_outfit"}), or \code{"equal"}
+(uniform size).}
 
 \item{facets}{Character vector of facets to include. \code{NULL} (default)
 includes all non-person facets.}
@@ -104,9 +115,24 @@ Points are colored by facet for easy identification.
 \examples{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", model = "RSM", maxit = 25)
+                method = "JML", model = "RSM", maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "none")
-plot_bubble(fit, diagnostics = diag, draw = FALSE)
+p <- plot_bubble(fit, diagnostics = diag, draw = FALSE)
+head(p$data$table[, c("Facet", "Level", "Estimate", "Infit", "Outfit")])
+# Look for (default `view = "measure"`): bubbles inside the shaded
+#   0.5-1.5 fit-review band. Bubbles above the band are underfit
+#   (noisy elements); below the band are overfit (overly predictable).
+#
+# For the Winsteps Table 30 layout pass `view = "infit_outfit"`:
+p_io <- plot_bubble(fit, diagnostics = diag, view = "infit_outfit",
+                     draw = FALSE)
+p_io$data$view
+# Look for: bubbles clustered inside the central [0.5, 1.5] x [0.5, 1.5]
+#   square. Points outside the upper-right corner have both Infit
+#   AND Outfit > 1.5 (consistent underfit); points outside the
+#   lower-left have both < 0.5 (consistent overfit). Bubble size in
+#   this view defaults to N (observation count) so the visual
+#   weighting matches how seriously the misfit should be taken.
 }
 \seealso{
 \code{\link{diagnose_mfrm}}, \code{\link{plot_unexpected}},

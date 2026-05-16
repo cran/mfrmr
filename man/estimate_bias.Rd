@@ -2,7 +2,7 @@
 % Please edit documentation in R/api-tables.R
 \name{estimate_bias}
 \alias{estimate_bias}
-\title{Estimate legacy-compatible bias/interaction terms iteratively}
+\title{Estimate bias and interaction screening terms}
 \usage{
 estimate_bias(
   fit,
@@ -21,13 +21,17 @@ estimate_bias(
 
 \item{diagnostics}{Output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.}
 
-\item{facet_a}{First facet name.}
+\item{facet_a}{First facet name. Provide together with \code{facet_b} for the
+classic pairwise 2-way interaction. Ignored when \code{interaction_facets}
+is supplied.}
 
-\item{facet_b}{Second facet name.}
+\item{facet_b}{Second facet name. See \code{facet_a}.}
 
 \item{interaction_facets}{Character vector of two or more facets to model as
 one interaction effect. When supplied, this takes precedence over
-\code{facet_a}/\code{facet_b}.}
+\code{facet_a}/\code{facet_b}. Use this form (rather than \code{facet_a}/\code{facet_b})
+whenever you want 3+ way interactions, since \code{facet_a/facet_b} is
+restricted to the pairwise case.}
 
 \item{max_abs}{Bound for absolute bias size.}
 
@@ -41,17 +45,30 @@ one interaction effect. When supplied, this takes precedence over
 An object of class \code{mfrm_bias} with:
 \itemize{
 \item \code{table}: interaction rows with effect size, SE, screening t/p metadata,
-reporting-use flags, and fit columns
+reporting-use flags, fit columns, and bounded-\code{GPCM}
+profile-likelihood columns when available
 \item \code{summary}: compact summary statistics
 \item \code{chi_sq}: fixed-effect chi-square style screening summary
 \item \code{facet_a}, \code{facet_b}: first two analyzed facet names (legacy compatibility)
 \item \code{interaction_facets}, \code{interaction_order}, \code{interaction_mode}: full
 interaction metadata
 \item \code{iteration}: iteration history/metadata
+\item \code{orientation_review}: facet-orientation sign-consistency review table
+\item \code{mixed_sign}: logical flag indicating whether bias-size signs flip
+across facets in a way that complicates direction interpretation
+\item \code{direction_note}: one-line interpretive note describing the
+dominant bias direction (empty when not applicable)
+\item \code{recommended_action}: one-line recommended-action label routing
+the user to the appropriate follow-up helper
+\item \code{inference_tier}: summary label indicating that the bias rows are
+intended for screening and follow-up review in this release
+\item \code{optimization_failures}: per-cell record of any inner-loop
+optimizer failures encountered while estimating the bias
+parameters; empty when every cell converged cleanly
 }
 }
 \description{
-Estimate legacy-compatible bias/interaction terms iteratively
+Estimate bias and interaction screening terms
 }
 \details{
 \strong{Bias (interaction) in MFRM} refers to a systematic departure from
@@ -65,16 +82,20 @@ criterion \eqn{c} modifies the linear predictor:
 
 \deqn{\eta_{njc} = \theta_n - \delta_j - \beta_c - b_{jc}}
 
-The function estimates \eqn{b_{jc}} from the residuals of the fitted
-(additive) model using iterative recalibration in a legacy-compatible style
-(Myford & Wolfe, 2003, 2004):
+For \code{RSM} / \code{PCM}, the function estimates \eqn{b_{jc}} from the residuals
+of the fitted additive model using an iterative recalibration screen aligned
+with the many-facet bias literature (Myford & Wolfe, 2003, 2004):
 
 \deqn{b_{jc} = \frac{\sum_n (X_{njc} - E_{njc})}
                     {\sum_n \mathrm{Var}_{njc}}}
 
-Each iteration updates expected scores using the current bias
-estimates, then re-computes the bias.  Convergence is reached when
-the maximum absolute change in bias estimates falls below \code{tol}.
+Each iteration updates expected scores using the current bias estimates,
+then re-computes the bias. Convergence is reached when the maximum absolute
+change in bias estimates falls below \code{tol}. For bounded \code{GPCM}, the same
+additive-bias idea is evaluated with the slope-aware GPCM kernel and
+conditional profile-likelihood follow-up columns; those quantities remain
+screening evidence because theta, facet, step, and slope estimates are held
+fixed.
 \itemize{
 \item For two-way mode, use \code{facet_a} and \code{facet_b} (or \code{interaction_facets}
 with length 2).
@@ -140,6 +161,10 @@ In \code{bias$table}, the most-used columns are:
 \item \code{t} and \code{Prob.}: screening metrics, not formal inferential quantities
 \item \verb{Obs-Exp Average}: direction and practical size of observed-vs-expected
 gap on the raw-score metric
+\item for bounded \code{GPCM}, \verb{LR ChiSq}, \verb{LR Prob.}, and \verb{Profile CI Lower} /
+\verb{Profile CI Upper}: conditional profile-likelihood checks for a single
+additive bias shift, holding the fitted person, facet, step, and slope
+estimates fixed
 }
 
 The \code{chi_sq} element provides a fixed-effect heterogeneity screen across all
@@ -153,14 +178,46 @@ integrate the result with DFF, linking, or substantive scoring review before
 making formal claims about fairness or invariance.
 }
 
+\section{References}{
+
+\itemize{
+\item Linacre, J. M. (1989). \emph{Many-Facet Rasch Measurement}. MESA Press.
+(FACETS Table 13 corresponds to the bias / interaction
+estimation that this helper implements.)
+\item Eckes, T. (2005). Examining rater effects in TestDaF writing
+and speaking performance assessments: A many-facet Rasch
+analysis. \emph{Language Assessment Quarterly, 2}(3), 197-221.
+\item Eckes, T. (2015). \emph{Introduction to many-facet Rasch
+measurement: Analyzing and evaluating rater-mediated
+assessments} (2nd ed.). Peter Lang.
+\item Myford, C. M., & Wolfe, E. W. (2003). Detecting and measuring
+rater effects using many-facet Rasch measurement: Part I.
+\emph{Journal of Applied Measurement, 4}(4), 386-422.
+\item Myford, C. M., & Wolfe, E. W. (2004). Detecting and measuring
+rater effects using many-facet Rasch measurement: Part II.
+\emph{Journal of Applied Measurement, 5}(2), 189-227.
+}
+}
+
 \examples{
 toy <- load_mfrmr_data("example_bias")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "none")
 bias <- estimate_bias(fit, diag, facet_a = "Rater", facet_b = "Criterion", max_iter = 2)
-summary(bias)
+s_bias <- summary(bias)
+s_bias$overview
+# Look for: `MaxAbsBias` < ~0.5 logits and `Significant = 0` mean
+#   no cell exceeded the screen. The `BonferroniSignificant` /
+#   `HolmSignificant` columns count cells that survive multiple-
+#   testing correction; both being 0 is a stronger "no bias"
+#   signal than the raw screen-positive count alone.
+s_bias$top_rows
+# Look for: rows with `|t|` > 2 and |Bias Size| > 0.5 logits warrant
+#   review (large effect AND statistically reliable). Rows with only
+#   one of those triggered are usually small-cell artefacts.
 p_bias <- plot_bias_interaction(bias, draw = FALSE)
 p_bias$data$plot
+
 }
 \seealso{
 \code{\link[=build_fixed_reports]{build_fixed_reports()}}, \code{\link[=build_apa_outputs]{build_apa_outputs()}}

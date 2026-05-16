@@ -2,7 +2,7 @@
 % Please edit documentation in R/api-reports.R
 \name{bias_pairwise_report}
 \alias{bias_pairwise_report}
-\title{Build a bias pairwise-contrast report}
+\title{Build a bias pairwise-contrast report (FACETS Table 14: pairwise contrasts)}
 \usage{
 bias_pairwise_report(
   x,
@@ -59,12 +59,25 @@ A named list with:
 \itemize{
 \item \code{table}: pairwise contrast rows
 \item \code{summary}: one-row contrast summary
-\item \code{orientation_audit}: interaction-facet sign audit
+\item \code{orientation_review}: interaction-facet sign review
 \item \code{settings}: resolved reporting options
+\item \code{direction_note}: one-line interpretive note describing the
+dominant pairwise-contrast direction (carried from the
+underlying bias estimator; empty string when not applicable)
+\item \code{recommended_action}: one-line recommended-action label
+(e.g. routing the user to follow-up review of the largest
+flagged pairs); empty string when the underlying estimator
+does not emit one
 }
 }
 \description{
-Build a bias pairwise-contrast report
+Build a pairwise contrast table that, for a chosen target facet
+(e.g. raters), compares each pair of target-facet levels while
+holding a context facet (e.g. items / criteria) constant. This is
+the FACETS Table 14 view: it answers "is rater A consistently
+more severe than rater B on the same items?" rather than "which
+(rater, item) cell has the largest local bias?" -- the latter is
+covered by \code{\link[=bias_interaction_report]{bias_interaction_report()}}.
 }
 \details{
 This helper exposes the pairwise contrast table that was previously only
@@ -73,12 +86,90 @@ reachable through fixed-width output generation. It is available only for
 Welch/Satterthwaite approximation and is labeled as a Rasch-Welch
 comparison in the output metadata.
 }
+\section{Interpreting output}{
+
+\itemize{
+\item \code{table}: one row per ordered (target_level_1, target_level_2)
+pair, with \code{Bias_diff}, \code{SE_diff}, \code{t_diff}, \code{df_diff},
+\code{p_diff}, and the underlying per-level bias rows. Rows are
+sorted so that the largest-magnitude \verb{|t_diff|} rises to the
+top.
+\item \code{summary}: one-row screening summary with \code{MaxAbsBiasDiff},
+\code{MaxAbsT}, \code{Significant} (count of flagged pairs at \code{p_max}),
+\code{BonferroniSignificant}, and \code{HolmSignificant}.
+\item \code{orientation_review} carries the same facet-orientation sign
+review as the parent \code{estimate_bias()} run.
+\item The SE caveat below applies: read \code{Significant} /
+\code{BonferroniSignificant} as a screening triage, not as formal
+inferential tests.
+}
+}
+
+\section{Typical workflow}{
+
+\enumerate{
+\item Fit and diagnose the model.
+\item Run \code{estimate_bias()} to get the underlying interaction effects.
+\item Pass that result to \code{bias_pairwise_report()} for the rater-pair
+contrast table.
+\item Use \code{summary(out)$MaxAbsT} and the top rows of \code{out$table} to
+flag rater-pair systematic differences for follow-up review.
+\item For the ranked flagged-cells view (which (rater, item) pairs
+have the largest local bias), use \code{bias_interaction_report()}
+on the same \code{estimate_bias()} output.
+}
+}
+
+\section{Standard-error caveat}{
+
+The contrast standard error is computed as
+\code{SE(b_i - b_j) = sqrt(SE_i^2 + SE_j^2)} -- the independence
+approximation. For same-facet bias values that share a sum-to-zero
+identification, \code{Cov(b_i, b_j) < 0}, so the true contrast variance
+is \code{SE_i^2 + SE_j^2 - 2 * Cov(b_i, b_j)}, which is \strong{smaller}
+than the reported value. The reported t-statistics and p-values
+are therefore conservative for same-facet contrasts (the true
+significance is higher than reported). For across-facet contrasts
+the covariance term is approximately zero and the approximation
+is appropriate. Use the report as a screening / triage table; for
+inferential claims that hinge on a marginally-significant
+same-facet contrast, follow up with a contrast that uses the full
+parameter covariance.
+}
+
+\section{References}{
+
+\itemize{
+\item Linacre, J. M. (1989). \emph{Many-Facet Rasch Measurement}. MESA Press.
+\item Eckes, T. (2005). Examining rater effects in TestDaF writing and
+speaking performance assessments: A many-facet Rasch analysis.
+\emph{Language Assessment Quarterly, 2}(3), 197-221.
+\item Myford, C. M., & Wolfe, E. W. (2003). Detecting and measuring
+rater effects using many-facet Rasch measurement: Part I.
+\emph{Journal of Applied Measurement, 4}(4), 386-422.
+\item Myford, C. M., & Wolfe, E. W. (2004). Detecting and measuring
+rater effects using many-facet Rasch measurement: Part II.
+\emph{Journal of Applied Measurement, 5}(2), 189-227.
+}
+}
+
 \examples{
 toy <- load_mfrmr_data("example_bias")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "none")
 out <- bias_pairwise_report(fit, diagnostics = diag, facet_a = "Rater", facet_b = "Criterion")
-summary(out)
+s <- summary(out)
+s$summary
+# Look for: `MaxAbsBiasDiff` < ~0.5 logits and `Significant = 0` mean
+#   no rater pair contrasts above the screen. The `BonferroniSignificant`
+#   / `HolmSignificant` columns count pairs that survive multiple-
+#   testing correction; both being 0 is a stronger "no rater-pair
+#   inconsistency" signal than the raw screen-positive count alone.
+head(out$table)
+# Look for: top rows with `|t_diff|` > 2 and |Bias_diff| > 0.5 logits
+#   warrant content-review of the two raters' scoring conventions on
+#   the conditioning context facet (e.g. compare their item-level
+#   marks for systematic strictness/leniency patterns).
 }
 \seealso{
 \code{\link[=estimate_bias]{estimate_bias()}}, \code{\link[=bias_interaction_report]{bias_interaction_report()}}, \code{\link[=build_fixed_reports]{build_fixed_reports()}}

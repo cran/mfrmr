@@ -21,27 +21,29 @@ misleading.}
 known to be nested and fitted with the same likelihood basis on the same
 observations. The default is \code{FALSE}, in which case no likelihood-ratio
 test is reported. When \code{TRUE}, the function still runs a conservative
-structural audit and computes the LRT only for supported nesting patterns.}
+structural nesting review and computes the LRT only for supported nesting patterns.}
 }
 \value{
 An object of class \code{mfrm_comparison} (named list) with:
 \itemize{
 \item \code{table}: data.frame of model-level statistics (LogLik, AIC, BIC,
-Delta_AIC, AkaikeWeight, Delta_BIC, BICWeight, npar, nobs, Model,
-Method, Converged, ICComparable).
+Delta_AIC, AkaikeWeight, Delta_BIC, BICWeight, npar, nobs, WeightedN,
+ICSampleSize, ICSampleSizeBasis, Model, Method, Converged, ICComparable).
 \item \code{lrt}: data.frame with likelihood-ratio test result (only when two models
 are supplied and \code{nested = TRUE}). Contains \code{ChiSq}, \code{df}, \code{p_value}.
 \item \code{evidence_ratios}: data.frame of pairwise Akaike-weight ratios (Model1,
 Model2, EvidenceRatio). \code{NULL} when weights cannot be computed.
 \item \code{preferred}: named list with the preferred model label by each criterion.
 \item \code{comparison_basis}: list describing whether IC and LRT comparisons were
-considered comparable. Includes a conservative \code{nesting_audit}.
+considered comparable. Includes a conservative \code{nesting_review} plus
+\code{lrt_status} / \code{lrt_reason} so withheld LRTs are explicit rather than
+silently absent.
 }
 }
 \description{
 Produce a side-by-side comparison of multiple \code{\link[=fit_mfrm]{fit_mfrm()}} results using
 information criteria, log-likelihood, and parameter counts. When exactly
-two models are supplied and the current conservative nesting audit passes,
+two models are supplied and the current conservative nesting review passes,
 a likelihood-ratio test is included.
 }
 \details{
@@ -54,6 +56,9 @@ use the package's \code{MML} estimation path, analyze the same observations, and
 converge successfully. Raw \code{AIC} and \code{BIC} values are still shown for each
 model, but \verb{Delta_*}, weights, and preferred-model summaries are suppressed
 when the likelihood basis is not comparable enough for primary reporting.
+The comparison table records both row count (\code{nobs}) and the sample-size
+basis used for the BIC penalty (\code{ICSampleSize}, \code{ICSampleSizeBasis}); for
+weighted fits this is the sum of weights rather than the number of rows.
 
 \strong{Nesting}: Two models are \emph{nested} when one is a special case of the
 other obtained by imposing equality constraints.  The most common
@@ -63,15 +68,22 @@ method (MML vs JML) on the same specification are not nested in the
 usual sense---use information criteria rather than LRT for that
 comparison.
 
-In the \strong{current \code{mfrmr} model space}, the automatic nesting audit is
-intentionally conservative: it treats \code{RSM} nested inside \code{PCM} under shared
-data and shared constraints as the only supported automatic relation.
-Same-family comparisons, cross-method comparisons, or comparisons that
-change anchors/dummying/centering are not automatically promoted to LRT
-claims.
+In the \strong{current \code{mfrmr} model space}, the automatic nesting review is
+intentionally conservative. It currently supports two fixed-effect
+restrictions under shared data and shared constraints:
+\itemize{
+\item \code{RSM} nested inside \code{PCM} when the \code{PCM} fit has an explicit
+\code{step_facet};
+\item same-family additive-vs-interaction comparisons when the smaller fit's
+\code{facet_interactions} set is a subset of the larger fit's set.
+}
+
+Cross-method comparisons, comparisons that change anchors/dummying/centering,
+and same-family comparisons that do not add fixed interaction terms are not
+automatically promoted to LRT claims.
 
 The \strong{likelihood-ratio test (LRT)} is reported only when exactly two
-models are supplied, \code{nested = TRUE}, the structural audit passes, and the
+models are supplied, \code{nested = TRUE}, the structural nesting review passes, and the
 difference in the number of parameters is positive:
 
 \deqn{\Lambda = -2 (\ell_{\mathrm{restricted}} - \ell_{\mathrm{full}})
@@ -116,8 +128,11 @@ structure.
 \itemize{
 \item Do not treat AIC/BIC differences as primary evidence when
 \code{table$ICComparable} is \code{FALSE}.
-\item Do not interpret the LRT unless \code{nested = TRUE} and the structural audit
-in \code{comparison_basis$nesting_audit} passes.
+\item Do not interpret the LRT unless \code{nested = TRUE} and the structural nesting review
+in \code{comparison_basis$nesting_review} passes.
+\item Same-family additive-vs-interaction fits are considered nested only when
+all other structural settings match and the smaller model's
+\code{facet_interactions} set is a subset of the larger model's set.
 \item Do not assume that \code{nested = TRUE} overrides the package's conservative
 nesting boundary; unsupported relations remain unsupported.
 \item Do not compare models fit to different datasets, different score codings,
@@ -146,10 +161,10 @@ cautiously---they do not adjust for multiple comparisons.
 \item \code{table}: first-pass comparison table; start with \code{ICComparable},
 \code{Model}, \code{Method}, \code{AIC}, and \code{BIC}.
 \item \code{comparison_basis}: records whether IC and LRT claims are defensible for
-the supplied models. Inspect \code{comparison_basis$nesting_audit$relation}
+the supplied models. Inspect \code{comparison_basis$nesting_review$relation}
 and \code{reason} before reading any LRT output.
 \item \code{lrt}: nested-model test summary, present only when the requested and
-audited conditions are met.
+reviewed conditions are met.
 \item \code{preferred}: candidate preferred by each criterion when those summaries
 are available.
 }
@@ -173,19 +188,34 @@ appropriate, an LRT.
 }
 }
 
+\section{References}{
+
+\itemize{
+\item Burnham, K. P., & Anderson, D. R. (2002). \emph{Model selection and
+multimodel inference: A practical information-theoretic
+approach} (2nd ed.). Springer.
+\item Akaike, H. (1974). A new look at the statistical model
+identification. \emph{IEEE Transactions on Automatic Control,
+19}(6), 716-723.
+\item Schwarz, G. (1978). Estimating the dimension of a model.
+\emph{Annals of Statistics, 6}(2), 461-464.
+}
+}
+
 \examples{
 \donttest{
 toy <- load_mfrmr_data("example_core")
 
 fit_rsm <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                     method = "MML", model = "RSM", maxit = 25)
+                     method = "MML", model = "RSM", quad_points = 7, maxit = 30)
 fit_pcm <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                      method = "MML", model = "PCM",
-                     step_facet = "Criterion", maxit = 25)
+                     step_facet = "Criterion", quad_points = 7, maxit = 30)
 comp <- compare_mfrm(fit_rsm, fit_pcm, labels = c("RSM", "PCM"))
 comp$table
 comp$evidence_ratios
 }
+
 }
 \seealso{
 \code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}

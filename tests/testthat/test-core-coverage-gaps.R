@@ -827,6 +827,34 @@ test_that("summarize_displacement_table handles missing Flag column", {
 })
 
 # ===========================================================================
+# 36b. summarize_displacement_table: all-NA Displacement / DisplacementT
+# (regression test for commit 8806749 -- guards against the
+# `MaxAbsDisplacement = -Inf` warning when every flagged level has zero
+# information and Displacement is therefore NA upstream).
+# ===========================================================================
+test_that("summarize_displacement_table returns NA, not -Inf, when all displacements are NA", {
+  fn <- mfrmr:::summarize_displacement_table
+  tbl <- dplyr::tibble(
+    Facet            = c("Rater", "Rater"),
+    Level            = c("R1", "R2"),
+    Displacement     = c(NA_real_, NA_real_),
+    DisplacementT    = c(NA_real_, NA_real_),
+    AnchorType       = c("Anchor", "Free"),
+    Flag             = c(TRUE, FALSE)
+  )
+  # Before commit 8806749 this called `max(abs(NA), na.rm = TRUE)` which
+  # returns -Inf and emits "no non-missing arguments to max; returning -Inf".
+  result <- expect_no_warning(fn(tbl))
+  expect_true(is.data.frame(result))
+  expect_identical(result$MaxAbsDisplacement, NA_real_)
+  expect_identical(result$MaxAbsDisplacementT, NA_real_)
+  # Other counts should still be populated correctly.
+  expect_equal(result$Levels, 2L)
+  expect_equal(result$AnchoredLevels, 1L)
+  expect_equal(result$FlaggedLevels, 1L)
+})
+
+# ===========================================================================
 # 37. build_facet_measure_table: extreme level handling (lines 2752-2764)
 # ===========================================================================
 test_that("diagnostics include facet measure tables with extreme handling", {

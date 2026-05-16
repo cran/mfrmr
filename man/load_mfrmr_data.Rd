@@ -19,8 +19,12 @@ A data.frame in long format.
 Load a packaged simulation dataset
 }
 \details{
-This helper is useful in scripts/functions where you want to choose a dataset
-by string key instead of calling \code{data()} manually.
+\code{load_mfrmr_data("<key>")} is the canonical loader for the packaged
+datasets and the entry point used across the package help and
+vignettes. The equivalent base-R alternative
+\code{data("mfrmr_<key>", package = "mfrmr")} remains available for users
+who prefer the full \code{data()} spelling; both paths return identical
+long-format data frames and are supported long-term.
 
 All returned datasets include the core long-format columns
 \code{Study}, \code{Person}, \code{Rater}, \code{Criterion}, and \code{Score}.
@@ -53,7 +57,7 @@ fit <- fit_mfrm(
   facets = c("Rater", "Criterion"),
   score = "Score",
   method = "JML",
-  maxit = 25
+  maxit = 30
 )
 summary(fit)
 }

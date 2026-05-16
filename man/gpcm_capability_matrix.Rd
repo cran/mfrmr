@@ -44,21 +44,28 @@ core R package:
 \item posterior-scoring and information helpers are supported,
 \item residual-based diagnostics and strict marginal follow-up are supported as
 exploratory screens,
-\item direct slope-aware simulation-spec generation is supported,
-\item APA writer, broader export bundles, fair-average semantics, and planning /
-forecasting helpers remain outside the validated \code{GPCM} boundary.
+\item direct slope-aware simulation-spec generation and parameter-recovery
+simulation are supported with caveats,
+\item \code{fair_average_table()} is supported with an explicit slope-aware
+element-conditional caveat,
+\item \code{estimate_bias()} is supported as conditional screening evidence with
+slope-aware information and profile-likelihood follow-up columns,
+\item summary-table appendix export is available for supported direct outputs,
+\item APA writer, fit-based export bundles, FACETS output-contract
+score-side outputs, QC pass/fail pipelines, and planning / forecasting
+helpers remain outside the validated \code{GPCM} boundary.
 }
 
 Why some helpers remain blocked:
 \itemize{
-\item fair-average, score-side export, and FACETS compatibility-contract outputs depend on
-Rasch-family measure-to-score semantics that are not yet generalized to
-the free-discrimination \code{GPCM} branch;
-\item APA writer, visual summaries, and QC pipelines remain blocked because they
-would turn those still-unvalidated score-side semantics into narrative or
-pass/fail outputs;
+\item score-side export and FACETS output-contract outputs depend on
+Rasch-family measure-to-score semantics plus delta-method SE machinery
+that are not yet generalized to the free-discrimination \code{GPCM} branch;
+\item APA writer, fit-based report/export bundles, visual summaries, and QC
+pipelines remain blocked because they would turn unsupported score-side
+semantics into narrative or pass/fail outputs;
 \item planning and forecasting remain deferred because the current design layer
-is still validated only for the role-based \code{RSM} / \code{PCM} planner.
+is validated only for the role-based \code{RSM} / \code{PCM} planner.
 }
 
 This boundary is aligned with the package's current validation evidence,

@@ -45,7 +45,7 @@ round_numeric_frame <- function(df, digits = 3L) {
 #'   person = "Person",
 #'   facets = c("Rater", "Criterion"),
 #'   score = "Score",
-#'   maxit = 25
+#'   maxit = 30
 #' )
 #' s <- summary(out)
 #' s$overview[, c("Model", "Method", "Converged")]
@@ -149,7 +149,7 @@ print.mfrm_facets_run <- function(x, ...) {
 #'   person = "Person",
 #'   facets = c("Rater", "Criterion"),
 #'   score = "Score",
-#'   maxit = 10
+#'   maxit = 30
 #' )
 #' p_fit <- plot(out, type = "fit", draw = FALSE)
 #' p_fit$wright_map$data$plot
@@ -164,7 +164,14 @@ plot.mfrm_facets_run <- function(x, y = NULL, type = c("fit", "qc"), ...) {
   }
   type <- match.arg(type)
   if (identical(type, "fit")) {
-    return(plot(x$fit, ...))
+    # Preserve the FACETS-style overview bundle (Wright + pathway +
+    # CCC) that existing run_mfrm_facets() scripts expect. Callers
+    # that want just the Wright map can use plot(x$fit, type = "wright").
+    dots <- list(...)
+    if (is.null(dots$type)) {
+      dots$type <- "bundle"
+    }
+    return(do.call(plot, c(list(x$fit), dots)))
   }
   plot_qc_dashboard(fit = x$fit, diagnostics = x$diagnostics, ...)
 }

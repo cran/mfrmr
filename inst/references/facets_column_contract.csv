@@ -7,7 +7,7 @@ Table 1,specifications_report,t1,convergence_control,Setting|Value
 Table 1,specifications_report,t1,anchor_summary,Facet|AnchoredLevels|GroupAnchors|DummyFacet
 Table 2,data_quality_report,t2,summary,TotalLinesInData|TotalDataLines|TotalNonBlankResponsesFound|MissingScoreRows|MissingFacetRows|MissingPersonRows|InvalidWeightRows|OutOfRangeScoreRows|ValidResponsesUsedForEstimation
 Table 2,data_quality_report,t2,model_match,Model|MatchedResponses|ValidResponses
-Table 2,data_quality_report,t2,row_audit,Status|N
+Table 2,data_quality_report,t2,row_review,Status|N
 Table 2,data_quality_report,t2,category_counts,Score|Count|WeightedCount
 Table 3,estimation_iteration_report,t3,table,Method|Iteration|MaxScoreResidual*|MaxLogitChange*|Objective
 Table 3,estimation_iteration_report,t3,summary,FinalConverged|FinalIterations|ReplayRows|ConnectedSubset
@@ -20,6 +20,7 @@ Table 5,measurable_summary_table,t5,subsets,Subset|Criterion|Person|Rater|Task|O
 Table 6,subset_connectivity_report,t6,summary,Subset|Criterion|Person|Rater|Task|Observations|ObservationPercent
 Table 6,subset_connectivity_report,t6,listing,Subset|Facet|LevelsN|Levels|Observations|ObservationPercent|Ruler
 Table 6,subset_connectivity_report,t6,nodes,Node|Component|Subset|Facet|Level
+Table 6,subset_connectivity_report,t6,edges,Subset|From|To|FromFacet|FromLevel|ToFacet|ToLevel|Weight
 Table 6.2,facet_statistics_report,t62,table,Metric|GlobalMin|GlobalMax|Ruler|Facet|Levels|Mean|SD|Min|Max
 Table 6.2,facet_statistics_report,t62,ranges,Metric|GlobalMin|GlobalMax
 Table 7,facets_chisq_table,t7chisq,table,Facet|Levels|MeanMeasure|SD|FixedChiSq|FixedDF|RandomVar|FixedProb|RandomChiSq|RandomDF|RandomProb|FixedFlag|RandomFlag

@@ -9,7 +9,8 @@ diagnose_mfrm(
   interaction_pairs = NULL,
   top_n_interactions = 20,
   whexact = FALSE,
-  diagnostic_mode = c("legacy", "marginal_fit", "both"),
+  fit_df_method = c("engine", "facets", "both"),
+  diagnostic_mode = c("both", "legacy", "marginal_fit"),
   residual_pca = c("none", "overall", "facet", "both"),
   pca_max_factors = 10L
 )
@@ -21,12 +22,35 @@ diagnose_mfrm(
 
 \item{top_n_interactions}{Number of top interactions.}
 
-\item{whexact}{Use exact ZSTD transformation.}
+\item{whexact}{Logical controlling the ZSTD standardisation of
+mean-square fit statistics. \code{FALSE} (default) applies the
+Wilson-Hilferty cube-root transformation
+\eqn{(\mathrm{MnSq}^{1/3} - (1 - 2/(9\,\mathit{df})))/\sqrt{2/(9\,\mathit{df})}}
+(recommended; the Winsteps/FACETS convention for \code{WHEXACT=Y}).
+\code{TRUE} uses the simpler linear-normal standardisation
+\eqn{(\mathrm{MnSq} - 1)\sqrt{\mathit{df}/2}}, which is kept for
+backward compatibility with earlier mfrmr summaries and with
+FACETS' \code{WHEXACT=N} mode.}
 
-\item{diagnostic_mode}{Diagnostic basis to compute: \code{"legacy"} keeps the
-residual/EAP-based stack only, \code{"marginal_fit"} adds the strict
-latent-integrated first-order marginal-fit companion, and \code{"both"}
-computes both paths.}
+\item{fit_df_method}{Degrees-of-freedom convention used for fit ZSTD.
+\code{"engine"} (default) keeps the package-native convention
+\code{DF_Infit = sum(Var * Weight)} and \code{DF_Outfit = sum(Weight)}.
+\code{"facets"} uses the FACETS/Wright-Masters fourth-moment approximation
+\code{df = 2 / q^2} as the primary \code{InfitZSTD} / \code{OutfitZSTD} basis and caps
+reported ZSTD values at +/-9. \code{"both"} keeps the engine convention as the
+primary columns and adds \verb{*_FACETS} companion columns for comparison.}
+
+\item{diagnostic_mode}{Diagnostic basis to compute: \code{"both"} (the
+current default) computes both the residual/EAP-based stack and
+the strict latent-integrated first-order marginal-fit companion;
+\code{"legacy"} keeps the residual/EAP-based stack only;
+\code{"marginal_fit"} returns only the marginal-fit companion. The
+\code{"both"} path adds a posterior-integrated pass that typically
+doubles to quintuples wall-clock time relative to \code{"legacy"};
+pass \code{"legacy"} explicitly when iterating on large designs and
+only the residual stack is needed. Use \code{"both"} for RSM/PCM
+reporting fits because it enables \code{\link[=plot_marginal_fit]{plot_marginal_fit()}} and
+\code{\link[=plot_marginal_pairwise]{plot_marginal_pairwise()}} follow-up.}
 
 \item{residual_pca}{Residual PCA mode: \code{"none"}, \code{"overall"}, \code{"facet"}, or \code{"both"}.}
 
@@ -36,13 +60,18 @@ computes both paths.}
 An object of class \code{mfrm_diagnostics} including:
 \itemize{
 \item \code{obs}: observed/expected/residual-level table
-\item \code{measures}: facet/person fit table (\code{Infit}, \code{Outfit}, \code{ZSTD}, \code{PTMEA})
+\item \code{measures}: facet/person fit table (\code{Infit}, \code{Outfit}, \code{ZSTD},
+\code{PTMEA}, \code{ModelSE}, \code{RealSE}, \code{CI_Lower}, \code{CI_Upper}, \code{CI_Level},
+\code{CI_Method})
 \item \code{overall_fit}: overall fit summary
 \item \code{fit}: element-level fit diagnostics
 \item \code{reliability}: facet-level model/real separation and reliability
 \item \code{precision_profile}: one-row summary of the active precision tier and its
 recommended use
-\item \code{precision_audit}: package-native checks for SE, CI, and reliability
+\item \code{precision_review}: package-native checks for SE, CI, and reliability
+\item \code{parameter_uncertainty}: MML observed-information uncertainty for
+structural parameters when available (\code{steps}, and bounded-\code{GPCM}
+\code{slopes} on both log and positive scales), plus covariance status metadata
 \item \code{facet_precision}: facet-level precision summary by distribution basis and
 SE mode
 \item \code{facets_chisq}: fixed/random facet variability summary
@@ -50,11 +79,12 @@ SE mode
 \item \code{interrater}: inter-rater agreement bundle (\code{summary}, \code{pairs}) including
 agreement and rater-severity spread indices
 \item \code{unexpected}: unexpected-response bundle
-\item \code{fair_average}: adjusted-score reference bundle (placeholder only for
-bounded \code{GPCM})
+\item \code{fair_average}: adjusted-score reference bundle (reported as unavailable
+for bounded \code{GPCM})
 \item \code{displacement}: displacement diagnostics bundle
 \item \code{approximation_notes}: method notes for SE/CI/reliability summaries
 \item \code{diagnostic_basis}: guide to the statistical target of each diagnostic path
+\item \code{fit_standardization}: guide to the df convention behind fit ZSTD values
 \item \code{marginal_fit}: optional strict marginal-fit companion based on
 posterior-expected first-order category counts
 \item \code{residual_pca_overall}: optional overall PCA object
@@ -108,6 +138,15 @@ approximate standard normal deviate.
 context); positive values confirm alignment with the latent trait.
 }
 
+The MnSq values and the ZSTD values should be read separately. \code{mfrmr} keeps
+the package-native engine df convention by default because it is the basis
+used by the R/Python/Julia validation engines. FACETS reports closely related
+MnSq values but standardizes them with a Wright-Masters fourth-moment df
+approximation (\code{df = 2 / q^2}) and caps reported ZSTD values. Use
+\code{fit_df_method = "both"} to review these two standardization conventions
+side by side without changing the primary \code{InfitZSTD} / \code{OutfitZSTD}
+columns.
+
 \strong{Misfit flagging guidelines (Bond & Fox, 2015):}
 \itemize{
 \item MnSq < 0.5: overfit (too predictable; may inflate reliability)
@@ -142,6 +181,15 @@ matrices. These summaries are exploratory screens for residual
 structure, not standalone proofs for or against unidimensionality.
 Facet-specific PCA can help localise where a stronger residual signal
 is concentrated.
+
+These residual-PCA summaries are not a DIMTEST/UNIDIM implementation.
+DIMTEST-style essential-unidimensionality tests work at an item-response
+layer and require an explicit decision about how many-facet rating data are
+collapsed, conditioned, or adjusted for rater/task/facet effects. For
+manuscripts, combine global/element fit, residual PCA, and local-dependence
+screens, and use limited wording such as "evidence consistent with essential
+unidimensionality under the specified facet structure" rather than
+"unidimensionality was established."
 }
 \section{Reading key components}{
 
@@ -153,8 +201,8 @@ uses model-based \code{ModelSE} values where available; \code{JML} keeps these
 quantities as exploratory approximations.
 \item \code{fit}: element-level misfit scan (\code{Infit}, \code{Outfit}, \code{ZSTD}).
 \item \code{unexpected}, \code{fair_average}, \code{displacement}: targeted QC bundles.
-For bounded \code{GPCM}, \code{fair_average} is retained as an unavailable
-placeholder because that compatibility calculation has not yet been
+For bounded \code{GPCM}, \code{fair_average} is retained with an unavailable
+status because that compatibility calculation has not yet been
 validated for the generalized model.
 \item \code{approximation_notes}: method notes for SE/CI/reliability summaries.
 }
@@ -176,7 +224,10 @@ single criterion.
 fit-adjusted companion defined as \code{ModelSE * sqrt(max(Infit, 1))}.
 Reliability tables report model and fit-adjusted bounds from observed
 variance, error variance, and true variance; \code{JML} entries should still be
-treated as exploratory.
+treated as exploratory. Separation, strata, and reliability follow the
+Wright & Masters (1982) conventions:
+\eqn{G = \mathrm{TrueSD}/\mathrm{RMSE}},
+\eqn{R = G^2 / (1 + G^2)}, and \eqn{H = (4G + 1) / 3}.
 }
 
 \section{Typical workflow}{
@@ -188,14 +239,64 @@ treated as exploratory.
 }
 }
 
+\section{References}{
+
+\itemize{
+\item Wright, B. D., & Masters, G. N. (1982). \emph{Rating scale analysis}.
+MESA Press. (G/R/H separation, reliability, and strata
+formulas summarized in \code{s_diag$reliability} follow this
+convention.)
+\item Wright, B. D., & Linacre, J. M. (1994). Reasonable mean-square
+fit values. \emph{Rasch Measurement Transactions, 8}(3), 370.
+(Source for the 0.5-1.5 Infit / Outfit acceptance band that
+\code{s_diag$key_warnings} and \code{misfit_thresholds} apply.)
+\item Linacre, J. M. (1989). \emph{Many-Facet Rasch Measurement}. MESA
+Press. (FACETS Tables 6 + 7 correspond to the per-facet
+element measures, fit, and chi-square heterogeneity screen
+exposed via \code{s_diag$reliability} and \code{s_diag$facets_chisq}.)
+\item Bond, T. G., & Fox, C. M. (2015). \emph{Applying the Rasch model:
+Fundamental measurement in the human sciences} (3rd ed.).
+Routledge. (Reference text for the Rasch-family fit
+conventions exposed by this helper.)
+\item Linacre, J. M. (2002). What do Infit and Outfit, Mean-square
+and Standardized mean? \emph{Rasch Measurement Transactions,
+16}(2), 878.
+\item Linacre, J. M. (2026). \emph{A user's guide to Facets Rasch-model computer
+programs}. Winsteps.com. (WHEXACT / FACETS standardized fit df notes.)
+}
+}
+
 \examples{
-\donttest{
+# Fast smoke run: legacy-only diagnostic mode is enough to confirm
+# the bundle has the expected slots. ~1 s on example_core.
 toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+fit_quick <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
+                      method = "JML", maxit = 30)
+diag_quick <- diagnose_mfrm(fit_quick, diagnostic_mode = "legacy",
+                             residual_pca = "none")
+summary(diag_quick)$overview[, c("Observations", "Facets", "Categories")]
+
+\donttest{
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 diag <- diagnose_mfrm(fit, diagnostic_mode = "both", residual_pca = "none")
 s_diag <- summary(diag)
 s_diag$overview[, c("Observations", "Facets", "Categories")]
 s_diag$diagnostic_basis[, c("DiagnosticPath", "Status", "Basis")]
+s_diag$key_warnings
+# Look for: "No immediate warnings ..." in `key_warnings` is the
+#   "all clear" signal. Lines starting with "MnSq misfit:" name the
+#   element + Infit / Outfit values that fell outside the
+#   0.5-1.5 acceptance band; review those first.
+s_diag$facets_chisq
+# Look for: `FixedProb` < 0.05 means that facet's elements differ
+#   reliably under the fixed-effect "all elements equal" null. A
+#   facet with a non-significant chi-square contributes little
+#   spread to the test scale.
+s_diag$interrater
+# Look for: ExactAgreement >= ExpectedExactAgreement and
+#   AgreementMinusExpected >= 0 indicate raters agree at least as
+#   often as the model expects. Negative values warrant a closer
+#   look at `diag$interrater$pairs`.
 p_qc <- plot_qc_dashboard(fit, diagnostics = diag, draw = FALSE)
 p_qc$data$plot
 
@@ -205,9 +306,10 @@ pca <- analyze_residual_pca(diag_pca, mode = "overall")
 head(pca$overall_table)
 
 # Reporting route:
-prec <- precision_audit_report(fit, diagnostics = diag)
+prec <- precision_review_report(fit, diagnostics = diag)
 summary(prec)
 }
+
 }
 \seealso{
 \code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=analyze_residual_pca]{analyze_residual_pca()}}, \code{\link[=build_visual_summaries]{build_visual_summaries()}},

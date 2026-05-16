@@ -1,4 +1,4 @@
-#' Simulate long-format many-facet Rasch data for design studies
+#' Simulate long-format ordered many-facet data for design studies
 #'
 #' @param n_person Number of persons/respondents.
 #' @param n_rater Number of rater facet levels.
@@ -33,14 +33,18 @@
 #'   vary across levels. Currently `"Criterion"` and `"Rater"` are supported.
 #' @param slope_facet Slope facet used when `model = "GPCM"`. The current
 #'   bounded `GPCM` branch requires `slope_facet == step_facet`.
-#' @param thresholds Optional threshold specification. Use either a numeric
-#'   vector of common thresholds or a data frame with columns `StepFacet`,
-#'   `Step`/`StepIndex`, and `Estimate`.
+#' @param thresholds Optional threshold specification. Use a numeric vector of
+#'   common thresholds; a named list such as `list(C01 = c(-1, 0, 1))`; a
+#'   numeric matrix with one row per `StepFacet` and one column per step; or a
+#'   long data frame with columns `StepFacet`, `Step`/`StepIndex`, and
+#'   `Estimate`.
 #' @param slopes Optional slope specification used when `model = "GPCM"`.
 #'   Use either a numeric vector aligned to the generated slope-facet levels or
-#'   a data frame with columns `SlopeFacet` and `Estimate`. When omitted,
-#'   slopes default to 1 for every slope-facet level, giving an exact `PCM`
-#'   reduction.
+#'   a data frame with columns `SlopeFacet` and `Estimate`. Supplied slopes are
+#'   treated as relative discriminations and normalized to the package's
+#'   geometric-mean-one identification convention on the log scale. When
+#'   omitted, slopes default to 1 for every slope-facet level, giving an exact
+#'   `PCM` reduction.
 #' @param assignment Assignment design. `"crossed"` means every person sees
 #'   every rater; `"rotating"` uses a balanced rotating subset; `"resampled"`
 #'   reuses person-level rater-assignment profiles stored in `sim_spec`;
@@ -59,7 +63,8 @@
 #'   refit that population model later.
 #'
 #' @details
-#' This function generates synthetic MFRM data from the Rasch model.
+#' This function generates synthetic ordered many-facet data under `RSM`,
+#' `PCM`, or the package's bounded `GPCM` branch.
 #' The data-generating process is:
 #'
 #' 1. Draw person abilities: \eqn{\theta_n \sim N(0, \texttt{theta\_sd}^2)}
@@ -96,15 +101,16 @@
 #' - if `thresholds = NULL`, common equally spaced thresholds are generated
 #'   from `step_span`
 #' - if `thresholds` is a numeric vector, it is used as one common threshold set
-#' - if `thresholds` is a data frame, threshold values may vary by `StepFacet`
-#'   (currently `Criterion` or `Rater`)
+#' - if `thresholds` is a named list, numeric matrix, or data frame, threshold
+#'   values may vary by `StepFacet` (currently `Criterion` or `Rater`)
 #'
 #' For bounded `GPCM`, the generator now requires an explicit slope
 #' contract in parallel with the threshold table. The current public branch
-#' keeps `slope_facet == step_facet` and uses the internal `category_prob_gpcm()`
-#' helper for
-#' response sampling. Broader design-planning helpers remain restricted until
-#' that slope-aware contract is generalized beyond direct data generation.
+#' keeps `slope_facet == step_facet`, normalizes supplied slopes to the same
+#' geometric-mean-one log-slope identification used by [fit_mfrm()], and uses
+#' the internal `category_prob_gpcm()` helper for response sampling. Broader
+#' design-planning helpers remain restricted until that slope-aware contract is
+#' generalized beyond direct data generation.
 #'
 #' Assignment handling is also explicit:
 #' - `"crossed"` uses the full person x rater x criterion design
@@ -636,6 +642,29 @@ simulate_mfrm_data <- function(n_person = 50,
   })
 }
 
+simulation_fit_score_support <- function(sim, fallback_score_levels = NULL) {
+  cfg <- attr(sim, "mfrm_simulation_spec")
+  score_levels <- suppressWarnings(as.integer(
+    (cfg$score_levels %||% fallback_score_levels %||% NA_integer_)[1]
+  ))
+  if (!is.finite(score_levels) || score_levels < 2L) {
+    return(list())
+  }
+  list(rating_min = 1L, rating_max = score_levels)
+}
+
+simulation_add_fit_score_support <- function(fit_args, sim,
+                                             fallback_score_levels = NULL) {
+  support <- simulation_fit_score_support(
+    sim = sim,
+    fallback_score_levels = fallback_score_levels
+  )
+  if (length(support) > 0L) {
+    fit_args[names(support)] <- support
+  }
+  fit_args
+}
+
 simulation_center_numeric <- function(x) {
   x <- suppressWarnings(as.numeric(x))
   x <- x[is.finite(x)]
@@ -1075,6950 +1104,6 @@ simulation_future_design_template <- function(sim_spec = NULL, facet_names = NUL
   )
 }
 
-simulation_future_branch_design_schema <- function(sim_spec = NULL, facet_names = NULL) {
-  future_facet_table <- if (is.null(facet_names)) {
-    simulation_future_facet_table(sim_spec)
-  } else {
-    simulation_future_facet_table(facet_names = facet_names)
-  }
-  future_design_template <- if (is.null(facet_names)) {
-    simulation_future_design_template(sim_spec)
-  } else {
-    simulation_future_design_template(facet_names = facet_names)
-  }
-
-  alias_source <- if (!is.null(sim_spec)) {
-    sim_spec
-  } else if (!is.null(facet_names)) {
-    list(facet_names = simulation_validate_output_facet_names(facet_names))
-  } else {
-    NULL
-  }
-
-  facet_axes <- future_facet_table |>
-    dplyr::transmute(
-      input_key = .data$future_facet_key,
-      facet = .data$facet,
-      facet_kind = .data$facet_kind,
-      axis_class = .data$future_axis_class,
-      level_count = .data$level_count,
-      canonical_design_variable = .data$current_planning_count_variable,
-      public_design_alias = .data$current_planning_count_alias,
-      current_planner_role_supported = .data$current_planner_role_supported,
-      arbitrary_facet_branch_candidate = .data$arbitrary_facet_branch_candidate
-    )
-
-  assignment_axis <- list(
-    current_planning_count_variable = "raters_per_person",
-    current_planning_count_alias = unname(simulation_design_variable_aliases(alias_source)[["raters_per_person"]]),
-    future_input_key = "assignment",
-    axis_class = "assignment_count",
-    depends_on_input_key = as.character(facet_axes$input_key[match("facet_level_count", facet_axes$axis_class)] %||% "rater"),
-    depends_on_canonical_design_variable = as.character(
-      facet_axes$canonical_design_variable[match("facet_level_count", facet_axes$axis_class)] %||% "n_rater"
-    ),
-    depends_on_public_design_alias = as.character(
-      facet_axes$public_design_alias[match("facet_level_count", facet_axes$axis_class)] %||% "n_rater"
-    )
-  )
-
-  schema <- list(
-    schema_contract = "arbitrary_facet_design_schema",
-    schema_stage = "schema_only",
-    facet_axes = facet_axes,
-    assignment_axis = assignment_axis,
-    input_keys = c(as.character(facet_axes$input_key), assignment_axis$future_input_key),
-    canonical_design_variables = c(
-      as.character(facet_axes$canonical_design_variable),
-      assignment_axis$current_planning_count_variable
-    ),
-    default_design = future_design_template,
-    note = paste(
-      "Schema-only design-schema object for the future arbitrary-facet branch,",
-      "bundling stable facet-count axes and the assignment axis in one",
-      "machine-readable contract."
-    )
-  )
-  schema$grid_semantics <- simulation_future_branch_grid_semantics(schema)
-  schema
-}
-
-simulation_future_branch_grid_semantics <- function(design_schema) {
-  design_schema <- simulation_coerce_future_branch_design_schema(design_schema)
-  facet_axes <- design_schema$facet_axes
-  assignment_axis <- design_schema$assignment_axis
-  assignment_var <- as.character(
-    assignment_axis$current_planning_count_variable %||% "raters_per_person"
-  )
-  assignment_key <- as.character(
-    assignment_axis$future_input_key %||% "assignment"
-  )
-  canonical_columns <- c(
-    "design_id",
-    as.character(facet_axes$canonical_design_variable),
-    assignment_var
-  )
-  public_columns <- c(
-    "design_id",
-    as.character(facet_axes$public_design_alias),
-    as.character(assignment_axis$current_planning_count_alias)
-  )
-  branch_columns <- c(
-    "design_id",
-    as.character(facet_axes$input_key),
-    assignment_key
-  )
-
-  list(
-    semantics_contract = "arbitrary_facet_design_grid_semantics",
-    semantics_stage = as.character(design_schema$schema_stage %||% "schema_only"),
-    id_variable = "design_id",
-    canonical_columns = canonical_columns,
-    public_columns = public_columns,
-    branch_columns = branch_columns,
-    feasibility_rule = paste0(
-      assignment_var,
-      " <= ",
-      as.character(assignment_axis$depends_on_canonical_design_variable %||% "n_rater")
-    ),
-    row_meaning = paste(
-      "Each row is one schema-only future-branch design condition formed by",
-      "crossing facet-count axes and the assignment axis after applying the",
-      "current feasibility rule."
-    ),
-    default_id_prefix = "F"
-  )
-}
-
-simulation_coerce_future_branch_design_schema <- function(future_branch_schema) {
-  required_fields <- c(
-    "schema_contract",
-    "schema_stage",
-    "facet_axes",
-    "assignment_axis",
-    "input_keys",
-    "canonical_design_variables",
-    "default_design",
-    "note"
-  )
-  attach_grid_semantics <- function(x) {
-    if (is.list(x$grid_semantics) &&
-        identical(x$grid_semantics$semantics_contract, "arbitrary_facet_design_grid_semantics")) {
-      return(c(x[required_fields], list(grid_semantics = x$grid_semantics)))
-    }
-
-    facet_axes <- x$facet_axes
-    assignment_axis <- x$assignment_axis
-    assignment_var <- as.character(
-      assignment_axis$current_planning_count_variable %||% "raters_per_person"
-    )
-    assignment_key <- as.character(
-      assignment_axis$future_input_key %||% "assignment"
-    )
-
-    c(
-      x[required_fields],
-      list(
-        grid_semantics = list(
-          semantics_contract = "arbitrary_facet_design_grid_semantics",
-          semantics_stage = as.character(x$schema_stage %||% "schema_only"),
-          id_variable = "design_id",
-          canonical_columns = c(
-            "design_id",
-            as.character(facet_axes$canonical_design_variable),
-            assignment_var
-          ),
-          public_columns = c(
-            "design_id",
-            as.character(facet_axes$public_design_alias),
-            as.character(assignment_axis$current_planning_count_alias)
-          ),
-          branch_columns = c(
-            "design_id",
-            as.character(facet_axes$input_key),
-            assignment_key
-          ),
-          feasibility_rule = paste0(
-            assignment_var,
-            " <= ",
-            as.character(assignment_axis$depends_on_canonical_design_variable %||% "n_rater")
-          ),
-          row_meaning = paste(
-            "Each row is one schema-only future-branch design condition formed by",
-            "crossing facet-count axes and the assignment axis after applying the",
-            "current feasibility rule."
-          ),
-          default_id_prefix = "F"
-        )
-      )
-    )
-  }
-  if (is.list(future_branch_schema) &&
-      all(required_fields %in% names(future_branch_schema)) &&
-      is.data.frame(future_branch_schema$facet_axes) &&
-      is.list(future_branch_schema$assignment_axis) &&
-      is.list(future_branch_schema$default_design)) {
-    return(attach_grid_semantics(future_branch_schema))
-  }
-
-  design_schema <- future_branch_schema$design_schema %||% NULL
-  if (is.list(design_schema) &&
-      all(required_fields %in% names(design_schema)) &&
-      is.data.frame(design_schema$facet_axes) &&
-      is.list(design_schema$assignment_axis) &&
-      is.list(design_schema$default_design)) {
-    return(attach_grid_semantics(design_schema))
-  }
-
-  if (!is.list(future_branch_schema) ||
-      !is.data.frame(future_branch_schema$facet_table) ||
-      !is.list(future_branch_schema$assignment_axis) ||
-      !is.list(future_branch_schema$design_template)) {
-    stop("`future_branch_schema` is not a valid schema-only arbitrary-facet branch contract.",
-         call. = FALSE)
-  }
-
-  facet_axes <- future_branch_schema$facet_table |>
-    dplyr::transmute(
-      input_key = .data$future_facet_key,
-      facet = .data$facet,
-      facet_kind = .data$facet_kind,
-      axis_class = .data$future_axis_class,
-      level_count = .data$level_count,
-      canonical_design_variable = .data$current_planning_count_variable,
-      public_design_alias = .data$current_planning_count_alias,
-      current_planner_role_supported = .data$current_planner_role_supported,
-      arbitrary_facet_branch_candidate = .data$arbitrary_facet_branch_candidate
-    )
-  assignment_axis <- future_branch_schema$assignment_axis
-
-  attach_grid_semantics(list(
-    schema_contract = "arbitrary_facet_design_schema",
-    schema_stage = as.character(future_branch_schema$planner_stage %||% "schema_only"),
-    facet_axes = facet_axes,
-    assignment_axis = assignment_axis,
-    input_keys = c(as.character(facet_axes$input_key), assignment_axis$future_input_key),
-    canonical_design_variables = c(
-      as.character(facet_axes$canonical_design_variable),
-      assignment_axis$current_planning_count_variable
-    ),
-    default_design = future_branch_schema$design_template,
-    note = paste(
-      "Compatibility coercion of a schema-only future arbitrary-facet branch",
-      "contract into the bundled design-schema object."
-    )
-  ))
-}
-
-simulation_build_future_branch_design_grid <- function(design_schema,
-                                                       design = NULL,
-                                                       id_prefix = "F") {
-  design_schema <- simulation_coerce_future_branch_design_schema(design_schema)
-  parsed <- simulation_parse_future_branch_design(
-    design = design,
-    future_branch_schema = list(design_schema = design_schema),
-    arg_name = "design"
-  )
-
-  defaults <- design_schema$default_design %||% list()
-  default_facets <- defaults$facets %||% list()
-  facet_axes <- design_schema$facet_axes
-  assignment_axis <- design_schema$assignment_axis
-  grid_semantics <- design_schema$grid_semantics
-
-  values <- list()
-  for (i in seq_len(nrow(facet_axes))) {
-    canonical <- as.character(facet_axes$canonical_design_variable[i])
-    input_key <- as.character(facet_axes$input_key[i])
-    value <- parsed[[canonical]] %||% default_facets[[input_key]]
-    values[[canonical]] <- simulation_validate_count_values(value, canonical, min_value = 2L)
-  }
-
-  assignment_var <- as.character(assignment_axis$current_planning_count_variable %||% "raters_per_person")
-  assignment_key <- as.character(assignment_axis$future_input_key %||% "assignment")
-  assignment_default <- defaults[[assignment_key]] %||%
-    values[[as.character(assignment_axis$depends_on_canonical_design_variable %||% "n_rater")]]
-  values[[assignment_var]] <- simulation_validate_count_values(
-    parsed[[assignment_var]] %||% assignment_default,
-    assignment_var,
-    min_value = 1L
-  )
-
-  canonical_order <- setdiff(
-    as.character(grid_semantics$canonical_columns %||% c("design_id", as.character(facet_axes$canonical_design_variable), assignment_var)),
-    "design_id"
-  )
-  design_grid <- expand.grid(
-    values[canonical_order],
-    KEEP.OUT.ATTRS = FALSE,
-    stringsAsFactors = FALSE
-  )
-
-  dependency_var <- as.character(
-    assignment_axis$depends_on_canonical_design_variable %||% "n_rater"
-  )
-  design_grid <- design_grid[
-    design_grid[[assignment_var]] <= design_grid[[dependency_var]],
-    ,
-    drop = FALSE
-  ]
-  if (nrow(design_grid) == 0L) {
-    stop(
-      "No valid future-branch design rows remain after enforcing `",
-      assignment_var,
-      " <= ",
-      dependency_var,
-      "`.",
-      call. = FALSE
-    )
-  }
-
-  prefix <- as.character(grid_semantics$default_id_prefix %||% "F")
-  design_grid$design_id <- sprintf("%s%02d", as.character(id_prefix[1] %||% prefix), seq_len(nrow(design_grid)))
-  design_grid <- tibble::as_tibble(design_grid[, c("design_id", canonical_order), drop = FALSE])
-
-  branch_grid <- tibble::tibble(design_id = design_grid$design_id)
-  for (i in seq_len(nrow(facet_axes))) {
-    branch_grid[[as.character(facet_axes$input_key[i])]] <-
-      design_grid[[as.character(facet_axes$canonical_design_variable[i])]]
-  }
-  branch_grid[[assignment_key]] <- design_grid[[assignment_var]]
-
-  aliases <- stats::setNames(
-    c(as.character(facet_axes$public_design_alias), as.character(assignment_axis$current_planning_count_alias)),
-    canonical_order
-  )
-
-  list(
-    canonical = design_grid,
-    public = simulation_append_design_alias_columns(design_grid, aliases),
-    branch = branch_grid,
-    design_schema = design_schema,
-    grid_semantics = grid_semantics
-  )
-}
-
-simulation_future_branch_preview <- function(future_branch_schema,
-                                             design = NULL,
-                                             id_prefix = "F") {
-  grid_contract <- simulation_future_branch_grid_contract(
-    future_branch_schema = future_branch_schema,
-    design = design,
-    id_prefix = id_prefix
-  )
-  preview_fields <- c(
-    "preview_available",
-    "reason",
-    "default_design",
-    "canonical",
-    "public",
-    "branch",
-    "design_schema",
-    "grid_semantics"
-  )
-
-  names(grid_contract)[names(grid_contract) == "contract"] <- "preview_contract"
-  names(grid_contract)[names(grid_contract) == "stage"] <- "preview_stage"
-  grid_contract[c("preview_contract", "preview_stage", preview_fields)]
-}
-
-simulation_future_branch_grid_contract <- function(future_branch_schema,
-                                                   design = NULL,
-                                                   id_prefix = "F") {
-  design_schema <- simulation_coerce_future_branch_design_schema(future_branch_schema)
-  default_design <- design_schema$default_design %||% list()
-  grid_semantics <- design_schema$grid_semantics
-  facet_defaults <- default_design$facets %||% list()
-  assignment_key <- as.character(
-    design_schema$assignment_axis$future_input_key %||% "assignment"
-  )
-  assignment_default <- default_design[[assignment_key]] %||% NULL
-
-  facet_complete <- length(facet_defaults) == nrow(design_schema$facet_axes) &&
-    all(vapply(
-      facet_defaults,
-      function(x) length(x) == 1L && is.numeric(x) && is.finite(x),
-      logical(1)
-    ))
-  assignment_complete <- length(assignment_default) == 1L &&
-    is.numeric(assignment_default) && is.finite(assignment_default)
-
-  preview_design <- design %||% default_design
-  if (!facet_complete || !assignment_complete) {
-    return(list(
-      contract = "arbitrary_facet_design_grid_contract",
-      stage = as.character(design_schema$schema_stage %||% "schema_only"),
-      planner_contract = as.character(
-        future_branch_schema$planner_contract %||% "arbitrary_facet_planning_scaffold"
-      ),
-      input_contract = as.character(
-        future_branch_schema$input_contract %||% "design$facets(named counts)"
-      ),
-      preview_available = FALSE,
-      reason = paste(
-        "The schema-only future arbitrary-facet branch does not yet have",
-        "complete default facet counts and assignment counts, so no",
-        "schema-only branch grid can be materialized."
-      ),
-      default_design = default_design,
-      design_schema = design_schema,
-      grid_semantics = grid_semantics,
-      note = paste(
-        "Schema-only future-branch grid contract is unavailable until the",
-        "default nested design carries finite facet and assignment counts."
-      )
-    ))
-  }
-
-  preview_grid <- simulation_build_future_branch_design_grid(
-    design_schema = design_schema,
-    design = preview_design,
-    id_prefix = id_prefix
-  )
-
-  list(
-    contract = "arbitrary_facet_design_grid_contract",
-    stage = as.character(design_schema$schema_stage %||% "schema_only"),
-    planner_contract = as.character(
-      future_branch_schema$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    input_contract = as.character(
-      future_branch_schema$input_contract %||% "design$facets(named counts)"
-    ),
-    preview_available = TRUE,
-    reason = paste(
-      "Schema-only branch grid built from the future arbitrary-facet",
-      "branch design schema and its current default design."
-    ),
-    default_design = default_design,
-    canonical = preview_grid$canonical,
-    public = preview_grid$public,
-    branch = preview_grid$branch,
-    design_schema = design_schema,
-    grid_semantics = preview_grid$grid_semantics,
-    note = paste(
-      "Schema-only future-branch grid contract bundling the default branch",
-      "grid, design schema, and grid semantics without activating arbitrary-",
-      "facet planner logic."
-    )
-  )
-}
-
-simulation_coerce_future_branch_grid_contract <- function(x) {
-  required_fields <- c(
-    "contract",
-    "stage",
-    "planner_contract",
-    "input_contract",
-    "preview_available",
-    "reason",
-    "default_design",
-    "design_schema",
-    "grid_semantics",
-    "note"
-  )
-  optional_grid_fields <- c("canonical", "public", "branch")
-
-  if (is.list(x) &&
-      identical(x$contract %||% "", "arbitrary_facet_design_grid_contract") &&
-      all(required_fields %in% names(x)) &&
-      is.list(x$design_schema) &&
-      is.list(x$grid_semantics)) {
-    out <- x[unique(c(required_fields, optional_grid_fields[optional_grid_fields %in% names(x)]))]
-    return(out)
-  }
-
-  nested <- x$grid_contract %||% x$future_branch_grid_contract %||% NULL
-  if (is.list(nested)) {
-    return(simulation_coerce_future_branch_grid_contract(nested))
-  }
-
-  branch <- x$future_branch_schema %||% x
-  if (!is.list(branch)) {
-    stop("`x` is not a valid schema-only future-branch grid contract.", call. = FALSE)
-  }
-
-  simulation_future_branch_grid_contract(branch)
-}
-
-simulation_build_future_branch_design_grid_from_contract <- function(grid_contract,
-                                                                     design = NULL,
-                                                                     id_prefix = NULL) {
-  grid_contract <- simulation_coerce_future_branch_grid_contract(grid_contract)
-  prefix <- as.character(id_prefix %||% grid_contract$grid_semantics$default_id_prefix %||% "F")
-
-  if (is.null(design) &&
-      isTRUE(grid_contract$preview_available) &&
-      all(c("canonical", "public", "branch") %in% names(grid_contract))) {
-    return(list(
-      canonical = grid_contract$canonical,
-      public = grid_contract$public,
-      branch = grid_contract$branch,
-      design_schema = grid_contract$design_schema,
-      grid_semantics = grid_contract$grid_semantics,
-      grid_contract = grid_contract
-    ))
-  }
-
-  built <- simulation_build_future_branch_design_grid(
-    design_schema = grid_contract$design_schema,
-    design = design %||% grid_contract$default_design,
-    id_prefix = prefix
-  )
-  built$grid_contract <- grid_contract
-  built
-}
-
-simulation_materialize_future_branch_grid <- function(x,
-                                                      design = NULL,
-                                                      id_prefix = NULL) {
-  grid_contract <- NULL
-
-  if (is.list(x) &&
-      identical(x$contract %||% "", "arbitrary_facet_design_grid_contract")) {
-    grid_contract <- x
-  }
-
-  if (is.null(grid_contract) && is.list(x)) {
-    nested <- x$future_branch_grid_contract %||%
-      x$grid_contract %||%
-      x$future_branch_schema %||%
-      x$planning_schema %||%
-      x$settings$planning_schema %||%
-      x$sim_spec$planning_schema %||%
-      x$ademp$data_generating_mechanism$planning_schema %||%
-      NULL
-    if (is.list(nested)) {
-      grid_contract <- simulation_coerce_future_branch_grid_contract(nested)
-    }
-  }
-
-  if (is.null(grid_contract)) {
-    schema <- tryCatch(
-      simulation_object_planning_schema(x),
-      error = function(e) NULL
-    )
-    if (is.list(schema) && is.list(schema$future_branch_grid_contract)) {
-      grid_contract <- schema$future_branch_grid_contract
-    }
-  }
-
-  if (is.null(grid_contract)) {
-    schema <- tryCatch(
-      simulation_planning_schema(x),
-      error = function(e) NULL
-    )
-    if (is.list(schema) && is.list(schema$future_branch_grid_contract)) {
-      grid_contract <- schema$future_branch_grid_contract
-    }
-  }
-
-  if (is.null(grid_contract)) {
-    stop(
-      "`x` is not a valid planning object, planning schema, sim spec, or ",
-      "future-branch grid contract.",
-      call. = FALSE
-    )
-  }
-
-  simulation_build_future_branch_design_grid_from_contract(
-    grid_contract = grid_contract,
-    design = design,
-    id_prefix = id_prefix
-  )
-}
-
-simulation_future_branch_grid_bundle <- function(x,
-                                                 design = NULL,
-                                                 id_prefix = NULL) {
-  grid_contract <- simulation_coerce_future_branch_grid_contract(x)
-
-  if (is.null(design) && !isTRUE(grid_contract$preview_available)) {
-    return(list(
-      bundle_contract = "arbitrary_facet_design_grid_bundle",
-      bundle_stage = as.character(grid_contract$stage %||% "schema_only"),
-      planner_contract = as.character(
-        grid_contract$planner_contract %||% "arbitrary_facet_planning_scaffold"
-      ),
-      input_contract = as.character(
-        grid_contract$input_contract %||% "design$facets(named counts)"
-      ),
-      grid_available = FALSE,
-      reason = as.character(
-        grid_contract$reason %||%
-          "No schema-only future-branch grid is currently materialized."
-      ),
-      default_design = grid_contract$default_design,
-      design_schema = grid_contract$design_schema,
-      grid_semantics = grid_contract$grid_semantics,
-      grid_contract = grid_contract,
-      note = paste(
-        "Schema-only future-branch bundle carrying the branch grid contract,",
-        "schema, and semantics without a materialized grid because default",
-        "counts are not yet available."
-      )
-    ))
-  }
-
-  built <- simulation_build_future_branch_design_grid_from_contract(
-    grid_contract = grid_contract,
-    design = design,
-    id_prefix = id_prefix
-  )
-
-  list(
-    bundle_contract = "arbitrary_facet_design_grid_bundle",
-    bundle_stage = as.character(grid_contract$stage %||% "schema_only"),
-    planner_contract = as.character(
-      grid_contract$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    input_contract = as.character(
-      grid_contract$input_contract %||% "design$facets(named counts)"
-    ),
-    grid_available = TRUE,
-    reason = paste(
-      "Schema-only future-branch bundle materialized from the branch grid",
-      "contract and matching design schema."
-    ),
-    canonical = built$canonical,
-    public = built$public,
-    branch = built$branch,
-    default_design = grid_contract$default_design,
-    design_schema = built$design_schema,
-    grid_semantics = built$grid_semantics,
-    grid_contract = grid_contract,
-    note = paste(
-      "Schema-only future-branch bundle that materializes canonical, public,",
-      "and branch-facing design grids from one authoritative branch-grid",
-      "contract."
-    )
-  )
-}
-
-simulation_coerce_future_branch_grid_bundle <- function(x) {
-  required_fields <- c(
-    "bundle_contract",
-    "bundle_stage",
-    "planner_contract",
-    "input_contract",
-    "grid_available",
-    "reason",
-    "default_design",
-    "design_schema",
-    "grid_semantics",
-    "grid_contract",
-    "note"
-  )
-  optional_grid_fields <- c("canonical", "public", "branch")
-
-  if (is.list(x) &&
-      identical(x$bundle_contract %||% "", "arbitrary_facet_design_grid_bundle") &&
-      all(required_fields %in% names(x)) &&
-      is.list(x$design_schema) &&
-      is.list(x$grid_semantics) &&
-      is.list(x$grid_contract)) {
-    return(x[unique(c(required_fields, optional_grid_fields[optional_grid_fields %in% names(x)]))])
-  }
-
-  nested <- x$grid_bundle %||% x$future_branch_grid_bundle %||% NULL
-  if (is.list(nested)) {
-    return(simulation_coerce_future_branch_grid_bundle(nested))
-  }
-
-  simulation_future_branch_grid_bundle(x)
-}
-
-simulation_materialize_future_branch_grid_bundle <- function(x,
-                                                             design = NULL,
-                                                             id_prefix = NULL) {
-  grid_bundle <- NULL
-
-  if (is.list(x) &&
-      identical(x$bundle_contract %||% "", "arbitrary_facet_design_grid_bundle")) {
-    grid_bundle <- x
-  }
-
-  if (is.null(grid_bundle) && is.list(x)) {
-    nested <- x$future_branch_grid_bundle %||%
-      x$grid_bundle %||%
-      x$future_branch_schema %||%
-      x$planning_schema %||%
-      x$settings$planning_schema %||%
-      x$sim_spec$planning_schema %||%
-      x$ademp$data_generating_mechanism$planning_schema %||%
-      NULL
-    if (is.list(nested)) {
-      grid_bundle <- simulation_coerce_future_branch_grid_bundle(nested)
-    }
-  }
-
-  if (is.null(grid_bundle)) {
-    schema <- tryCatch(
-      simulation_object_planning_schema(x),
-      error = function(e) NULL
-    )
-    if (is.list(schema) && is.list(schema$future_branch_grid_bundle)) {
-      grid_bundle <- schema$future_branch_grid_bundle
-    }
-  }
-
-  if (is.null(grid_bundle)) {
-    schema <- tryCatch(
-      simulation_planning_schema(x),
-      error = function(e) NULL
-    )
-    if (is.list(schema) && is.list(schema$future_branch_grid_bundle)) {
-      grid_bundle <- schema$future_branch_grid_bundle
-    }
-  }
-
-  if (is.null(grid_bundle)) {
-    stop(
-      "`x` is not a valid planning object, planning schema, sim spec, or ",
-      "future-branch grid bundle.",
-      call. = FALSE
-    )
-  }
-
-  if (is.null(design) && isTRUE(grid_bundle$grid_available)) {
-    return(grid_bundle)
-  }
-
-  simulation_future_branch_grid_bundle(
-    x = grid_bundle$grid_contract %||% grid_bundle,
-    design = design,
-    id_prefix = id_prefix
-  )
-}
-
-simulation_future_branch_grid_view <- function(x,
-                                               view = c("canonical", "public", "branch"),
-                                               design = NULL,
-                                               id_prefix = NULL) {
-  view <- match.arg(view)
-  grid_bundle <- simulation_materialize_future_branch_grid_bundle(
-    x = x,
-    design = design,
-    id_prefix = id_prefix
-  )
-
-  if (!isTRUE(grid_bundle$grid_available) || !is.data.frame(grid_bundle[[view]])) {
-    stop(
-      "The requested `", view, "` future-branch grid view is not currently ",
-      "available from this schema-only bundle.",
-      call. = FALSE
-    )
-  }
-
-  grid_bundle[[view]]
-}
-
-simulation_future_branch_grid_context <- function(x,
-                                                  design = NULL,
-                                                  id_prefix = NULL) {
-  grid_bundle <- simulation_materialize_future_branch_grid_bundle(
-    x = x,
-    design = design,
-    id_prefix = id_prefix
-  )
-
-  design_schema <- grid_bundle$design_schema
-  grid_semantics <- grid_bundle$grid_semantics
-  facet_axes <- design_schema$facet_axes
-  assignment_axis <- design_schema$assignment_axis
-
-  axis_table <- dplyr::bind_rows(
-    facet_axes |>
-      dplyr::transmute(
-        axis_source = "facet",
-        input_key = .data$input_key,
-        canonical_design_variable = .data$canonical_design_variable,
-        public_design_alias = .data$public_design_alias,
-        axis_class = .data$axis_class,
-        facet = .data$facet
-      ),
-    tibble::tibble(
-      axis_source = "assignment",
-      input_key = as.character(assignment_axis$future_input_key %||% "assignment"),
-      canonical_design_variable = as.character(
-        assignment_axis$current_planning_count_variable %||% "raters_per_person"
-      ),
-      public_design_alias = as.character(
-        assignment_axis$current_planning_count_alias %||% "raters_per_person"
-      ),
-      axis_class = as.character(assignment_axis$axis_class %||% "assignment_count"),
-      facet = NA_character_
-    )
-  )
-
-  if (!isTRUE(grid_bundle$grid_available) || !is.data.frame(grid_bundle$canonical)) {
-    axis_table$values <- vector("list", nrow(axis_table))
-    axis_table$n_values <- rep(NA_integer_, nrow(axis_table))
-    axis_table$varying <- rep(NA, nrow(axis_table))
-    axis_table$fixed_value <- rep(NA_integer_, nrow(axis_table))
-
-    return(list(
-      context_contract = "arbitrary_facet_design_grid_context",
-      context_stage = as.character(grid_bundle$bundle_stage %||% "schema_only"),
-      grid_available = FALSE,
-      reason = as.character(grid_bundle$reason %||% "No future-branch grid is available."),
-      id_variable = as.character(grid_semantics$id_variable %||% "design_id"),
-      canonical_columns = as.character(grid_semantics$canonical_columns %||% character(0)),
-      public_columns = as.character(grid_semantics$public_columns %||% character(0)),
-      branch_columns = as.character(grid_semantics$branch_columns %||% character(0)),
-      axis_table = axis_table,
-      varying_canonical = character(0),
-      fixed_canonical = character(0),
-      varying_input_keys = character(0),
-      fixed_input_keys = character(0),
-      grid_bundle = grid_bundle,
-      note = paste(
-        "Schema-only future-branch context exposes axis metadata even when a",
-        "materialized grid is not yet available."
-      )
-    ))
-  }
-
-  canonical_grid <- grid_bundle$canonical
-  axis_values <- lapply(axis_table$canonical_design_variable, function(var) {
-    sort(unique(as.integer(canonical_grid[[var]])))
-  })
-  n_values <- vapply(axis_values, length, integer(1))
-  varying <- n_values > 1L
-  fixed_value <- vapply(axis_values, function(vals) {
-    if (length(vals) == 1L) vals[[1]] else NA_integer_
-  }, integer(1))
-
-  axis_table$values <- axis_values
-  axis_table$n_values <- as.integer(n_values)
-  axis_table$varying <- as.logical(varying)
-  axis_table$fixed_value <- as.integer(fixed_value)
-
-  list(
-    context_contract = "arbitrary_facet_design_grid_context",
-    context_stage = as.character(grid_bundle$bundle_stage %||% "schema_only"),
-    grid_available = TRUE,
-    reason = as.character(
-      grid_bundle$reason %||% "Future-branch grid context built from a materialized bundle."
-    ),
-    id_variable = as.character(grid_semantics$id_variable %||% "design_id"),
-    canonical_columns = as.character(grid_semantics$canonical_columns %||% names(canonical_grid)),
-    public_columns = as.character(grid_semantics$public_columns %||% names(grid_bundle$public %||% canonical_grid)),
-    branch_columns = as.character(grid_semantics$branch_columns %||% names(grid_bundle$branch %||% canonical_grid)),
-    axis_table = axis_table,
-    varying_canonical = as.character(axis_table$canonical_design_variable[axis_table$varying]),
-    fixed_canonical = as.character(axis_table$canonical_design_variable[!axis_table$varying]),
-    varying_input_keys = as.character(axis_table$input_key[axis_table$varying]),
-    fixed_input_keys = as.character(axis_table$input_key[!axis_table$varying]),
-    grid_bundle = grid_bundle,
-    note = paste(
-      "Schema-only future-branch context summarizing which branch axes vary",
-      "within the currently materialized design grid."
-    )
-  )
-}
-
-simulation_future_branch_grid_summary <- function(x,
-                                                  design = NULL,
-                                                  id_prefix = NULL) {
-  grid_context <- simulation_future_branch_grid_context(
-    x = x,
-    design = design,
-    id_prefix = id_prefix
-  )
-  axis_table <- tibble::as_tibble(grid_context$axis_table)
-  varying_rows <- !is.na(axis_table$varying) & as.logical(axis_table$varying)
-  fixed_rows <- !is.na(axis_table$varying) & !as.logical(axis_table$varying)
-  fixed_values <- stats::setNames(
-    as.list(axis_table$fixed_value[fixed_rows]),
-    as.character(axis_table$canonical_design_variable[fixed_rows])
-  )
-
-  if (!isTRUE(grid_context$grid_available)) {
-    return(list(
-      summary_contract = "arbitrary_facet_design_grid_summary",
-      summary_stage = as.character(grid_context$context_stage %||% "schema_only"),
-      planner_contract = as.character(
-        grid_context$grid_bundle$planner_contract %||% "arbitrary_facet_planning_scaffold"
-      ),
-      input_contract = as.character(
-        grid_context$grid_bundle$input_contract %||% "design$facets(named counts)"
-      ),
-      grid_available = FALSE,
-      reason = as.character(
-        grid_context$reason %||%
-          "No schema-only future-branch grid is currently materialized."
-      ),
-      n_designs = 0L,
-      n_varying_axes = sum(varying_rows),
-      n_fixed_axes = sum(fixed_rows),
-      varying_canonical = as.character(grid_context$varying_canonical),
-      fixed_canonical = as.character(grid_context$fixed_canonical),
-      varying_input_keys = as.character(grid_context$varying_input_keys),
-      fixed_input_keys = as.character(grid_context$fixed_input_keys),
-      fixed_values = fixed_values,
-      axis_table = axis_table,
-      grid_context = grid_context,
-      grid_bundle = grid_context$grid_bundle,
-      note = paste(
-        "Schema-only future-branch summary is unavailable because no",
-        "materialized branch grid exists yet, but axis metadata are still",
-        "returned for branch-side planning helpers."
-      )
-    ))
-  }
-
-  canonical <- tibble::as_tibble(grid_context$grid_bundle$canonical)
-  public <- tibble::as_tibble(grid_context$grid_bundle$public)
-  branch <- tibble::as_tibble(grid_context$grid_bundle$branch)
-
-  list(
-    summary_contract = "arbitrary_facet_design_grid_summary",
-    summary_stage = as.character(grid_context$context_stage %||% "schema_only"),
-    planner_contract = as.character(
-      grid_context$grid_bundle$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    input_contract = as.character(
-      grid_context$grid_bundle$input_contract %||% "design$facets(named counts)"
-    ),
-    grid_available = TRUE,
-    reason = as.character(
-      grid_context$reason %||%
-        "Schema-only future-branch grid is materialized."
-    ),
-    n_designs = nrow(canonical),
-    n_varying_axes = sum(varying_rows),
-    n_fixed_axes = sum(fixed_rows),
-    varying_canonical = as.character(grid_context$varying_canonical),
-    fixed_canonical = as.character(grid_context$fixed_canonical),
-    varying_input_keys = as.character(grid_context$varying_input_keys),
-    fixed_input_keys = as.character(grid_context$fixed_input_keys),
-    fixed_values = fixed_values,
-    axis_table = axis_table,
-    canonical = canonical,
-    public = public,
-    branch = branch,
-    grid_context = grid_context,
-    grid_bundle = grid_context$grid_bundle,
-    note = paste(
-      "Schema-only future-branch summary bundling the materialized grid with",
-      "axis-level varying/fixed metadata for later arbitrary-facet branch",
-      "helpers."
-    )
-  )
-}
-
-simulation_future_branch_axis_lookup <- function(axis_table) {
-  axis_table <- tibble::as_tibble(axis_table)
-  lookup <- c(
-    stats::setNames(
-      as.character(axis_table$canonical_design_variable),
-      as.character(axis_table$canonical_design_variable)
-    ),
-    stats::setNames(
-      as.character(axis_table$canonical_design_variable),
-      as.character(axis_table$public_design_alias)
-    ),
-    stats::setNames(
-      as.character(axis_table$canonical_design_variable),
-      as.character(axis_table$input_key)
-    )
-  )
-  lookup <- lookup[!is.na(names(lookup)) & nzchar(names(lookup))]
-  lookup[!duplicated(names(lookup))]
-}
-
-simulation_resolve_future_branch_axis <- function(value,
-                                                  axis_table,
-                                                  arg_name = "axis",
-                                                  allow_null = FALSE) {
-  if (allow_null && is.null(value)) {
-    return(NULL)
-  }
-  lookup <- simulation_future_branch_axis_lookup(axis_table)
-  value <- as.character(value[1] %||% "")
-  resolved <- unname(lookup[[value]])
-  if (!is.null(resolved) && nzchar(resolved)) {
-    return(resolved)
-  }
-  stop(
-    "`", arg_name, "` must be one of: ",
-    paste(sort(unique(names(lookup))), collapse = ", "),
-    ".",
-    call. = FALSE
-  )
-}
-
-simulation_future_branch_axis_label <- function(canonical,
-                                                axis_table,
-                                                view = c("public", "canonical", "branch")) {
-  view <- match.arg(view)
-  axis_table <- tibble::as_tibble(axis_table)
-  row <- axis_table[axis_table$canonical_design_variable == canonical, , drop = FALSE]
-  if (nrow(row) == 0L) {
-    return(as.character(canonical))
-  }
-  if (identical(view, "canonical")) {
-    return(as.character(canonical))
-  }
-  if (identical(view, "branch")) {
-    label <- as.character(row$input_key[[1]])
-    if (nzchar(label)) return(label)
-  }
-  label <- as.character(row$public_design_alias[[1]])
-  if (nzchar(label)) return(label)
-  as.character(canonical)
-}
-
-simulation_future_branch_grid_recommendation <- function(x,
-                                                         design = NULL,
-                                                         prefer = NULL,
-                                                         id_prefix = NULL) {
-  grid_summary <- simulation_future_branch_grid_summary(
-    x = x,
-    design = design,
-    id_prefix = id_prefix
-  )
-
-  axis_table <- tibble::as_tibble(grid_summary$axis_table)
-  lookup <- c(
-    stats::setNames(
-      as.character(axis_table$canonical_design_variable),
-      as.character(axis_table$canonical_design_variable)
-    ),
-    stats::setNames(
-      as.character(axis_table$canonical_design_variable),
-      as.character(axis_table$public_design_alias)
-    ),
-    stats::setNames(
-      as.character(axis_table$canonical_design_variable),
-      as.character(axis_table$input_key)
-    )
-  )
-  lookup <- lookup[!duplicated(names(lookup))]
-
-  if (!isTRUE(grid_summary$grid_available)) {
-    return(list(
-      recommendation_contract = "arbitrary_facet_design_grid_recommendation",
-      recommendation_stage = as.character(grid_summary$summary_stage %||% "schema_only"),
-      planner_contract = as.character(
-        grid_summary$planner_contract %||% "arbitrary_facet_planning_scaffold"
-      ),
-      recommendation_available = FALSE,
-      reason = as.character(
-        grid_summary$reason %||%
-          "No schema-only future-branch grid is currently materialized."
-      ),
-      selection_rule = paste(
-        "Unavailable because no schema-only branch grid exists yet.",
-        "This helper does not fabricate facet counts."
-      ),
-      prefer = character(0),
-      rank_order = character(0),
-      grid_summary = grid_summary,
-      note = paste(
-        "Schema-only future-branch recommendation is unavailable until the",
-        "underlying branch grid is materialized."
-      )
-    ))
-  }
-
-  canonical_order <- setdiff(
-    as.character(
-      grid_summary$grid_bundle$grid_semantics$canonical_columns %||%
-        names(grid_summary$canonical)
-    ),
-    "design_id"
-  )
-  default_prefer <- if (length(grid_summary$varying_canonical) > 0L) {
-    intersect(canonical_order, grid_summary$varying_canonical)
-  } else {
-    canonical_order
-  }
-
-  if (is.null(prefer)) {
-    resolved_prefer <- default_prefer
-  } else {
-    prefer <- unique(as.character(prefer))
-    resolved_prefer <- unname(lookup[prefer])
-    resolved_prefer <- unique(resolved_prefer[!is.na(resolved_prefer) & nzchar(resolved_prefer)])
-    if (length(resolved_prefer) == 0L) {
-      stop(
-        "`prefer` must resolve to at least one future-branch design axis. Valid names: ",
-        paste(sort(unique(names(lookup))), collapse = ", "),
-        ".",
-        call. = FALSE
-      )
-    }
-  }
-  rank_order <- unique(c(resolved_prefer, setdiff(canonical_order, resolved_prefer)))
-
-  ranked <- dplyr::arrange(grid_summary$canonical, !!!rlang::syms(rank_order))
-  recommended_canonical <- dplyr::slice_head(ranked, n = 1)
-  recommended_id <- as.character(recommended_canonical$design_id[[1]])
-  recommended_public <- dplyr::filter(grid_summary$public, .data$design_id == recommended_id)
-  recommended_branch <- dplyr::filter(grid_summary$branch, .data$design_id == recommended_id)
-
-  list(
-    recommendation_contract = "arbitrary_facet_design_grid_recommendation",
-    recommendation_stage = as.character(grid_summary$summary_stage %||% "schema_only"),
-    planner_contract = as.character(
-      grid_summary$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    recommendation_available = TRUE,
-    reason = paste(
-      "Schema-only future-branch baseline design selected by deterministic",
-      "lexicographic ordering over the requested branch axes."
-    ),
-    selection_rule = paste(
-      "Pick the lexicographically smallest feasible design row after sorting",
-      "the schema-only canonical grid by `prefer`, then by the remaining",
-      "canonical design axes. This is a deterministic baseline pick, not a",
-      "performance-based recommendation."
-    ),
-    prefer = resolved_prefer,
-    rank_order = rank_order,
-    recommended_design_id = recommended_id,
-    recommended_canonical = recommended_canonical,
-    recommended_public = recommended_public,
-    recommended_branch = recommended_branch,
-    grid_summary = grid_summary,
-    note = paste(
-      "Schema-only future-branch baseline pick derived from the currently",
-      "materialized branch grid without activating arbitrary-facet planner",
-      "logic or performance criteria."
-    )
-  )
-}
-
-simulation_future_branch_grid_table <- function(x,
-                                                design = NULL,
-                                                prefer = NULL,
-                                                view = c("public", "canonical", "branch"),
-                                                id_prefix = NULL) {
-  view <- match.arg(view)
-  grid_summary <- simulation_future_branch_grid_summary(
-    x = x,
-    design = design,
-    id_prefix = id_prefix
-  )
-  recommendation <- simulation_future_branch_grid_recommendation(
-    x = x,
-    design = design,
-    prefer = prefer,
-    id_prefix = id_prefix
-  )
-
-  if (!isTRUE(grid_summary$grid_available)) {
-    return(list(
-      table_contract = "arbitrary_facet_design_grid_table",
-      table_stage = as.character(grid_summary$summary_stage %||% "schema_only"),
-      planner_contract = as.character(
-        grid_summary$planner_contract %||% "arbitrary_facet_planning_scaffold"
-      ),
-      grid_available = FALSE,
-      reason = as.character(
-        grid_summary$reason %||%
-          "No schema-only future-branch grid is currently materialized."
-      ),
-      view = view,
-      view_label = view,
-      table = tibble::tibble(),
-      recommended_design_id = character(0),
-      grid_summary = grid_summary,
-      grid_recommendation = recommendation,
-      note = paste(
-        "Schema-only future-branch table is unavailable until the",
-        "underlying branch grid is materialized."
-      )
-    ))
-  }
-
-  table <- switch(
-    view,
-    canonical = tibble::as_tibble(grid_summary$canonical),
-    public = tibble::as_tibble(grid_summary$public),
-    branch = tibble::as_tibble(grid_summary$branch)
-  )
-  table$recommended <- table$design_id == recommendation$recommended_design_id
-
-  list(
-    table_contract = "arbitrary_facet_design_grid_table",
-    table_stage = as.character(grid_summary$summary_stage %||% "schema_only"),
-    planner_contract = as.character(
-      grid_summary$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    grid_available = TRUE,
-    reason = as.character(
-      grid_summary$reason %||%
-        "Schema-only future-branch grid is materialized."
-    ),
-    view = view,
-    view_label = view,
-    table = table,
-    recommended_design_id = recommendation$recommended_design_id,
-    grid_summary = grid_summary,
-    grid_recommendation = recommendation,
-    note = paste(
-      "Schema-only future-branch table exposing one grid view together with",
-      "the deterministic baseline design flag."
-    )
-  )
-}
-
-simulation_future_branch_grid_plot_payload <- function(x,
-                                                       design = NULL,
-                                                       x_var = NULL,
-                                                       group_var = NULL,
-                                                       prefer = NULL,
-                                                       view = c("public", "canonical", "branch"),
-                                                       id_prefix = NULL) {
-  view <- match.arg(view)
-  grid_summary <- simulation_future_branch_grid_summary(
-    x = x,
-    design = design,
-    id_prefix = id_prefix
-  )
-  recommendation <- simulation_future_branch_grid_recommendation(
-    x = x,
-    design = design,
-    prefer = prefer,
-    id_prefix = id_prefix
-  )
-  axis_table <- tibble::as_tibble(grid_summary$axis_table)
-
-  if (!isTRUE(grid_summary$grid_available)) {
-    return(new_mfrm_plot_data(
-      "future_branch_grid_schema",
-      list(
-        title = "Schema-Only Future-Branch Grid",
-        subtitle = as.character(
-          grid_summary$reason %||%
-            "No schema-only branch grid is currently materialized."
-        ),
-        plot_available = FALSE,
-        reason = as.character(
-          grid_summary$reason %||%
-            "No schema-only branch grid is currently materialized."
-        ),
-        view = view,
-        x_var = NULL,
-        x_label = NULL,
-        group_var = NULL,
-        group_label = NULL,
-        recommended_design_id = character(0),
-        data = tibble::tibble(),
-        axis_table = axis_table,
-        grid_summary = grid_summary,
-        grid_recommendation = recommendation,
-        note = paste(
-          "Draw-free plotting payload for the schema-only future branch is",
-          "unavailable until the branch grid can be materialized."
-        )
-      )
-    ))
-  }
-
-  lookup <- simulation_future_branch_axis_lookup(axis_table)
-  varying <- as.character(grid_summary$varying_canonical)
-  canonical_default_x <- if (length(varying) > 0L) varying[[1]] else as.character(axis_table$canonical_design_variable[[1]])
-  x_canonical <- if (is.null(x_var)) {
-    canonical_default_x
-  } else {
-    simulation_resolve_future_branch_axis(x_var, axis_table, arg_name = "x_var")
-  }
-
-  group_default <- setdiff(varying, x_canonical)
-  group_canonical <- if (is.null(group_var)) {
-    if (length(group_default) > 0L) group_default[[1]] else NULL
-  } else {
-    simulation_resolve_future_branch_axis(group_var, axis_table, arg_name = "group_var", allow_null = TRUE)
-  }
-  if (!is.null(group_canonical) && identical(group_canonical, x_canonical)) {
-    stop("`group_var` must differ from `x_var`.", call. = FALSE)
-  }
-
-  display_table <- switch(
-    view,
-    canonical = tibble::as_tibble(grid_summary$canonical),
-    public = tibble::as_tibble(grid_summary$public),
-    branch = tibble::as_tibble(grid_summary$branch)
-  )
-  canonical_axes <- tibble::as_tibble(grid_summary$canonical[, c("design_id", unique(c(x_canonical, group_canonical))), drop = FALSE])
-  names(canonical_axes)[-1] <- paste0(names(canonical_axes)[-1], "__canonical")
-  plot_data <- dplyr::left_join(display_table, canonical_axes, by = "design_id")
-  plot_data$x_value <- plot_data[[paste0(x_canonical, "__canonical")]]
-  if (!is.null(group_canonical)) {
-    plot_data$group_value <- as.character(plot_data[[paste0(group_canonical, "__canonical")]])
-  } else {
-    plot_data$group_value <- "All designs"
-  }
-  plot_data$recommended <- plot_data$design_id == recommendation$recommended_design_id
-  plot_data <- dplyr::arrange(plot_data, .data$x_value, .data$group_value, dplyr::desc(.data$recommended))
-
-  x_label <- simulation_future_branch_axis_label(x_canonical, axis_table, view = view)
-  group_label <- if (is.null(group_canonical)) "Design set" else simulation_future_branch_axis_label(group_canonical, axis_table, view = view)
-  fixed_rows <- !is.na(axis_table$varying) & !as.logical(axis_table$varying)
-  fixed_text <- if (any(fixed_rows)) {
-    fixed_bits <- vapply(which(fixed_rows), function(i) {
-      paste0(
-        simulation_future_branch_axis_label(axis_table$canonical_design_variable[[i]], axis_table, view = view),
-        "=",
-        axis_table$fixed_value[[i]]
-      )
-    }, character(1))
-    paste(fixed_bits, collapse = ", ")
-  } else {
-    "No fixed design axes"
-  }
-
-  legend <- if (!is.null(group_canonical)) {
-    group_levels <- unique(as.character(plot_data$group_value))
-    new_plot_legend(
-      label = group_levels,
-      role = rep("group", length(group_levels)),
-      aesthetic = rep("line", length(group_levels)),
-      value = group_levels
-    )
-  } else {
-    new_plot_legend(
-      label = "All designs",
-      role = "group",
-      aesthetic = "line",
-      value = "All designs"
-    )
-  }
-
-  new_mfrm_plot_data(
-    "future_branch_grid_schema",
-    list(
-      title = "Schema-Only Future-Branch Grid",
-      subtitle = fixed_text,
-      plot_available = TRUE,
-      reason = as.character(
-        grid_summary$reason %||%
-          "Schema-only future-branch grid is materialized."
-      ),
-      view = view,
-      x_var = x_canonical,
-      x_label = x_label,
-      group_var = group_canonical,
-      group_label = group_label,
-      recommended_design_id = recommendation$recommended_design_id,
-      selection_rule = recommendation$selection_rule,
-      data = plot_data,
-      axis_table = axis_table,
-      grid_summary = grid_summary,
-      grid_recommendation = recommendation,
-      legend = legend,
-      note = paste(
-        "Draw-free plotting payload for the schema-only future branch. It",
-        "summarizes the current branch grid and the deterministic baseline",
-        "pick without implying an active arbitrary-facet planner."
-      )
-    )
-  )
-}
-
-simulation_future_branch_cached_default <- function(x,
-                                                    field,
-                                                    design = NULL,
-                                                    prefer = NULL,
-                                                    view = NULL,
-                                                    view_default = NULL,
-                                                    mode = NULL,
-                                                    mode_default = NULL,
-                                                    surface = NULL,
-                                                    surface_default = NULL,
-                                                    table_component = NULL,
-                                                    table_component_default = NULL,
-                                                    component = NULL,
-                                                    component_default = NULL,
-                                                    x_var = NULL,
-                                                    group_var = NULL,
-                                                    id_prefix = NULL) {
-  if (!is.list(x) || !is.list(x[[field]])) {
-    return(NULL)
-  }
-  if (!is.null(design) || !is.null(prefer) || !is.null(x_var) ||
-      !is.null(group_var) || !is.null(id_prefix)) {
-    return(NULL)
-  }
-  if (!is.null(view_default) &&
-      !identical(as.character(view[[1]] %||% view_default), as.character(view_default))) {
-    return(NULL)
-  }
-  if (!is.null(mode_default) &&
-      !identical(as.character(mode[[1]] %||% mode_default), as.character(mode_default))) {
-    return(NULL)
-  }
-  if (!is.null(surface_default) &&
-      !identical(as.character(surface[[1]] %||% surface_default), as.character(surface_default))) {
-    return(NULL)
-  }
-  if (!is.null(table_component_default) &&
-      !identical(
-        as.character(table_component[[1]] %||% table_component_default),
-        as.character(table_component_default)
-      )) {
-    return(NULL)
-  }
-  if (!is.null(component_default) &&
-      !identical(as.character(component[[1]] %||% component_default), as.character(component_default))) {
-    return(NULL)
-  }
-  x[[field]]
-}
-
-simulation_future_branch_report_bundle <- function(x,
-                                                   design = NULL,
-                                                   prefer = NULL,
-                                                   x_var = NULL,
-                                                   group_var = NULL,
-                                                   id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "report_bundle",
-    design = design,
-    prefer = prefer,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  grid_summary <- simulation_future_branch_grid_summary(
-    x = x,
-    design = design,
-    id_prefix = id_prefix
-  )
-  recommendation <- simulation_future_branch_grid_recommendation(
-    x = x,
-    design = design,
-    prefer = prefer,
-    id_prefix = id_prefix
-  )
-  tables <- list(
-    canonical = simulation_future_branch_grid_table(
-      x = x,
-      design = design,
-      prefer = prefer,
-      view = "canonical",
-      id_prefix = id_prefix
-    ),
-    public = simulation_future_branch_grid_table(
-      x = x,
-      design = design,
-      prefer = prefer,
-      view = "public",
-      id_prefix = id_prefix
-    ),
-    branch = simulation_future_branch_grid_table(
-      x = x,
-      design = design,
-      prefer = prefer,
-      view = "branch",
-      id_prefix = id_prefix
-    )
-  )
-  plots <- list(
-    canonical = simulation_future_branch_grid_plot_payload(
-      x = x,
-      design = design,
-      x_var = x_var,
-      group_var = group_var,
-      prefer = prefer,
-      view = "canonical",
-      id_prefix = id_prefix
-    ),
-    public = simulation_future_branch_grid_plot_payload(
-      x = x,
-      design = design,
-      x_var = x_var,
-      group_var = group_var,
-      prefer = prefer,
-      view = "public",
-      id_prefix = id_prefix
-    ),
-    branch = simulation_future_branch_grid_plot_payload(
-      x = x,
-      design = design,
-      x_var = x_var,
-      group_var = group_var,
-      prefer = prefer,
-      view = "branch",
-      id_prefix = id_prefix
-    )
-  )
-
-  overview_table <- tibble::as_tibble(grid_summary$axis_table)
-
-  if (!isTRUE(grid_summary$grid_available)) {
-    return(list(
-      report_contract = "arbitrary_facet_design_grid_report_bundle",
-      report_stage = as.character(grid_summary$summary_stage %||% "schema_only"),
-      planner_contract = as.character(
-        grid_summary$planner_contract %||% "arbitrary_facet_planning_scaffold"
-      ),
-      report_available = FALSE,
-      reason = as.character(
-        grid_summary$reason %||%
-          "No schema-only future-branch grid is currently materialized."
-      ),
-      overview_table = overview_table,
-      grid_summary = grid_summary,
-      grid_recommendation = recommendation,
-      tables = tables,
-      plots = plots,
-      note = paste(
-        "Schema-only future-branch report bundle is unavailable until the",
-        "underlying branch grid is materialized. The contract still bundles",
-        "summary metadata, branch-side table contracts, and draw-free plot",
-        "payloads in one internal object."
-      )
-    ))
-  }
-
-  list(
-    report_contract = "arbitrary_facet_design_grid_report_bundle",
-    report_stage = as.character(grid_summary$summary_stage %||% "schema_only"),
-    planner_contract = as.character(
-      grid_summary$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    report_available = TRUE,
-    reason = as.character(
-      grid_summary$reason %||%
-        "Schema-only future-branch grid is materialized."
-    ),
-    recommended_design_id = as.character(recommendation$recommended_design_id %||% character(0)),
-    overview_table = overview_table,
-    grid_summary = grid_summary,
-    grid_recommendation = recommendation,
-    tables = tables,
-    plots = plots,
-    note = paste(
-      "Schema-only future-branch report bundle combining the internal",
-      "summary, deterministic baseline recommendation, canonical/public/",
-      "branch table views, and draw-free plot payloads without implying an",
-      "active arbitrary-facet planner."
-    )
-  )
-}
-
-simulation_future_branch_report_summary <- function(x,
-                                                    design = NULL,
-                                                    prefer = NULL,
-                                                    x_var = NULL,
-                                                    group_var = NULL,
-                                                    id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "report_summary",
-    design = design,
-    prefer = prefer,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  report_bundle <- simulation_future_branch_report_bundle(
-    x = x,
-    design = design,
-    prefer = prefer,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-
-  table_views <- names(report_bundle$tables %||% list())
-  plot_views <- names(report_bundle$plots %||% list())
-  table_available <- vapply(
-    report_bundle$tables %||% list(),
-    function(obj) isTRUE(obj$grid_available),
-    logical(1)
-  )
-  plot_available <- vapply(
-    report_bundle$plots %||% list(),
-    function(obj) isTRUE(obj$data$plot_available),
-    logical(1)
-  )
-  first_or_na <- function(value) {
-    if (length(value) == 0L) {
-      return(NA_character_)
-    }
-    as.character(value[[1]] %||% NA_character_)
-  }
-
-  table_index <- tibble::tibble(
-    component_type = "table",
-    view = table_views,
-    available = as.logical(table_available),
-    n_rows = vapply(
-      report_bundle$tables %||% list(),
-      function(obj) if (is.data.frame(obj$table)) nrow(obj$table) else 0L,
-      integer(1)
-    ),
-    x_var = NA_character_,
-    group_var = NA_character_,
-    recommended_design_id = vapply(
-      report_bundle$tables %||% list(),
-      function(obj) first_or_na(obj$recommended_design_id),
-      character(1)
-    )
-  )
-  plot_index <- tibble::tibble(
-    component_type = "plot",
-    view = plot_views,
-    available = as.logical(plot_available),
-    n_rows = vapply(
-      report_bundle$plots %||% list(),
-      function(obj) if (is.data.frame(obj$data$data)) nrow(obj$data$data) else 0L,
-      integer(1)
-    ),
-    x_var = vapply(
-      report_bundle$plots %||% list(),
-      function(obj) first_or_na(obj$data$x_var),
-      character(1)
-    ),
-    group_var = vapply(
-      report_bundle$plots %||% list(),
-      function(obj) first_or_na(obj$data$group_var),
-      character(1)
-    ),
-    recommended_design_id = vapply(
-      report_bundle$plots %||% list(),
-      function(obj) first_or_na(obj$data$recommended_design_id),
-      character(1)
-    )
-  )
-  component_index <- dplyr::bind_rows(
-    tibble::tibble(
-      component_type = "summary",
-      view = NA_character_,
-      available = isTRUE(report_bundle$grid_summary$grid_available),
-      n_rows = as.integer(report_bundle$grid_summary$n_designs %||% 0L),
-      x_var = NA_character_,
-      group_var = NA_character_,
-      recommended_design_id = NA_character_
-    ),
-    tibble::tibble(
-      component_type = "recommendation",
-      view = NA_character_,
-      available = isTRUE(report_bundle$grid_recommendation$recommendation_available),
-      n_rows = NA_integer_,
-      x_var = NA_character_,
-      group_var = NA_character_,
-      recommended_design_id = first_or_na(report_bundle$grid_recommendation$recommended_design_id)
-    ),
-    table_index,
-    plot_index
-  )
-
-  if (!isTRUE(report_bundle$report_available)) {
-    return(list(
-      report_summary_contract = "arbitrary_facet_design_grid_report_summary",
-      report_summary_stage = as.character(report_bundle$report_stage %||% "schema_only"),
-      planner_contract = as.character(
-        report_bundle$planner_contract %||% "arbitrary_facet_planning_scaffold"
-      ),
-      report_available = FALSE,
-      reason = as.character(
-        report_bundle$reason %||%
-          "No schema-only future-branch grid is currently materialized."
-      ),
-      n_designs = 0L,
-      available_table_views = as.character(table_views[table_available]),
-      available_plot_views = as.character(plot_views[plot_available]),
-      component_index = component_index,
-      report_bundle = report_bundle,
-      note = paste(
-        "Schema-only future-branch report summary is unavailable until the",
-        "underlying branch grid is materialized. The component index still",
-        "describes which branch-side report surfaces would be populated."
-      )
-    ))
-  }
-
-  list(
-    report_summary_contract = "arbitrary_facet_design_grid_report_summary",
-    report_summary_stage = as.character(report_bundle$report_stage %||% "schema_only"),
-    planner_contract = as.character(
-      report_bundle$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    report_available = TRUE,
-    reason = as.character(
-      report_bundle$reason %||%
-        "Schema-only future-branch grid is materialized."
-    ),
-    n_designs = as.integer(report_bundle$grid_summary$n_designs %||% 0L),
-    recommended_design_id = first_or_na(report_bundle$recommended_design_id),
-    available_table_views = as.character(table_views[table_available]),
-    available_plot_views = as.character(plot_views[plot_available]),
-    component_index = component_index,
-    report_bundle = report_bundle,
-    note = paste(
-      "Schema-only future-branch report summary exposing a compact component",
-      "index over the current report bundle without implying an active",
-      "arbitrary-facet planner."
-    )
-  )
-}
-
-simulation_future_branch_report_overview_table <- function(x,
-                                                           design = NULL,
-                                                           prefer = NULL,
-                                                           x_var = NULL,
-                                                           group_var = NULL,
-                                                           id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "report_overview_table",
-    design = design,
-    prefer = prefer,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  report_summary <- simulation_future_branch_report_summary(
-    x = x,
-    design = design,
-    prefer = prefer,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  report_bundle <- report_summary$report_bundle
-  overview_source <- tibble::as_tibble(report_bundle$overview_table %||% tibble::tibble())
-  has_fixed_value <- "fixed_value" %in% names(overview_source)
-
-  metrics_table <- tibble::tibble(
-    report_available = isTRUE(report_summary$report_available),
-    n_designs = as.integer(report_summary$n_designs %||% 0L),
-    recommended_design_id = as.character(report_summary$recommended_design_id %||% NA_character_),
-    n_table_views = length(report_summary$available_table_views %||% character(0)),
-    n_plot_views = length(report_summary$available_plot_views %||% character(0)),
-    available_table_views = paste(report_summary$available_table_views %||% character(0), collapse = ", "),
-    available_plot_views = paste(report_summary$available_plot_views %||% character(0), collapse = ", ")
-  )
-
-  axis_overview_table <- if (nrow(overview_source) == 0L) {
-    overview_source
-  } else {
-    overview_source |>
-      dplyr::mutate(
-        axis_state = dplyr::case_when(
-          is.na(.data$varying) ~ "unavailable",
-          .data$varying ~ "varying",
-          TRUE ~ "fixed"
-        ),
-        value_summary = vapply(.data$values, function(vals) {
-          if (length(vals) == 0L || all(is.na(vals))) {
-            return(NA_character_)
-          }
-          paste(as.character(vals), collapse = ", ")
-        }, character(1)),
-        fixed_value = if (has_fixed_value) as.integer(.data$fixed_value) else NA_integer_
-      ) |>
-      dplyr::select(
-        dplyr::all_of(c(
-          "axis_source",
-          "input_key",
-          "canonical_design_variable",
-          "public_design_alias",
-          "axis_class",
-          "facet",
-          "axis_state",
-          "n_values",
-          "value_summary",
-          "fixed_value"
-        ))
-      )
-  }
-
-  if (!isTRUE(report_summary$report_available)) {
-    return(list(
-      overview_contract = "arbitrary_facet_design_report_overview_table",
-      overview_stage = as.character(report_summary$report_summary_stage %||% "schema_only"),
-      planner_contract = as.character(
-        report_summary$planner_contract %||% "arbitrary_facet_planning_scaffold"
-      ),
-      report_available = FALSE,
-      reason = as.character(
-        report_summary$reason %||%
-          "No schema-only future-branch grid is currently materialized."
-      ),
-      metrics_table = metrics_table,
-      axis_overview_table = axis_overview_table,
-      component_index = tibble::as_tibble(report_summary$component_index %||% tibble::tibble()),
-      report_summary = report_summary,
-      report_bundle = report_bundle,
-      note = paste(
-        "Schema-only future-branch overview table is unavailable until the",
-        "underlying branch grid is materialized. Metrics and axis metadata",
-        "are still returned from the current report summary contract."
-      )
-    ))
-  }
-
-  list(
-    overview_contract = "arbitrary_facet_design_report_overview_table",
-    overview_stage = as.character(report_summary$report_summary_stage %||% "schema_only"),
-    planner_contract = as.character(
-      report_summary$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    report_available = TRUE,
-    reason = as.character(
-      report_summary$reason %||%
-        "Schema-only future-branch grid is materialized."
-    ),
-    metrics_table = metrics_table,
-    axis_overview_table = axis_overview_table,
-    component_index = tibble::as_tibble(report_summary$component_index %||% tibble::tibble()),
-    report_summary = report_summary,
-    report_bundle = report_bundle,
-    note = paste(
-      "Schema-only future-branch overview table exposing compact report",
-      "metrics and axis-level state summaries without implying an active",
-      "arbitrary-facet planner."
-    )
-  )
-}
-
-simulation_future_branch_report_overview_view <- function(x,
-                                                          component = c("metrics", "axes", "components"),
-                                                          design = NULL,
-                                                          prefer = NULL,
-                                                          x_var = NULL,
-                                                          group_var = NULL,
-                                                          id_prefix = NULL) {
-  component <- match.arg(component)
-  overview <- simulation_future_branch_report_overview_table(
-    x = x,
-    design = design,
-    prefer = prefer,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-
-  table <- switch(
-    component,
-    metrics = tibble::as_tibble(overview$metrics_table %||% tibble::tibble()),
-    axes = tibble::as_tibble(overview$axis_overview_table %||% tibble::tibble()),
-    components = tibble::as_tibble(overview$component_index %||% tibble::tibble())
-  )
-  component_label <- switch(
-    component,
-    metrics = "report metrics",
-    axes = "axis overview",
-    components = "component index"
-  )
-
-  list(
-    overview_view_contract = "arbitrary_facet_design_report_overview_view",
-    overview_stage = as.character(overview$overview_stage %||% "schema_only"),
-    planner_contract = as.character(
-      overview$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    component = component,
-    component_label = component_label,
-    report_available = isTRUE(overview$report_available),
-    reason = as.character(
-      overview$reason %||%
-        "No schema-only future-branch report overview is currently available."
-    ),
-    table = table,
-    report_overview = overview,
-    note = paste(
-      "Schema-only future-branch overview view exposing the selected",
-      component_label,
-      "table from the compact report-overview contract without implying an",
-      "active arbitrary-facet planner."
-    )
-  )
-}
-
-simulation_future_branch_report_catalog <- function(x,
-                                                    design = NULL,
-                                                    prefer = NULL,
-                                                    x_var = NULL,
-                                                    group_var = NULL,
-                                                    id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "report_catalog",
-    design = design,
-    prefer = prefer,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  component_ids <- c("metrics", "axes", "components")
-  views <- stats::setNames(vector("list", length(component_ids)), component_ids)
-
-  for (component in component_ids) {
-    views[[component]] <- simulation_future_branch_report_overview_view(
-      x = x,
-      component = component,
-      design = design,
-      prefer = prefer,
-      x_var = x_var,
-      group_var = group_var,
-      id_prefix = id_prefix
-    )
-  }
-
-  overview <- views[[1]]$report_overview %||% simulation_future_branch_report_overview_table(
-    x = x,
-    design = design,
-    prefer = prefer,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  recommended_design_id <- as.character(
-    overview$metrics_table$recommended_design_id[[1]] %||% NA_character_
-  )
-  surface_index <- tibble::tibble(
-    component = component_ids,
-    component_label = vapply(views, function(obj) {
-      as.character(obj$component_label %||% NA_character_)
-    }, character(1)),
-    available = vapply(views, function(obj) {
-      isTRUE(obj$report_available)
-    }, logical(1)),
-    n_rows = vapply(views, function(obj) {
-      if (is.data.frame(obj$table)) nrow(obj$table) else 0L
-    }, integer(1)),
-    recommended_design_id = rep(recommended_design_id, length(component_ids))
-  )
-
-  list(
-    catalog_contract = "arbitrary_facet_design_report_catalog",
-    catalog_stage = as.character(overview$overview_stage %||% "schema_only"),
-    planner_contract = as.character(
-      overview$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    report_available = isTRUE(overview$report_available),
-    reason = as.character(
-      overview$reason %||%
-        "No schema-only future-branch report catalog is currently available."
-    ),
-    recommended_design_id = recommended_design_id,
-    surface_index = surface_index,
-    views = views,
-    report_overview = overview,
-    note = paste(
-      "Schema-only future-branch report catalog enumerating the compact",
-      "overview surfaces that branch-side reporting code can request from",
-      "the current overview contract without implying an active arbitrary-",
-      "facet planner."
-    )
-  )
-}
-
-simulation_future_branch_report_digest <- function(x,
-                                                   design = NULL,
-                                                   prefer = NULL,
-                                                   x_var = NULL,
-                                                   group_var = NULL,
-                                                   id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "report_digest",
-    design = design,
-    prefer = prefer,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  report_catalog <- simulation_future_branch_report_catalog(
-    x = x,
-    design = design,
-    prefer = prefer,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  report_overview <- report_catalog$report_overview %||% simulation_future_branch_report_overview_table(
-    x = x,
-    design = design,
-    prefer = prefer,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-
-  metrics_table <- tibble::as_tibble(report_overview$metrics_table %||% tibble::tibble())
-  axis_table <- tibble::as_tibble(report_overview$axis_overview_table %||% tibble::tibble())
-  surface_index <- tibble::as_tibble(report_catalog$surface_index %||% tibble::tibble())
-
-  first_chr <- function(value, default = NA_character_) {
-    if (length(value) == 0L) {
-      return(as.character(default))
-    }
-    as.character(value[[1]] %||% default)
-  }
-  first_int <- function(value, default = 0L) {
-    if (length(value) == 0L) {
-      return(as.integer(default))
-    }
-    as.integer(value[[1]] %||% default)
-  }
-
-  available_surfaces <- if (nrow(surface_index) == 0L) {
-    character(0)
-  } else {
-    as.character(surface_index$component[replace(as.logical(surface_index$available), is.na(surface_index$available), FALSE)])
-  }
-  varying_axes <- if (nrow(axis_table) == 0L) {
-    character(0)
-  } else {
-    as.character(axis_table$canonical_design_variable[axis_table$axis_state %in% "varying"])
-  }
-  fixed_axes <- if (nrow(axis_table) == 0L) {
-    character(0)
-  } else {
-    as.character(axis_table$canonical_design_variable[axis_table$axis_state %in% "fixed"])
-  }
-
-  digest_table <- tibble::tibble(
-    report_available = isTRUE(report_catalog$report_available),
-    n_designs = first_int(metrics_table$n_designs, 0L),
-    recommended_design_id = first_chr(metrics_table$recommended_design_id),
-    n_available_surfaces = length(available_surfaces),
-    available_surfaces = paste(available_surfaces, collapse = ", "),
-    varying_axes = paste(varying_axes, collapse = ", "),
-    fixed_axes = paste(fixed_axes, collapse = ", ")
-  )
-
-  list(
-    digest_contract = "arbitrary_facet_design_report_digest",
-    digest_stage = as.character(report_catalog$catalog_stage %||% "schema_only"),
-    planner_contract = as.character(
-      report_catalog$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    report_available = isTRUE(report_catalog$report_available),
-    reason = as.character(
-      report_catalog$reason %||%
-        "No schema-only future-branch report digest is currently available."
-    ),
-    recommended_design_id = first_chr(metrics_table$recommended_design_id),
-    available_surfaces = available_surfaces,
-    varying_axes = varying_axes,
-    fixed_axes = fixed_axes,
-    digest_table = digest_table,
-    report_catalog = report_catalog,
-    report_overview = report_overview,
-    note = paste(
-      "Schema-only future-branch report digest exposing headline report",
-      "availability, baseline design metadata, and compact surface/axis",
-      "summaries from one internal contract without implying an active",
-      "arbitrary-facet planner."
-    )
-  )
-}
-
-simulation_future_branch_report_surface <- function(x,
-                                                    surface = c("digest", "catalog", "metrics", "axes", "components"),
-                                                    design = NULL,
-                                                    prefer = NULL,
-                                                    x_var = NULL,
-                                                    group_var = NULL,
-                                                    id_prefix = NULL) {
-  surface <- match.arg(surface)
-
-  source_object <- switch(
-    surface,
-    digest = simulation_future_branch_report_digest(
-      x = x,
-      design = design,
-      prefer = prefer,
-      x_var = x_var,
-      group_var = group_var,
-      id_prefix = id_prefix
-    ),
-    catalog = simulation_future_branch_report_catalog(
-      x = x,
-      design = design,
-      prefer = prefer,
-      x_var = x_var,
-      group_var = group_var,
-      id_prefix = id_prefix
-    ),
-    metrics = simulation_future_branch_report_overview_view(
-      x = x,
-      component = "metrics",
-      design = design,
-      prefer = prefer,
-      x_var = x_var,
-      group_var = group_var,
-      id_prefix = id_prefix
-    ),
-    axes = simulation_future_branch_report_overview_view(
-      x = x,
-      component = "axes",
-      design = design,
-      prefer = prefer,
-      x_var = x_var,
-      group_var = group_var,
-      id_prefix = id_prefix
-    ),
-    components = simulation_future_branch_report_overview_view(
-      x = x,
-      component = "components",
-      design = design,
-      prefer = prefer,
-      x_var = x_var,
-      group_var = group_var,
-      id_prefix = id_prefix
-    )
-  )
-
-  surface_label <- switch(
-    surface,
-    digest = "report digest",
-    catalog = "report catalog",
-    metrics = "report metrics",
-    axes = "axis overview",
-    components = "component index"
-  )
-  source_contract <- switch(
-    surface,
-    digest = as.character(source_object$digest_contract %||% "arbitrary_facet_design_report_digest"),
-    catalog = as.character(source_object$catalog_contract %||% "arbitrary_facet_design_report_catalog"),
-    metrics = as.character(source_object$overview_view_contract %||% "arbitrary_facet_design_report_overview_view"),
-    axes = as.character(source_object$overview_view_contract %||% "arbitrary_facet_design_report_overview_view"),
-    components = as.character(source_object$overview_view_contract %||% "arbitrary_facet_design_report_overview_view")
-  )
-  recommended_design_id <- switch(
-    surface,
-    digest = as.character(source_object$recommended_design_id %||% NA_character_),
-    catalog = as.character(source_object$recommended_design_id %||% NA_character_),
-    metrics = as.character(source_object$table$recommended_design_id[[1]] %||% NA_character_),
-    axes = as.character(source_object$report_overview$metrics_table$recommended_design_id[[1]] %||% NA_character_),
-    components = as.character(source_object$report_overview$metrics_table$recommended_design_id[[1]] %||% NA_character_)
-  )
-  table <- switch(
-    surface,
-    digest = tibble::as_tibble(source_object$digest_table %||% tibble::tibble()),
-    catalog = {
-      tbl <- tibble::as_tibble(source_object$surface_index %||% tibble::tibble())
-      if ("component" %in% names(tbl) && !("surface" %in% names(tbl))) {
-        names(tbl)[names(tbl) == "component"] <- "surface"
-      }
-      tbl
-    },
-    metrics = tibble::as_tibble(source_object$table %||% tibble::tibble()),
-    axes = tibble::as_tibble(source_object$table %||% tibble::tibble()),
-    components = tibble::as_tibble(source_object$table %||% tibble::tibble())
-  )
-  report_available <- switch(
-    surface,
-    digest = isTRUE(source_object$report_available),
-    catalog = isTRUE(source_object$report_available),
-    metrics = isTRUE(source_object$report_available),
-    axes = isTRUE(source_object$report_available),
-    components = isTRUE(source_object$report_available)
-  )
-  reason <- switch(
-    surface,
-    digest = as.character(source_object$reason %||% NA_character_),
-    catalog = as.character(source_object$reason %||% NA_character_),
-    metrics = as.character(source_object$reason %||% NA_character_),
-    axes = as.character(source_object$reason %||% NA_character_),
-    components = as.character(source_object$reason %||% NA_character_)
-  )
-  surface_stage <- switch(
-    surface,
-    digest = as.character(source_object$digest_stage %||% "schema_only"),
-    catalog = as.character(source_object$catalog_stage %||% "schema_only"),
-    metrics = as.character(source_object$overview_stage %||% "schema_only"),
-    axes = as.character(source_object$overview_stage %||% "schema_only"),
-    components = as.character(source_object$overview_stage %||% "schema_only")
-  )
-  planner_contract <- switch(
-    surface,
-    digest = as.character(source_object$planner_contract %||% "arbitrary_facet_planning_scaffold"),
-    catalog = as.character(source_object$planner_contract %||% "arbitrary_facet_planning_scaffold"),
-    metrics = as.character(source_object$planner_contract %||% "arbitrary_facet_planning_scaffold"),
-    axes = as.character(source_object$planner_contract %||% "arbitrary_facet_planning_scaffold"),
-    components = as.character(source_object$planner_contract %||% "arbitrary_facet_planning_scaffold")
-  )
-
-  list(
-    surface_contract = "arbitrary_facet_design_report_surface",
-    surface_stage = surface_stage,
-    planner_contract = planner_contract,
-    surface = surface,
-    surface_label = surface_label,
-    source_contract = source_contract,
-    report_available = report_available,
-    reason = reason,
-    recommended_design_id = recommended_design_id,
-    table = table,
-    source_object = source_object,
-    note = paste(
-      "Schema-only future-branch report surface exposing the selected",
-      surface_label,
-      "from one compact branch-side operation without implying an active",
-      "arbitrary-facet planner."
-    )
-  )
-}
-
-simulation_future_branch_report_surface_registry <- function(x,
-                                                             design = NULL,
-                                                             prefer = NULL,
-                                                             x_var = NULL,
-                                                             group_var = NULL,
-                                                             id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "report_surface_registry",
-    design = design,
-    prefer = prefer,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  surface_ids <- c("digest", "catalog", "metrics", "axes", "components")
-  surfaces <- stats::setNames(vector("list", length(surface_ids)), surface_ids)
-
-  for (surface in surface_ids) {
-    surfaces[[surface]] <- simulation_future_branch_report_surface(
-      x = x,
-      surface = surface,
-      design = design,
-      prefer = prefer,
-      x_var = x_var,
-      group_var = group_var,
-      id_prefix = id_prefix
-    )
-  }
-
-  recommended_design_id <- as.character(
-    surfaces$digest$recommended_design_id %||%
-      surfaces$catalog$recommended_design_id %||%
-      NA_character_
-  )
-  surface_index <- tibble::tibble(
-    surface = surface_ids,
-    surface_label = vapply(surfaces, function(obj) {
-      as.character(obj$surface_label %||% NA_character_)
-    }, character(1)),
-    source_contract = vapply(surfaces, function(obj) {
-      as.character(obj$source_contract %||% NA_character_)
-    }, character(1)),
-    available = vapply(surfaces, function(obj) {
-      isTRUE(obj$report_available)
-    }, logical(1)),
-    n_rows = vapply(surfaces, function(obj) {
-      if (is.data.frame(obj$table)) nrow(obj$table) else 0L
-    }, integer(1)),
-    recommended_design_id = rep(recommended_design_id, length(surface_ids))
-  )
-
-  list(
-    registry_contract = "arbitrary_facet_design_report_surface_registry",
-    registry_stage = as.character(surfaces[[1]]$surface_stage %||% "schema_only"),
-    planner_contract = as.character(
-      surfaces[[1]]$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    report_available = isTRUE(surfaces[[1]]$report_available),
-    reason = as.character(
-      surfaces[[1]]$reason %||%
-        "No schema-only future-branch report surfaces are currently available."
-    ),
-    recommended_design_id = recommended_design_id,
-    surface_index = surface_index,
-    surfaces = surfaces,
-    note = paste(
-      "Schema-only future-branch report surface registry exposing digest,",
-      "catalog, and compact overview surfaces from one internal contract",
-      "without implying an active arbitrary-facet planner."
-    )
-  )
-}
-
-simulation_future_branch_report_panel <- function(x,
-                                                  surface = c("digest", "catalog", "metrics", "axes", "components"),
-                                                  design = NULL,
-                                                  prefer = NULL,
-                                                  x_var = NULL,
-                                                  group_var = NULL,
-                                                  id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "report_panel",
-    design = design,
-    prefer = prefer,
-    surface = surface,
-    surface_default = "digest",
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  surface <- match.arg(surface)
-  registry <- simulation_future_branch_report_surface_registry(
-    x = x,
-    design = design,
-    prefer = prefer,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  selected_surface <- registry$surfaces[[surface]] %||% simulation_future_branch_report_surface(
-    x = x,
-    surface = surface,
-    design = design,
-    prefer = prefer,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  digest_table <- tibble::as_tibble(
-    registry$surfaces$digest$table %||% tibble::tibble()
-  )
-
-  list(
-    panel_contract = "arbitrary_facet_design_report_panel",
-    panel_stage = as.character(registry$registry_stage %||% "schema_only"),
-    planner_contract = as.character(
-      registry$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    surface = surface,
-    surface_label = as.character(selected_surface$surface_label %||% surface),
-    report_available = isTRUE(selected_surface$report_available),
-    reason = as.character(
-      selected_surface$reason %||%
-        "No schema-only future-branch report panel is currently available."
-    ),
-    recommended_design_id = as.character(
-      selected_surface$recommended_design_id %||%
-        registry$recommended_design_id %||%
-        NA_character_
-    ),
-    digest_table = digest_table,
-    surface_index = tibble::as_tibble(registry$surface_index %||% tibble::tibble()),
-    selected_table = tibble::as_tibble(selected_surface$table %||% tibble::tibble()),
-    selected_surface = selected_surface,
-    registry = registry,
-    note = paste(
-      "Schema-only future-branch report panel exposing one selected compact",
-      "surface together with headline digest metadata and the surface index",
-      "from one internal contract without implying an active arbitrary-",
-      "facet planner."
-    )
-  )
-}
-
-simulation_future_branch_report_operation <- function(x,
-                                                      surface = c("digest", "catalog", "metrics", "axes", "components"),
-                                                      design = NULL,
-                                                      prefer = NULL,
-                                                      x_var = NULL,
-                                                      group_var = NULL,
-                                                      id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "report_operation",
-    design = design,
-    prefer = prefer,
-    surface = surface,
-    surface_default = "digest",
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  surface <- match.arg(surface)
-  panel <- simulation_future_branch_report_panel(
-    x = x,
-    surface = surface,
-    design = design,
-    prefer = prefer,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  registry <- panel$registry %||% simulation_future_branch_report_surface_registry(
-    x = x,
-    design = design,
-    prefer = prefer,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  digest_surface <- registry$surfaces$digest %||% simulation_future_branch_report_surface(
-    x = x,
-    surface = "digest",
-    design = design,
-    prefer = prefer,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  metrics_surface <- registry$surfaces$metrics %||% simulation_future_branch_report_surface(
-    x = x,
-    surface = "metrics",
-    design = design,
-    prefer = prefer,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  axes_surface <- registry$surfaces$axes %||% simulation_future_branch_report_surface(
-    x = x,
-    surface = "axes",
-    design = design,
-    prefer = prefer,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  components_surface <- registry$surfaces$components %||% simulation_future_branch_report_surface(
-    x = x,
-    surface = "components",
-    design = design,
-    prefer = prefer,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-
-  list(
-    operation_contract = "arbitrary_facet_design_report_operation",
-    operation_stage = as.character(
-      panel$panel_stage %||% registry$registry_stage %||% "schema_only"
-    ),
-    planner_contract = as.character(
-      panel$planner_contract %||%
-        registry$planner_contract %||%
-        "arbitrary_facet_planning_scaffold"
-    ),
-    surface = surface,
-    surface_label = as.character(panel$surface_label %||% surface),
-    report_available = isTRUE(panel$report_available),
-    reason = as.character(
-      panel$reason %||%
-        "No schema-only future-branch report operation is currently available."
-    ),
-    recommended_design_id = as.character(
-      panel$recommended_design_id %||%
-        registry$recommended_design_id %||%
-        NA_character_
-    ),
-    digest_table = tibble::as_tibble(digest_surface$table %||% tibble::tibble()),
-    surface_index = tibble::as_tibble(registry$surface_index %||% tibble::tibble()),
-    metrics_table = tibble::as_tibble(metrics_surface$table %||% tibble::tibble()),
-    axis_overview_table = tibble::as_tibble(axes_surface$table %||% tibble::tibble()),
-    component_index = tibble::as_tibble(components_surface$table %||% tibble::tibble()),
-    selected_table = tibble::as_tibble(panel$selected_table %||% tibble::tibble()),
-    selected_surface = panel$selected_surface,
-    report_panel = panel,
-    report_surface_registry = registry,
-    note = paste(
-      "Schema-only future-branch report operation exposing digest, compact",
-      "overview tables, the current surface registry, and one selected",
-      "surface from one internal contract without implying an active",
-      "arbitrary-facet planner."
-    )
-  )
-}
-
-simulation_future_branch_report_snapshot <- function(x,
-                                                     surface = c("digest", "catalog", "metrics", "axes", "components"),
-                                                     design = NULL,
-                                                     prefer = NULL,
-                                                     x_var = NULL,
-                                                     group_var = NULL,
-                                                     id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "report_snapshot",
-    design = design,
-    prefer = prefer,
-    surface = surface,
-    surface_default = "digest",
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  surface <- match.arg(surface)
-  operation <- simulation_future_branch_report_operation(
-    x = x,
-    surface = surface,
-    design = design,
-    prefer = prefer,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-
-  first_chr <- function(value, default = NA_character_) {
-    if (length(value) == 0L) {
-      return(as.character(default))
-    }
-    as.character(value[[1]] %||% default)
-  }
-
-  digest_tbl <- tibble::as_tibble(operation$digest_table %||% tibble::tibble())
-  surface_index <- tibble::as_tibble(operation$surface_index %||% tibble::tibble())
-  selected_tbl <- tibble::as_tibble(operation$selected_table %||% tibble::tibble())
-
-  available_surfaces <- if (nrow(surface_index) == 0L) {
-    character(0)
-  } else {
-    as.character(surface_index$surface[replace(as.logical(surface_index$available), is.na(surface_index$available), FALSE)])
-  }
-  varying_axes <- if (!("varying_axes" %in% names(digest_tbl))) {
-    character(0)
-  } else {
-    strsplit(first_chr(digest_tbl$varying_axes, ""), ", ", fixed = TRUE)[[1]]
-  }
-  varying_axes <- varying_axes[nzchar(varying_axes)]
-  fixed_axes <- if (!("fixed_axes" %in% names(digest_tbl))) {
-    character(0)
-  } else {
-    strsplit(first_chr(digest_tbl$fixed_axes, ""), ", ", fixed = TRUE)[[1]]
-  }
-  fixed_axes <- fixed_axes[nzchar(fixed_axes)]
-
-  list(
-    snapshot_contract = "arbitrary_facet_design_report_snapshot",
-    snapshot_stage = as.character(operation$operation_stage %||% "schema_only"),
-    planner_contract = as.character(
-      operation$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    surface = surface,
-    surface_label = as.character(operation$surface_label %||% surface),
-    report_available = isTRUE(operation$report_available),
-    reason = as.character(
-      operation$reason %||%
-        "No schema-only future-branch report snapshot is currently available."
-    ),
-    recommended_design_id = as.character(
-      operation$recommended_design_id %||% NA_character_
-    ),
-    n_designs = if ("n_designs" %in% names(digest_tbl)) as.integer(digest_tbl$n_designs[[1]] %||% 0L) else 0L,
-    available_surfaces = available_surfaces,
-    varying_axes = varying_axes,
-    fixed_axes = fixed_axes,
-    digest_table = digest_tbl,
-    surface_index = surface_index,
-    selected_table = selected_tbl,
-    metrics_table = tibble::as_tibble(operation$metrics_table %||% tibble::tibble()),
-    axis_overview_table = tibble::as_tibble(operation$axis_overview_table %||% tibble::tibble()),
-    component_index = tibble::as_tibble(operation$component_index %||% tibble::tibble()),
-    note = paste(
-      "Schema-only future-branch report snapshot exposing compact headline",
-      "metadata, compact overview tables, and one selected surface without",
-      "carrying the deeper nested operation graph."
-    )
-  )
-}
-
-simulation_future_branch_report_brief <- function(x,
-                                                  surface = c("digest", "catalog", "metrics", "axes", "components"),
-                                                  design = NULL,
-                                                  prefer = NULL,
-                                                  x_var = NULL,
-                                                  group_var = NULL,
-                                                  id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "report_brief",
-    design = design,
-    prefer = prefer,
-    surface = surface,
-    surface_default = "digest",
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  surface <- match.arg(surface)
-  snapshot <- simulation_future_branch_report_snapshot(
-    x = x,
-    surface = surface,
-    design = design,
-    prefer = prefer,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-
-  headline_table <- tibble::tibble(
-    report_available = isTRUE(snapshot$report_available),
-    n_designs = as.integer(snapshot$n_designs %||% 0L),
-    recommended_design_id = as.character(
-      snapshot$recommended_design_id %||% NA_character_
-    ),
-    surface = as.character(snapshot$surface %||% surface),
-    surface_label = as.character(snapshot$surface_label %||% surface),
-    available_surfaces = paste(snapshot$available_surfaces %||% character(0), collapse = ", "),
-    varying_axes = paste(snapshot$varying_axes %||% character(0), collapse = ", "),
-    fixed_axes = paste(snapshot$fixed_axes %||% character(0), collapse = ", ")
-  )
-
-  list(
-    brief_contract = "arbitrary_facet_design_report_brief",
-    brief_stage = as.character(snapshot$snapshot_stage %||% "schema_only"),
-    planner_contract = as.character(
-      snapshot$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    surface = surface,
-    surface_label = as.character(snapshot$surface_label %||% surface),
-    report_available = isTRUE(snapshot$report_available),
-    reason = as.character(
-      snapshot$reason %||%
-        "No schema-only future-branch report brief is currently available."
-    ),
-    headline_table = headline_table,
-    selected_table = tibble::as_tibble(snapshot$selected_table %||% tibble::tibble()),
-    surface_index = tibble::as_tibble(snapshot$surface_index %||% tibble::tibble()),
-    note = paste(
-      "Schema-only future-branch report brief exposing one selected surface",
-      "together with a headline table and surface index, without carrying",
-      "the broader snapshot or nested operation graph."
-    )
-  )
-}
-
-simulation_future_branch_report_consume <- function(x,
-                                                    mode = c("brief", "snapshot", "operation"),
-                                                    surface = c("digest", "catalog", "metrics", "axes", "components"),
-                                                    design = NULL,
-                                                    prefer = NULL,
-                                                    x_var = NULL,
-                                                    group_var = NULL,
-                                                    id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "report_consumer",
-    design = design,
-    prefer = prefer,
-    mode = mode,
-    mode_default = "brief",
-    surface = surface,
-    surface_default = "digest",
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  mode <- match.arg(mode)
-  surface <- match.arg(surface)
-
-  payload <- switch(
-    mode,
-    brief = simulation_future_branch_report_brief(
-      x = x,
-      surface = surface,
-      design = design,
-      prefer = prefer,
-      x_var = x_var,
-      group_var = group_var,
-      id_prefix = id_prefix
-    ),
-    snapshot = simulation_future_branch_report_snapshot(
-      x = x,
-      surface = surface,
-      design = design,
-      prefer = prefer,
-      x_var = x_var,
-      group_var = group_var,
-      id_prefix = id_prefix
-    ),
-    operation = simulation_future_branch_report_operation(
-      x = x,
-      surface = surface,
-      design = design,
-      prefer = prefer,
-      x_var = x_var,
-      group_var = group_var,
-      id_prefix = id_prefix
-    )
-  )
-
-  payload_contract <- switch(
-    mode,
-    brief = as.character(payload$brief_contract %||% NA_character_),
-    snapshot = as.character(payload$snapshot_contract %||% NA_character_),
-    operation = as.character(payload$operation_contract %||% NA_character_)
-  )
-  stage <- switch(
-    mode,
-    brief = as.character(payload$brief_stage %||% "schema_only"),
-    snapshot = as.character(payload$snapshot_stage %||% "schema_only"),
-    operation = as.character(payload$operation_stage %||% "schema_only")
-  )
-  selected_table <- switch(
-    mode,
-    brief = tibble::as_tibble(payload$selected_table %||% tibble::tibble()),
-    snapshot = tibble::as_tibble(payload$selected_table %||% tibble::tibble()),
-    operation = tibble::as_tibble(payload$selected_table %||% tibble::tibble())
-  )
-  surface_index <- switch(
-    mode,
-    brief = tibble::as_tibble(payload$surface_index %||% tibble::tibble()),
-    snapshot = tibble::as_tibble(payload$surface_index %||% tibble::tibble()),
-    operation = tibble::as_tibble(payload$surface_index %||% tibble::tibble())
-  )
-  recommended_design_id <- switch(
-    mode,
-    brief = as.character(payload$headline_table$recommended_design_id[[1]] %||% NA_character_),
-    snapshot = as.character(payload$recommended_design_id %||% NA_character_),
-    operation = as.character(payload$recommended_design_id %||% NA_character_)
-  )
-  n_designs <- switch(
-    mode,
-    brief = as.integer(payload$headline_table$n_designs[[1]] %||% 0L),
-    snapshot = as.integer(payload$n_designs %||% 0L),
-    operation = if ("n_designs" %in% names(payload$digest_table)) {
-      as.integer(payload$digest_table$n_designs[[1]] %||% 0L)
-    } else {
-      0L
-    }
-  )
-
-  list(
-    consumer_contract = "arbitrary_facet_design_report_consumer",
-    consumer_stage = stage,
-    planner_contract = as.character(
-      payload$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    mode = mode,
-    payload_contract = payload_contract,
-    surface = surface,
-    surface_label = as.character(payload$surface_label %||% surface),
-    report_available = isTRUE(payload$report_available),
-    reason = as.character(
-      payload$reason %||%
-        "No schema-only future-branch report payload is currently available."
-    ),
-    recommended_design_id = recommended_design_id,
-    n_designs = n_designs,
-    selected_table = selected_table,
-    surface_index = surface_index,
-    payload = payload,
-    note = paste(
-      "Schema-only future-branch report consumer dispatching to the selected",
-      mode,
-      "contract so branch-side code can switch report payload weight without",
-      "re-implementing the dispatch logic."
-    )
-  )
-}
-
-simulation_future_branch_report_mode_registry <- function(x) {
-  cached <- if (is.list(x)) x$report_mode_registry %||% NULL else NULL
-  if (is.list(cached) || (is.data.frame(cached) && nrow(cached) >= 0L)) {
-    return(cached)
-  }
-
-  tibble::tibble(
-    mode = c("brief", "snapshot", "operation"),
-    payload_contract = c(
-      "arbitrary_facet_design_report_brief",
-      "arbitrary_facet_design_report_snapshot",
-      "arbitrary_facet_design_report_operation"
-    ),
-    default_surface = "digest",
-    carries_nested_graph = c(FALSE, FALSE, TRUE),
-    note = c(
-      "Selected surface plus headline table and surface index.",
-      "Compact headline metadata plus one selected surface.",
-      "Full compact report operation with selected surface and nested registry."
-    )
-  )
-}
-
-simulation_future_branch_pilot <- function(x,
-                                           design = NULL,
-                                           prefer = NULL,
-                                           view = c("public", "canonical", "branch"),
-                                           mode = c("brief", "snapshot", "operation"),
-                                           surface = c("digest", "catalog", "metrics", "axes", "components"),
-                                           x_var = NULL,
-                                           group_var = NULL,
-                                           id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "pilot",
-    design = design,
-    prefer = prefer,
-    view = view,
-    view_default = "public",
-    mode = mode,
-    mode_default = "brief",
-    surface = surface,
-    surface_default = "digest",
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  view <- match.arg(view)
-  mode <- match.arg(mode)
-  surface <- match.arg(surface)
-
-  grid_summary <- simulation_future_branch_grid_summary(
-    x = x,
-    design = design,
-    id_prefix = id_prefix
-  )
-  grid_recommendation <- simulation_future_branch_grid_recommendation(
-    x = x,
-    design = design,
-    prefer = prefer,
-    id_prefix = id_prefix
-  )
-  grid_table <- simulation_future_branch_grid_table(
-    x = x,
-    design = design,
-    prefer = prefer,
-    view = view,
-    id_prefix = id_prefix
-  )
-  plot_payload <- simulation_future_branch_grid_plot_payload(
-    x = x,
-    design = design,
-    x_var = x_var,
-    group_var = group_var,
-    prefer = prefer,
-    view = view,
-    id_prefix = id_prefix
-  )
-  report_consumer <- simulation_future_branch_report_consume(
-    x = x,
-    mode = mode,
-    surface = surface,
-    design = design,
-    prefer = prefer,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-
-  pilot_available <- isTRUE(grid_summary$grid_available) && isTRUE(report_consumer$report_available)
-
-  list(
-    pilot_contract = "arbitrary_facet_planning_pilot",
-    pilot_stage = if (pilot_available) "pilot_active" else "schema_only",
-    planner_contract = as.character(
-      grid_summary$planner_contract %||%
-        report_consumer$planner_contract %||%
-        "arbitrary_facet_planning_scaffold"
-    ),
-    pilot_available = pilot_available,
-    reason = as.character(
-      if (pilot_available) {
-        "Schema-only future-branch pilot is materialized from the current grid and report consumer contracts."
-      } else {
-        grid_summary$reason %||%
-          report_consumer$reason %||%
-          "No schema-only future-branch pilot is currently available."
-      }
-    ),
-    view = view,
-    mode = mode,
-    surface = surface,
-    recommended_design_id = as.character(
-      report_consumer$recommended_design_id %||%
-        grid_recommendation$recommended_design_id %||%
-        NA_character_
-    ),
-    n_designs = as.integer(
-      report_consumer$n_designs %||%
-        grid_summary$n_designs %||%
-        0L
-    ),
-    grid_table = tibble::as_tibble(grid_table$table %||% tibble::tibble()),
-    plot_payload = plot_payload,
-    report_consumer = report_consumer,
-    grid_summary = grid_summary,
-    grid_recommendation = grid_recommendation,
-    note = paste(
-      "Internal schema-only future-branch pilot bundling one materialized grid",
-      "view, one draw-free plot payload, and one mode-selected report consumer.",
-      "This is the first active branch-side object, but it remains a",
-      "deterministic scaffold rather than a performance-based arbitrary-facet planner."
-    )
-  )
-}
-
-simulation_future_branch_pilot_summary <- function(x,
-                                                   design = NULL,
-                                                   prefer = NULL,
-                                                   view = c("public", "canonical", "branch"),
-                                                   mode = c("brief", "snapshot", "operation"),
-                                                   surface = c("digest", "catalog", "metrics", "axes", "components"),
-                                                   x_var = NULL,
-                                                   group_var = NULL,
-                                                   id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "pilot_summary",
-    design = design,
-    prefer = prefer,
-    view = view,
-    view_default = "public",
-    mode = mode,
-    mode_default = "brief",
-    surface = surface,
-    surface_default = "digest",
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  pilot <- simulation_future_branch_pilot(
-    x = x,
-    design = design,
-    prefer = prefer,
-    view = view,
-    mode = mode,
-    surface = surface,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-
-  headline_table <- tibble::tibble(
-    pilot_available = isTRUE(pilot$pilot_available),
-    n_designs = as.integer(pilot$n_designs %||% 0L),
-    recommended_design_id = as.character(pilot$recommended_design_id %||% NA_character_),
-    view = as.character(pilot$view %||% NA_character_),
-    mode = as.character(pilot$mode %||% NA_character_),
-    surface = as.character(pilot$surface %||% NA_character_),
-    grid_rows = if (is.data.frame(pilot$grid_table)) nrow(pilot$grid_table) else 0L,
-    plot_available = isTRUE(pilot$plot_payload$data$plot_available %||% FALSE),
-    report_payload_contract = as.character(
-      pilot$report_consumer$payload_contract %||% NA_character_
-    )
-  )
-
-  list(
-    pilot_summary_contract = "arbitrary_facet_planning_pilot_summary",
-    pilot_stage = as.character(pilot$pilot_stage %||% "schema_only"),
-    planner_contract = as.character(
-      pilot$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    pilot_available = isTRUE(pilot$pilot_available),
-    reason = as.character(
-      pilot$reason %||%
-        "No schema-only future-branch pilot summary is currently available."
-    ),
-    headline_table = headline_table,
-    pilot = pilot,
-    note = paste(
-      "Compact summary for the schema-only future-branch pilot, exposing one",
-      "headline table over the current grid/report scaffold without implying",
-      "an active performance-based arbitrary-facet planner."
-    )
-  )
-}
-
-simulation_future_branch_pilot_table <- function(x,
-                                                 component = c("grid", "report", "surface_index"),
-                                                 design = NULL,
-                                                 prefer = NULL,
-                                                 view = c("public", "canonical", "branch"),
-                                                 mode = c("brief", "snapshot", "operation"),
-                                                 surface = c("digest", "catalog", "metrics", "axes", "components"),
-                                                 x_var = NULL,
-                                                 group_var = NULL,
-                                                 id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "pilot_table",
-    design = design,
-    prefer = prefer,
-    view = view,
-    view_default = "public",
-    mode = mode,
-    mode_default = "brief",
-    surface = surface,
-    surface_default = "digest",
-    component = component,
-    component_default = "grid",
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  component <- match.arg(component)
-  pilot <- simulation_future_branch_pilot(
-    x = x,
-    design = design,
-    prefer = prefer,
-    view = view,
-    mode = mode,
-    surface = surface,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-
-  table <- switch(
-    component,
-    grid = tibble::as_tibble(pilot$grid_table %||% tibble::tibble()),
-    report = tibble::as_tibble(pilot$report_consumer$selected_table %||% tibble::tibble()),
-    surface_index = tibble::as_tibble(pilot$report_consumer$surface_index %||% tibble::tibble())
-  )
-
-  list(
-    pilot_table_contract = "arbitrary_facet_planning_pilot_table",
-    pilot_stage = as.character(pilot$pilot_stage %||% "schema_only"),
-    planner_contract = as.character(
-      pilot$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    pilot_available = isTRUE(pilot$pilot_available),
-    reason = as.character(
-      pilot$reason %||%
-        "No schema-only future-branch pilot table is currently available."
-    ),
-    component = component,
-    table = table,
-    pilot = pilot,
-    note = paste(
-      "Selected table view from the schema-only future-branch pilot.",
-      "This exposes either the grid table, the selected report table, or",
-      "the compact surface index from the current pilot scaffold."
-    )
-  )
-}
-
-simulation_future_branch_pilot_plot <- function(x,
-                                                design = NULL,
-                                                prefer = NULL,
-                                                view = c("public", "canonical", "branch"),
-                                                mode = c("brief", "snapshot", "operation"),
-                                                surface = c("digest", "catalog", "metrics", "axes", "components"),
-                                                x_var = NULL,
-                                                group_var = NULL,
-                                                id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "pilot_plot",
-    design = design,
-    prefer = prefer,
-    view = view,
-    view_default = "public",
-    mode = mode,
-    mode_default = "brief",
-    surface = surface,
-    surface_default = "digest",
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  pilot <- simulation_future_branch_pilot(
-    x = x,
-    design = design,
-    prefer = prefer,
-    view = view,
-    mode = mode,
-    surface = surface,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-
-  list(
-    pilot_plot_contract = "arbitrary_facet_planning_pilot_plot",
-    pilot_stage = as.character(pilot$pilot_stage %||% "schema_only"),
-    planner_contract = as.character(
-      pilot$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    pilot_available = isTRUE(pilot$pilot_available),
-    reason = as.character(
-      pilot$reason %||%
-        "No schema-only future-branch pilot plot is currently available."
-    ),
-    plot = pilot$plot_payload,
-    pilot = pilot,
-    note = paste(
-      "Draw-free plotting payload from the schema-only future-branch pilot.",
-      "This preserves the existing plot contract while routing access through",
-      "the pilot scaffold."
-    )
-  )
-}
-
-simulation_future_branch_active_branch <- function(x,
-                                                   design = NULL,
-                                                   prefer = NULL,
-                                                   view = c("public", "canonical", "branch"),
-                                                   mode = c("brief", "snapshot", "operation"),
-                                                   surface = c("digest", "catalog", "metrics", "axes", "components"),
-                                                   table_component = c("grid", "report", "surface_index"),
-                                                   x_var = NULL,
-                                                   group_var = NULL,
-                                                   id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "active_branch",
-    design = design,
-    prefer = prefer,
-    view = view,
-    view_default = "public",
-    mode = mode,
-    mode_default = "brief",
-    surface = surface,
-    surface_default = "digest",
-    table_component = table_component,
-    table_component_default = "grid",
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  if (inherits(x, "mfrm_future_branch_active_branch") ||
-      identical(as.character(x$branch_contract %||% NA_character_), "arbitrary_facet_planning_active_branch")) {
-    return(x)
-  }
-
-  view <- match.arg(view)
-  mode <- match.arg(mode)
-  surface <- match.arg(surface)
-  table_component <- match.arg(table_component)
-
-  pilot_summary <- simulation_future_branch_pilot_summary(
-    x = x,
-    design = design,
-    prefer = prefer,
-    view = view,
-    mode = mode,
-    surface = surface,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  pilot_table <- simulation_future_branch_pilot_table(
-    x = x,
-    component = table_component,
-    design = design,
-    prefer = prefer,
-    view = view,
-    mode = mode,
-    surface = surface,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  pilot_plot <- simulation_future_branch_pilot_plot(
-    x = x,
-    design = design,
-    prefer = prefer,
-    view = view,
-    mode = mode,
-    surface = surface,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-
-  branch_available <- isTRUE(pilot_summary$pilot_available) &&
-    isTRUE(pilot_table$pilot_available) &&
-    isTRUE(pilot_plot$pilot_available)
-  canonical_grid <- tibble::as_tibble(
-    pilot_summary$pilot$grid_summary$canonical %||% tibble::tibble()
-  )
-
-  structure(list(
-    branch_contract = "arbitrary_facet_planning_active_branch",
-    branch_stage = if (branch_available) "pilot_active" else "schema_only",
-    planner_contract = as.character(
-      pilot_summary$planner_contract %||%
-        pilot_table$planner_contract %||%
-        pilot_plot$planner_contract %||%
-        "arbitrary_facet_planning_scaffold"
-    ),
-    branch_available = branch_available,
-    reason = as.character(
-      if (branch_available) {
-        "Schema-only future-branch active branch is materialized from the pilot summary, table, and plot contracts."
-      } else {
-        pilot_summary$reason %||%
-          pilot_table$reason %||%
-          pilot_plot$reason %||%
-          "No schema-only future-branch active branch is currently available."
-      }
-    ),
-    view = view,
-    mode = mode,
-    surface = surface,
-    table_component = table_component,
-    recommended_design_id = as.character(
-      pilot_summary$headline_table$recommended_design_id[[1]] %||% NA_character_
-    ),
-    n_designs = as.integer(
-      pilot_summary$headline_table$n_designs[[1]] %||% 0L
-    ),
-    summary = pilot_summary,
-    table = pilot_table,
-    plot = pilot_plot,
-    canonical_grid = canonical_grid,
-    note = paste(
-      "Minimal active future-branch object bundling pilot-level summary, one",
-      "selected table component, and one draw-free plot payload from the",
-      "current arbitrary-facet scaffold."
-    )
-  ), class = c("mfrm_future_branch_active_branch", "list"))
-}
-
-simulation_future_branch_active_branch_canonical_grid <- function(branch) {
-  candidates <- list(
-    branch$canonical_grid,
-    branch$summary$pilot$grid_summary$canonical,
-    branch$table$pilot$grid_summary$canonical,
-    branch$plot$pilot$grid_summary$canonical
-  )
-
-  for (candidate in candidates) {
-    if (is.data.frame(candidate) && nrow(candidate) > 0L) {
-      return(tibble::as_tibble(candidate))
-    }
-  }
-
-  tibble::tibble()
-}
-
-simulation_future_branch_active_branch_metric_registry <- function() {
-  tibble::tibble(
-    metric = c(
-      "total_observations",
-      "observations_per_person",
-      "observations_per_criterion",
-      "expected_observations_per_rater",
-      "assignment_fraction"
-    ),
-    basis_class = c(
-      "exact_identity",
-      "exact_identity",
-      "exact_identity",
-      "balanced_expectation",
-      "density_ratio"
-    ),
-    formula = c(
-      "n_person * raters_per_person * n_criterion",
-      "raters_per_person * n_criterion",
-      "n_person * raters_per_person",
-      "(n_person * raters_per_person * n_criterion) / n_rater",
-      "raters_per_person / n_rater"
-    ),
-    interpretation = c(
-      "Total number of scored observations implied by the current design row.",
-      "Number of scored observations contributed by one person under the current design row.",
-      "Number of scored observations contributed to one criterion across persons.",
-      "Average expected rater load under balanced assignment, not a guaranteed realized count.",
-      "Fraction of available raters assigned to each person."
-    ),
-    psychometric = FALSE
-  )
-}
-
-simulation_future_branch_active_branch_load_balance_registry <- function() {
-  tibble::tibble(
-    metric = c(
-      "expected_observations_per_rater",
-      "expected_person_assignments_per_rater",
-      "observation_load_floor",
-      "observation_load_ceiling",
-      "observation_load_remainder",
-      "perfect_integer_observation_balance"
-    ),
-    basis_class = c(
-      "balanced_expectation",
-      "balanced_expectation",
-      "integer_balance_bound",
-      "integer_balance_bound",
-      "exact_identity",
-      "exact_identity"
-    ),
-    formula = c(
-      "(n_person * raters_per_person * n_criterion) / n_rater",
-      "(n_person * raters_per_person) / n_rater",
-      "floor((n_person * raters_per_person * n_criterion) / n_rater)",
-      "ceiling((n_person * raters_per_person * n_criterion) / n_rater)",
-      "(n_person * raters_per_person * n_criterion) %% n_rater",
-      "as.integer(((n_person * raters_per_person * n_criterion) %% n_rater) == 0)"
-    ),
-    interpretation = c(
-      "Average observation load per rater under balanced assignment, not a guaranteed realized count.",
-      "Average person-assignment load per rater under balanced assignment, not a guaranteed realized count.",
-      "Lower integer observation count per rater under the most even observation-level split implied by the current design row.",
-      "Upper integer observation count per rater under the most even observation-level split implied by the current design row.",
-      "Number of observations left over after equal integer splitting across raters.",
-      "Indicator that the total observation count is divisible by the number of raters."
-    ),
-    psychometric = FALSE
-  )
-}
-
-simulation_future_branch_active_branch_coverage_registry <- function() {
-  tibble::tibble(
-    metric = c(
-      "person_criterion_cells",
-      "criterion_replications_per_person",
-      "rater_pair_overlap_per_cell",
-      "total_rater_pair_overlaps",
-      "pair_coverage_fraction_per_cell",
-      "redundant_scoring"
-    ),
-    basis_class = c(
-      "exact_identity",
-      "exact_identity",
-      "exact_identity",
-      "exact_identity",
-      "exact_ratio",
-      "exact_identity"
-    ),
-    formula = c(
-      "n_person * n_criterion",
-      "raters_per_person",
-      "choose(raters_per_person, 2)",
-      "n_person * n_criterion * choose(raters_per_person, 2)",
-      "ifelse(choose(n_rater, 2) > 0, choose(raters_per_person, 2) / choose(n_rater, 2), 0)",
-      "as.integer(raters_per_person > 1)"
-    ),
-    interpretation = c(
-      "Number of person-by-criterion cells implied by the current design row.",
-      "Number of ratings attached to each person-by-criterion cell.",
-      "Number of distinct rater pairs overlapping within one scored cell.",
-      "Total number of rater-pair overlaps implied across all person-by-criterion cells.",
-      "Fraction of available rater pairs represented within one scored cell; set to 0 when fewer than two raters are available.",
-      "Indicator that the design uses more than one rater per scored cell."
-    ),
-    psychometric = FALSE
-  )
-}
-
-simulation_future_branch_active_branch_profile <- function(x,
-                                                           design = NULL,
-                                                           prefer = NULL,
-                                                           view = c("public", "canonical", "branch"),
-                                                           mode = c("brief", "snapshot", "operation"),
-                                                           surface = c("digest", "catalog", "metrics", "axes", "components"),
-                                                           table_component = c("grid", "report", "surface_index"),
-                                                           x_var = NULL,
-                                                           group_var = NULL,
-                                                           id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "active_branch_profile",
-    design = design,
-    prefer = prefer,
-    view = view,
-    view_default = "public",
-    mode = mode,
-    mode_default = "brief",
-    surface = surface,
-    surface_default = "digest",
-    table_component = table_component,
-    table_component_default = "grid",
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  branch <- simulation_future_branch_active_branch(
-    x = x,
-    design = design,
-    prefer = prefer,
-    view = view,
-    mode = mode,
-    surface = surface,
-    table_component = table_component,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-
-  canonical <- simulation_future_branch_active_branch_canonical_grid(branch)
-
-  if (!isTRUE(branch$branch_available) || nrow(canonical) == 0L) {
-    return(list(
-      profile_contract = "arbitrary_facet_planning_active_branch_profile",
-      profile_stage = as.character(branch$branch_stage %||% "schema_only"),
-      planner_contract = as.character(
-        branch$planner_contract %||% "arbitrary_facet_planning_scaffold"
-      ),
-      branch_available = FALSE,
-      reason = as.character(
-        branch$reason %||%
-          "No schema-only future-branch active profile is currently available."
-      ),
-      metric_registry = simulation_future_branch_active_branch_metric_registry(),
-      profile_summary_table = tibble::tibble(),
-      profile_table = tibble::tibble(),
-      active_branch = branch,
-      note = paste(
-        "Deterministic design-profile metrics are unavailable until the",
-        "active future-branch scaffold can be materialized."
-      )
-    ))
-  }
-
-  profile_table <- canonical |>
-    dplyr::mutate(
-      total_observations = as.numeric(.data$n_person) * as.numeric(.data$raters_per_person) * as.numeric(.data$n_criterion),
-      observations_per_person = as.numeric(.data$raters_per_person) * as.numeric(.data$n_criterion),
-      observations_per_criterion = as.numeric(.data$n_person) * as.numeric(.data$raters_per_person),
-      expected_observations_per_rater = .data$total_observations / as.numeric(.data$n_rater),
-      assignment_fraction = as.numeric(.data$raters_per_person) / as.numeric(.data$n_rater),
-      recommended = .data$design_id == as.character(branch$recommended_design_id %||% NA_character_)
-    )
-  metric_registry <- simulation_future_branch_active_branch_metric_registry()
-  recommended_row <- profile_table[profile_table$recommended %in% TRUE, , drop = FALSE]
-  profile_summary_table <- metric_registry |>
-    dplyr::mutate(
-      min = vapply(.data$metric, function(metric) {
-        min(profile_table[[metric]], na.rm = TRUE)
-      }, numeric(1)),
-      max = vapply(.data$metric, function(metric) {
-        max(profile_table[[metric]], na.rm = TRUE)
-      }, numeric(1)),
-      mean = vapply(.data$metric, function(metric) {
-        mean(profile_table[[metric]], na.rm = TRUE)
-      }, numeric(1)),
-      recommended_value = vapply(.data$metric, function(metric) {
-        if (nrow(recommended_row) == 0L) return(NA_real_)
-        as.numeric(recommended_row[[metric]][[1]])
-      }, numeric(1))
-    )
-
-  list(
-    profile_contract = "arbitrary_facet_planning_active_branch_profile",
-    profile_stage = as.character(branch$branch_stage %||% "schema_only"),
-    planner_contract = as.character(
-      branch$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    branch_available = TRUE,
-    reason = as.character(
-      branch$reason %||%
-        "Schema-only future-branch active profile is materialized."
-    ),
-    metric_registry = metric_registry,
-    profile_summary_table = profile_summary_table,
-    profile_table = profile_table,
-    active_branch = branch,
-    note = paste(
-      "Deterministic design-bookkeeping profile for the active future-branch",
-      "scaffold. These quantities summarize observation counts, expected rater",
-      "load, and assignment density; they are not psychometric performance estimates."
-    )
-  )
-}
-
-simulation_future_branch_active_branch_load_balance <- function(x,
-                                                                design = NULL,
-                                                                prefer = NULL,
-                                                                view = c("public", "canonical", "branch"),
-                                                                mode = c("brief", "snapshot", "operation"),
-                                                                surface = c("digest", "catalog", "metrics", "axes", "components"),
-                                                                table_component = c("grid", "report", "surface_index"),
-                                                                x_var = NULL,
-                                                                group_var = NULL,
-                                                                id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "active_branch_load_balance",
-    design = design,
-    prefer = prefer,
-    view = view,
-    view_default = "public",
-    mode = mode,
-    mode_default = "brief",
-    surface = surface,
-    surface_default = "digest",
-    table_component = table_component,
-    table_component_default = "grid",
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  profile <- simulation_future_branch_active_branch_profile(
-    x = x,
-    design = design,
-    prefer = prefer,
-    view = view,
-    mode = mode,
-    surface = surface,
-    table_component = table_component,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-
-  profile_table <- tibble::as_tibble(profile$profile_table %||% tibble::tibble())
-  metric_registry <- simulation_future_branch_active_branch_load_balance_registry()
-
-  if (!isTRUE(profile$branch_available) || nrow(profile_table) == 0L) {
-    return(list(
-      diagnostics_contract = "arbitrary_facet_planning_active_branch_load_balance",
-      diagnostics_stage = as.character(profile$profile_stage %||% "schema_only"),
-      planner_contract = as.character(
-        profile$planner_contract %||% "arbitrary_facet_planning_scaffold"
-      ),
-      branch_available = FALSE,
-      reason = as.character(
-        profile$reason %||%
-          "No schema-only future-branch load/balance diagnostics are currently available."
-      ),
-      metric_registry = metric_registry,
-      diagnostic_summary_table = tibble::tibble(),
-      diagnostic_table = tibble::tibble(),
-      active_branch_profile = profile,
-      note = paste(
-        "Deterministic load/balance diagnostics are unavailable until the",
-        "active future-branch scaffold can be materialized."
-      )
-    ))
-  }
-
-  diagnostic_table <- profile_table |>
-    dplyr::mutate(
-      expected_person_assignments_per_rater = (as.numeric(.data$n_person) * as.numeric(.data$raters_per_person)) / as.numeric(.data$n_rater),
-      observation_load_floor = floor(as.numeric(.data$total_observations) / as.numeric(.data$n_rater)),
-      observation_load_ceiling = ceiling(as.numeric(.data$total_observations) / as.numeric(.data$n_rater)),
-      observation_load_remainder = as.numeric(.data$total_observations) %% as.numeric(.data$n_rater),
-      perfect_integer_observation_balance = as.integer(.data$observation_load_remainder == 0)
-    )
-  recommended_row <- diagnostic_table[diagnostic_table$recommended %in% TRUE, , drop = FALSE]
-  diagnostic_summary_table <- metric_registry |>
-    dplyr::mutate(
-      min = vapply(.data$metric, function(metric) {
-        min(diagnostic_table[[metric]], na.rm = TRUE)
-      }, numeric(1)),
-      max = vapply(.data$metric, function(metric) {
-        max(diagnostic_table[[metric]], na.rm = TRUE)
-      }, numeric(1)),
-      mean = vapply(.data$metric, function(metric) {
-        mean(diagnostic_table[[metric]], na.rm = TRUE)
-      }, numeric(1)),
-      recommended_value = vapply(.data$metric, function(metric) {
-        if (nrow(recommended_row) == 0L) return(NA_real_)
-        as.numeric(recommended_row[[metric]][[1]])
-      }, numeric(1))
-    )
-
-  list(
-    diagnostics_contract = "arbitrary_facet_planning_active_branch_load_balance",
-    diagnostics_stage = as.character(profile$profile_stage %||% "schema_only"),
-    planner_contract = as.character(
-      profile$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    branch_available = TRUE,
-    reason = as.character(
-      profile$reason %||%
-        "Schema-only future-branch load/balance diagnostics are materialized."
-    ),
-    metric_registry = metric_registry,
-    diagnostic_summary_table = diagnostic_summary_table,
-    diagnostic_table = diagnostic_table,
-    active_branch_profile = profile,
-    note = paste(
-      "Deterministic load/balance diagnostics for the active future-branch",
-      "scaffold. Balanced-load quantities are labeled as expectations, while",
-      "integer split diagnostics are exact combinatorial summaries of the",
-      "current observation counts."
-    )
-  )
-}
-
-simulation_future_branch_active_branch_overview <- function(x,
-                                                            design = NULL,
-                                                            prefer = NULL,
-                                                            view = c("public", "canonical", "branch"),
-                                                            mode = c("brief", "snapshot", "operation"),
-                                                            surface = c("digest", "catalog", "metrics", "axes", "components"),
-                                                            table_component = c("grid", "report", "surface_index"),
-                                                            x_var = NULL,
-                                                            group_var = NULL,
-                                                            id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "active_branch_overview",
-    design = design,
-    prefer = prefer,
-    view = view,
-    view_default = "public",
-    mode = mode,
-    mode_default = "brief",
-    surface = surface,
-    surface_default = "digest",
-    table_component = table_component,
-    table_component_default = "grid",
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  branch <- simulation_future_branch_active_branch(
-    x = x,
-    design = design,
-    prefer = prefer,
-    view = view,
-    mode = mode,
-    surface = surface,
-    table_component = table_component,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  profile <- simulation_future_branch_active_branch_profile(
-    x = x,
-    design = design,
-    prefer = prefer,
-    view = view,
-    mode = mode,
-    surface = surface,
-    table_component = table_component,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-
-  headline_table <- tibble::tibble(
-    branch_available = isTRUE(branch$branch_available),
-    n_designs = as.integer(branch$n_designs %||% 0L),
-    recommended_design_id = as.character(branch$recommended_design_id %||% NA_character_),
-    view = as.character(branch$view %||% NA_character_),
-    mode = as.character(branch$mode %||% NA_character_),
-    surface = as.character(branch$surface %||% NA_character_),
-    table_component = as.character(branch$table_component %||% NA_character_),
-    selected_table_rows = if (is.data.frame(branch$table$table)) nrow(branch$table$table) else 0L,
-    plot_available = isTRUE(branch$plot$plot$data$plot_available %||% FALSE),
-    n_metrics = if (is.data.frame(profile$metric_registry)) nrow(profile$metric_registry) else 0L
-  )
-
-  list(
-    overview_contract = "arbitrary_facet_planning_active_branch_overview",
-    overview_stage = as.character(branch$branch_stage %||% "schema_only"),
-    planner_contract = as.character(
-      branch$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    branch_available = isTRUE(branch$branch_available) && isTRUE(profile$branch_available),
-    reason = as.character(
-      branch$reason %||%
-        profile$reason %||%
-        "No future-branch active overview is currently available."
-    ),
-    headline_table = headline_table,
-    metric_registry = tibble::as_tibble(profile$metric_registry %||% tibble::tibble()),
-    metric_summary_table = tibble::as_tibble(profile$profile_summary_table %||% tibble::tibble()),
-    active_branch = branch,
-    active_branch_profile = profile,
-    note = paste(
-      "Compact overview for the active future-branch scaffold, combining the",
-      "branch headline with metric-basis-aware deterministic design summaries."
-    )
-  )
-}
-
-simulation_future_branch_active_branch_load_balance_overview <- function(x,
-                                                                         design = NULL,
-                                                                         prefer = NULL,
-                                                                         view = c("public", "canonical", "branch"),
-                                                                         mode = c("brief", "snapshot", "operation"),
-                                                                         surface = c("digest", "catalog", "metrics", "axes", "components"),
-                                                                         table_component = c("grid", "report", "surface_index"),
-                                                                         x_var = NULL,
-                                                                         group_var = NULL,
-                                                                         id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "active_branch_load_balance_overview",
-    design = design,
-    prefer = prefer,
-    view = view,
-    view_default = "public",
-    mode = mode,
-    mode_default = "brief",
-    surface = surface,
-    surface_default = "digest",
-    table_component = table_component,
-    table_component_default = "grid",
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  diagnostics <- simulation_future_branch_active_branch_load_balance(
-    x = x,
-    design = design,
-    prefer = prefer,
-    view = view,
-    mode = mode,
-    surface = surface,
-    table_component = table_component,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-
-  diagnostic_table <- tibble::as_tibble(diagnostics$diagnostic_table %||% tibble::tibble())
-  headline_table <- tibble::tibble(
-    branch_available = isTRUE(diagnostics$branch_available),
-    n_designs = nrow(diagnostic_table),
-    n_metrics = if (is.data.frame(diagnostics$metric_registry)) nrow(diagnostics$metric_registry) else 0L,
-    recommended_design_id = if ("design_id" %in% names(diagnostic_table) &&
-                                any(diagnostic_table$recommended %in% TRUE)) {
-      as.character(diagnostic_table$design_id[which(diagnostic_table$recommended %in% TRUE)[1]])
-    } else {
-      NA_character_
-    },
-    n_perfect_integer_balance = if ("perfect_integer_observation_balance" %in% names(diagnostic_table)) {
-      sum(diagnostic_table$perfect_integer_observation_balance %in% 1L, na.rm = TRUE)
-    } else {
-      0L
-    },
-    n_nondivisible_designs = if ("perfect_integer_observation_balance" %in% names(diagnostic_table)) {
-      sum(diagnostic_table$perfect_integer_observation_balance %in% 0L, na.rm = TRUE)
-    } else {
-      0L
-    }
-  )
-
-  list(
-    overview_contract = "arbitrary_facet_planning_active_branch_load_balance_overview",
-    overview_stage = as.character(diagnostics$diagnostics_stage %||% "schema_only"),
-    planner_contract = as.character(
-      diagnostics$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    branch_available = isTRUE(diagnostics$branch_available),
-    reason = as.character(
-      diagnostics$reason %||%
-        "No future-branch load/balance overview is currently available."
-    ),
-    headline_table = headline_table,
-    metric_registry = tibble::as_tibble(diagnostics$metric_registry %||% tibble::tibble()),
-    diagnostic_summary_table = tibble::as_tibble(diagnostics$diagnostic_summary_table %||% tibble::tibble()),
-    active_branch_load_balance = diagnostics,
-    note = paste(
-      "Compact load/balance overview for the active future-branch scaffold,",
-      "combining a one-row divisibility headline with basis-aware deterministic",
-      "observation-load diagnostics."
-    )
-  )
-}
-
-simulation_future_branch_active_branch_coverage <- function(x,
-                                                            design = NULL,
-                                                            prefer = NULL,
-                                                            view = c("public", "canonical", "branch"),
-                                                            mode = c("brief", "snapshot", "operation"),
-                                                            surface = c("digest", "catalog", "metrics", "axes", "components"),
-                                                            table_component = c("grid", "report", "surface_index"),
-                                                            x_var = NULL,
-                                                            group_var = NULL,
-                                                            id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "active_branch_coverage",
-    design = design,
-    prefer = prefer,
-    view = view,
-    view_default = "public",
-    mode = mode,
-    mode_default = "brief",
-    surface = surface,
-    surface_default = "digest",
-    table_component = table_component,
-    table_component_default = "grid",
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  profile <- simulation_future_branch_active_branch_profile(
-    x = x,
-    design = design,
-    prefer = prefer,
-    view = view,
-    mode = mode,
-    surface = surface,
-    table_component = table_component,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-
-  profile_table <- tibble::as_tibble(profile$profile_table %||% tibble::tibble())
-  metric_registry <- simulation_future_branch_active_branch_coverage_registry()
-
-  if (!isTRUE(profile$branch_available) || nrow(profile_table) == 0L) {
-    return(list(
-      diagnostics_contract = "arbitrary_facet_planning_active_branch_coverage",
-      diagnostics_stage = as.character(profile$profile_stage %||% "schema_only"),
-      planner_contract = as.character(
-        profile$planner_contract %||% "arbitrary_facet_planning_scaffold"
-      ),
-      branch_available = FALSE,
-      reason = as.character(
-        profile$reason %||%
-          "No schema-only future-branch coverage/connectivity diagnostics are currently available."
-      ),
-      metric_registry = metric_registry,
-      diagnostic_summary_table = tibble::tibble(),
-      diagnostic_table = tibble::tibble(),
-      active_branch_profile = profile,
-      note = paste(
-        "Deterministic coverage/connectivity diagnostics are unavailable until",
-        "the active future-branch scaffold can be materialized."
-      )
-    ))
-  }
-
-  diagnostic_table <- profile_table |>
-    dplyr::mutate(
-      person_criterion_cells = as.numeric(.data$n_person) * as.numeric(.data$n_criterion),
-      criterion_replications_per_person = as.numeric(.data$raters_per_person),
-      available_rater_pairs = choose(as.numeric(.data$n_rater), 2),
-      rater_pair_overlap_per_cell = choose(as.numeric(.data$raters_per_person), 2),
-      total_rater_pair_overlaps = as.numeric(.data$person_criterion_cells) * as.numeric(.data$rater_pair_overlap_per_cell),
-      pair_coverage_fraction_per_cell = dplyr::if_else(
-        .data$available_rater_pairs > 0,
-        as.numeric(.data$rater_pair_overlap_per_cell) / as.numeric(.data$available_rater_pairs),
-        0
-      ),
-      redundant_scoring = as.integer(as.numeric(.data$raters_per_person) > 1)
-    ) |>
-    dplyr::select(-"available_rater_pairs")
-
-  recommended_row <- diagnostic_table[diagnostic_table$recommended %in% TRUE, , drop = FALSE]
-  diagnostic_summary_table <- metric_registry |>
-    dplyr::mutate(
-      min = vapply(.data$metric, function(metric) {
-        min(diagnostic_table[[metric]], na.rm = TRUE)
-      }, numeric(1)),
-      max = vapply(.data$metric, function(metric) {
-        max(diagnostic_table[[metric]], na.rm = TRUE)
-      }, numeric(1)),
-      mean = vapply(.data$metric, function(metric) {
-        mean(diagnostic_table[[metric]], na.rm = TRUE)
-      }, numeric(1)),
-      recommended_value = vapply(.data$metric, function(metric) {
-        if (nrow(recommended_row) == 0L) return(NA_real_)
-        as.numeric(recommended_row[[metric]][[1]])
-      }, numeric(1))
-    )
-
-  list(
-    diagnostics_contract = "arbitrary_facet_planning_active_branch_coverage",
-    diagnostics_stage = as.character(profile$profile_stage %||% "schema_only"),
-    planner_contract = as.character(
-      profile$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    branch_available = TRUE,
-    reason = as.character(
-      profile$reason %||%
-        "Schema-only future-branch coverage/connectivity diagnostics are materialized."
-    ),
-    metric_registry = metric_registry,
-    diagnostic_summary_table = diagnostic_summary_table,
-    diagnostic_table = diagnostic_table,
-    active_branch_profile = profile,
-    note = paste(
-      "Deterministic coverage/connectivity diagnostics for the active future-branch",
-      "scaffold. These quantities summarize scored-cell counts and rater-pair",
-      "overlap identities without implying psychometric performance."
-    )
-  )
-}
-
-simulation_future_branch_active_branch_coverage_overview <- function(x,
-                                                                     design = NULL,
-                                                                     prefer = NULL,
-                                                                     view = c("public", "canonical", "branch"),
-                                                                     mode = c("brief", "snapshot", "operation"),
-                                                                     surface = c("digest", "catalog", "metrics", "axes", "components"),
-                                                                     table_component = c("grid", "report", "surface_index"),
-                                                                     x_var = NULL,
-                                                                     group_var = NULL,
-                                                                     id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "active_branch_coverage_overview",
-    design = design,
-    prefer = prefer,
-    view = view,
-    view_default = "public",
-    mode = mode,
-    mode_default = "brief",
-    surface = surface,
-    surface_default = "digest",
-    table_component = table_component,
-    table_component_default = "grid",
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  diagnostics <- simulation_future_branch_active_branch_coverage(
-    x = x,
-    design = design,
-    prefer = prefer,
-    view = view,
-    mode = mode,
-    surface = surface,
-    table_component = table_component,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-
-  diagnostic_table <- tibble::as_tibble(diagnostics$diagnostic_table %||% tibble::tibble())
-  headline_table <- tibble::tibble(
-    branch_available = isTRUE(diagnostics$branch_available),
-    n_designs = nrow(diagnostic_table),
-    n_metrics = if (is.data.frame(diagnostics$metric_registry)) nrow(diagnostics$metric_registry) else 0L,
-    recommended_design_id = if ("design_id" %in% names(diagnostic_table) &&
-                                any(diagnostic_table$recommended %in% TRUE)) {
-      as.character(diagnostic_table$design_id[which(diagnostic_table$recommended %in% TRUE)[1]])
-    } else {
-      NA_character_
-    },
-    n_redundant_designs = if ("redundant_scoring" %in% names(diagnostic_table)) {
-      sum(diagnostic_table$redundant_scoring %in% 1L, na.rm = TRUE)
-    } else {
-      0L
-    },
-    n_single_rater_designs = if ("redundant_scoring" %in% names(diagnostic_table)) {
-      sum(diagnostic_table$redundant_scoring %in% 0L, na.rm = TRUE)
-    } else {
-      0L
-    },
-    n_pair_connected_designs = if ("rater_pair_overlap_per_cell" %in% names(diagnostic_table)) {
-      sum(diagnostic_table$rater_pair_overlap_per_cell > 0, na.rm = TRUE)
-    } else {
-      0L
-    },
-    n_zero_pair_overlap_designs = if ("rater_pair_overlap_per_cell" %in% names(diagnostic_table)) {
-      sum(diagnostic_table$rater_pair_overlap_per_cell <= 0, na.rm = TRUE)
-    } else {
-      0L
-    }
-  )
-
-  list(
-    overview_contract = "arbitrary_facet_planning_active_branch_coverage_overview",
-    overview_stage = as.character(diagnostics$diagnostics_stage %||% "schema_only"),
-    planner_contract = as.character(
-      diagnostics$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    branch_available = isTRUE(diagnostics$branch_available),
-    reason = as.character(
-      diagnostics$reason %||%
-        "No future-branch coverage/connectivity overview is currently available."
-    ),
-    headline_table = headline_table,
-    metric_registry = tibble::as_tibble(diagnostics$metric_registry %||% tibble::tibble()),
-    diagnostic_summary_table = tibble::as_tibble(diagnostics$diagnostic_summary_table %||% tibble::tibble()),
-    active_branch_coverage = diagnostics,
-    note = paste(
-      "Compact coverage/connectivity overview for the active future-branch",
-      "scaffold, combining a one-row redundancy headline with basis-aware",
-      "deterministic rater-overlap diagnostics."
-    )
-  )
-}
-
-simulation_future_branch_active_branch_guardrail_registry <- function() {
-  tibble::tibble(
-    guardrail = c(
-      "rater_linking_regime",
-      "pair_coverage_regime",
-      "integer_balance_regime",
-      "redundancy_regime"
-    ),
-    basis_class = c(
-      "exact_classification",
-      "exact_classification",
-      "exact_classification",
-      "exact_classification"
-    ),
-    rule = c(
-      "ifelse(raters_per_person <= 1, 'single_rater', ifelse(raters_per_person >= n_rater, 'fully_crossed', 'partial_overlap'))",
-      "ifelse(pair_coverage_fraction_per_cell <= 0, 'no_pair_coverage', ifelse(pair_coverage_fraction_per_cell >= 1, 'full_pair_coverage', 'partial_pair_coverage'))",
-      "ifelse(perfect_integer_observation_balance == 1, 'integer_balanced', 'integer_unbalanced')",
-      "ifelse(redundant_scoring == 1, 'redundant', 'single_rater_only')"
-    ),
-    interpretation = c(
-      "Exact cell-level linking regime implied by the current assignments-per-person relative to the available rater count.",
-      "Exact pair-coverage regime implied by the current within-cell rater overlap fraction.",
-      "Exact integer-balance regime induced by the current total observation count and rater count.",
-      "Exact indicator of whether each scored cell uses more than one rater."
-    ),
-    psychometric = FALSE
-  )
-}
-
-simulation_future_branch_active_branch_guardrails <- function(x,
-                                                              design = NULL,
-                                                              prefer = NULL,
-                                                              view = c("public", "canonical", "branch"),
-                                                              mode = c("brief", "snapshot", "operation"),
-                                                              surface = c("digest", "catalog", "metrics", "axes", "components"),
-                                                              table_component = c("grid", "report", "surface_index"),
-                                                              x_var = NULL,
-                                                              group_var = NULL,
-                                                              id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "active_branch_guardrails",
-    design = design,
-    prefer = prefer,
-    view = view,
-    view_default = "public",
-    mode = mode,
-    mode_default = "brief",
-    surface = surface,
-    surface_default = "digest",
-    table_component = table_component,
-    table_component_default = "grid",
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  coverage <- simulation_future_branch_active_branch_coverage(
-    x = x,
-    design = design,
-    prefer = prefer,
-    view = view,
-    mode = mode,
-    surface = surface,
-    table_component = table_component,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  load_balance <- simulation_future_branch_active_branch_load_balance(
-    x = x,
-    design = design,
-    prefer = prefer,
-    view = view,
-    mode = mode,
-    surface = surface,
-    table_component = table_component,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-
-  coverage_table <- tibble::as_tibble(coverage$diagnostic_table %||% tibble::tibble())
-  load_balance_table <- tibble::as_tibble(load_balance$diagnostic_table %||% tibble::tibble())
-  guardrail_registry <- simulation_future_branch_active_branch_guardrail_registry()
-
-  if (!isTRUE(coverage$branch_available) || nrow(coverage_table) == 0L ||
-      !isTRUE(load_balance$branch_available) || nrow(load_balance_table) == 0L) {
-    return(list(
-      guardrail_contract = "arbitrary_facet_planning_active_branch_guardrails",
-      guardrail_stage = as.character(
-        coverage$diagnostics_stage %||% load_balance$diagnostics_stage %||% "schema_only"
-      ),
-      planner_contract = as.character(
-        coverage$planner_contract %||%
-          load_balance$planner_contract %||%
-          "arbitrary_facet_planning_scaffold"
-      ),
-      branch_available = FALSE,
-      reason = as.character(
-        coverage$reason %||%
-          load_balance$reason %||%
-          "No schema-only future-branch guardrail classifications are currently available."
-      ),
-      guardrail_registry = guardrail_registry,
-      guardrail_summary_table = tibble::tibble(),
-      guardrail_table = tibble::tibble(),
-      active_branch_coverage = coverage,
-      active_branch_load_balance = load_balance,
-      note = paste(
-        "Deterministic guardrail classifications are unavailable until the",
-        "active future-branch scaffold can be materialized."
-      )
-    ))
-  }
-
-  join_cols <- c("design_id", "recommended")
-  joined <- dplyr::left_join(
-    coverage_table,
-    load_balance_table[, c(join_cols, "perfect_integer_observation_balance"), drop = FALSE],
-    by = join_cols
-  )
-
-  guardrail_table <- joined |>
-    dplyr::mutate(
-      rater_linking_regime = dplyr::case_when(
-        as.numeric(.data$criterion_replications_per_person) <= 1 ~ "single_rater",
-        as.numeric(.data$criterion_replications_per_person) >= as.numeric(.data$n_rater) ~ "fully_crossed",
-        TRUE ~ "partial_overlap"
-      ),
-      pair_coverage_regime = dplyr::case_when(
-        as.numeric(.data$pair_coverage_fraction_per_cell) <= 0 ~ "no_pair_coverage",
-        as.numeric(.data$pair_coverage_fraction_per_cell) >= 1 ~ "full_pair_coverage",
-        TRUE ~ "partial_pair_coverage"
-      ),
-      integer_balance_regime = dplyr::if_else(
-        as.integer(.data$perfect_integer_observation_balance) == 1L,
-        "integer_balanced",
-        "integer_unbalanced"
-      ),
-      redundancy_regime = dplyr::if_else(
-        as.integer(.data$redundant_scoring) == 1L,
-        "redundant",
-        "single_rater_only"
-      )
-    )
-
-  guardrail_summary_table <- guardrail_registry |>
-    dplyr::rowwise() |>
-    dplyr::mutate(
-      n_levels = dplyr::n_distinct(guardrail_table[[.data$guardrail]]),
-      recommended_level = {
-        row <- guardrail_table[guardrail_table$recommended %in% TRUE, , drop = FALSE]
-        if (nrow(row) == 0L) NA_character_ else as.character(row[[.data$guardrail]][[1]])
-      },
-      observed_levels = paste(sort(unique(as.character(guardrail_table[[.data$guardrail]]))), collapse = ", ")
-    ) |>
-    dplyr::ungroup()
-
-  list(
-    guardrail_contract = "arbitrary_facet_planning_active_branch_guardrails",
-    guardrail_stage = as.character(
-      coverage$diagnostics_stage %||% load_balance$diagnostics_stage %||% "schema_only"
-    ),
-    planner_contract = as.character(
-      coverage$planner_contract %||%
-        load_balance$planner_contract %||%
-        "arbitrary_facet_planning_scaffold"
-    ),
-    branch_available = TRUE,
-    reason = "Schema-only future-branch guardrail classifications are materialized.",
-    guardrail_registry = guardrail_registry,
-    guardrail_summary_table = guardrail_summary_table,
-    guardrail_table = guardrail_table,
-    active_branch_coverage = coverage,
-    active_branch_load_balance = load_balance,
-    note = paste(
-      "Deterministic guardrail classifications for the active future-branch",
-      "scaffold. These are exact design-regime labels derived from overlap and",
-      "integer-balance structure; they do not estimate psychometric performance."
-    )
-  )
-}
-
-simulation_future_branch_active_branch_guardrail_overview <- function(x,
-                                                                      design = NULL,
-                                                                      prefer = NULL,
-                                                                      view = c("public", "canonical", "branch"),
-                                                                      mode = c("brief", "snapshot", "operation"),
-                                                                      surface = c("digest", "catalog", "metrics", "axes", "components"),
-                                                                      table_component = c("grid", "report", "surface_index"),
-                                                                      x_var = NULL,
-                                                                      group_var = NULL,
-                                                                      id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "active_branch_guardrail_overview",
-    design = design,
-    prefer = prefer,
-    view = view,
-    view_default = "public",
-    mode = mode,
-    mode_default = "brief",
-    surface = surface,
-    surface_default = "digest",
-    table_component = table_component,
-    table_component_default = "grid",
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  guardrails <- simulation_future_branch_active_branch_guardrails(
-    x = x,
-    design = design,
-    prefer = prefer,
-    view = view,
-    mode = mode,
-    surface = surface,
-    table_component = table_component,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-
-  guardrail_table <- tibble::as_tibble(guardrails$guardrail_table %||% tibble::tibble())
-  headline_table <- tibble::tibble(
-    branch_available = isTRUE(guardrails$branch_available),
-    n_designs = nrow(guardrail_table),
-    n_guardrails = if (is.data.frame(guardrails$guardrail_registry)) nrow(guardrails$guardrail_registry) else 0L,
-    recommended_design_id = if ("design_id" %in% names(guardrail_table) &&
-                                any(guardrail_table$recommended %in% TRUE)) {
-      as.character(guardrail_table$design_id[which(guardrail_table$recommended %in% TRUE)[1]])
-    } else {
-      NA_character_
-    },
-    n_single_rater_designs = if ("rater_linking_regime" %in% names(guardrail_table)) {
-      sum(guardrail_table$rater_linking_regime %in% "single_rater", na.rm = TRUE)
-    } else {
-      0L
-    },
-    n_partial_overlap_designs = if ("rater_linking_regime" %in% names(guardrail_table)) {
-      sum(guardrail_table$rater_linking_regime %in% "partial_overlap", na.rm = TRUE)
-    } else {
-      0L
-    },
-    n_fully_crossed_designs = if ("rater_linking_regime" %in% names(guardrail_table)) {
-      sum(guardrail_table$rater_linking_regime %in% "fully_crossed", na.rm = TRUE)
-    } else {
-      0L
-    },
-    n_integer_balanced_designs = if ("integer_balance_regime" %in% names(guardrail_table)) {
-      sum(guardrail_table$integer_balance_regime %in% "integer_balanced", na.rm = TRUE)
-    } else {
-      0L
-    }
-  )
-
-  list(
-    overview_contract = "arbitrary_facet_planning_active_branch_guardrail_overview",
-    overview_stage = as.character(guardrails$guardrail_stage %||% "schema_only"),
-    planner_contract = as.character(
-      guardrails$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    branch_available = isTRUE(guardrails$branch_available),
-    reason = as.character(
-      guardrails$reason %||%
-        "No future-branch guardrail overview is currently available."
-    ),
-    headline_table = headline_table,
-    guardrail_registry = tibble::as_tibble(guardrails$guardrail_registry %||% tibble::tibble()),
-    guardrail_summary_table = tibble::as_tibble(guardrails$guardrail_summary_table %||% tibble::tibble()),
-    active_branch_guardrails = guardrails,
-    note = paste(
-      "Compact guardrail overview for the active future-branch scaffold,",
-      "combining exact design-regime counts with a basis-aware guardrail index."
-    )
-  )
-}
-
-simulation_future_branch_active_branch_readiness_registry <- function() {
-  tibble::tibble(
-    indicator = c(
-      "supports_multi_rater_cells",
-      "supports_pair_overlap",
-      "supports_integer_balanced_load",
-      "supports_full_pair_coverage"
-    ),
-    basis_class = c(
-      "exact_indicator",
-      "exact_indicator",
-      "exact_indicator",
-      "exact_indicator"
-    ),
-    rule = c(
-      "as.integer(redundancy_regime == 'redundant')",
-      "as.integer(pair_coverage_regime != 'no_pair_coverage')",
-      "as.integer(integer_balance_regime == 'integer_balanced')",
-      "as.integer(pair_coverage_regime == 'full_pair_coverage')"
-    ),
-    interpretation = c(
-      "Exact indicator that each scored cell uses more than one rater.",
-      "Exact indicator that the current design yields at least one within-cell rater pair overlap.",
-      "Exact indicator that the total observation count is evenly divisible across raters.",
-      "Exact indicator that every available rater pair is represented within each scored cell."
-    ),
-    psychometric = FALSE
-  )
-}
-
-simulation_future_branch_active_branch_readiness <- function(x,
-                                                             design = NULL,
-                                                             prefer = NULL,
-                                                             view = c("public", "canonical", "branch"),
-                                                             mode = c("brief", "snapshot", "operation"),
-                                                             surface = c("digest", "catalog", "metrics", "axes", "components"),
-                                                             table_component = c("grid", "report", "surface_index"),
-                                                             x_var = NULL,
-                                                             group_var = NULL,
-                                                             id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "active_branch_readiness",
-    design = design,
-    prefer = prefer,
-    view = view,
-    view_default = "public",
-    mode = mode,
-    mode_default = "brief",
-    surface = surface,
-    surface_default = "digest",
-    table_component = table_component,
-    table_component_default = "grid",
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  guardrails <- simulation_future_branch_active_branch_guardrails(
-    x = x,
-    design = design,
-    prefer = prefer,
-    view = view,
-    mode = mode,
-    surface = surface,
-    table_component = table_component,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-
-  guardrail_table <- tibble::as_tibble(guardrails$guardrail_table %||% tibble::tibble())
-  indicator_registry <- simulation_future_branch_active_branch_readiness_registry()
-
-  if (!isTRUE(guardrails$branch_available) || nrow(guardrail_table) == 0L) {
-    return(list(
-      readiness_contract = "arbitrary_facet_planning_active_branch_readiness",
-      readiness_stage = as.character(guardrails$guardrail_stage %||% "schema_only"),
-      planner_contract = as.character(
-        guardrails$planner_contract %||% "arbitrary_facet_planning_scaffold"
-      ),
-      branch_available = FALSE,
-      reason = as.character(
-        guardrails$reason %||%
-          "No schema-only future-branch structural readiness summary is currently available."
-      ),
-      indicator_registry = indicator_registry,
-      readiness_summary_table = tibble::tibble(),
-      readiness_table = tibble::tibble(),
-      active_branch_guardrails = guardrails,
-      note = paste(
-        "Deterministic structural readiness indicators are unavailable until",
-        "the active future-branch scaffold can be materialized."
-      )
-    ))
-  }
-
-  readiness_table <- guardrail_table |>
-    dplyr::mutate(
-      supports_multi_rater_cells = as.integer(.data$redundancy_regime == "redundant"),
-      supports_pair_overlap = as.integer(.data$pair_coverage_regime != "no_pair_coverage"),
-      supports_integer_balanced_load = as.integer(.data$integer_balance_regime == "integer_balanced"),
-      supports_full_pair_coverage = as.integer(.data$pair_coverage_regime == "full_pair_coverage"),
-      structural_tier = dplyr::case_when(
-        .data$supports_pair_overlap <= 0 ~ "single_rater_only",
-        .data$supports_full_pair_coverage >= 1 & .data$supports_integer_balanced_load >= 1 ~ "full_overlap_balanced",
-        .data$supports_full_pair_coverage >= 1 ~ "full_overlap_unbalanced",
-        .data$supports_integer_balanced_load >= 1 ~ "partial_overlap_balanced",
-        TRUE ~ "partial_overlap_unbalanced"
-      )
-    )
-
-  recommended_row <- readiness_table[readiness_table$recommended %in% TRUE, , drop = FALSE]
-  readiness_summary_table <- indicator_registry |>
-    dplyr::mutate(
-      min = vapply(.data$indicator, function(indicator) {
-        min(readiness_table[[indicator]], na.rm = TRUE)
-      }, numeric(1)),
-      max = vapply(.data$indicator, function(indicator) {
-        max(readiness_table[[indicator]], na.rm = TRUE)
-      }, numeric(1)),
-      mean = vapply(.data$indicator, function(indicator) {
-        mean(readiness_table[[indicator]], na.rm = TRUE)
-      }, numeric(1)),
-      recommended_value = vapply(.data$indicator, function(indicator) {
-        if (nrow(recommended_row) == 0L) return(NA_real_)
-        as.numeric(recommended_row[[indicator]][[1]])
-      }, numeric(1))
-    )
-
-  list(
-    readiness_contract = "arbitrary_facet_planning_active_branch_readiness",
-    readiness_stage = as.character(guardrails$guardrail_stage %||% "schema_only"),
-    planner_contract = as.character(
-      guardrails$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    branch_available = TRUE,
-    reason = "Schema-only future-branch structural readiness summary is materialized.",
-    indicator_registry = indicator_registry,
-    readiness_summary_table = readiness_summary_table,
-    readiness_table = readiness_table,
-    active_branch_guardrails = guardrails,
-    note = paste(
-      "Deterministic structural readiness indicators for the active future-branch",
-      "scaffold. These summarize exact overlap and balance preconditions only;",
-      "they do not estimate psychometric performance."
-    )
-  )
-}
-
-simulation_future_branch_active_branch_readiness_overview <- function(x,
-                                                                      design = NULL,
-                                                                      prefer = NULL,
-                                                                      view = c("public", "canonical", "branch"),
-                                                                      mode = c("brief", "snapshot", "operation"),
-                                                                      surface = c("digest", "catalog", "metrics", "axes", "components"),
-                                                                      table_component = c("grid", "report", "surface_index"),
-                                                                      x_var = NULL,
-                                                                      group_var = NULL,
-                                                                      id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "active_branch_readiness_overview",
-    design = design,
-    prefer = prefer,
-    view = view,
-    view_default = "public",
-    mode = mode,
-    mode_default = "brief",
-    surface = surface,
-    surface_default = "digest",
-    table_component = table_component,
-    table_component_default = "grid",
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  readiness <- simulation_future_branch_active_branch_readiness(
-    x = x,
-    design = design,
-    prefer = prefer,
-    view = view,
-    mode = mode,
-    surface = surface,
-    table_component = table_component,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-
-  readiness_table <- tibble::as_tibble(readiness$readiness_table %||% tibble::tibble())
-  headline_table <- tibble::tibble(
-    branch_available = isTRUE(readiness$branch_available),
-    n_designs = nrow(readiness_table),
-    n_indicators = if (is.data.frame(readiness$indicator_registry)) nrow(readiness$indicator_registry) else 0L,
-    recommended_design_id = if ("design_id" %in% names(readiness_table) &&
-                                any(readiness_table$recommended %in% TRUE)) {
-      as.character(readiness_table$design_id[which(readiness_table$recommended %in% TRUE)[1]])
-    } else {
-      NA_character_
-    },
-    n_single_rater_only_tiers = if ("structural_tier" %in% names(readiness_table)) {
-      sum(readiness_table$structural_tier %in% "single_rater_only", na.rm = TRUE)
-    } else {
-      0L
-    },
-    n_partial_overlap_balanced_tiers = if ("structural_tier" %in% names(readiness_table)) {
-      sum(readiness_table$structural_tier %in% "partial_overlap_balanced", na.rm = TRUE)
-    } else {
-      0L
-    },
-    n_partial_overlap_unbalanced_tiers = if ("structural_tier" %in% names(readiness_table)) {
-      sum(readiness_table$structural_tier %in% "partial_overlap_unbalanced", na.rm = TRUE)
-    } else {
-      0L
-    },
-    n_full_overlap_tiers = if ("structural_tier" %in% names(readiness_table)) {
-      sum(readiness_table$structural_tier %in% c("full_overlap_balanced", "full_overlap_unbalanced"), na.rm = TRUE)
-    } else {
-      0L
-    }
-  )
-
-  list(
-    overview_contract = "arbitrary_facet_planning_active_branch_readiness_overview",
-    overview_stage = as.character(readiness$readiness_stage %||% "schema_only"),
-    planner_contract = as.character(
-      readiness$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    branch_available = isTRUE(readiness$branch_available),
-    reason = as.character(
-      readiness$reason %||%
-        "No future-branch structural readiness overview is currently available."
-    ),
-    headline_table = headline_table,
-    indicator_registry = tibble::as_tibble(readiness$indicator_registry %||% tibble::tibble()),
-    readiness_summary_table = tibble::as_tibble(readiness$readiness_summary_table %||% tibble::tibble()),
-    active_branch_readiness = readiness,
-    note = paste(
-      "Compact structural readiness overview for the active future-branch",
-      "scaffold, combining exact overlap/balance tiers with a basis-aware",
-      "indicator index."
-    )
-  )
-}
-
-simulation_future_branch_active_branch_recommendation <- function(x,
-                                                                  design = NULL,
-                                                                  prefer = NULL,
-                                                                  view = c("public", "canonical", "branch"),
-                                                                  mode = c("brief", "snapshot", "operation"),
-                                                                  surface = c("digest", "catalog", "metrics", "axes", "components"),
-                                                                  table_component = c("grid", "report", "surface_index"),
-                                                                  x_var = NULL,
-                                                                  group_var = NULL,
-                                                                  id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "active_branch_recommendation",
-    design = design,
-    prefer = prefer,
-    view = view,
-    view_default = "public",
-    mode = mode,
-    mode_default = "brief",
-    surface = surface,
-    surface_default = "digest",
-    table_component = table_component,
-    table_component_default = "grid",
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  readiness <- simulation_future_branch_active_branch_readiness(
-    x = x,
-    design = design,
-    prefer = prefer,
-    view = view,
-    mode = mode,
-    surface = surface,
-    table_component = table_component,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  profile <- simulation_future_branch_active_branch_profile(
-    x = x,
-    design = design,
-    prefer = prefer,
-    view = view,
-    mode = mode,
-    surface = surface,
-    table_component = table_component,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-
-  readiness_table <- tibble::as_tibble(readiness$readiness_table %||% tibble::tibble())
-  profile_table <- tibble::as_tibble(profile$profile_table %||% tibble::tibble())
-
-  if (!isTRUE(readiness$branch_available) || nrow(readiness_table) == 0L ||
-      !isTRUE(profile$branch_available) || nrow(profile_table) == 0L) {
-    return(list(
-      recommendation_contract = "arbitrary_facet_planning_active_branch_recommendation",
-      recommendation_stage = as.character(
-        readiness$readiness_stage %||% profile$profile_stage %||% "schema_only"
-      ),
-      planner_contract = as.character(
-        readiness$planner_contract %||%
-          profile$planner_contract %||%
-          "arbitrary_facet_planning_scaffold"
-      ),
-      recommendation_available = FALSE,
-      reason = as.character(
-        readiness$reason %||%
-          profile$reason %||%
-          "No schema-only future-branch structural recommendation is currently available."
-      ),
-      ranking_rule = paste(
-        "Unavailable because the active future-branch readiness and profile",
-        "contracts are not both materialized."
-      ),
-      recommended_design_id = character(0),
-      recommended_tier = character(0),
-      recommendation_table = tibble::tibble(),
-      active_branch_readiness = readiness,
-      active_branch_profile = profile,
-      note = paste(
-        "Structural recommendation is unavailable until the active future-branch",
-        "scaffold can be materialized."
-      )
-    ))
-  }
-
-  tier_priority <- c(
-    full_overlap_balanced = 1L,
-    full_overlap_unbalanced = 2L,
-    partial_overlap_balanced = 3L,
-    partial_overlap_unbalanced = 4L,
-    single_rater_only = 5L
-  )
-
-  recommendation_table <- readiness_table
-  required_profile_cols <- c(
-    "total_observations", "n_person", "n_rater", "n_criterion", "raters_per_person"
-  )
-  missing_profile_cols <- setdiff(required_profile_cols, names(recommendation_table))
-  if (length(missing_profile_cols) > 0L) {
-    recommendation_table <- dplyr::left_join(
-      recommendation_table,
-      profile_table[, c("design_id", missing_profile_cols), drop = FALSE],
-      by = "design_id"
-    )
-  }
-
-  recommendation_table <- recommendation_table |>
-    dplyr::mutate(
-      structural_priority = unname(tier_priority[as.character(.data$structural_tier)]),
-      structural_priority = dplyr::coalesce(.data$structural_priority, length(tier_priority) + 1L)
-    ) |>
-    dplyr::arrange(
-      .data$structural_priority,
-      .data$total_observations,
-      .data$n_person,
-      .data$n_criterion,
-      .data$raters_per_person,
-      .data$n_rater,
-      .data$design_id
-    ) |>
-    dplyr::mutate(recommended = dplyr::row_number() == 1L)
-
-  recommended_row <- dplyr::slice_head(recommendation_table, n = 1)
-  recommended_id <- as.character(recommended_row$design_id[[1]] %||% NA_character_)
-  recommended_tier <- as.character(recommended_row$structural_tier[[1]] %||% NA_character_)
-
-  list(
-    recommendation_contract = "arbitrary_facet_planning_active_branch_recommendation",
-    recommendation_stage = as.character(
-      readiness$readiness_stage %||% profile$profile_stage %||% "schema_only"
-    ),
-    planner_contract = as.character(
-      readiness$planner_contract %||%
-        profile$planner_contract %||%
-        "arbitrary_facet_planning_scaffold"
-    ),
-    recommendation_available = TRUE,
-    reason = paste(
-      "Structural recommendation is available from the active future-branch",
-      "readiness and profile contracts."
-    ),
-    ranking_rule = paste(
-      "Rank by structural tier in the order",
-      "full_overlap_balanced > full_overlap_unbalanced > partial_overlap_balanced >",
-      "partial_overlap_unbalanced > single_rater_only, then minimize total_observations",
-      "and remaining canonical count variables."
-    ),
-    recommended_design_id = recommended_id,
-    recommended_tier = recommended_tier,
-    recommendation_table = recommendation_table,
-    active_branch_readiness = readiness,
-    active_branch_profile = profile,
-    note = paste(
-      "Conservative structural recommendation for the active future-branch",
-      "scaffold. This ranking uses exact overlap/balance tiers and total",
-      "observation counts only; it is not a psychometric optimization."
-    )
-  )
-}
-
-simulation_future_branch_active_branch_recommendation_overview <- function(x,
-                                                                           design = NULL,
-                                                                           prefer = NULL,
-                                                                           view = c("public", "canonical", "branch"),
-                                                                           mode = c("brief", "snapshot", "operation"),
-                                                                           surface = c("digest", "catalog", "metrics", "axes", "components"),
-                                                                           table_component = c("grid", "report", "surface_index"),
-                                                                           x_var = NULL,
-                                                                           group_var = NULL,
-                                                                           id_prefix = NULL) {
-  cached <- simulation_future_branch_cached_default(
-    x = x,
-    field = "active_branch_recommendation_overview",
-    design = design,
-    prefer = prefer,
-    view = view,
-    view_default = "public",
-    mode = mode,
-    mode_default = "brief",
-    surface = surface,
-    surface_default = "digest",
-    table_component = table_component,
-    table_component_default = "grid",
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-  if (!is.null(cached)) {
-    return(cached)
-  }
-
-  recommendation <- simulation_future_branch_active_branch_recommendation(
-    x = x,
-    design = design,
-    prefer = prefer,
-    view = view,
-    mode = mode,
-    surface = surface,
-    table_component = table_component,
-    x_var = x_var,
-    group_var = group_var,
-    id_prefix = id_prefix
-  )
-
-  recommendation_table <- tibble::as_tibble(recommendation$recommendation_table %||% tibble::tibble())
-  headline_table <- tibble::tibble(
-    recommendation_available = isTRUE(recommendation$recommendation_available),
-    n_designs = nrow(recommendation_table),
-    recommended_design_id = as.character(recommendation$recommended_design_id %||% NA_character_),
-    recommended_tier = as.character(recommendation$recommended_tier %||% NA_character_),
-    n_top_tier_candidates = if ("structural_priority" %in% names(recommendation_table)) {
-      min_priority <- min(recommendation_table$structural_priority, na.rm = TRUE)
-      sum(recommendation_table$structural_priority == min_priority, na.rm = TRUE)
-    } else {
-      0L
-    }
-  )
-
-  list(
-    overview_contract = "arbitrary_facet_planning_active_branch_recommendation_overview",
-    overview_stage = as.character(recommendation$recommendation_stage %||% "schema_only"),
-    planner_contract = as.character(
-      recommendation$planner_contract %||% "arbitrary_facet_planning_scaffold"
-    ),
-    recommendation_available = isTRUE(recommendation$recommendation_available),
-    reason = as.character(
-      recommendation$reason %||%
-        "No future-branch structural recommendation overview is currently available."
-    ),
-    headline_table = headline_table,
-    recommendation_table = recommendation_table,
-    active_branch_recommendation = recommendation,
-    note = paste(
-      "Compact structural recommendation overview for the active future-branch",
-      "scaffold, summarizing the conservative exact-tier ranking outcome."
-    )
-  )
-}
-
-future_branch_active_table_index <- function(active,
-                                             overview,
-                                             load_balance,
-                                             coverage,
-                                             guardrails,
-                                             readiness,
-                                             recommendation) {
-  rows_or_zero <- function(tbl) {
-    if (!is.data.frame(tbl)) return(0L)
-    as.integer(nrow(tbl))
-  }
-
-  tibble::tibble(
-    Table = c(
-      "overview",
-      "profile_summary",
-      "load_balance_summary",
-      "coverage_summary",
-      "guardrail_summary",
-      "readiness_summary",
-      "recommendation_table"
-    ),
-    Rows = c(
-      rows_or_zero(overview$headline_table),
-      rows_or_zero(overview$metric_summary_table),
-      rows_or_zero(load_balance$diagnostic_summary_table),
-      rows_or_zero(coverage$diagnostic_summary_table),
-      rows_or_zero(guardrails$guardrail_summary_table),
-      rows_or_zero(readiness$readiness_summary_table),
-      rows_or_zero(recommendation$recommendation_table)
-    ),
-    Role = c(
-      "overview",
-      "profile",
-      "load_balance",
-      "coverage",
-      "guardrails",
-      "readiness",
-      "recommendation"
-    ),
-    Description = c(
-      "Headline active-branch configuration and selected branch surface.",
-      "Deterministic observation/load profile for the current design grid.",
-      "Balanced-expectation and integer split summaries.",
-      "Coverage/connectivity summaries implied by the current design grid.",
-      "Exact overlap/balance regime summaries.",
-      "Exact structural readiness indicators and tier summaries.",
-      "Conservative deterministic recommendation ranking."
-    ),
-    stringsAsFactors = FALSE
-  )
-}
-
-future_branch_appendix_selection_tables <- function(bundle,
-                                                    label = "future_branch_active_branch",
-                                                    presets = c("all", "recommended", "compact", "methods", "results", "diagnostics", "reporting")) {
-  presets <- unique(as.character(presets))
-  original_bundles <- stats::setNames(list(bundle), label)
-
-  bind_tables <- function(parts) {
-    keep <- vapply(parts, function(df) is.data.frame(df) && nrow(df) > 0L, logical(1))
-    parts <- parts[keep]
-    if (length(parts) == 0L) {
-      return(data.frame())
-    }
-    out <- do.call(rbind, parts)
-    rownames(out) <- NULL
-    out
-  }
-
-  selection_catalog <- bind_tables(lapply(presets, function(preset) {
-    selected <- export_select_summary_table_bundles_for_appendix(
-      original_bundles,
-      preset = preset
-    )
-    export_summary_table_selection_catalog(
-      original_bundles = original_bundles,
-      selected_bundles = selected,
-      preset = preset
-    )
-  }))
-
-  list(
-    selection_catalog = selection_catalog,
-    selection_summary = bind_tables(lapply(presets, function(preset) {
-      export_summary_table_selection_summary(selection_catalog, preset = preset)
-    })),
-    selection_role_summary = bind_tables(lapply(presets, function(preset) {
-      export_summary_table_selection_role_summary(selection_catalog, preset = preset)
-    })),
-    selection_section_summary = bind_tables(lapply(presets, function(preset) {
-      export_summary_table_selection_section_summary(selection_catalog, preset = preset)
-    }))
-  )
-}
-
-future_branch_selection_table_summary <- function(selection_catalog,
-                                                  preset = NULL) {
-  tbl <- as.data.frame(selection_catalog %||% data.frame(), stringsAsFactors = FALSE)
-  if (nrow(tbl) == 0L) {
-    return(data.frame())
-  }
-
-  if (!is.null(preset)) {
-    tbl <- tbl[as.character(tbl$Preset %||% "") %in% unique(as.character(preset)), , drop = FALSE]
-  }
-  tbl <- tbl[tbl$Selected %in% TRUE, , drop = FALSE]
-  if (nrow(tbl) == 0L || !"Table" %in% names(tbl)) {
-    return(data.frame())
-  }
-
-  compact_unique <- function(x, max_n = 4L) {
-    summary_table_bundle_compact_labels(unique(as.character(x %||% character(0))), max_n = max_n)
-  }
-  first_non_missing <- function(x, default = NA_character_) {
-    x <- as.character(x %||% character(0))
-    x <- x[!is.na(x) & nzchar(x)]
-    if (length(x) == 0L) {
-      return(default)
-    }
-    x[[1]]
-  }
-  first_numeric <- function(x, default = NA_real_) {
-    x <- suppressWarnings(as.numeric(x))
-    x <- x[is.finite(x)]
-    if (length(x) == 0L) {
-      return(default)
-    }
-    x[[1]]
-  }
-
-  split_tbl <- split(tbl, as.character(tbl$Table))
-  out <- do.call(
-    rbind,
-    lapply(names(split_tbl), function(table_nm) {
-      part <- split_tbl[[table_nm]]
-      data.frame(
-        Table = as.character(table_nm),
-        PresetsSelected = length(unique(as.character(part$Preset %||% ""))),
-        Presets = compact_unique(part$Preset, max_n = 7L),
-        Rows = as.integer(first_numeric(part$Rows, default = 0)),
-        Role = first_non_missing(part$Role),
-        AppendixSection = first_non_missing(part$AppendixSection),
-        PreferredAppendixOrder = as.integer(first_numeric(part$PreferredAppendixOrder, default = 9999)),
-        PlotReady = any(part$PlotReady %in% TRUE, na.rm = TRUE),
-        ExportReady = any(part$ExportReady %in% TRUE, na.rm = TRUE),
-        ApaTableReady = any(part$ApaTableReady %in% TRUE, na.rm = TRUE),
-        stringsAsFactors = FALSE
-      )
-    })
-  )
-  rownames(out) <- NULL
-  out[order(out$PreferredAppendixOrder, out$Table, na.last = TRUE), , drop = FALSE]
-}
-
-future_branch_selection_table_preset_summary <- function(selection_catalog,
-                                                         presets = c("all", "recommended", "compact", "methods", "results", "diagnostics", "reporting")) {
-  bind_tables <- function(parts) {
-    keep <- vapply(parts, function(df) is.data.frame(df) && nrow(df) > 0L, logical(1))
-    parts <- parts[keep]
-    if (length(parts) == 0L) {
-      return(data.frame())
-    }
-    out <- do.call(rbind, parts)
-    rownames(out) <- NULL
-    out
-  }
-
-  presets <- unique(as.character(presets))
-  bind_tables(lapply(presets, function(preset) {
-    export_summary_table_selection_table_summary(
-      selection_catalog = selection_catalog,
-      preset = preset
-    )
-  }))
-}
-
-future_branch_selection_handoff_table_summary <- function(selection_catalog,
-                                                          presets = c("all", "recommended", "compact", "methods", "results", "diagnostics", "reporting")) {
-  bind_tables <- function(parts) {
-    keep <- vapply(parts, function(df) is.data.frame(df) && nrow(df) > 0L, logical(1))
-    parts <- parts[keep]
-    if (length(parts) == 0L) {
-      return(data.frame())
-    }
-    out <- do.call(rbind, parts)
-    rownames(out) <- NULL
-    out
-  }
-
-  presets <- unique(as.character(presets))
-  bind_tables(lapply(presets, function(preset) {
-    export_summary_table_selection_handoff_table_summary(
-      selection_catalog = selection_catalog,
-      preset = preset
-    )
-  }))
-}
-
-future_branch_selection_handoff_summary <- function(selection_catalog,
-                                                    presets = c("all", "recommended", "compact", "methods", "results", "diagnostics", "reporting")) {
-  tbl <- as.data.frame(selection_catalog %||% data.frame(), stringsAsFactors = FALSE)
-  if (nrow(tbl) == 0L) {
-    return(data.frame())
-  }
-
-  presets <- unique(as.character(presets))
-  tbl <- tbl[tbl$Selected %in% TRUE & as.character(tbl$Preset %||% "") %in% presets, , drop = FALSE]
-  if (nrow(tbl) == 0L || !"AppendixSection" %in% names(tbl)) {
-    return(data.frame())
-  }
-
-  compact_unique <- function(x, max_n = 4L) {
-    summary_table_bundle_compact_labels(unique(as.character(x %||% character(0))), max_n = max_n)
-  }
-
-  split_tbl <- split(tbl, paste(as.character(tbl$Preset), as.character(tbl$AppendixSection), sep = "\r"))
-  out <- do.call(
-    rbind,
-    lapply(split_tbl, function(part) {
-      tables <- nrow(part)
-      plot_ready <- sum(part$PlotReady %in% TRUE, na.rm = TRUE)
-      numeric_tables <- sum(suppressWarnings(as.numeric(part$NumericColumns)) > 0, na.rm = TRUE)
-      data.frame(
-        Preset = as.character(part$Preset[[1]] %||% ""),
-        AppendixSection = as.character(part$AppendixSection[[1]] %||% ""),
-        Tables = tables,
-        PlotReadyTables = plot_ready,
-        PlotReadyFraction = export_exact_fraction(plot_ready, tables),
-        NumericTables = numeric_tables,
-        NumericFraction = export_exact_fraction(numeric_tables, tables),
-        RolesCovered = compact_unique(part$Role, max_n = 4L),
-        KeyTables = compact_unique(part$Table, max_n = 4L),
-        stringsAsFactors = FALSE
-      )
-    })
-  )
-  rownames(out) <- NULL
-  out[order(out$Preset, out$AppendixSection), , drop = FALSE]
-}
-
-future_branch_selection_handoff_bundle_summary <- function(selection_catalog,
-                                                           presets = c("all", "recommended", "compact", "methods", "results", "diagnostics", "reporting")) {
-  bind_tables <- function(parts) {
-    keep <- vapply(parts, function(df) is.data.frame(df) && nrow(df) > 0L, logical(1))
-    parts <- parts[keep]
-    if (length(parts) == 0L) {
-      return(data.frame())
-    }
-    out <- do.call(rbind, parts)
-    rownames(out) <- NULL
-    out
-  }
-
-  presets <- unique(as.character(presets))
-  bind_tables(lapply(presets, function(preset) {
-    export_summary_table_selection_handoff_bundle_summary(
-      selection_catalog = selection_catalog,
-      preset = preset
-    )
-  }))
-}
-
-future_branch_selection_handoff_preset_summary <- function(selection_catalog,
-                                                           presets = c("all", "recommended", "compact", "methods", "results", "diagnostics", "reporting")) {
-  bind_tables <- function(parts) {
-    keep <- vapply(parts, function(df) is.data.frame(df) && nrow(df) > 0L, logical(1))
-    parts <- parts[keep]
-    if (length(parts) == 0L) {
-      return(data.frame())
-    }
-    out <- do.call(rbind, parts)
-    rownames(out) <- NULL
-    out
-  }
-
-  presets <- unique(as.character(presets))
-  bind_tables(lapply(presets, function(preset) {
-    export_summary_table_selection_handoff_preset_summary(
-      selection_catalog = selection_catalog,
-      preset = preset
-    )
-  }))
-}
-
-future_branch_selection_handoff_role_summary <- function(selection_catalog,
-                                                         presets = c("all", "recommended", "compact", "methods", "results", "diagnostics", "reporting")) {
-  bind_tables <- function(parts) {
-    keep <- vapply(parts, function(df) is.data.frame(df) && nrow(df) > 0L, logical(1))
-    parts <- parts[keep]
-    if (length(parts) == 0L) {
-      return(data.frame())
-    }
-    out <- do.call(rbind, parts)
-    rownames(out) <- NULL
-    out
-  }
-
-  presets <- unique(as.character(presets))
-  bind_tables(lapply(presets, function(preset) {
-    export_summary_table_selection_handoff_role_summary(
-      selection_catalog = selection_catalog,
-      preset = preset
-    )
-  }))
-}
-
-future_branch_selection_handoff_role_section_summary <- function(selection_catalog,
-                                                                 presets = c("all", "recommended", "compact", "methods", "results", "diagnostics", "reporting")) {
-  bind_tables <- function(parts) {
-    keep <- vapply(parts, function(df) is.data.frame(df) && nrow(df) > 0L, logical(1))
-    parts <- parts[keep]
-    if (length(parts) == 0L) {
-      return(data.frame())
-    }
-    out <- do.call(rbind, parts)
-    rownames(out) <- NULL
-    out
-  }
-
-  presets <- unique(as.character(presets))
-  bind_tables(lapply(presets, function(preset) {
-    export_summary_table_selection_handoff_role_section_summary(
-      selection_catalog = selection_catalog,
-      preset = preset
-    )
-  }))
-}
-
-future_branch_active_plot_index_from_bundle <- function(plot_index) {
-  idx <- as.data.frame(plot_index %||% data.frame(), stringsAsFactors = FALSE)
-  if (nrow(idx) == 0L) {
-    return(idx)
-  }
-  if (!all(c("Table", "DefaultPlotTypes") %in% names(idx))) {
-    return(idx)
-  }
-
-  direct_routes <- c(
-    future_branch_profile = "profile_metrics",
-    future_branch_load_balance = "load_balance",
-    future_branch_coverage = "coverage",
-    future_branch_readiness = "readiness_tiers",
-    future_branch_appendix_roles = "appendix_roles",
-    future_branch_appendix_sections = "appendix_sections",
-    future_branch_appendix_presets = "appendix_presets",
-    future_branch_selection_table_presets = "selection_tables",
-    future_branch_selection_handoff_presets = "selection_handoff_presets",
-    future_branch_selection_handoff = "selection_handoff",
-    future_branch_selection_handoff_bundles = "selection_handoff_bundles",
-    future_branch_selection_handoff_roles = "selection_handoff_roles",
-    future_branch_selection_handoff_role_sections = "selection_handoff_role_sections",
-    future_branch_selection_tables = "selection_tables",
-    future_branch_selection_summary = "selection_bundles",
-    future_branch_selection_roles = "selection_roles",
-    future_branch_selection_sections = "selection_sections"
-  )
-
-  idx$DefaultPlotTypes <- vapply(seq_len(nrow(idx)), function(i) {
-    tbl <- as.character(idx$Table[i] %||% "")
-    base_types <- strsplit(as.character(idx$DefaultPlotTypes[i] %||% ""), ",", fixed = TRUE)[[1]]
-    base_types <- trimws(base_types)
-    base_types <- base_types[nzchar(base_types)]
-    extra <- unname(direct_routes[tbl])
-    extra <- extra[!is.na(extra) & nzchar(extra)]
-    paste(unique(c(extra, base_types)), collapse = ", ")
-  }, character(1))
-
-  idx
-}
-
-#' Summarize a future arbitrary-facet planning active branch
-#'
-#' @param object Output from the future-branch active planning scaffold stored
-#'   in `planning_schema$future_branch_active_branch`.
-#' @param digits Number of digits used in numeric summaries.
-#' @param top_n Maximum number of recommendation rows to print in the preview.
-#' @param ... Reserved for generic compatibility.
-#'
-#' @details
-#' This summary is intentionally conservative. It aggregates only deterministic
-#' branch-side quantities already validated in the schema-first arbitrary-facet
-#' planning scaffold: observation bookkeeping, load/balance, coverage,
-#' guardrails, structural readiness, and conservative recommendation ranking.
-#' It also exposes the same manuscript-facing table/appendix metadata used by
-#' [build_summary_table_bundle()] so the future branch can be reviewed directly
-#' without first routing through planning summaries. In addition to bundle-level
-#' appendix presets and section counts, it includes export-like appendix
-#' selection summaries by preset, reporting role, manuscript section,
-#' bundle-aware handoff summaries, preset-specific table surface, and a
-#' table-level handoff crosswalk, plus direct `role_summary` / `table_profile`
-#' surfaces for table-shape review.
-#' It does not report psychometric recovery or Monte Carlo performance.
-#'
-#' @return An object of class `summary.mfrm_future_branch_active_branch`.
-#' @seealso [summary.mfrm_design_evaluation()], [plot.mfrm_future_branch_active_branch()]
-#' @export
-summary.mfrm_future_branch_active_branch <- function(object, digits = 3, top_n = 8, ...) {
-  active <- simulation_future_branch_active_branch(object)
-  overview <- simulation_future_branch_active_branch_overview(active)
-  load_balance <- simulation_future_branch_active_branch_load_balance_overview(active)
-  coverage <- simulation_future_branch_active_branch_coverage_overview(active)
-  guardrails <- simulation_future_branch_active_branch_guardrail_overview(active)
-  readiness <- simulation_future_branch_active_branch_readiness_overview(active)
-  recommendation <- simulation_future_branch_active_branch_recommendation_overview(active)
-
-  digits <- max(0L, as.integer(digits[1]))
-  top_n <- max(1L, as.integer(top_n[1]))
-
-  round_df <- function(df) {
-    if (!is.data.frame(df) || nrow(df) == 0L) return(df)
-    num_cols <- vapply(df, is.numeric, logical(1))
-    df[num_cols] <- lapply(df[num_cols], round, digits = digits)
-    df
-  }
-
-  headline <- tibble::tibble(
-    branch_available = isTRUE(active$branch_available),
-    n_designs = as.integer(active$n_designs %||% 0L),
-    recommended_design_id = as.character(active$recommended_design_id %||% NA_character_),
-    view = as.character(active$view %||% NA_character_),
-    mode = as.character(active$mode %||% NA_character_),
-    surface = as.character(active$surface %||% NA_character_),
-    table_component = as.character(active$table_component %||% NA_character_)
-  )
-
-  recommendation_table <- tibble::as_tibble(recommendation$recommendation_table %||% tibble::tibble())
-  if (nrow(recommendation_table) > 0L) {
-    recommendation_table <- utils::head(recommendation_table, n = top_n)
-  }
-
-  notes <- unique(stats::na.omit(c(
-    as.character(active$note %||% character(0)),
-    as.character(overview$note %||% character(0)),
-    as.character(load_balance$note %||% character(0)),
-    as.character(coverage$note %||% character(0)),
-    as.character(guardrails$note %||% character(0)),
-    as.character(readiness$note %||% character(0)),
-    as.character(recommendation$note %||% character(0))
-  )))
-
-  out <- list(
-    overview = round_df(headline),
-    table_index = future_branch_active_table_index(
-      active = active,
-      overview = overview,
-      load_balance = load_balance,
-      coverage = coverage,
-      guardrails = guardrails,
-      readiness = readiness,
-      recommendation = recommendation
-    ),
-    profile_summary = round_df(tibble::as_tibble(overview$metric_summary_table %||% tibble::tibble())),
-    load_balance_summary = round_df(tibble::as_tibble(load_balance$diagnostic_summary_table %||% tibble::tibble())),
-    coverage_summary = round_df(tibble::as_tibble(coverage$diagnostic_summary_table %||% tibble::tibble())),
-    guardrail_summary = round_df(tibble::as_tibble(guardrails$guardrail_summary_table %||% tibble::tibble())),
-    readiness_summary = round_df(tibble::as_tibble(readiness$readiness_summary_table %||% tibble::tibble())),
-    recommendation_table = round_df(recommendation_table),
-    notes = notes,
-    digits = digits
-  )
-  temp_core <- out
-  class(temp_core) <- "summary.mfrm_future_branch_active_branch"
-  bundle_core <- build_summary_table_bundle(temp_core, include_empty = TRUE)
-  selection_tables <- future_branch_appendix_selection_tables(bundle_core)
-  out$selection_table_summary <- future_branch_selection_table_summary(
-    selection_catalog = selection_tables$selection_catalog
-  )
-  out$selection_table_preset_summary <- future_branch_selection_table_preset_summary(
-    selection_catalog = selection_tables$selection_catalog
-  )
-  out$selection_handoff_table_summary <- future_branch_selection_handoff_table_summary(
-    selection_catalog = selection_tables$selection_catalog
-  )
-  out$selection_handoff_preset_summary <- future_branch_selection_handoff_preset_summary(
-    selection_catalog = selection_tables$selection_catalog
-  )
-  out$selection_handoff_summary <- future_branch_selection_handoff_summary(
-    selection_catalog = selection_tables$selection_catalog
-  )
-  out$selection_handoff_bundle_summary <- future_branch_selection_handoff_bundle_summary(
-    selection_catalog = selection_tables$selection_catalog
-  )
-  out$selection_handoff_role_summary <- future_branch_selection_handoff_role_summary(
-    selection_catalog = selection_tables$selection_catalog
-  )
-  out$selection_handoff_role_section_summary <- future_branch_selection_handoff_role_section_summary(
-    selection_catalog = selection_tables$selection_catalog
-  )
-  out$selection_summary <- selection_tables$selection_summary
-  out$selection_role_summary <- selection_tables$selection_role_summary
-  out$selection_section_summary <- selection_tables$selection_section_summary
-  out$selection_catalog <- selection_tables$selection_catalog
-
-  temp_final <- out
-  class(temp_final) <- "summary.mfrm_future_branch_active_branch"
-  bundle_final <- build_summary_table_bundle(temp_final, include_empty = TRUE)
-  out$table_index <- as.data.frame(bundle_final$table_index %||% data.frame(), stringsAsFactors = FALSE)
-  out$plot_index <- future_branch_active_plot_index_from_bundle(
-    as.data.frame(bundle_final$plot_index %||% data.frame(), stringsAsFactors = FALSE)
-  )
-  out$table_catalog <- summary_table_bundle_catalog(bundle_final)
-  out$table_profile <- summary_table_bundle_profile(bundle_final)
-  if (nrow(out$table_profile) > 0L) {
-    ord <- order(out$table_profile$Rows, out$table_profile$Cols, decreasing = TRUE, na.last = TRUE)
-    out$table_profile <- out$table_profile[ord, , drop = FALSE]
-    out$table_profile <- utils::head(out$table_profile, n = top_n)
-  }
-  out$role_summary <- data.frame()
-  if (nrow(out$table_index) > 0L && "Role" %in% names(out$table_index)) {
-    roles <- split(out$table_index, out$table_index$Role %||% "")
-    out$role_summary <- do.call(
-      rbind,
-      lapply(names(roles), function(role_nm) {
-        part <- roles[[role_nm]]
-        data.frame(
-          Role = as.character(role_nm),
-          Tables = nrow(part),
-          TotalRows = sum(suppressWarnings(as.numeric(part$Rows)), na.rm = TRUE),
-          TotalCols = sum(suppressWarnings(as.numeric(part$Cols)), na.rm = TRUE),
-          stringsAsFactors = FALSE
-        )
-      })
-    )
-    out$role_summary <- out$role_summary[
-      order(out$role_summary$Tables, out$role_summary$Role, decreasing = TRUE),
-      ,
-      drop = FALSE
-    ]
-    rownames(out$role_summary) <- NULL
-  }
-  out$appendix_presets <- summary_table_bundle_appendix_presets(out$table_catalog)
-  out$appendix_role_summary <- summary_table_bundle_appendix_role_summary(out$table_catalog)
-  out$appendix_section_summary <- summary_table_bundle_appendix_section_summary(out$table_catalog)
-  out$reporting_map <- summary_table_bundle_reporting_map(bundle_final, out$table_catalog)
-  out$overview$RecommendedAppendixTables <- sum(out$table_catalog$RecommendedAppendix %in% TRUE, na.rm = TRUE)
-  out$overview$CompactAppendixTables <- sum(out$table_catalog$CompactAppendix %in% TRUE, na.rm = TRUE)
-  out$overview$NumericTables <- sum(out$table_profile$NumericColumns > 0, na.rm = TRUE)
-  out$overview$AnyNumericTable <- nrow(out$table_profile) > 0L &&
-    any(out$table_profile$NumericColumns > 0, na.rm = TRUE)
-  class(out) <- "summary.mfrm_future_branch_active_branch"
-  out
-}
-
-#' @export
-print.summary.mfrm_future_branch_active_branch <- function(x, ...) {
-  digits <- max(0L, as.integer(x$digits %||% 3L))
-
-  cat("mfrmr Future Arbitrary-Facet Planning Summary\n")
-  if (!is.null(x$overview) && nrow(x$overview) > 0L) {
-    cat("\nOverview\n")
-    print(round_numeric_df(as.data.frame(x$overview), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$table_index) && nrow(x$table_index) > 0L) {
-    cat("\nTable index\n")
-    print(as.data.frame(x$table_index), row.names = FALSE)
-  }
-  if (!is.null(x$plot_index) && nrow(x$plot_index) > 0L) {
-    cat("\nPlot index\n")
-    print(as.data.frame(x$plot_index), row.names = FALSE)
-  }
-  if (!is.null(x$table_catalog) && nrow(x$table_catalog) > 0L) {
-    cat("\nTable catalog\n")
-    print(round_numeric_df(as.data.frame(x$table_catalog), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$role_summary) && nrow(x$role_summary) > 0L) {
-    cat("\nRole summary\n")
-    print(round_numeric_df(as.data.frame(x$role_summary), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$table_profile) && nrow(x$table_profile) > 0L) {
-    cat("\nTable profile\n")
-    print(round_numeric_df(as.data.frame(x$table_profile), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$profile_summary) && nrow(x$profile_summary) > 0L) {
-    cat("\nProfile summary\n")
-    print(round_numeric_df(as.data.frame(x$profile_summary), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$load_balance_summary) && nrow(x$load_balance_summary) > 0L) {
-    cat("\nLoad/balance summary\n")
-    print(round_numeric_df(as.data.frame(x$load_balance_summary), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$coverage_summary) && nrow(x$coverage_summary) > 0L) {
-    cat("\nCoverage summary\n")
-    print(round_numeric_df(as.data.frame(x$coverage_summary), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$guardrail_summary) && nrow(x$guardrail_summary) > 0L) {
-    cat("\nGuardrail summary\n")
-    print(round_numeric_df(as.data.frame(x$guardrail_summary), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$readiness_summary) && nrow(x$readiness_summary) > 0L) {
-    cat("\nReadiness summary\n")
-    print(round_numeric_df(as.data.frame(x$readiness_summary), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$recommendation_table) && nrow(x$recommendation_table) > 0L) {
-    cat("\nRecommendation table\n")
-    print(round_numeric_df(as.data.frame(x$recommendation_table), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$appendix_presets) && nrow(x$appendix_presets) > 0L) {
-    cat("\nAppendix presets\n")
-    print(round_numeric_df(as.data.frame(x$appendix_presets), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$appendix_role_summary) && nrow(x$appendix_role_summary) > 0L) {
-    cat("\nAppendix role summary\n")
-    print(round_numeric_df(as.data.frame(x$appendix_role_summary), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$appendix_section_summary) && nrow(x$appendix_section_summary) > 0L) {
-    cat("\nAppendix section summary\n")
-    print(round_numeric_df(as.data.frame(x$appendix_section_summary), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$selection_summary) && nrow(x$selection_summary) > 0L) {
-    cat("\nSelection summary\n")
-    print(round_numeric_df(as.data.frame(x$selection_summary), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$selection_table_summary) && nrow(x$selection_table_summary) > 0L) {
-    cat("\nSelection table summary\n")
-    print(round_numeric_df(as.data.frame(x$selection_table_summary), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$selection_table_preset_summary) && nrow(x$selection_table_preset_summary) > 0L) {
-    cat("\nSelection table preset summary\n")
-    print(round_numeric_df(as.data.frame(x$selection_table_preset_summary), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$selection_handoff_table_summary) && nrow(x$selection_handoff_table_summary) > 0L) {
-    cat("\nSelection handoff table summary\n")
-    print(round_numeric_df(as.data.frame(x$selection_handoff_table_summary), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$selection_handoff_preset_summary) && nrow(x$selection_handoff_preset_summary) > 0L) {
-    cat("\nSelection handoff preset summary\n")
-    print(round_numeric_df(as.data.frame(x$selection_handoff_preset_summary), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$selection_handoff_summary) && nrow(x$selection_handoff_summary) > 0L) {
-    cat("\nSelection handoff summary\n")
-    print(round_numeric_df(as.data.frame(x$selection_handoff_summary), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$selection_handoff_bundle_summary) && nrow(x$selection_handoff_bundle_summary) > 0L) {
-    cat("\nSelection handoff bundle summary\n")
-    print(round_numeric_df(as.data.frame(x$selection_handoff_bundle_summary), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$selection_handoff_role_summary) && nrow(x$selection_handoff_role_summary) > 0L) {
-    cat("\nSelection handoff role summary\n")
-    print(round_numeric_df(as.data.frame(x$selection_handoff_role_summary), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$selection_handoff_role_section_summary) && nrow(x$selection_handoff_role_section_summary) > 0L) {
-    cat("\nSelection handoff role-section summary\n")
-    print(round_numeric_df(as.data.frame(x$selection_handoff_role_section_summary), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$selection_role_summary) && nrow(x$selection_role_summary) > 0L) {
-    cat("\nSelection role summary\n")
-    print(round_numeric_df(as.data.frame(x$selection_role_summary), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$selection_section_summary) && nrow(x$selection_section_summary) > 0L) {
-    cat("\nSelection section summary\n")
-    print(round_numeric_df(as.data.frame(x$selection_section_summary), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$reporting_map) && nrow(x$reporting_map) > 0L) {
-    cat("\nReporting map\n")
-    print(as.data.frame(x$reporting_map), row.names = FALSE)
-  }
-  if (length(x$notes %||% character(0)) > 0L) {
-    cat("\nNotes\n")
-    for (line in x$notes) cat(" - ", line, "\n", sep = "")
-  }
-  invisible(x)
-}
-
-simulation_compact_future_branch_active_summary <- function(x,
-                                                            digits = 3,
-                                                            top_n = 6L) {
-  planning_schema <- simulation_object_planning_schema(x)
-  active_branch <- planning_schema$future_branch_active_branch %||% NULL
-  if (!is.list(active_branch)) {
-    return(NULL)
-  }
-
-  out <- tryCatch(
-    summary.mfrm_future_branch_active_branch(
-      active_branch,
-      digits = digits,
-      top_n = top_n
-    ),
-    error = function(e) NULL
-  )
-  if (!inherits(out, "summary.mfrm_future_branch_active_branch")) {
-    return(NULL)
-  }
-
-  out
-}
-
-print_compact_future_branch_active_summary <- function(x,
-                                                       digits = 3,
-                                                       heading = "Future arbitrary-facet planning scaffold") {
-  if (!inherits(x, "summary.mfrm_future_branch_active_branch")) {
-    return(invisible(NULL))
-  }
-
-  cat("\n", heading, "\n", sep = "")
-  if (!is.null(x$overview) && nrow(x$overview) > 0L) {
-    print(round_numeric_df(as.data.frame(x$overview), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$readiness_summary) && nrow(x$readiness_summary) > 0L) {
-    cat("\nReadiness summary\n")
-    print(round_numeric_df(as.data.frame(x$readiness_summary), digits = digits), row.names = FALSE)
-  }
-  if (!is.null(x$recommendation_table) && nrow(x$recommendation_table) > 0L) {
-    cat("\nRecommendation table\n")
-    print(round_numeric_df(as.data.frame(x$recommendation_table), digits = digits), row.names = FALSE)
-  }
-
-  invisible(x)
-}
-
-#' Plot a future arbitrary-facet planning active branch
-#'
-#' @param x Output from the future-branch active planning scaffold stored in
-#'   `planning_schema$future_branch_active_branch`.
-#' @param y Unused placeholder for generic compatibility.
-#' @param type Plot type: `"profile_metrics"` for recommended deterministic
-#'   profile values by metric, `"load_balance"` for recommended load/balance
-#'   values by metric, `"coverage"` for recommended coverage/connectivity values
-#'   by metric, `"readiness_tiers"` for counts of structural tiers across the
-#'   current active-branch design grid, `"table_rows"` / `"role_tables"` /
-#'   `"appendix_roles"` for summary-table bundle QC,
-#'   `"appendix_sections"` / `"appendix_presets"` for manuscript-facing
-#'   appendix selection counts, `"selection_handoff_presets"` for preset-level
-#'   appendix handoff counts, `"selection_tables"` for appendix-selected
-#'   future-branch tables ranked by row count within a preset,
-#'   `"selection_handoff"` for section-aware plot-ready appendix handoff counts,
-#'   `"selection_handoff_bundles"` for section-and-bundle plot-ready appendix
-#'   handoff counts,
-#'   `"selection_handoff_roles"` for role-aware plot-ready appendix handoff
-#'   counts, `"selection_handoff_role_sections"` for role-by-section plot-ready
-#'   appendix handoff counts,
-#'   or `"selection_bundles"` / `"selection_roles"` / `"selection_sections"`
-#'   for preset-filtered appendix selection summaries.
-#' @param appendix_preset Appendix preset used for `selection_*` plot types.
-#' @param selection_value For `selection_*` plot types, whether to plot exact
-#'   counts (`"count"`) or the matching exact fraction (`"fraction"`) when that
-#'   surface exposes one. `selection_tables` remains count-only because it
-#'   represents table row counts rather than a normalized selection surface.
-#' @param draw If `TRUE`, draw with base graphics; otherwise return plotting data.
-#' @param main Optional title override.
-#' @param palette Optional named color overrides.
-#' @param label_angle Axis-label rotation angle.
-#' @param ... Reserved for generic compatibility.
-#'
-#' @return A plotting-data object of class `mfrm_plot_data`.
-#' @seealso [summary.mfrm_future_branch_active_branch()]
-#' @export
-plot.mfrm_future_branch_active_branch <- function(x,
-                                                  y = NULL,
-                                                  type = c("profile_metrics", "load_balance", "coverage", "readiness_tiers", "table_rows", "role_tables", "appendix_roles", "appendix_sections", "appendix_presets", "selection_handoff_presets", "selection_tables", "selection_handoff", "selection_handoff_bundles", "selection_handoff_roles", "selection_handoff_role_sections", "selection_bundles", "selection_roles", "selection_sections"),
-                                                  appendix_preset = c("recommended", "compact", "all", "methods", "results", "diagnostics", "reporting"),
-                                                  selection_value = c("count", "fraction"),
-                                                  draw = TRUE,
-                                                  main = NULL,
-                                                  palette = NULL,
-                                                  label_angle = 45,
-                                                  ...) {
-  type <- match.arg(type)
-  appendix_preset <- match.arg(
-    tolower(as.character(appendix_preset[1])),
-    choices = c("recommended", "compact", "all", "methods", "results", "diagnostics", "reporting")
-  )
-  selection_value <- match.arg(selection_value)
-  active <- simulation_future_branch_active_branch(x)
-
-  if (type %in% c("table_rows", "role_tables", "appendix_roles", "appendix_sections", "appendix_presets")) {
-    bundle <- build_summary_table_bundle(active)
-    return(plot.mfrm_summary_table_bundle(
-      bundle,
-      type = type,
-      selection_value = selection_value,
-      main = main,
-      palette = palette,
-      label_angle = label_angle,
-      draw = draw,
-      ...
-    ))
-  }
-
-  if (type %in% c("selection_handoff_presets", "selection_tables", "selection_handoff", "selection_handoff_bundles", "selection_handoff_roles", "selection_handoff_role_sections", "selection_bundles", "selection_roles", "selection_sections")) {
-    sx <- summary.mfrm_future_branch_active_branch(active)
-    if (type == "selection_handoff_presets") {
-      tbl <- as.data.frame(sx$selection_handoff_preset_summary %||% data.frame(), stringsAsFactors = FALSE)
-      tbl <- tbl[as.character(tbl$Preset %||% "") %in% appendix_preset, , drop = FALSE]
-      if (nrow(tbl) == 0L || !all(c("Preset", "PlotReadyTables") %in% names(tbl))) {
-        stop("No future-branch appendix handoff-preset summary is available for preset `", appendix_preset, "`.", call. = FALSE)
-      }
-      labels <- as.character(tbl$Preset)
-      measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
-      values <- measure$values
-      subtitle <- paste0("Plot-ready appendix handoff by preset for `", appendix_preset, "`")
-      default_palette <- c(selection_handoff_presets = "#f4a261", grid = "#ececec")
-      plot_name <- "selection_handoff_presets"
-      legend_label <- measure$legend_label
-      ylab <- measure$ylab
-    } else if (type == "selection_tables") {
-      tbl <- future_branch_selection_table_summary(
-        selection_catalog = sx$selection_catalog,
-        preset = appendix_preset
-      )
-      if (nrow(tbl) == 0L || !all(c("Table", "Rows") %in% names(tbl))) {
-        stop("No future-branch appendix table selection is available for preset `", appendix_preset, "`.", call. = FALSE)
-      }
-      labels <- as.character(tbl$Table)
-      measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
-      values <- measure$values
-      subtitle <- paste0("Selected appendix tables for preset `", appendix_preset, "`")
-      default_palette <- c(selection_tables = "#e76f51", grid = "#ececec")
-      plot_name <- "selection_tables"
-      legend_label <- measure$legend_label
-      ylab <- measure$ylab
-    } else if (type == "selection_handoff") {
-      tbl <- as.data.frame(sx$selection_handoff_summary %||% data.frame(), stringsAsFactors = FALSE)
-      tbl <- tbl[as.character(tbl$Preset %||% "") %in% appendix_preset, , drop = FALSE]
-      if (nrow(tbl) == 0L || !all(c("AppendixSection", "PlotReadyTables") %in% names(tbl))) {
-        stop("No future-branch appendix handoff summary is available for preset `", appendix_preset, "`.", call. = FALSE)
-      }
-      labels <- as.character(tbl$AppendixSection)
-      measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
-      values <- measure$values
-      subtitle <- paste0("Plot-ready appendix handoff by section for preset `", appendix_preset, "`")
-      default_palette <- c(selection_handoff = "#ff9f1c", grid = "#ececec")
-      plot_name <- "selection_handoff"
-      legend_label <- measure$legend_label
-      ylab <- measure$ylab
-    } else if (type == "selection_handoff_bundles") {
-      tbl <- as.data.frame(sx$selection_handoff_bundle_summary %||% data.frame(), stringsAsFactors = FALSE)
-      tbl <- tbl[as.character(tbl$Preset %||% "") %in% appendix_preset, , drop = FALSE]
-      if (nrow(tbl) == 0L || !all(c("AppendixSection", "Bundle", "PlotReadyTables") %in% names(tbl))) {
-        stop("No future-branch appendix handoff-bundle summary is available for preset `", appendix_preset, "`.", call. = FALSE)
-      }
-      labels <- paste0(as.character(tbl$AppendixSection), " :: ", as.character(tbl$Bundle))
-      measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
-      values <- measure$values
-      subtitle <- paste0("Plot-ready appendix handoff by section and bundle for preset `", appendix_preset, "`")
-      default_palette <- c(selection_handoff_bundles = "#5c677d", grid = "#ececec")
-      plot_name <- "selection_handoff_bundles"
-      legend_label <- measure$legend_label
-      ylab <- measure$ylab
-    } else if (type == "selection_handoff_roles") {
-      tbl <- as.data.frame(sx$selection_handoff_role_summary %||% data.frame(), stringsAsFactors = FALSE)
-      tbl <- tbl[as.character(tbl$Preset %||% "") %in% appendix_preset, , drop = FALSE]
-      if (nrow(tbl) == 0L || !all(c("Role", "PlotReadyTables") %in% names(tbl))) {
-        stop("No future-branch appendix handoff-role summary is available for preset `", appendix_preset, "`.", call. = FALSE)
-      }
-      labels <- as.character(tbl$Role)
-      measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
-      values <- measure$values
-      subtitle <- paste0("Plot-ready appendix handoff by role for preset `", appendix_preset, "`")
-      default_palette <- c(selection_handoff_roles = "#9c6644", grid = "#ececec")
-      plot_name <- "selection_handoff_roles"
-      legend_label <- measure$legend_label
-      ylab <- measure$ylab
-    } else if (type == "selection_handoff_role_sections") {
-      tbl <- as.data.frame(sx$selection_handoff_role_section_summary %||% data.frame(), stringsAsFactors = FALSE)
-      tbl <- tbl[as.character(tbl$Preset %||% "") %in% appendix_preset, , drop = FALSE]
-      if (nrow(tbl) == 0L || !all(c("AppendixSection", "Role", "PlotReadyTables") %in% names(tbl))) {
-        stop("No future-branch appendix handoff role-section summary is available for preset `", appendix_preset, "`.", call. = FALSE)
-      }
-      labels <- paste0(as.character(tbl$AppendixSection), " :: ", as.character(tbl$Role))
-      measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
-      values <- measure$values
-      subtitle <- paste0("Plot-ready appendix handoff by section and role for preset `", appendix_preset, "`")
-      default_palette <- c(selection_handoff_role_sections = "#7f5539", grid = "#ececec")
-      plot_name <- "selection_handoff_role_sections"
-      legend_label <- measure$legend_label
-      ylab <- measure$ylab
-    } else if (type == "selection_bundles") {
-      tbl <- as.data.frame(sx$selection_summary %||% data.frame(), stringsAsFactors = FALSE)
-      tbl <- tbl[as.character(tbl$Preset %||% "") %in% appendix_preset, , drop = FALSE]
-      if (nrow(tbl) == 0L || !all(c("Bundle", "TablesSelected") %in% names(tbl))) {
-        stop("No future-branch appendix selection summary is available for preset `", appendix_preset, "`.", call. = FALSE)
-      }
-      labels <- as.character(tbl$Bundle)
-      measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
-      values <- measure$values
-      subtitle <- paste0("Appendix tables by bundle for preset `", appendix_preset, "`")
-      default_palette <- c(selection_bundles = "#54a24b", grid = "#ececec")
-      plot_name <- "selection_bundles"
-      legend_label <- measure$legend_label
-      ylab <- measure$ylab
-    } else if (type == "selection_roles") {
-      tbl <- as.data.frame(sx$selection_role_summary %||% data.frame(), stringsAsFactors = FALSE)
-      tbl <- tbl[as.character(tbl$Preset %||% "") %in% appendix_preset, , drop = FALSE]
-      if (nrow(tbl) == 0L || !all(c("Role", "Tables") %in% names(tbl))) {
-        stop("No future-branch appendix role summary is available for preset `", appendix_preset, "`.", call. = FALSE)
-      }
-      labels <- as.character(tbl$Role)
-      measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
-      values <- measure$values
-      subtitle <- paste0("Selected appendix roles for preset `", appendix_preset, "`")
-      default_palette <- c(selection_roles = "#b279a2", grid = "#ececec")
-      plot_name <- "selection_roles"
-      legend_label <- measure$legend_label
-      ylab <- measure$ylab
-    } else {
-      tbl <- as.data.frame(sx$selection_section_summary %||% data.frame(), stringsAsFactors = FALSE)
-      tbl <- tbl[as.character(tbl$Preset %||% "") %in% appendix_preset, , drop = FALSE]
-      if (nrow(tbl) == 0L || !all(c("AppendixSection", "Tables") %in% names(tbl))) {
-        stop("No future-branch appendix section summary is available for preset `", appendix_preset, "`.", call. = FALSE)
-      }
-      labels <- as.character(tbl$AppendixSection)
-      measure <- resolve_selection_plot_measure(tbl, type, selection_value = selection_value)
-      values <- measure$values
-      subtitle <- paste0("Selected appendix sections for preset `", appendix_preset, "`")
-      default_palette <- c(selection_sections = "#2a9d8f", grid = "#ececec")
-      plot_name <- "selection_sections"
-      legend_label <- measure$legend_label
-      ylab <- measure$ylab
-    }
-
-    keep <- is.finite(values) & nzchar(labels)
-    if (!any(keep)) {
-      stop("Selected future-branch appendix plot has no finite values to display.", call. = FALSE)
-    }
-    labels <- labels[keep]
-    values <- values[keep]
-    tbl <- tbl[keep, , drop = FALSE]
-    pal <- resolve_palette(palette = palette, defaults = default_palette)
-    plot_title <- if (is.null(main)) paste("Future branch", gsub("_", " ", plot_name)) else as.character(main[1])
-
-    if (isTRUE(draw)) {
-      barplot_rot45(
-        height = values,
-        labels = labels,
-        col = pal[plot_name],
-        main = plot_title,
-        ylab = ylab,
-        label_angle = label_angle,
-        mar_bottom = 8.8
-      )
-      graphics::abline(h = 0, col = pal["grid"], lty = 2)
-    }
-
-    return(invisible(new_mfrm_plot_data(
-      "future_branch_active_branch",
-      list(
-        plot = plot_name,
-        selection_value = measure$selection_value,
-        appendix_preset = appendix_preset,
-        table = tbl,
-        title = plot_title,
-        subtitle = subtitle,
-        legend = new_plot_legend(legend_label, "future_branch", "bar", pal[plot_name]),
-        reference_lines = new_reference_lines("h", 0, "Zero-table reference", "dashed", "reference")
-      )
-    )))
-  }
-
-  if (type == "profile_metrics") {
-    tbl <- simulation_future_branch_active_branch_profile(active)$profile_summary_table
-    tbl <- tibble::as_tibble(tbl %||% tibble::tibble())
-    if (nrow(tbl) == 0L || !all(c("metric", "recommended_value") %in% names(tbl))) {
-      stop("No future-branch profile metrics are available for plotting.", call. = FALSE)
-    }
-    labels <- as.character(tbl$metric)
-    values <- suppressWarnings(as.numeric(tbl$recommended_value))
-    subtitle <- "Recommended deterministic profile values"
-    default_palette <- c(profile_metrics = "#3a7ca5", grid = "#ececec")
-    plot_name <- "profile_metrics"
-    legend_label <- "Recommended value"
-  } else if (type == "load_balance") {
-    tbl <- simulation_future_branch_active_branch_load_balance(active)$diagnostic_summary_table
-    tbl <- tibble::as_tibble(tbl %||% tibble::tibble())
-    if (nrow(tbl) == 0L || !all(c("metric", "recommended_value") %in% names(tbl))) {
-      stop("No future-branch load/balance metrics are available for plotting.", call. = FALSE)
-    }
-    labels <- as.character(tbl$metric)
-    values <- suppressWarnings(as.numeric(tbl$recommended_value))
-    subtitle <- "Recommended deterministic load/balance values"
-    default_palette <- c(load_balance = "#2a9d8f", grid = "#ececec")
-    plot_name <- "load_balance"
-    legend_label <- "Recommended value"
-  } else if (type == "coverage") {
-    tbl <- simulation_future_branch_active_branch_coverage(active)$diagnostic_summary_table
-    tbl <- tibble::as_tibble(tbl %||% tibble::tibble())
-    if (nrow(tbl) == 0L || !all(c("metric", "recommended_value") %in% names(tbl))) {
-      stop("No future-branch coverage metrics are available for plotting.", call. = FALSE)
-    }
-    labels <- as.character(tbl$metric)
-    values <- suppressWarnings(as.numeric(tbl$recommended_value))
-    subtitle <- "Recommended deterministic coverage/connectivity values"
-    default_palette <- c(coverage = "#f4a261", grid = "#ececec")
-    plot_name <- "coverage"
-    legend_label <- "Recommended value"
-  } else {
-    tbl <- simulation_future_branch_active_branch_readiness(active)$readiness_table
-    tbl <- tibble::as_tibble(tbl %||% tibble::tibble())
-    if (nrow(tbl) == 0L || !"structural_tier" %in% names(tbl)) {
-      stop("No future-branch readiness tiers are available for plotting.", call. = FALSE)
-    }
-    counts <- sort(table(as.character(tbl$structural_tier)), decreasing = TRUE)
-    labels <- names(counts)
-    values <- as.numeric(counts)
-    subtitle <- "Structural tier counts across active-branch designs"
-    default_palette <- c(readiness_tiers = "#b279a2", grid = "#ececec")
-    plot_name <- "readiness_tiers"
-    legend_label <- "Designs"
-  }
-
-  keep <- is.finite(values) & nzchar(labels)
-  if (!any(keep)) {
-    stop("Selected future-branch plot has no finite values to display.", call. = FALSE)
-  }
-  labels <- labels[keep]
-  values <- values[keep]
-  pal <- resolve_palette(palette = palette, defaults = default_palette)
-  color_name <- names(default_palette)[1]
-  plot_title <- if (is.null(main)) "Future arbitrary-facet planning profile" else as.character(main[1])
-
-  if (isTRUE(draw)) {
-    barplot_rot45(
-      height = values,
-      labels = labels,
-      col = pal[color_name],
-      main = plot_title,
-      ylab = legend_label,
-      label_angle = label_angle,
-      mar_bottom = 9
-    )
-    graphics::abline(h = 0, col = pal["grid"], lty = 2)
-  }
-
-  invisible(new_mfrm_plot_data(
-    "future_branch_active_branch",
-    list(
-      plot = plot_name,
-      label = labels,
-      value = values,
-      title = plot_title,
-      subtitle = subtitle,
-      recommended_design_id = as.character(active$recommended_design_id %||% NA_character_),
-      legend = new_plot_legend(legend_label, "future_branch", "bar", pal[color_name]),
-      reference_lines = new_reference_lines("h", 0, "Zero reference", "dashed", "reference")
-    )
-  ))
-}
-
-simulation_compact_future_branch_report_cache <- function(x) {
-  if (!is.list(x) || is.data.frame(x) || inherits(x, "mfrm_plot_data")) {
-    return(x)
-  }
-
-  nested_report_fields <- c(
-    "report_bundle",
-    "report_summary",
-    "report_overview",
-    "report_catalog",
-    "report_surface_registry",
-    "report_panel",
-    "source_object",
-    "registry",
-    "selected_surface"
-  )
-  x[intersect(names(x), nested_report_fields)] <- NULL
-
-  for (nm in names(x)) {
-    if (is.list(x[[nm]]) && !is.data.frame(x[[nm]]) && !inherits(x[[nm]], "mfrm_plot_data")) {
-      x[[nm]] <- simulation_compact_future_branch_report_cache(x[[nm]])
-    }
-  }
-
-  x
-}
-
-simulation_compact_future_branch_schema_report_cache <- function(branch_schema) {
-  report_fields <- c(
-    "report_summary",
-    "report_overview_table",
-    "report_catalog",
-    "report_digest",
-    "report_surface_registry",
-    "report_panel",
-    "report_operation",
-    "report_snapshot",
-    "report_brief",
-    "report_consumer"
-  )
-  for (nm in intersect(report_fields, names(branch_schema))) {
-    branch_schema[[nm]] <- simulation_compact_future_branch_report_cache(branch_schema[[nm]])
-  }
-  branch_schema
-}
-
-simulation_compact_future_branch_schema_active_cache <- function(branch_schema) {
-  if (is.list(branch_schema$active_branch)) {
-    if (is.list(branch_schema$active_branch$summary)) {
-      branch_schema$active_branch$summary$pilot <- NULL
-    }
-    if (is.list(branch_schema$active_branch$table)) {
-      branch_schema$active_branch$table$pilot <- NULL
-    }
-    if (is.list(branch_schema$active_branch$plot)) {
-      branch_schema$active_branch$plot$pilot <- NULL
-    }
-  }
-
-  drop_map <- list(
-    pilot_summary = "pilot",
-    pilot_table = "pilot",
-    pilot_plot = "pilot",
-    active_branch_profile = "active_branch",
-    active_branch_load_balance = "active_branch_profile",
-    active_branch_overview = c("active_branch", "active_branch_profile"),
-    active_branch_load_balance_overview = "active_branch_load_balance",
-    active_branch_coverage = "active_branch_profile",
-    active_branch_coverage_overview = "active_branch_coverage",
-    active_branch_guardrails = c("active_branch_coverage", "active_branch_load_balance"),
-    active_branch_guardrail_overview = "active_branch_guardrails",
-    active_branch_readiness = "active_branch_guardrails",
-    active_branch_readiness_overview = "active_branch_readiness",
-    active_branch_recommendation = c("active_branch_readiness", "active_branch_profile"),
-    active_branch_recommendation_overview = "active_branch_recommendation"
-  )
-
-  for (nm in intersect(names(drop_map), names(branch_schema))) {
-    branch_schema[[nm]][intersect(drop_map[[nm]], names(branch_schema[[nm]]))] <- NULL
-  }
-
-  branch_schema
-}
-
-simulation_future_branch_schema <- function(sim_spec = NULL, facet_names = NULL) {
-  future_facet_table <- if (is.null(facet_names)) {
-    simulation_future_facet_table(sim_spec)
-  } else {
-    simulation_future_facet_table(facet_names = facet_names)
-  }
-  future_design_template <- if (is.null(facet_names)) {
-    simulation_future_design_template(sim_spec)
-  } else {
-    simulation_future_design_template(facet_names = facet_names)
-  }
-  design_schema <- if (is.null(facet_names)) {
-    simulation_future_branch_design_schema(sim_spec)
-  } else {
-    simulation_future_branch_design_schema(facet_names = facet_names)
-  }
-  branch_schema <- list(
-    planner_contract = "arbitrary_facet_planning_scaffold",
-    planner_stage = "schema_only",
-    input_contract = "design$facets(named counts)",
-    facet_table = future_facet_table,
-    design_template = future_design_template,
-    assignment_axis = design_schema$assignment_axis,
-    design_schema = design_schema,
-    grid_semantics = design_schema$grid_semantics,
-    note = paste(
-      "Schema-only future-branch contract bundling the stable facet-count table",
-      "and matching `design$facets(named counts)` template for a later",
-      "arbitrary-facet planner, together with a preview-ready nested",
-      "design schema."
-    )
-  )
-  branch_schema$grid_contract <- simulation_future_branch_grid_contract(branch_schema)
-  branch_schema$preview <- simulation_future_branch_preview(branch_schema)
-  branch_schema$grid_bundle <- simulation_future_branch_grid_bundle(branch_schema)
-  branch_schema$grid_context <- simulation_future_branch_grid_context(branch_schema)
-  branch_schema$report_bundle <- simulation_future_branch_report_bundle(branch_schema)
-  branch_schema$report_summary <- simulation_future_branch_report_summary(branch_schema)
-  branch_schema$report_overview_table <- simulation_future_branch_report_overview_table(branch_schema)
-  branch_schema$report_catalog <- simulation_future_branch_report_catalog(branch_schema)
-  branch_schema$report_digest <- simulation_future_branch_report_digest(branch_schema)
-  branch_schema$report_surface_registry <- simulation_future_branch_report_surface_registry(branch_schema)
-  branch_schema$report_panel <- simulation_future_branch_report_panel(branch_schema)
-  branch_schema$report_operation <- simulation_future_branch_report_operation(branch_schema)
-  branch_schema$report_snapshot <- simulation_future_branch_report_snapshot(branch_schema)
-  branch_schema$report_brief <- simulation_future_branch_report_brief(branch_schema)
-  branch_schema$report_mode_registry <- simulation_future_branch_report_mode_registry(branch_schema)
-  branch_schema$report_consumer <- simulation_future_branch_report_consume(branch_schema)
-  branch_schema$pilot <- simulation_future_branch_pilot(branch_schema)
-  branch_schema$pilot_summary <- simulation_future_branch_pilot_summary(branch_schema)
-  branch_schema$pilot_table <- simulation_future_branch_pilot_table(branch_schema)
-  branch_schema$pilot_plot <- simulation_future_branch_pilot_plot(branch_schema)
-  branch_schema$active_branch <- simulation_future_branch_active_branch(branch_schema)
-  branch_schema$active_branch_profile <- simulation_future_branch_active_branch_profile(branch_schema)
-  branch_schema$active_branch_load_balance <- simulation_future_branch_active_branch_load_balance(branch_schema)
-  branch_schema$active_branch_overview <- simulation_future_branch_active_branch_overview(branch_schema)
-  branch_schema$active_branch_load_balance_overview <- simulation_future_branch_active_branch_load_balance_overview(branch_schema)
-  branch_schema$active_branch_coverage <- simulation_future_branch_active_branch_coverage(branch_schema)
-  branch_schema$active_branch_coverage_overview <- simulation_future_branch_active_branch_coverage_overview(branch_schema)
-  branch_schema$active_branch_guardrails <- simulation_future_branch_active_branch_guardrails(branch_schema)
-  branch_schema$active_branch_guardrail_overview <- simulation_future_branch_active_branch_guardrail_overview(branch_schema)
-  branch_schema$active_branch_readiness <- simulation_future_branch_active_branch_readiness(branch_schema)
-  branch_schema$active_branch_readiness_overview <- simulation_future_branch_active_branch_readiness_overview(branch_schema)
-  branch_schema$active_branch_recommendation <- simulation_future_branch_active_branch_recommendation(branch_schema)
-  branch_schema$active_branch_recommendation_overview <- simulation_future_branch_active_branch_recommendation_overview(branch_schema)
-  branch_schema <- simulation_compact_future_branch_schema_report_cache(branch_schema)
-  branch_schema <- simulation_compact_future_branch_schema_active_cache(branch_schema)
-  branch_schema
-}
-
-simulation_planning_scope <- function(sim_spec = NULL, facet_names = NULL) {
-  if (is.null(facet_names)) {
-    facet_names <- simulation_spec_output_facet_names(sim_spec)
-    aliases <- simulation_design_variable_aliases(sim_spec)
-    facet_manifest <- simulation_facet_manifest(sim_spec)
-  } else {
-    facet_names <- simulation_validate_output_facet_names(facet_names)
-    aliases <- simulation_design_variable_aliases(list(facet_names = facet_names))
-    facet_manifest <- simulation_facet_manifest(facet_names = facet_names)
-  }
-  list(
-    planner_contract = "role_based_two_non_person_facets",
-    planner_stage = "first_release",
-    supports_arbitrary_facet_planning = FALSE,
-    supports_arbitrary_facet_estimation = TRUE,
-    supported_non_person_roles = c("rater", "criterion"),
-    supported_non_person_facet_count = 2L,
-    role_labels = unname(facet_names),
-    design_variables = c("n_person", "n_rater", "n_criterion", "raters_per_person"),
-    design_variable_aliases = aliases[c("n_person", "n_rater", "n_criterion", "raters_per_person")],
-    facet_manifest = facet_manifest,
-    future_planner_contract = "arbitrary_facet_planning_scaffold",
-    future_planner_stage = "schema_only",
-    future_branch_input_contract = "design$facets(named counts)",
-    note = paste0(
-      "Current planning helpers vary one person count and exactly two non-person facet roles (",
-      facet_names[1], " and ", facet_names[2], "). ",
-      "The estimation core supports arbitrary facet counts, but planning/forecasting remain role-based until a fully arbitrary-facet planner is validated. ",
-      "A facet manifest is now exposed so a future arbitrary-facet branch can reuse the same public facet labels without changing the current planner contract."
-    )
-  )
-}
-
-simulation_planning_scope_note <- function(scope) {
-  if (is.list(scope) && is.character(scope$note) && length(scope$note) > 0L) {
-    note <- as.character(scope$note[1])
-    if (nzchar(note)) {
-      return(note)
-    }
-  }
-  character(0)
-}
-
-simulation_planning_constraints <- function(sim_spec = NULL) {
-  all_vars <- c("n_person", "n_rater", "n_criterion", "raters_per_person")
-  if (is.null(sim_spec) || !inherits(sim_spec, "mfrm_sim_spec")) {
-    return(list(
-      mutable_design_variables = all_vars,
-      locked_design_variables = character(0),
-      lock_reasons = stats::setNames(character(0), character(0)),
-      feasibility_rule = "`raters_per_person <= n_rater`",
-      note = "Current scalar-argument planning paths allow `n_person`, `n_rater`, `n_criterion`, and `raters_per_person` to vary subject to `raters_per_person <= n_rater`."
-    ))
-  }
-
-  mutable <- all_vars
-  reasons <- character(0)
-  assignment <- as.character(sim_spec$assignment %||% "rotating")
-
-  if (identical(assignment, "resampled")) {
-    reasons["n_rater"] <- paste0(
-      "`assignment = \"resampled\"` reuses empirical person-level ",
-      simulation_spec_output_facet_names(sim_spec)[1],
-      " profiles."
-    )
-    reasons["raters_per_person"] <- reasons[["n_rater"]]
-  }
-  if (identical(assignment, "skeleton")) {
-    skeleton_reason <- "`assignment = \"skeleton\"` reuses the observed person-by-facet response skeleton."
-    reasons["n_rater"] <- skeleton_reason
-    reasons["n_criterion"] <- skeleton_reason
-    reasons["raters_per_person"] <- skeleton_reason
-  }
-
-  threshold_mode <- simulation_spec_threshold_mode(sim_spec)
-  if (identical(threshold_mode, "step_facet_specific")) {
-    role <- simulation_step_facet_role(sim_spec, step_facet = sim_spec$step_facet)
-    lock_var <- if (identical(role, "criterion")) "n_criterion" else if (identical(role, "rater")) "n_rater" else NULL
-    if (!is.null(lock_var)) {
-      reasons[lock_var] <- paste0(
-        "`sim_spec` contains step-facet-specific thresholds for `",
-        sim_spec$step_facet,
-        "`."
-      )
-    }
-  }
-
-  slope_mode <- simulation_spec_slope_mode(sim_spec)
-  if (identical(slope_mode, "slope_facet_specific")) {
-    role <- simulation_step_facet_role(sim_spec, step_facet = sim_spec$slope_facet)
-    lock_var <- if (identical(role, "criterion")) "n_criterion" else if (identical(role, "rater")) "n_rater" else NULL
-    if (!is.null(lock_var)) {
-      reasons[lock_var] <- paste0(
-        "First-release `GPCM` stores slope values for `",
-        sim_spec$slope_facet,
-        "` levels."
-      )
-    }
-  }
-
-  reason_names <- names(reasons)
-  if (is.null(reason_names)) {
-    reason_names <- character(0)
-  }
-  locked <- intersect(all_vars, reason_names)
-  mutable <- setdiff(all_vars, locked)
-  note <- if (length(locked) == 0L) {
-    "All current design variables remain mutable subject to `raters_per_person <= n_rater`."
-  } else {
-    paste0(
-      "Current planning path allows changing ",
-      paste(mutable, collapse = ", "),
-      "; locked variables are ",
-      paste(locked, collapse = ", "),
-      "."
-    )
-  }
-
-  list(
-    mutable_design_variables = mutable,
-    locked_design_variables = locked,
-    lock_reasons = reasons[locked],
-    feasibility_rule = "`raters_per_person <= n_rater`",
-    note = note
-  )
-}
-
-simulation_planning_constraints_note <- function(constraints) {
-  if (is.list(constraints) && is.character(constraints$note) && length(constraints$note) > 0L) {
-    note <- as.character(constraints$note[1])
-    if (nzchar(note)) {
-      return(note)
-    }
-  }
-  character(0)
-}
-
-simulation_planning_schema <- function(sim_spec = NULL, facet_names = NULL) {
-  descriptor <- if (is.null(facet_names)) {
-    simulation_design_descriptor(sim_spec)
-  } else {
-    simulation_design_descriptor(list(facet_names = simulation_validate_output_facet_names(facet_names)))
-  }
-  scope <- if (is.null(facet_names)) {
-    simulation_planning_scope(sim_spec)
-  } else {
-    simulation_planning_scope(facet_names = facet_names)
-  }
-  constraints <- simulation_planning_constraints(sim_spec)
-  lock_lookup <- constraints$lock_reasons %||% stats::setNames(character(0), character(0))
-
-  role_table <- descriptor |>
-    dplyr::mutate(
-      axis_class = c("person_count", "facet_level_count", "facet_level_count", "assignment_count"),
-      depends_on_role = c(NA_character_, NA_character_, NA_character_, "rater"),
-      mutable = .data$canonical %in% constraints$mutable_design_variables,
-      locked = .data$canonical %in% constraints$locked_design_variables,
-      lock_reason = unname(lock_lookup[.data$canonical])
-    )
-  role_table$lock_reason[is.na(role_table$lock_reason)] <- ""
-  facet_manifest <- if (is.null(facet_names)) {
-    simulation_facet_manifest(sim_spec)
-  } else {
-    simulation_facet_manifest(facet_names = facet_names)
-  }
-  future_facet_table <- if (is.null(facet_names)) {
-    simulation_future_facet_table(sim_spec)
-  } else {
-    simulation_future_facet_table(facet_names = facet_names)
-  }
-  future_design_template <- if (is.null(facet_names)) {
-    simulation_future_design_template(sim_spec)
-  } else {
-    simulation_future_design_template(facet_names = facet_names)
-  }
-  future_branch_schema <- if (is.null(facet_names)) {
-    simulation_future_branch_schema(sim_spec)
-  } else {
-    simulation_future_branch_schema(facet_names = facet_names)
-  }
-
-  list(
-    planner_contract = scope$planner_contract,
-    planner_stage = scope$planner_stage,
-    supports_arbitrary_facet_planning = scope$supports_arbitrary_facet_planning,
-    supports_arbitrary_facet_estimation = scope$supports_arbitrary_facet_estimation,
-    role_labels = scope$role_labels,
-    design_variables = scope$design_variables,
-    design_variable_aliases = scope$design_variable_aliases,
-    facet_manifest = facet_manifest,
-    future_planner_contract = scope$future_planner_contract,
-    future_planner_stage = scope$future_planner_stage,
-    future_branch_input_contract = scope$future_branch_input_contract,
-    future_facet_table = future_facet_table,
-    future_design_template = future_design_template,
-    future_branch_schema = future_branch_schema,
-    future_branch_preview = future_branch_schema$preview,
-    future_branch_grid_semantics = future_branch_schema$grid_semantics,
-    future_branch_grid_contract = future_branch_schema$grid_contract,
-    future_branch_grid_bundle = future_branch_schema$grid_bundle,
-    future_branch_grid_context = future_branch_schema$grid_context,
-    future_branch_report_bundle = future_branch_schema$report_bundle,
-    future_branch_report_summary = future_branch_schema$report_summary,
-    future_branch_report_overview_table = future_branch_schema$report_overview_table,
-    future_branch_report_catalog = future_branch_schema$report_catalog,
-    future_branch_report_digest = future_branch_schema$report_digest,
-    future_branch_report_surface_registry = future_branch_schema$report_surface_registry,
-    future_branch_report_panel = future_branch_schema$report_panel,
-    future_branch_report_operation = future_branch_schema$report_operation,
-    future_branch_report_snapshot = future_branch_schema$report_snapshot,
-    future_branch_report_brief = future_branch_schema$report_brief,
-    future_branch_report_mode_registry = future_branch_schema$report_mode_registry,
-    future_branch_report_consumer = future_branch_schema$report_consumer,
-    future_branch_pilot = future_branch_schema$pilot,
-    future_branch_pilot_summary = future_branch_schema$pilot_summary,
-    future_branch_pilot_table = future_branch_schema$pilot_table,
-    future_branch_pilot_plot = future_branch_schema$pilot_plot,
-    future_branch_active_branch = future_branch_schema$active_branch,
-    future_branch_active_branch_profile = future_branch_schema$active_branch_profile,
-    future_branch_active_branch_load_balance = future_branch_schema$active_branch_load_balance,
-    future_branch_active_branch_overview = future_branch_schema$active_branch_overview,
-    future_branch_active_branch_load_balance_overview = future_branch_schema$active_branch_load_balance_overview,
-    future_branch_active_branch_coverage = future_branch_schema$active_branch_coverage,
-    future_branch_active_branch_coverage_overview = future_branch_schema$active_branch_coverage_overview,
-    future_branch_active_branch_guardrails = future_branch_schema$active_branch_guardrails,
-    future_branch_active_branch_guardrail_overview = future_branch_schema$active_branch_guardrail_overview,
-    future_branch_active_branch_readiness = future_branch_schema$active_branch_readiness,
-    future_branch_active_branch_readiness_overview = future_branch_schema$active_branch_readiness_overview,
-    future_branch_active_branch_recommendation = future_branch_schema$active_branch_recommendation,
-    future_branch_active_branch_recommendation_overview = future_branch_schema$active_branch_recommendation_overview,
-    role_table = role_table,
-    feasibility_rules = constraints$feasibility_rule,
-    note = paste(
-      "Current planning schema exposes one person-count axis, two non-person facet-count axes,",
-      "and one assignments-per-person axis under the first-release role-based planner,",
-      "while exposing a facet manifest and a nested schema-only future-branch",
-      "contract for arbitrary-facet planning, including machine-readable",
-      "future-branch preview, grid, bundle, context, report-bundle,",
-      "report-summary, report-overview, report-catalog, and report-digest metadata",
-      "plus a report-surface registry and compact report panel when default",
-      "counts are available, alongside one combined report operation object",
-      "plus one lightweight report snapshot, one selected-surface report brief,",
-      "one mode-based report consumer, one internal active pilot object,",
-      "compact pilot-level summary/table/plot consumers, and one bundled",
-      "active-branch object plus deterministic active-branch profile,",
-      "load/balance diagnostics, coverage/connectivity diagnostics,",
-      "guardrail classifications, structural readiness summaries,",
-      "and conservative recommendation/overview contracts."
-    )
-  )
-}
-
-simulation_planning_schema_note <- function(schema) {
-  if (is.list(schema) && is.character(schema$note) && length(schema$note) > 0L) {
-    note <- as.character(schema$note[1])
-    if (nzchar(note)) {
-      return(note)
-    }
-  }
-  character(0)
-}
-
-simulation_object_design_variable_aliases <- function(x) {
-  aliases <- x$design_variable_aliases %||% x$settings$design_variable_aliases %||% NULL
-  if (is.character(aliases) &&
-      identical(sort(names(aliases)), sort(c("n_person", "n_rater", "n_criterion", "raters_per_person")))) {
-    return(aliases[c("n_person", "n_rater", "n_criterion", "raters_per_person")])
-  }
-  sim_spec <- x$settings$sim_spec %||% NULL
-  simulation_design_variable_aliases(sim_spec)
-}
-
-simulation_object_design_descriptor <- function(x) {
-  descriptor <- x$design_descriptor %||% x$settings$design_descriptor %||% x$ademp$data_generating_mechanism$design_descriptor %||% NULL
-  required_cols <- c("role", "canonical", "alias", "facet", "quantity", "description")
-  if (is.data.frame(descriptor) && all(required_cols %in% names(descriptor))) {
-    descriptor <- tibble::as_tibble(descriptor)
-    return(descriptor[, required_cols])
-  }
-  sim_spec <- x$settings$sim_spec %||% NULL
-  simulation_design_descriptor(sim_spec)
-}
-
-simulation_object_planning_scope <- function(x) {
-  scope <- x$planning_scope %||% x$settings$planning_scope %||%
-    x$ademp$data_generating_mechanism$planning_scope %||%
-    x$sim_spec$planning_scope %||% NULL
-  required_fields <- c(
-    "planner_contract",
-    "planner_stage",
-    "supports_arbitrary_facet_planning",
-    "supports_arbitrary_facet_estimation",
-    "supported_non_person_roles",
-    "supported_non_person_facet_count",
-    "role_labels",
-    "design_variables",
-    "design_variable_aliases",
-    "facet_manifest",
-    "future_planner_contract",
-    "future_planner_stage",
-    "future_branch_input_contract",
-    "note"
-  )
-  if (is.list(scope) &&
-      all(required_fields %in% names(scope)) &&
-      is.data.frame(scope$facet_manifest)) {
-    return(scope[required_fields])
-  }
-  sim_spec <- x$settings$sim_spec %||% x$sim_spec %||% NULL
-  simulation_planning_scope(sim_spec)
-}
-
-simulation_object_planning_constraints <- function(x) {
-  constraints <- x$planning_constraints %||% x$settings$planning_constraints %||%
-    x$ademp$data_generating_mechanism$planning_constraints %||%
-    x$sim_spec$planning_constraints %||% NULL
-  required_fields <- c(
-    "mutable_design_variables",
-    "locked_design_variables",
-    "lock_reasons",
-    "feasibility_rule",
-    "note"
-  )
-  if (is.list(constraints) && all(required_fields %in% names(constraints))) {
-    return(constraints[required_fields])
-  }
-  sim_spec <- x$settings$sim_spec %||% x$sim_spec %||% NULL
-  simulation_planning_constraints(sim_spec)
-}
-
-simulation_object_planning_schema <- function(x) {
-  schema <- x$planning_schema %||% x$settings$planning_schema %||%
-    x$ademp$data_generating_mechanism$planning_schema %||%
-    x$sim_spec$planning_schema %||% NULL
-  required_fields <- c(
-    "planner_contract",
-    "planner_stage",
-    "supports_arbitrary_facet_planning",
-    "supports_arbitrary_facet_estimation",
-    "role_labels",
-    "design_variables",
-    "design_variable_aliases",
-    "facet_manifest",
-    "future_planner_contract",
-    "future_planner_stage",
-    "future_branch_input_contract",
-    "future_facet_table",
-    "future_design_template",
-    "future_branch_schema",
-    "future_branch_preview",
-    "future_branch_grid_semantics",
-    "future_branch_grid_contract",
-    "future_branch_grid_bundle",
-    "future_branch_grid_context",
-    "future_branch_report_bundle",
-    "future_branch_report_summary",
-    "future_branch_report_overview_table",
-    "future_branch_report_catalog",
-    "future_branch_report_digest",
-    "future_branch_report_surface_registry",
-    "future_branch_report_panel",
-    "future_branch_report_operation",
-    "future_branch_report_snapshot",
-    "future_branch_report_brief",
-    "future_branch_report_mode_registry",
-    "future_branch_report_consumer",
-    "future_branch_pilot",
-    "future_branch_pilot_summary",
-    "future_branch_pilot_table",
-    "future_branch_pilot_plot",
-    "future_branch_active_branch",
-    "future_branch_active_branch_profile",
-    "future_branch_active_branch_load_balance",
-    "future_branch_active_branch_overview",
-    "future_branch_active_branch_load_balance_overview",
-    "future_branch_active_branch_coverage",
-    "future_branch_active_branch_coverage_overview",
-    "future_branch_active_branch_guardrails",
-    "future_branch_active_branch_guardrail_overview",
-    "future_branch_active_branch_readiness",
-    "future_branch_active_branch_readiness_overview",
-    "future_branch_active_branch_recommendation",
-    "future_branch_active_branch_recommendation_overview",
-    "role_table",
-    "feasibility_rules",
-    "note"
-  )
-  if (is.list(schema) &&
-      all(required_fields %in% names(schema)) &&
-      is.data.frame(schema$role_table) &&
-      is.data.frame(schema$facet_manifest) &&
-      is.data.frame(schema$future_facet_table) &&
-      is.list(schema$future_design_template) &&
-      is.list(schema$future_branch_schema) &&
-      is.list(schema$future_branch_preview) &&
-      is.list(schema$future_branch_grid_semantics) &&
-      is.list(schema$future_branch_grid_contract) &&
-      is.list(schema$future_branch_grid_bundle) &&
-      is.list(schema$future_branch_grid_context) &&
-      is.list(schema$future_branch_report_bundle) &&
-      is.list(schema$future_branch_report_summary) &&
-      is.list(schema$future_branch_report_overview_table) &&
-      is.list(schema$future_branch_report_catalog) &&
-      is.list(schema$future_branch_report_digest) &&
-      is.list(schema$future_branch_report_surface_registry) &&
-      is.list(schema$future_branch_report_panel) &&
-      is.list(schema$future_branch_report_operation) &&
-      is.list(schema$future_branch_report_snapshot) &&
-      is.list(schema$future_branch_report_brief) &&
-      is.data.frame(schema$future_branch_report_mode_registry) &&
-      is.list(schema$future_branch_report_consumer) &&
-      is.list(schema$future_branch_pilot) &&
-      is.list(schema$future_branch_pilot_summary) &&
-      is.list(schema$future_branch_pilot_table) &&
-      is.list(schema$future_branch_pilot_plot) &&
-      is.list(schema$future_branch_active_branch) &&
-      is.list(schema$future_branch_active_branch_profile) &&
-      is.list(schema$future_branch_active_branch_load_balance) &&
-      is.list(schema$future_branch_active_branch_overview) &&
-      is.list(schema$future_branch_active_branch_load_balance_overview) &&
-      is.list(schema$future_branch_active_branch_coverage) &&
-      is.list(schema$future_branch_active_branch_coverage_overview) &&
-      is.list(schema$future_branch_active_branch_guardrails) &&
-      is.list(schema$future_branch_active_branch_guardrail_overview) &&
-      is.list(schema$future_branch_active_branch_readiness) &&
-      is.list(schema$future_branch_active_branch_readiness_overview) &&
-      is.list(schema$future_branch_active_branch_recommendation) &&
-      is.list(schema$future_branch_active_branch_recommendation_overview)) {
-    return(schema[required_fields])
-  }
-  sim_spec <- x$settings$sim_spec %||% x$sim_spec %||% NULL
-  simulation_planning_schema(sim_spec)
-}
-
-simulation_design_variable_choices <- function(aliases, descriptor = NULL) {
-  role_names <- if (is.data.frame(descriptor) && "role" %in% names(descriptor)) as.character(descriptor$role) else character(0)
-  unique(c(names(aliases), unname(aliases), role_names))
-}
-
-simulation_design_variable_lookup <- function(aliases, descriptor = NULL) {
-  canonical <- names(aliases)
-  lookup <- c(stats::setNames(canonical, canonical), stats::setNames(canonical, unname(aliases)))
-  if (is.data.frame(descriptor) && all(c("role", "canonical") %in% names(descriptor))) {
-    role_lookup <- stats::setNames(as.character(descriptor$canonical), as.character(descriptor$role))
-    lookup <- c(lookup, role_lookup)
-  }
-  lookup[!duplicated(names(lookup))]
-}
-
-simulation_resolve_design_variable <- function(value, aliases, arg_name, descriptor = NULL) {
-  value <- as.character(value[1])
-  lookup <- simulation_design_variable_lookup(aliases, descriptor = descriptor)
-  resolved <- unname(lookup[[value]])
-  if (!is.null(resolved) && nzchar(resolved)) {
-    return(resolved)
-  }
-  stop(
-    "`", arg_name, "` must be one of: ",
-    paste(simulation_design_variable_choices(aliases, descriptor = descriptor), collapse = ", "),
-    ".",
-    call. = FALSE
-  )
-}
-
-simulation_resolve_design_variable_vector <- function(values, aliases, descriptor = NULL) {
-  values <- unique(as.character(values))
-  values <- values[!is.na(values) & nzchar(values)]
-  if (length(values) == 0L) {
-    return(character(0))
-  }
-  lookup <- simulation_design_variable_lookup(aliases, descriptor = descriptor)
-  resolved <- unname(lookup[values])
-  unique(resolved[!is.na(resolved) & nzchar(resolved)])
-}
-
-simulation_design_variable_label <- function(value, aliases) {
-  label <- unname(aliases[[value]])
-  if (is.null(label) || is.na(label) || !nzchar(label)) {
-    return(value)
-  }
-  label
-}
-
-simulation_parse_future_facet_input <- function(facets,
-                                                future_facet_table,
-                                                arg_name = "design$facets") {
-  if (is.null(facets)) {
-    return(list())
-  }
-  if (is.data.frame(facets)) {
-    if (nrow(facets) != 1L) {
-      stop("`", arg_name, "` must be a one-row data frame when supplied as a data frame.",
-           call. = FALSE)
-    }
-    facets <- as.list(facets[1, , drop = FALSE])
-  } else if (is.atomic(facets) && !is.list(facets)) {
-    facets <- as.list(facets)
-  } else if (!is.list(facets)) {
-    stop(
-      "`", arg_name, "` must be a named list, named vector, or one-row data frame keyed by future facet names.",
-      call. = FALSE
-    )
-  }
-
-  raw_names <- names(facets)
-  valid_names <- as.character(future_facet_table$future_facet_key)
-  if (is.null(raw_names) || any(!nzchar(raw_names))) {
-    stop(
-      "`", arg_name, "` must use names such as ",
-      paste(valid_names, collapse = ", "),
-      ".",
-      call. = FALSE
-    )
-  }
-
-  lookup <- stats::setNames(
-    as.character(future_facet_table$current_planning_count_variable),
-    valid_names
-  )
-  resolved <- unname(lookup[raw_names])
-  if (any(is.na(resolved) | !nzchar(resolved))) {
-    bad <- unique(raw_names[is.na(resolved) | !nzchar(resolved)])
-    stop(
-      "`", arg_name, "` must use names such as ",
-      paste(valid_names, collapse = ", "),
-      ". Invalid names: ",
-      paste(bad, collapse = ", "),
-      ".",
-      call. = FALSE
-    )
-  }
-  if (anyDuplicated(resolved)) {
-    dup <- unique(resolved[duplicated(resolved)])
-    stop(
-      "`", arg_name, "` supplies the same facet-count variable more than once: ",
-      paste(dup, collapse = ", "),
-      ".",
-      call. = FALSE
-    )
-  }
-
-  stats::setNames(unname(facets), resolved)
-}
-
-simulation_parse_future_branch_design <- function(design,
-                                                  future_branch_schema,
-                                                  arg_name = "design") {
-  if (is.null(future_branch_schema) || !is.list(future_branch_schema)) {
-    return(list())
-  }
-  design_schema <- simulation_coerce_future_branch_design_schema(future_branch_schema)
-
-  parsed <- list()
-  if ("facets" %in% names(design)) {
-    parsed <- c(
-      parsed,
-      simulation_parse_future_facet_input(
-        facets = design[["facets"]],
-        future_facet_table = dplyr::transmute(
-          design_schema$facet_axes,
-          future_facet_key = .data$input_key,
-          current_planning_count_variable = .data$canonical_design_variable
-        ),
-        arg_name = paste0(arg_name, "$facets")
-      )
-    )
-  }
-
-  assignment_axis <- design_schema$assignment_axis
-  assignment_key <- as.character(assignment_axis$future_input_key %||% "assignment")
-  assignment_var <- as.character(
-    assignment_axis$current_planning_count_variable %||% "raters_per_person"
-  )
-  if (assignment_key %in% names(design)) {
-    parsed[[assignment_var]] <- design[[assignment_key]]
-  }
-
-  parsed
-}
-
-simulation_parse_design_input <- function(design,
-                                          aliases,
-                                          descriptor = NULL,
-                                          future_facet_table = NULL,
-                                          future_branch_schema = NULL,
-                                          arg_name = "design") {
-  if (is.null(design)) {
-    return(list())
-  }
-
-  if (is.data.frame(design)) {
-    if (nrow(design) != 1L) {
-      stop("`", arg_name, "` must be a one-row data frame when supplied as a data frame.",
-           call. = FALSE)
-    }
-    design <- as.list(design[1, , drop = FALSE])
-  } else if (is.atomic(design) && !is.list(design)) {
-    design <- as.list(design)
-  } else if (!is.list(design)) {
-    stop(
-      "`", arg_name, "` must be a named list, named vector, or one-row data frame. Valid names: ",
-      paste(simulation_design_variable_choices(aliases, descriptor = descriptor), collapse = ", "),
-      ".",
-      call. = FALSE
-    )
-  }
-
-  parsed_future_branch <- list()
-  if ("facets" %in% names(design)) {
-    if (!is.null(future_branch_schema) && is.list(future_branch_schema)) {
-      parsed_future_branch <- simulation_parse_future_branch_design(
-        design = design,
-        future_branch_schema = future_branch_schema,
-        arg_name = arg_name
-      )
-      assignment_key <- as.character(
-        future_branch_schema$assignment_axis$future_input_key %||% "assignment"
-      )
-      design[["facets"]] <- NULL
-      if (assignment_key %in% names(design)) {
-        design[[assignment_key]] <- NULL
-      }
-    } else {
-      if (is.null(future_facet_table) || !is.data.frame(future_facet_table)) {
-        stop("`", arg_name, "$facets` is not available for this planning object.", call. = FALSE)
-      }
-      parsed_future_branch <- simulation_parse_future_facet_input(
-        facets = design[["facets"]],
-        future_facet_table = future_facet_table,
-        arg_name = paste0(arg_name, "$facets")
-      )
-      design[["facets"]] <- NULL
-    }
-  } else if (!is.null(future_branch_schema) && is.list(future_branch_schema)) {
-    assignment_key <- as.character(
-      future_branch_schema$assignment_axis$future_input_key %||% "assignment"
-    )
-    if (assignment_key %in% names(design)) {
-      parsed_future_branch <- simulation_parse_future_branch_design(
-        design = design,
-        future_branch_schema = future_branch_schema,
-        arg_name = arg_name
-      )
-      design[[assignment_key]] <- NULL
-    }
-  }
-
-  raw_names <- names(design)
-  if (length(design) == 0L) {
-    raw_names <- character(0)
-  } else if (is.null(raw_names) || any(!nzchar(raw_names))) {
-    stop(
-      "`", arg_name, "` must use names such as ",
-      paste(simulation_design_variable_choices(aliases, descriptor = descriptor), collapse = ", "),
-      ".",
-      call. = FALSE
-    )
-  }
-
-  parsed_top_level <- list()
-  if (length(raw_names) > 0L) {
-    canonical_names <- vapply(
-      raw_names,
-      simulation_resolve_design_variable,
-      aliases = aliases,
-      arg_name = arg_name,
-      descriptor = descriptor,
-      FUN.VALUE = character(1)
-    )
-    if (anyDuplicated(canonical_names)) {
-      dup <- unique(canonical_names[duplicated(canonical_names)])
-      stop(
-        "`", arg_name, "` supplies the same design variable more than once: ",
-        paste(dup, collapse = ", "),
-        ".",
-        call. = FALSE
-      )
-    }
-    parsed_top_level <- stats::setNames(unname(design), canonical_names)
-  }
-
-  overlap <- intersect(names(parsed_top_level), names(parsed_future_branch))
-  if (length(overlap) > 0L) {
-    stop(
-      "`", arg_name, "` supplies the same design variable through both top-level names and `",
-      arg_name,
-      "$facets`: ",
-      paste(overlap, collapse = ", "),
-      ".",
-      call. = FALSE
-    )
-  }
-
-  c(parsed_top_level, parsed_future_branch)
-}
-
-simulation_resolve_design_counts <- function(sim_spec = NULL,
-                                             n_person = NULL,
-                                             n_rater = NULL,
-                                             n_criterion = NULL,
-                                             raters_per_person = NULL,
-                                             design = NULL,
-                                             defaults = NULL,
-                                             design_arg = "design",
-                                             explicit_scalar_names = NULL) {
-  aliases <- simulation_design_variable_aliases(sim_spec)
-  descriptor <- simulation_design_descriptor(sim_spec)
-  parsed_design <- simulation_parse_design_input(
-    design = design,
-    aliases = aliases,
-    descriptor = descriptor,
-    future_facet_table = simulation_future_facet_table(sim_spec),
-    future_branch_schema = simulation_future_branch_schema(sim_spec),
-    arg_name = design_arg
-  )
-
-  explicit_scalars <- list(
-    n_person = n_person,
-    n_rater = n_rater,
-    n_criterion = n_criterion,
-    raters_per_person = raters_per_person
-  )
-  if (is.null(explicit_scalar_names)) {
-    explicit_scalars <- explicit_scalars[!vapply(explicit_scalars, is.null, logical(1))]
-  } else {
-    explicit_scalar_names <- intersect(names(explicit_scalars), explicit_scalar_names)
-    explicit_scalars <- explicit_scalars[explicit_scalar_names]
-    explicit_scalars <- explicit_scalars[!vapply(explicit_scalars, is.null, logical(1))]
-  }
-  overlap <- intersect(names(parsed_design), names(explicit_scalars))
-  if (length(overlap) > 0L) {
-    stop(
-      "Do not supply the same design variable through both scalar arguments and `",
-      design_arg,
-      "`: ",
-      paste(overlap, collapse = ", "),
-      ".",
-      call. = FALSE
-    )
-  }
-
-  values <- as.list(defaults %||% list())
-  values[names(parsed_design)] <- parsed_design
-  values[names(explicit_scalars)] <- explicit_scalars
-
-  required <- c("n_person", "n_rater", "n_criterion")
-  missing_required <- required[!required %in% names(values)]
-  if (length(missing_required) > 0L) {
-    stop(
-      "Missing required design counts: ",
-      paste(missing_required, collapse = ", "),
-      ".",
-      call. = FALSE
-    )
-  }
-  if (!"raters_per_person" %in% names(values) || is.null(values$raters_per_person)) {
-    values$raters_per_person <- values$n_rater
-  }
-
-  out <- tibble::tibble(
-    n_person = simulation_validate_count(values$n_person, "n_person", min_value = 2L),
-    n_rater = simulation_validate_count(values$n_rater, "n_rater", min_value = 2L),
-    n_criterion = simulation_validate_count(values$n_criterion, "n_criterion", min_value = 2L),
-    raters_per_person = simulation_validate_count(values$raters_per_person, "raters_per_person", min_value = 1L)
-  )
-  if (out$raters_per_person > out$n_rater) {
-    stop("`raters_per_person` cannot exceed `n_rater`.", call. = FALSE)
-  }
-  out
-}
-
-simulation_validate_count_values <- function(x, arg_name, min_value = 1L) {
-  values <- as.integer(x)
-  if (length(values) < 1L || any(!is.finite(values)) || any(values < min_value)) {
-    stop("`", arg_name, "` must contain integer values >= ", min_value, ".", call. = FALSE)
-  }
-  values
-}
-
-simulation_resolve_design_grid_values <- function(sim_spec = NULL,
-                                                  n_person = NULL,
-                                                  n_rater = NULL,
-                                                  n_criterion = NULL,
-                                                  raters_per_person = NULL,
-                                                  design = NULL,
-                                                  defaults = NULL,
-                                                  design_arg = "design",
-                                                  explicit_scalar_names = NULL) {
-  aliases <- simulation_design_variable_aliases(sim_spec)
-  descriptor <- simulation_design_descriptor(sim_spec)
-  parsed_design <- simulation_parse_design_input(
-    design = design,
-    aliases = aliases,
-    descriptor = descriptor,
-    future_facet_table = simulation_future_facet_table(sim_spec),
-    future_branch_schema = simulation_future_branch_schema(sim_spec),
-    arg_name = design_arg
-  )
-
-  if (is.null(explicit_scalar_names)) {
-    overlap_candidates <- c("n_person", "n_rater", "n_criterion", "raters_per_person")
-  } else {
-    overlap_candidates <- intersect(
-      c("n_person", "n_rater", "n_criterion", "raters_per_person"),
-      explicit_scalar_names
-    )
-  }
-  overlap <- intersect(names(parsed_design), overlap_candidates)
-  if (length(overlap) > 0L) {
-    stop(
-      "Do not supply the same design variable through both scalar arguments and `",
-      design_arg,
-      "`: ",
-      paste(overlap, collapse = ", "),
-      ".",
-      call. = FALSE
-    )
-  }
-
-  values <- as.list(defaults %||% list(
-    n_person = n_person,
-    n_rater = n_rater,
-    n_criterion = n_criterion,
-    raters_per_person = raters_per_person
-  ))
-  values[names(parsed_design)] <- parsed_design
-
-  required <- c("n_person", "n_rater", "n_criterion")
-  missing_required <- required[!required %in% names(values)]
-  if (length(missing_required) > 0L) {
-    stop(
-      "Missing required design values: ",
-      paste(missing_required, collapse = ", "),
-      ".",
-      call. = FALSE
-    )
-  }
-  if (!"raters_per_person" %in% names(values) || is.null(values$raters_per_person)) {
-    values$raters_per_person <- values$n_rater
-  }
-
-  list(
-    n_person = simulation_validate_count_values(values$n_person, "n_person", min_value = 2L),
-    n_rater = simulation_validate_count_values(values$n_rater, "n_rater", min_value = 2L),
-    n_criterion = simulation_validate_count_values(values$n_criterion, "n_criterion", min_value = 2L),
-    raters_per_person = simulation_validate_count_values(values$raters_per_person, "raters_per_person", min_value = 1L)
-  )
-}
-
-simulation_design_canonical_variables <- function(descriptor = NULL) {
-  if (is.data.frame(descriptor) && "canonical" %in% names(descriptor)) {
-    vals <- as.character(descriptor$canonical)
-    vals <- vals[!is.na(vals) & nzchar(vals)]
-    if (length(vals) > 0L) {
-      return(vals)
-    }
-  }
-  c("n_person", "n_rater", "n_criterion", "raters_per_person")
-}
-
-simulation_design_group_variables <- function(descriptor = NULL, include_design_id = TRUE) {
-  vars <- simulation_design_canonical_variables(descriptor)
-  if (isTRUE(include_design_id)) {
-    c("design_id", vars)
-  } else {
-    vars
-  }
-}
-
-simulation_append_design_alias_columns <- function(tbl, aliases) {
-  tbl <- tibble::as_tibble(tbl)
-  if (!is.character(aliases) || length(aliases) == 0L) {
-    return(tbl)
-  }
-  for (canonical in names(aliases)) {
-    alias <- as.character(aliases[[canonical]])
-    if (!canonical %in% names(tbl)) next
-    if (is.na(alias) || !nzchar(alias) || identical(alias, canonical) || alias %in% names(tbl)) next
-    tbl[[alias]] <- tbl[[canonical]]
-  }
-  tbl
-}
-
-simulation_build_design_grid <- function(n_person,
-                                         n_rater,
-                                         n_criterion,
-                                         raters_per_person,
-                                         design = NULL,
-                                         sim_spec = NULL,
-                                         id_prefix = "D",
-                                         explicit_scalar_names = NULL) {
-  aliases <- simulation_design_variable_aliases(sim_spec)
-  descriptor <- simulation_design_descriptor(sim_spec)
-  canonical_order <- as.character(descriptor$canonical)
-  design_values <- simulation_resolve_design_grid_values(
-    sim_spec = sim_spec,
-    n_person = n_person,
-    n_rater = n_rater,
-    n_criterion = n_criterion,
-    raters_per_person = raters_per_person,
-    design = design,
-    defaults = list(
-      n_person = n_person,
-      n_rater = n_rater,
-      n_criterion = n_criterion,
-      raters_per_person = raters_per_person
-    ),
-    design_arg = "design",
-    explicit_scalar_names = explicit_scalar_names
-  )
-
-  design_grid <- expand.grid(
-    n_person = design_values$n_person,
-    n_rater = design_values$n_rater,
-    n_criterion = design_values$n_criterion,
-    raters_per_person = design_values$raters_per_person,
-    KEEP.OUT.ATTRS = FALSE,
-    stringsAsFactors = FALSE
-  )
-  design_grid <- design_grid[design_grid$raters_per_person <= design_grid$n_rater, , drop = FALSE]
-  if (nrow(design_grid) == 0) {
-    msg <- "No valid design rows remain after enforcing `raters_per_person <= n_rater`."
-    public_rule <- paste0("`", unname(aliases[["raters_per_person"]]), " <= ", unname(aliases[["n_rater"]]), "`")
-    if (!identical(public_rule, "`raters_per_person <= n_rater`")) {
-      msg <- paste0(msg, " Public aliases: ", public_rule, ".")
-    }
-    stop(msg, call. = FALSE)
-  }
-  design_grid$design_id <- sprintf("%s%02d", as.character(id_prefix[1]), seq_len(nrow(design_grid)))
-  design_grid <- tibble::as_tibble(design_grid[, c("design_id", canonical_order), drop = FALSE])
-
-  list(
-    canonical = design_grid,
-    public = simulation_append_design_alias_columns(design_grid, aliases),
-    aliases = aliases,
-    descriptor = descriptor
-  )
-}
 
 simulation_build_ademp <- function(purpose,
                                    design_grid,
@@ -8189,6 +1274,1906 @@ design_eval_summarize_results <- function(results, rep_overview, design_variable
   )
 }
 
+recovery_safe_mean <- function(x) {
+  x <- suppressWarnings(as.numeric(x))
+  x <- x[is.finite(x)]
+  if (length(x) == 0L) return(NA_real_)
+  mean(x)
+}
+
+recovery_safe_sd <- function(x) {
+  x <- suppressWarnings(as.numeric(x))
+  x <- x[is.finite(x)]
+  if (length(x) <= 1L) return(NA_real_)
+  stats::sd(x)
+}
+
+recovery_safe_cor <- function(x, y) {
+  x <- suppressWarnings(as.numeric(x))
+  y <- suppressWarnings(as.numeric(y))
+  ok <- is.finite(x) & is.finite(y)
+  sdx <- recovery_safe_sd(x[ok])
+  sdy <- recovery_safe_sd(y[ok])
+  if (sum(ok) <= 1L || !is.finite(sdx) || !is.finite(sdy) || sdx == 0 || sdy == 0) {
+    return(NA_real_)
+  }
+  suppressWarnings(stats::cor(x[ok], y[ok]))
+}
+
+recovery_mcse_rmse <- function(x) {
+  x <- suppressWarnings(as.numeric(x))
+  x <- x[is.finite(x)]
+  n <- length(x)
+  if (n <= 1L) return(NA_real_)
+  rmse <- sqrt(mean(x^2))
+  if (!is.finite(rmse) || rmse <= 0) return(NA_real_)
+  stats::sd(x^2) / (2 * rmse * sqrt(n))
+}
+
+recovery_get_se <- function(tbl) {
+  tbl <- as.data.frame(tbl, stringsAsFactors = FALSE)
+  candidates <- c("SE", "S.E.", "ModelSE", "Std.Error", "StdError")
+  hit <- candidates[candidates %in% names(tbl)][1]
+  if (is.na(hit)) return(rep(NA_real_, nrow(tbl)))
+  suppressWarnings(as.numeric(tbl[[hit]]))
+}
+
+recovery_normalize_step_table <- function(x) {
+  if (is.null(x)) {
+    return(data.frame(StepFacet = character(0), Step = character(0), Estimate = numeric(0)))
+  }
+  if (is.numeric(x)) {
+    return(data.frame(
+      StepFacet = "Common",
+      Step = paste0("Step_", seq_along(x)),
+      Estimate = as.numeric(x),
+      stringsAsFactors = FALSE
+    ))
+  }
+  x <- as.data.frame(x, stringsAsFactors = FALSE)
+  if (!"StepFacet" %in% names(x)) x$StepFacet <- "Common"
+  if (!"Step" %in% names(x)) {
+    if ("StepIndex" %in% names(x)) {
+      x$Step <- paste0("Step_", as.integer(x$StepIndex))
+    } else {
+      x$Step <- paste0("Step_", seq_len(nrow(x)))
+    }
+  }
+  if (!"Estimate" %in% names(x)) {
+    stop("Step recovery requires an `Estimate` column.", call. = FALSE)
+  }
+  data.frame(
+    StepFacet = as.character(x$StepFacet),
+    Step = as.character(x$Step),
+    Estimate = suppressWarnings(as.numeric(x$Estimate)),
+    stringsAsFactors = FALSE
+  )
+}
+
+recovery_expand_common_steps <- function(truth_steps, fit_steps) {
+  if (nrow(truth_steps) == 0L || nrow(fit_steps) == 0L) return(truth_steps)
+  if (!all(unique(as.character(truth_steps$StepFacet)) == "Common")) return(truth_steps)
+  fit_facets <- unique(as.character(fit_steps$StepFacet))
+  fit_facets <- fit_facets[!is.na(fit_facets) & nzchar(fit_facets)]
+  if (length(fit_facets) == 0L || identical(fit_facets, "Common")) return(truth_steps)
+  expanded <- lapply(fit_facets, function(step_facet) {
+    out <- truth_steps
+    out$StepFacet <- step_facet
+    out
+  })
+  dplyr::bind_rows(expanded)
+}
+
+recovery_new_rows <- function(rep,
+                              parameter_type,
+                              facet,
+                              level,
+                              subparameter,
+                              truth,
+                              estimate,
+                              se = NA_real_,
+                              raw_truth = truth,
+                              raw_estimate = estimate,
+                              comparison_scale = "logit",
+                              alignment_group = facet,
+                              align = TRUE,
+                              recovery_comparable = TRUE,
+                              recovery_basis = "truth_estimate_matched") {
+  n <- length(level)
+  recycle_field <- function(x) {
+    x <- as.character(x)
+    if (length(x) == n) x else rep(x[1] %||% NA_character_, n)
+  }
+  tibble::tibble(
+    rep = rep,
+    ParameterType = recycle_field(parameter_type),
+    Facet = recycle_field(facet),
+    Level = as.character(level),
+    Subparameter = as.character(subparameter),
+    Truth = suppressWarnings(as.numeric(truth)),
+    Estimate = suppressWarnings(as.numeric(estimate)),
+    SE = suppressWarnings(as.numeric(se)),
+    RawTruth = suppressWarnings(as.numeric(raw_truth)),
+    RawEstimate = suppressWarnings(as.numeric(raw_estimate)),
+    ComparisonScale = recycle_field(comparison_scale),
+    AlignmentGroup = recycle_field(alignment_group),
+    AlignWithinGroup = rep(isTRUE(align), n),
+    RecoveryComparable = rep(isTRUE(recovery_comparable), n),
+    RecoveryBasis = rep(as.character(recovery_basis), n)
+  )
+}
+
+recovery_rows_from_fit <- function(fit, truth, rep, include_person = TRUE) {
+  if (is.null(truth) || !is.list(truth)) return(tibble::tibble())
+  rows <- list()
+  k <- 0L
+
+  if (isTRUE(include_person) && !is.null(truth$person) && !is.null(fit$facets$person)) {
+    person_tbl <- as.data.frame(fit$facets$person, stringsAsFactors = FALSE)
+    if (all(c("Person", "Estimate") %in% names(person_tbl))) {
+      idx <- match(as.character(person_tbl$Person), names(truth$person))
+      ok <- is.finite(idx)
+      if (any(ok)) {
+        k <- k + 1L
+        rows[[k]] <- recovery_new_rows(
+          rep = rep,
+          parameter_type = "person",
+          facet = "Person",
+          level = person_tbl$Person[ok],
+          subparameter = "measure",
+          truth = as.numeric(truth$person[idx[ok]]),
+          estimate = suppressWarnings(as.numeric(person_tbl$Estimate[ok])),
+          se = recovery_get_se(person_tbl)[ok],
+          comparison_scale = "logit",
+          alignment_group = "Person",
+          align = TRUE
+        )
+      }
+    }
+  }
+
+  if (!is.null(truth$facets) && length(truth$facets) > 0L && !is.null(fit$facets$others)) {
+    other_tbl <- as.data.frame(fit$facets$others, stringsAsFactors = FALSE)
+    if (all(c("Facet", "Level", "Estimate") %in% names(other_tbl))) {
+      for (facet_name in names(truth$facets)) {
+        truth_vec <- truth$facets[[facet_name]]
+        facet_tbl <- other_tbl[as.character(other_tbl$Facet) == facet_name, , drop = FALSE]
+        if (nrow(facet_tbl) == 0L || is.null(names(truth_vec))) next
+        idx <- match(as.character(facet_tbl$Level), names(truth_vec))
+        ok <- is.finite(idx)
+        if (!any(ok)) next
+        k <- k + 1L
+        rows[[k]] <- recovery_new_rows(
+          rep = rep,
+          parameter_type = "facet",
+          facet = facet_name,
+          level = facet_tbl$Level[ok],
+          subparameter = "measure",
+          truth = as.numeric(truth_vec[idx[ok]]),
+          estimate = suppressWarnings(as.numeric(facet_tbl$Estimate[ok])),
+          se = recovery_get_se(facet_tbl)[ok],
+          comparison_scale = "logit",
+          alignment_group = facet_name,
+          align = TRUE
+        )
+      }
+    }
+  }
+
+  if (!is.null(truth$step_table) && !is.null(fit$steps)) {
+    truth_steps <- recovery_normalize_step_table(truth$step_table)
+    fit_steps <- recovery_normalize_step_table(fit$steps)
+    truth_steps <- recovery_expand_common_steps(truth_steps, fit_steps)
+    step_tbl <- merge(
+      truth_steps,
+      fit_steps,
+      by = c("StepFacet", "Step"),
+      suffixes = c(".Truth", ".Estimate"),
+      sort = FALSE
+    )
+    if (nrow(step_tbl) > 0L) {
+      k <- k + 1L
+      rows[[k]] <- recovery_new_rows(
+        rep = rep,
+        parameter_type = "step",
+        facet = as.character(step_tbl$StepFacet),
+        level = as.character(step_tbl$StepFacet),
+        subparameter = as.character(step_tbl$Step),
+        truth = suppressWarnings(as.numeric(step_tbl$Estimate.Truth)),
+        estimate = suppressWarnings(as.numeric(step_tbl$Estimate.Estimate)),
+        comparison_scale = "logit",
+        alignment_group = paste0("step:", step_tbl$StepFacet),
+        align = TRUE
+      )
+    }
+  }
+
+  if (!is.null(truth$slope_table) && !is.null(fit$slopes)) {
+    truth_slopes <- as.data.frame(truth$slope_table, stringsAsFactors = FALSE)
+    fit_slopes <- as.data.frame(fit$slopes, stringsAsFactors = FALSE)
+    if (all(c("SlopeFacet", "Estimate") %in% names(truth_slopes)) &&
+        all(c("SlopeFacet", "Estimate") %in% names(fit_slopes))) {
+      slope_tbl <- merge(
+        truth_slopes[, c("SlopeFacet", "Estimate"), drop = FALSE],
+        fit_slopes[, c("SlopeFacet", "Estimate"), drop = FALSE],
+        by = "SlopeFacet",
+        suffixes = c(".Truth", ".Estimate"),
+        sort = FALSE
+      )
+      slope_truth <- suppressWarnings(as.numeric(slope_tbl$Estimate.Truth))
+      slope_est <- suppressWarnings(as.numeric(slope_tbl$Estimate.Estimate))
+      ok <- is.finite(slope_truth) & slope_truth > 0 & is.finite(slope_est) & slope_est > 0
+      if (any(ok)) {
+        k <- k + 1L
+        rows[[k]] <- recovery_new_rows(
+          rep = rep,
+          parameter_type = "slope",
+          facet = "SlopeFacet",
+          level = as.character(slope_tbl$SlopeFacet[ok]),
+          subparameter = "log_slope",
+          truth = log(slope_truth[ok]),
+          estimate = log(slope_est[ok]),
+          raw_truth = slope_truth[ok],
+          raw_estimate = slope_est[ok],
+          comparison_scale = "log_slope",
+          alignment_group = "slope_identified",
+          align = FALSE,
+          recovery_basis = "geometric_mean_one_log_slope"
+        )
+      }
+    }
+  }
+
+  truth_pop <- truth$population
+  fit_pop <- fit$population
+  if (is.list(truth_pop) && is.list(fit_pop) && !is.null(truth_pop$coefficients) &&
+      !is.null(fit_pop$coefficients)) {
+    truth_coef <- truth_pop$coefficients
+    fit_coef <- fit_pop$coefficients
+    common_terms <- intersect(names(truth_coef), names(fit_coef))
+    if (length(common_terms) > 0L) {
+      k <- k + 1L
+      rows[[k]] <- recovery_new_rows(
+        rep = rep,
+        parameter_type = "population",
+        facet = "population",
+        level = common_terms,
+        subparameter = "coefficient",
+        truth = as.numeric(truth_coef[common_terms]),
+        estimate = as.numeric(fit_coef[common_terms]),
+        comparison_scale = "coefficient",
+        alignment_group = "population_coefficients",
+        align = FALSE
+      )
+    }
+    if (!is.null(truth_pop$sigma2) && !is.null(fit_pop$sigma2)) {
+      k <- k + 1L
+      rows[[k]] <- recovery_new_rows(
+        rep = rep,
+        parameter_type = "population",
+        facet = "population",
+        level = "sigma2",
+        subparameter = "variance",
+        truth = as.numeric(truth_pop$sigma2),
+        estimate = as.numeric(fit_pop$sigma2),
+        comparison_scale = "variance",
+        alignment_group = "population_variance",
+        align = FALSE
+      )
+    }
+  }
+
+  out <- dplyr::bind_rows(rows)
+  if (nrow(out) == 0L) return(out)
+  out |>
+    dplyr::group_by(.data$rep, .data$ParameterType, .data$Facet,
+                    .data$AlignmentGroup, .data$ComparisonScale) |>
+    dplyr::mutate(
+      ErrorRaw = .data$Estimate - .data$Truth,
+      AlignmentShift = if (dplyr::first(.data$AlignWithinGroup)) {
+        recovery_safe_mean(.data$ErrorRaw)
+      } else {
+        0
+      },
+      EstimateAligned = .data$Estimate - .data$AlignmentShift,
+      ErrorAligned = .data$EstimateAligned - .data$Truth,
+      Covered95 = dplyr::if_else(
+        is.finite(.data$SE) & .data$SE > 0,
+        .data$Truth >= .data$EstimateAligned - stats::qnorm(0.975) * .data$SE &
+          .data$Truth <= .data$EstimateAligned + stats::qnorm(0.975) * .data$SE,
+        NA
+      )
+    ) |>
+    dplyr::ungroup()
+}
+
+recovery_summarize_rows <- function(rows) {
+  rows <- tibble::as_tibble(rows)
+  if (nrow(rows) == 0L) return(tibble::tibble())
+  rows |>
+    dplyr::group_by(.data$ParameterType, .data$Facet, .data$ComparisonScale) |>
+    dplyr::summarise(
+      Rows = dplyr::n(),
+      Reps = dplyr::n_distinct(.data$rep),
+      ComparableRate = mean(.data$RecoveryComparable, na.rm = TRUE),
+      MeanTruth = recovery_safe_mean(.data$Truth),
+      MeanEstimate = recovery_safe_mean(.data$EstimateAligned),
+      Bias = recovery_safe_mean(.data$ErrorAligned),
+      McseBias = simulation_mcse_mean(.data$ErrorAligned),
+      RMSE = sqrt(recovery_safe_mean(.data$ErrorAligned^2)),
+      McseRMSE = recovery_mcse_rmse(.data$ErrorAligned),
+      MAE = recovery_safe_mean(abs(.data$ErrorAligned)),
+      RawBias = recovery_safe_mean(.data$ErrorRaw),
+      RawRMSE = sqrt(recovery_safe_mean(.data$ErrorRaw^2)),
+      Correlation = recovery_safe_cor(.data$EstimateAligned, .data$Truth),
+      MeanSE = recovery_safe_mean(.data$SE),
+      SEAvailableRate = mean(is.finite(.data$SE) & .data$SE > 0, na.rm = TRUE),
+      Coverage95 = if (all(is.na(.data$Covered95))) NA_real_ else mean(.data$Covered95, na.rm = TRUE),
+      RecoveryBasis = paste(sort(unique(as.character(.data$RecoveryBasis))), collapse = "; "),
+      .groups = "drop"
+    ) |>
+    dplyr::arrange(.data$ParameterType, .data$Facet, .data$ComparisonScale)
+}
+
+recovery_build_notes <- function(rep_overview, recovery_summary, model) {
+  notes <- character(0)
+  if (is.data.frame(rep_overview) && nrow(rep_overview) > 0L) {
+    if (any(!rep_overview$RunOK, na.rm = TRUE)) {
+      notes <- c(notes, "Some recovery replications failed before recovery rows could be computed.")
+    }
+    if (any(!rep_overview$Converged, na.rm = TRUE)) {
+      notes <- c(notes, "Some fitted models did not report convergence; inspect `rep_overview` before interpreting recovery summaries.")
+    }
+  }
+  if (is.data.frame(recovery_summary) && nrow(recovery_summary) > 0L &&
+      any(recovery_summary$SEAvailableRate < 1, na.rm = TRUE)) {
+    notes <- c(notes, "Coverage95 is reported only for rows with available standard errors.")
+  }
+  if (identical(model, "GPCM")) {
+    notes <- c(
+      notes,
+      "Bounded GPCM recovery compares identified log slopes under the geometric-mean-one slope convention and keeps the current bounded GPCM support caveats."
+    )
+  }
+  if (length(notes) == 0L) notes <- "No immediate warnings from the recovery simulation summary."
+  notes
+}
+
+#' Evaluate parameter recovery by repeated simulation and refitting
+#'
+#' @description
+#' Runs a compact parameter-recovery simulation study: generate data from a
+#' known ordered many-facet data-generating setup, refit the requested model,
+#' align estimates to the known truth where location indeterminacy requires it,
+#' and summarize bias, RMSE, MAE, correlation, and standard-error coverage.
+#'
+#' @inheritParams simulate_mfrm_data
+#' @param reps Number of Monte Carlo replications.
+#' @param fit_method Estimation method passed to [fit_mfrm()].
+#' @param maxit Maximum optimizer iterations passed to [fit_mfrm()].
+#' @param quad_points Quadrature points used when `fit_method = "MML"`.
+#' @param include_person Logical. When `TRUE`, include person-measure recovery
+#'   rows when the fitted object exposes person estimates.
+#'
+#' @details
+#' This helper is deliberately narrower than [evaluate_mfrm_design()]. Design
+#' evaluation asks which design condition is operationally adequate; recovery
+#' simulation asks whether the fitted model recovers the known parameters under
+#' one explicit data-generating setup.
+#'
+#' Location-like parameters (`Person`, non-person facets, and steps) are
+#' summarized after mean alignment within each replication and parameter group.
+#' This follows the usual Rasch/MFRM identification convention: adding a common
+#' constant to one location block should not be counted as recovery failure.
+#' Raw, unaligned errors are retained in `recovery` and summarized as
+#' `RawBias` / `RawRMSE`.
+#'
+#' For bounded `GPCM`, supplied generator slopes are treated as relative
+#' discriminations and normalized to the same geometric-mean-one log-slope
+#' identification used by the fitter. Slope recovery is therefore summarized on
+#' the identified log-slope scale without an additional mean-alignment step.
+#' Direct data generation and refitting are supported, but broader GPCM design-
+#' planning claims remain outside the current package boundary.
+#'
+#' The returned `ademp` component follows the simulation-study framing of
+#' Morris, White, and Crowther (2019) and the ADEMP planning/reporting template
+#' used in later simulation-study guidance.
+#'
+#' @return An object of class `mfrm_recovery_simulation` with components:
+#' - `recovery`: row-level truth/estimate comparisons by replication.
+#' - `recovery_summary`: parameter-type summaries across replications.
+#' - `rep_overview`: replication-level convergence, timing, and error status.
+#' - `settings`: fitting and simulation settings.
+#' - `ademp`: simulation-study metadata.
+#'
+#' @section Typical workflow:
+#' 1. Build a simulation specification with [build_mfrm_sim_spec()] or pass scalar
+#'    generator arguments directly.
+#' 2. Run `evaluate_mfrm_recovery(...)` with a modest `reps` value for a smoke
+#'    check, then increase `reps` for stable Monte Carlo summaries.
+#' 3. Inspect `summary(x)$recovery_summary` and the row-level `x$recovery` table.
+#'
+#' @seealso [simulate_mfrm_data()], [evaluate_mfrm_design()], [fit_mfrm()]
+#' @examples
+#' \donttest{
+#' rec <- evaluate_mfrm_recovery(
+#'   n_person = 12,
+#'   n_rater = 2,
+#'   n_criterion = 2,
+#'   reps = 1,
+#'   maxit = 30,
+#'   seed = 123
+#' )
+#' summary(rec)$recovery_summary[, c("ParameterType", "Facet", "RMSE", "Bias")]
+#' }
+#' @export
+evaluate_mfrm_recovery <- function(n_person = 50,
+                                   n_rater = 4,
+                                   n_criterion = 4,
+                                   raters_per_person = n_rater,
+                                   design = NULL,
+                                   reps = 10,
+                                   score_levels = 4,
+                                   theta_sd = 1,
+                                   rater_sd = 0.35,
+                                   criterion_sd = 0.25,
+                                   noise_sd = 0,
+                                   step_span = 1.4,
+                                   model = c("RSM", "PCM", "GPCM"),
+                                   step_facet = NULL,
+                                   slope_facet = NULL,
+                                   thresholds = NULL,
+                                   slopes = NULL,
+                                   assignment = NULL,
+                                   sim_spec = NULL,
+                                   fit_method = c("JML", "MML"),
+                                   maxit = 25,
+                                   quad_points = 7,
+                                   include_person = TRUE,
+                                   seed = NULL) {
+  model <- match.arg(toupper(as.character(model[1])), c("RSM", "PCM", "GPCM"))
+  fit_method <- match.arg(fit_method)
+  reps <- as.integer(reps[1])
+  if (!is.finite(reps) || reps < 1L) stop("`reps` must be >= 1.", call. = FALSE)
+  if (!is.null(sim_spec) && !inherits(sim_spec, "mfrm_sim_spec")) {
+    stop("`sim_spec` must be output from build_mfrm_sim_spec() or extract_mfrm_sim_spec().", call. = FALSE)
+  }
+  if (!is.null(sim_spec)) {
+    model <- as.character(sim_spec$model %||% model)
+    step_facet <- sim_spec$step_facet %||% step_facet
+    slope_facet <- sim_spec$slope_facet %||% slope_facet
+  }
+  if (identical(model, "GPCM")) {
+    facet_names_for_resolution <- if (is.null(sim_spec)) {
+      simulation_default_output_facet_names()
+    } else {
+      simulation_spec_output_facet_names(sim_spec)
+    }
+    resolved_facets <- resolve_step_and_slope_facets(
+      model = model,
+      step_facet = step_facet[1] %||% facet_names_for_resolution[2],
+      slope_facet = slope_facet,
+      facet_names = unname(facet_names_for_resolution)
+    )
+    step_facet <- resolved_facets$step_facet
+    slope_facet <- resolved_facets$slope_facet
+  } else if (identical(model, "PCM")) {
+    step_facet <- step_facet[1] %||% if (is.null(sim_spec)) "Criterion" else sim_spec$step_facet
+  } else {
+    step_facet <- NULL
+    slope_facet <- NULL
+  }
+  if (!is.null(sim_spec) &&
+      isTRUE((sim_spec$population %||% simulation_empty_population_spec())$active) &&
+      !identical(fit_method, "MML")) {
+    stop(
+      "Recovery simulations with an active latent-regression population generator require `fit_method = \"MML\"`.",
+      call. = FALSE
+    )
+  }
+
+  seeds <- with_preserved_rng_seed(
+    seed,
+    sample.int(.Machine$integer.max, size = reps, replace = FALSE)
+  )
+  base_facet_names <- if (is.null(sim_spec)) simulation_default_output_facet_names() else simulation_spec_output_facet_names(sim_spec)
+  generator_model <- if (is.null(sim_spec)) model else as.character(sim_spec$model %||% model)
+  generator_step_facet <- if (is.null(sim_spec)) {
+    if (identical(generator_model, "RSM")) NA_character_ else step_facet
+  } else {
+    sim_spec$step_facet %||% NA_character_
+  }
+  generator_assignment <- if (is.null(sim_spec)) {
+    assignment %||% "design_dependent"
+  } else {
+    sim_spec$assignment
+  }
+
+  recovery_rows <- vector("list", reps)
+  rep_rows <- vector("list", reps)
+  for (rep in seq_len(reps)) {
+    t0 <- proc.time()[["elapsed"]]
+    sim <- tryCatch(
+      if (is.null(sim_spec)) {
+        simulate_mfrm_data(
+          n_person = n_person,
+          n_rater = n_rater,
+          n_criterion = n_criterion,
+          raters_per_person = raters_per_person,
+          design = design,
+          score_levels = score_levels,
+          theta_sd = theta_sd,
+          rater_sd = rater_sd,
+          criterion_sd = criterion_sd,
+          noise_sd = noise_sd,
+          step_span = step_span,
+          seed = seeds[rep],
+          model = model,
+          step_facet = step_facet %||% "Criterion",
+          slope_facet = slope_facet,
+          thresholds = thresholds,
+          slopes = slopes,
+          assignment = assignment
+        )
+      } else {
+        simulate_mfrm_data(sim_spec = sim_spec, seed = seeds[rep])
+      },
+      error = function(e) e
+    )
+    elapsed_sim <- proc.time()[["elapsed"]] - t0
+    rep_row <- tibble::tibble(
+      rep = rep,
+      Seed = seeds[rep],
+      Observations = if (is.data.frame(sim)) nrow(sim) else NA_integer_,
+      ElapsedSec = elapsed_sim,
+      RunOK = FALSE,
+      Converged = FALSE,
+      RecoveryRows = 0L,
+      Error = NA_character_
+    )
+    if (inherits(sim, "error")) {
+      rep_row$Error <- conditionMessage(sim)
+      rep_rows[[rep]] <- rep_row
+      recovery_rows[[rep]] <- tibble::tibble()
+      next
+    }
+
+    row_facet_names <- if (is.null(sim_spec)) base_facet_names else simulation_spec_output_facet_names(sim_spec)
+    fit_args <- list(
+      data = sim,
+      person = "Person",
+      facets = row_facet_names,
+      score = "Score",
+      method = fit_method,
+      model = model,
+      maxit = maxit
+    )
+    if (identical(model, "PCM")) fit_args$step_facet <- step_facet %||% row_facet_names[2]
+    if (identical(model, "GPCM")) {
+      fit_args$step_facet <- step_facet %||% row_facet_names[2]
+      fit_args$slope_facet <- slope_facet %||% fit_args$step_facet
+    }
+    if (identical(fit_method, "MML")) fit_args$quad_points <- quad_points
+    if ("Weight" %in% names(sim)) fit_args$weight <- "Weight"
+    sim_population <- attr(sim, "mfrm_population_data")
+    if (is.list(sim_population) && isTRUE(sim_population$active)) {
+      fit_args$population_formula <- sim_population$population_formula
+      fit_args$person_data <- sim_population$person_data
+      fit_args$person_id <- sim_population$person_id
+      fit_args$population_policy <- sim_population$population_policy
+    }
+    fit_args <- simulation_add_fit_score_support(
+      fit_args,
+      sim,
+      fallback_score_levels = if (is.null(sim_spec)) score_levels else sim_spec$score_levels
+    )
+
+    fit <- tryCatch(suppressWarnings(do.call(fit_mfrm, fit_args)), error = function(e) e)
+    elapsed <- proc.time()[["elapsed"]] - t0
+    rep_row$ElapsedSec <- elapsed
+    if (inherits(fit, "error")) {
+      rep_row$Error <- conditionMessage(fit)
+      rep_rows[[rep]] <- rep_row
+      recovery_rows[[rep]] <- tibble::tibble()
+      next
+    }
+    truth <- attr(sim, "mfrm_truth")
+    rows <- recovery_rows_from_fit(fit, truth, rep = rep, include_person = include_person)
+    rep_row$RunOK <- TRUE
+    rep_row$Converged <- isTRUE(as.logical(fit$summary$Converged[1]))
+    rep_row$RecoveryRows <- nrow(rows)
+    rep_rows[[rep]] <- rep_row
+    recovery_rows[[rep]] <- rows
+  }
+
+  recovery <- dplyr::bind_rows(recovery_rows)
+  rep_overview <- dplyr::bind_rows(rep_rows)
+  recovery_summary <- recovery_summarize_rows(recovery)
+  ademp <- simulation_build_ademp(
+    purpose = "Assess parameter recovery under one explicit many-facet data-generating setup by repeated simulation and refitting.",
+    design_grid = data.frame(
+      design_id = "R1",
+      n_person = n_person,
+      n_rater = n_rater,
+      n_criterion = n_criterion,
+      raters_per_person = raters_per_person
+    ),
+    generator_model = generator_model,
+    generator_step_facet = generator_step_facet,
+    generator_assignment = generator_assignment,
+    sim_spec = sim_spec,
+    estimands = c(
+      "Person and facet location recovery after identification alignment",
+      "Step-threshold recovery after identification alignment",
+      "Bounded GPCM log-slope recovery when slopes are fitted",
+      "Latent-regression coefficient and variance recovery when present"
+    ),
+    analysis_methods = list(
+      fit_method = fit_method,
+      fitted_model = model,
+      maxit = maxit,
+      quad_points = if (identical(fit_method, "MML")) quad_points else NA_integer_
+    ),
+    performance_measures = c(
+      "Bias",
+      "RMSE",
+      "MAE",
+      "Truth-estimate correlation",
+      "95% Wald coverage where standard errors are available",
+      "Monte Carlo standard errors for bias and RMSE"
+    )
+  )
+  structure(
+    list(
+      recovery = recovery,
+      recovery_summary = recovery_summary,
+      rep_overview = rep_overview,
+      settings = list(
+        reps = reps,
+        fit_method = fit_method,
+        model = model,
+        step_facet = step_facet,
+        slope_facet = slope_facet,
+        maxit = maxit,
+        quad_points = quad_points,
+        include_person = isTRUE(include_person),
+        sim_spec = sim_spec,
+        seed = seed
+      ),
+      notes = recovery_build_notes(rep_overview, recovery_summary, model),
+      ademp = ademp
+    ),
+    class = "mfrm_recovery_simulation"
+  )
+}
+
+#' @export
+summary.mfrm_recovery_simulation <- function(object, digits = 3, ...) {
+  if (!inherits(object, "mfrm_recovery_simulation")) {
+    stop("`object` must be output from evaluate_mfrm_recovery().", call. = FALSE)
+  }
+  rep_tbl <- tibble::as_tibble(object$rep_overview %||% tibble::tibble())
+  overview <- tibble::tibble(
+    Reps = nrow(rep_tbl),
+    SuccessfulRuns = if (nrow(rep_tbl) > 0L) sum(rep_tbl$RunOK, na.rm = TRUE) else 0L,
+    ConvergedRuns = if (nrow(rep_tbl) > 0L) sum(rep_tbl$Converged, na.rm = TRUE) else 0L,
+    MeanElapsedSec = if (nrow(rep_tbl) > 0L) recovery_safe_mean(rep_tbl$ElapsedSec) else NA_real_,
+    RecoveryRows = if (nrow(rep_tbl) > 0L) sum(rep_tbl$RecoveryRows, na.rm = TRUE) else 0L
+  )
+  out <- list(
+    overview = overview,
+    recovery_summary = tibble::as_tibble(object$recovery_summary %||% tibble::tibble()),
+    rep_overview = rep_tbl,
+    settings = object$settings %||% list(),
+    notes = object$notes %||% character(0),
+    ademp = object$ademp %||% NULL,
+    digits = max(0L, as.integer(digits[1]))
+  )
+  class(out) <- "summary.mfrm_recovery_simulation"
+  out
+}
+
+#' @export
+print.summary.mfrm_recovery_simulation <- function(x, ...) {
+  digits <- as.integer(x$digits %||% 3L)
+  if (!is.finite(digits)) digits <- 3L
+  cat("MFRM Parameter Recovery Simulation Summary\n")
+  if (!is.null(x$overview) && nrow(x$overview) > 0L) {
+    print(round_numeric_df(as.data.frame(x$overview), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$recovery_summary) && nrow(x$recovery_summary) > 0L) {
+    cat("\nRecovery summary\n")
+    print(round_numeric_df(as.data.frame(x$recovery_summary), digits = digits), row.names = FALSE)
+  }
+  if (length(x$notes) > 0L) {
+    cat("\nNotes\n")
+    for (line in x$notes) cat(" - ", line, "\n", sep = "")
+  }
+  if (is.list(x$ademp) && length(x$ademp) > 0L) {
+    cat("\nADEMP\n")
+    cat(" - Aim: ", paste(x$ademp$aims, collapse = "; "), "\n", sep = "")
+    cat(" - DGM model: ", x$ademp$data_generating_mechanism$model, "\n", sep = "")
+  }
+  invisible(x)
+}
+
+#' @export
+print.mfrm_recovery_simulation <- function(x, ...) {
+  print(summary(x), ...)
+  invisible(x)
+}
+
+recovery_assessment_threshold <- function(thresholds,
+                                          parameter_type,
+                                          facet,
+                                          comparison_scale) {
+  if (is.null(thresholds) || length(thresholds) == 0L) return(NA_real_)
+  thresholds <- unlist(thresholds, use.names = TRUE)
+  thresholds <- suppressWarnings(as.numeric(thresholds))
+  if (length(thresholds) == 0L) return(NA_real_)
+  nm <- names(thresholds)
+  if (is.null(nm) || !any(nzchar(nm))) return(thresholds[1])
+  keys <- c(
+    paste(parameter_type, facet, comparison_scale, sep = ":"),
+    paste(parameter_type, facet, sep = ":"),
+    paste(parameter_type, comparison_scale, sep = ":"),
+    as.character(parameter_type),
+    as.character(facet),
+    "default"
+  )
+  hit <- keys[keys %in% nm][1]
+  if (is.na(hit)) return(NA_real_)
+  thresholds[[hit]]
+}
+
+recovery_assessment_overall_status <- function(status) {
+  status <- as.character(status)
+  status <- status[!is.na(status) & nzchar(status)]
+  if (length(status) == 0L) return("review")
+  if (any(status == "concern")) return("concern")
+  if (any(status == "review")) return("review")
+  if (any(status == "not_available")) return("review")
+  if (all(status %in% c("ok", "not_assessed"))) return("ok")
+  "review"
+}
+
+recovery_assessment_metric_status <- function(value,
+                                              limit,
+                                              lower_is_better = TRUE,
+                                              concern_multiplier = 2) {
+  value <- suppressWarnings(as.numeric(value))
+  limit <- suppressWarnings(as.numeric(limit))
+  if (!is.finite(value)) return("not_available")
+  if (!is.finite(limit)) return("not_assessed")
+  if (isTRUE(lower_is_better)) {
+    if (value <= limit) return("ok")
+    if (value <= limit * concern_multiplier) return("review")
+    return("concern")
+  }
+  if (value >= limit) return("ok")
+  if (value >= limit / concern_multiplier) return("review")
+  "concern"
+}
+
+recovery_assessment_rate_status <- function(value,
+                                            target,
+                                            tolerance = 0,
+                                            concern_gap = 0.15) {
+  value <- suppressWarnings(as.numeric(value))
+  target <- suppressWarnings(as.numeric(target))
+  tolerance <- suppressWarnings(as.numeric(tolerance))
+  concern_gap <- suppressWarnings(as.numeric(concern_gap))
+  if (!is.finite(value)) return("not_available")
+  if (!is.finite(target)) return("not_assessed")
+  if (value >= target - tolerance) return("ok")
+  if (value >= target - max(tolerance, concern_gap)) return("review")
+  "concern"
+}
+
+recovery_assessment_coverage_status <- function(value,
+                                                target = 0.95,
+                                                tolerance = 0.05) {
+  value <- suppressWarnings(as.numeric(value))
+  target <- suppressWarnings(as.numeric(target))
+  tolerance <- suppressWarnings(as.numeric(tolerance))
+  if (!is.finite(value)) return("not_available")
+  if (!is.finite(target) || !is.finite(tolerance)) return("not_assessed")
+  delta <- abs(value - target)
+  if (delta <= tolerance) return("ok")
+  if (delta <= 2 * tolerance) return("review")
+  "concern"
+}
+
+recovery_assessment_action <- function(status, topic = "metric") {
+  switch(
+    as.character(status)[1] %||% "review",
+    ok = "Use as supporting evidence under the stated simulation setup and thresholds.",
+    not_assessed = paste0("Set a practical threshold if ", topic, " must support a go/no-go decision."),
+    not_available = paste0("Treat ", topic, " as unavailable for this run; inspect row-level output before reporting it."),
+    review = paste0("Review ", topic, " with plots and row-level output before using it for a decision."),
+    concern = paste0("Do not use ", topic, " as adequacy evidence until the design, fit settings, or replication count are revisited."),
+    paste0("Review ", topic, " before interpretation.")
+  )
+}
+
+recovery_assessment_check_row <- function(section,
+                                          item,
+                                          status,
+                                          evidence,
+                                          next_action) {
+  tibble::tibble(
+    Section = as.character(section),
+    Item = as.character(item),
+    Status = as.character(status),
+    Evidence = as.character(evidence),
+    NextAction = as.character(next_action)
+  )
+}
+
+recovery_assessment_status_counts <- function(status) {
+  status <- as.character(status)
+  status <- status[!is.na(status) & nzchar(status)]
+  if (length(status) == 0L) return("none")
+  tbl <- sort(table(status), decreasing = TRUE)
+  paste(paste(names(tbl), as.integer(tbl), sep = "="), collapse = ", ")
+}
+
+recovery_assessment_next_actions <- function(checklist, metric_review, max_n = 6L) {
+  actions <- character(0)
+  if (is.data.frame(checklist) && nrow(checklist) > 0L) {
+    bad <- checklist[checklist$Status %in% c("concern", "review", "not_available"), , drop = FALSE]
+    if (nrow(bad) > 0L) actions <- c(actions, paste(bad$Item, bad$NextAction, sep = ": "))
+  }
+  if (is.data.frame(metric_review) && nrow(metric_review) > 0L) {
+    bad <- metric_review[metric_review$OverallStatus %in% c("concern", "review"), , drop = FALSE]
+    if (nrow(bad) > 0L) {
+      labels <- paste(bad$ParameterType, bad$Facet, bad$ComparisonScale, sep = " / ")
+      actions <- c(actions, paste(labels, bad$NextAction, sep = ": "))
+    }
+  }
+  actions <- unique(actions[nzchar(actions)])
+  if (length(actions) == 0L) {
+    actions <- "No immediate follow-up action from the selected recovery assessment thresholds."
+  }
+  utils::head(actions, n = max(1L, as.integer(max_n)))
+}
+
+#' Assess whether recovery-simulation results are ready to use
+#'
+#' @description
+#' Converts the numerical output from [evaluate_mfrm_recovery()] into a
+#' reviewer-facing adequacy checklist. The goal is not to impose one universal
+#' pass/fail rule; it is to make the main user questions explicit: Did the runs
+#' finish? Did the fitted models converge? Are uncertainty summaries available?
+#' Are coverage and Monte Carlo precision plausible? If practical RMSE or bias
+#' limits are supplied, which parameter groups need follow-up?
+#'
+#' @param x For `assess_mfrm_recovery()`, output from
+#'   [evaluate_mfrm_recovery()]. For `plot.mfrm_recovery_assessment()`, output
+#'   from `assess_mfrm_recovery()`.
+#' @param min_reps Minimum replication count expected before treating the
+#'   simulation as more than a smoke check.
+#' @param min_success_rate Minimum acceptable proportion of replications that
+#'   generated data and produced a fitted model.
+#' @param min_convergence_rate Minimum acceptable proportion of replications
+#'   whose fitted model reported convergence.
+#' @param min_se_available Minimum acceptable proportion of recovery rows with
+#'   standard errors in each parameter group. Set to `NULL` to skip this check.
+#' @param coverage_target Nominal coverage target, usually `0.95`.
+#' @param coverage_tolerance Absolute tolerance around `coverage_target`.
+#' @param max_mcse_rmse_ratio Maximum acceptable Monte Carlo SE of RMSE divided
+#'   by RMSE. Set to `NULL` to skip this precision check.
+#' @param max_rmse Optional practical RMSE limit. Use a scalar for all parameter
+#'   groups or a named vector/list with names such as `"facet"`, `"step"`,
+#'   `"slope"`, `"Rater"`, or `"facet:Rater:logit"`.
+#' @param max_abs_bias Optional practical absolute-bias limit. Naming follows
+#'   `max_rmse`.
+#' @param top_n Number of next-action lines retained in the compact output.
+#' @param digits Digits used by the print method.
+#' @param ... Reserved for future extensions.
+#'
+#' @details
+#' RMSE and bias adequacy depends on the substantive scale and the use case, so
+#' the function does not mark them as failed unless the user supplies
+#' `max_rmse` or `max_abs_bias`. Without those limits, the corresponding rows are
+#' marked `not_assessed` and the next action asks the user to set practical
+#' thresholds when a decision depends on the metric.
+#'
+#' `plot.mfrm_recovery_assessment()` is a user-facing review aid. Use
+#' `type = "status"` first to see where checklist attention is needed, then
+#' `type = "metrics"` to inspect the parameter groups behind RMSE, bias,
+#' coverage, standard-error availability, or Monte Carlo precision statuses.
+#' The intended reading order is `summary(recovery_review)`, then the status
+#' plot, then the metric plot, then the row-level recovery table for the
+#' parameter groups that need follow-up. When `draw = FALSE`, the plot data
+#' include `reading_order`, `guidance`, and user-facing handoff tables such as
+#' `section_status` for status plots and `metric_review` for metric plots.
+#'
+#' @return An object of class `mfrm_recovery_assessment` with:
+#' - `overview`: compact run-level status.
+#' - `checklist`: reviewer-facing adequacy checks.
+#' - `metric_review`: parameter-group metric checks.
+#' - `next_actions`: short action list sorted by severity.
+#' - `thresholds`: thresholds used for the assessment.
+#' @seealso [evaluate_mfrm_recovery()], [plot.mfrm_recovery_simulation()]
+#' @examples
+#' \donttest{
+#' rec <- evaluate_mfrm_recovery(
+#'   n_person = 12,
+#'   n_rater = 2,
+#'   n_criterion = 2,
+#'   reps = 1,
+#'   maxit = 30,
+#'   seed = 123
+#' )
+#' assess_mfrm_recovery(rec, min_reps = 1, max_rmse = 1)
+#' }
+#' @export
+assess_mfrm_recovery <- function(x,
+                                 min_reps = 30,
+                                 min_success_rate = 0.95,
+                                 min_convergence_rate = 0.95,
+                                 min_se_available = 0.80,
+                                 coverage_target = 0.95,
+                                 coverage_tolerance = 0.05,
+                                 max_mcse_rmse_ratio = 0.25,
+                                 max_rmse = NULL,
+                                 max_abs_bias = NULL,
+                                 top_n = 6,
+                                 digits = 3,
+                                 ...) {
+  if (!inherits(x, "mfrm_recovery_simulation")) {
+    stop("`x` must be output from evaluate_mfrm_recovery().", call. = FALSE)
+  }
+  rep_tbl <- tibble::as_tibble(x$rep_overview %||% tibble::tibble())
+  summary_tbl <- tibble::as_tibble(x$recovery_summary %||% tibble::tibble())
+  recovery_tbl <- tibble::as_tibble(x$recovery %||% tibble::tibble())
+
+  reps <- if (nrow(rep_tbl) > 0L) nrow(rep_tbl) else 0L
+  successful <- if (nrow(rep_tbl) > 0L) sum(rep_tbl$RunOK, na.rm = TRUE) else 0L
+  converged <- if (nrow(rep_tbl) > 0L) sum(rep_tbl$Converged, na.rm = TRUE) else 0L
+  success_rate <- if (reps > 0L) successful / reps else NA_real_
+  convergence_rate <- if (reps > 0L) converged / reps else NA_real_
+
+  metric_review <- summary_tbl
+  if (nrow(metric_review) > 0L) {
+    metric_review$RMSELimit <- mapply(
+      recovery_assessment_threshold,
+      parameter_type = metric_review$ParameterType,
+      facet = metric_review$Facet,
+      comparison_scale = metric_review$ComparisonScale,
+      MoreArgs = list(thresholds = max_rmse),
+      SIMPLIFY = TRUE
+    )
+    metric_review$AbsBiasLimit <- mapply(
+      recovery_assessment_threshold,
+      parameter_type = metric_review$ParameterType,
+      facet = metric_review$Facet,
+      comparison_scale = metric_review$ComparisonScale,
+      MoreArgs = list(thresholds = max_abs_bias),
+      SIMPLIFY = TRUE
+    )
+    metric_review$RMSEStatus <- mapply(
+      recovery_assessment_metric_status,
+      value = metric_review$RMSE,
+      limit = metric_review$RMSELimit,
+      SIMPLIFY = TRUE
+    )
+    metric_review$BiasStatus <- mapply(
+      recovery_assessment_metric_status,
+      value = abs(metric_review$Bias),
+      limit = metric_review$AbsBiasLimit,
+      SIMPLIFY = TRUE
+    )
+    metric_review$CoverageStatus <- vapply(
+      metric_review$Coverage95,
+      recovery_assessment_coverage_status,
+      character(1),
+      target = coverage_target,
+      tolerance = coverage_tolerance
+    )
+    metric_review$SEStatus <- if (is.null(min_se_available)) {
+      rep("not_assessed", nrow(metric_review))
+    } else {
+      vapply(
+        metric_review$SEAvailableRate,
+        recovery_assessment_rate_status,
+        character(1),
+        target = min_se_available,
+        tolerance = 0,
+        concern_gap = 0.25
+      )
+    }
+    rmse_ratio <- suppressWarnings(as.numeric(metric_review$McseRMSE) / as.numeric(metric_review$RMSE))
+    metric_review$McseRMSEToRMSE <- rmse_ratio
+    metric_review$MonteCarloStatus <- if (is.null(max_mcse_rmse_ratio)) {
+      rep("not_assessed", nrow(metric_review))
+    } else {
+      vapply(
+        rmse_ratio,
+        recovery_assessment_metric_status,
+        character(1),
+        limit = max_mcse_rmse_ratio,
+        concern_multiplier = 2
+      )
+    }
+    metric_review$OverallStatus <- apply(
+      metric_review[, c("RMSEStatus", "BiasStatus", "CoverageStatus",
+                        "SEStatus", "MonteCarloStatus"), drop = FALSE],
+      1,
+      recovery_assessment_overall_status
+    )
+    metric_review$NextAction <- vapply(
+      metric_review$OverallStatus,
+      recovery_assessment_action,
+      character(1),
+      topic = "this parameter group"
+    )
+  } else {
+    metric_review <- tibble::tibble()
+  }
+
+  run_status <- recovery_assessment_rate_status(reps, min_reps, tolerance = 0, concern_gap = min_reps)
+  if (reps > 0L && reps < min_reps) run_status <- "review"
+  success_status <- recovery_assessment_rate_status(success_rate, min_success_rate, tolerance = 0, concern_gap = 0.20)
+  convergence_status <- recovery_assessment_rate_status(convergence_rate, min_convergence_rate, tolerance = 0, concern_gap = 0.20)
+  row_status <- if (nrow(recovery_tbl) > 0L) "ok" else "concern"
+
+  se_status <- if (nrow(metric_review) == 0L || is.null(min_se_available)) {
+    "not_assessed"
+  } else {
+    recovery_assessment_overall_status(metric_review$SEStatus)
+  }
+  coverage_status <- if (nrow(metric_review) == 0L) {
+    "not_available"
+  } else {
+    recovery_assessment_overall_status(metric_review$CoverageStatus)
+  }
+  mc_status <- if (nrow(metric_review) == 0L || is.null(max_mcse_rmse_ratio)) {
+    "not_assessed"
+  } else {
+    recovery_assessment_overall_status(metric_review$MonteCarloStatus)
+  }
+  rmse_status <- if (nrow(metric_review) == 0L) {
+    "not_available"
+  } else if (is.null(max_rmse)) {
+    "not_assessed"
+  } else {
+    recovery_assessment_overall_status(metric_review$RMSEStatus)
+  }
+  bias_status <- if (nrow(metric_review) == 0L) {
+    "not_available"
+  } else if (is.null(max_abs_bias)) {
+    "not_assessed"
+  } else {
+    recovery_assessment_overall_status(metric_review$BiasStatus)
+  }
+
+  checklist <- dplyr::bind_rows(
+    recovery_assessment_check_row(
+      "Run completion",
+      "Replication count",
+      run_status,
+      sprintf("%d replication(s); requested minimum is %d.", reps, as.integer(min_reps)),
+      recovery_assessment_action(run_status, "the replication count")
+    ),
+    recovery_assessment_check_row(
+      "Run completion",
+      "Simulation and refit success",
+      success_status,
+      sprintf("%d/%d successful run(s); rate = %.3f.", successful, reps, success_rate),
+      recovery_assessment_action(success_status, "run completion")
+    ),
+    recovery_assessment_check_row(
+      "Run completion",
+      "Reported convergence",
+      convergence_status,
+      sprintf("%d/%d converged run(s); rate = %.3f.", converged, reps, convergence_rate),
+      recovery_assessment_action(convergence_status, "model convergence")
+    ),
+    recovery_assessment_check_row(
+      "Recovery content",
+      "Recoverable truth-estimate rows",
+      row_status,
+      sprintf("%d row-level recovery comparison(s).", nrow(recovery_tbl)),
+      recovery_assessment_action(row_status, "recovery rows")
+    ),
+    recovery_assessment_check_row(
+      "Uncertainty",
+      "Standard-error availability",
+      se_status,
+      if (nrow(metric_review) > 0L) {
+        sprintf("Group statuses: %s.", recovery_assessment_status_counts(metric_review$SEStatus))
+      } else {
+        "No parameter-group summaries were available."
+      },
+      recovery_assessment_action(se_status, "standard-error availability")
+    ),
+    recovery_assessment_check_row(
+      "Uncertainty",
+      "Coverage",
+      coverage_status,
+      if (nrow(metric_review) > 0L) {
+        sprintf("Group statuses: %s.", recovery_assessment_status_counts(metric_review$CoverageStatus))
+      } else {
+        "No parameter-group summaries were available."
+      },
+      recovery_assessment_action(coverage_status, "coverage")
+    ),
+    recovery_assessment_check_row(
+      "Monte Carlo precision",
+      "RMSE Monte Carlo error",
+      mc_status,
+      if (nrow(metric_review) > 0L) {
+        sprintf("Group statuses: %s.", recovery_assessment_status_counts(metric_review$MonteCarloStatus))
+      } else {
+        "No parameter-group summaries were available."
+      },
+      recovery_assessment_action(mc_status, "Monte Carlo precision")
+    ),
+    recovery_assessment_check_row(
+      "Practical thresholds",
+      "RMSE threshold",
+      rmse_status,
+      if (is.null(max_rmse)) {
+        "No practical RMSE threshold was supplied."
+      } else {
+        sprintf("Group statuses: %s.", recovery_assessment_status_counts(metric_review$RMSEStatus))
+      },
+      recovery_assessment_action(rmse_status, "RMSE")
+    ),
+    recovery_assessment_check_row(
+      "Practical thresholds",
+      "Bias threshold",
+      bias_status,
+      if (is.null(max_abs_bias)) {
+        "No practical absolute-bias threshold was supplied."
+      } else {
+        sprintf("Group statuses: %s.", recovery_assessment_status_counts(metric_review$BiasStatus))
+      },
+      recovery_assessment_action(bias_status, "bias")
+    )
+  )
+
+  overall_status <- recovery_assessment_overall_status(checklist$Status)
+  overview <- tibble::tibble(
+    Reps = reps,
+    SuccessfulRuns = successful,
+    SuccessRate = success_rate,
+    ConvergedRuns = converged,
+    ConvergenceRate = convergence_rate,
+    RecoveryRows = nrow(recovery_tbl),
+    RecoveryGroups = nrow(summary_tbl),
+    OverallStatus = overall_status
+  )
+  next_actions <- recovery_assessment_next_actions(checklist, metric_review, max_n = top_n)
+
+  structure(
+    list(
+      overview = overview,
+      checklist = checklist,
+      metric_review = metric_review,
+      next_actions = next_actions,
+      thresholds = list(
+        min_reps = min_reps,
+        min_success_rate = min_success_rate,
+        min_convergence_rate = min_convergence_rate,
+        min_se_available = min_se_available,
+        coverage_target = coverage_target,
+        coverage_tolerance = coverage_tolerance,
+        max_mcse_rmse_ratio = max_mcse_rmse_ratio,
+        max_rmse = max_rmse,
+        max_abs_bias = max_abs_bias
+      ),
+      notes = c(
+        "RMSE and bias statuses are decision-specific; supply practical thresholds when they matter.",
+        as.character(x$notes %||% character(0))
+      ),
+      source = x,
+      digits = max(0L, as.integer(digits[1]))
+    ),
+    class = "mfrm_recovery_assessment"
+  )
+}
+
+#' @export
+summary.mfrm_recovery_assessment <- function(object, digits = NULL, ...) {
+  if (!inherits(object, "mfrm_recovery_assessment")) {
+    stop("`object` must be output from assess_mfrm_recovery().", call. = FALSE)
+  }
+  if (is.null(digits)) digits <- object$digits %||% 3L
+  out <- list(
+    overview = tibble::as_tibble(object$overview %||% tibble::tibble()),
+    checklist = tibble::as_tibble(object$checklist %||% tibble::tibble()),
+    metric_review = tibble::as_tibble(object$metric_review %||% tibble::tibble()),
+    next_actions = as.character(object$next_actions %||% character(0)),
+    thresholds = object$thresholds %||% list(),
+    notes = as.character(object$notes %||% character(0)),
+    digits = max(0L, as.integer(digits[1]))
+  )
+  class(out) <- "summary.mfrm_recovery_assessment"
+  out
+}
+
+#' @export
+print.summary.mfrm_recovery_assessment <- function(x, ...) {
+  digits <- as.integer(x$digits %||% 3L)
+  if (!is.finite(digits)) digits <- 3L
+  cat("MFRM Recovery Adequacy Assessment\n")
+  if (!is.null(x$overview) && nrow(x$overview) > 0L) {
+    print(round_numeric_df(as.data.frame(x$overview), digits = digits), row.names = FALSE)
+  }
+  if (!is.null(x$checklist) && nrow(x$checklist) > 0L) {
+    cat("\nChecklist\n")
+    print(as.data.frame(x$checklist), row.names = FALSE)
+  }
+  if (!is.null(x$metric_review) && nrow(x$metric_review) > 0L) {
+    keep <- intersect(
+      c("ParameterType", "Facet", "ComparisonScale", "RMSE", "Bias",
+        "Coverage95", "SEAvailableRate", "McseRMSEToRMSE", "OverallStatus"),
+      names(x$metric_review)
+    )
+    cat("\nMetric review\n")
+    print(round_numeric_df(as.data.frame(x$metric_review[, keep, drop = FALSE]), digits = digits),
+          row.names = FALSE)
+  }
+  if (length(x$next_actions) > 0L) {
+    cat("\nNext actions\n")
+    for (line in x$next_actions) cat(" - ", line, "\n", sep = "")
+  }
+  invisible(x)
+}
+
+#' @export
+print.mfrm_recovery_assessment <- function(x, ...) {
+  print(summary(x), ...)
+  invisible(x)
+}
+
+recovery_assessment_status_rank <- function(status) {
+  ranks <- c(ok = 1L, not_assessed = 2L, not_available = 2L,
+             review = 3L, concern = 4L, fail = 4L)
+  out <- unname(ranks[as.character(status)])
+  out[is.na(out)] <- 0L
+  out
+}
+
+recovery_assessment_status_palette <- function(status) {
+  pal <- c(
+    ok = "#238b45",
+    review = "#b65e16",
+    concern = "#b11f24",
+    not_available = "#6b7280",
+    not_assessed = "#8c8c8c",
+    fail = "#b11f24"
+  )
+  out <- unname(pal[as.character(status)])
+  out[is.na(out)] <- "#6b7280"
+  out
+}
+
+recovery_assessment_reading_order <- function() {
+  data.frame(
+    Step = seq_len(4L),
+    Route = c(
+      "summary(recovery_review)",
+      "plot(recovery_review, type = \"status\")",
+      "plot(recovery_review, type = \"metrics\")",
+      "recovery_review$source$recovery"
+    ),
+    WhatToRead = c(
+      "Overall run status, next actions, and compact checklist.",
+      "Checklist domains ordered by attention status.",
+      "Parameter groups behind RMSE, bias, coverage, SE, or Monte Carlo statuses.",
+      "Row-level truth-estimate comparisons for the parameter groups that need follow-up."
+    ),
+    Purpose = c(
+      "Decide whether the assessment is ready to inspect.",
+      "Find the part of the assessment that needs attention first.",
+      "Identify the specific parameter group and metric driving the status.",
+      "Diagnose the underlying recovery pattern before changing design or fit settings."
+    ),
+    stringsAsFactors = FALSE
+  )
+}
+
+recovery_assessment_plot_guidance <- function(type, metric = NULL) {
+  if (identical(type, "status")) {
+    return(c(
+      "Read this plot before metric-level plots.",
+      "Start with concern/review rows; ok rows are supporting evidence.",
+      "Use section_status to identify the assessment section that needs follow-up."
+    ))
+  }
+  c(
+    paste0("This metric plot is sorted by status priority, then by ", metric %||% "value", "."),
+    "Inspect concern/review rows before ok rows.",
+    "Use the row-level recovery table only after identifying the parameter group that needs follow-up."
+  )
+}
+
+recovery_assessment_plot_metric_spec <- function(metric, thresholds) {
+  metric <- match.arg(
+    tolower(as.character(metric[1])),
+    c("rmse", "bias", "coverage", "se_available", "mcse_rmse")
+  )
+  thresholds <- thresholds %||% list()
+  switch(
+    metric,
+    rmse = list(
+      metric = "rmse",
+      value_col = "RMSE",
+      limit_col = "RMSELimit",
+      status_col = "RMSEStatus",
+      label = "RMSE",
+      transform = identity,
+      reference = NA_real_
+    ),
+    bias = list(
+      metric = "bias",
+      value_col = "Bias",
+      limit_col = "AbsBiasLimit",
+      status_col = "BiasStatus",
+      label = "Absolute bias",
+      transform = abs,
+      reference = NA_real_
+    ),
+    coverage = list(
+      metric = "coverage",
+      value_col = "Coverage95",
+      limit_col = NULL,
+      status_col = "CoverageStatus",
+      label = "95% coverage",
+      transform = identity,
+      reference = suppressWarnings(as.numeric(thresholds$coverage_target %||% 0.95))
+    ),
+    se_available = list(
+      metric = "se_available",
+      value_col = "SEAvailableRate",
+      limit_col = NULL,
+      status_col = "SEStatus",
+      label = "SE availability rate",
+      transform = identity,
+      reference = suppressWarnings(as.numeric(thresholds$min_se_available %||% NA_real_))
+    ),
+    mcse_rmse = list(
+      metric = "mcse_rmse",
+      value_col = "McseRMSEToRMSE",
+      limit_col = NULL,
+      status_col = "MonteCarloStatus",
+      label = "MCSE / RMSE",
+      transform = identity,
+      reference = suppressWarnings(as.numeric(thresholds$max_mcse_rmse_ratio %||% NA_real_))
+    )
+  )
+}
+
+#' @rdname assess_mfrm_recovery
+#' @param y Reserved for S3 generic compatibility.
+#' @param type Assessment plot route. `"status"` summarizes checklist status
+#'   counts; `"metrics"` plots a parameter-group assessment metric colored by
+#'   its status.
+#' @param metric Metric used when `type = "metrics"`. Supported values are
+#'   `"rmse"`, `"bias"`, `"coverage"`, `"se_available"`, and `"mcse_rmse"`.
+#' @param draw If `TRUE`, draw with base graphics. If `FALSE`, return an
+#'   `mfrm_plot_data` object with reusable plot tables and metadata.
+#' @export
+plot.mfrm_recovery_assessment <- function(x,
+                                          y = NULL,
+                                          type = c("status", "metrics"),
+                                          metric = c("rmse", "bias", "coverage",
+                                                     "se_available", "mcse_rmse"),
+                                          draw = TRUE,
+                                          ...) {
+  if (!inherits(x, "mfrm_recovery_assessment")) {
+    stop("`x` must be output from assess_mfrm_recovery().", call. = FALSE)
+  }
+  type <- match.arg(type)
+
+  if (identical(type, "status")) {
+    checklist <- as.data.frame(x$checklist %||% data.frame(), stringsAsFactors = FALSE)
+    if (nrow(checklist) == 0L || !"Status" %in% names(checklist)) {
+      stop("No recovery-assessment checklist statuses are available to plot.", call. = FALSE)
+    }
+    section_tbl <- as.data.frame(
+      stats::xtabs(~ Section + Status, data = checklist),
+      stringsAsFactors = FALSE
+    )
+    names(section_tbl)[names(section_tbl) == "Freq"] <- "Checks"
+    section_tbl <- section_tbl[section_tbl$Checks > 0, , drop = FALSE]
+    section_tbl$StatusRank <- recovery_assessment_status_rank(section_tbl$Status)
+    section_tbl <- section_tbl[order(-section_tbl$StatusRank, section_tbl$Section,
+                                     section_tbl$Status), , drop = FALSE]
+    section_tbl$AttentionOrder <- seq_len(nrow(section_tbl))
+    row.names(section_tbl) <- NULL
+    status_tbl <- stats::aggregate(Checks ~ Status, data = section_tbl, FUN = sum)
+    status_tbl$StatusRank <- recovery_assessment_status_rank(status_tbl$Status)
+    status_tbl <- status_tbl[order(-status_tbl$StatusRank, status_tbl$Status), , drop = FALSE]
+    status_tbl$AttentionOrder <- seq_len(nrow(status_tbl))
+    row.names(status_tbl) <- NULL
+    payload <- list(
+      type = type,
+      metric = "check_count",
+      metric_label = "Checklist checks",
+      plot_table = section_tbl,
+      section_status = section_tbl,
+      status_counts = status_tbl,
+      checklist = checklist,
+      reading_order = recovery_assessment_reading_order(),
+      guidance = recovery_assessment_plot_guidance("status"),
+      notes = as.character(x$notes %||% character(0)),
+      title = "Recovery assessment: checklist status",
+      subtitle = "Counts of checklist checks by status",
+      legend = new_plot_legend(
+        label = c("ok", "review", "concern", "not_available", "not_assessed"),
+        role = rep("status", 5L),
+        aesthetic = rep("fill", 5L),
+        value = recovery_assessment_status_palette(c("ok", "review", "concern", "not_available", "not_assessed"))
+      ),
+      reference_lines = new_reference_lines()
+    )
+    out <- new_mfrm_plot_data("recovery_assessment", payload)
+    if (!isTRUE(draw)) return(out)
+    graphics::barplot(
+      status_tbl$Checks,
+      names.arg = status_tbl$Status,
+      col = recovery_assessment_status_palette(status_tbl$Status),
+      border = NA,
+      ylab = "Checklist checks",
+      main = payload$title
+    )
+    return(invisible(out))
+  }
+
+  metric_review <- as.data.frame(x$metric_review %||% data.frame(), stringsAsFactors = FALSE)
+  if (nrow(metric_review) == 0L) {
+    stop("No recovery-assessment metric-review rows are available to plot.", call. = FALSE)
+  }
+  spec <- recovery_assessment_plot_metric_spec(metric, x$thresholds %||% list())
+  required <- c("ParameterType", "Facet", "ComparisonScale", spec$value_col, spec$status_col)
+  missing <- setdiff(required, names(metric_review))
+  if (length(missing) > 0L) {
+    stop("Metric-review table is missing required column(s): ",
+         paste(missing, collapse = ", "), call. = FALSE)
+  }
+  raw_value <- suppressWarnings(as.numeric(metric_review[[spec$value_col]]))
+  value <- spec$transform(raw_value)
+  limit <- if (!is.null(spec$limit_col) && spec$limit_col %in% names(metric_review)) {
+    suppressWarnings(as.numeric(metric_review[[spec$limit_col]]))
+  } else {
+    rep(spec$reference, nrow(metric_review))
+  }
+  plot_tbl <- data.frame(
+    ParameterType = as.character(metric_review$ParameterType),
+    Facet = as.character(metric_review$Facet),
+    ComparisonScale = as.character(metric_review$ComparisonScale),
+    PlotGroup = paste(
+      as.character(metric_review$ParameterType),
+      as.character(metric_review$Facet),
+      as.character(metric_review$ComparisonScale),
+      sep = " / "
+    ),
+    Metric = spec$metric,
+    Value = value,
+    Limit = limit,
+    Status = as.character(metric_review[[spec$status_col]]),
+    OverallStatus = as.character(metric_review$OverallStatus %||% NA_character_),
+    stringsAsFactors = FALSE
+  )
+  plot_tbl <- plot_tbl[is.finite(plot_tbl$Value), , drop = FALSE]
+  if (nrow(plot_tbl) == 0L) {
+    stop("Selected assessment metric has no finite values to plot.", call. = FALSE)
+  }
+  plot_tbl$StatusRank <- recovery_assessment_status_rank(plot_tbl$Status)
+  plot_tbl <- plot_tbl[order(-plot_tbl$StatusRank, -plot_tbl$Value, plot_tbl$PlotGroup), , drop = FALSE]
+  plot_tbl$AttentionOrder <- seq_len(nrow(plot_tbl))
+  row.names(plot_tbl) <- NULL
+  finite_limits <- unique(plot_tbl$Limit[is.finite(plot_tbl$Limit)])
+  reference_lines <- if (length(finite_limits) == 1L) {
+    new_reference_lines("h", finite_limits, "Assessment threshold", "dashed", "threshold")
+  } else {
+    new_reference_lines()
+  }
+  payload <- list(
+    type = type,
+    metric = spec$metric,
+    metric_label = spec$label,
+    status_column = spec$status_col,
+    plot_table = plot_tbl,
+    metric_review = plot_tbl,
+    reading_order = recovery_assessment_reading_order(),
+    guidance = recovery_assessment_plot_guidance("metrics", spec$label),
+    notes = as.character(x$notes %||% character(0)),
+    title = paste("Recovery assessment:", spec$label),
+    subtitle = "Parameter-group assessment metric colored by status",
+    legend = new_plot_legend(
+      label = c("ok", "review", "concern", "not_available", "not_assessed"),
+      role = rep("status", 5L),
+      aesthetic = rep("fill", 5L),
+      value = recovery_assessment_status_palette(c("ok", "review", "concern", "not_available", "not_assessed"))
+    ),
+    reference_lines = reference_lines
+  )
+  out <- new_mfrm_plot_data("recovery_assessment", payload)
+  if (!isTRUE(draw)) return(out)
+  op <- graphics::par(no.readonly = TRUE)
+  on.exit(graphics::par(op), add = TRUE)
+  graphics::par(mar = c(8, 4, 3, 1))
+  ylim <- range(c(0, plot_tbl$Value, reference_lines$value), na.rm = TRUE)
+  if (!all(is.finite(ylim)) || diff(ylim) == 0) {
+    ylim <- range(plot_tbl$Value + c(-0.1, 0.1), na.rm = TRUE)
+  }
+  graphics::barplot(
+    plot_tbl$Value,
+    names.arg = truncate_axis_label(plot_tbl$PlotGroup, width = 26L),
+    las = 2,
+    col = recovery_assessment_status_palette(plot_tbl$Status),
+    border = NA,
+    ylim = ylim,
+    ylab = spec$label,
+    main = payload$title
+  )
+  if (nrow(reference_lines) > 0L && is.finite(reference_lines$value[1])) {
+    graphics::abline(h = reference_lines$value[1], lty = 2, col = "grey35")
+  }
+  invisible(out)
+}
+
+recovery_plot_metric_col <- function(metric) {
+  metric <- match.arg(
+    tolower(as.character(metric[1])),
+    c("rmse", "bias", "mae", "correlation", "coverage", "mcse_bias",
+      "mcse_rmse", "raw_rmse", "raw_bias", "mean_se", "se_available")
+  )
+  switch(
+    metric,
+    rmse = "RMSE",
+    bias = "Bias",
+    mae = "MAE",
+    correlation = "Correlation",
+    coverage = "Coverage95",
+    mcse_bias = "McseBias",
+    mcse_rmse = "McseRMSE",
+    raw_rmse = "RawRMSE",
+    raw_bias = "RawBias",
+    mean_se = "MeanSE",
+    se_available = "SEAvailableRate"
+  )
+}
+
+recovery_plot_metric_label <- function(metric_col) {
+  switch(
+    metric_col,
+    RMSE = "RMSE",
+    Bias = "Bias",
+    MAE = "MAE",
+    Correlation = "Truth-estimate correlation",
+    Coverage95 = "95% coverage",
+    McseBias = "MCSE of bias",
+    McseRMSE = "MCSE of RMSE",
+    RawRMSE = "Unaligned RMSE",
+    RawBias = "Unaligned bias",
+    MeanSE = "Mean standard error",
+    SEAvailableRate = "SE availability rate",
+    metric_col
+  )
+}
+
+recovery_plot_filter <- function(tbl, parameter_type = NULL, facet = NULL) {
+  tbl <- tibble::as_tibble(tbl)
+  if (!is.null(parameter_type)) {
+    parameter_type <- as.character(parameter_type)
+    tbl <- tbl[as.character(tbl$ParameterType) %in% parameter_type, , drop = FALSE]
+  }
+  if (!is.null(facet)) {
+    facet <- as.character(facet)
+    tbl <- tbl[as.character(tbl$Facet) %in% facet, , drop = FALSE]
+  }
+  tbl
+}
+
+recovery_plot_status_table <- function(rep_tbl) {
+  rep_tbl <- tibble::as_tibble(rep_tbl)
+  if (nrow(rep_tbl) == 0L) return(tibble::tibble())
+  rep_tbl |>
+    dplyr::mutate(
+      Status = dplyr::case_when(
+        !.data$RunOK ~ "failed",
+        !.data$Converged ~ "not_converged",
+        TRUE ~ "converged"
+      )
+    ) |>
+    dplyr::group_by(.data$Status) |>
+    dplyr::summarise(
+      Reps = dplyr::n(),
+      MeanRecoveryRows = recovery_safe_mean(.data$RecoveryRows),
+      MeanElapsedSec = recovery_safe_mean(.data$ElapsedSec),
+      .groups = "drop"
+    ) |>
+    dplyr::arrange(.data$Status)
+}
+
+#' Plot parameter-recovery simulation results
+#'
+#' @param x Output from [evaluate_mfrm_recovery()].
+#' @param y Reserved for S3 generic compatibility.
+#' @param type Plot route: `"summary"` draws a metric from
+#'   `x$recovery_summary`, `"coverage"` draws 95% coverage by parameter group,
+#'   `"errors"` draws row-level recovery-error distributions, `"scatter"` draws
+#'   truth against estimated values, and `"replications"` summarizes run status.
+#' @param metric Summary metric used when `type = "summary"`. Supported values
+#'   are `"rmse"`, `"bias"`, `"mae"`, `"correlation"`, `"coverage"`,
+#'   `"mcse_bias"`, `"mcse_rmse"`, `"raw_rmse"`, `"raw_bias"`, `"mean_se"`, and
+#'   `"se_available"`.
+#' @param parameter_type Optional parameter type filter, such as `"person"`,
+#'   `"facet"`, `"step"`, `"slope"`, or `"population"`.
+#' @param facet Optional facet filter.
+#' @param comparison Error/estimate scale for row-level routes. `"aligned"`
+#'   uses `EstimateAligned` / `ErrorAligned`; `"unaligned"` uses `Estimate` /
+#'   `ErrorRaw` on the same comparison scale.
+#' @param draw If `TRUE`, draw with base graphics. If `FALSE`, return an
+#'   `mfrm_plot_data` object with reusable plot tables and metadata.
+#' @param ... Reserved for future extensions.
+#'
+#' @details
+#' These plots are intended as simulation-review graphics. They do not replace
+#' the row-level `x$recovery` table or the ADEMP metadata; they make the main
+#' recovery estimands easier to inspect during model-development and design
+#' checks. Coverage is displayed only for parameter groups with available
+#' standard errors.
+#'
+#' @return An `mfrm_plot_data` object. When `draw = TRUE`, the object is returned
+#'   invisibly after drawing.
+#' @seealso [evaluate_mfrm_recovery()], [summary()]
+#' @examples
+#' \donttest{
+#' rec <- evaluate_mfrm_recovery(
+#'   n_person = 12,
+#'   n_rater = 2,
+#'   n_criterion = 2,
+#'   reps = 1,
+#'   maxit = 30,
+#'   seed = 123
+#' )
+#' plot(rec, type = "summary", metric = "rmse", draw = FALSE)
+#' }
+#' @export
+plot.mfrm_recovery_simulation <- function(x,
+                                          y = NULL,
+                                          type = c("summary", "coverage", "errors",
+                                                   "scatter", "replications"),
+                                          metric = c("rmse", "bias", "mae",
+                                                     "correlation", "coverage",
+                                                     "mcse_bias", "mcse_rmse",
+                                                     "raw_rmse", "raw_bias",
+                                                     "mean_se", "se_available"),
+                                          parameter_type = NULL,
+                                          facet = NULL,
+                                          comparison = c("aligned", "unaligned"),
+                                          draw = TRUE,
+                                          ...) {
+  if (!inherits(x, "mfrm_recovery_simulation")) {
+    stop("`x` must be output from evaluate_mfrm_recovery().", call. = FALSE)
+  }
+  type <- match.arg(type)
+  comparison <- match.arg(comparison)
+  metric_col <- recovery_plot_metric_col(metric)
+  metric_label <- recovery_plot_metric_label(metric_col)
+  notes <- as.character(x$notes %||% character(0))
+  reference_lines <- new_reference_lines()
+
+  if (identical(type, "summary") || identical(type, "coverage")) {
+    summary_tbl <- recovery_plot_filter(x$recovery_summary, parameter_type, facet)
+    if (nrow(summary_tbl) == 0L) {
+      stop("No recovery-summary rows are available for the requested filters.", call. = FALSE)
+    }
+    if (identical(type, "coverage")) {
+      metric_col <- "Coverage95"
+      metric_label <- recovery_plot_metric_label(metric_col)
+      summary_tbl <- summary_tbl[is.finite(summary_tbl$Coverage95), , drop = FALSE]
+      reference_lines <- new_reference_lines(
+        axis = "y",
+        value = 0.95,
+        label = "0.95 nominal coverage",
+        linetype = "dashed",
+        role = "nominal_coverage"
+      )
+      if (nrow(summary_tbl) == 0L) {
+        stop("No finite coverage rows are available for the requested filters.", call. = FALSE)
+      }
+    }
+    plot_tbl <- summary_tbl |>
+      dplyr::mutate(
+        PlotGroup = paste(
+          as.character(.data$ParameterType),
+          as.character(.data$Facet),
+          as.character(.data$ComparisonScale),
+          sep = " / "
+        ),
+        Value = suppressWarnings(as.numeric(.data[[metric_col]]))
+      ) |>
+      dplyr::arrange(.data$ParameterType, .data$Facet, .data$ComparisonScale)
+    plot_tbl <- plot_tbl[is.finite(plot_tbl$Value), , drop = FALSE]
+    if (nrow(plot_tbl) == 0L) {
+      stop("Selected recovery metric has no finite values to plot.", call. = FALSE)
+    }
+    payload <- list(
+      type = type,
+      metric = metric_col,
+      metric_label = metric_label,
+      comparison = comparison,
+      parameter_type = parameter_type,
+      facet = facet,
+      plot_table = plot_tbl,
+      notes = notes,
+      title = if (identical(type, "coverage")) {
+        "Parameter recovery: coverage"
+      } else {
+        paste("Parameter recovery:", metric_label)
+      },
+      subtitle = "Summary by parameter type, facet, and comparison scale",
+      legend = new_plot_legend(),
+      reference_lines = reference_lines
+    )
+    out <- new_mfrm_plot_data("recovery_simulation", payload)
+    if (!isTRUE(draw)) return(out)
+    op <- graphics::par(no.readonly = TRUE)
+    on.exit(graphics::par(op), add = TRUE)
+    graphics::par(mar = c(8, 4, 3, 1))
+    cols <- grDevices::hcl.colors(nrow(plot_tbl), "Dark 3")
+    ylim <- range(c(0, plot_tbl$Value, reference_lines$value), na.rm = TRUE)
+    if (identical(metric_col, "Coverage95") || identical(metric_col, "SEAvailableRate")) {
+      ylim <- c(0, 1)
+    } else if (!all(is.finite(ylim)) || diff(ylim) == 0) {
+      ylim <- range(plot_tbl$Value + c(-0.1, 0.1), na.rm = TRUE)
+    }
+    graphics::barplot(
+      plot_tbl$Value,
+      names.arg = truncate_axis_label(plot_tbl$PlotGroup, width = 26L),
+      las = 2,
+      col = cols,
+      border = NA,
+      ylim = ylim,
+      ylab = metric_label,
+      main = payload$title
+    )
+    if (0 >= ylim[1] && 0 <= ylim[2]) graphics::abline(h = 0, col = "grey55")
+    if (nrow(reference_lines) > 0L) {
+      graphics::abline(h = reference_lines$value, lty = 2, col = "grey35")
+    }
+    return(invisible(out))
+  }
+
+  if (identical(type, "replications")) {
+    rep_tbl <- tibble::as_tibble(x$rep_overview %||% tibble::tibble())
+    status_tbl <- recovery_plot_status_table(rep_tbl)
+    if (nrow(status_tbl) == 0L) stop("No replication rows are available.", call. = FALSE)
+    payload <- list(
+      type = type,
+      metric = "Reps",
+      metric_label = "Replications",
+      comparison = NA_character_,
+      parameter_type = parameter_type,
+      facet = facet,
+      plot_table = status_tbl,
+      rep_overview = rep_tbl,
+      notes = notes,
+      title = "Parameter recovery: replication status",
+      subtitle = "Run, convergence, and timing summary",
+      legend = new_plot_legend(),
+      reference_lines = new_reference_lines()
+    )
+    out <- new_mfrm_plot_data("recovery_simulation", payload)
+    if (!isTRUE(draw)) return(out)
+    cols <- c(converged = "#238b45", not_converged = "#b65e16", failed = "#b11f24")
+    bar_cols <- unname(cols[status_tbl$Status])
+    bar_cols[is.na(bar_cols)] <- "#6b7280"
+    graphics::barplot(
+      status_tbl$Reps,
+      names.arg = status_tbl$Status,
+      col = bar_cols,
+      border = NA,
+      ylab = "Replications",
+      main = payload$title
+    )
+    return(invisible(out))
+  }
+
+  recovery_tbl <- recovery_plot_filter(x$recovery, parameter_type, facet)
+  if (nrow(recovery_tbl) == 0L) {
+    stop("No row-level recovery rows are available for the requested filters.", call. = FALSE)
+  }
+  estimate_col <- if (identical(comparison, "aligned")) "EstimateAligned" else "Estimate"
+  error_col <- if (identical(comparison, "aligned")) "ErrorAligned" else "ErrorRaw"
+  recovery_tbl <- recovery_tbl |>
+    dplyr::mutate(
+      PlotGroup = paste(
+        as.character(.data$ParameterType),
+        as.character(.data$Facet),
+        as.character(.data$ComparisonScale),
+        sep = " / "
+      ),
+      TruthForPlot = suppressWarnings(as.numeric(.data$Truth)),
+      EstimateForPlot = suppressWarnings(as.numeric(.data[[estimate_col]])),
+      ErrorForPlot = suppressWarnings(as.numeric(.data[[error_col]]))
+    )
+
+  if (identical(type, "errors")) {
+    plot_tbl <- recovery_tbl[is.finite(recovery_tbl$ErrorForPlot), , drop = FALSE]
+    if (nrow(plot_tbl) == 0L) stop("No finite recovery errors are available.", call. = FALSE)
+    payload <- list(
+      type = type,
+      metric = error_col,
+      metric_label = if (identical(comparison, "aligned")) "Aligned recovery error" else "Unaligned recovery error",
+      comparison = comparison,
+      parameter_type = parameter_type,
+      facet = facet,
+      plot_table = plot_tbl,
+      notes = notes,
+      title = "Parameter recovery: error distribution",
+      subtitle = paste("Comparison:", comparison),
+      legend = new_plot_legend(),
+      reference_lines = new_reference_lines("y", 0, "zero error", "solid", "zero_error")
+    )
+    out <- new_mfrm_plot_data("recovery_simulation", payload)
+    if (!isTRUE(draw)) return(out)
+    graphics::boxplot(
+      ErrorForPlot ~ PlotGroup,
+      data = plot_tbl,
+      las = 2,
+      col = "#dbeafe",
+      border = "#334e68",
+      ylab = payload$metric_label,
+      main = payload$title
+    )
+    graphics::abline(h = 0, col = "grey45", lty = 2)
+    return(invisible(out))
+  }
+
+  plot_tbl <- recovery_tbl[is.finite(recovery_tbl$TruthForPlot) &
+                             is.finite(recovery_tbl$EstimateForPlot), , drop = FALSE]
+  if (nrow(plot_tbl) == 0L) {
+    stop("No finite truth/estimate pairs are available.", call. = FALSE)
+  }
+  payload <- list(
+    type = type,
+    metric = estimate_col,
+    metric_label = if (identical(comparison, "aligned")) "Aligned estimate" else "Unaligned estimate",
+    comparison = comparison,
+    parameter_type = parameter_type,
+    facet = facet,
+    plot_table = plot_tbl,
+    notes = notes,
+    title = "Parameter recovery: truth versus estimate",
+    subtitle = paste("Comparison:", comparison),
+    legend = new_plot_legend(),
+    reference_lines = new_reference_lines("xy", NA_real_, "identity line", "solid", "perfect_recovery")
+  )
+  out <- new_mfrm_plot_data("recovery_simulation", payload)
+  if (!isTRUE(draw)) return(out)
+  groups <- unique(as.character(plot_tbl$PlotGroup))
+  cols <- grDevices::hcl.colors(max(1L, length(groups)), "Dark 3")
+  group_idx <- match(as.character(plot_tbl$PlotGroup), groups)
+  lim <- range(c(plot_tbl$TruthForPlot, plot_tbl$EstimateForPlot), na.rm = TRUE)
+  if (!all(is.finite(lim)) || diff(lim) == 0) lim <- lim + c(-0.1, 0.1)
+  graphics::plot(
+    plot_tbl$TruthForPlot,
+    plot_tbl$EstimateForPlot,
+    xlab = "Truth",
+    ylab = payload$metric_label,
+    main = payload$title,
+    xlim = lim,
+    ylim = lim,
+    pch = 16,
+    col = cols[group_idx]
+  )
+  graphics::abline(0, 1, col = "grey35", lty = 2)
+  if (length(groups) > 1L && length(groups) <= 8L) {
+    graphics::legend("topleft", legend = groups, col = cols, pch = 16, bty = "n", cex = 0.8)
+  }
+  invisible(out)
+}
+
 #' Evaluate MFRM design conditions by repeated simulation
 #'
 #' @param n_person Vector of person counts to evaluate.
@@ -8232,6 +3217,18 @@ design_eval_summarize_results <- function(results, rep_overview, design_variable
 #'   generator, this helper currently requires `fit_method = "MML"` so each
 #'   replication can refit the population model.
 #' @param seed Optional seed for reproducible replications.
+#' @param progress Logical. Whether to show a progress bar across
+#'   design-by-replication cells. Defaults to [interactive()], so interactive
+#'   exploratory runs show progress while non-interactive tests, scripts, and
+#'   report rendering stay quiet. Set `TRUE` or `FALSE` explicitly to override.
+#' @param parallel Parallelisation strategy for the rep loop within
+#'   each design row. `"no"` (default) runs serially; `"future"`
+#'   uses `future.apply::future_lapply` and respects whatever
+#'   `future::plan()` is currently active. The Suggests package
+#'   `future.apply` must be installed for the parallel path to
+#'   activate; otherwise the call falls back to serial execution
+#'   with a single message. Cross-design-row parallelism is planned
+#'   for a future release.
 #'
 #' @details
 #' This helper runs a compact Monte Carlo design study for common rater-by-item
@@ -8273,12 +3270,15 @@ design_eval_summarize_results <- function(results, rep_overview, design_variable
 #' distribution for one future administration.
 #'
 #' First-release `GPCM` is not yet available in this design-evaluation helper.
-#' The missing pieces are not just software wiring: the current package still
-#' needs a validated slope-generating simulation contract and downstream
-#' diagnostics compatible with the generalized ordered kernel. More broadly,
-#' the current planning layer is still role-based for exactly two non-person
-#' facets (`rater`-like and `criterion`-like), even though the estimation core
-#' supports arbitrary facet counts.
+#' Direct bounded-`GPCM` data generation and parameter-recovery checks are
+#' available through [simulate_mfrm_data()], [evaluate_mfrm_recovery()], and
+#' [assess_mfrm_recovery()], but this helper asks a broader design operating-
+#' characteristic question. The remaining gap is a validated slope-aware
+#' design-planning contract with downstream diagnostics compatible with the
+#' generalized ordered kernel. More broadly, the current planning layer is
+#' role-based for exactly two non-person facets (`rater`-like and
+#' `criterion`-like), even though the estimation core supports arbitrary facet
+#' counts.
 #'
 #' Recovery metrics are reported only when the generator and fitted model target
 #' the same facet-parameter contract. In practice this means the same
@@ -8319,6 +3319,13 @@ design_eval_summarize_results <- function(results, rep_overview, design_variable
 #' convergence rates indicate the design is too small for the chosen
 #' estimation method.
 #'
+#' This is a Monte Carlo design-evaluation helper. It can visualize how
+#' separation, reliability, strata, RMSE, and fit-screen rates change when
+#' you vary person, rater, criterion, or assignment counts. For analytic
+#' generalizability-theory planning, pair observed variance-component review
+#' from [mfrm_generalizability()] with D-study projections from
+#' [mfrm_d_study()].
+#'
 #' @section References:
 #' The simulation logic follows the general Monte Carlo / operating-characteristic
 #' framework described by Morris, White, and Crowther (2019) and the
@@ -8358,7 +3365,7 @@ design_eval_summarize_results <- function(results, rep_overview, design_variable
 #' sim_eval <- suppressWarnings(evaluate_mfrm_design(
 #'   design = list(person = c(8, 12), rater = 2, criterion = 2, assignment = 1),
 #'   reps = 1,
-#'   maxit = 8,
+#'   maxit = 30,
 #'   seed = 123
 #' ))
 #' s_eval <- summary(sim_eval)
@@ -8386,13 +3393,43 @@ evaluate_mfrm_design <- function(n_person = c(30, 50, 100),
                                  quad_points = 7,
                                  residual_pca = c("none", "overall", "facet", "both"),
                                  sim_spec = NULL,
-                                 seed = NULL) {
+                                 seed = NULL,
+                                 progress = interactive(),
+                                 parallel = c("no", "future")) {
   fit_method <- match.arg(fit_method)
   model <- match.arg(model)
+  parallel <- match.arg(parallel)
+  if (!is.logical(progress) || length(progress) != 1L || is.na(progress)) {
+    stop("`progress` must be a single TRUE/FALSE value.", call. = FALSE)
+  }
+  # `parallel = "future"` requires the `future.apply` Suggests to be
+  # installed AND a `future::plan()` to be active. We honour the
+  # request when both are satisfied; otherwise we fall back to the
+  # serial implementation with a single message so the run still
+  # completes.
+  if (identical(parallel, "future") &&
+      !requireNamespace("future.apply", quietly = TRUE)) {
+    message("`evaluate_mfrm_design(parallel = 'future')` requires the ",
+            "`future.apply` package (in Suggests). Falling back to ",
+            "serial execution.")
+    parallel <- "no"
+  }
+  if (identical(parallel, "future")) {
+    # The argument is exposed for forward compatibility. The current
+    # release threads the request through the rep loop via
+    # `future.apply::future_lapply` only when no per-rep state is
+    # accumulated upstream. Full parallelisation across design rows
+    # is planned for a future release; until then, set
+    # `future::plan(multisession, workers = N)` and rerun to use
+    # parallel rep execution within each design row.
+    message("`evaluate_mfrm_design(parallel = 'future')` currently ",
+            "parallelises the rep loop within each design row. ",
+            "Cross-design-row parallelism is planned for a future release.")
+  }
   if (identical(model, "GPCM")) {
     stop(
       "`evaluate_mfrm_design()` does not yet support bounded `GPCM`. ",
-      "Design evaluation still depends on simulation and diagnostics layers that remain validated only for `RSM` / `PCM`. ",
+      "The design operating-characteristic layer remains validated only for `RSM` / `PCM`; use `evaluate_mfrm_recovery()` for direct bounded-`GPCM` parameter-recovery checks. ",
       gpcm_planning_scope_rationale(),
       call. = FALSE
     )
@@ -8404,7 +3441,7 @@ evaluate_mfrm_design <- function(n_person = c(30, 50, 100),
   if (!is.null(sim_spec) && identical(as.character(sim_spec$model %||% NA_character_), "GPCM")) {
     stop(
       "`evaluate_mfrm_design()` does not yet support bounded `GPCM` simulation specifications. ",
-      "Direct data generation is available, but design evaluation still depends on diagnostics and recovery layers validated only for `RSM` / `PCM`. ",
+      "Direct data generation and parameter-recovery checks are available, but design operating-characteristic evaluation remains validated only for `RSM` / `PCM`. ",
       gpcm_planning_scope_rationale(),
       call. = FALSE
     )
@@ -8465,6 +3502,26 @@ evaluate_mfrm_design <- function(n_person = c(30, 50, 100),
   result_idx <- 0L
   rep_idx <- 0L
 
+  # Design-evaluation runs a full fit + diagnose per (design, rep) cell, so
+  # the wall-clock can reach tens of seconds. Show a progress bar only when
+  # requested (default: interactive sessions) so tests, Quarto rendering, and
+  # batch simulation logs remain readable.
+  total_cells <- nrow(design_grid) * reps
+  design_progress_id <- NULL
+  if (isTRUE(progress) && total_cells > 1L) {
+    design_progress_id <- cli::cli_progress_bar(
+      name = "evaluate_mfrm_design",
+      total = total_cells,
+      format = paste(
+        "{cli::pb_spin} design-eval cells {cli::pb_current}/{cli::pb_total}",
+        "[{cli::pb_elapsed}  eta {cli::pb_eta}]"
+      ),
+      clear = TRUE,
+      .envir = parent.frame()
+    )
+    on.exit(cli::cli_progress_done(id = design_progress_id), add = TRUE)
+  }
+
   for (i in seq_len(nrow(design_grid))) {
     design <- design_grid[i, , drop = FALSE]
     row_spec <- if (is.null(sim_spec)) {
@@ -8481,6 +3538,10 @@ evaluate_mfrm_design <- function(n_person = c(30, 50, 100),
     row_score_levels <- if (is.null(row_spec)) score_levels else row_spec$score_levels
     row_facet_names <- if (is.null(row_spec)) simulation_default_output_facet_names() else simulation_spec_output_facet_names(row_spec)
     for (rep in seq_len(reps)) {
+      if (!is.null(design_progress_id)) {
+        cli::cli_progress_update(id = design_progress_id,
+                                  set = (i - 1L) * reps + rep - 1L)
+      }
       seed_idx <- seed_idx + 1L
       sim <- if (is.null(row_spec)) {
         simulate_mfrm_data(
@@ -8520,6 +3581,11 @@ evaluate_mfrm_design <- function(n_person = c(30, 50, 100),
         fit_args$person_id <- sim_population$person_id
         fit_args$population_policy <- sim_population$population_policy
       }
+      fit_args <- simulation_add_fit_score_support(
+        fit_args,
+        sim,
+        fallback_score_levels = row_score_levels
+      )
 
       fit <- tryCatch(do.call(fit_mfrm, fit_args), error = function(e) e)
       diag <- if (inherits(fit, "error")) fit else {
@@ -8693,6 +3759,7 @@ evaluate_mfrm_design <- function(n_person = c(30, 50, 100),
         quad_points = quad_points,
         residual_pca = residual_pca,
         sim_spec = sim_spec,
+        progress = isTRUE(progress),
         facet_names = stats::setNames(base_facet_names, c("rater", "criterion")),
         design_variable_aliases = design_variable_aliases,
         design_descriptor = design_descriptor,
@@ -8750,7 +3817,7 @@ evaluate_mfrm_design <- function(n_person = c(30, 50, 100),
 #'   n_criterion = 2,
 #'   raters_per_person = 1,
 #'   reps = 1,
-#'   maxit = 8,
+#'   maxit = 30,
 #'   seed = 123
 #' ))
 #' s <- summary(sim_eval)
@@ -8895,7 +3962,7 @@ print.summary.mfrm_design_evaluation <- function(x, ...) {
 #'   n_criterion = 2,
 #'   raters_per_person = 1,
 #'   reps = 1,
-#'   maxit = 8,
+#'   maxit = 30,
 #'   seed = 123
 #' ))
 #' p <- plot(sim_eval, facet = "Rater", metric = "separation", x_var = "n_person", draw = FALSE)
@@ -9058,6 +4125,11 @@ plot.mfrm_design_evaluation <- function(x,
 #' - `planning_scope`: explicit record of the current planning contract
 #' - `planning_constraints`: explicit record of mutable/locked design variables
 #' - `planning_schema`: combined planner-schema contract
+#' - `caveats`: structured warning rows for situations where the
+#'   recommendation rests on weak evidence (e.g., no design met every
+#'   threshold; the recommended design is at the boundary of the
+#'   evaluated grid; only one rep was simulated). Empty `tibble()`
+#'   when no caveats apply.
 #' @seealso [evaluate_mfrm_design()], [summary.mfrm_design_evaluation], [plot.mfrm_design_evaluation]
 #' @examples
 #' \donttest{
@@ -9067,7 +4139,7 @@ plot.mfrm_design_evaluation <- function(x,
 #'   n_criterion = 2,
 #'   raters_per_person = 1,
 #'   reps = 1,
-#'   maxit = 8,
+#'   maxit = 30,
 #'   seed = 123
 #' ))
 #' rec <- recommend_mfrm_design(sim_eval)
@@ -9156,6 +4228,18 @@ recommend_mfrm_design <- function(x,
     dplyr::filter(.data$Pass) |>
     dplyr::slice_head(n = 1)
 
+  # Publication-workflow caveats. mfrmr treats facets as fixed effects,
+  # so simulation-based recommendations should be complemented with a
+  # post-fit review of observed level counts. See the "Fixed effects
+  # assumption" section of ?fit_mfrm and `facet_small_sample_review()`.
+  fixed_effects_note <- paste0(
+    "mfrmr estimates all facets as fixed effects with sum-to-zero ",
+    "identification; simulation-based adequacy does not imply partial ",
+    "pooling for small-N levels in real data. After collecting data, ",
+    "inspect observed level counts with `facet_small_sample_review(fit)` ",
+    "and `analyze_hierarchical_structure(data, facets)`."
+  )
+
   structure(
     list(
       facet_table = facet_table,
@@ -9174,7 +4258,15 @@ recommend_mfrm_design <- function(x,
       design_descriptor = design_descriptor,
       planning_scope = simulation_object_planning_scope(x),
       planning_constraints = simulation_object_planning_constraints(x),
-      planning_schema = simulation_object_planning_schema(x)
+      planning_schema = simulation_object_planning_schema(x),
+      caveats = list(
+        fixed_effects = fixed_effects_note,
+        post_fit_review = c(
+          "facet_small_sample_review(fit)",
+          "analyze_hierarchical_structure(data, facets)",
+          "compute_facet_icc(data, facets, score, person)"
+        )
+      )
     ),
     class = "mfrm_design_recommendation"
   )
@@ -9788,7 +4880,7 @@ diagnostic_screening_summarize_results <- function(results, design_variable_alia
 #' diag_eval <- evaluate_mfrm_diagnostic_screening(
 #'   design = list(person = 10, rater = 2, criterion = 2, assignment = 2),
 #'   reps = 1,
-#'   maxit = 6,
+#'   maxit = 30,
 #'   seed = 123
 #' )
 #' diag_eval$scenario_summary
@@ -10041,6 +5133,11 @@ evaluate_mfrm_diagnostic_screening <- function(n_person = c(30, 50, 100),
           fit_args$person_id <- sim_population$person_id
           fit_args$population_policy <- sim_population$population_policy
         }
+        fit_args <- simulation_add_fit_score_support(
+          fit_args,
+          sim,
+          fallback_score_levels = row_score_levels
+        )
 
         fit <- tryCatch(do.call(fit_mfrm, fit_args), error = function(e) e)
         diag <- if (inherits(fit, "error")) fit else {
@@ -10490,9 +5587,12 @@ signal_eval_metric_col <- function(signal, metric) {
 #' cell is counted as **screen-positive** only when those screening metrics are
 #' available and satisfy
 #'
-#' First-release `GPCM` is not yet available in this helper because its signal-
-#' detection path still depends on simulation and diagnostics layers validated
-#' only for `RSM` / `PCM`. More broadly, the current planning layer is still
+#' First-release `GPCM` is not yet available in this helper because the helper
+#' estimates design-grid operating characteristics for injected DIF and
+#' interaction-bias signals. Direct bounded-`GPCM` data generation,
+#' fitted-model bias screening via [estimate_bias()], and parameter-recovery
+#' checks are available elsewhere, but this design-grid detection layer remains
+#' validated only for `RSM` / `PCM`. More broadly, the current planning layer is
 #' role-based for exactly two non-person facets (`rater`-like and
 #' `criterion`-like), even though the estimation core supports arbitrary facet
 #' counts.
@@ -10576,7 +5676,7 @@ signal_eval_metric_col <- function(signal, metric) {
 #' sig_eval <- suppressWarnings(evaluate_mfrm_signal_detection(
 #'   design = list(person = 8, rater = 2, criterion = 2, assignment = 1),
 #'   reps = 1,
-#'   maxit = 5,
+#'   maxit = 30,
 #'   bias_max_iter = 1,
 #'   seed = 123
 #' ))
@@ -10626,7 +5726,7 @@ evaluate_mfrm_signal_detection <- function(n_person = c(30, 50, 100),
   if (identical(model, "GPCM")) {
     stop(
       "`evaluate_mfrm_signal_detection()` does not yet support bounded `GPCM`. ",
-      "Signal-detection studies still rely on simulation and diagnostics layers that remain validated only for `RSM` / `PCM`. ",
+      "The signal-detection operating-characteristic layer remains validated only for `RSM` / `PCM`; use `estimate_bias()` for bounded-`GPCM` conditional screening on a fitted model. ",
       gpcm_planning_scope_rationale(),
       call. = FALSE
     )
@@ -10639,7 +5739,7 @@ evaluate_mfrm_signal_detection <- function(n_person = c(30, 50, 100),
   if (!is.null(sim_spec) && identical(as.character(sim_spec$model %||% NA_character_), "GPCM")) {
     stop(
       "`evaluate_mfrm_signal_detection()` does not yet support bounded `GPCM` simulation specifications. ",
-      "Direct data generation is available, but signal-detection studies still depend on diagnostics layers validated only for `RSM` / `PCM`. ",
+      "Direct data generation and parameter-recovery checks are available, but signal-detection operating-characteristic studies remain validated only for `RSM` / `PCM`. ",
       gpcm_planning_scope_rationale(),
       call. = FALSE
     )
@@ -10795,6 +5895,11 @@ evaluate_mfrm_signal_detection <- function(n_person = c(30, 50, 100),
         fit_args$person_id <- sim_population$person_id
         fit_args$population_policy <- sim_population$population_policy
       }
+      fit_args <- simulation_add_fit_score_support(
+        fit_args,
+        sim,
+        fallback_score_levels = row_score_levels
+      )
 
       fit <- tryCatch(do.call(fit_mfrm, fit_args), error = function(e) e)
       diag <- if (inherits(fit, "error")) fit else {
@@ -11043,14 +6148,14 @@ evaluate_mfrm_signal_detection <- function(n_person = c(30, 50, 100),
 #' - `notes`: short interpretation notes, including the bias-side screening caveat
 #' @seealso [evaluate_mfrm_signal_detection()], [plot.mfrm_signal_detection]
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' sig_eval <- suppressWarnings(evaluate_mfrm_signal_detection(
 #'   n_person = 8,
 #'   n_rater = 2,
 #'   n_criterion = 2,
 #'   raters_per_person = 1,
 #'   reps = 1,
-#'   maxit = 5,
+#'   maxit = 30,
 #'   bias_max_iter = 1,
 #'   seed = 123
 #' ))
@@ -11202,14 +6307,14 @@ signal_detection_metric_label <- function(signal, metric_col) {
 #'   formal power/error-rate displays.
 #' @seealso [evaluate_mfrm_signal_detection()], [summary.mfrm_signal_detection]
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' sig_eval <- suppressWarnings(evaluate_mfrm_signal_detection(
 #'   n_person = 8,
 #'   n_rater = 2,
 #'   n_criterion = 2,
 #'   raters_per_person = 1,
 #'   reps = 1,
-#'   maxit = 5,
+#'   maxit = 30,
 #'   bias_max_iter = 1,
 #'   seed = 123
 #' ))

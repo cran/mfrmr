@@ -8,7 +8,12 @@ analyze_residual_pca(
   diagnostics,
   mode = c("overall", "facet", "both"),
   facets = NULL,
-  pca_max_factors = 10L
+  pca_max_factors = 10L,
+  parallel = FALSE,
+  parallel_reps = 200L,
+  parallel_quantile = 0.95,
+  parallel_method = c("residual_permutation"),
+  seed = NULL
 )
 }
 \arguments{
@@ -19,6 +24,23 @@ analyze_residual_pca(
 \item{facets}{Optional subset of facets for facet-specific PCA.}
 
 \item{pca_max_factors}{Maximum number of retained components.}
+
+\item{parallel}{Logical; if \code{TRUE}, add residual-permutation parallel
+analysis to the PCA tables.}
+
+\item{parallel_reps}{Number of residual permutations used when
+\code{parallel = TRUE}.}
+
+\item{parallel_quantile}{Upper null quantile used as the exploratory
+comparison cutoff. The default (\code{0.95}) follows the common parallel
+analysis convention.}
+
+\item{parallel_method}{Parallel-analysis null method. Currently
+\code{"residual_permutation"} is implemented: standardized residuals are
+permuted within each residual column, preserving each column's residual
+distribution and missingness pattern while breaking residual association.}
+
+\item{seed}{Optional integer seed for reproducible residual permutations.}
 }
 \value{
 A named list with:
@@ -29,6 +51,16 @@ A named list with:
 \item \code{by_facet}: named list of facet PCA bundles
 \item \code{overall_table}: variance table for overall PCA
 \item \code{by_facet_table}: stacked variance table across facets
+\item \code{parallel_settings}, \code{parallel_overall_table},
+\code{parallel_by_facet_table}, and \code{parallel_status}: returned for every call;
+the parallel tables are populated when \code{parallel = TRUE}
+\item \code{errors}: named list of any per-facet PCA errors that were
+caught and turned into \code{NA_real_} rows in the variance tables
+(e.g., \code{psych::principal()} failure on a near-singular residual
+matrix). The list is empty when every facet PCA succeeded.
+\item \code{warnings}: named list of non-fatal PCA warnings captured from the
+underlying PCA engine. These indicate exploratory boundary conditions,
+not confirmatory evidence.
 }
 }
 \description{
@@ -50,6 +82,14 @@ many-facet adaptation}: it works on standardized residual matrices built as
 person x combined-facet or person x facet-level layouts, rather than
 reproducing FACETS/Winsteps residual-contrast tables one-to-one.
 
+Residual PCA should therefore be reported as residual-structure evidence,
+not as a formal proof of unidimensionality. It also should not be described
+as DIMTEST or UNIDIM: those essential-unidimensionality tests require a
+separate item-response-layer definition that is not uniquely determined by a
+many-facet long data set. In applied MFRM reporting, residual PCA is best
+triangulated with global residual fit, element fit, and Q3-style
+local-dependence screens.
+
 Output tables use:
 \itemize{
 \item \code{Component}: principal-component index (1, 2, ...)
@@ -58,20 +98,40 @@ Output tables use:
 \item \code{Cumulative}: cumulative variance proportion
 }
 
+When \code{parallel = TRUE}, the variance tables additionally include
+data-driven null summaries:
+\itemize{
+\item \code{ParallelMean}: mean permuted-residual eigenvalue
+\item \code{ParallelCutoff}: \code{parallel_quantile} cutoff of permuted eigenvalues
+\item \code{ExcessOverParallelCutoff}: observed eigenvalue minus the cutoff
+\item \code{ExceedsParallelCutoff}: whether the observed eigenvalue exceeds the
+permutation cutoff
+}
+
+The default \code{parallel_reps = 200} is intended as a practical review setting.
+For stable final reporting of the 95\% cutoff, use a larger value when the
+residual matrix size makes that computationally reasonable.
+
 For \code{mode = "facet"} or \code{"both"}, \code{by_facet_table} additionally includes
 a \code{Facet} column.
 
 \code{summary(pca)} is supported through \code{summary()}.
 \code{plot(pca)} is dispatched through \code{plot()} for class
 \code{mfrm_residual_pca}. Available types include \code{"overall_scree"},
-\code{"facet_scree"}, \code{"overall_loadings"}, and \code{"facet_loadings"}.
+\code{"facet_scree"}, \code{"overall_parallel_scree"},
+\code{"facet_parallel_scree"}, \code{"overall_parallel_excess"},
+\code{"facet_parallel_excess"}, \code{"overall_loadings"}, and
+\code{"facet_loadings"}.
 }
 \section{Interpreting output}{
 
 Use \code{overall_table} first:
 \itemize{
 \item early components with noticeably larger eigenvalues or proportions
-suggest stronger residual structure that may deserve follow-up.
+suggest stronger residual structure that may deserve follow-up. Small
+early components can be described as evidence consistent with the specified
+one-dimensional facet structure only when fit and local-dependence screens
+tell the same story.
 }
 
 Then inspect \code{by_facet_table}:
@@ -90,11 +150,42 @@ especially Linacre's discussions of principal components of Rasch residuals.
 The current \code{mfrmr} implementation should be interpreted as an exploratory
 extension for many-facet workflows rather than as a direct reproduction of a
 single FACETS/Winsteps output table.
+
+The optional parallel analysis follows Horn's data-driven eigenvalue
+comparison logic and later recommendations to compare observed eigenvalues
+with high quantiles of an empirical null distribution. Because \code{mfrmr}
+applies it to standardized Rasch-family residual matrices, the null
+distribution is generated by within-column residual permutation rather than
+by simulating raw item scores.
 \itemize{
+\item Horn, J. L. (1965). A rationale and test for the number of factors in
+factor analysis. \emph{Psychometrika}, 30, 179-185.
+\item Glorfeld, L. W. (1995). An improvement on Horn's parallel analysis
+methodology for selecting the correct number of factors to retain.
+\emph{Educational and Psychological Measurement}, 55, 377-393.
+\item Hayton, J. C., Allen, D. G., & Scarpello, V. (2004). Factor retention
+decisions in exploratory factor analysis: A tutorial on parallel analysis.
+\emph{Organizational Research Methods}, 7, 191-205.
+\item Timmerman, M. E., & Lorenzo-Seva, U. (2011). Dimensionality assessment
+of ordered polytomous items with parallel analysis. \emph{Psychological
+Methods}, 16, 209-220.
 \item Linacre, J. M. (1998). \emph{Structure in Rasch residuals: Why principal
 components analysis (PCA)?} Rasch Measurement Transactions, 12(2), 636.
 \item Linacre, J. M. (1998). \emph{Detecting multidimensionality: Which residual
 data-type works best?} Journal of Outcome Measurement, 2(3), 266-283.
+\item Eckes, T. (2005). Examining rater effects in TestDaF writing and speaking
+performance assessments: A many-facet Rasch analysis. \emph{Language Assessment
+Quarterly}, 2(3), 197-221.
+\item Yamashita, T. (2024). An application of many-facet Rasch measurement to
+evaluate automated essay scoring: A case of ChatGPT-4.0. \emph{Research Methods
+in Applied Linguistics}, 3(3), 100133.
+\item Uto, M. (2021). A multidimensional generalized many-facet Rasch model for
+rubric-based performance assessment. \emph{Behaviormetrika}, 48(2), 425-457.
+\item Aryadoust, V., Ng, L. Y., & Sayama, H. (2021). A comprehensive review of
+Rasch measurement in language assessment: Recommendations and guidelines
+for research. \emph{Language Testing}, 38(1), 6-40.
+\item Tseng, W.-T. (2016). Measuring English vocabulary size via computerized
+adaptive testing. \emph{Computers & Education}, 97, 69-85.
 }
 }
 
@@ -111,7 +202,7 @@ data-type works best?} Journal of Outcome Measurement, 2(3), 266-283.
 \examples{
 \donttest{
 toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "both")
 pca <- analyze_residual_pca(diag, mode = "both")
 pca2 <- analyze_residual_pca(fit, mode = "both")
@@ -119,6 +210,8 @@ summary(pca)
 p <- plot_residual_pca(pca, mode = "overall", plot_type = "scree", draw = FALSE)
 p$data$plot
 head(p$data)
+pca_pa <- analyze_residual_pca(diag, mode = "overall", parallel = TRUE, parallel_reps = 10)
+head(pca_pa$overall_table)
 head(pca$overall_table)
 }
 }

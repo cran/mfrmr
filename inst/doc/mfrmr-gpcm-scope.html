@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>GPCM scope and current limitations</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">GPCM scope and current limitations</h1>
+
+
+
+<p><code>mfrmr</code> includes a bounded implementation of the
+Generalized Partial Credit Model (GPCM; Muraki 1992). The estimator is
+fully functional, but several downstream reporting helpers remain
+restricted because score-side semantics under free discrimination differ
+from the Rasch-family case. This vignette documents which helpers are
+available, which are not, and what to use as a substitute when a helper
+is restricted.</p>
+<div id="before-fitting-model-choice-triage" class="section level2">
+<h2>Before fitting: model-choice triage</h2>
+<p>Do not choose <code>GPCM</code> only because it is the most flexible
+model in the menu. Start with the score interpretation.</p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Model</th>
+<th>Use when</th>
+<th>Main risk if over-used</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>RSM</code></td>
+<td>The rating scale is intended to share one category-threshold
+structure across the step facet.</td>
+<td>Real threshold differences can be hidden in residual
+diagnostics.</td>
+</tr>
+<tr class="even">
+<td><code>PCM</code></td>
+<td>Thresholds may differ by item, criterion, task, or another
+designated step facet, but rating events should still contribute equally
+after conditioning on the modeled facets.</td>
+<td>It can absorb threshold heterogeneity without asking whether some
+levels are more discriminating.</td>
+</tr>
+<tr class="odd">
+<td>bounded <code>GPCM</code></td>
+<td>The analysis explicitly allows discrimination-based reweighting and
+treats slopes as part of the substantive sensitivity question.</td>
+<td>Better statistical fit can be mistaken for a better operational
+scoring rule.</td>
+</tr>
+</tbody>
+</table>
+<p>This ordering matters for reporting. <code>RSM</code> and
+<code>PCM</code> are the package’s equal-weighting reference route;
+bounded <code>GPCM</code> is a slope-aware extension. If equal
+contribution of items, criteria, or raters is part of the validity
+argument, a better-fitting bounded <code>GPCM</code> should be reported
+as sensitivity evidence rather than as an automatic replacement.</p>
+</div>
+<div id="report-wording-templates" class="section level2">
+<h2>Report wording templates</h2>
+<p>Use wording that matches the model actually fitted:</p>
+<ul>
+<li><code>RSM</code>: “We fit a many-facet rating-scale Rasch model,
+treating category thresholds as common across the step facet.”</li>
+<li><code>PCM</code>: “We fit a many-facet partial-credit Rasch model,
+allowing thresholds to vary by the designated step facet while retaining
+equal discrimination.”</li>
+<li>bounded <code>GPCM</code>: “We fit a bounded generalized
+partial-credit many-facet model as a slope-aware sensitivity analysis;
+interpretation focused on whether discrimination-based reweighting
+changed the substantive conclusions.”</li>
+</ul>
+<p>Avoid wording that says bounded <code>GPCM</code> “improves the
+score” solely because it improves log-likelihood, <code>AIC</code>, or
+<code>BIC</code>. The model can fit better while changing the scoring
+contract.</p>
+</div>
+<div id="checking-the-support-boundary" class="section level2">
+<h2>Checking the support boundary</h2>
+<p><code>gpcm_capability_matrix()</code> is the canonical reference. It
+returns one row per helper family with a <code>Status</code> column
+drawn from <code>supported</code>, <code>supported_with_caveat</code>,
+<code>blocked</code>, and <code>deferred</code>, plus the rationale and
+the evidence trail behind each classification.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="fu">gpcm_capability_matrix</span>(<span class="st">&quot;supported&quot;</span>)[, <span class="fu">c</span>(<span class="st">&quot;Area&quot;</span>, <span class="st">&quot;Status&quot;</span>)]</span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">gpcm_capability_matrix</span>(<span class="st">&quot;supported_with_caveat&quot;</span>)[, <span class="fu">c</span>(<span class="st">&quot;Area&quot;</span>, <span class="st">&quot;Status&quot;</span>)]</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">gpcm_capability_matrix</span>(<span class="st">&quot;blocked&quot;</span>)[, <span class="fu">c</span>(<span class="st">&quot;Area&quot;</span>, <span class="st">&quot;Status&quot;</span>, <span class="st">&quot;Boundary&quot;</span>)]</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">gpcm_capability_matrix</span>(<span class="st">&quot;deferred&quot;</span>)[, <span class="fu">c</span>(<span class="st">&quot;Area&quot;</span>, <span class="st">&quot;Status&quot;</span>)]</span></code></pre></div>
+<p>The matrix is intentionally conservative. A row stays in
+<code>blocked</code> or <code>deferred</code> even when some lower-level
+component already runs, because the scope statement reflects the
+validation evidence rather than the raw code path.</p>
+</div>
+<div id="what-works-today" class="section level2">
+<h2>What works today</h2>
+<p>The following routes are validated for bounded <code>GPCM</code>:</p>
+<ul>
+<li><strong>Fitting and core summaries</strong> via
+<code>fit_mfrm(model = &quot;GPCM&quot;, step_facet = ...)</code>. The validated
+default keeps <code>slope_facet == step_facet</code>, with the direct
+<code>MML</code> engine.</li>
+<li><strong>Posterior scoring and information</strong> via
+<code>predict_mfrm_units()</code>,
+<code>sample_mfrm_plausible_values()</code>,
+<code>compute_information()</code>, and
+<code>plot_information()</code>.</li>
+<li><strong>Curve and category views</strong> via
+<code>plot(fit, type = c(&quot;wright&quot;, &quot;pathway&quot;, &quot;ccc&quot;, &quot;ccc_surface&quot;))</code>,
+<code>category_structure_report()</code>, and
+<code>category_curves_report()</code>.</li>
+<li><strong>Slope-aware simulation specifications</strong> via
+<code>build_mfrm_sim_spec()</code> and
+<code>simulate_mfrm_data()</code>.</li>
+<li><strong>Direct recovery checks</strong> via
+<code>evaluate_mfrm_recovery()</code> and
+<code>assess_mfrm_recovery()</code>, including fitted bounded-GPCM slope
+recovery on the log-slope scale.</li>
+</ul>
+</div>
+<div id="what-works-with-caveats" class="section level2">
+<h2>What works with caveats</h2>
+<p>The following are exposed for <code>GPCM</code> but should be read as
+exploratory screens rather than as Rasch-style invariance evidence:</p>
+<ul>
+<li><code>diagnose_mfrm()</code> and the residual and
+unexpected-response stack: <code>unexpected_response_table()</code>,
+<code>displacement_table()</code>,
+<code>measurable_summary_table()</code>,
+<code>rating_scale_table()</code>,
+<code>interrater_agreement_table()</code>,
+<code>facet_quality_dashboard()</code>,
+<code>plot_qc_dashboard()</code>, <code>plot_marginal_fit()</code>,
+<code>plot_marginal_pairwise()</code>.</li>
+<li><code>reporting_checklist()</code> and
+<code>precision_review_report()</code> route to the supported direct
+tables and plots only. They do not imply that the broader APA writer is
+available.</li>
+<li><code>build_misfit_casebook()</code> inherits the exploratory
+screening framing of its underlying sources.</li>
+<li><code>estimate_bias()</code> now provides bounded-GPCM conditional
+screening rows with slope-aware information and profile-likelihood
+columns. Treat these rows as screening evidence for follow-up, not as
+standalone confirmatory fairness tests.</li>
+</ul>
+<p>The dashboard marks the fair-average panel unavailable under
+<code>GPCM</code>; use <code>fair_average_table()</code> directly for
+the slope-aware element-conditional table and
+<code>fair_average_table(fair_se = TRUE)</code> when you need structural
+fair-average SEs for non-person rows.</p>
+</div>
+<div id="what-is-intentionally-restricted" class="section level2">
+<h2>What is intentionally restricted</h2>
+<p>The slope-aware <code>fair_average_table()</code> route is available
+under <code>GPCM</code>, but FACETS-style score-side compatibility and
+full narrative/export bundles remain restricted because free
+discrimination changes the relationship between the latent measure and
+operational score-side summaries. Specifically:</p>
+<ul>
+<li><code>facets_output_contract_review()</code> and
+<code>facets_output_file_bundle(include = &quot;score&quot;)</code> still depend
+on Rasch-family score-side compatibility semantics that are not
+generalized to free discrimination.</li>
+<li><code>build_apa_outputs()</code>,
+<code>build_visual_summaries()</code>, <code>run_qc_pipeline()</code>,
+<code>build_mfrm_manifest()</code>,
+<code>build_mfrm_replay_script()</code>, and
+<code>export_mfrm_bundle()</code> would convert those score-side outputs
+into narrative or bundle claims, so they are also restricted.</li>
+</ul>
+<p><code>build_linking_review()</code> is deferred under
+<code>GPCM</code> for the same reason. The underlying
+<code>review_mfrm_anchors()</code> and
+<code>detect_anchor_drift()</code> helpers can still be called directly
+as exploratory support.</p>
+</div>
+<div id="recommended-substitutes" class="section level2">
+<h2>Recommended substitutes</h2>
+<p>When a restricted helper is needed for a <code>GPCM</code> report,
+the practical paths are:</p>
+<ul>
+<li>Refit with <code>model = &quot;PCM&quot;</code> if the discrimination-free
+assumption is defensible for the data. The full APA / output-contract /
+fit-based export stack becomes available, and
+<code>compare_mfrm()</code> quantifies the loss in fit.</li>
+<li>Keep the report on the <code>GPCM</code> fit itself but draft the
+manuscript section manually around the supported tables:
+<code>summary(fit)</code> for parameters, <code>diagnose_mfrm()</code>
+for residual fit, <code>facet_quality_dashboard()</code> for the
+per-facet quality summary, and <code>compute_information()</code> for
+precision evidence.</li>
+<li>Generate the reproducibility manifest from a parallel
+<code>RSM</code> or <code>PCM</code> baseline fit. The two fits can be
+reported side by side in the same document, with the <code>GPCM</code>
+fit footnoted as the discrimination-aware counterpart.</li>
+</ul>
+</div>
+<div id="a-worked-example" class="section level2">
+<h2>A worked example</h2>
+<p>The <code>example_core</code> dataset includes a small synthetic
+block that supports a bounded <code>GPCM</code> fit. This example uses
+compact quadrature and iteration settings to keep optional local
+execution short; for final evidence, rerun with the package default or a
+higher quadrature setting and a larger recovery design.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>toy <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_core&quot;</span>)</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>fit_gpcm <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>  <span class="at">data =</span> toy,</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>  <span class="at">step_facet =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;GPCM&quot;</span>,</span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">7</span>,</span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a>  <span class="at">maxit =</span> <span class="dv">20</span></span>
+<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a>)</span>
+<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a></span>
+<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a><span class="fu">summary</span>(fit_gpcm)</span>
+<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a></span>
+<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a>diag_gpcm <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit_gpcm)</span>
+<span id="cb5-19"><a href="#cb5-19" tabindex="-1"></a><span class="fu">summary</span>(diag_gpcm)</span>
+<span id="cb5-20"><a href="#cb5-20" tabindex="-1"></a></span>
+<span id="cb5-21"><a href="#cb5-21" tabindex="-1"></a>info <span class="ot">&lt;-</span> <span class="fu">compute_information</span>(fit_gpcm)</span>
+<span id="cb5-22"><a href="#cb5-22" tabindex="-1"></a><span class="fu">plot_information</span>(info)</span>
+<span id="cb5-23"><a href="#cb5-23" tabindex="-1"></a></span>
+<span id="cb5-24"><a href="#cb5-24" tabindex="-1"></a>rec_gpcm <span class="ot">&lt;-</span> <span class="fu">evaluate_mfrm_recovery</span>(</span>
+<span id="cb5-25"><a href="#cb5-25" tabindex="-1"></a>  <span class="at">sim_spec =</span> <span class="fu">build_mfrm_sim_spec</span>(</span>
+<span id="cb5-26"><a href="#cb5-26" tabindex="-1"></a>    <span class="at">n_person =</span> <span class="dv">30</span>,</span>
+<span id="cb5-27"><a href="#cb5-27" tabindex="-1"></a>    <span class="at">n_rater =</span> <span class="dv">3</span>,</span>
+<span id="cb5-28"><a href="#cb5-28" tabindex="-1"></a>    <span class="at">n_criterion =</span> <span class="dv">4</span>,</span>
+<span id="cb5-29"><a href="#cb5-29" tabindex="-1"></a>    <span class="at">raters_per_person =</span> <span class="dv">2</span>,</span>
+<span id="cb5-30"><a href="#cb5-30" tabindex="-1"></a>    <span class="at">model =</span> <span class="st">&quot;GPCM&quot;</span>,</span>
+<span id="cb5-31"><a href="#cb5-31" tabindex="-1"></a>    <span class="at">step_facet =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
+<span id="cb5-32"><a href="#cb5-32" tabindex="-1"></a>    <span class="at">slope_facet =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
+<span id="cb5-33"><a href="#cb5-33" tabindex="-1"></a>    <span class="at">slopes =</span> <span class="fu">c</span>(<span class="fl">0.8</span>, <span class="fl">1.0</span>, <span class="fl">1.15</span>, <span class="fl">1.05</span>)</span>
+<span id="cb5-34"><a href="#cb5-34" tabindex="-1"></a>  ),</span>
+<span id="cb5-35"><a href="#cb5-35" tabindex="-1"></a>  <span class="at">reps =</span> <span class="dv">10</span>,</span>
+<span id="cb5-36"><a href="#cb5-36" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;GPCM&quot;</span>,</span>
+<span id="cb5-37"><a href="#cb5-37" tabindex="-1"></a>  <span class="at">fit_method =</span> <span class="st">&quot;MML&quot;</span>,</span>
+<span id="cb5-38"><a href="#cb5-38" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">7</span>,</span>
+<span id="cb5-39"><a href="#cb5-39" tabindex="-1"></a>  <span class="at">maxit =</span> <span class="dv">20</span>,</span>
+<span id="cb5-40"><a href="#cb5-40" tabindex="-1"></a>  <span class="at">seed =</span> <span class="dv">1</span></span>
+<span id="cb5-41"><a href="#cb5-41" tabindex="-1"></a>)</span>
+<span id="cb5-42"><a href="#cb5-42" tabindex="-1"></a><span class="fu">assess_mfrm_recovery</span>(</span>
+<span id="cb5-43"><a href="#cb5-43" tabindex="-1"></a>  rec_gpcm,</span>
+<span id="cb5-44"><a href="#cb5-44" tabindex="-1"></a>  <span class="at">max_rmse =</span> <span class="fu">c</span>(<span class="at">facet =</span> <span class="fl">0.5</span>, <span class="at">step =</span> <span class="fl">0.5</span>, <span class="at">slope =</span> <span class="fl">0.25</span>),</span>
+<span id="cb5-45"><a href="#cb5-45" tabindex="-1"></a>  <span class="at">max_abs_bias =</span> <span class="fu">c</span>(<span class="at">default =</span> <span class="fl">0.25</span>)</span>
+<span id="cb5-46"><a href="#cb5-46" tabindex="-1"></a>)</span></code></pre></div>
+<p>The fit, summary, residual diagnostics, information, recovery,
+fair-average, and conditional bias-screening helpers all run under
+<code>GPCM</code> with the caveats listed above. Trying
+<code>build_apa_outputs(fit_gpcm)</code> raises an explicit message
+pointing back at <code>gpcm_capability_matrix()</code> rather than
+producing a partial output.</p>
+</div>
+<div id="roadmap" class="section level2">
+<h2>Roadmap</h2>
+<p>The boundary above is a release-scope statement, not a permanent
+design choice. Score-side semantics for free-discrimination polytomous
+models are on the roadmap for a future release. Until then, the matrix
+returned by <code>gpcm_capability_matrix()</code> is the binding
+contract.</p>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

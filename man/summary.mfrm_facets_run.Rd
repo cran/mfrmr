@@ -56,7 +56,7 @@ out <- run_mfrm_facets(
   person = "Person",
   facets = c("Rater", "Criterion"),
   score = "Score",
-  maxit = 25
+  maxit = 30
 )
 s <- summary(out)
 s$overview[, c("Model", "Method", "Converged")]

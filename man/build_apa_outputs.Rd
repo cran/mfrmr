@@ -50,7 +50,7 @@ Output text includes residual-PCA screening commentary if PCA diagnostics are
 available in \code{diagnostics}.
 
 For bounded \code{GPCM}, this helper is intentionally unavailable. Use
-\code{\link[=reporting_checklist]{reporting_checklist()}}, \code{\link[=precision_audit_report]{precision_audit_report()}}, and the direct
+\code{\link[=reporting_checklist]{reporting_checklist()}}, \code{\link[=precision_review_report]{precision_review_report()}}, and the direct
 table/plot helpers instead, and treat \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}} as the
 formal boundary statement for that branch.
 
@@ -119,10 +119,20 @@ package-native bias helper that provides a table component.
 }
 
 \examples{
-\donttest{
+# Fast smoke run: a JML fit and a legacy diagnostic let us build the
+# APA bundle and confirm `report_text` is non-empty in well under
+# a second.
 toy <- load_mfrmr_data("example_core")
+fit_quick <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
+                      method = "JML", maxit = 30)
+diag_quick <- diagnose_mfrm(fit_quick, residual_pca = "none",
+                             diagnostic_mode = "legacy")
+apa_quick <- build_apa_outputs(fit_quick, diag_quick)
+nchar(apa_quick$report_text) > 0
+
+\donttest{
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "MML", maxit = 200)
+                method = "MML", quad_points = 7, maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "both", diagnostic_mode = "both")
 apa <- build_apa_outputs(
   fit,
@@ -136,8 +146,17 @@ apa <- build_apa_outputs(
 )
 s_apa <- summary(apa)
 s_apa$overview
+# Look for: `SentenceCount` non-zero in every section that the run
+#   should support (Method / Results / fit / reliability / bias).
+#   Zero counts mean that section's prose is empty and the
+#   manuscript will need to fill it manually.
 chk <- reporting_checklist(fit, diagnostics = diag)
 head(chk$checklist[, c("Section", "Item", "DraftReady", "NextAction")])
+# Look for: rows with `DraftReady = "yes"` are ready to paste into
+#   the manuscript. `"no"` rows tell you which helper / setting
+#   needs to run before that paragraph can be drafted, via
+#   `NextAction`. Aim for every Visual Displays / Reliability /
+#   Diagnostics row to be `"yes"` before submitting.
 cat(apa$report_text)
 apa$section_map[, c("SectionId", "Available")]
 }

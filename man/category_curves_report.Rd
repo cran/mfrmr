@@ -38,12 +38,28 @@ Build a category curve export bundle (preferred alias)
 Preferred high-level API for category-probability curve exports.
 Returns tidy curve coordinates and summary metadata for quick
 plotting/report integration without calling low-level helpers directly.
+The expected-score table also carries the per-curve score variance and
+information function. For \code{GPCM}, the information column follows the
+Muraki/Samejima identity \eqn{a^2 \mathrm{Var}(X \mid \theta)};
+for \code{RSM} / \code{PCM}, this reduces to the usual score variance because
+discrimination is fixed at one. The \code{category_information} table decomposes
+that total into category-level contributions,
+\eqn{a^2 P_k(\theta)(k - E[X \mid \theta])^2}, whose sum equals the
+reported information at the same theta value. The
+\code{cumulative_probabilities} table follows the FACETS / Winsteps graph
+convention of accumulating modeled probabilities across ordered categories
+(\code{P(X <= k)} by default, with \code{P(X >= k)} also returned for flipped curves).
+\code{cumulative_boundaries} reports approximate theta values where
+\code{P(X <= k) = .5}, with \code{BoundaryStatus} and \code{CrossingCount} to avoid
+over-interpreting boundaries outside the requested theta range or with
+multiple crossings.
 }
 \section{Interpreting output}{
 
 Use this report to inspect:
 \itemize{
 \item where each category has highest probability across theta
+\item where cumulative category probabilities cross .5
 \item whether adjacent categories cross in expected order
 \item whether probability bands look compressed (often sparse categories)
 }
@@ -51,8 +67,34 @@ Use this report to inspect:
 Recommended read order:
 \enumerate{
 \item \code{summary(out)} for compact diagnostics.
-\item \code{out$curve_points} (or equivalent curve table) for downstream graphics.
-\item \code{plot(out)} for a default visual check.
+\item \code{out$probabilities}, \code{out$expected_ogive}, and
+\code{out$category_information} for custom graphics.
+\item \code{plot(out)} for a default visual check, or
+\code{plot(out, type = "cumulative")} to inspect cumulative probabilities.
+\code{plot(out, type = "information")} to inspect curve-level information.
+Use \code{plot(out, type = "category_information")} when category-level
+contributions are needed.
+}
+}
+
+\section{References}{
+
+Category response curves follow Andrich's rating-scale formulation,
+Masters' partial-credit model, and Muraki's generalized partial-credit
+model. The \code{Information} column for bounded \code{GPCM} uses Muraki's
+item-information result obtained from Samejima's general polytomous
+information formula.
+\itemize{
+\item Andrich, D. (1978). \emph{A rating formulation for ordered response
+categories}. Psychometrika, 43(4), 561-573.
+\item Masters, G. N. (1982). \emph{A Rasch model for partial credit scoring}.
+Psychometrika, 47(2), 149-174.
+\item Muraki, E. (1992). \emph{A generalized partial credit model: Application
+of an EM algorithm}. Applied Psychological Measurement, 16(2),
+159-176. \doi{10.1177/014662169201600206}
+\item Muraki, E. (1993). \emph{Information functions of the generalized
+partial credit model}. Applied Psychological Measurement, 17(4),
+351-363. \doi{10.1177/014662169301700403}
 }
 }
 
@@ -62,17 +104,31 @@ Recommended read order:
 \item Fit model with \code{\link[=fit_mfrm]{fit_mfrm()}}.
 \item Run \code{category_curves_report()} with suitable \code{theta_points}.
 \item Use \code{summary()} and \code{plot()}; export tables for manuscripts/dashboard use.
+\code{plot(out)} gives a four-panel overview. Use
+\code{preset = "monochrome"} for grayscale/line-type output and
+\code{boundary_status = "none"} when cumulative \code{.5} boundary lines should
+be suppressed. \code{plot(out, type = "category_probability")} and
+\code{plot(out, type = "conditional_probability")} are explicit aliases for
+the same category-probability curves as \code{type = "ccc"}. Use
+\code{plot_data(out, component = "plot_long")} when rebuilding the curves with
+ggplot2, plotly, or another R graphics system.
 }
 }
 
 \examples{
 toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 out <- category_curves_report(fit, theta_points = 101)
 summary(out)
 head(out$probabilities[, c("CurveGroup", "Theta", "Category", "Probability")])
-p_cc <- plot(out, draw = FALSE)
-p_cc$data$plot
+p_overview <- plot(out, draw = FALSE)
+p_overview$data$plot
+p_cum <- plot(out, type = "cumulative", draw = FALSE)
+head(p_cum$data$cumulative_boundaries)
+p_info <- plot(out, type = "category_information", draw = FALSE)
+head(p_info$data$category_information)
+curve_long <- plot_data(out, component = "plot_long")
+head(curve_long[, c("PlotType", "Theta", "Series", "Value")])
 }
 \seealso{
 \code{\link[=category_structure_report]{category_structure_report()}}, \code{\link[=rating_scale_table]{rating_scale_table()}}, \code{\link[=plot.mfrm_fit]{plot.mfrm_fit()}},

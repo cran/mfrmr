@@ -70,9 +70,11 @@ variable through both \code{design} and the scalar count arguments.}
 \item{step_span}{Spread used to generate equally spaced thresholds when
 \code{thresholds = NULL}.}
 
-\item{thresholds}{Optional threshold specification. Use either a numeric
-vector of common thresholds or a data frame with columns \code{StepFacet},
-\code{Step}/\code{StepIndex}, and \code{Estimate}.}
+\item{thresholds}{Optional threshold specification. Use a numeric vector of
+common thresholds; a named list such as \code{list(C01 = c(-1, 0, 1))}; a
+numeric matrix with one row per \code{StepFacet} and one column per step; or a
+long data frame with columns \code{StepFacet}, \code{Step}/\code{StepIndex}, and
+\code{Estimate}.}
 
 \item{model}{Measurement model recorded in the simulation specification.}
 
@@ -84,7 +86,9 @@ bounded \code{GPCM} branch requires \code{slope_facet == step_facet}.}
 
 \item{slopes}{Optional slope specification for \code{model = "GPCM"}. Use either
 a numeric vector aligned to the generated slope-facet levels or a data
-frame with columns \code{SlopeFacet} and \code{Estimate}. When omitted, slopes
+frame with columns \code{SlopeFacet} and \code{Estimate}. Supplied slopes are treated
+as relative discriminations and normalized to the package's geometric-mean-
+one identification convention on the log scale. When omitted, slopes
 default to 1 for every slope-facet level, giving an exact \code{PCM}
 reduction.}
 
@@ -180,7 +184,7 @@ values
 a reusable template of person-level covariates, including model-matrix
 xlevel/contrast provenance for categorical covariates
 \item \code{planning_scope}, an explicit record that the current planning/forecasting
-helpers still target the role-based person x rater-like x criterion-like
+helpers target the role-based person x rater-like x criterion-like
 design contract rather than a fully arbitrary-facet planner
 \item \code{planning_constraints}, an explicit record of which design variables can
 currently be changed from that specification without rebuilding it
@@ -195,15 +199,17 @@ input through that bundled \code{future_branch_schema}, whose nested
 \item optional signal tables for DIF and interaction bias
 }
 
-The current generator still targets the package's standard person x rater x
+The current generator targets the package's standard person x rater x
 criterion workflow, but the public output names for those two facet roles
 can now be customized with \code{facet_names}. This naming layer improves public
 ergonomics; it does not yet turn the generator into a fully arbitrary-facet
-simulator. Internally, helper objects still keep canonical role mappings so
-that planning functions can treat the first non-person facet as rater-like
-and the second as criterion-like. When threshold values are provided by
+simulator. Internally, helper objects keep canonical role mappings so that
+planning functions can treat the first non-person facet as rater-like and
+the second as criterion-like. When threshold values are provided by
 \code{StepFacet}, the supported step facets are the generated levels of the
-chosen public rater-like or criterion-like column.
+chosen public rater-like or criterion-like column. For convenience,
+step-facet-specific thresholds can be supplied as a named list or as a
+numeric matrix whose row names are \code{StepFacet} labels.
 When \code{model = "GPCM"}, the same public facet naming rules apply to the
 slope table; the current bounded branch keeps \code{slope_facet} equal to
 \code{step_facet}.

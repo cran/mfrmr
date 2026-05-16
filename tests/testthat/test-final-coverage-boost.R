@@ -421,7 +421,7 @@ test_that("count_facet_params for fully-anchored (dummy) spec returns 0", {
   expect_equal(unname(expanded), c(0, 0, 0))
 })
 
-# ---- lines 883, 922, 925, 928, 934: anchor audit issues ----
+# ---- lines 883, 922, 925, 928, 934: anchor review issues ----
 test_that("collect_anchor_levels returns valid tibble", {
   prep <- .fit$prep
   al <- mfrmr:::collect_anchor_levels(prep)

@@ -57,7 +57,7 @@ Build an estimation-iteration report (preferred alias)
 
 \examples{
 toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 out <- estimation_iteration_report(fit, max_iter = 5)
 summary(out)
 p_iter <- plot(out, draw = FALSE)

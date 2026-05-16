@@ -64,9 +64,9 @@ records the \code{mfrmr} estimates that should be compared externally.
 The \code{conquest_command} component is a conservative starting template, not a
 guaranteed version-invariant automation. The \code{conquest_output_contract}
 component records which requested external output should feed each
-normalized audit table.
+normalized review table.
 Use \code{\link[=normalize_conquest_overlap_files]{normalize_conquest_overlap_files()}} or
-\code{\link[=normalize_conquest_overlap_tables]{normalize_conquest_overlap_tables()}} and then \code{\link[=audit_conquest_overlap]{audit_conquest_overlap()}} only
+\code{\link[=normalize_conquest_overlap_tables]{normalize_conquest_overlap_tables()}} and then \code{\link[=review_conquest_overlap]{review_conquest_overlap()}} only
 after the matching ConQuest run has been executed externally and the relevant
 output tables have been extracted. The bundle and command template alone are
 not external validation evidence.
@@ -88,9 +88,9 @@ population model.
 The returned object has class \code{mfrm_conquest_overlap_bundle} and includes:
 \itemize{
 \item \code{summary}: one-row scope summary with posterior-basis and
-population-model audit fields
+population-model review fields
 \item \code{comparison_targets}: comparison rules for the exported tables
-\item \code{conquest_output_contract}: requested ConQuest outputs and audit handoff
+\item \code{conquest_output_contract}: requested ConQuest outputs and review handoff
 \item \code{response_long}: long-format binary response data used by the bundle
 \item \code{response_wide}: wide CSV-ready response matrix for the ConQuest template
 \item \code{person_data}: one-row-per-person covariate table
@@ -106,7 +106,7 @@ population-model audit fields
 }
 
 \examples{
-bundle <- build_conquest_overlap_bundle()
+bundle <- build_conquest_overlap_bundle(quad_points = 3, maxit = 30)
 bundle$summary[, c("Case", "Facet", "Covariate", "Persons", "Items")]
 summary(bundle)$conquest_command_scope
 summary(bundle)$conquest_output_contract
@@ -114,7 +114,7 @@ cat(substr(bundle$conquest_command, 1, 120))
 }
 \seealso{
 \code{\link[=normalize_conquest_overlap_files]{normalize_conquest_overlap_files()}},
-\code{\link[=normalize_conquest_overlap_tables]{normalize_conquest_overlap_tables()}}, \code{\link[=audit_conquest_overlap]{audit_conquest_overlap()}},
+\code{\link[=normalize_conquest_overlap_tables]{normalize_conquest_overlap_tables()}}, \code{\link[=review_conquest_overlap]{review_conquest_overlap()}},
 \code{\link[=reference_case_benchmark]{reference_case_benchmark()}}, \code{\link[=build_mfrm_replay_script]{build_mfrm_replay_script()}},
 \code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}}
 }

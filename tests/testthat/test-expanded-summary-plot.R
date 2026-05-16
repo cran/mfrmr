@@ -28,7 +28,7 @@ test_that("expanded bundle classes dispatch through plot.mfrm_bundle", {
     list(obj = mfrmr::facets_output_file_bundle(fit, diagnostics = diag, include = c("graph", "score")), type = "graph_expected"),
     list(obj = mfrmr::analyze_residual_pca(diag, mode = "both"), type = "overall_scree"),
     list(obj = mfrmr::specifications_report(fit), type = "facet_elements"),
-    list(obj = mfrmr::data_quality_report(fit, data = toy, person = "Person", facets = c("Rater", "Criterion"), score = "Score"), type = "row_audit"),
+    list(obj = mfrmr::data_quality_report(fit, data = toy, person = "Person", facets = c("Rater", "Criterion"), score = "Score"), type = "row_review"),
     list(obj = mfrmr::estimation_iteration_report(fit, max_iter = 5), type = "residual"),
     list(obj = mfrmr::subset_connectivity_report(fit), type = "subset_observations"),
     list(obj = mfrmr::facet_statistics_report(fit), type = "means")
@@ -166,7 +166,7 @@ test_that("print.summary.mfrm_bundle uses class-aware titles", {
   expect_match(out_rs, "Category/threshold summary", fixed = TRUE)
 })
 
-test_that("data description and anchor audit support summary and plot", {
+test_that("data description and anchor review support summary and plot", {
   toy <- expand.grid(
     Person = paste0("P", 1:4),
     Rater = paste0("R", 1:2),
@@ -190,14 +190,14 @@ test_that("data description and anchor audit support summary and plot", {
   ds_plot <- plot(ds, type = "score_distribution", draw = FALSE)
   expect_s3_class(ds_plot, "mfrm_plot_data")
 
-  aud <- mfrmr::audit_mfrm_anchors(
+  aud <- mfrmr::review_mfrm_anchors(
     data = toy,
     person = "Person",
     facets = c("Rater", "Criterion"),
     score = "Score"
   )
   aud_sum <- summary(aud)
-  expect_s3_class(aud_sum, "summary.mfrm_anchor_audit")
+  expect_s3_class(aud_sum, "summary.mfrm_anchor_review")
   aud_plot <- plot(aud, type = "issue_counts", draw = FALSE)
   expect_s3_class(aud_plot, "mfrm_plot_data")
 })

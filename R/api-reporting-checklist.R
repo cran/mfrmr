@@ -5,6 +5,12 @@
 #'   diagnostics are computed with `residual_pca = "none"`.
 #' @param bias_results Optional output from [estimate_bias()] or a named list of
 #'   such outputs.
+#' @param hierarchical_structure Optional output from
+#'   [analyze_hierarchical_structure()]. When supplied, the
+#'   "Hierarchical structure review" checklist item is flipped to
+#'   `DraftReady = TRUE` and its `Detail` column surfaces the number
+#'   of nested / crossed facet pairs and whether the ICC table is
+#'   available.
 #' @param include_references If `TRUE`, include a compact reference table in the
 #'   returned bundle.
 #'
@@ -28,7 +34,7 @@
 #' categorical model-matrix coding, complete-case omissions, posterior-basis
 #' wording, and ConQuest scope wording.
 #'
-#' The output is designed for manuscript preparation, audit trails, and
+#' The output is designed for manuscript preparation, reproducibility records, and
 #' reproducible reporting workflows.
 #'
 #' @section What this checklist means:
@@ -52,9 +58,12 @@
 #' - `section_summary`: available items by section.
 #' - `software_scope`: external-software relationship summary for `mfrmr`,
 #'   FACETS, ConQuest, and SPSS-style tabular handoffs.
+#' - `facets_positioning`: report-ready wording that states `mfrmr` is not a
+#'   FACETS numerical clone and separates native estimation from FACETS-style
+#'   handoff or external-table review.
 #' - `visual_scope`: plotting-route summary that separates report-default
-#'   2D figures from exploratory surface/3D-ready payloads, including a short
-#'   `InterpretationCheck` for the main user-facing caveat.
+#'   2D figures from exploratory surface/3D-ready data handoffs, including a
+#'   short `InterpretationCheck` for the main user-facing caveat.
 #' - `references`: core background references when requested.
 #'
 #' @section Recommended next step:
@@ -92,21 +101,38 @@
 #'   [specifications_report()], [data_quality_report()],
 #'   [build_misfit_casebook()], [build_linking_review()]
 #' @examples
-#' \donttest{
+#' # Fast smoke run: a JML fit + legacy-only diagnostic produces a
+#' # populated checklist in well under a second.
 #' toy <- load_mfrmr_data("example_core")
+#' fit_quick <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
+#'                       method = "JML", maxit = 30)
+#' diag_quick <- diagnose_mfrm(fit_quick, residual_pca = "none",
+#'                              diagnostic_mode = "legacy")
+#' chk_quick <- reporting_checklist(fit_quick, diagnostics = diag_quick)
+#' head(chk_quick$checklist[, c("Section", "Item", "DraftReady")])
+#'
+#' \donttest{
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-#'                 method = "MML", maxit = 200)
+#'                 method = "MML", quad_points = 7, maxit = 30)
 #' diag <- diagnose_mfrm(fit, residual_pca = "both", diagnostic_mode = "both")
 #' chk <- reporting_checklist(fit, diagnostics = diag)
 #' summary(chk)
+#' # Look for: a high `Ready` / `Total` ratio in the summary block.
+#' #   Sections with `Ready = 0` need follow-up before submitting
+#' #   (typically diagnostic_mode = "both" or a residual-PCA pass).
 #' apa <- build_apa_outputs(fit, diag)
 #' head(chk$checklist[, c("Section", "Item", "DraftReady", "NextAction")])
+#' # Look for: every row where `DraftReady = "yes"` is ready to paste
+#' #   into the manuscript. `"no"` rows include a concrete `NextAction`
+#' #   step (e.g. "run plot_qc_dashboard()") so the gap can be closed
+#' #   without re-reading the methodology guide.
 #' nchar(apa$report_text)
 #' }
 #' @export
 reporting_checklist <- function(fit,
                                 diagnostics = NULL,
                                 bias_results = NULL,
+                                hierarchical_structure = NULL,
                                 include_references = TRUE) {
   if (!inherits(fit, "mfrm_fit")) {
     stop("`fit` must be an mfrm_fit object from fit_mfrm().", call. = FALSE)
@@ -116,6 +142,11 @@ reporting_checklist <- function(fit,
   }
   if (!is.list(diagnostics) || is.null(diagnostics$obs)) {
     stop("`diagnostics` must be output from diagnose_mfrm().", call. = FALSE)
+  }
+  if (!is.null(hierarchical_structure) &&
+      !inherits(hierarchical_structure, "mfrm_hierarchical_structure")) {
+    stop("`hierarchical_structure` must come from ",
+         "analyze_hierarchical_structure().", call. = FALSE)
   }
 
   config <- fit$config %||% list()
@@ -326,7 +357,7 @@ reporting_checklist <- function(fit,
       ),
       add_item(
         "Population Model",
-        "Complete-case omission audit",
+        "Complete-case omission review",
         TRUE,
         detail = omission_detail,
         source_component = "summary(fit)$population_overview + summary(fit)$caveats",
@@ -354,7 +385,7 @@ reporting_checklist <- function(fit,
         "ConQuest overlap wording",
         TRUE,
         detail = "Current overlap is narrow RSM/PCM unidimensional conditional-normal latent regression; ConQuest comparison is scoped to the documented external-table workflow.",
-        source_component = "README latent-regression status + audit_conquest_overlap()",
+        source_component = "README latent-regression status + review_conquest_overlap()",
         severity = "recommended",
         ready_for_apa = FALSE,
         available_action = "Use conservative wording: ConQuest overlap is limited to the documented latent-regression MML comparison scope."
@@ -431,6 +462,121 @@ reporting_checklist <- function(fit,
         severity = "recommended",
         missing_action = "Run the subset/connectivity diagnostics and summarize whether the design is connected.",
         available_action = "Document the connectivity result before making common-scale or linking claims."
+      ),
+      add_item(
+        "Method Section",
+        "Empirical-Bayes shrinkage when small-N facets are present",
+        {
+          shrink_mode <- as.character(config$facet_shrinkage %||% "none")
+          sparse_n <- suppressWarnings(as.integer(
+            fit$summary$FacetSparseCount %||% NA_integer_
+          ))
+          # Ready if either (a) shrinkage was applied, or (b) there are no
+          # sparse facets so shrinkage isn't needed.
+          (!identical(shrink_mode, "none")) ||
+            (is.finite(sparse_n) && sparse_n == 0L)
+        },
+        detail = {
+          shrink_mode <- as.character(config$facet_shrinkage %||% "none")
+          sparse_n <- suppressWarnings(as.integer(
+            fit$summary$FacetSparseCount %||% NA_integer_
+          ))
+          if (!identical(shrink_mode, "none")) {
+            paste0(
+              "Shrinkage active: ", shrink_mode, ". See `fit$shrinkage_report`."
+            )
+          } else if (is.finite(sparse_n) && sparse_n == 0L) {
+            "No sparse facets detected; fixed-effects estimates are stable without shrinkage."
+          } else {
+            paste0(
+              "Sparse facet(s) detected (count = ", sparse_n,
+              ") but no shrinkage was applied. Consider ",
+              "`fit_mfrm(..., facet_shrinkage = 'empirical_bayes')`."
+            )
+          }
+        },
+        source_component = "fit$config$facet_shrinkage + fit$shrinkage_report",
+        severity = "recommended",
+        missing_action = paste0(
+          "Re-run with `facet_shrinkage = 'empirical_bayes'` or apply ",
+          "`apply_empirical_bayes_shrinkage(fit)` post-hoc when small-N ",
+          "facets are present."
+        ),
+        available_action = paste0(
+          "Report both the fixed-effects and shrunk estimates; cite ",
+          "Efron & Morris (1973) for the empirical-Bayes rationale."
+        )
+      ),
+      add_item(
+        "Method Section",
+        "Facet sample-size adequacy",
+        {
+          flag <- suppressWarnings(as.character(fit$summary$FacetSampleSizeFlag %||% NA_character_))
+          !is.na(flag) && flag %in% c("standard", "strong")
+        },
+        detail = {
+          flag <- suppressWarnings(as.character(fit$summary$FacetSampleSizeFlag %||% NA_character_))
+          min_n <- suppressWarnings(as.integer(fit$summary$FacetMinLevelN %||% NA_integer_))
+          sparse_n <- suppressWarnings(as.integer(fit$summary$FacetSparseCount %||% NA_integer_))
+          if (is.na(flag)) {
+            "Sample-size flag unavailable in fit summary."
+          } else {
+            sprintf(
+              "Worst facet band: %s (min level N = %s; sparse facets = %s).",
+              flag,
+              if (is.na(min_n)) NA_character_ else as.character(min_n),
+              if (is.na(sparse_n)) NA_character_ else as.character(sparse_n)
+            )
+          }
+        },
+        source_component = "fit$summary$FacetSampleSizeFlag + facet_small_sample_review()",
+        severity = "recommended",
+        missing_action = paste0(
+          "Run `facet_small_sample_review(fit)` and report the bands. ",
+          "mfrmr treats facets as fixed effects with no shrinkage, so small-N ",
+          "levels keep wide SEs."
+        ),
+        available_action = paste0(
+          "Report the per-facet adequacy bands and discuss any sparse/marginal ",
+          "levels; cite Linacre (1994) sample-size guidance where relevant."
+        )
+      ),
+      add_item(
+        "Method Section",
+        "Hierarchical structure review",
+        # Ready when the user actually ran analyze_hierarchical_structure()
+        # and passed the result in. Previously this item was hard-coded to
+        # FALSE so there was no way to mark it draft-ready; now callers can
+        # supply `hierarchical_structure = hs`.
+        !is.null(hierarchical_structure),
+        detail = if (!is.null(hierarchical_structure)) {
+          hs_sum <- hierarchical_structure$summary
+          paste0(
+            "Hierarchical review complete: ",
+            hs_sum$NFacets %||% NA, " facets, ",
+            hs_sum$NestedPairs %||% 0L, " nested pair(s), ",
+            hs_sum$CrossedPairs %||% 0L, " crossed pair(s)",
+            if (isTRUE(hs_sum$ICCAvailable)) "; ICC available" else "",
+            "."
+          )
+        } else {
+          paste0(
+            "Structural review (nesting, ICC, design effect) is optional but ",
+            "recommended when raters, criteria, or persons span strata ",
+            "(regions, schools, cohorts) that additive fixed-effects MFRM cannot ",
+            "partition out."
+          )
+        },
+        source_component = "analyze_hierarchical_structure(data, facets)",
+        severity = "recommended",
+        missing_action = paste0(
+          "Run `analyze_hierarchical_structure(fit)` once per design and pass ",
+          "the result to `reporting_checklist(..., hierarchical_structure = hs)`."
+        ),
+        available_action = paste0(
+          "Report nesting classifications and (where applicable) the Kish design ",
+          "effect before generalizing rater severity beyond the sampled raters."
+        )
       ),
       add_item(
         "Global Fit",
@@ -815,7 +961,7 @@ reporting_checklist <- function(fit,
         "Eckes (2005)",
         "Koizumi et al. (2019)",
         "Myford & Wolfe (2003, 2004)",
-        "Linacre (1989, 2004)",
+        "Linacre (1989, 2002)",
         "Wright & Masters (1982)"
       ),
       Topic = c(
@@ -844,6 +990,7 @@ reporting_checklist <- function(fit,
     summary = as.data.frame(section_summary, stringsAsFactors = FALSE),
     section_summary = as.data.frame(section_summary, stringsAsFactors = FALSE),
     software_scope = external_software_scope_table(fit),
+    facets_positioning = facets_positioning_guide(),
     visual_scope = visual_scope_table(fit, checklist),
     references = references,
     settings = settings
@@ -865,7 +1012,7 @@ external_software_scope_table <- function(fit) {
     Software = c("mfrmr native", "FACETS", "ConQuest", "SPSS"),
     Relationship = c(
       "primary estimation/reporting surface",
-      "compatibility-style wrappers and exports for handoff",
+      "FACETS-style reporting and handoff surface",
       "scoped external-table comparison for latent-regression overlap",
       "downstream table/report handoff only"
     ),
@@ -877,19 +1024,19 @@ external_software_scope_table <- function(fit) {
     ),
     PrimaryHelpers = c(
       "fit_mfrm() -> diagnose_mfrm() -> reporting_checklist() -> build_apa_outputs()",
-      "run_mfrm_facets(), mfrmRFacets(), facets_output_file_bundle(), facets_parity_report()",
-      "build_conquest_overlap_bundle() -> normalize_conquest_overlap_*() -> audit_conquest_overlap()",
+      "facets_positioning_guide(), facets_feature_coverage(), run_mfrm_facets(), facets_output_file_bundle(), facets_output_contract_review()",
+      "build_conquest_overlap_bundle() -> normalize_conquest_overlap_*() -> review_conquest_overlap()",
       "export_mfrm_bundle(), export_summary_appendix(), as.data.frame()"
     ),
     Boundary = c(
       "Package-native results are the authoritative analysis objects.",
-      "Results remain mfrmr estimates unless a separate external FACETS audit is performed.",
+      "Results remain mfrmr estimates; use an external FACETS run plus review helpers only when numerical comparison is needed.",
       "Requires an external ConQuest run and extracted output tables for the documented overlap case.",
       "CSV/data-frame outputs support reporting handoff; native SPSS integration is not implemented."
     ),
     RecommendedWording = c(
       "Estimated with mfrmr under the stated model/method settings.",
-      "FACETS-style handoff outputs were generated; estimates were produced by mfrmr.",
+      "Estimated with mfrmr; FACETS-style outputs were used for handoff or report organization unless external FACETS output is explicitly compared.",
       "ConQuest overlap is limited to the documented latent-regression MML comparison scope.",
       "Tables were exported for possible SPSS/reporting use; analysis was not performed in SPSS."
     ),
@@ -911,7 +1058,7 @@ visual_scope_table <- function(fit, checklist) {
   }
 
   surface_status <- if (has_steps && model %in% c("RSM", "PCM", "GPCM")) {
-    "active payload route for current fit"
+    "active plot-data route for current fit"
   } else if (!(model %in% c("RSM", "PCM", "GPCM"))) {
     paste0("not active for current model: ", model)
   } else {
@@ -992,9 +1139,9 @@ visual_scope_table <- function(fit, checklist) {
     ThreeDStatus = c(
       "2D dashboard only; 3D not recommended",
       "2D recommended; 3D Wright maps are discouraged",
-      "2D report default; surface payload available through the category route",
+      "2D report default; surface plot data available through the category route",
       "advanced surface data only; no package-native interactive renderer",
-      "2D curve route active; 3D information surface is a future payload candidate",
+      "2D curve route active; 3D information surface is a future data handoff candidate",
       "2D heatmap/bar style preferred; 3D not recommended",
       "2D heatmap/profile preferred; 3D not recommended",
       "2D scree/loadings preferred; 3D not recommended"
@@ -1034,7 +1181,8 @@ visual_scope_table <- function(fit, checklist) {
 #' - `overview`: run-level counts of available and draft-ready items
 #' - `section_summary`: section-level checklist coverage
 #' - `software_scope`: external-software relationship summary
-#' - `visual_scope`: plotting-route and 3D-ready payload summary, including
+#' - `facets_positioning`: report-ready FACETS relationship wording
+#' - `visual_scope`: plotting-route and 3D-ready data-handoff summary, including
 #'   the main `InterpretationCheck` caveat for each visual family
 #' - `priority_summary`: counts by priority/severity
 #' - `action_items`: highest-priority rows that still need draft work
@@ -1045,7 +1193,7 @@ visual_scope_table <- function(fit, checklist) {
 #' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-#'                 method = "MML", maxit = 200)
+#'                 method = "MML", quad_points = 7, maxit = 30)
 #' diag <- diagnose_mfrm(fit, residual_pca = "both", diagnostic_mode = "both")
 #' chk <- reporting_checklist(fit, diagnostics = diag)
 #' summary(chk)
@@ -1061,6 +1209,7 @@ summary.mfrm_reporting_checklist <- function(object, top_n = 10, ...) {
   checklist <- as.data.frame(object$checklist %||% data.frame(), stringsAsFactors = FALSE)
   section_summary <- as.data.frame(object$section_summary %||% object$summary %||% data.frame(), stringsAsFactors = FALSE)
   software_scope <- as.data.frame(object$software_scope %||% data.frame(), stringsAsFactors = FALSE)
+  facets_positioning <- as.data.frame(object$facets_positioning %||% facets_positioning_guide(), stringsAsFactors = FALSE)
   visual_scope <- as.data.frame(object$visual_scope %||% data.frame(), stringsAsFactors = FALSE)
 
   overview <- data.frame(
@@ -1105,7 +1254,7 @@ summary.mfrm_reporting_checklist <- function(object, top_n = 10, ...) {
   notes <- c(
     "This summary is a manuscript-preparation guide.",
     "DraftReady indicates that the corresponding reporting element can be drafted with the package's documented caveats; it does not certify inferential adequacy.",
-    "Detailed software and visual scope tables are available in `$software_scope` and `$visual_scope`."
+    "Detailed FACETS positioning, software scope, and visual scope tables are available in `$facets_positioning`, `$software_scope`, and `$visual_scope`."
   )
   if (nrow(action_items) == 0) {
     notes <- c(notes, "No remaining draft-action rows were detected in the current checklist.")
@@ -1115,6 +1264,7 @@ summary.mfrm_reporting_checklist <- function(object, top_n = 10, ...) {
     overview = overview,
     section_summary = section_summary,
     software_scope = software_scope,
+    facets_positioning = facets_positioning,
     visual_scope = visual_scope,
     priority_summary = priority_summary,
     action_items = action_items,
@@ -1145,6 +1295,11 @@ print.summary.mfrm_reporting_checklist <- function(x, ...) {
   if (!is.null(x$action_items) && nrow(x$action_items) > 0) {
     cat("\nAction items (preview)\n")
     print(as.data.frame(x$action_items), row.names = FALSE)
+  }
+  if (!is.null(x$facets_positioning) && nrow(x$facets_positioning) > 0) {
+    cat("\nFACETS positioning\n")
+    pos_cols <- intersect(c("Topic", "RecommendedWording"), names(x$facets_positioning))
+    print(as.data.frame(x$facets_positioning[, pos_cols, drop = FALSE]), row.names = FALSE)
   }
   if (!is.null(x$settings) && nrow(x$settings) > 0) {
     cat("\nSettings\n")

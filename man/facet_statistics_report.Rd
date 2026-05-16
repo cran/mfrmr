@@ -66,7 +66,7 @@ The returned bundle now includes:
 
 \examples{
 toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 out <- facet_statistics_report(fit)
 summary(out)
 p_fs <- plot(out, draw = FALSE)

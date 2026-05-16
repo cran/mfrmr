@@ -1,0 +1,153 @@
+---
+title: "mfrmr cheatsheet (2 pages)"
+author: "mfrmr authors"
+date: "`r format(Sys.Date(), '%Y-%m-%d')`"
+output:
+  pdf_document:
+    latex_engine: xelatex
+    fig_width: 5
+    fig_height: 3
+geometry: landscape, margin=0.4in
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  eval = FALSE, echo = TRUE, message = FALSE, warning = FALSE,
+  collapse = TRUE, comment = "#>"
+)
+```
+
+# Quick reference: mfrmr 0.2.0
+
+A two-page reference for the fit / diagnose / report loop in mfrmr.
+Every snippet assumes `library(mfrmr)` and a long-format
+`data.frame` with `Person`, one or more facet columns, and `Score`.
+
+## 1. Fit
+
+```{r fit}
+toy <- load_mfrmr_data("example_core")
+
+fit <- fit_mfrm(
+  toy,
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  score  = "Score",
+  method = "MML",          # default; "JML" for exploratory speed
+  model  = "RSM"            # "PCM", "GPCM" (bounded) also supported
+  # quad_points = 31 (default, publication tier; 7/15 for iteration)
+)
+```
+
+## 2. Diagnose
+
+```{r diagnose}
+diag <- diagnose_mfrm(fit, residual_pca = "none")
+# diagnostic_mode = "both" (default) runs residual + strict marginal.
+summary(fit)
+summary(diag)
+```
+
+## 3. Report / APA
+
+```{r report}
+chk  <- reporting_checklist(fit, diagnostics = diag)
+apa  <- build_apa_outputs(fit, diag)
+cat(apa$report_text)
+
+tbl  <- apa_table(fit, which = "facets", diagnostics = diag)
+kab  <- as_kable(tbl)       # Markdown / HTML via kableExtra
+ft   <- as_flextable(tbl)   # Word / PowerPoint via flextable
+```
+
+## 4. Bias / DFF / Equivalence
+
+```{r bias}
+bias <- estimate_bias(fit, diag, facet_a = "Rater", facet_b = "Criterion")
+summary(bias)
+plot_bias_interaction(bias, plot = "ranked", show_ci = TRUE)
+
+dff <- analyze_dff(fit, diagnostics = diag,
+                   facet = "Rater", group = "Group", data = toy)
+plot_dif_summary(dff)
+
+eq <- analyze_facet_equivalence(fit, facet = "Rater", ci_level = 0.95)
+plot_facet_equivalence(eq, type = "forest")
+```
+
+## 5. Hierarchical structure and small-N review
+
+```{r hier}
+review <- facet_small_sample_review(fit)
+summary(review)
+
+icc <- compute_facet_icc(
+  toy, facets = c("Rater", "Criterion"),
+  score = "Score", person = "Person",
+  ci_method = "profile"      # "boot" for parametric bootstrap CI
+)
+
+h <- analyze_hierarchical_structure(
+  toy, facets = c("Rater", "Criterion"),
+  ci_method = "profile"
+)
+```
+
+## 6. Empirical-Bayes shrinkage for small-N facets
+
+```{r eb}
+# Integrated:
+fit_eb <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
+                    method = "MML", facet_shrinkage = "empirical_bayes")
+shrinkage_report(fit_eb)
+
+# Post-hoc:
+fit_eb2 <- apply_empirical_bayes_shrinkage(fit)
+```
+
+## 7. Plot surface (selected)
+
+| Function | Purpose |
+|---|---|
+| `plot(fit)` | Wright map (default) |
+| `plot(fit, type = "bundle")` | Wright + pathway + CCC |
+| `plot(fit, type = "ccc_overlay")` | Model + observed theta-bin dots |
+| `plot(fit, type = "wright", group=..., group_data=...)` | DIF density overlay |
+| `plot(fit, type = "shrinkage")` | Shrinkage direction arrows |
+| `plot_threshold_ladder(fit)` | Category threshold ordering |
+| `plot_person_fit(fit, diag)` | Per-person Infit/Outfit bubble |
+| `plot_rater_severity_profile(fit, diag)` | Rater ranking + CI bands |
+| `plot_bias_interaction(bias, plot="heatmap")` | Bias cell heatmap |
+| `plot_displacement(fit, show_ci=TRUE)` | Anchor displacement lollipop |
+| `plot_fair_average(fit, show_ci=TRUE)` | Fair averages; CIs for Rasch-family fits |
+| `plot_anchor_drift(drift, type="forest")` | Wave-level anchor CI forest |
+| `plot.mfrm_equating_chain(chain, type="graph")` | Bipartite wave/anchor graph |
+| `plot_apa_figure_one(fit)` | Publication 2x2 composite |
+| `plot_dif_summary(dff)` | DIF effect-size summary |
+
+## 8. Reproducibility and export
+
+```{r export}
+export_mfrm_bundle(fit, diagnostics = diag, path = "mfrmr_bundle/")
+manifest <- build_mfrm_manifest(fit, diagnostics = diag)
+# manifest$environment, $dependencies, $input_hash, $session_info,
+# $hierarchical_review, $missing_recoding, $shrinkage_review
+replay_script <- build_mfrm_replay_script(fit, path = "replay_mfrmr.R")
+```
+
+## 9. Missing-code pre-processing
+
+```{r missing}
+fit <- fit_mfrm(
+  dirty_data, "Person", c("Rater", "Criterion"), "Score",
+  missing_codes = TRUE      # 99 / 999 / -1 / "N/A" / "" -> NA
+)
+fit$prep$missing_recoding
+```
+
+## Package links
+
+- Source and documentation: <https://github.com/Ryuya-dot-com/mfrmr>
+- Citation:      `citation("mfrmr")`
+
+*mfrmr 0.2.0 cheatsheet*. Distributed under MIT License.

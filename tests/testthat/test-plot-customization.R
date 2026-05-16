@@ -1,7 +1,7 @@
 test_that("plot APIs accept title/palette/label customization", {
   d <- mfrmr:::sample_mfrm_data(seed = 321)
 
-  fit <- mfrmr::fit_mfrm(
+  fit <- suppressWarnings(mfrmr::fit_mfrm(
     data = d,
     person = "Person",
     facets = c("Rater", "Task", "Criterion"),
@@ -10,7 +10,7 @@ test_that("plot APIs accept title/palette/label customization", {
     model = "RSM",
     maxit = 20,
     quad_points = 7
-  )
+  ))
   diag <- mfrmr::diagnose_mfrm(fit, residual_pca = "none")
 
   expect_no_error(
@@ -142,4 +142,7 @@ test_that("plot APIs accept title/palette/label customization", {
 
   p_wright <- plot(fit, type = "wright", draw = FALSE, preset = "publication")
   expect_true(all(c("title", "subtitle", "legend", "reference_lines") %in% names(p_wright$data)))
+
+  p_bubble_mono <- mfrmr::plot_bubble(fit, draw = FALSE, preset = "monochrome")
+  expect_identical(as.character(p_bubble_mono$data$preset), "monochrome")
 })

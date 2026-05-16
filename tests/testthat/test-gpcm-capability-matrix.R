@@ -30,7 +30,7 @@ test_that("gpcm_capability_matrix exposes the bounded GPCM support contract", {
       tbl$Status == "supported_with_caveat"
   ))
   expect_true(any(
-    grepl("build_weighting_audit\\(\\)", tbl$Helpers) &
+    grepl("build_weighting_review\\(\\)", tbl$Helpers) &
       tbl$Status == "supported_with_caveat"
   ))
   expect_true(any(

@@ -122,7 +122,7 @@ For a plot-selection guide and a longer walkthrough, see
 \examples{
 \donttest{
 toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 p <- plot_interrater_agreement(fit, rater_facet = "Rater", draw = FALSE)
 if (interactive()) {
   plot_interrater_agreement(

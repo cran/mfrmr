@@ -78,7 +78,7 @@ CSV/fixed-width text files to disk.
 \item \code{graphfile}: legacy-compatible wide curve coordinates (human-readable labels).
 \item \code{graphfile_syntactic}: same curves with syntactic column names for programmatic use.
 \item \code{scorefile}: observation-level observed/expected/residual diagnostics.
-\item \code{written_files}: audit trail of files produced when \code{write_files = TRUE}.
+\item \code{written_files}: traceability record of files produced when \code{write_files = TRUE}.
 }
 
 For reproducible pipelines, prefer \code{graphfile_syntactic} and keep
@@ -106,7 +106,7 @@ scorefile contract is required.
 
 \examples{
 toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 out <- facets_output_file_bundle(fit, diagnostics = diagnose_mfrm(fit, residual_pca = "none"))
 summary(out)
 p_out <- plot(out, draw = FALSE)

@@ -42,13 +42,18 @@ test_that("core fit/diagnostics workflow runs", {
   expect_true(any(grepl("Status:", printed_summary, fixed = TRUE)))
   expect_true(any(grepl("Basis:", printed_summary, fixed = TRUE)))
   expect_true(any(grepl("Facet overview", printed_summary, fixed = TRUE)))
+  # Default plot(fit) now returns the Wright map alone; the 3-plot
+  # bundle remains available via `type = "bundle"`.
   p_fit_default <- plot(fit, draw = FALSE)
-  expect_s3_class(p_fit_default, "mfrm_plot_bundle")
-  expect_true(all(c("wright_map", "pathway_map", "category_characteristic_curves") %in% names(p_fit_default)))
-  expect_s3_class(p_fit_default$wright_map, "mfrm_plot_data")
-  expect_s3_class(p_fit_default$pathway_map, "mfrm_plot_data")
-  expect_s3_class(p_fit_default$category_characteristic_curves, "mfrm_plot_data")
-  printed_bundle <- capture.output(print(p_fit_default))
+  expect_s3_class(p_fit_default, "mfrm_plot_data")
+  expect_identical(p_fit_default$name, "wright_map")
+  p_fit_bundle <- plot(fit, type = "bundle", draw = FALSE)
+  expect_s3_class(p_fit_bundle, "mfrm_plot_bundle")
+  expect_true(all(c("wright_map", "pathway_map", "category_characteristic_curves") %in% names(p_fit_bundle)))
+  expect_s3_class(p_fit_bundle$wright_map, "mfrm_plot_data")
+  expect_s3_class(p_fit_bundle$pathway_map, "mfrm_plot_data")
+  expect_s3_class(p_fit_bundle$category_characteristic_curves, "mfrm_plot_data")
+  printed_bundle <- capture.output(print(p_fit_bundle))
   expect_true(any(grepl("mfrm plot bundle", printed_bundle, fixed = TRUE)))
 
   p_fit_wright <- plot(fit, type = "wright", draw = FALSE)
@@ -62,6 +67,10 @@ test_that("core fit/diagnostics workflow runs", {
   expect_s3_class(p_fit_person, "mfrm_plot_data")
   expect_s3_class(p_fit_step, "mfrm_plot_data")
   expect_identical(as.character(p_fit_wright$data$preset), "standard")
+  expect_true(all(c("pathway_long", "fit_measures", "curve_fit_status", "fit_measure_status") %in%
+    names(p_fit_pathway$data)))
+  expect_s3_class(p_fit_pathway$data$pathway_long, "data.frame")
+  expect_s3_class(p_fit_pathway$data$fit_measures, "data.frame")
 
   p_fit_pub <- plot(fit, type = "wright", draw = FALSE, preset = "publication")
   expect_identical(as.character(p_fit_pub$data$preset), "publication")
@@ -77,7 +86,8 @@ test_that("core fit/diagnostics workflow runs", {
   expect_true("interrater" %in% names(diag))
   expect_true("facets_chisq" %in% names(diag))
   expect_true("precision_profile" %in% names(diag))
-  expect_true("precision_audit" %in% names(diag))
+  expect_true("precision_review" %in% names(diag))
+  expect_false("precision_audit" %in% names(diag))
   expect_true("facet_precision" %in% names(diag))
   expect_true("approximation_notes" %in% names(diag))
   expect_true(is.data.frame(diag$unexpected$table))
@@ -86,14 +96,14 @@ test_that("core fit/diagnostics workflow runs", {
   expect_true(is.data.frame(diag$interrater$pairs))
   expect_true(is.data.frame(diag$facets_chisq))
   expect_true(is.data.frame(diag$precision_profile))
-  expect_true(is.data.frame(diag$precision_audit))
+  expect_true(is.data.frame(diag$precision_review))
   expect_true(is.data.frame(diag$facet_precision))
   expect_true(is.data.frame(diag$approximation_notes))
   expect_true(all(c("Method", "Converged", "PrecisionTier", "SupportsFormalInference", "HasFallbackSE", "RecommendedUse") %in% names(diag$precision_profile)))
-  expect_true(all(c("Check", "Status", "Detail") %in% names(diag$precision_audit)))
+  expect_true(all(c("Check", "Status", "Detail") %in% names(diag$precision_review)))
   expect_true(all(c("DistributionBasis", "SEMode", "Separation", "Reliability") %in%
     names(diag$facet_precision)))
-  expect_true(all(c("Converged", "PrecisionTier", "SupportsFormalInference", "SEUse", "CIBasis", "CIUse", "CIEligible", "CILabel") %in%
+  expect_true(all(c("Converged", "PrecisionTier", "SupportsFormalInference", "SEUse", "CIBasis", "CIUse", "CI_Level", "CI_Method", "CIEligible", "CILabel") %in%
     names(diag$measures)))
   expect_true(all(c("Converged", "PrecisionTier", "SupportsFormalInference", "ReliabilityUse") %in%
     names(diag$reliability)))
@@ -172,7 +182,7 @@ test_that("core fit/diagnostics workflow runs", {
     score = "Score"
   )
   expect_s3_class(t2, "mfrm_data_quality")
-  expect_true(all(c("summary", "model_match", "row_audit", "unknown_elements", "category_counts") %in% names(t2)))
+  expect_true(all(c("summary", "model_match", "row_review", "unknown_elements", "category_counts") %in% names(t2)))
   expect_true(is.data.frame(t2$summary))
   expect_true(is.data.frame(t2$model_match))
   t2_summary <- summary(t2)
@@ -492,6 +502,8 @@ test_that("core fit/diagnostics workflow runs", {
   pca_from_fit <- mfrmr::analyze_residual_pca(fit, mode = "both", pca_max_factors = 4)
   expect_true(is.data.frame(pca$overall_table))
   expect_true(is.data.frame(pca$by_facet_table))
+  expect_true("warnings" %in% names(pca))
+  expect_true(is.list(pca$warnings))
   expect_gt(nrow(pca$overall_table), 0)
   expect_true(is.data.frame(pca_from_fit$overall_table))
   expect_gt(nrow(pca_from_fit$overall_table), 0)
@@ -601,15 +613,25 @@ test_that("core fit/diagnostics workflow runs", {
   expect_true("standard" %in% names(profiles_summary$thresholds))
 })
 
-test_that("packaged extdata includes baseline and iterative-calibrated CSVs", {
+test_that("packaged simulation datasets are accessible via load_mfrmr_data()", {
+  # Starting in 0.1.6, the Eckes-and-Jin-inspired simulation datasets
+  # are distributed as lazy-loaded .rda files under `data/` rather
+  # than duplicate CSVs under `inst/extdata/`. load_mfrmr_data() is
+  # the canonical loader; base-R data("mfrmr_<key>") is the
+  # equivalent direct path.
+  expected_keys <- c("study1", "study2", "combined",
+                     "study1_itercal", "study2_itercal", "combined_itercal")
+  for (key in expected_keys) {
+    df <- load_mfrmr_data(key)
+    expect_s3_class(df, "data.frame")
+    expect_true(all(c("Person", "Rater", "Criterion", "Score") %in% names(df)))
+  }
+
+  # extdata still exists as a doc pointer (README_sim_data.txt) but
+  # no longer holds duplicate CSVs.
   ext <- system.file("extdata", package = "mfrmr")
   expect_true(nzchar(ext))
-
-  files <- sort(list.files(ext))
-  expect_true("eckes_jin_2021_study1_sim.csv" %in% files)
-  expect_true("eckes_jin_2021_study2_sim.csv" %in% files)
-  expect_true("eckes_jin_2021_study1_itercal_sim.csv" %in% files)
-  expect_true("eckes_jin_2021_study2_itercal_sim.csv" %in% files)
+  expect_true(any(grepl("README", list.files(ext), ignore.case = TRUE)))
 })
 
 test_that("legacy numbered API names are internal (not exported)", {
@@ -653,7 +675,7 @@ test_that("legacy numbered API names are internal (not exported)", {
   expect_equal(names(old_t8), names(new_t8))
 })
 
-test_that("descriptive and anchor-audit helpers run", {
+test_that("descriptive and anchor-review helpers run", {
   toy <- expand.grid(
     Person = paste0("P", 1:6),
     Rater = paste0("R", 1:3),
@@ -695,7 +717,7 @@ test_that("descriptive and anchor-audit helpers run", {
     stringsAsFactors = FALSE
   )
 
-  aud <- mfrmr::audit_mfrm_anchors(
+  aud <- mfrmr::review_mfrm_anchors(
     data = toy,
     person = "Person",
     facets = c("Rater", "Criterion"),
@@ -706,7 +728,7 @@ test_that("descriptive and anchor-audit helpers run", {
     min_obs_per_element = 20,
     min_obs_per_category = 8
   )
-  expect_s3_class(aud, "mfrm_anchor_audit")
+  expect_s3_class(aud, "mfrm_anchor_review")
   expect_true(is.data.frame(aud$anchors))
   expect_true(is.data.frame(aud$group_anchors))
   expect_true(is.list(aud$design_checks))
@@ -733,7 +755,7 @@ test_that("descriptive and anchor-audit helpers run", {
       min_common_anchors = 4,
       anchor_policy = "error"
     ),
-    "Anchor audit detected"
+    "Anchor review detected"
   )
 
   fit <- mfrmr::fit_mfrm(
@@ -749,7 +771,8 @@ test_that("descriptive and anchor-audit helpers run", {
     anchor_policy = "silent"
   )
   expect_s3_class(fit, "mfrm_fit")
-  expect_true("anchor_audit" %in% names(fit$config))
+  expect_true("anchor_review" %in% names(fit$config))
+  expect_false("anchor_audit" %in% names(fit$config))
 
   anchor_tbl <- mfrmr::make_anchor_table(fit)
   expect_true(is.data.frame(anchor_tbl))

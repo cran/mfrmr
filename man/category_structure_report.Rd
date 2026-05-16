@@ -73,7 +73,7 @@ categories are retained.
 
 \examples{
 toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 out <- category_structure_report(fit)
 summary(out)
 head(out$category_table[, c("Category", "Count", "Infit", "Outfit")])

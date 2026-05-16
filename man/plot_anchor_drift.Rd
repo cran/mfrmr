@@ -6,8 +6,9 @@
 \usage{
 plot_anchor_drift(
   x,
-  type = c("drift", "chain", "heatmap"),
+  type = c("drift", "chain", "heatmap", "forest"),
   facet = NULL,
+  ci_level = 0.95,
   preset = c("standard", "publication", "compact"),
   draw = TRUE,
   ...
@@ -17,11 +18,17 @@ plot_anchor_drift(
 \item{x}{An \code{mfrm_anchor_drift} or \code{mfrm_equating_chain} object.}
 
 \item{type}{Plot type: \code{"drift"} (dot plot of element drift),
-\code{"chain"} (cumulative offset line plot), or \code{"heatmap"}
-(wave-by-element drift heatmap).}
+\code{"chain"} (cumulative offset line plot), \code{"heatmap"}
+(wave-by-element drift heatmap), or \code{"forest"} (per-(Facet, Level,
+Wave) anchor estimate with \verb{+/- z * SE} whiskers; requires
+\code{mfrm_anchor_drift}).}
 
 \item{facet}{Optional character vector to filter drift plots to specific
 facets.}
+
+\item{ci_level}{Confidence level used by \code{type = "forest"} for the
+anchor-estimate whiskers (default \code{0.95}). Ignored for other
+plot types.}
 
 \item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, or \code{"compact"}).}
 
@@ -34,8 +41,8 @@ functions.}
 A plotting-data object of class \code{mfrm_plot_data}. With
 \code{draw = FALSE}, \code{result$data$table} contains the filtered drift or chain
 table, \code{result$data$matrix} contains the heatmap matrix when requested,
-and the payload includes package-native \code{title}, \code{subtitle}, \code{legend},
-and \code{reference_lines}.
+and the returned plot data includes package-native \code{title}, \code{subtitle},
+\code{legend}, and \code{reference_lines}.
 }
 \description{
 Creates base-R plots for inspecting anchor drift across calibration waves
@@ -118,9 +125,9 @@ people <- unique(toy$Person)
 d1 <- toy[toy$Person \%in\% people[1:12], , drop = FALSE]
 d2 <- toy[toy$Person \%in\% people[13:24], , drop = FALSE]
 fit1 <- fit_mfrm(d1, "Person", c("Rater", "Criterion"), "Score",
-                 method = "JML", maxit = 10)
+                 method = "JML", maxit = 30)
 fit2 <- fit_mfrm(d2, "Person", c("Rater", "Criterion"), "Score",
-                 method = "JML", maxit = 10)
+                 method = "JML", maxit = 30)
 drift <- detect_anchor_drift(list(W1 = fit1, W2 = fit2))
 drift_plot <- plot_anchor_drift(drift, type = "drift", draw = FALSE)
 class(drift_plot)

@@ -6,7 +6,7 @@
 \usage{
 plot_bias_interaction(
   x,
-  plot = c("scatter", "ranked", "abs_t_hist", "facet_profile"),
+  plot = c("scatter", "ranked", "heatmap", "abs_t_hist", "facet_profile"),
   diagnostics = NULL,
   facet_a = NULL,
   facet_b = NULL,
@@ -16,6 +16,8 @@ plot_bias_interaction(
   abs_bias_warn = 0.5,
   p_max = 0.05,
   sort_by = c("abs_t", "abs_bias", "prob"),
+  show_ci = FALSE,
+  ci_level = 0.95,
   main = NULL,
   palette = NULL,
   label_angle = 45,
@@ -26,8 +28,8 @@ plot_bias_interaction(
 \arguments{
 \item{x}{Output from \code{\link[=estimate_bias]{estimate_bias()}} or \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
-\item{plot}{Plot type: \code{"scatter"}, \code{"ranked"}, \code{"abs_t_hist"},
-or \code{"facet_profile"}.}
+\item{plot}{Plot type: \code{"scatter"}, \code{"ranked"}, \code{"heatmap"},
+\code{"abs_t_hist"}, or \code{"facet_profile"}.}
 
 \item{diagnostics}{Optional output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} (used when \code{x} is fit).}
 
@@ -49,6 +51,18 @@ or \code{"facet_profile"}.}
 
 \item{sort_by}{Ranking key: \code{"abs_t"}, \code{"abs_bias"}, or \code{"prob"}.}
 
+\item{show_ci}{Logical. When \code{TRUE} and \code{plot} is \code{"scatter"} or
+\code{"ranked"}, draw confidence-interval whiskers for \verb{Bias Size}.
+Bounded \code{GPCM} rows use the conditional profile-likelihood limits
+returned by \code{\link[=estimate_bias]{estimate_bias()}} when available; otherwise the interval
+uses the per-cell standard error from \code{\link[=estimate_bias]{estimate_bias()}}. Ignored for
+\code{"heatmap"}, \code{"abs_t_hist"}, and \code{"facet_profile"}.}
+
+\item{ci_level}{Confidence level used when \code{show_ci = TRUE}; default
+\code{0.95}. The returned plot-data object gains \code{CI_Lower} / \code{CI_Upper}
+/ \code{CI_Level} columns on the \code{ranked_table} and \code{scatter_data}
+elements for downstream reuse.}
+
 \item{main}{Optional plot title override.}
 
 \item{palette}{Optional named color overrides (\code{normal}, \code{flag}, \code{hist},
@@ -68,6 +82,11 @@ Plot bias interaction diagnostics (preferred alias)
 }
 \details{
 Visualization front-end for \code{\link[=bias_interaction_report]{bias_interaction_report()}} with multiple views.
+With \code{draw = FALSE}, the returned plot data include \code{plot_long},
+\code{plot_annotations}, \code{flag_summary}, and \code{plot_settings} in addition to the
+view-specific \code{ranked_table}, \code{scatter_data}, \code{facet_profile}, and heatmap
+components. Use these fields when rebuilding the same screening view in
+ggplot2, plotly, Quarto, or a dashboard.
 }
 \section{Plot types}{
 
@@ -79,6 +98,10 @@ of interaction effects.}
 \item{\code{"ranked"}}{Ranked bar chart of top \code{top_n} interactions sorted
 by \code{sort_by} criterion (absolute t, absolute bias, or probability).
 Bars colored red for flagged cells.}
+\item{\code{"heatmap"}}{Facet A by facet B matrix of signed bias size.
+Cells retain reusable matrix and flag tables for dashboards. This is
+a Table 13 follow-up display: it supports pattern recognition but does
+not turn screening rows into confirmatory tests.}
 \item{\code{"abs_t_hist"}}{Histogram of absolute screening t-statistics across all
 interaction cells.  Dashed reference line at \code{abs_t_warn}.  Use for
 assessing the overall distribution of interaction effect sizes.}
@@ -109,7 +132,7 @@ themselves establish formal inferential evidence.
 
 \examples{
 toy <- load_mfrmr_data("example_bias")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 p <- plot_bias_interaction(
   fit,
   diagnostics = diagnose_mfrm(fit, residual_pca = "none"),

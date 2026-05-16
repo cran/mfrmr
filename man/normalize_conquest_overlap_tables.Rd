@@ -2,7 +2,7 @@
 % Please edit documentation in R/api-export-bundles.R
 \name{normalize_conquest_overlap_tables}
 \alias{normalize_conquest_overlap_tables}
-\title{Normalize extracted ConQuest overlap tables to the \code{mfrmr} audit contract}
+\title{Normalize extracted ConQuest overlap tables to the \code{mfrmr} review contract}
 \usage{
 normalize_conquest_overlap_tables(
   conquest_population,
@@ -58,11 +58,11 @@ standardized identifier and estimate columns.}
 A named list with class \code{mfrm_conquest_overlap_tables}.
 }
 \description{
-Normalize extracted ConQuest overlap tables to the \code{mfrmr} audit contract
+Normalize extracted ConQuest overlap tables to the \code{mfrmr} review contract
 }
 \details{
 This helper does not parse raw ConQuest text output. It standardizes already
-extracted tables to the contract used by \code{\link[=audit_conquest_overlap]{audit_conquest_overlap()}}:
+extracted tables to the contract used by \code{\link[=review_conquest_overlap]{review_conquest_overlap()}}:
 \itemize{
 \item population parameters become columns \code{Parameter}, \code{Estimate}, and
 \code{EstimateNonNumeric};
@@ -74,7 +74,7 @@ extracted tables to the contract used by \code{\link[=audit_conquest_overlap]{au
 
 The resulting object is intentionally conservative. It does not infer
 whether item IDs correspond to exported response variables or original item
-levels; that matching step remains part of \code{\link[=audit_conquest_overlap]{audit_conquest_overlap()}}, where
+levels; that matching step remains part of \code{\link[=review_conquest_overlap]{review_conquest_overlap()}}, where
 the standardized ConQuest tables are compared against a concrete overlap
 bundle.
 }
@@ -90,9 +90,9 @@ The returned object has class \code{mfrm_conquest_overlap_tables} and includes:
 \item \code{notes}: interpretation notes
 }
 
-Read \code{summary(normalized)$normalization_scope} before auditing to confirm
+Read \code{summary(normalized)$normalization_scope} before review to confirm
 that the object contains extracted tabular inputs, not parsed raw ConQuest
-report text, and to check duplicate-ID / non-numeric-estimate pre-audit
+report text, and to check duplicate-ID / non-numeric-estimate pre-review
 flags.
 }
 
@@ -120,5 +120,5 @@ normalized <- normalize_conquest_overlap_tables(
 summary(normalized)$normalization_scope
 }
 \seealso{
-\code{\link[=build_conquest_overlap_bundle]{build_conquest_overlap_bundle()}}, \code{\link[=audit_conquest_overlap]{audit_conquest_overlap()}}
+\code{\link[=build_conquest_overlap_bundle]{build_conquest_overlap_bundle()}}, \code{\link[=review_conquest_overlap]{review_conquest_overlap()}}
 }

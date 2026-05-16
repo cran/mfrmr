@@ -34,14 +34,21 @@ Plot report/table bundles with base R defaults
 \item \code{mfrm_fixed_reports} -> pairwise-contrast diagnostics
 \item \code{mfrm_visual_summaries} -> warning/summary message count plots
 \item \code{mfrm_category_structure} -> default base-R category plots
-\item \code{mfrm_category_curves} -> default ogive/CCC plots
+\item \code{mfrm_category_curves} -> overview (default), ogive, CCC / category
+probability / conditional probability, cumulative, total-information, and
+category-specific-information plots
 \item \code{mfrm_rating_scale} -> category-counts/threshold plots
 \item \code{mfrm_measurable} -> measurable-data coverage/count plots
 \item \code{mfrm_unexpected_after_bias} -> post-bias unexpected-response plots
 \item \code{mfrm_output_bundle} -> graph/score output-file diagnostics
-\item \code{mfrm_residual_pca} -> residual PCA scree/loadings via \code{\link[=plot_residual_pca]{plot_residual_pca()}}
+\item \code{mfrm_residual_pca} -> residual PCA scree, parallel-analysis, or
+loadings views via \code{\link[=plot_residual_pca]{plot_residual_pca()}}
 \item \code{mfrm_specifications} -> facet/anchor/convergence plots
-\item \code{mfrm_data_quality} -> row-audit/category/missing-row plots
+\item \code{mfrm_data_quality} -> dashboard, quality-flag, score-map, facet-pattern,
+and row/category/missing-row plots
+\item \code{mfrm_facets_fit_review} -> FACETS-style df-sensitivity plot
+\item \code{mfrm_fit_measures} -> fit-status counts, Infit/Outfit scatter, measure
+intervals, and FACETS-style df-sensitivity plots
 \item \code{mfrm_iteration_report} -> replayed-iteration trajectories
 \item \code{mfrm_subset_connectivity} -> subset-observation/connectivity plots
 \item \code{mfrm_facet_statistics} -> facet statistic profile plots
@@ -55,11 +62,20 @@ plots (\code{formats}, \code{artifact_groups}, \code{selection_tables},
 
 If a class is outside these families, use dedicated plotting helpers
 or custom base R graphics on component tables.
+
+For \code{mfrm_category_curves}, pass \code{preset = "monochrome"} for
+grayscale/line-type output. Cumulative \code{.5} boundary lines are shown
+only for interpretable in-range boundaries by default; use
+\code{boundary_status = "all"} to show every finite boundary estimate or
+\code{boundary_status = "none"} / \code{show_cumulative_boundaries = FALSE} to
+suppress those vertical boundary lines. Use
+\code{plot_data(x, component = "plot_long")} on a category-curve bundle when
+you want one ggplot2/plotly-friendly table across all curve families.
 }
 \section{Interpreting output}{
 
 The returned object is plotting data (\code{mfrm_plot_data}) that captures
-the selected route and payload; set \code{draw = TRUE} for immediate base graphics.
+the selected route and reusable data; set \code{draw = TRUE} for immediate base graphics.
 }
 
 \section{Typical workflow}{
@@ -77,7 +93,7 @@ toy_full <- load_mfrmr_data("example_core")
 toy_people <- unique(toy_full$Person)[1:12]
 toy <- toy_full[toy_full$Person \%in\% toy_people, , drop = FALSE]
 fit <- suppressWarnings(
-  fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 10)
+  fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 )
 t4 <- unexpected_response_table(fit, abs_z_min = 1.5, prob_max = 0.4, top_n = 5)
 p <- plot(t4, draw = FALSE)

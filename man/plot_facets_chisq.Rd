@@ -100,7 +100,7 @@ non-trivial heterogeneity beyond measurement error.
 
 \examples{
 toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 p <- plot_facets_chisq(fit, draw = FALSE)
 if (interactive()) {
   plot_facets_chisq(

@@ -60,7 +60,7 @@ scoring layout.}
 \code{fit} uses the latent-regression branch. \code{"error"} (default) requires
 complete person-level covariates for all scored persons; \code{"omit"} drops
 scored persons lacking complete covariates and records that omission in
-\code{population_audit}.}
+\code{population_review}.}
 
 \item{interval_level}{Posterior interval level returned in \code{Lower}/\code{Upper}.}
 
@@ -74,8 +74,8 @@ An object of class \code{mfrm_unit_prediction} with components:
 \itemize{
 \item \code{estimates}: posterior summaries by person
 \item \code{draws}: optional quadrature-grid posterior draws
-\item \code{audit}: row-level preparation audit for \code{new_data}
-\item \code{population_audit}: optional person-level omission audit for
+\item \code{row_review}: row-level preparation review for \code{new_data}
+\item \code{population_review}: optional person-level omission review for
 latent-regression scoring
 \item \code{input_data}: cleaned canonical scoring rows retained from \code{new_data}
 \item \code{person_data}: cleaned or supplied person-level background data used for
@@ -150,7 +150,7 @@ requested \code{interval_level}.
 scoring.
 \item \code{draws}, when requested, contains approximate plausible values on the
 fitted quadrature grid.
-\item \code{population_audit}, when present, records whether scored persons were
+\item \code{population_review}, when present, records whether scored persons were
 omitted because their background data were incomplete for a
 latent-regression fit.
 }
@@ -198,7 +198,7 @@ toy_fit <- suppressWarnings(
     "Person", c("Rater", "Criterion"), "Score",
     method = "MML",
     quad_points = 5,
-    maxit = 15
+    maxit = 30
   )
 )
 raters <- unique(toy$Rater)[1:2]

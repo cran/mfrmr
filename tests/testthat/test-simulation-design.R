@@ -45,6 +45,45 @@ test_that("build_mfrm_sim_spec returns reusable simulation metadata", {
   expect_equal(length(unique(spec$threshold_table$StepFacet)), 4)
 })
 
+test_that("build_mfrm_sim_spec accepts compact step-facet threshold shortcuts", {
+  spec_list <- build_mfrm_sim_spec(
+    n_person = 18,
+    n_rater = 3,
+    n_criterion = 3,
+    raters_per_person = 2,
+    assignment = "rotating",
+    thresholds = list(
+      C01 = c(-1.2, 0.0, 1.1),
+      C02 = c(-0.9, 0.2, 1.0),
+      C03 = c(-0.8, 0.3, 1.2)
+    ),
+    model = "PCM",
+    step_facet = "Criterion"
+  )
+
+  expect_equal(sort(unique(spec_list$threshold_table$StepFacet)), c("C01", "C02", "C03"))
+  expect_equal(spec_list$threshold_table$Estimate[spec_list$threshold_table$StepFacet == "C02"], c(-0.9, 0.2, 1.0))
+
+  mat <- rbind(
+    C01 = c(-1.2, 0.0, 1.1),
+    C02 = c(-0.9, 0.2, 1.0),
+    C03 = c(-0.8, 0.3, 1.2)
+  )
+  spec_matrix <- build_mfrm_sim_spec(
+    n_person = 18,
+    n_rater = 3,
+    n_criterion = 3,
+    raters_per_person = 2,
+    assignment = "rotating",
+    thresholds = mat,
+    model = "PCM",
+    step_facet = "Criterion"
+  )
+
+  expect_equal(spec_matrix$threshold_table, spec_list$threshold_table)
+  expect_silent(simulate_mfrm_data(sim_spec = spec_matrix, seed = 2026))
+})
+
 test_that("build_mfrm_sim_spec accepts custom public facet names", {
   spec <- build_mfrm_sim_spec(
     n_person = 16,
@@ -237,6 +276,7 @@ test_that("design$facets accepts schema-only future facet-count keys", {
   expect_true(all(sim_eval$design_grid$n_person == 14))
   expect_true(all(sim_eval$design_grid$n_rater == 3))
   expect_true(all(sim_eval$design_grid$n_criterion == 2))
+  expect_false(sim_eval$settings$progress)
 
   expect_error(
     build_mfrm_sim_spec(
@@ -2159,7 +2199,7 @@ test_that("build_mfrm_sim_spec can store a latent-regression population generato
   expect_true("G" %in% names(spec$population$contrasts))
 })
 
-test_that("internal design-grid helper returns canonical and public design metadata", {
+test_that("design-grid helper returns canonical and public design metadata", {
   spec <- build_mfrm_sim_spec(
     n_person = 16,
     n_rater = 3,
@@ -2294,6 +2334,60 @@ test_that("simulate_mfrm_data uses PCM step-facet thresholds when sampling score
   expect_gt(unname(mean_by_criterion["C01"]), unname(mean_by_criterion["C02"]))
 })
 
+test_that("RSM simulation reduces exactly to PCM simulation under common thresholds", {
+  base_args <- list(
+    n_person = 24,
+    n_rater = 3,
+    n_criterion = 3,
+    raters_per_person = 2,
+    score_levels = 4,
+    theta_sd = 0.8,
+    rater_sd = 0.25,
+    criterion_sd = 0.2,
+    noise_sd = 0,
+    assignment = "rotating",
+    thresholds = c(-1.1, 0.1, 1.0),
+    step_facet = "Criterion"
+  )
+  spec_rsm <- do.call(build_mfrm_sim_spec, c(base_args, list(model = "RSM")))
+  spec_pcm <- do.call(build_mfrm_sim_spec, c(base_args, list(model = "PCM")))
+
+  sim_rsm <- simulate_mfrm_data(sim_spec = spec_rsm, seed = 3141)
+  sim_pcm <- simulate_mfrm_data(sim_spec = spec_pcm, seed = 3141)
+
+  visible_cols <- c("Study", "Person", "Rater", "Criterion", "Score")
+  expect_identical(as.list(sim_rsm[visible_cols]), as.list(sim_pcm[visible_cols]))
+
+  truth_rsm <- attr(sim_rsm, "mfrm_truth")
+  truth_pcm <- attr(sim_pcm, "mfrm_truth")
+  expect_equal(truth_rsm$person, truth_pcm$person, tolerance = 1e-12)
+  expect_equal(truth_rsm$facets, truth_pcm$facets, tolerance = 1e-12)
+  expect_equal(truth_rsm$steps, truth_pcm$steps, tolerance = 1e-12)
+  expect_equal(truth_rsm$step_table, truth_pcm$step_table)
+
+  step_cum <- c(0, cumsum(truth_rsm$steps))
+  step_cum_mat <- matrix(
+    rep(step_cum, times = length(unique(sim_rsm$Criterion))),
+    nrow = length(unique(sim_rsm$Criterion)),
+    byrow = TRUE
+  )
+  step_levels <- sort(unique(as.character(sim_rsm$Criterion)))
+  criterion_idx <- match(as.character(sim_rsm$Criterion), step_levels)
+  eta <- unname(
+    truth_rsm$person[sim_rsm$Person] -
+      truth_rsm$facets$Rater[sim_rsm$Rater] -
+      truth_rsm$facets$Criterion[sim_rsm$Criterion]
+  )
+
+  probs_rsm <- mfrmr:::category_prob_rsm(eta, step_cum)
+  probs_pcm <- mfrmr:::category_prob_pcm(
+    eta = eta,
+    step_cum_mat = step_cum_mat,
+    criterion_idx = criterion_idx
+  )
+  expect_equal(unname(probs_rsm), unname(probs_pcm), tolerance = 1e-12)
+})
+
 test_that("GPCM direct and sim-spec generators carry slope-aware truth metadata", {
   sim_direct <- simulate_mfrm_data(
     n_person = 18,
@@ -2335,6 +2429,7 @@ test_that("GPCM direct and sim-spec generators carry slope-aware truth metadata"
   expect_equal(spec$slope_facet, "Criterion")
   expect_true(is.data.frame(spec$slope_table))
   expect_true(all(spec$slope_table$Estimate > 0))
+  expect_equal(exp(mean(log(spec$slope_table$Estimate))), 1, tolerance = 1e-12)
 
   sim_spec <- simulate_mfrm_data(sim_spec = spec, seed = 718)
   truth_spec <- attr(sim_spec, "mfrm_truth")
@@ -2344,6 +2439,123 @@ test_that("GPCM direct and sim-spec generators carry slope-aware truth metadata"
   expect_equal(attr(sim_spec, "mfrm_simulation_spec")$model, "GPCM")
   expect_equal(attr(sim_spec, "mfrm_simulation_spec")$slope_facet, "Criterion")
   expect_equal(truth_spec$slope_table$Estimate, spec$slope_table$Estimate, tolerance = 1e-12)
+})
+
+test_that("unit-slope GPCM simulation reduces exactly to PCM simulation", {
+  thresholds <- data.frame(
+    StepFacet = rep(c("C01", "C02", "C03"), each = 3),
+    StepIndex = rep(1:3, times = 3),
+    Estimate = c(
+      -1.2, -0.1, 1.1,
+      -0.8,  0.3, 1.3,
+      -1.5,  0.0, 0.9
+    )
+  )
+
+  base_args <- list(
+    n_person = 20,
+    n_rater = 3,
+    n_criterion = 3,
+    raters_per_person = 2,
+    score_levels = 4,
+    theta_sd = 0.7,
+    rater_sd = 0.2,
+    criterion_sd = 0.15,
+    noise_sd = 0,
+    assignment = "rotating",
+    thresholds = thresholds,
+    step_facet = "Criterion"
+  )
+  spec_pcm <- do.call(build_mfrm_sim_spec, c(base_args, list(model = "PCM")))
+  spec_gpcm <- do.call(
+    build_mfrm_sim_spec,
+    c(
+      base_args,
+      list(
+        model = "GPCM",
+        slope_facet = "Criterion",
+        slopes = c(C01 = 1, C02 = 1, C03 = 1)
+      )
+    )
+  )
+
+  sim_pcm <- simulate_mfrm_data(sim_spec = spec_pcm, seed = 2718)
+  sim_gpcm <- simulate_mfrm_data(sim_spec = spec_gpcm, seed = 2718)
+
+  visible_cols <- c("Study", "Person", "Rater", "Criterion", "Score")
+  expect_identical(as.list(sim_gpcm[visible_cols]), as.list(sim_pcm[visible_cols]))
+
+  truth_pcm <- attr(sim_pcm, "mfrm_truth")
+  truth_gpcm <- attr(sim_gpcm, "mfrm_truth")
+  expect_equal(truth_gpcm$person, truth_pcm$person, tolerance = 1e-12)
+  expect_equal(truth_gpcm$facets, truth_pcm$facets, tolerance = 1e-12)
+  expect_equal(truth_gpcm$step_table, truth_pcm$step_table)
+  expect_equal(truth_gpcm$slope_table$Estimate, rep(1, 3), tolerance = 1e-12)
+
+  step_table <- truth_pcm$step_table
+  step_lookup <- split(step_table$Estimate, step_table$StepFacet)
+  step_levels <- unique(as.character(step_table$StepFacet))
+  step_cum_mat <- t(vapply(
+    step_levels,
+    function(level) c(0, cumsum(step_lookup[[level]])),
+    numeric(spec_pcm$score_levels)
+  ))
+  criterion_idx <- match(as.character(sim_pcm$Criterion), step_levels)
+  eta <- unname(
+    truth_pcm$person[sim_pcm$Person] -
+      truth_pcm$facets$Rater[sim_pcm$Rater] -
+      truth_pcm$facets$Criterion[sim_pcm$Criterion]
+  )
+
+  probs_pcm <- mfrmr:::category_prob_pcm(
+    eta = eta,
+    step_cum_mat = step_cum_mat,
+    criterion_idx = criterion_idx
+  )
+  probs_gpcm <- mfrmr:::category_prob_gpcm(
+    eta = eta,
+    step_cum_mat = step_cum_mat,
+    criterion_idx = criterion_idx,
+    slopes = rep(1, length(step_levels)),
+    slope_idx = criterion_idx
+  )
+
+  expect_equal(unname(probs_gpcm), unname(probs_pcm), tolerance = 1e-12)
+})
+
+test_that("GPCM simulation slopes are normalized to the identified scale", {
+  spec <- build_mfrm_sim_spec(
+    n_person = 12,
+    n_rater = 2,
+    n_criterion = 3,
+    raters_per_person = 2,
+    model = "GPCM",
+    step_facet = "Criterion",
+    slope_facet = "Criterion",
+    slopes = c(C01 = 0.6, C02 = 1.1, C03 = 1.8)
+  )
+
+  expect_equal(exp(mean(log(spec$slope_table$Estimate))), 1, tolerance = 1e-12)
+  expect_equal(
+    spec$slope_table$Estimate,
+    exp(log(c(0.6, 1.1, 1.8)) - mean(log(c(0.6, 1.1, 1.8)))),
+    tolerance = 1e-12
+  )
+
+  spec_df <- build_mfrm_sim_spec(
+    n_person = 12,
+    n_rater = 2,
+    n_criterion = 3,
+    raters_per_person = 2,
+    model = "GPCM",
+    step_facet = "Criterion",
+    slope_facet = "Criterion",
+    slopes = data.frame(
+      SlopeFacet = c("C03", "C01", "C02"),
+      Estimate = c(1.8, 0.6, 1.1)
+    )
+  )
+  expect_equal(spec_df$slope_table$Estimate, spec$slope_table$Estimate, tolerance = 1e-12)
 })
 
 test_that("simulate_mfrm_data accepts role-based design input in the direct path", {
@@ -2638,7 +2850,7 @@ test_that("simulate_mfrm_data supports empirical latent draws and resampled assi
     assignment = "resampled",
     latent_distribution = "empirical"
   )
-  spec_n30 <- simulation_override_spec_design(
+  spec_n30 <- mfrmr:::simulation_override_spec_design(
     spec,
     n_person = 30,
     n_rater = spec$n_rater,
@@ -2674,7 +2886,7 @@ test_that("resampled assignment specs reject unsupported design changes", {
   expect_true(all(c("n_rater", "raters_per_person") %in% names(spec$planning_constraints$lock_reasons)))
 
   expect_error(
-    simulation_override_spec_design(
+    mfrmr:::simulation_override_spec_design(
       spec,
       n_person = spec$n_person,
       n_rater = spec$n_rater + 1L,
@@ -2725,7 +2937,7 @@ test_that("simulate_mfrm_data supports observed design skeleton reuse", {
     person = "Person",
     group = "Group"
   )
-  spec_n30 <- simulation_override_spec_design(
+  spec_n30 <- mfrmr:::simulation_override_spec_design(
     spec,
     n_person = 30,
     n_rater = spec$n_rater,
@@ -2768,7 +2980,7 @@ test_that("observed response skeleton can carry Group and Weight metadata", {
     person = "Person",
     group = "Group"
   )
-  spec_n24 <- simulation_override_spec_design(
+  spec_n24 <- mfrmr:::simulation_override_spec_design(
     spec,
     n_person = 24,
     n_rater = spec$n_rater,
@@ -2853,7 +3065,7 @@ test_that("skeleton assignment specs reject unsupported design changes", {
   expect_identical(spec$planning_constraints$locked_design_variables, c("n_rater", "n_criterion", "raters_per_person"))
 
   expect_error(
-    simulation_override_spec_design(
+    mfrmr:::simulation_override_spec_design(
       spec,
       n_person = spec$n_person,
       n_rater = spec$n_rater,
@@ -3118,7 +3330,7 @@ test_that("role-based design input is accepted in spec override and forecast hel
     facet_names = c("Judge", "Task")
   )
 
-  spec_over <- simulation_override_spec_design(
+  spec_over <- mfrmr:::simulation_override_spec_design(
     spec,
     design = list(person = 14, n_judge = spec$n_rater, n_task = spec$n_criterion, judge_per_person = spec$raters_per_person)
   )
@@ -3292,7 +3504,7 @@ test_that("seeded simulation helpers preserve caller RNG state", {
 })
 
 test_that("design recovery metrics align location before RMSE and bias", {
-  metrics <- design_eval_recovery_metrics(
+  metrics <- mfrmr:::design_eval_recovery_metrics(
     est_levels = c("L1", "L2", "L3"),
     est_values = c(0.2, 1.2, 2.2),
     truth_vec = c(L1 = 0, L2 = 1, L3 = 2)

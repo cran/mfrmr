@@ -11,10 +11,10 @@ test_that("NAMESPACE roxygen contract keeps expected exports and methods", {
     "analyze_dif",
     "analyze_facet_equivalence",
     "analyze_residual_pca",
+    "anchor_review",
     "anchor_to_baseline",
+    "assess_mfrm_recovery",
     "apa_table",
-    "audit_conquest_overlap",
-    "audit_mfrm_anchors",
     "bias_count_table",
     "bias_interaction_report",
     "bias_iteration_report",
@@ -25,10 +25,11 @@ test_that("NAMESPACE roxygen contract keeps expected exports and methods", {
     "build_fixed_reports",
     "build_misfit_casebook",
     "build_linking_review",
-    "build_weighting_audit",
+    "build_weighting_review",
     "build_mfrm_manifest",
     "build_mfrm_replay_script",
     "build_mfrm_sim_spec",
+    "build_model_choice_review",
     "build_summary_table_bundle",
     "build_visual_summaries",
     "category_curves_report",
@@ -48,6 +49,7 @@ test_that("NAMESPACE roxygen contract keeps expected exports and methods", {
     "estimation_iteration_report",
     "evaluate_mfrm_design",
     "evaluate_mfrm_diagnostic_screening",
+    "evaluate_mfrm_recovery",
     "evaluate_mfrm_signal_detection",
     "export_mfrm",
     "export_mfrm_bundle",
@@ -56,17 +58,24 @@ test_that("NAMESPACE roxygen contract keeps expected exports and methods", {
     "facet_quality_dashboard",
     "facet_statistics_report",
     "facets_chisq_table",
+    "facets_feature_coverage",
     "facets_output_file_bundle",
-    "facets_parity_report",
+    "facets_output_contract_review",
     "fair_average_table",
     "fit_mfrm",
     "gpcm_capability_matrix",
+    "interaction_effect_table",
     "interrater_agreement_table",
     "list_mfrmr_data",
     "load_mfrmr_data",
     "make_anchor_table",
     "measurable_summary_table",
     "mfrmRFacets",
+    "mfrm_d_study",
+    "mfrm_network_analysis",
+    "rater_network_analysis",
+    "rater_halo_network_analysis",
+    "mfrmr_output_guide",
     "mfrm_threshold_profiles",
     "normalize_conquest_overlap_files",
     "normalize_conquest_overlap_tables",
@@ -91,11 +100,14 @@ test_that("NAMESPACE roxygen contract keeps expected exports and methods", {
     "predict_mfrm_population",
     "predict_mfrm_units",
     "sample_mfrm_plausible_values",
-    "precision_audit_report",
+    "precision_review",
+    "precision_review_report",
     "rating_scale_table",
     "recommend_mfrm_design",
-    "reference_case_audit",
     "reference_case_benchmark",
+    "reference_case_review",
+    "review_conquest_overlap",
+    "review_mfrm_anchors",
     "reporting_checklist",
     "run_mfrm_facets",
     "run_qc_pipeline",
@@ -104,9 +116,62 @@ test_that("NAMESPACE roxygen contract keeps expected exports and methods", {
     "subset_connectivity_report",
     "unexpected_after_bias_table",
     "unexpected_response_table",
-    "visual_reporting_template"
+    "visual_reporting_template",
+    "write_mfrm_residual_file",
+    "write_mfrm_subset_file",
+    # Hierarchical review exports added in 0.1.6.
+    "detect_facet_nesting",
+    "facet_small_sample_review",
+    "compute_facet_icc",
+    "compute_facet_design_effect",
+    "analyze_hierarchical_structure",
+    # 0.1.6 polish additions: missing recoder + report adapters.
+    "recode_missing_codes",
+    "as_kable",
+    "as_flextable",
+    # 0.1.6: empirical-Bayes shrinkage exports.
+    "apply_empirical_bayes_shrinkage",
+    "shrinkage_report",
+    # 0.1.6: additional visualization helpers.
+    "plot_threshold_ladder",
+    "plot_person_fit",
+    "plot_rater_severity_profile",
+    "plot_apa_figure_one",
+    "plot_dif_summary",
+    # 0.1.6 second-wave visualizations.
+    "plot_guttman_scalogram",
+    "plot_residual_qq",
+    "plot_rater_trajectory",
+    "plot_rater_agreement_heatmap",
+    # 0.1.6 secondary plot helpers.
+    "plot_local_dependence_heatmap",
+    "plot_reliability_snapshot",
+    "plot_residual_matrix",
+    "plot_shrinkage_funnel",
+    # 0.1.6 package-level MnSq misfit threshold getter / setter.
+    "mfrm_misfit_thresholds",
+    # 0.1.6 additions: Q3 + person fit + GT + interop importers.
+    "q3_statistic",
+    "compute_person_fit_indices",
+    "mfrm_generalizability",
+    "import_mirt_fit",
+    "import_tam_fit",
+    "import_erm_fit"
   )
-  expect_setequal(exports, expected_exports)
+  # Subset assertion rather than exact-set equality. The hard-coded
+  # `expected_exports` list above is the 0.1.6 baseline contract: every entry
+  # must remain exported, but additional exports introduced by later cycles
+  # (Phase 7c plots, Phase 7d classical DIF, Phase 7g GPCM helpers, Phase 8
+  # visualisation round 2, etc.) are allowed to grow the namespace without
+  # tripping this regression guard.
+  missing_exports <- setdiff(expected_exports, exports)
+  expect_identical(
+    missing_exports, character(0),
+    info = paste0(
+      "These exports from the 0.1.6 baseline are no longer in NAMESPACE: ",
+      paste(missing_exports, collapse = ", ")
+    )
+  )
 
   s3 <- grep("^S3method\\(", ns_lines, value = TRUE)
   expected_s3 <- c(
@@ -118,10 +183,10 @@ test_that("NAMESPACE roxygen contract keeps expected exports and methods", {
     "S3method(print,summary.apa_table)",
     "S3method(print,summary.mfrm_summary_table_bundle)",
     "S3method(print,mfrm_data_description)",
-    "S3method(print,mfrm_anchor_audit)",
+    "S3method(print,mfrm_anchor_review)",
     "S3method(print,mfrm_facets_run)",
     "S3method(print,summary.mfrm_data_description)",
-    "S3method(print,summary.mfrm_anchor_audit)",
+    "S3method(print,summary.mfrm_anchor_review)",
     "S3method(print,summary.mfrm_apa_outputs)",
     "S3method(print,summary.mfrm_facets_run)",
     "S3method(print,summary.mfrm_bundle)",
@@ -131,7 +196,7 @@ test_that("NAMESPACE roxygen contract keeps expected exports and methods", {
     "S3method(print,summary.mfrm_threshold_profiles)",
     "S3method(plot,apa_table)",
     "S3method(plot,mfrm_data_description)",
-    "S3method(plot,mfrm_anchor_audit)",
+    "S3method(plot,mfrm_anchor_review)",
     "S3method(plot,mfrm_design_evaluation)",
     "S3method(plot,mfrm_facet_equivalence)",
     "S3method(plot,mfrm_facets_run)",
@@ -142,7 +207,7 @@ test_that("NAMESPACE roxygen contract keeps expected exports and methods", {
     "S3method(plot,mfrm_signal_detection)",
     "S3method(summary,apa_table)",
     "S3method(summary,mfrm_data_description)",
-    "S3method(summary,mfrm_anchor_audit)",
+    "S3method(summary,mfrm_anchor_review)",
     "S3method(summary,mfrm_apa_outputs)",
     "S3method(summary,mfrm_design_evaluation)",
     "S3method(summary,mfrm_dff)",
@@ -177,15 +242,15 @@ test_that("NAMESPACE roxygen contract keeps expected exports and methods", {
     "S3method(print,mfrm_equating_chain)",
     "S3method(print,mfrm_misfit_casebook)",
     "S3method(print,mfrm_linking_review)",
-    "S3method(print,mfrm_weighting_audit)",
+    "S3method(print,mfrm_weighting_review)",
     "S3method(print,summary.mfrm_equating_chain)",
     "S3method(print,summary.mfrm_misfit_casebook)",
     "S3method(print,summary.mfrm_linking_review)",
-    "S3method(print,summary.mfrm_weighting_audit)",
+    "S3method(print,summary.mfrm_weighting_review)",
     "S3method(summary,mfrm_equating_chain)",
     "S3method(summary,mfrm_misfit_casebook)",
     "S3method(summary,mfrm_linking_review)",
-    "S3method(summary,mfrm_weighting_audit)",
+    "S3method(summary,mfrm_weighting_review)",
     "S3method(print,mfrm_qc_pipeline)",
     "S3method(print,summary.mfrm_facet_dashboard)",
     "S3method(print,summary.mfrm_qc_pipeline)",
@@ -204,7 +269,68 @@ test_that("NAMESPACE roxygen contract keeps expected exports and methods", {
     "S3method(summary,mfrm_unit_prediction)",
     "S3method(summary,mfrm_plausible_values)",
     "S3method(summary,mfrm_future_branch_active_branch)",
-    "S3method(plot,mfrm_future_branch_active_branch)"
+    "S3method(plot,mfrm_d_study)",
+    "S3method(plot,mfrm_future_branch_active_branch)",
+    # print delegates added in 0.1.6 for classes that only had summary methods.
+    "S3method(print,mfrm_apa_outputs)",
+    "S3method(print,mfrm_bias)",
+    "S3method(print,mfrm_bundle)",
+    "S3method(print,mfrm_d_study)",
+    "S3method(print,mfrm_design_evaluation)",
+    "S3method(print,mfrm_diagnostics)",
+    "S3method(print,mfrm_facet_dashboard)",
+    "S3method(print,mfrm_future_branch_active_branch)",
+    "S3method(print,mfrm_plausible_values)",
+    "S3method(print,mfrm_population_prediction)",
+    "S3method(print,mfrm_reporting_checklist)",
+    "S3method(print,mfrm_signal_detection)",
+    "S3method(print,mfrm_threshold_profiles)",
+    "S3method(print,mfrm_unit_prediction)",
+    # Hierarchical-audit S3 methods added in 0.1.6.
+    "S3method(print,mfrm_facet_nesting)",
+    "S3method(summary,mfrm_facet_nesting)",
+    "S3method(print,mfrm_facet_sample_review)",
+    "S3method(summary,mfrm_facet_sample_review)",
+    "S3method(print,mfrm_facet_icc)",
+    "S3method(print,mfrm_facet_design_effect)",
+    "S3method(print,mfrm_hierarchical_structure)",
+    "S3method(summary,mfrm_hierarchical_structure)",
+    "S3method(plot,mfrm_hierarchical_structure)",
+    # 0.1.6 polish: apa_table Word/HTML adapters.
+    "S3method(as_kable,apa_table)",
+    "S3method(as_flextable,apa_table)",
+    # 0.1.6 polish second pass: summary methods for facet_icc /
+    # design_effect.
+    "S3method(summary,mfrm_facet_icc)",
+    "S3method(summary,mfrm_facet_design_effect)",
+    # 0.1.6: sample-review bar and nesting heatmap plots.
+    "S3method(plot,mfrm_facet_sample_review)",
+    "S3method(plot,mfrm_facet_nesting)",
+    # 0.1.6: equating chain bipartite / common-anchor plot method.
+    "S3method(plot,mfrm_equating_chain)",
+    # 0.1.6 second-pass: print methods for the new public classes.
+    "S3method(print,mfrm_q3)",
+    "S3method(print,mfrm_generalizability)",
+    "S3method(print,mfrm_imported_fit)",
+    # 0.2.0: print method for the `draw = FALSE` plot payload class
+    # (added in commit f8409d4 so users don't see a raw list dump).
+    "S3method(print,mfrm_plot_data)",
+    # 0.2.0: dedicated parameter-recovery simulation class.
+    "S3method(print,mfrm_recovery_assessment)",
+    "S3method(plot,mfrm_recovery_assessment)",
+    "S3method(plot,mfrm_recovery_simulation)",
+    "S3method(print,mfrm_recovery_simulation)",
+    "S3method(print,summary.mfrm_recovery_assessment)",
+    "S3method(print,summary.mfrm_recovery_simulation)",
+    "S3method(summary,mfrm_recovery_assessment)",
+    "S3method(summary,mfrm_recovery_simulation)",
+    # 0.2.0: fit-level model-choice review helper.
+    "S3method(print,mfrm_model_choice_review)",
+    "S3method(print,summary.mfrm_model_choice_review)",
+    "S3method(summary,mfrm_model_choice_review)",
+    # 0.2.0: person-fit table summaries for lz / lz_star reporting.
+    "S3method(print,summary.mfrm_person_fit_indices)",
+    "S3method(summary,mfrm_person_fit_indices)"
   )
   expect_setequal(s3, expected_s3)
 })

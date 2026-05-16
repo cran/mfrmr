@@ -362,6 +362,65 @@ format_reporting_marginal_pair_label <- function(pair_row) {
   )
 }
 
+#' MnSq misfit threshold pair used across mfrmr screening helpers
+#'
+#' Returns the lower / upper bounds that mfrmr screens treat as the
+#' acceptable mean-square (Infit / Outfit MnSq) band when flagging
+#' element-level misfit. Defaults follow Linacre's published 0.5-1.5
+#' acceptance band; both ends can be overridden via R options.
+#'
+#' Helpers that consume the band include
+#' [summary.mfrm_diagnostics()] (`misfit_flagged` block and
+#' `key_warnings` auto-flag), [build_misfit_casebook()] (the new
+#' `element_fit` source family), the bias / misfit narrative inside
+#' [build_apa_outputs()], and [facet_quality_dashboard()] when
+#' `misfit_warn = NULL`. Setting the options once at the top of an
+#' analysis script therefore changes every downstream screen at once.
+#'
+#' @section Configuration:
+#' Two scalar R options drive the band:
+#' \describe{
+#'   \item{`mfrmr.misfit_lower`}{Lower acceptance bound. Default `0.5`.}
+#'   \item{`mfrmr.misfit_upper`}{Upper acceptance bound. Default `1.5`.}
+#' }
+#'
+#' Pass scalar arguments to override the options for a single call,
+#' e.g. `mfrm_misfit_thresholds(lower = 0.7, upper = 1.3)` for the
+#' tighter Bond & Fox (2015) reporting band.
+#'
+#' @param lower Optional lower bound. When `NULL` (default), the
+#'   active option / package default is used.
+#' @param upper Optional upper bound.
+#'
+#' @return A named numeric vector `c(lower = ..., upper = ...)` with
+#'   `lower < upper`.
+#' @seealso [summary.mfrm_diagnostics()], [build_misfit_casebook()],
+#'   [facet_quality_dashboard()]
+#' @examples
+#' mfrm_misfit_thresholds()
+#' old <- options(mfrmr.misfit_lower = 0.7, mfrmr.misfit_upper = 1.3)
+#' mfrm_misfit_thresholds()
+#' options(old)
+#' @export
+mfrm_misfit_thresholds <- function(lower = NULL, upper = NULL) {
+  lo <- if (is.null(lower)) {
+    suppressWarnings(as.numeric(getOption("mfrmr.misfit_lower", 0.5)))
+  } else {
+    suppressWarnings(as.numeric(lower[1]))
+  }
+  up <- if (is.null(upper)) {
+    suppressWarnings(as.numeric(getOption("mfrmr.misfit_upper", 1.5)))
+  } else {
+    suppressWarnings(as.numeric(upper[1]))
+  }
+  if (!is.finite(lo) || !is.finite(up) || lo <= 0 || up <= 0 || lo >= up) {
+    stop("`mfrm_misfit_thresholds` requires `0 < lower < upper`. ",
+         "Got lower = ", lo, ", upper = ", up, ".",
+         call. = FALSE)
+  }
+  c(lower = lo, upper = up)
+}
+
 # Warning threshold profiles for MFRM quality control.
 # Sources:
 #   - n_obs_min, n_person_min: Linacre (1994), sample size guidelines for stable estimates.
@@ -529,15 +588,24 @@ extract_facet_pca_errors <- function(pca_obj) {
   as.data.frame(pca_obj$errors$by_facet, stringsAsFactors = FALSE)
 }
 
-collapse_apa_paragraph <- function(sentences, width = 92L) {
+collapse_apa_paragraph <- function(sentences, width = 92L,
+                                    output_mode = c("wrapped", "reflow")) {
   lines <- trimws(as.character(sentences %||% character(0)))
   lines <- lines[nzchar(lines)]
   if (length(lines) == 0) return("")
 
+  output_mode <- match.arg(output_mode)
   width <- suppressWarnings(as.integer(width))
   if (!is.finite(width) || width < 40L) width <- 92L
 
   txt <- paste(lines, collapse = " ")
+  if (identical(output_mode, "reflow")) {
+    # Reflow mode returns a single line without hard breaks, which is
+    # what Word / RMarkdown / Quarto want when pasting into a running
+    # paragraph. The default "wrapped" mode retains the classic 92-
+    # char console readability.
+    return(txt)
+  }
   wrapped <- strwrap(txt, width = width)
   paste(wrapped, collapse = "\n")
 }
@@ -708,8 +776,12 @@ summarize_top_misfit_levels <- function(fit_tbl, top_n = 3L) {
   outz <- suppressWarnings(as.numeric(tbl$OutfitZSTD))
   absz <- pmax(abs(inz), abs(outz), na.rm = TRUE)
 
+  metric_label <- "|ZSTD|"
   if (!all(is.finite(absz))) {
     absz2 <- pmax(abs(infit - 1), abs(outfit - 1), na.rm = TRUE)
+    if (any(!is.finite(absz)) && any(is.finite(absz2))) {
+      metric_label <- "|MnSq - 1|"
+    }
     absz <- ifelse(is.finite(absz), absz, absz2)
   }
 
@@ -724,7 +796,8 @@ summarize_top_misfit_levels <- function(fit_tbl, top_n = 3L) {
   labels <- vapply(seq_len(nrow(show)), function(i) {
     facet <- if ("Facet" %in% names(show)) as.character(show$Facet[i]) else "Facet"
     level <- if ("Level" %in% names(show)) as.character(show$Level[i]) else as.character(i)
-    paste0(facet, ":", level, " (|metric| = ", fmt_num(show$AbsMetric[i]), ")")
+    paste0(facet, ":", level,
+           " (", metric_label, " = ", fmt_num(show$AbsMetric[i]), ")")
   }, character(1))
 
   paste0("Largest misfit signals: ", paste(labels, collapse = "; "), ".")
@@ -1131,7 +1204,9 @@ build_apa_caption_map_from_contract <- function(contract) {
   caption_map
 }
 
-build_apa_section_entry <- function(parent, heading, sentences, width = 92L) {
+build_apa_section_entry <- function(parent, heading, sentences, width = 92L,
+                                    output_mode = c("wrapped", "reflow")) {
+  output_mode <- match.arg(output_mode)
   sentences <- trimws(as.character(sentences %||% character(0)))
   sentences <- sentences[nzchar(sentences)]
   list(
@@ -1139,23 +1214,30 @@ build_apa_section_entry <- function(parent, heading, sentences, width = 92L) {
     Heading = as.character(heading),
     Sentences = sentences,
     SentenceCount = length(sentences),
-    Text = collapse_apa_paragraph(sentences, width = width),
+    Text = collapse_apa_paragraph(sentences, width = width,
+                                  output_mode = output_mode),
     Available = length(sentences) > 0
   )
 }
 
 build_apa_section_map_from_contract <- function(contract) {
   width <- contract$metadata$line_width %||% 92L
+  output_mode <- contract$metadata$output_mode %||% "wrapped"
+  if (!output_mode %in% c("wrapped", "reflow")) output_mode <- "wrapped"
+  entry <- function(parent, heading, sentences) {
+    build_apa_section_entry(parent, heading, sentences,
+                            width = width, output_mode = output_mode)
+  }
   sections <- list(
-    method_design = build_apa_section_entry("Method", "Design and data", contract$method_design_sentences, width = width),
-    method_estimation = build_apa_section_entry("Method", "Estimation settings", contract$method_estimation_sentences, width = width),
-    results_scale = build_apa_section_entry("Results", "Scale functioning", contract$results_scale_sentences, width = width),
-    results_measures = build_apa_section_entry("Results", "Facet measures", contract$results_measure_sentences, width = width),
-    results_population_model = build_apa_section_entry("Results", "Latent-regression population model", contract$results_population_sentences, width = width),
-    results_fit_precision = build_apa_section_entry("Results", "Fit and precision", contract$results_fit_precision_sentences, width = width),
-    results_residual_structure = build_apa_section_entry("Results", "Residual structure", contract$results_residual_sentences, width = width),
-    results_bias_screening = build_apa_section_entry("Results", "Bias screening", contract$results_bias_sentences, width = width),
-    results_cautions = build_apa_section_entry("Results", "Reporting cautions", contract$caution_sentences, width = width)
+    method_design = entry("Method", "Design and data", contract$method_design_sentences),
+    method_estimation = entry("Method", "Estimation settings", contract$method_estimation_sentences),
+    results_scale = entry("Results", "Scale functioning", contract$results_scale_sentences),
+    results_measures = entry("Results", "Facet measures", contract$results_measure_sentences),
+    results_population_model = entry("Results", "Latent-regression population model", contract$results_population_sentences),
+    results_fit_precision = entry("Results", "Fit and precision", contract$results_fit_precision_sentences),
+    results_residual_structure = entry("Results", "Residual structure", contract$results_residual_sentences),
+    results_bias_screening = entry("Results", "Bias screening", contract$results_bias_sentences),
+    results_cautions = entry("Results", "Reporting cautions", contract$caution_sentences)
   )
   sections
 }
@@ -1207,6 +1289,7 @@ build_apa_reporting_contract <- function(res, diagnostics, bias_results = NULL, 
   summary <- if (!is.null(res$summary) && nrow(res$summary) > 0) res$summary[1, , drop = FALSE] else NULL
   prep <- res$prep
   config <- res$config
+  model <- toupper(as.character(config$model %||% "RSM"))
 
   n_obs <- if (!is.null(summary)) to_float(summary$N) else NA_real_
   n_person <- if (!is.null(summary)) to_float(summary$Persons) else nrow(res$facets$person)
@@ -1292,8 +1375,15 @@ build_apa_reporting_contract <- function(res, diagnostics, bias_results = NULL, 
     method_sentences <- c(method_sentences, assessment_sentence)
   }
 
+  model_overview_label <- switch(
+    model,
+    RSM = "A many-facet rating-scale Rasch model",
+    PCM = "A many-facet partial-credit Rasch model",
+    GPCM = "A bounded generalized partial-credit many-facet model",
+    "A many-facet ordered-response model"
+  )
   design_overview_sentence <- paste0(
-    "A many-facet Rasch model (MFRM) was fit to ", fmt_count(n_obs),
+    model_overview_label, " was fit to ", fmt_count(n_obs),
     " observations from ", fmt_count(n_person),
     " persons scored on a ", fmt_count(n_cat),
     "-category scale (", fmt_count(rating_min), "-", fmt_count(rating_max), ")."
@@ -1305,6 +1395,98 @@ build_apa_reporting_contract <- function(res, diagnostics, bias_results = NULL, 
   }
   method_design_sentences <- c(method_design_sentences, design_overview_sentence, design_facets_sentence)
   method_sentences <- c(method_sentences, design_overview_sentence, design_facets_sentence)
+
+  # Sample adequacy sentence. Lead authors who are about to write
+  # a Methods section into the fixed-effects assumption: facets are not
+  # partially pooled, so small-N levels carry wide SE without shrinkage.
+  facet_flag <- as.character(summary$FacetSampleSizeFlag %||% NA_character_)
+  facet_min_n <- suppressWarnings(as.integer(summary$FacetMinLevelN %||% NA_integer_))
+  if (!is.na(facet_flag)) {
+    adequacy_sentence <- switch(
+      facet_flag,
+      sparse = paste0(
+        "At least one facet level had sparse coverage (minimum level N = ",
+        if (is.na(facet_min_n)) "NA" else facet_min_n,
+        "). mfrmr estimates facets as fixed effects without partial pooling, so ",
+        "sparse levels retain wide standard errors; consider reviewing the output ",
+        "of `facet_small_sample_review()` before generalising."
+      ),
+      marginal = paste0(
+        "The smallest facet-level N was ",
+        if (is.na(facet_min_n)) "NA" else facet_min_n,
+        ", below the 30-examinee floor (Linacre, 1994) used as the marginal-band ",
+        "anchor in this package's adapted screening bands. Facet estimates remain ",
+        "fixed-effect and unshrunk; see `facet_small_sample_review()` for per-level detail."
+      ),
+      standard = paste0(
+        "Facet-level sample sizes met the package's `standard` band ",
+        "(smallest level N = ",
+        if (is.na(facet_min_n)) "NA" else facet_min_n,
+        "), an mfrmr-specific watermark adapted from Linacre's (1994) 30/100 ",
+        "guidance; facets were nonetheless estimated as fixed effects with ",
+        "sum-to-zero identification (see `facet_small_sample_review()`)."
+      ),
+      strong = paste0(
+        "Facet-level sample sizes were strong (smallest level N = ",
+        if (is.na(facet_min_n)) "NA" else facet_min_n,
+        "), though facets were still estimated as fixed effects with sum-to-zero ",
+        "identification; `analyze_hierarchical_structure()` is available for ",
+        "nesting and variance-component follow-up."
+      ),
+      NULL
+    )
+    if (!is.null(adequacy_sentence)) {
+      method_design_sentences <- c(method_design_sentences, adequacy_sentence)
+      method_sentences <- c(method_sentences, adequacy_sentence)
+    }
+  }
+
+  # Empirical-Bayes / Laplace shrinkage note. When the caller opted
+  # into empirical-Bayes shrinkage, record the fact in Methods so reviewers see
+  # both the fixed-effects fit and the post-hoc partial-pooling layer.
+  shrinkage_mode <- as.character(config$facet_shrinkage %||% "none")
+  if (!identical(shrinkage_mode, "none")) {
+    shrink_report <- res$shrinkage_report
+    tau_mean <- if (!is.null(shrink_report) && nrow(shrink_report) > 0L) {
+      mean(as.numeric(shrink_report$Tau2), na.rm = TRUE)
+    } else NA_real_
+    mean_shrink <- if (!is.null(shrink_report) && nrow(shrink_report) > 0L) {
+      mean(as.numeric(shrink_report$MeanShrinkage), na.rm = TRUE)
+    } else NA_real_
+    shrinkage_sentence <- paste0(
+      "Empirical-Bayes shrinkage (", shrinkage_mode,
+      ") was applied post-hoc to the facet estimates following ",
+      "Efron and Morris (1973). Across non-person facets, the estimated ",
+      "prior variance was ",
+      if (is.finite(tau_mean)) sprintf("tau^2 = %.3f", tau_mean) else "not identifiable",
+      ", and the mean shrinkage factor was ",
+      if (is.finite(mean_shrink)) sprintf("%.2f", mean_shrink) else "NA",
+      ". Shrunk point estimates and posterior SEs appear alongside the ",
+      "fixed-effects columns in `fit$facets$others`."
+    )
+    method_estimation_sentences <- c(method_estimation_sentences, shrinkage_sentence)
+    method_sentences <- c(method_sentences, shrinkage_sentence)
+  }
+
+  # Extreme-score person warning (added in 0.1.6). Under JMLE the
+  # theta for such persons diverges; under MML the EAP is finite but
+  # the information is small. Flag either tail in the Methods section
+  # so reviewers understand why those persons may have been dropped or
+  # reported at the truncation limit.
+  ext_hi <- suppressWarnings(as.integer(summary$ExtremeHighN %||% NA_integer_))
+  ext_lo <- suppressWarnings(as.integer(summary$ExtremeLowN %||% NA_integer_))
+  if (isTRUE(is.finite(ext_hi) && is.finite(ext_lo) &&
+             (ext_hi + ext_lo) > 0)) {
+    extreme_sentence <- paste0(
+      "Extreme-score persons were observed at the ceiling (n = ", ext_hi,
+      ") and floor (n = ", ext_lo, "). Under JML the corresponding ",
+      "theta estimates diverge toward infinity (Wright, 1998); under ",
+      "MML they remain finite but carry little information. ",
+      "Fit$facets$person$Extreme records the per-person flag."
+    )
+    method_design_sentences <- c(method_design_sentences, extreme_sentence)
+    method_sentences <- c(method_sentences, extreme_sentence)
+  }
 
   if (nzchar(scale_desc)) {
     scale_sentence <- paste0("The rating scale was described as ", scale_desc, ".")
@@ -1323,9 +1505,8 @@ build_apa_reporting_contract <- function(res, diagnostics, bias_results = NULL, 
   }
 
   population_summary <- summarize_population_model_for_apa(res)
-  model <- config$model
   method <- config$method
-  model_sentence <- paste0("The ", model, " specification was estimated using ", method, " in the native R MFRM package.")
+  model_sentence <- paste0("The ", model, " specification was estimated using ", method, " with mfrmr.")
   if (identical(model, "PCM") && !is.null(config$step_facet) && nzchar(config$step_facet)) {
     model_sentence <- paste0(model_sentence, " The step structure varied by ", config$step_facet, ".")
   }
@@ -1418,13 +1599,21 @@ build_apa_reporting_contract <- function(res, diagnostics, bias_results = NULL, 
     results_sentences <- c(results_sentences, results_population_sentences)
   }
 
+  band <- mfrm_misfit_thresholds()
+  band_lower <- as.numeric(band["lower"])
+  band_upper <- as.numeric(band["upper"])
+  band_text <- sprintf("%.1f-%.1f", band_lower, band_upper)
+
   overall_fit <- if (!is.null(diagnostics$overall_fit) && nrow(diagnostics$overall_fit) > 0) diagnostics$overall_fit[1, , drop = FALSE] else NULL
   if (!is.null(overall_fit)) {
     infit <- to_float(overall_fit$Infit)
     outfit <- to_float(overall_fit$Outfit)
-    fit_label <- if (is.finite(infit) && is.finite(outfit) && infit >= 0.5 && infit <= 1.5 && outfit >= 0.5 && outfit <= 1.5) "acceptable" else "elevated"
+    fit_label <- if (is.finite(infit) && is.finite(outfit) &&
+                     infit >= band_lower && infit <= band_upper &&
+                     outfit >= band_lower && outfit <= band_upper) "acceptable" else "elevated"
     fit_sentence <- paste0(
-      "Overall fit was ", fit_label, " (infit MnSq = ", fmt_num(infit), ", outfit MnSq = ", fmt_num(outfit), ")."
+      "Overall fit was ", fit_label, " (infit MnSq = ", fmt_num(infit),
+      ", outfit MnSq = ", fmt_num(outfit), ")."
     )
     results_fit_precision_sentences <- c(results_fit_precision_sentences, fit_sentence)
     results_sentences <- c(results_sentences, fit_sentence)
@@ -1435,9 +1624,11 @@ build_apa_reporting_contract <- function(res, diagnostics, bias_results = NULL, 
   misfit_total <- if (!is.null(fit_tbl)) nrow(fit_tbl) else 0L
   top_misfit_sentence <- "Top misfit levels were not available."
   if (!is.null(fit_tbl) && nrow(fit_tbl) > 0) {
-    misfit <- with(fit_tbl, (Infit < 0.5) | (Infit > 1.5) | (Outfit < 0.5) | (Outfit > 1.5))
+    misfit <- with(fit_tbl, (Infit < band_lower) | (Infit > band_upper) |
+                            (Outfit < band_lower) | (Outfit > band_upper))
     misfit_n <- sum(misfit, na.rm = TRUE)
-    misfit_sentence <- paste0(fmt_count(misfit_n), " of ", fmt_count(nrow(fit_tbl)), " elements exceeded the 0.5-1.5 fit range.")
+    misfit_sentence <- paste0(fmt_count(misfit_n), " of ", fmt_count(nrow(fit_tbl)),
+                               " elements exceeded the ", band_text, " fit range.")
     results_fit_precision_sentences <- c(results_fit_precision_sentences, misfit_sentence)
     results_sentences <- c(results_sentences, misfit_sentence)
     top_misfit_sentence <- summarize_top_misfit_levels(fit_tbl, top_n = 3L)
@@ -1627,7 +1818,16 @@ build_apa_reporting_contract <- function(res, diagnostics, bias_results = NULL, 
       facet_names = facet_names,
       facet_counts = facet_counts,
       facets_text = facets_text,
-      line_width = line_width
+      line_width = line_width,
+      # Reflow vs wrapped controls whether section text uses hard line
+      # breaks (wrapped, the current 92-col default) or returns one
+      # long line per sentence-joined paragraph (reflow, suitable for
+      # pasting into Word / RMarkdown / Quarto paragraphs without
+      # breaking re-flow).
+      output_mode = {
+        mode <- as.character(context$output_mode %||% "wrapped")
+        if (!mode %in% c("wrapped", "reflow")) "wrapped" else mode
+      }
     ),
     context = list(
       assessment = assessment,
@@ -1873,7 +2073,9 @@ build_visual_warning_map <- function(res,
     }
   }
 
-  misfit <- (infit < 0.5) | (infit > 1.5) | (outfit < 0.5) | (outfit > 1.5)
+  band <- mfrm_misfit_thresholds()
+  misfit <- (infit < band["lower"]) | (infit > band["upper"]) |
+            (outfit < band["lower"]) | (outfit > band["upper"])
   misfit_ratio <- mean(misfit, na.rm = TRUE)
   if (is.finite(misfit_ratio) && misfit_ratio > misfit_ratio_warn) {
     warnings$fit_diagnostics <- c(warnings$fit_diagnostics, paste0("High proportion of misfit elements (", sprintf("%.0f", misfit_ratio * 100), "%)."))
@@ -2198,8 +2400,13 @@ build_visual_summary_map <- function(res,
     outfit <- suppressWarnings(as.numeric(measures$Outfit))
     ok <- is.finite(infit) & is.finite(outfit)
     if (any(ok)) {
-      misfit <- (infit < 0.5) | (infit > 1.5) | (outfit < 0.5) | (outfit > 1.5)
-      summaries$fit_diagnostics <- c(summaries$fit_diagnostics, paste0("Misfit elements (0.5-1.5 rule): ", fmt_count(sum(misfit, na.rm = TRUE)), " of ", fmt_count(sum(ok)), "."))
+      band <- mfrm_misfit_thresholds()
+      band_text <- sprintf("%.1f-%.1f", as.numeric(band["lower"]), as.numeric(band["upper"]))
+      misfit <- (infit < band["lower"]) | (infit > band["upper"]) |
+                (outfit < band["lower"]) | (outfit > band["upper"])
+      summaries$fit_diagnostics <- c(summaries$fit_diagnostics,
+        paste0("Misfit elements (", band_text, " rule): ",
+               fmt_count(sum(misfit, na.rm = TRUE)), " of ", fmt_count(sum(ok)), "."))
       if (detail == "detailed") {
         summaries$fit_diagnostics <- c(summaries$fit_diagnostics, paste0("Mean infit = ", fmt_num(mean(infit, na.rm = TRUE)), ", mean outfit = ", fmt_num(mean(outfit, na.rm = TRUE)), "."))
       }

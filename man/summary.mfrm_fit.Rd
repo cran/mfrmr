@@ -23,22 +23,42 @@ An object of class \code{summary.mfrm_fit} with:
 \item \code{key_warnings}: highest-priority warnings to review first
 \item \code{next_actions}: recommended follow-up helpers
 \item \code{population_overview}: current population-model basis, residual variance,
-and omission audit
+and omission review
 \item \code{population_coefficients}: fitted latent-regression coefficients when a
 population model is active
-\item \code{population_design}: latent-regression design-matrix column audit when a
+\item \code{population_design}: latent-regression design-matrix column check when a
 population model is active
 \item \code{population_coding}: categorical covariate levels and contrast provenance
 when a population model uses model-matrix coding
 \item \code{facet_overview}: per-facet estimate distribution summary
 \item \code{person_overview}: person-measure distribution summary
+\item \code{targeting}: person-versus-non-person facet targeting overview
+(Wright-map-style mean/SD comparison)
 \item \code{step_overview}: threshold/step diagnostics
 \item \code{slope_overview}: discrimination summary for \code{GPCM} fits
+\item \code{interaction_overview}: model-estimated facet-interaction summary
+when the fit was specified with \code{facet_interactions}
+\item \code{settings_overview}: estimation-settings overview that pins the
+configuration that affects identification/scoring
+\item \code{attached_diagnostics}: logical flag indicating whether the
+\code{mfrm_fit} was returned with diagnostics already attached
+\item \code{attached_diagnostics_cols}: character vector of diagnostic
+columns attached to \code{fit$facets$person} when
+\code{attached_diagnostics = TRUE}
+\item \code{row_retention}: row counts before and after preparation filters
+\item \code{preparation_notes}: structured preparation notes retained from
+\code{fit$prep}
+\item \code{reporting_map}: routing map showing which companion summaries
+and tables should be used for the four manuscript-oriented
+reporting sections (data description, diagnostics, category
+checks, draft reporting)
 \item \code{person_high} / \code{person_low}: highest and lowest person measures
 \item \code{facet_extremes}: extreme facet-level estimates
 \item \code{caveats}: structured warning/review rows for score-support and
 latent-regression population-model issues
 \item \code{notes}: short interpretation notes
+\item \code{digits}: numeric-print precision threaded through to
+\code{print.summary.mfrm_fit()}
 }
 }
 \description{
@@ -75,7 +95,7 @@ complete-case omissions, zero-variance design columns, missing
 coefficients, or unstable residual variance when present. Incomplete or
 non-finite covariates are normally handled before fitting as input errors
 or complete-case omissions; they appear here only if retained in a
-population-design audit row.
+population-design check row.
 \item \code{caveats}: structured rows behind those warnings for appendix/export use;
 \code{print(summary(fit))} shows a compact \code{Caveats} block when rows are present.
 \item \code{reporting_map}: where to get companion outputs for manuscript reporting.
@@ -98,9 +118,21 @@ checks. For bounded \code{GPCM}, continue with \code{\link[=compute_information]
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(
   toy, "Person", c("Rater", "Criterion"), "Score",
-  method = "MML", quad_points = 15
+  method = "MML", quad_points = 5
 )
-summary(fit)
+s <- summary(fit)
+s$overview[, c("Model", "Method", "Converged")]
+# Look for: Converged = TRUE. If FALSE the fit is not safe to report;
+#   raise `maxit`, relax `reltol`, or rerun with `quad_points = 31`.
+s$person_overview
+# Look for: Mean ~ 0 (logits) and SD ~ 1 are typical when the sample
+#   is centred on the test difficulty. Min < -3 or Max > 3 with
+#   `Extreme = "min"/"max"` rows indicates ceiling / floor cases.
+s$targeting
+# Look for: |Targeting| < ~0.5 logits across non-person facets is
+#   comfortable. Larger absolute values mean the test is systematically
+#   easier or harder than the person sample. SpreadRatio > 2 means
+#   persons dominate facet variability; < 0.5 means facets dominate.
 }
 \seealso{
 \code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}

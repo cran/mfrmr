@@ -114,7 +114,7 @@ For a plot-selection guide and a longer walkthrough, see
 toy <- load_mfrmr_data("example_core")
 toy_small <- toy[toy$Person \%in\% unique(toy$Person)[1:12], , drop = FALSE]
 fit <- fit_mfrm(toy_small, "Person", c("Rater", "Criterion"), "Score",
-                 method = "JML", model = "RSM", maxit = 10)
+                 method = "JML", model = "RSM", maxit = 30)
 map_data <- plot_wright_unified(fit, draw = FALSE)
 names(map_data)
 }

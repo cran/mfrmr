@@ -17,14 +17,25 @@ build_fixed_reports(
 
 \item{branch}{Output branch:
 \code{"facets"} keeps the legacy-compatible fixed-width layout;
-\code{"original"} returns compact sectioned fixed-width text for internal reporting.}
+\code{"original"} returns compact sectioned fixed-width text for report drafts.}
 }
 \value{
-A named list with:
+A named list with class \code{mfrm_fixed_reports} (and a branch-specific
+subclass \verb{mfrm_fixed_reports_<branch>}):
 \itemize{
 \item \code{bias_fixed}: fixed-width interaction table text
 \item \code{pairwise_fixed}: fixed-width pairwise contrast text
 \item \code{pairwise_table}: underlying pairwise data.frame
+\item \code{branch}: character scalar \code{"original"} or \code{"facets"} echoing
+which fixed-width style was rendered
+\item \code{style}: character scalar carrying the resolved style preset
+used when building the text artifact
+\item \code{interaction_label}: human-readable label for the interaction
+that drove the bias run (\code{"Rater x Criterion"}-style); \code{NA}
+when no bias rows are available
+\item \code{target_facet}: character scalar identifying which facet was
+used as the target facet for pairwise contrasts; \code{NA} when no
+pairwise contrasts were requested or available
 }
 }
 \description{
@@ -44,7 +55,7 @@ skipped.
 \itemize{
 \item \code{bias_fixed}: fixed-width table of interaction effects.
 \item \code{pairwise_fixed}: pairwise contrast text (2-way only).
-\item \code{pairwise_table}: machine-readable contrast table.
+\item \code{pairwise_table}: structured contrast table.
 \item \code{interaction_label}: facets used for the bias run.
 }
 }
@@ -68,7 +79,7 @@ artifact is specifically required for a compatibility handoff.
 \examples{
 \donttest{
 toy <- load_mfrmr_data("example_bias")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "none")
 bias <- estimate_bias(fit, diag, facet_a = "Rater", facet_b = "Criterion", max_iter = 2)
 fixed <- build_fixed_reports(bias)

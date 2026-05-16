@@ -1,5 +1,15 @@
-# Global variable declarations for dplyr NSE columns used in pipelines.
-# These declarations keep R CMD check quiet without changing runtime behavior.
+# Global variable declarations for dplyr NSE columns and other
+# unquoted identifiers used inside `data` / `mutate` / `summarize`
+# pipelines. These declarations keep R CMD check quiet about
+# "no visible binding for global variable" without changing runtime
+# behaviour.
+#
+# Entries are kept in a single alphabetised vector so the file is easy
+# to grep and easy to merge. When adding a new column, prefer adding
+# it here in the right alphabetical slot rather than relying on
+# `.data[[...]]` everywhere; the latter is fine for occasional uses
+# but `.data$Col` lookups are more readable in the most common
+# pipelines.
 if (getRversion() >= "2.15.1") {
   utils::globalVariables(c(
     ".",
@@ -91,6 +101,8 @@ if (getRversion() >= "2.15.1") {
     "item_combination",
     "Label",
     "Level",
+    "LevelA",
+    "LevelB",
     "Levels",
     "Local",
     "Local Measure1",
@@ -149,6 +161,7 @@ if (getRversion() >= "2.15.1") {
     "RaterSeparation",
     "RaterStrata",
     "S.E.",
+    "SampleCategory",
     "Score",
     "SD",
     "SE",

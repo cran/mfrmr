@@ -36,14 +36,14 @@ planning schema
 Summarize a DIF/bias screening simulation
 }
 \examples{
-\dontrun{
+\donttest{
 sig_eval <- suppressWarnings(evaluate_mfrm_signal_detection(
   n_person = 8,
   n_rater = 2,
   n_criterion = 2,
   raters_per_person = 1,
   reps = 1,
-  maxit = 5,
+  maxit = 30,
   bias_max_iter = 1,
   seed = 123
 ))

@@ -8,11 +8,13 @@ vignette: >
 ---
 
 ```{r, include = FALSE}
+is_cran_check <- !isTRUE(as.logical(Sys.getenv("NOT_CRAN", "false")))
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
   fig.width = 7,
-  fig.height = 5
+  fig.height = 5,
+  eval = !is_cran_check
 )
 ```
 
@@ -71,7 +73,7 @@ identical(names(ej2021_study1), names(study1_alt))
 
 ## Minimal Runnable Example
 
-We start with the packaged `example_core` dataset. It is intentionally compact,
+Start with the packaged `example_core` dataset. It is intentionally compact,
 category-complete, and generated from a single latent trait plus facet main
 effects so that help-page examples stay fast without relying on undersized toy
 data. The same object is also available via
@@ -88,7 +90,7 @@ fit_toy <- fit_mfrm(
   score = "Score",
   method = "JML",
   model = "RSM",
-  maxit = 15
+  maxit = 30
 )
 diag_toy <- diagnose_mfrm(fit_toy, residual_pca = "none")
 
@@ -133,7 +135,7 @@ subset(
 
 ## Fit and Diagnose with Full Data
 
-For a realistic analysis, we use the packaged Study 1 dataset:
+For a realistic analysis, use the packaged Study 1 dataset:
 
 ```{r fit-full}
 fit <- fit_mfrm(
@@ -155,8 +157,13 @@ summary(fit)
 summary(diag)
 ```
 
-If you need dimensionality evidence for a final report, you can add residual PCA
-after the initial diagnostic pass:
+If you need residual-structure evidence for a final report, you can add residual
+PCA after the initial diagnostic pass. Treat this as an exploratory screen, not
+as a standalone unidimensionality test or as a DIMTEST/UNIDIM substitute. In
+MFRM reporting, a cautious claim should combine global residual fit,
+element-level fit, residual PCA, and local-dependence screens, for example:
+"evidence consistent with essential unidimensionality under the specified facet
+structure."
 
 ```{r fit-full-pca}
 diag_pca <- diagnose_mfrm(
@@ -182,7 +189,7 @@ fit_rsm_strict <- fit_mfrm(
   method = "MML",
   model = "RSM",
   quad_points = 7,
-  maxit = 10
+  maxit = 30
 )
 diag_rsm_strict <- diagnose_mfrm(
   fit_rsm_strict,
@@ -199,7 +206,7 @@ fit_pcm_strict <- fit_mfrm(
   model = "PCM",
   step_facet = "Criterion",
   quad_points = 7,
-  maxit = 10
+  maxit = 30
 )
 diag_pcm_strict <- diagnose_mfrm(
   fit_pcm_strict,
@@ -220,7 +227,7 @@ screen_rsm <- evaluate_mfrm_diagnostic_screening(
   reps = 1,
   scenarios = c("well_specified", "local_dependence"),
   model = "RSM",
-  maxit = 8,
+  maxit = 30,
   quad_points = 7,
   seed = 123
 )
@@ -229,7 +236,7 @@ screen_pcm <- evaluate_mfrm_diagnostic_screening(
   reps = 1,
   scenarios = c("well_specified", "step_structure_misspecification"),
   model = "PCM",
-  maxit = 8,
+  maxit = 30,
   quad_points = 7,
   seed = 123
 )
@@ -309,6 +316,9 @@ plot_bias_interaction(bias_rep, plot = "scatter")
 The package also supports a separate simulation/prediction layer. The key
 distinction is:
 
+- `evaluate_mfrm_recovery()` checks whether known generating parameters are
+  recovered under a stated simulation design. It is the first simulation check
+  to run when you are validating a model specification or a planned design.
 - `evaluate_mfrm_design()` and `predict_mfrm_population()` are
   design-level helpers that summarize expected operating characteristics under
   an explicit simulation specification.
@@ -324,10 +334,59 @@ sim_spec <- build_mfrm_sim_spec(
   assignment = "rotating"
 )
 
+recovery <- suppressWarnings(
+  evaluate_mfrm_recovery(
+    sim_spec = sim_spec,
+    reps = 2,
+    maxit = 30,
+    seed = 2
+  )
+)
+
+summary(recovery)$recovery_summary[, c("ParameterType", "Facet", "RMSE", "Bias")]
+plot(recovery, type = "summary", metric = "rmse", draw = FALSE)$data$plot_table
+
+recovery_review <- assess_mfrm_recovery(
+  recovery,
+  min_reps = 2,
+  min_se_available = NULL,
+  max_mcse_rmse_ratio = NULL,
+  max_rmse = c(facet = 1, step = 1, default = 1.5),
+  max_abs_bias = c(default = 0.75)
+)
+
+summary(recovery_review)$checklist[, c("Section", "Item", "Status")]
+status_plot <- plot(recovery_review, type = "status", draw = FALSE)
+status_plot$data$section_status
+status_plot$data$reading_order
+
+metric_plot <- plot(recovery_review, type = "metrics", metric = "rmse", draw = FALSE)
+metric_plot$data$plot_table
+metric_plot$data$guidance
+
+recovery_bundle <- build_summary_table_bundle(
+  recovery_review,
+  appendix_preset = "recommended"
+)
+recovery_bundle$table_index[, c("Table", "Rows", "Role")]
+
+# For a release-scale check, use the optional validation protocol:
+# source(system.file("validation", "recovery-validation.R", package = "mfrmr"))
+# validation <- mfrmr_run_recovery_validation(tier = "core", output_dir = "recovery-validation")
+# summary(validation)
+# validation_summary <- mfrmr_summarize_recovery_validation(validation)
+# validation_summary$topline_release_decision
+# validation_summary$release_decision_table
+# validation_summary$domain_decision_table
+# The top-line table is the release-recovery conclusion. It uses recovery
+# metrics, convergence, and Monte Carlo precision as the primary evidence.
+# The domain table keeps uncertainty status separate, so OverallStatus =
+# "review" is not read as a recovery-metric failure by itself.
+
 pred_pop <- predict_mfrm_population(
   sim_spec = sim_spec,
   reps = 2,
-  maxit = 10,
+  maxit = 30,
   seed = 1
 )
 
@@ -342,7 +401,7 @@ toy_mml <- suppressWarnings(
     score = "Score",
     method = "MML",
     quad_points = 5,
-    maxit = 15
+    maxit = 30
   )
 )
 
@@ -359,3 +418,23 @@ pv_units <- sample_mfrm_plausible_values(toy_mml, new_units, n_draws = 2, seed =
 summary(pred_units)$estimates[, c("Person", "Estimate", "Lower", "Upper")]
 summary(pv_units)$draw_summary[, c("Person", "Draws", "MeanValue")]
 ```
+
+For a report or appendix handoff, pass the recovery objects through the same
+summary-table export route used by the rest of the package:
+
+```{r recovery-export, eval = FALSE}
+export_summary_appendix(
+  list(recovery = recovery, recovery_review = recovery_review),
+  output_dir = tempdir(),
+  prefix = "mfrmr_recovery_appendix",
+  preset = "recommended",
+  include_html = FALSE,
+  overwrite = TRUE
+)
+```
+
+For a quick smoke test, `reps = 2` or another very small value is useful only to
+check that the data-generating setup and refit path run. For a study report,
+increase `reps`, keep the ADEMP-style metadata in the exported tables, and set
+substantive RMSE/Bias thresholds so that `assess_mfrm_recovery()` can mark those
+rows as `ok`, `review`, or `concern` rather than `not_assessed`.

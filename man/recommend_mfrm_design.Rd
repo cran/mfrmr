@@ -49,6 +49,11 @@ alias columns when applicable
 \item \code{planning_scope}: explicit record of the current planning contract
 \item \code{planning_constraints}: explicit record of mutable/locked design variables
 \item \code{planning_schema}: combined planner-schema contract
+\item \code{caveats}: structured warning rows for situations where the
+recommendation rests on weak evidence (e.g., no design met every
+threshold; the recommended design is at the boundary of the
+evaluated grid; only one rep was simulated). Empty \code{tibble()}
+when no caveats apply.
 }
 }
 \description{
@@ -80,7 +85,7 @@ sim_eval <- suppressWarnings(evaluate_mfrm_design(
   n_criterion = 2,
   raters_per_person = 1,
   reps = 1,
-  maxit = 8,
+  maxit = 30,
   seed = 123
 ))
 rec <- recommend_mfrm_design(sim_eval)

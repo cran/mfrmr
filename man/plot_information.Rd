@@ -6,7 +6,7 @@
 \usage{
 plot_information(
   x,
-  type = c("tif", "iif", "se", "both"),
+  type = c("tif", "iif", "se", "sem", "csem", "both"),
   facet = NULL,
   draw = TRUE,
   ...
@@ -16,9 +16,9 @@ plot_information(
 \item{x}{Output from \code{\link[=compute_information]{compute_information()}}.}
 
 \item{type}{\code{"tif"} for the overall precision curve (default), \code{"iif"} for
-facet-level contribution curves, \code{"se"} for the approximate standard error
-implied by that curve, or \code{"both"} for precision with approximate SE on a
-secondary axis.}
+facet-level contribution curves, \code{"se"} / \code{"sem"} / \code{"csem"} for the
+conditional standard error of measurement implied by that curve, or
+\code{"both"} for precision with conditional SEM on a secondary axis.}
 
 \item{facet}{For \code{type = "iif"}, which facet to plot. If \code{NULL},
 the first facet is used.}
@@ -39,8 +39,8 @@ per-facet-level contribution curves from \code{\link[=compute_information]{compu
 
 \itemize{
 \item \code{"tif"}: overall design-weighted precision across theta.
-\item \code{"se"}: approximate standard error across theta.
-\item \code{"both"}: precision and approximate SE together, useful for presentations.
+\item \code{"se"} / \code{"sem"} / \code{"csem"}: conditional SEM across theta.
+\item \code{"both"}: precision and conditional SEM together, useful for presentations.
 \item \code{"iif"}: facet-level contribution curves for one selected facet in a
 supported \code{RSM}, \code{PCM}, or bounded \code{GPCM} fit.
 }
@@ -50,8 +50,8 @@ supported \code{RSM}, \code{PCM}, or bounded \code{GPCM} fit.
 
 \itemize{
 \item Use \code{"tif"} for a quick overall read on precision.
-\item Use \code{"se"} when standard-error language is easier to communicate than
-precision.
+\item Use \code{"sem"} or \code{"csem"} when standard-error language is easier to
+communicate than precision.
 \item Use \code{"both"} when you want both views in one figure.
 \item Use \code{"iif"} when you want to see which facet levels are shaping the total
 precision curve.
@@ -62,7 +62,7 @@ precision curve.
 
 \itemize{
 \item The total curve peaks where the realized design is most precise.
-\item SE is derived as \code{1 / sqrt(precision)}; lower is better.
+\item Conditional SEM is derived as \code{1 / sqrt(precision)}; lower is better.
 \item Facet-level curves show which facet levels contribute most to that
 realized precision at each theta.
 \item For bounded \code{GPCM}, those contributions include the squared
@@ -77,7 +77,10 @@ realized design may be poorly targeted.
 \code{draw = FALSE} returns an \code{mfrm_plot_data} object. The underlying plotting
 data are stored in \verb{$data$plot}. For \code{type = "tif"}, \code{"se"}, or \code{"both"},
 those rows come from \code{x$tif}. For \code{type = "iif"}, the returned rows come
-from \code{x$iif} filtered to the requested facet.
+from \code{x$iif} filtered to the requested facet. The plot data also include
+\code{plot_long}, \code{information_long}, \code{conditional_sem}, \code{summary}, and
+\code{settings} so ggplot2, plotly, Quarto, and table workflows can reuse the
+information and conditional-SEM series without parsing the drawn figure.
 }
 
 \section{Typical workflow}{
@@ -87,15 +90,15 @@ from \code{x$iif} filtered to the requested facet.
 \item Plot with \code{plot_information(info)} for the total precision curve.
 \item Use \code{plot_information(info, type = "iif", facet = "Rater")} for
 facet-level contributions.
-\item Use \code{draw = FALSE} when you want reusable plotting payloads for custom
-graphics or reporting helpers.
+\item Use \code{draw = FALSE} when you want reusable plot data for custom graphics
+or reporting helpers.
 }
 }
 
 \examples{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                 method = "JML", model = "RSM", maxit = 25)
+                 method = "JML", model = "RSM", maxit = 30)
 info <- compute_information(fit)
 tif_data <- plot_information(info, type = "tif", draw = FALSE)
 head(tif_data$data$plot)

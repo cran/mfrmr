@@ -20,7 +20,8 @@ An object of class \code{summary.mfrm_reporting_checklist} with:
 \item \code{overview}: run-level counts of available and draft-ready items
 \item \code{section_summary}: section-level checklist coverage
 \item \code{software_scope}: external-software relationship summary
-\item \code{visual_scope}: plotting-route and 3D-ready payload summary, including
+\item \code{facets_positioning}: report-ready FACETS relationship wording
+\item \code{visual_scope}: plotting-route and 3D-ready data-handoff summary, including
 the main \code{InterpretationCheck} caveat for each visual family
 \item \code{priority_summary}: counts by priority/severity
 \item \code{action_items}: highest-priority rows that still need draft work
@@ -35,7 +36,7 @@ Summarize a reporting-checklist bundle for manuscript work
 \donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "MML", maxit = 200)
+                method = "MML", quad_points = 7, maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "both", diagnostic_mode = "both")
 chk <- reporting_checklist(fit, diagnostics = diag)
 summary(chk)

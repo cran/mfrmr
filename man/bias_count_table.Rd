@@ -82,7 +82,7 @@ For a plot-selection guide and a longer walkthrough, see
 
 The \code{table} data.frame contains, in the legacy-compatible branch:
 \describe{
-\item{FacetA, FacetB}{Interaction facet level identifiers; placeholder
+\item{FacetA, FacetB}{Interaction facet level identifiers; generic
 names for the two interaction facets.}
 \item{Sq}{Sequential row number.}
 \item{Observd Count}{Number of observations for this cell.}
@@ -103,7 +103,7 @@ cells.}
 
 \examples{
 toy <- load_mfrmr_data("example_bias")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "none")
 bias <- estimate_bias(fit, diag, facet_a = "Rater", facet_b = "Criterion", max_iter = 2)
 t11 <- bias_count_table(bias)

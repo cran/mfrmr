@@ -18,7 +18,7 @@ FACETS or ConQuest numerical equivalence.
 SPSS is treated differently from FACETS and ConQuest: \code{mfrmr} currently
 supports table/data-frame/CSV handoff for SPSS-oriented reporting workflows,
 but it does not generate SPSS syntax, write native SPSS system files, execute
-SPSS estimators, or claim SPSS numerical parity.
+SPSS estimators, or claim SPSS numerical equivalence.
 }
 \section{When to use this layer}{
 
@@ -27,7 +27,7 @@ SPSS estimators, or claim SPSS numerical parity.
 \item You need fixed-width text blocks for console, logs, or archival handoff.
 \item You need graphfile or scorefile style outputs for downstream legacy tools.
 \item You are checking column coverage and metric consistency against a
-compatibility contract.
+FACETS-style output contract.
 }
 }
 
@@ -44,6 +44,9 @@ compatibility contract.
 \section{Compatibility map}{
 
 \describe{
+\item{\code{\link[=facets_positioning_guide]{facets_positioning_guide()}}}{User-facing wording for the package's
+relationship to FACETS. Use before describing compatibility outputs in a
+report or migration note.}
 \item{\code{\link[=run_mfrm_facets]{run_mfrm_facets()}}}{One-shot legacy-compatible wrapper that fits,
 diagnoses, and returns key tables in one object.}
 \item{\code{\link[=mfrmRFacets]{mfrmRFacets()}}}{Alias for \code{\link[=run_mfrm_facets]{run_mfrm_facets()}} kept for continuity.}
@@ -51,10 +54,14 @@ diagnoses, and returns key tables in one object.}
 blocks. Best when a text-only compatibility artifact is required.}
 \item{\code{\link[=facets_output_file_bundle]{facets_output_file_bundle()}}}{Graphfile/scorefile style CSV and
 fixed-width exports for legacy pipelines.}
-\item{\code{\link[=facets_parity_report]{facets_parity_report()}}}{Column and metric contract audit against
-the compatibility specification. Use only when an explicit compatibility
-contract audit is part of the task; the function name is historical and does
-not by itself imply external FACETS equivalence.}
+\item{\code{\link[=write_mfrm_residual_file]{write_mfrm_residual_file()}}}{Package-native observation-level
+residual CSV/TSV export for reviewer, spreadsheet, or external QC handoff.}
+\item{\code{\link[=write_mfrm_subset_file]{write_mfrm_subset_file()}}}{Package-native connected-subset summary
+and node-membership CSV/TSV export for linking review handoff.}
+\item{\code{\link[=facets_output_contract_review]{facets_output_contract_review()}}}{Column and metric review against
+the FACETS-style output-contract specification. Use only when an explicit
+output-contract review is part of the task; it checks the package output contract
+and does not imply external FACETS equivalence.}
 }
 }
 
@@ -68,8 +75,10 @@ not by itself imply external FACETS equivalence.}
 \item Instead of \code{\link[=facets_output_file_bundle]{facets_output_file_bundle()}}, prefer:
 \code{\link[=category_curves_report]{category_curves_report()}} or \code{\link[=category_structure_report]{category_structure_report()}} plus
 \code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}}.
-\item Instead of \code{\link[=facets_parity_report]{facets_parity_report()}} for routine QA, prefer:
-\code{\link[=reference_case_audit]{reference_case_audit()}} for package-native completeness auditing or
+\item For residual or subset handoff, prefer \code{\link[=write_mfrm_residual_file]{write_mfrm_residual_file()}} and
+\code{\link[=write_mfrm_subset_file]{write_mfrm_subset_file()}} over reusing graph/score compatibility exports.
+\item Instead of \code{\link[=facets_output_contract_review]{facets_output_contract_review()}} for routine QA, prefer:
+\code{\link[=reference_case_review]{reference_case_review()}} for package-native completeness review or
 \code{\link[=reference_case_benchmark]{reference_case_benchmark()}} for internal benchmark cases.
 }
 }
@@ -77,6 +86,8 @@ not by itself imply external FACETS equivalence.}
 \section{Practical migration rules}{
 
 \itemize{
+\item Start FACETS-facing reports with \code{\link[=facets_positioning_guide]{facets_positioning_guide()}} when readers
+might otherwise assume FACETS numerical reproduction.
 \item Keep compatibility wrappers only where a downstream consumer truly needs
 the old layout or fixed-width format.
 \item For new scripts, start from package-native bundles and add compatibility
@@ -90,12 +101,27 @@ FACETS, ConQuest, and SPSS relationship wording for a fitted analysis.
 }
 }
 
+\section{Retained table-field names}{
+
+\itemize{
+\item \code{row_review} is the data-quality table field used to document row
+filtering. FACETS-style column and metric contract results are exposed as
+\code{column_review} and \code{metric_checks}.
+\item Prediction outputs expose row-preparation and person-omission
+traceability as \code{row_review} and \code{population_review}.
+\item \code{hierarchical_review}, \code{shrinkage_review}, and \code{nesting_review} are
+manifest or model-comparison traceability fields. They are not callable
+helper names; user-facing helper names use review/check terminology.
+}
+}
+
 \section{Typical workflow}{
 
 \itemize{
 \item Legacy handoff:
 \code{\link[=run_mfrm_facets]{run_mfrm_facets()}} -> \code{\link[=build_fixed_reports]{build_fixed_reports()}} ->
-\code{\link[=facets_output_file_bundle]{facets_output_file_bundle()}}.
+\code{\link[=facets_output_file_bundle]{facets_output_file_bundle()}} plus \code{\link[=write_mfrm_residual_file]{write_mfrm_residual_file()}} /
+\code{\link[=write_mfrm_subset_file]{write_mfrm_subset_file()}} only when those standalone files are needed.
 \item Mixed workflow:
 \code{RSM} / \code{PCM}:
 \code{\link[=fit_mfrm]{fit_mfrm()}} -> \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} -> \code{\link[=build_apa_outputs]{build_apa_outputs()}} ->
@@ -104,14 +130,16 @@ bounded \code{GPCM}:
 \code{\link[=fit_mfrm]{fit_mfrm()}} -> \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} -> \code{\link[=reporting_checklist]{reporting_checklist()}} ->
 graph-only compatibility export only when a legacy handoff truly requires
 it.
-\item Compatibility-contract audit:
-\code{\link[=fit_mfrm]{fit_mfrm()}} -> \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} -> \code{\link[=facets_parity_report]{facets_parity_report()}}.
+\item FACETS output-contract review:
+\code{\link[=fit_mfrm]{fit_mfrm()}} -> \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} -> \code{\link[=facets_output_contract_review]{facets_output_contract_review()}}.
 }
 }
 
 \section{Companion guides}{
 
 \itemize{
+\item For FACETS coverage and boundary wording, see
+\code{\link[=facets_positioning_guide]{facets_positioning_guide()}} and \code{\link[=facets_feature_coverage]{facets_feature_coverage()}}.
 \item For standard reports/tables, see \link{mfrmr_reports_and_tables}.
 \item For manuscript-draft reporting, see \link{mfrmr_reporting_and_apa}.
 \item For visual diagnostics, see \link{mfrmr_visual_diagnostics}.
@@ -130,7 +158,7 @@ run <- run_mfrm_facets(
   person = "Person",
   facets = c("Rater", "Criterion"),
   score = "Score",
-  maxit = 10
+  maxit = 30
 )
 summary(run)
 compatibility_alias_table("functions")

@@ -10,7 +10,7 @@ facet_quality_dashboard(
   facet = NULL,
   bias_results = NULL,
   severity_warn = 1,
-  misfit_warn = 1.5,
+  misfit_warn = NULL,
   central_tendency_max = 0.25,
   bias_count_warn = 1L,
   bias_abs_t_warn = 2,
@@ -71,9 +71,12 @@ complementary criteria:
 \itemize{
 \item \strong{Severity}: elements with \eqn{|\mathrm{Estimate}| >}
 \code{severity_warn} logits are flagged as unusually harsh or lenient.
-\item \strong{Misfit}: elements with Infit or Outfit MnSq outside
+\item \strong{Misfit}: elements with Infit or Outfit MnSq outside the
+acceptance band are flagged. The band defaults to the package
+pair returned by \code{\link[=mfrm_misfit_thresholds]{mfrm_misfit_thresholds()}} (Linacre 0.5-1.5);
+pass \code{misfit_warn = 1.5} to keep the older symmetric
 \eqn{[1/}\code{misfit_warn}\eqn{,\;}\code{misfit_warn}\eqn{]}
-(default 0.67--1.5) are flagged.
+form (0.67-1.5).
 \item \strong{Central tendency}: elements with
 \eqn{|\mathrm{Estimate}| <} \code{central_tendency_max} logits
 are flagged.  Near-zero estimates may indicate a rater who avoids
@@ -93,8 +96,12 @@ certification, more lenient for formative assessment.
 \section{Output}{
 
 The returned object is a bundle-like list with class
-\code{mfrm_facet_dashboard} and components such as:
+\code{mfrm_facet_dashboard} and components:
 \itemize{
+\item \code{facet}: character scalar naming the dashboard's target facet
+\item \code{facet_source}: character scalar describing whether the target
+facet was inferred from the fit configuration or supplied
+explicitly
 \item \code{overview}: one-row structural overview
 \item \code{summary}: one-row screening summary
 \item \code{detail}: level-level detail table
@@ -103,13 +110,18 @@ The returned object is a bundle-like list with class
 \item \code{bias_sources}: per-bundle bias aggregation metadata
 \item \code{settings}: resolved threshold settings
 \item \code{notes}: short interpretation notes
+\item \code{diagnostics}: the \code{mfrm_diagnostics} bundle the dashboard was
+built from (echoed for downstream helpers that need to traverse
+the same diagnostics object)
+\item \code{bias_results}: the \code{mfrm_bias} bundle (or list of bundles)
+when \code{bias_results} was supplied; \code{NULL} otherwise
 }
 }
 
 \examples{
 toy <- load_mfrmr_data("example_core")
 toy <- toy[toy$Person \%in\% unique(toy$Person)[1:8], ]
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 50)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "none")
 dash <- facet_quality_dashboard(fit, diagnostics = diag)
 summary(dash)

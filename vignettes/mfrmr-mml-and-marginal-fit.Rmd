@@ -8,9 +8,11 @@ vignette: >
 ---
 
 ```{r, include = FALSE}
+is_cran_check <- !isTRUE(as.logical(Sys.getenv("NOT_CRAN", "false")))
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>"
+  comment = "#>",
+  eval = !is_cran_check
 )
 ```
 
@@ -69,16 +71,17 @@ strict marginal expected values.
 
 ## Current MML scope
 
-For the current public `RSM` / `PCM` release:
+For the `RSM` / `PCM` MML branch:
 
 - the person distribution is integrated with Gauss-Hermite quadrature
 - `mml_engine = "direct"` uses gradient-based direct optimization of the
   marginal log-likelihood
 - `mml_engine = "em"` and `mml_engine = "hybrid"` are also available for
-  `RSM` / `PCM`, while unsupported branches fall back to `direct`
+  `RSM` / `PCM`; bounded `GPCM` uses the direct engine regardless of that
+  option
 - person summaries are reported post-hoc from the integrated posterior
 
-This is the implemented scope for the current release.
+This is the implemented MML-engine scope for this release.
 
 ## Strict Marginal Diagnostic Target
 
@@ -148,8 +151,9 @@ r = \frac{T - \hat{\mathbb{E}}(T)}{\hat{s}_D},
 4. Posterior predictive follow-up.
    Sinharay et al. (2006) treat posterior predictive checking as a separate
    model-checking family built around replicated datasets and discrepancy
-   measures. That is the intended follow-up role of the package's currently
-   scaffolded `posterior_predictive_follow_up` path.
+   measures. That is the intended follow-up role of the package's
+   `posterior_predictive_follow_up` path, which is reserved for a future
+   release.
 
 5. Many-facet reporting context.
    Linacre's FACETS framework and applied MFRM studies such as Eckes (2005)
@@ -173,6 +177,25 @@ That design choice follows the broader review logic in Sinharay and Monroe
 (2025): use several complementary diagnostics, match them to the intended use
 of the scores, and examine practical significance before making strong claims.
 
+### Assumption: independent-Bernoulli variance for grouped counts
+
+The `marginal_fit` grid sums per-observation posterior-integrated
+variances as `VarianceCount = sum_i w_i^2 * p_i * (1 - p_i)`, which
+treats observations within a cell as independent Bernoulli draws
+given the fitted parameters. This is the same independence assumption
+that underlies conditional independence in the MFRM specification
+(Linacre, 1989). When the rating design violates it - e.g. multiple
+ratings by the same rater on the same person-criterion combination -
+cell-level posterior variances can be underestimated, which in turn
+makes the reported standard errors and screening t-statistics
+slightly optimistic. The documented follow-up is
+`diagnose_mfrm(..., diagnostic_mode = "both")` combined with
+`strict_pairwise_local_dependence`, which surfaces evidence of
+dependence at the pair level. See Haberman and Sinharay (2013) for a
+generalized-residual framework that models such dependence
+explicitly; that path is not yet included in the current release
+scope.
+
 For many-facet reporting, one additional boundary matters. Facet-level
 separation/reliability and inter-rater agreement answer different questions.
 High rater separation reliability can coexist with weak observed agreement, and
@@ -191,9 +214,20 @@ The current simulation-based validation covers:
 
 These checks target `RSM` and `PCM`. `GPCM` is now supported only within a
 bounded core route: fitting, slope summaries, posterior scoring, information
-curves, direct curve/category reports, and exploratory residual-based follow-up.
-Broader APA/report bundles, fair-average semantics, and planning/forecasting
-helpers remain out of scope for `GPCM` in this release.
+curves, direct curve/category reports, exploratory residual-based follow-up,
+direct recovery checks, and the slope-aware element-conditional
+`fair_average_table()` and `estimate_bias()`. Historical fair-average SE
+columns remain scaled facet-measure SEs rather than delta-method SEs of the
+fair-average value; `fair_average_table(fair_se = TRUE)` adds distinct
+structural delta-method fair-average SEs for non-person rows when the MML
+observed-information Hessian is available. Bias SE / `t` / `Prob.` columns are
+conditional plug-in screening quantities, and bounded-GPCM rows also carry
+profile-likelihood follow-up columns. Summary-table appendix export is
+available for supported direct outputs. The APA writer, fit-based
+report/export bundles, FACETS-style
+score-side exports, QC pass/fail pipelines, linking synthesis, and planning /
+forecasting helpers remain out of scope for `GPCM` in this release. See
+`gpcm_capability_matrix()` for the full per-helper support contract.
 
 ## Why GPCM Is The Current Upper Scope
 
@@ -216,7 +250,7 @@ Robitzsch and Steinfeld (2018) are helpful because they separate two arguments
 that are often conflated in applied many-facet work.
 
 1. A generalized many-facet model with discrimination parameters will often fit
-   empirical data better than a Rasch-MFRM.
+   empirical data better than an equal-weighting `RSM`/`PCM` fit.
 2. That fit advantage does not, by itself, settle the operational scoring
    question.
 
@@ -227,14 +261,43 @@ equal-weighting reference models and bounded `GPCM` as a supported alternative
 for users who explicitly want to inspect or allow discrimination-based
 reweighting.
 
-This is also why some score-side helpers remain out of scope for bounded
-`GPCM`. FACETS-style fair averages are Rasch-family score transformations, and
-a slope-aware analogue should not silently reuse the Rasch-family calculation.
+This is also why score-side FACETS output-contract routes (for example,
+score-side `facets_output_file_bundle()`), manuscript-grade APA text, and
+fit-based report/export bundles remain out of scope for bounded `GPCM` in this
+release: their published forms are Rasch-family score transformations, and the
+slope-aware analogue that would replace them in a free-discrimination context
+requires careful delta-method standard-error handling. `fair_average_table()`
+and `estimate_bias()` themselves are now available under bounded `GPCM` via the
+slope-aware element-conditional kernel. For fair averages,
+`fair_average_table(fair_se = TRUE)` adds structural delta-method SEs for
+non-person rows when the MML Hessian is available; the historical `SE` columns
+remain measure-level SEs.
 
 One additional distinction matters for implementation. The `weight` argument in
 `fit_mfrm()` is an observation-weight column. It changes how rating events
 enter estimation and summaries, but it is not the same thing as the
 equal-weighting versus discrimination-weighting question discussed above.
+
+## Practical Reading Order
+
+For users deciding among `RSM`, `PCM`, and bounded `GPCM`, use this reading
+order:
+
+1. Start with the score claim. If category thresholds should be common, begin
+   with `RSM`; if thresholds may vary by a designated step facet, begin with
+   `PCM`.
+2. Fit the Rasch-family reference model with `method = "MML"` and read
+   `summary(fit)` plus `summary(diagnose_mfrm(fit, diagnostic_mode = "both"))`.
+3. Fit bounded `GPCM` only when discrimination-based reweighting is a meaningful
+   sensitivity question, not as a routine replacement for the equal-weighting
+   model.
+4. If bounded `GPCM` fits better, report what changed: slopes, information
+   redistribution, bias-screening rows, fair averages, or conclusions. Do not
+   let fit improvement alone decide the operational model.
+
+This sequence keeps the interpretation aligned with the validation boundary:
+`RSM`/`PCM` support the full manuscript/reporting route, while bounded `GPCM`
+supports the documented direct and caveated routes.
 
 ## Future extensions
 
@@ -278,10 +341,9 @@ For the current release, the most defensible interpretation sequence is:
 - Orlando, M., & Thissen, D. (2003). *Further investigation of the performance
   of S-X2: An item fit index for use with dichotomous item response theory
   models*. Applied Psychological Measurement, 27, 289-298.
-- Robitzsch, A., & Steinfeld, J. (2018). *Modeling rater effects in
-  achievement tests by item response models: Facets, generalized linear mixed
-  models, or signal detection models?* Journal of Educational and Behavioral
-  Statistics, 43, 218-244.
+- Robitzsch, A., & Steinfeld, J. (2018). *Item response models for human
+  ratings: Overview, estimation methods, and implementation in R*.
+  Psychological Test and Assessment Modeling, 60(1), 101-139.
 - Sinharay, S., & Monroe, S. (2025). *Assessment of fit of item response
   theory models: A critical review of the status quo and some future
   directions*. British Journal of Mathematical and Statistical Psychology, 78,

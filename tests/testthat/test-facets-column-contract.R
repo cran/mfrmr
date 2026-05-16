@@ -114,14 +114,14 @@ test_that("FACETS column contract is satisfied by current outputs", {
     collapse = "\n"
   ))
 
-  parity_summary <- data.frame(
+  contract_summary <- data.frame(
     Components = nrow(audit),
     FullCoverage = sum(audit$coverage == 1),
     MeanCoverage = mean(audit$coverage),
     MinCoverage = min(audit$coverage),
     stringsAsFactors = FALSE
   )
-  expect_equal(parity_summary$FullCoverage, parity_summary$Components)
-  expect_equal(parity_summary$MeanCoverage, 1)
-  expect_equal(parity_summary$MinCoverage, 1)
+  expect_equal(contract_summary$FullCoverage, contract_summary$Components)
+  expect_equal(contract_summary$MeanCoverage, 1)
+  expect_equal(contract_summary$MinCoverage, 1)
 })

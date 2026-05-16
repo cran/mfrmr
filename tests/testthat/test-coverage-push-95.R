@@ -106,7 +106,7 @@ test_that("summary.mfrm_data_description missing data note", {
   d$Score[1:2] <- NA
   ds <- describe_mfrm_data(d, "Person", c("Rater", "Task", "Criterion"), "Score")
   s <- summary(ds)
-  expect_true(grepl("Missing", s$notes))
+  expect_true(any(grepl("Missing", s$notes)))
 })
 
 test_that("print.summary.mfrm_data_description exercises all sections", {
@@ -150,49 +150,49 @@ test_that("plot.mfrm_data_description missing draws", {
   })
 })
 
-# ==== anchor audit print with issues ====
+# ==== anchor review print with issues ====
 
-test_that("print.mfrm_anchor_audit with nonzero issues", {
+test_that("print.mfrm_anchor_review with nonzero issues", {
   d <- mfrmr:::sample_mfrm_data(seed = 1)
   anchors <- data.frame(
     Facet = c("Rater", "Rater", "Task"),
     Level = c("R1", "R2", "T1"),
     Anchor = c(0.5, -0.3, 0.1)
   )
-  audit <- audit_mfrm_anchors(
+  audit <- review_mfrm_anchors(
     d, "Person", c("Rater", "Task", "Criterion"), "Score",
     anchors = anchors
   )
   out <- capture.output(print(audit))
-  expect_true(any(grepl("anchor audit", out)))
+  expect_true(any(grepl("anchor review", out)))
 })
 
-test_that("summary.mfrm_anchor_audit with issues", {
+test_that("summary.mfrm_anchor_review with issues", {
   d <- mfrmr:::sample_mfrm_data(seed = 1)
   anchors <- data.frame(
     Facet = c("Rater", "Rater", "Task"),
     Level = c("R1", "R2", "T1"),
     Anchor = c(0.5, -0.3, 0.1)
   )
-  audit <- audit_mfrm_anchors(
+  audit <- review_mfrm_anchors(
     d, "Person", c("Rater", "Task", "Criterion"), "Score",
     anchors = anchors
   )
   s <- summary(audit)
   out <- capture.output(print(s))
-  expect_true(any(grepl("Audit", out)))
+  expect_true(any(grepl("Review", out)))
 })
 
-# ==== plot.mfrm_anchor_audit with draw=TRUE ====
+# ==== plot.mfrm_anchor_review with draw=TRUE ====
 
-test_that("plot.mfrm_anchor_audit issue_counts draws", {
+test_that("plot.mfrm_anchor_review issue_counts draws", {
   d <- mfrmr:::sample_mfrm_data(seed = 1)
   anchors <- data.frame(
     Facet = c("Rater", "Rater", "Task"),
     Level = c("R1", "R2", "T1"),
     Anchor = c(0.5, -0.3, 0.1)
   )
-  audit <- audit_mfrm_anchors(
+  audit <- review_mfrm_anchors(
     d, "Person", c("Rater", "Task", "Criterion"), "Score",
     anchors = anchors
   )
@@ -478,17 +478,17 @@ test_that("analyze_residual_pca loadings draws", {
   })
 })
 
-# ==== format_anchor_audit_message with issues ====
+# ==== format_anchor_review_message with issues ====
 
-test_that("format_anchor_audit_message with zero issues", {
-  msg <- mfrmr:::format_anchor_audit_message(
+test_that("format_anchor_review_message with zero issues", {
+  msg <- mfrmr:::format_anchor_review_message(
     list(issue_counts = data.frame(Issue = "dup", N = 0L))
   )
   expect_true(grepl("no issues", msg))
 })
 
-test_that("format_anchor_audit_message with NULL", {
-  msg <- mfrmr:::format_anchor_audit_message(
+test_that("format_anchor_review_message with NULL", {
+  msg <- mfrmr:::format_anchor_review_message(
     list(issue_counts = NULL)
   )
   expect_true(grepl("no issues", msg))
@@ -508,7 +508,7 @@ test_that("fit_mfrm anchor_policy error fires on bad anchors", {
       fit_mfrm(d, "Person", c("Rater", "Task", "Criterion"), "Score",
                anchors = bad_anchors, anchor_policy = "error",
                method = "JML", maxit = 5)
-    ), "Anchor audit|anchor"
+    ), "Anchor review|anchor"
   )
 })
 
@@ -624,41 +624,41 @@ test_that("build_fixed_reports with empty bias returns empty list", {
   expect_true(is.list(result))
 })
 
-# ==== print.mfrm_anchor_audit exercises deeper branches ====
+# ==== print.mfrm_anchor_review exercises deeper branches ====
 
-test_that("print.mfrm_anchor_audit with design_checks", {
+test_that("print.mfrm_anchor_review with design_checks", {
   d <- mfrmr:::sample_mfrm_data(seed = 1)
   anchors <- data.frame(
     Facet = c("Rater", "Rater", "Task"),
     Level = c("R1", "R2", "T1"),
     Anchor = c(0.5, -0.3, 0.1)
   )
-  audit <- audit_mfrm_anchors(
+  audit <- review_mfrm_anchors(
     d, "Person", c("Rater", "Task", "Criterion"), "Score",
     anchors = anchors
   )
   # Ensure design_checks has level_observation_summary
   expect_true(!is.null(audit$design_checks$level_observation_summary))
   out <- capture.output(print(audit))
-  expect_true(any(grepl("anchor audit", out)))
+  expect_true(any(grepl("anchor review", out)))
 })
 
-# ==== summary/print.mfrm_anchor_audit with nonzero issue counts ====
+# ==== summary/print.mfrm_anchor_review with nonzero issue counts ====
 
-test_that("summary.mfrm_anchor_audit exercises issue count and recommendation branches", {
+test_that("summary.mfrm_anchor_review exercises issue count and recommendation branches", {
   d <- mfrmr:::sample_mfrm_data(seed = 1)
   anchors <- data.frame(
     Facet = c("Rater", "Rater", "Task"),
     Level = c("R1", "R2", "T1"),
     Anchor = c(0.5, -0.3, 0.1)
   )
-  audit <- audit_mfrm_anchors(
+  audit <- review_mfrm_anchors(
     d, "Person", c("Rater", "Task", "Criterion"), "Score",
     anchors = anchors
   )
   s <- summary(audit, top_n = 2)
   out <- capture.output(print(s))
-  expect_true(any(grepl("Audit", out)))
+  expect_true(any(grepl("Review", out)))
 })
 
 # ==== Additional type-check errors for remaining uncovered stop() lines ====
@@ -711,12 +711,12 @@ test_that("facets_chisq_table with empty summary returns empty df", {
   # summary_tbl empty branch (line 1688) - only if tbl empty
 })
 
-# ==== anchor audit plot error branches ====
+# ==== anchor review plot error branches ====
 
-test_that("plot.mfrm_anchor_audit error on empty issue_counts", {
+test_that("plot.mfrm_anchor_review error on empty issue_counts", {
   fake_audit <- structure(
     list(issue_counts = data.frame(), facet_summary = data.frame()),
-    class = "mfrm_anchor_audit"
+    class = "mfrm_anchor_review"
   )
   expect_error(
     plot(fake_audit, type = "issue_counts"),
@@ -724,10 +724,10 @@ test_that("plot.mfrm_anchor_audit error on empty issue_counts", {
   )
 })
 
-test_that("plot.mfrm_anchor_audit error on empty facet_summary", {
+test_that("plot.mfrm_anchor_review error on empty facet_summary", {
   fake_audit <- structure(
     list(issue_counts = data.frame(), facet_summary = data.frame()),
-    class = "mfrm_anchor_audit"
+    class = "mfrm_anchor_review"
   )
   expect_error(
     plot(fake_audit, type = "facet_constraints"),
@@ -735,14 +735,14 @@ test_that("plot.mfrm_anchor_audit error on empty facet_summary", {
   )
 })
 
-test_that("plot.mfrm_anchor_audit error on empty level_observations", {
+test_that("plot.mfrm_anchor_review error on empty level_observations", {
   fake_audit <- structure(
     list(
       issue_counts = data.frame(),
       facet_summary = data.frame(),
       design_checks = list(level_observation_summary = data.frame())
     ),
-    class = "mfrm_anchor_audit"
+    class = "mfrm_anchor_review"
   )
   expect_error(
     plot(fake_audit, type = "level_observations"),

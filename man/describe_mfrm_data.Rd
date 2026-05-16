@@ -13,6 +13,7 @@ describe_mfrm_data(
   rating_min = NULL,
   rating_max = NULL,
   keep_original = FALSE,
+  missing_codes = NULL,
   include_person_facet = FALSE,
   include_agreement = TRUE,
   rater_facet = NULL,
@@ -43,6 +44,14 @@ support.}
 \code{rating_min} / \code{rating_max} when the intended scale has unused
 intermediate categories such as \verb{1, 2, 4, 5} on a 1-5 scale.}
 
+\item{missing_codes}{Optional. \code{NULL} (default) is a no-op;
+\code{TRUE} or \code{"default"} activates the FACETS / SPSS / SAS
+convention (\code{c("99", "999", "-1", "N", "NA", "n/a", ".", "")});
+supply a character vector for a custom code set. Replacement
+counts are returned in the \code{missing_recoding} component when
+supported by the calling helper. See \code{\link[=recode_missing_codes]{recode_missing_codes()}}
+for the standalone version.}
+
 \item{include_person_facet}{If \code{TRUE}, include person-level rows in
 \code{facet_level_summary}.}
 
@@ -62,6 +71,8 @@ A list of class \code{mfrm_data_description} with:
 \itemize{
 \item \code{overview}: one-row run-level summary
 \item \code{missing_by_column}: missing counts in selected input columns
+\item \code{missing_rate_summary}: per-column missingness rate summary
+(one row per input column, with raw and proportion-of-N columns)
 \item \code{score_descriptives}: output from \code{\link[psych:describe]{psych::describe()}} for score
 \item \code{weight_descriptives}: output from \code{\link[psych:describe]{psych::describe()}} for weight
 \item \code{score_distribution}: weighted and raw score frequencies over the prepared
@@ -69,8 +80,15 @@ score support. Unused boundary categories are retained when the rating
 range was supplied explicitly; unused intermediate categories require
 \code{keep_original = TRUE}.
 \item \code{facet_level_summary}: per-level usage and score summaries
+\item \code{facet_crosstabs}: pairwise observation-count crosstabs between
+non-person facets (named list keyed \code{"facetA__facetB"}); used by
+\code{summary(ds)$design_links} to flag sparse / disconnected
+facet-pair coverage
 \item \code{linkage_summary}: person-facet connectivity diagnostics
 \item \code{agreement}: observed-score inter-rater agreement bundle
+\item \code{row_retention}: row counts before and after preparation filters
+\item \code{preparation_notes}: structured notes for row drops, ID trimming, and
+design conditions detected during preparation
 \item \code{score_support}: minimal prepared score-support metadata used by
 \code{summary(ds)$caveats}
 }
@@ -142,5 +160,5 @@ p_ds <- plot(ds, draw = FALSE)
 p_ds$data$plot
 }
 \seealso{
-\code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=audit_mfrm_anchors]{audit_mfrm_anchors()}}
+\code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}}
 }

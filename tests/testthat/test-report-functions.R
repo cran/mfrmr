@@ -38,8 +38,278 @@ test_that("estimation_iteration_report returns a bundle", {
 test_that("data_quality_report returns a bundle", {
   dq <- data_quality_report(.fit)
   expect_s3_class(dq, "mfrm_bundle")
+  expect_true("quality_overview" %in% names(dq))
+  expect_true("quality_flags" %in% names(dq))
+  expect_true("facet_response_patterns" %in% names(dq))
+  expect_false("attention_items" %in% names(dq))
+  expect_true(all(c("Area", "Status", "NextStep") %in% names(dq$quality_overview)))
   s <- summary(dq)
   expect_s3_class(s, "summary.mfrm_bundle")
+  expect_error(
+    data_quality_report(.fit, dominant_category_cutoff = 0),
+    "`dominant_category_cutoff`"
+  )
+})
+
+test_that("data_quality_report flags retained zero-frequency score categories", {
+  d <- mfrmr:::sample_mfrm_data(seed = 42)
+  d <- d[d$Score != 3, , drop = FALSE]
+  fit <- suppressWarnings(
+    fit_mfrm(
+      d, "Person", c("Rater", "Task", "Criterion"), "Score",
+      method = "JML", maxit = 8,
+      rating_min = 1, rating_max = 5,
+      keep_original = TRUE
+    )
+  )
+  dq <- data_quality_report(
+    fit,
+    data = d,
+    person = "Person",
+    facets = c("Rater", "Task", "Criterion"),
+    score = "Score"
+  )
+  zero_row <- dq$category_counts[dq$category_counts$Score == 3, , drop = FALSE]
+  expect_equal(nrow(zero_row), 1L)
+  expect_true(isTRUE(zero_row$ZeroCount[1]))
+  expect_identical(zero_row$UnusedCategoryType[1], "internal")
+  expect_true("zero_count_intermediate_score_category" %in% dq$caveats$Condition)
+  expect_true(any(dq$quality_flags$Flag == "Intermediate score categories have zero observations"))
+  expect_true(any(dq$quality_overview$Area == "Score support" & dq$quality_overview$Status == "high"))
+  expect_identical(summary(dq)$preview_name, "quality_flags")
+
+  p <- plot(dq, type = "score_support", preset = "monochrome", draw = FALSE)
+  expect_s3_class(p, "mfrm_plot_data")
+  expect_identical(p$data$plot, "score_support")
+  expect_equal(p$data$preset, "monochrome")
+  p_flags <- plot(dq, type = "quality_flags", draw = FALSE)
+  expect_s3_class(p_flags, "mfrm_plot_data")
+  expect_identical(p_flags$data$plot, "quality_flags")
+})
+
+test_that("data_quality_report flags original gaps hidden by score recoding", {
+  d <- mfrmr:::sample_mfrm_data(seed = 42)
+  d <- d[d$Score != 3, , drop = FALSE]
+  fit <- suppressWarnings(
+    fit_mfrm(
+      d, "Person", c("Rater", "Task", "Criterion"), "Score",
+      method = "JML", maxit = 8,
+      rating_min = 1, rating_max = 5,
+      keep_original = FALSE
+    )
+  )
+  dq <- data_quality_report(
+    fit,
+    data = d,
+    person = "Person",
+    facets = c("Rater", "Task", "Criterion"),
+    score = "Score"
+  )
+  expect_true("score_categories_recoded" %in% dq$caveats$Condition)
+  expect_true("original_score_gap_before_recoding" %in% dq$caveats$Condition)
+  expect_equal(
+    dq$caveats$Categories[dq$caveats$Condition == "original_score_gap_before_recoding"],
+    "3"
+  )
+  expect_true(any(dq$quality_flags$Flag == "Original score sequence had gaps before recoding"))
+  expect_true(any(dq$quality_overview$Area == "Score support" & dq$quality_overview$Status == "high"))
+  p_map <- plot(dq, type = "score_map", draw = FALSE)
+  expect_s3_class(p_map, "mfrm_plot_data")
+  expect_identical(p_map$data$plot, "score_map")
+  expect_true(any(p_map$data$table$MappingStatus == "recoded"))
+  expect_false("score_out_of_range" %in% dq$row_review$Status)
+})
+
+test_that("data_quality_report flags facet-level category usage gaps", {
+  d <- mfrmr:::sample_mfrm_data(seed = 42)
+  d$Score[d$Rater == "R1" & d$Score == 3] <- 2L
+  expect_true(any(d$Score == 3))
+  expect_false(any(d$Rater == "R1" & d$Score == 3))
+
+  fit <- suppressWarnings(
+    fit_mfrm(
+      d, "Person", c("Rater", "Task", "Criterion"), "Score",
+      method = "JML", maxit = 8,
+      rating_min = 1, rating_max = 5,
+      keep_original = TRUE
+    )
+  )
+  dq <- data_quality_report(
+    fit,
+    data = d,
+    person = "Person",
+    facets = c("Rater", "Task", "Criterion"),
+    score = "Score",
+    min_category_count = 10
+  )
+
+  r1_mid <- dq$category_usage_by_facet[
+    dq$category_usage_by_facet$Facet == "Rater" &
+      dq$category_usage_by_facet$Level == "R1" &
+      dq$category_usage_by_facet$Score == 3,
+    ,
+    drop = FALSE
+  ]
+  expect_equal(nrow(r1_mid), 1L)
+  expect_true(isTRUE(r1_mid$ZeroCount[1]))
+  expect_identical(r1_mid$CategoryPosition[1], "intermediate")
+  expect_identical(r1_mid$ReviewStatus[1], "warning")
+
+  r1_summary <- dq$category_usage_summary[
+    dq$category_usage_summary$Facet == "Rater" &
+      dq$category_usage_summary$Level == "R1",
+    ,
+    drop = FALSE
+  ]
+  expect_equal(r1_summary$IntermediateZeroCategories[1], 1)
+  expect_identical(r1_summary$ReviewStatus[1], "warning")
+  expect_true(dq$summary$FacetLevelsWithIntermediateZeroCategories[1] >= 1)
+  expect_true(any(dq$quality_flags$Flag == "Facet levels have intermediate zero-category use"))
+  expect_true(any(dq$quality_overview$Area == "Facet category use" & dq$quality_overview$Status == "high"))
+
+  p <- plot(dq, type = "facet_category_usage", top_n = 5, draw = FALSE)
+  expect_s3_class(p, "mfrm_plot_data")
+  expect_identical(p$data$plot, "facet_category_usage")
+  expect_equal(p$data$top_n, 5L)
+})
+
+test_that("data_quality_report flags facet levels with restricted response patterns", {
+  d <- mfrmr:::sample_mfrm_data(seed = 42)
+  d$Score[d$Rater == "R1"] <- 1L
+
+  fit <- suppressWarnings(
+    fit_mfrm(
+      d, "Person", c("Rater", "Task", "Criterion"), "Score",
+      method = "JML", maxit = 8,
+      rating_min = 1, rating_max = 5,
+      keep_original = TRUE
+    )
+  )
+  dq <- data_quality_report(
+    fit,
+    data = d,
+    person = "Person",
+    facets = c("Rater", "Task", "Criterion"),
+    score = "Score"
+  )
+
+  r1_pattern <- dq$facet_response_patterns[
+    dq$facet_response_patterns$Facet == "Rater" &
+      dq$facet_response_patterns$Level == "R1",
+    ,
+    drop = FALSE
+  ]
+  expect_equal(nrow(r1_pattern), 1L)
+  expect_true(isTRUE(r1_pattern$SingleCategoryUse[1]))
+  expect_equal(r1_pattern$DominantScore[1], 1L)
+  expect_identical(r1_pattern$PatternStatus[1], "high")
+  expect_true(any(dq$quality_flags$Flag == "Facet levels use only one score category"))
+  expect_true(any(dq$quality_overview$Area == "Facet response patterns" & dq$quality_overview$Status == "high"))
+
+  p <- plot(dq, type = "facet_response_patterns", top_n = 5, draw = FALSE)
+  expect_s3_class(p, "mfrm_plot_data")
+  expect_identical(p$data$plot, "facet_response_patterns")
+})
+
+test_that("fit_measures_table lists directional fit statuses", {
+  fm <- fit_measures_table(.fit, diagnostics = .diag, facet = "Rater", ci_level = 0.90)
+  expect_s3_class(fm, "mfrm_fit_measures")
+  expect_true(all(c(
+    "Facet", "Level", "Infit", "Outfit", "FitStatus",
+    "Underfit", "Overfit", "ReviewReason", "CI_Lower", "CI_Upper", "CI_Level"
+  ) %in% names(fm$table)))
+  expect_true(all(c("Infit MnSq", "Outfit MnSq", "Lower CI", "Upper CI", "CI Level", "Fit Status") %in% names(fm$facets_table)))
+  expect_true(all(fm$table$Facet == "Rater"))
+  expect_true(all(fm$table$FitStatus %in% c("underfit", "overfit", "mixed", "within_band", "not_available")))
+  expect_equal(unique(fm$table$CI_Level), 0.90)
+  expect_true(all(c(
+    "Profile", "ProfileLabel", "Lower", "Upper", "Facet",
+    "UnderfitRate", "OverfitRate", "AnyFlagRate"
+  ) %in% names(fm$profile_summary_by_facet)))
+  expect_gt(length(unique(fm$profile_summary_by_facet$Profile)), 1)
+  expect_true(all(fm$profile_summary_by_facet$Facet == "Rater"))
+
+  s <- summary(fm)
+  expect_s3_class(s, "summary.mfrm_bundle")
+  p_status <- plot(fm, draw = FALSE)
+  expect_s3_class(p_status, "mfrm_plot_data")
+  expect_identical(p_status$data$plot, "status")
+  p_scatter <- plot(fm, type = "infit_outfit", draw = FALSE)
+  expect_s3_class(p_scatter, "mfrm_plot_data")
+  expect_identical(p_scatter$data$plot, "infit_outfit")
+  p_ci <- plot(fm, type = "measure_ci", ci_level = 0.80, preset = "monochrome", draw = FALSE)
+  expect_s3_class(p_ci, "mfrm_plot_data")
+  expect_identical(p_ci$data$plot, "measure_ci")
+  expect_equal(p_ci$data$ci_level, 0.80)
+  expect_equal(p_ci$data$preset, "monochrome")
+
+  fm_df <- fit_measures_table(
+    .fit,
+    facet = "Rater",
+    fit_df_method = "both",
+    df_zstd_tolerance = 0.01,
+    df_zstd_large_shift = 0.25,
+    df_ratio_tolerance = 0.01,
+    top_n = Inf
+  )
+  expect_true(all(c(
+    "Infit df", "Outfit df", "Fit df method",
+    "FACETS Infit df", "FACETS Outfit df",
+    "FACETS Infit ZStd", "FACETS Outfit ZStd",
+    "Max df rel shift"
+  ) %in% names(fm_df$facets_table)))
+  expect_true(all(c(
+    "DF_Infit_ENGINE", "DF_Infit_FACETS",
+    "InfitZSTD_FACETS", "FitDfMethod", "FitZSTDTransform"
+  ) %in% names(fm_df$table)))
+  expect_s3_class(fm_df$df_conversion_guide, "mfrm_facets_fit_df_guide")
+  expect_equal(fm_df$settings$fit_df_method, "both")
+  expect_true(all(c(
+    "Facet", "Level", "InfitZSTD_ENGINE", "InfitZSTD_FACETS",
+    "MaxAbsZSTDDiff_FACETS_vs_ENGINE", "FlagChangedByDf",
+    "MaxDFRelativeDifference_ENGINE_vs_FACETS",
+    "DfSensitivityStatus", "Interpretation"
+  ) %in% names(fm_df$df_sensitivity)))
+  expect_true(all(c(
+    "ComparedRows", "FlagChangedByDfRows", "LargeZSTDShiftRows",
+    "DfConventionDifferenceRows"
+  ) %in% names(fm_df$df_sensitivity_summary)))
+  expect_true(all(c(
+    "DfComparedRows", "DfSensitiveRows", "FlagChangedByDfRows"
+  ) %in% names(fm_df$summary)))
+  expect_equal(fm_df$summary$DfSensitiveRows, nrow(fm_df$df_sensitive))
+  expect_equal(fm_df$settings$df_zstd_tolerance, 0.01)
+  expect_equal(fm_df$settings$df_zstd_large_shift, 0.25)
+  expect_equal(fm_df$settings$df_ratio_tolerance, 0.01)
+  s_df <- summary(fm_df)
+  expect_s3_class(s_df, "summary.mfrm_bundle")
+  expect_identical(s_df$summary_kind, "mfrm_fit_measures")
+  p_df <- plot(fm_df, type = "df_sensitivity", top_n = 5, draw = FALSE)
+  expect_s3_class(p_df, "mfrm_plot_data")
+  expect_identical(p_df$data$plot, "df_sensitivity")
+  expect_lte(nrow(p_df$data$table), 5L)
+
+  fm_df_from_engine_diag <- fit_measures_table(
+    .fit,
+    diagnostics = .diag,
+    facet = "Rater",
+    fit_df_method = "both",
+    top_n = Inf
+  )
+  expect_true("FACETS Infit df" %in% names(fm_df_from_engine_diag$facets_table))
+  expect_error(
+    fit_measures_table(.fit, facet = "Rater", fit_df_method = "both", df_zstd_large_shift = 0.01),
+    "`df_zstd_large_shift`"
+  )
+})
+
+test_that("fit-measure threshold profile rates use all selected rows", {
+  fm_full <- fit_measures_table(.fit, diagnostics = .diag, facet = "Rater", top_n = Inf)
+  fm_top <- fit_measures_table(.fit, diagnostics = .diag, facet = "Rater", top_n = 1)
+  expect_equal(nrow(fm_top$table), 1L)
+  expect_equal(fm_top$summary$Rows, fm_full$summary$Rows)
+  expect_equal(fm_top$summary$DisplayedRows, 1L)
+  expect_equal(fm_top$profile_summary_by_facet, fm_full$profile_summary_by_facet)
 })
 
 # ---- category_curves_report ----
@@ -47,6 +317,84 @@ test_that("data_quality_report returns a bundle", {
 test_that("category_curves_report returns a bundle", {
   cc <- category_curves_report(.fit)
   expect_s3_class(cc, "mfrm_bundle")
+  cc_summary <- summary(cc)
+  expect_s3_class(cc_summary, "summary.mfrm_bundle")
+  expect_true(all(c("Metric", "Value") %in% names(cc_summary$summary)))
+  expect_true(all(c(
+    "cumulative_probability_rows",
+    "cumulative_boundary_rows",
+    "category_information_rows",
+    "boundary_rows_needing_review"
+  ) %in% cc_summary$summary$Metric))
+  expect_true("category_information" %in% names(cc))
+  expect_true(all(c("CategoryInformation", "CategoryInformationShare") %in%
+                    names(cc$category_information)))
+  expect_true(all(c("cumulative_probabilities", "cumulative_boundaries") %in% names(cc)))
+  expect_true(all(c("Direction", "CumulativeProbability", "BoundaryCategory") %in%
+                    names(cc$cumulative_probabilities)))
+  expect_true(any(cc$cumulative_probabilities$Direction == "at_or_below"))
+  expect_true(any(cc$cumulative_probabilities$Direction == "at_or_above"))
+})
+
+test_that("standalone residual and subset writers create files", {
+  residual_path <- tempfile(fileext = ".csv")
+  residual <- write_mfrm_residual_file(
+    .fit,
+    diagnostics = .diag,
+    path = residual_path,
+    overwrite = TRUE,
+    include_probabilities = TRUE
+  )
+  expect_s3_class(residual, "mfrm_residual_file")
+  expect_true(file.exists(residual_path))
+  expect_true(all(c("Observed", "Expected", "Residual", "StdResidual") %in% names(residual$table)))
+  expect_true(any(grepl("^PrCategory_", names(residual$table))))
+  expect_true(all(c("Component", "Format", "Path") %in% names(residual$written_files)))
+
+  subset_path <- tempfile(fileext = ".csv")
+  subset <- write_mfrm_subset_file(
+    .fit,
+    diagnostics = .diag,
+    path = subset_path,
+    overwrite = TRUE
+  )
+  expect_s3_class(subset, "mfrm_subset_file")
+  expect_true(file.exists(subset_path))
+  node_path <- subset$written_files$Path[subset$written_files$Component == "subset_nodes"]
+  expect_length(node_path, 1L)
+  expect_true(file.exists(node_path))
+  expect_true(all(c("Subset", "Observations") %in% names(subset$table)))
+  expect_true(all(c("Node", "Subset", "Facet", "Level") %in% names(subset$nodes)))
+
+  subset_tsv_path <- tempfile(fileext = ".tsv")
+  subset_tsv <- write_mfrm_subset_file(
+    .fit,
+    diagnostics = .diag,
+    path = subset_tsv_path,
+    overwrite = TRUE,
+    include_nodes = FALSE
+  )
+  expect_identical(subset_tsv$summary$Format[1], "tsv")
+  expect_identical(subset_tsv$settings$include_nodes, FALSE)
+  expect_error(
+    write_mfrm_subset_file(
+      .fit,
+      diagnostics = .diag,
+      path = subset_path,
+      node_path = subset_path,
+      overwrite = TRUE
+    ),
+    "`node_path` must differ"
+  )
+  expect_error(
+    write_mfrm_residual_file(
+      .fit,
+      diagnostics = .diag,
+      path = residual_path,
+      overwrite = FALSE
+    ),
+    "already exists"
+  )
 })
 
 # ---- category_structure_report ----
@@ -75,6 +423,14 @@ test_that("subset_connectivity_report returns a bundle", {
   expect_s3_class(p_design, "mfrm_plot_data")
   expect_identical(p_design$data$plot, "coverage_matrix")
   expect_identical(p_design$data$requested_type, "design_matrix")
+
+  p_net <- plot(sc, type = "network", draw = FALSE)
+  expect_s3_class(p_net, "mfrm_plot_data")
+  expect_identical(p_net$data$plot, "network")
+  expect_true(all(c("nodes", "edges") %in% names(p_net$data)))
+  expect_s3_class(p_net$data$nodes, "data.frame")
+  expect_s3_class(p_net$data$edges, "data.frame")
+  expect_true(all(c("From", "To", "Weight") %in% names(p_net$data$edges)))
 })
 
 test_that("subset_connectivity linking_matrix draws without error", {
@@ -83,6 +439,108 @@ test_that("subset_connectivity linking_matrix draws without error", {
   on.exit(dev.off(), add = TRUE)
   expect_no_error(plot(sc, type = "linking_matrix", preset = "publication"))
   expect_no_error(plot(sc, type = "design_matrix", preset = "publication"))
+})
+
+test_that("mfrm_network_analysis returns graph metrics for the fitted design", {
+  if (!requireNamespace("igraph", quietly = TRUE)) {
+    skip("igraph (Suggests) not installed.")
+  }
+  net <- mfrm_network_analysis(.fit, diagnostics = .diag)
+  expect_s3_class(net, "mfrm_bundle")
+  expect_s3_class(net, "mfrm_network_analysis")
+  expect_true(all(c(
+    "summary", "node_metrics", "edge_metrics", "facet_summary",
+    "cut_nodes", "bridge_edges"
+  ) %in% names(net)))
+  expect_true(all(c(
+    "Nodes", "Edges", "Components", "ArticulationPoints", "Bridges",
+    "Connected"
+  ) %in% names(net$summary)))
+  expect_true(all(c(
+    "Node", "Facet", "Degree", "Strength", "Betweenness",
+    "IsArticulationPoint"
+  ) %in% names(net$node_metrics)))
+  expect_true(all(c("From", "To", "Weight", "EdgeBetweenness", "IsBridge")
+                  %in% names(net$edge_metrics)))
+  expect_true(all(c("Facet", "Levels", "ArticulationPoints", "BridgeIncidentEdges")
+                  %in% names(net$facet_summary)))
+  expect_true(all(net$node_metrics$Degree >= 0))
+  p_cent <- plot(net, type = "centrality", draw = FALSE)
+  expect_s3_class(p_cent, "mfrm_plot_data")
+  expect_identical(p_cent$data$plot, "centrality")
+  p_facet <- plot(net, type = "facet_summary", metric = "BridgeIncidentEdges", draw = FALSE)
+  expect_identical(p_facet$data$plot, "facet_summary")
+  p_network <- plot(net, type = "network", draw = FALSE)
+  expect_identical(p_network$data$plot, "network")
+  s <- summary(net)
+  expect_s3_class(s, "summary.mfrm_bundle")
+})
+
+test_that("rater_network_analysis returns rater relationship graph metrics", {
+  if (!requireNamespace("igraph", quietly = TRUE)) {
+    skip("igraph (Suggests) not installed.")
+  }
+  rn <- rater_network_analysis(.fit, diagnostics = .diag, mode = "severity_direction")
+  expect_s3_class(rn, "mfrm_bundle")
+  expect_s3_class(rn, "mfrm_rater_network")
+  expect_true(all(c(
+    "summary", "node_metrics", "edge_metrics", "pair_metrics",
+    "source_interrater", "caveats"
+  ) %in% names(rn)))
+  expect_true(all(c(
+    "Rater", "InStrength", "OutStrength", "SeverityIndex",
+    "RelativePattern"
+  ) %in% names(rn$node_metrics)))
+  expect_true(all(c("From", "To", "Weight", "Direction") %in% names(rn$edge_metrics)))
+  expect_true(any(is.finite(rn$node_metrics$SeverityIndex)))
+  p_sev <- plot(rn, type = "severity", draw = FALSE)
+  expect_s3_class(p_sev, "mfrm_plot_data")
+  expect_identical(p_sev$data$plot, "severity")
+  p_net <- plot(rn, type = "network", draw = FALSE)
+  expect_identical(p_net$data$plot, "network")
+  p_mat <- plot(rn, type = "matrix", draw = FALSE)
+  expect_identical(p_mat$data$plot, "matrix")
+  rn_agree <- rater_network_analysis(.fit, diagnostics = .diag, mode = "agreement")
+  expect_identical(rn_agree$summary$Mode[1], "agreement")
+  expect_true(all(rn_agree$edge_metrics$Weight >= 0))
+  s <- summary(rn)
+  expect_s3_class(s, "summary.mfrm_bundle")
+})
+
+test_that("rater_halo_network_analysis returns rater-by-criterion halo diagnostics", {
+  if (!requireNamespace("igraph", quietly = TRUE)) {
+    skip("igraph (Suggests) not installed.")
+  }
+  halo <- rater_halo_network_analysis(.fit, diagnostics = .diag)
+  expect_s3_class(halo, "mfrm_bundle")
+  expect_s3_class(halo, "mfrm_halo_network")
+  expect_true(all(c(
+    "summary", "node_metrics", "edge_metrics", "pair_metrics",
+    "halo_summary_by_rater", "caveats"
+  ) %in% names(halo)))
+  expect_true(all(c(
+    "RaterFacet", "CriterionFacet", "HaloEdges", "MeanHaloWeight",
+    "MeanNonHaloWeight"
+  ) %in% names(halo$summary)))
+  expect_true(all(c("Node", "Rater", "Criterion", "HaloStrength") %in% names(halo$node_metrics)))
+  expect_true(all(c("ReviewStatus", "ReviewReason", "HaloMinusIncidentNonHalo")
+                  %in% names(halo$halo_summary_by_rater)))
+  expect_true(all(c("From", "To", "EdgeType", "Estimate", "PAdjusted", "RetainedEdge")
+                  %in% names(halo$pair_metrics)))
+  expect_true(any(halo$pair_metrics$EdgeType == "halo"))
+  expect_true(all(halo$halo_summary_by_rater$ReviewStatus %in%
+                    c("warning", "review", "ok", "insufficient_data")))
+  p_dist <- plot(halo, type = "edge_distribution", draw = FALSE)
+  expect_s3_class(p_dist, "mfrm_plot_data")
+  expect_identical(p_dist$data$plot, "edge_distribution")
+  p_sum <- plot(halo, type = "halo_summary", draw = FALSE)
+  expect_identical(p_sum$data$plot, "halo_summary")
+  p_mat <- plot(halo, type = "matrix", draw = FALSE)
+  expect_identical(p_mat$data$plot, "matrix")
+  p_net <- plot(halo, type = "network", draw = FALSE)
+  expect_identical(p_net$data$plot, "network")
+  s <- summary(halo)
+  expect_s3_class(s, "summary.mfrm_bundle")
 })
 
 # ---- facet_statistics_report ----
@@ -98,8 +556,8 @@ test_that("facet_statistics_report returns a bundle", {
   expect_s3_class(s, "summary.mfrm_bundle")
 })
 
-test_that("precision_audit_report returns a bundle", {
-  pa <- precision_audit_report(.fit, diagnostics = .diag)
+test_that("precision_review_report returns a bundle", {
+  pa <- precision_review_report(.fit, diagnostics = .diag)
   expect_s3_class(pa, "mfrm_bundle")
   expect_true(all(c("profile", "checks", "approximation_notes", "settings") %in% names(pa)))
   expect_true(is.data.frame(pa$profile))
@@ -109,8 +567,8 @@ test_that("precision_audit_report returns a bundle", {
   expect_s3_class(s, "summary.mfrm_bundle")
 })
 
-test_that("precision_audit_report marks JML runs as exploratory", {
-  pa <- precision_audit_report(.fit, diagnostics = .diag)
+test_that("precision_review_report marks JML runs as exploratory", {
+  pa <- precision_review_report(.fit, diagnostics = .diag)
   expect_identical(as.character(pa$profile$PrecisionTier[1]), "exploratory")
   expect_true(any(pa$checks$Status %in% c("review", "warn")))
 })
@@ -171,6 +629,13 @@ test_that("fair_average_table produces valid output", {
   expect_true("stacked" %in% names(fa))
   s <- summary(fa)
   expect_s3_class(s, "summary.mfrm_bundle")
+  expect_true(all(c(
+    "FairSERequested", "FairSEAvailableRows", "FairSEMethod", "FairSEStatus"
+  ) %in% names(s$summary)))
+  expect_false(isTRUE(s$summary$FairSERequested[1]))
+  expect_identical(s$summary$FairSEMethod[1], "not_requested")
+  expect_identical(s$summary$FairSEStatus[1], "not_requested")
+  expect_true(all(c("ObservedAverage", "AdjustedAverage") %in% names(s$preview)))
   p <- plot(fa, draw = FALSE)
   expect_s3_class(p, "mfrm_plot_data")
 })
@@ -310,10 +775,10 @@ test_that("bias_interaction_report produces valid output", {
 test_that("bias_iteration_report produces valid output", {
   bi <- bias_iteration_report(.bias)
   expect_s3_class(bi, "mfrm_bundle")
-  expect_true(all(c("table", "summary", "orientation_audit", "settings") %in% names(bi)))
+  expect_true(all(c("table", "summary", "orientation_review", "settings") %in% names(bi)))
   expect_true(is.data.frame(bi$table))
   expect_true(is.data.frame(bi$summary))
-  expect_true(is.data.frame(bi$orientation_audit))
+  expect_true(is.data.frame(bi$orientation_review))
   s <- summary(bi)
   expect_s3_class(s, "summary.mfrm_bundle")
 })
@@ -321,10 +786,10 @@ test_that("bias_iteration_report produces valid output", {
 test_that("bias_pairwise_report produces valid output", {
   bp <- bias_pairwise_report(.bias, top_n = 8)
   expect_s3_class(bp, "mfrm_bundle")
-  expect_true(all(c("table", "summary", "orientation_audit", "settings") %in% names(bp)))
+  expect_true(all(c("table", "summary", "orientation_review", "settings") %in% names(bp)))
   expect_true(is.data.frame(bp$table))
   expect_true(is.data.frame(bp$summary))
-  expect_true(is.data.frame(bp$orientation_audit))
+  expect_true(is.data.frame(bp$orientation_review))
   if (nrow(bp$table) > 0) {
     expect_true(all(c("ContrastBasis", "SEBasis", "StatisticLabel", "ProbabilityMetric", "DFBasis") %in% names(bp$table)))
     expect_true(all(bp$table$StatisticLabel == "Bias-contrast Welch screening t"))
@@ -408,8 +873,8 @@ test_that("bias reports flag mixed-sign orientation when facets mix score direct
   diag_pos <- diagnose_mfrm(fit_pos, residual_pca = "none")
   bi <- bias_iteration_report(fit_pos, diagnostics = diag_pos, facet_a = "Rater", facet_b = "Task", max_iter = 2)
   expect_true(isTRUE(bi$summary$MixedSign[1]))
-  expect_true(any(bi$orientation_audit$Orientation == "positive"))
-  expect_true(any(bi$orientation_audit$Orientation == "negative"))
+  expect_true(any(bi$orientation_review$Orientation == "positive"))
+  expect_true(any(bi$orientation_review$Orientation == "negative"))
   expect_match(bi$direction_note, "higher-than-expected|lower-than-expected")
 })
 
@@ -490,6 +955,46 @@ test_that("analyze_residual_pca accepts fit object directly", {
   expect_s3_class(pca, "mfrm_residual_pca")
 })
 
+test_that("analyze_residual_pca supports residual-permutation parallel analysis", {
+  pca <- analyze_residual_pca(
+    .diag,
+    mode = "both",
+    parallel = TRUE,
+    parallel_reps = 5,
+    seed = 101
+  )
+
+  expect_s3_class(pca, "mfrm_residual_pca")
+  expect_true(all(c(
+    "ParallelMean", "ParallelCutoff", "ExcessOverParallelCutoff",
+    "ExceedsParallelCutoff", "SuccessfulParallelReps"
+  ) %in% names(pca$overall_table)))
+  expect_true(all(c("Component", "ParallelCutoff") %in% names(pca$parallel_overall_table)))
+  expect_true("Facet" %in% names(pca$parallel_by_facet_table))
+  expect_true(all(c("ParallelAvailable", "SuccessfulParallelReps", "Error", "Warning") %in%
+    names(pca$parallel_status)))
+  expect_true(any(pca$parallel_status$ParallelAvailable))
+  expect_equal(pca$parallel_settings$Enabled, TRUE)
+  expect_equal(pca$parallel_settings$Reps, 5L)
+
+  p_scree <- plot_residual_pca(pca, plot_type = "parallel_scree", draw = FALSE)
+  expect_s3_class(p_scree, "mfrm_plot_data")
+  expect_equal(p_scree$data$plot, "parallel_scree")
+
+  p_excess <- plot_residual_pca(pca, plot_type = "parallel_excess", draw = FALSE)
+  expect_s3_class(p_excess, "mfrm_plot_data")
+  expect_equal(p_excess$data$plot, "parallel_excess")
+})
+
+test_that("plot_residual_pca requires parallel results for parallel plots", {
+  pca <- analyze_residual_pca(.diag, mode = "overall")
+  expect_error(
+    plot_residual_pca(pca, plot_type = "parallel_scree", draw = FALSE),
+    "parallel = TRUE",
+    fixed = TRUE
+  )
+})
+
 test_that("analyze_residual_pca retains computation errors instead of dropping them", {
   local_mocked_bindings(
     compute_pca_overall = function(...) {
@@ -528,9 +1033,26 @@ test_that("plot.mfrm_fit supports all named types", {
   expect_s3_class(p_wright, "mfrm_plot_data")
   expect_true(all(c("person_hist", "person_stats", "label_points", "group_summary", "y_range") %in% names(p_wright$data)))
 
-  p_pathway <- plot(.fit, type = "pathway", draw = FALSE)
+  p_pathway <- plot(.fit, type = "pathway", diagnostics = .diag, draw = FALSE)
   expect_s3_class(p_pathway, "mfrm_plot_data")
-  expect_true(all(c("steps", "endpoint_labels", "dominance_regions") %in% names(p_pathway$data)))
+  expect_true(all(c(
+    "steps", "endpoint_labels", "dominance_regions",
+    "pathway_long", "pathway_annotations", "fit_measures",
+    "fit_status", "curve_fit_status", "fit_measure_status"
+  ) %in% names(p_pathway$data)))
+  expect_true(all(c(
+    "Layer", "CurveGroup", "Theta", "Value", "ValueName"
+  ) %in% names(p_pathway$data$pathway_long)))
+  expect_true(all(c(
+    "AnnotationType", "CurveGroup", "X", "Y", "Label"
+  ) %in% names(p_pathway$data$pathway_annotations)))
+  expect_true(all(c(
+    "Facet", "Level", "Measure", "SE", "FitStatus"
+  ) %in% names(p_pathway$data$fit_measures)))
+  expect_true(all(c(
+    "CurveGroup", "FitStatus", "MatchedFitRow"
+  ) %in% names(p_pathway$data$curve_fit_status)))
+  expect_true(isTRUE(p_pathway$data$fit_measure_status$Available[1]))
 
   p_ccc <- plot(.fit, type = "ccc", draw = FALSE)
   expect_s3_class(p_ccc, "mfrm_plot_data")

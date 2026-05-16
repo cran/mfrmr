@@ -54,7 +54,7 @@ out <- run_mfrm_facets(
   person = "Person",
   facets = c("Rater", "Criterion"),
   score = "Score",
-  maxit = 10
+  maxit = 30
 )
 p_fit <- plot(out, type = "fit", draw = FALSE)
 p_fit$wright_map$data$plot

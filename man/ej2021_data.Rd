@@ -20,7 +20,17 @@ A data.frame with 5 columns:
 }
 }
 \source{
-Simulated for this package with design settings informed by Eckes and Jin (2021).
+Simulated for this package with design settings informed by Eckes
+and Jin (2021). The Eckes & Jin (2021) Method section reports the
+following design parameters that motivated the synthetic versions
+shipped here: Study 1 had 307 examinees (149 males, 158 females), 18
+raters (4 males, 14 females), and 3 criteria (global impression, task
+fulfillment, linguistic realization) on a 4-category rating scale (TDN
+levels rescored 1-4); Study 2 had 206 examinees (66 males, 140 females),
+12 raters (1 male, 11 females), and 9 criteria on the same 4-category
+scale. The packaged datasets reproduce these
+(examinees, raters, criteria, categories) shapes but use simulated
+responses, so they are not the real TestDaF data.
 }
 \description{
 Synthetic many-facet rating datasets in long format.
@@ -91,4 +101,9 @@ Each dataset is already in long format and can be passed directly to
 data("ej2021_study1", package = "mfrmr")
 head(ej2021_study1)
 table(ej2021_study1$Study)
+}
+\references{
+Eckes, T., & Jin, K.-Y. (2021). Measuring rater centrality effects in
+writing assessment: A Bayesian facets modeling approach.
+\emph{Psychological Test and Assessment Modeling, 63}(1), 65--94.
 }

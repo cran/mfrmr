@@ -5,14 +5,14 @@
 \title{Build a linking-review synthesis object}
 \usage{
 build_linking_review(
-  anchor_audit = NULL,
+  anchor_review = NULL,
   drift = NULL,
   chain = NULL,
   top_n = 10
 )
 }
 \arguments{
-\item{anchor_audit}{Optional output from \code{\link[=audit_mfrm_anchors]{audit_mfrm_anchors()}}.}
+\item{anchor_review}{Optional output from \code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}}.}
 
 \item{drift}{Optional output from \code{\link[=detect_anchor_drift]{detect_anchor_drift()}}.}
 
@@ -47,7 +47,7 @@ proofs of scale equivalence or score comparability.
 
 Use existing package-native outputs in this order:
 \enumerate{
-\item \code{\link[=audit_mfrm_anchors]{audit_mfrm_anchors()}} for pre-fit anchor adequacy.
+\item \code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}} for pre-fit anchor adequacy.
 \item \code{\link[=detect_anchor_drift]{detect_anchor_drift()}} for direct wave-to-reference drift screening.
 \item \code{\link[=build_equating_chain]{build_equating_chain()}} for adjacent screened-link review across waves.
 }
@@ -78,19 +78,19 @@ support.
 d1 <- load_mfrmr_data("study1")
 d2 <- load_mfrmr_data("study2")
 fit1 <- fit_mfrm(d1, "Person", c("Rater", "Criterion"), "Score",
-                 method = "JML", maxit = 15)
+                 method = "JML", maxit = 30)
 fit2 <- fit_mfrm(d2, "Person", c("Rater", "Criterion"), "Score",
-                 method = "JML", maxit = 15)
-audit <- audit_mfrm_anchors(d1, "Person", c("Rater", "Criterion"), "Score")
+                 method = "JML", maxit = 30)
+anchor_review_obj <- review_mfrm_anchors(d1, "Person", c("Rater", "Criterion"), "Score")
 drift <- detect_anchor_drift(list(Wave1 = fit1, Wave2 = fit2))
 chain <- build_equating_chain(list(Wave1 = fit1, Wave2 = fit2))
-review <- build_linking_review(anchor_audit = audit, drift = drift, chain = chain)
+review <- build_linking_review(anchor_review = anchor_review_obj, drift = drift, chain = chain)
 summary(review)
 review$top_linking_risks
 review$group_view_index
 }
 }
 \seealso{
-\code{\link[=audit_mfrm_anchors]{audit_mfrm_anchors()}}, \code{\link[=detect_anchor_drift]{detect_anchor_drift()}},
+\code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}}, \code{\link[=detect_anchor_drift]{detect_anchor_drift()}},
 \code{\link[=build_equating_chain]{build_equating_chain()}}, \code{\link[=plot_anchor_drift]{plot_anchor_drift()}}, \link{mfrmr_linking_and_dff}
 }

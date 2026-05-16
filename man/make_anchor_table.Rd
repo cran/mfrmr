@@ -31,7 +31,7 @@ place new data on that same scale.
 Anchor values should be exported from a well-fitting reference run
 with adequate sample size.  If the reference model has convergence
 issues or large misfit, the exported anchors may propagate
-instability.  Re-run \code{\link[=audit_mfrm_anchors]{audit_mfrm_anchors()}} on the receiving data
+instability.  Re-run \code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}} on the receiving data
 to verify compatibility before estimation.
 
 The \code{digits} parameter controls rounding precision.  Use at least 4
@@ -58,11 +58,11 @@ can introduce avoidable calibration error.
 
 \examples{
 toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 anchors_tbl <- make_anchor_table(fit)
 head(anchors_tbl)
 summary(anchors_tbl$Anchor)
 }
 \seealso{
-\code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=audit_mfrm_anchors]{audit_mfrm_anchors()}}
+\code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}}
 }

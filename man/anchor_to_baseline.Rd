@@ -69,11 +69,13 @@ Object of class \code{mfrm_anchored_fit} with components:
 }
 }
 \description{
-Re-estimates a many-facet Rasch model on new data while holding selected
+Re-estimates a fitted many-facet model on new data while holding selected
 facet parameters fixed at the values from a previous (baseline) calibration.
 This is the standard workflow for placing new data onto an existing scale,
 linking test forms, or carrying a baseline calibration across
 administration windows.
+For bounded \code{GPCM}, treat this as direct exploratory anchor/drift support
+rather than as the package's formal linking-synthesis route.
 }
 \details{
 This function automates the baseline-anchored calibration workflow:
@@ -131,7 +133,7 @@ drift study on unanchored common elements.
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=measurable_summary_table]{measurable_summary_table()}}, etc.
 \item \verb{$diagnostics}: pre-computed diagnostics for the anchored calibration.
 \item \verb{$baseline_anchors}: the anchor table fed to \code{\link[=fit_mfrm]{fit_mfrm()}}, useful for
-auditing which elements were constrained.
+reviewing which elements were constrained.
 }
 }
 
@@ -154,7 +156,7 @@ d1 <- load_mfrmr_data("study1")
 keep1 <- unique(d1$Person)[1:15]
 d1 <- d1[d1$Person \%in\% keep1, , drop = FALSE]
 fit1 <- fit_mfrm(d1, "Person", c("Rater", "Criterion"), "Score",
-                 method = "JML", maxit = 15)
+                 method = "JML", maxit = 30)
 d2 <- load_mfrmr_data("study2")
 keep2 <- unique(d2$Person)[1:15]
 d2 <- d2[d2$Person \%in\% keep2, , drop = FALSE]

@@ -54,7 +54,7 @@ contrasts are reused when building the scoring design matrix.}
 \item{population_policy}{How missing background data are handled when
 \code{fit} uses the latent-regression branch. \code{"error"} (default) requires
 complete person-level covariates; \code{"omit"} drops scored persons lacking
-complete covariates and records that omission in \code{population_audit}.}
+complete covariates and records that omission in \code{population_review}.}
 
 \item{n_draws}{Number of posterior draws per person. Must be a positive
 integer.}
@@ -69,8 +69,8 @@ An object of class \code{mfrm_plausible_values} with components:
 \itemize{
 \item \code{values}: one row per person per draw
 \item \code{estimates}: companion posterior EAP summaries
-\item \code{audit}: row-preparation audit
-\item \code{population_audit}: optional person-level omission audit for
+\item \code{row_review}: row-preparation review
+\item \code{population_review}: optional person-level omission review for
 latent-regression scoring
 \item \code{input_data}: cleaned canonical scoring rows retained from \code{new_data}
 \item \code{person_data}: cleaned or supplied person-level background data used for
@@ -150,7 +150,7 @@ toy_fit <- suppressWarnings(
     "Person", c("Rater", "Criterion"), "Score",
     method = "MML",
     quad_points = 5,
-    maxit = 15
+    maxit = 30
   )
 )
 new_units <- data.frame(

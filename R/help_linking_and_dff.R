@@ -9,21 +9,21 @@
 #' - "Is the design connected enough to support a common scale?"
 #'   Use [subset_connectivity_report()] and `plot(..., type = "design_matrix")`.
 #' - "Which elements can I export as anchors from an existing fit?"
-#'   Use [make_anchor_table()] and [audit_mfrm_anchors()].
+#'   Use [make_anchor_table()] and [review_mfrm_anchors()].
 #' - "How do I anchor a new administration to a baseline?"
 #'   Use [anchor_to_baseline()].
 #' - "Have common elements drifted across separately fitted waves?"
 #'   Use [detect_anchor_drift()] and [plot_anchor_drift()].
-#' - "Can I synthesize anchor audit, drift, and chain evidence into one review?"
+#' - "Can I synthesize anchor review, drift, and chain evidence into one review?"
 #'   Use [build_linking_review()].
 #' - "Do specific facet levels function differently across groups?"
-#'   Use [analyze_dff()] and [plot_dif_heatmap()].
+#'   Use [analyze_dff()], [plot_dif_heatmap()], and [plot_dif_summary()].
 #'
 #' @section Recommended linking route:
 #' 1. Fit with [fit_mfrm()] and diagnose with [diagnose_mfrm()].
 #' 2. Check connectedness with [subset_connectivity_report()].
-#' 3. Build or audit anchors with [make_anchor_table()] and
-#'    [audit_mfrm_anchors()].
+#' 3. Build or review anchors with [make_anchor_table()] and
+#'    [review_mfrm_anchors()].
 #' 4. Use [anchor_to_baseline()] when you need to place raw new data onto a
 #'    baseline scale.
 #' 5. Use [build_equating_chain()] only as a screened linking aid across
@@ -47,7 +47,7 @@
 #'   unstable anchor elements.}
 #'   \item{[build_equating_chain()]}{Accumulates screened pairwise links across
 #'   a series of administrations or forms.}
-#'   \item{[build_linking_review()]}{Synthesizes anchor-audit, drift, and
+#'   \item{[build_linking_review()]}{Synthesizes anchor review, drift, and
 #'   screened-chain evidence into one operational review surface.}
 #'   \item{[analyze_dff()]}{Screens differential facet functioning with residual
 #'   or refit methods, using screening-only language unless linking and
@@ -57,6 +57,11 @@
 #' @section Practical linking rules:
 #' - Check connectedness before interpreting subgroup or wave differences.
 #' - Use DFF outputs as screening results when common-scale linking is weak.
+#' - Always name the facet, facet level, and group pair involved in a DFF
+#'   contrast. A generic "DIF exists" statement is not interpretable in a
+#'   many-facet design.
+#' - Residual-method DFF classifications are screening labels. ETS A/B/C
+#'   labels require refit output whose `ClassificationSystem` is `"ETS"`.
 #' - Treat drift flags as prompts for review, not automatic evidence that an
 #'   anchor must be removed.
 #' - Treat `LinkSupportAdequate = FALSE` as a weak-link warning: at least one
@@ -75,7 +80,7 @@
 #'   [build_linking_review()] -> [plot_anchor_drift()].
 #' - Group comparison route:
 #'   [subset_connectivity_report()] -> [analyze_dff()] ->
-#'   [dif_report()] -> [plot_dif_heatmap()].
+#'   [dif_report()] -> [plot_dif_heatmap()] / [plot_dif_summary()].
 #'
 #' @section Companion guides:
 #' - For visual follow-up, see [mfrmr_visual_diagnostics].
@@ -93,7 +98,8 @@
 #'   facets = c("Rater", "Criterion"),
 #'   score = "Score",
 #'   method = "MML",
-#'   maxit = 200
+#'   quad_points = 7,
+#'   maxit = 30
 #' )
 #' diag <- diagnose_mfrm(fit, residual_pca = "none", diagnostic_mode = "both")
 #'
@@ -101,7 +107,8 @@
 #' subsets$summary[, c("Subset", "Observations", "ObservationPercent")]
 #'
 #' dff <- analyze_dff(fit, diag, facet = "Rater", group = "Group", data = toy)
-#' head(dff$dif_table[, c("Level", "Group1", "Group2", "Classification")])
+#' head(dff$dif_table[, c("Level", "Group1", "Group2",
+#'                        "Classification", "ClassificationSystem")])
 #' }
 #'
 #' @name mfrmr_linking_and_dff

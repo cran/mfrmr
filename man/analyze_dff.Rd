@@ -32,7 +32,12 @@ defines the grouping variable (e.g., \code{"Gender"}, \code{"Site"}).}
 
 \item{data}{Optional data frame containing at least the group column
 and the same person/facet/score columns used to fit the model. If
-\code{NULL} (default), the data stored in \code{fit$prep$data} is used.}
+\code{NULL} (default), mfrmr tries to recover the data from
+\code{fit$prep$data}. That slot only holds the columns that
+\code{fit_mfrm()} actually modelled; if the grouping column was not
+among them (common for DIF screening), pass the original data
+frame via \verb{data = <df>} explicitly. The same applies when the
+fit object has been serialized without the prep slot.}
 
 \item{focal}{Optional character vector of group levels to treat as focal.
 If \code{NULL} (default), all pairwise group comparisons are performed.}
@@ -174,16 +179,32 @@ visible together.
 toy <- load_mfrmr_data("example_bias")
 
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                 method = "MML", model = "RSM", maxit = 200)
+                 method = "MML", model = "RSM", quad_points = 7, maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "none", diagnostic_mode = "both")
 dff <- analyze_dff(fit, diag, facet = "Rater", group = "Group", data = toy)
 dff$summary
-head(dff$dif_table[, c("Level", "Group1", "Group2", "Contrast", "Classification")])
+# Look for: a small `FlaggedPairs` count relative to `Pairs`. Under
+#   method = "residual", `ClassificationSystem` is "screening", not
+#   ETS. "Screen positive" rows are prompts for substantive review.
+head(dff$dif_table[, c("Level", "Group1", "Group2", "Contrast",
+                       "Classification", "ClassificationSystem")])
+# The residual contrast is an observed-minus-expected average contrast
+# between groups. It is useful for screening, but it is not an ETS
+# A/B/C logit-delta classification.
+dff_refit <- analyze_dff(fit, diag, facet = "Rater", group = "Group",
+                         data = toy, method = "refit")
+unique(dff_refit$dif_table$ClassificationSystem)
+# Look for: "ETS" only when subgroup calibration, linking, and precision
+#   checks all support a common-scale model-based contrast.
 sc <- subset_connectivity_report(fit, diagnostics = diag)
 plot(sc, type = "design_matrix", draw = FALSE)
-if ("ScaleLinkStatus" \%in\% names(dff$dif_table)) {
-  unique(dff$dif_table$ScaleLinkStatus)
+if ("ScaleLinkStatus" \%in\% names(dff_refit$dif_table)) {
+  unique(dff_refit$dif_table$ScaleLinkStatus)
 }
+# Look for: "linked" in `ScaleLinkStatus` confirms the focal and
+#   reference groups share enough common elements for a comparable
+#   contrast; "demoted_*" rows lose linking under the refit branch
+#   and should be read as exploratory.
 }
 }
 \seealso{

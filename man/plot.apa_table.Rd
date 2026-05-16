@@ -64,7 +64,7 @@ graphics.
 \examples{
 \donttest{
 toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 tbl <- apa_table(fit, which = "summary")
 p <- plot(tbl, draw = FALSE)
 p2 <- plot(tbl, type = "first_numeric", draw = FALSE)

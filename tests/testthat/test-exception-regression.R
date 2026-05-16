@@ -97,10 +97,18 @@ test_that("estimate_bias rejects invalid inputs", {
   fit <- suppressWarnings(fit_mfrm(d, "Person",
     c("Rater", "Task", "Criterion"), "Score", method = "JML", maxit = 20))
   dx <- diagnose_mfrm(fit, residual_pca = "none")
-  # Non-existent facet returns an empty result (not an error)
-  res <- estimate_bias(fit, dx, facet_a = "NonExistent", facet_b = "Rater")
-  expect_true(is.list(res))
-  expect_equal(length(names(res)), 0)
+  # A typo'd facet name now raises an informative error naming the
+  # available facets, instead of silently returning an empty list.
+  expect_error(
+    estimate_bias(fit, dx, facet_a = "NonExistent", facet_b = "Rater"),
+    "not part of this fit"
+  )
+  # The missing-diagnostics branch also raises an explicit mfrmr error
+  # rather than R's locale-dependent "argument 'diagnostics' is missing".
+  expect_error(
+    estimate_bias(fit, facet_a = "Rater", facet_b = "Task"),
+    "diagnostics"
+  )
 })
 
 # === 6.9 Extremely small dataset ==========================================

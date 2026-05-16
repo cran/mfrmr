@@ -16,8 +16,11 @@
   label_angle = 45,
   show_ci = FALSE,
   ci_level = 0.95,
+  group = NULL,
+  diagnostics = NULL,
+  include_fit_measures = TRUE,
   draw = TRUE,
-  preset = c("standard", "publication", "compact"),
+  preset = c("standard", "publication", "compact", "monochrome"),
   ...
 )
 }
@@ -35,10 +38,10 @@ three-part fit bundle; otherwise choose one of \code{"facet"}, \code{"person"},
 compact displays.}
 
 \item{theta_range}{Numeric length-2 range for pathway, CCC, and
-category-surface payloads.}
+category-surface plot data.}
 
 \item{theta_points}{Number of theta grid points used for pathway, CCC, and
-category-surface payloads.}
+category-surface plot data.}
 
 \item{title}{Optional custom title.}
 
@@ -51,46 +54,73 @@ available.}
 
 \item{ci_level}{Confidence level used when \code{show_ci = TRUE}.}
 
+\item{group}{Optional grouping for \code{type = "wright"} to overlay
+per-group person-density curves (DIF / DFF screening view).
+Either a column name (looked up first in \code{group_data} when
+supplied through \code{...}, then in \code{fit$prep$data}) or a vector
+aligned with \code{fit$facets$person}. Ignored for other \code{type}
+values. To pass the source data alongside, use
+\verb{plot(fit, type = "wright", group = "MyCol", group_data = <df>)}.}
+
+\item{diagnostics}{Optional output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}. When supplied,
+pathway plot data reuse it for \code{fit_measures}, \code{fit_status}, and
+\code{curve_fit_status} instead of recomputing diagnostics.}
+
+\item{include_fit_measures}{If \code{TRUE} (default), pathway plot data include
+tidy fit-measure and fit-status tables for custom R graphics. Set to
+\code{FALSE} when only the curve coordinates are needed.}
+
 \item{draw}{If \code{TRUE}, draw the plot with base graphics.}
 
-\item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, or
-\code{"compact"}).}
+\item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, \code{"compact"},
+or \code{"monochrome"}).}
 
 \item{...}{Additional arguments ignored for S3 compatibility.}
 }
 \value{
-Invisibly, an \code{mfrm_plot_data} object or an \code{mfrm_plot_bundle}
-when \code{type} is omitted.
+Invisibly, an \code{mfrm_plot_data} object (default and for any
+single \code{type}), or an \code{mfrm_plot_bundle} when
+\code{type = "bundle"} / \code{"all"} / \code{"default"}.
 }
 \description{
 Plot fitted MFRM results with base R
 }
 \details{
 This S3 plotting method provides the core fit-family visuals for
-\code{mfrmr}. When \code{type} is omitted, it returns a bundle containing a
+\code{mfrmr}. When \code{type} is omitted, it returns the Wright map alone as
+an \code{mfrm_plot_data} object (the most useful single figure for a
+first inspection). Pass \code{type = "bundle"} (or \code{"all"} / \code{"default"})
+to obtain the legacy three-plot \code{mfrm_plot_bundle} containing a
 Wright map, pathway map, and category characteristic curves. The
-returned object still carries machine-readable metadata through the
-\code{mfrm_plot_data} contract, even when the plot is drawn immediately.
+returned object always carries machine-readable metadata through
+the \code{mfrm_plot_data} contract, even when the plot is drawn
+immediately.
 
 \code{type = "wright"} shows persons, facet levels, and step thresholds on
 a shared logit scale. \code{type = "pathway"} shows expected score traces
-and dominant-category regions across theta. \code{type = "ccc"} shows
+and dominant-category regions across theta. Its draw-free plot data also
+includes \code{pathway_long}, \code{pathway_annotations}, \code{fit_measures},
+\code{fit_status}, and \code{curve_fit_status}, so R users can rebuild the pathway
+map in ggplot2, plotly, or a report pipeline while keeping the same
+underfit/overfit labels used by \code{\link[=fit_measures_table]{fit_measures_table()}}. \code{type = "ccc"} shows
 category response probabilities. \code{type = "ccc_surface"} or
-\code{type = "category_surface"} returns a 3D-ready category-probability
-surface payload for external rendering; it deliberately does not add a
+\code{type = "category_surface"} returns 3D-ready category-probability surface
+data for external rendering; it deliberately does not add a
 plotly/rgl dependency or replace the 2D CCC/pathway reporting figures. The
-payload includes \code{category_support}, \code{interpretation_guide}, and
+returned object includes \code{category_support}, \code{interpretation_guide}, and
 \code{reporting_policy} tables so retained zero-frequency categories and
-manuscript-use boundaries remain visible to beginners. The remaining types
-provide compact person, step, or facet-specific displays.
+manuscript-use boundaries remain visible to beginners. The remaining
+types (\code{"facet"}, \code{"person"}, \code{"step"}, \code{"shrinkage"}) provide
+compact location-specific displays.
 }
 \section{Typical workflow}{
 
 \enumerate{
 \item Fit a model with \code{\link[=fit_mfrm]{fit_mfrm()}}.
-\item Use \code{plot(fit)} to inspect the three core fit-family visuals.
-\item Switch to \code{type = "wright"} or \code{type = "pathway"} when you need a
-single figure for reporting or manuscript preparation.
+\item Use \code{plot(fit)} to inspect the Wright map at a glance.
+\item Switch to \code{type = "pathway"}, \code{"ccc"}, or \code{"shrinkage"} for the
+relevant follow-up figure, or \code{type = "bundle"} for the
+three-plot overview when preparing a FACETS-style summary.
 }
 }
 
@@ -110,13 +140,25 @@ fit <- fit_mfrm(
   "Score",
   method = "JML",
   model = "RSM",
-  maxit = 25
+  maxit = 30
 )
-bundle <- plot(fit, draw = FALSE)
+wright <- plot(fit, draw = FALSE)
+wright$data$plot
+# Look for: persons clustered against the facet / step rows on the
+#   shared logit axis. Large gaps between the person density and
+#   the step / facet rails indicate weak targeting; ceiling /
+#   floor stripes mean the test is too easy / hard.
+bundle <- plot(fit, type = "bundle", draw = FALSE)
 bundle$wright_map$data$plot
+# Look for: pathway curves rising in the expected order with
+#   visible dominant-category bands; CCC curves peaking sequentially
+#   without one category being completely overlapped by neighbours.
 surface <- plot(fit, type = "ccc_surface", draw = FALSE)
 head(surface$data$surface)
 surface$data$category_support
+# Look for: every retained category having `Observed > 0`; categories
+#   with zero observations are returned as a zero-observation slice and
+#   should not be interpreted as a real score region.
 surface$data$interpretation_guide
 if (interactive()) {
   plot(

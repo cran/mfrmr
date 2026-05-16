@@ -1,4 +1,4 @@
-# Tests for Phase 4: Anchoring & Equating Workflow
+# Tests for the anchoring & equating workflow.
 
 # ---------- shared fixtures (computed once) ----------
 d1   <- load_mfrmr_data("study1")
@@ -7,7 +7,7 @@ fit1 <- fit_mfrm(d1, person = "Person", facets = c("Rater", "Criterion"),
                  score = "Score", method = "JML")
 fit2 <- fit_mfrm(d2, person = "Person", facets = c("Rater", "Criterion"),
                  score = "Score", method = "JML")
-audit1 <- audit_mfrm_anchors(d1, "Person", c("Rater", "Criterion"), "Score")
+audit1 <- review_mfrm_anchors(d1, "Person", c("Rater", "Criterion"), "Score")
 
 # ================================================================
 # anchor_to_baseline
@@ -134,7 +134,9 @@ test_that("detect_anchor_drift returns correct class and structure", {
   drift <- detect_anchor_drift(list(Wave1 = fit1, Wave2 = fit2))
 
   expect_s3_class(drift, "mfrm_anchor_drift")
-  expect_named(drift, c("drift_table", "summary", "common_elements", "common_by_facet", "config"),
+  expect_named(drift, c("drift_table", "summary", "common_elements",
+                        "common_vs_reference", "n_common_all_waves",
+                        "common_by_facet", "config"),
                ignore.order = TRUE)
 
   # drift_table is a tibble with expected columns
@@ -364,7 +366,7 @@ test_that("build_equating_chain S3 methods produce output", {
 test_that("build_linking_review returns a synthesis bundle with expected structure", {
   drift <- detect_anchor_drift(list(W1 = fit1, W2 = fit2))
   chain <- build_equating_chain(list(F1 = fit1, F2 = fit2))
-  review <- build_linking_review(anchor_audit = audit1, drift = drift, chain = chain)
+  review <- build_linking_review(anchor_review = audit1, drift = drift, chain = chain)
 
   expect_s3_class(review, "mfrm_linking_review")
   expect_true(all(c(
@@ -393,12 +395,21 @@ test_that("build_linking_review returns a synthesis bundle with expected structu
   expect_true(is.data.frame(review$plot_map))
   expect_true(is.data.frame(review$reporting_map))
   expect_true(is.list(review$settings))
+  review_public_text <- c(
+    names(review$overview),
+    as.character(review$top_linking_risks$SourceTable %||% character(0)),
+    as.character(review$top_linking_risks$PrimaryPlotRoute %||% character(0)),
+    as.character(review$plot_map$PlotHelper %||% character(0)),
+    as.character(review$settings$source_profile$Source %||% character(0))
+  )
+  expect_false(any(grepl("AnchorAudit|anchor_audit|plot\\(anchor_audit", review_public_text)))
+  expect_true(any(grepl("AnchorReview|anchor_review|plot\\(anchor_review", review_public_text)))
 })
 
 test_that("build_linking_review summary methods produce front-door output", {
   drift <- detect_anchor_drift(list(W1 = fit1, W2 = fit2))
   chain <- build_equating_chain(list(F1 = fit1, F2 = fit2))
-  review <- build_linking_review(anchor_audit = audit1, drift = drift, chain = chain)
+  review <- build_linking_review(anchor_review = audit1, drift = drift, chain = chain)
   s <- summary(review)
 
   expect_s3_class(s, "summary.mfrm_linking_review")
@@ -425,8 +436,8 @@ test_that("build_linking_review rejects malformed inputs", {
     "requires at least one"
   )
   expect_error(
-    build_linking_review(anchor_audit = list(x = 1)),
-    "mfrm_anchor_audit"
+    build_linking_review(anchor_review = list(x = 1)),
+    "mfrm_anchor_review"
   )
 })
 

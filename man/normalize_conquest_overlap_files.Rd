@@ -2,7 +2,7 @@
 % Please edit documentation in R/api-export-bundles.R
 \name{normalize_conquest_overlap_files}
 \alias{normalize_conquest_overlap_files}
-\title{Normalize extracted ConQuest overlap files to the \code{mfrmr} audit contract}
+\title{Normalize extracted ConQuest overlap files to the \code{mfrmr} review contract}
 \usage{
 normalize_conquest_overlap_files(
   population_file,
@@ -69,7 +69,7 @@ standardized identifier and estimate columns.}
 A named list with class \code{mfrm_conquest_overlap_tables}.
 }
 \description{
-Normalize extracted ConQuest overlap files to the \code{mfrmr} audit contract
+Normalize extracted ConQuest overlap files to the \code{mfrmr} review contract
 }
 \details{
 This helper is a thin file-wrapper around \code{\link[=normalize_conquest_overlap_tables]{normalize_conquest_overlap_tables()}}.
@@ -81,12 +81,12 @@ The recommended workflow is:
 \item export an exact-overlap bundle with \code{\link[=build_conquest_overlap_bundle]{build_conquest_overlap_bundle()}};
 \item extract the relevant ConQuest tables to CSV/TSV/TXT files;
 \item call \code{normalize_conquest_overlap_files()} on those files;
-\item pass the result to \code{\link[=audit_conquest_overlap]{audit_conquest_overlap()}}.
+\item pass the result to \code{\link[=review_conquest_overlap]{review_conquest_overlap()}}.
 }
 
-Read \code{summary(normalized)$normalization_scope} before auditing to confirm
+Read \code{summary(normalized)$normalization_scope} before review to confirm
 that the files were treated as extracted tables, not raw ConQuest report
-text, and to check duplicate-ID / non-numeric-estimate pre-audit flags.
+text, and to check duplicate-ID / non-numeric-estimate pre-review flags.
 }
 \examples{
 bundle <- build_conquest_overlap_bundle()
@@ -131,9 +131,9 @@ normalized <- normalize_conquest_overlap_files(
   conquest_case_estimate = "EAP"
 )
 summary(normalized)$normalization_scope
-audit <- audit_conquest_overlap(bundle, normalized)
-summary(audit)$summary
+review <- review_conquest_overlap(bundle, normalized)
+summary(review)$summary
 }
 \seealso{
-\code{\link[=normalize_conquest_overlap_tables]{normalize_conquest_overlap_tables()}}, \code{\link[=audit_conquest_overlap]{audit_conquest_overlap()}}
+\code{\link[=normalize_conquest_overlap_tables]{normalize_conquest_overlap_tables()}}, \code{\link[=review_conquest_overlap]{review_conquest_overlap()}}
 }

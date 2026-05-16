@@ -143,22 +143,22 @@ test_that("output bundle draws all graph types", {
   }
 })
 
-# ---- Anchor audit with actual anchors ----
+# ---- Anchor review with actual anchors ----
 
-test_that("audit_mfrm_anchors with anchors exercises more branches", {
+test_that("review_mfrm_anchors with anchors exercises more branches", {
   d <- mfrmr:::sample_mfrm_data(seed = 1)
   anchors <- data.frame(
     Facet = c("Rater", "Rater", "Task"),
     Level = c("R1", "R2", "T1"),
     Anchor = c(0.5, -0.3, 0.1)
   )
-  audit <- audit_mfrm_anchors(
+  audit <- review_mfrm_anchors(
     d, "Person", c("Rater", "Task", "Criterion"), "Score",
     anchors = anchors
   )
-  expect_s3_class(audit, "mfrm_anchor_audit")
+  expect_s3_class(audit, "mfrm_anchor_review")
   s <- summary(audit)
-  expect_s3_class(s, "summary.mfrm_anchor_audit")
+  expect_s3_class(s, "summary.mfrm_anchor_review")
   out <- capture.output(print(s))
   expect_true(length(out) > 0)
 })

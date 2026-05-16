@@ -11,6 +11,8 @@ plot_displacement(
   facets = NULL,
   plot_type = c("lollipop", "hist"),
   top_n = 40,
+  show_ci = FALSE,
+  ci_level = 0.95,
   preset = c("standard", "publication", "compact"),
   draw = TRUE,
   ...
@@ -28,6 +30,14 @@ plot_displacement(
 \item{plot_type}{\code{"lollipop"} or \code{"hist"}.}
 
 \item{top_n}{Maximum levels shown in \code{"lollipop"} mode.}
+
+\item{show_ci}{Logical. When \code{TRUE} and \code{plot_type = "lollipop"}, draw
+approximate confidence-interval whiskers from \code{DisplacementSE}
+(ignored for \code{"hist"}).}
+
+\item{ci_level}{Confidence level used when \code{show_ci = TRUE}; default
+\code{0.95}. The returned plot-data object gains \code{CI_Lower} / \code{CI_Upper}
+/ \code{CI_Level} columns on the \code{table} element for downstream reuse.}
 
 \item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, or \code{"compact"}).}
 
@@ -104,7 +114,7 @@ For a plot-selection guide and a longer walkthrough, see
 
 \examples{
 toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 p <- plot_displacement(fit, anchored_only = FALSE, draw = FALSE)
 if (interactive()) {
   plot_displacement(

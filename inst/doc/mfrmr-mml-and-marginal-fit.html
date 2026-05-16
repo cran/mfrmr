@@ -290,8 +290,7 @@ EAP summaries, and strict marginal expected values.</p>
 </div>
 <div id="current-mml-scope" class="section level2">
 <h2>Current MML scope</h2>
-<p>For the current public <code>RSM</code> / <code>PCM</code>
-release:</p>
+<p>For the <code>RSM</code> / <code>PCM</code> MML branch:</p>
 <ul>
 <li>the person distribution is integrated with Gauss-Hermite
 quadrature</li>
@@ -299,12 +298,12 @@ quadrature</li>
 optimization of the marginal log-likelihood</li>
 <li><code>mml_engine = &quot;em&quot;</code> and
 <code>mml_engine = &quot;hybrid&quot;</code> are also available for
-<code>RSM</code> / <code>PCM</code>, while unsupported branches fall
-back to <code>direct</code></li>
+<code>RSM</code> / <code>PCM</code>; bounded <code>GPCM</code> uses the
+direct engine regardless of that option</li>
 <li>person summaries are reported post-hoc from the integrated
 posterior</li>
 </ul>
-<p>This is the implemented scope for the current release.</p>
+<p>This is the implemented MML-engine scope for this release.</p>
 </div>
 <div id="strict-marginal-diagnostic-target" class="section level2">
 <h2>Strict Marginal Diagnostic Target</h2>
@@ -376,8 +375,9 @@ treating one index as universally decisive.</p></li>
 <li><p>Posterior predictive follow-up. Sinharay et al. (2006) treat
 posterior predictive checking as a separate model-checking family built
 around replicated datasets and discrepancy measures. That is the
-intended follow-up role of the package’s currently scaffolded
-<code>posterior_predictive_follow_up</code> path.</p></li>
+intended follow-up role of the package’s
+<code>posterior_predictive_follow_up</code> path, which is reserved for
+a future release.</p></li>
 <li><p>Many-facet reporting context. Linacre’s FACETS framework and
 applied MFRM studies such as Eckes (2005) remain the primary references
 for severity/leniency, mean-square fit, separation, and inter-rater
@@ -402,6 +402,24 @@ accept/reject rule. That design choice follows the broader review logic
 in Sinharay and Monroe (2025): use several complementary diagnostics,
 match them to the intended use of the scores, and examine practical
 significance before making strong claims.</p>
+<div id="assumption-independent-bernoulli-variance-for-grouped-counts" class="section level3">
+<h3>Assumption: independent-Bernoulli variance for grouped counts</h3>
+<p>The <code>marginal_fit</code> grid sums per-observation
+posterior-integrated variances as
+<code>VarianceCount = sum_i w_i^2 * p_i * (1 - p_i)</code>, which treats
+observations within a cell as independent Bernoulli draws given the
+fitted parameters. This is the same independence assumption that
+underlies conditional independence in the MFRM specification (Linacre,
+1989). When the rating design violates it - e.g. multiple ratings by the
+same rater on the same person-criterion combination - cell-level
+posterior variances can be underestimated, which in turn makes the
+reported standard errors and screening t-statistics slightly optimistic.
+The documented follow-up is
+<code>diagnose_mfrm(..., diagnostic_mode = &quot;both&quot;)</code> combined with
+<code>strict_pairwise_local_dependence</code>, which surfaces evidence
+of dependence at the pair level. See Haberman and Sinharay (2013) for a
+generalized-residual framework that models such dependence explicitly;
+that path is not yet included in the current release scope.</p>
 <p>For many-facet reporting, one additional boundary matters.
 Facet-level separation/reliability and inter-rater agreement answer
 different questions. High rater separation reliability can coexist with
@@ -409,6 +427,7 @@ weak observed agreement, and strong observed agreement does not imply
 that raters are interchangeable on the latent severity scale. That is
 why <code>mfrmr</code> reports <code>diagnostics$reliability</code> and
 <code>diagnostics$interrater</code> as separate objects.</p>
+</div>
 </div>
 <div id="validation-scope-in-the-current-release" class="section level2">
 <h2>Validation Scope In The Current Release</h2>
@@ -422,10 +441,22 @@ why <code>mfrmr</code> reports <code>diagnostics$reliability</code> and
 <p>These checks target <code>RSM</code> and <code>PCM</code>.
 <code>GPCM</code> is now supported only within a bounded core route:
 fitting, slope summaries, posterior scoring, information curves, direct
-curve/category reports, and exploratory residual-based follow-up.
-Broader APA/report bundles, fair-average semantics, and
-planning/forecasting helpers remain out of scope for <code>GPCM</code>
-in this release.</p>
+curve/category reports, exploratory residual-based follow-up, direct
+recovery checks, and the slope-aware element-conditional
+<code>fair_average_table()</code> and <code>estimate_bias()</code>.
+Historical fair-average SE columns remain scaled facet-measure SEs
+rather than delta-method SEs of the fair-average value;
+<code>fair_average_table(fair_se = TRUE)</code> adds distinct structural
+delta-method fair-average SEs for non-person rows when the MML
+observed-information Hessian is available. Bias SE / <code>t</code> /
+<code>Prob.</code> columns are conditional plug-in screening quantities,
+and bounded-GPCM rows also carry profile-likelihood follow-up columns.
+Summary-table appendix export is available for supported direct outputs.
+The APA writer, fit-based report/export bundles, FACETS-style score-side
+exports, QC pass/fail pipelines, linking synthesis, and planning /
+forecasting helpers remain out of scope for <code>GPCM</code> in this
+release. See <code>gpcm_capability_matrix()</code> for the full
+per-helper support contract.</p>
 </div>
 <div id="why-gpcm-is-the-current-upper-scope" class="section level2">
 <h2>Why GPCM Is The Current Upper Scope</h2>
@@ -451,7 +482,8 @@ work.</p>
 arguments that are often conflated in applied many-facet work.</p>
 <ol style="list-style-type: decimal">
 <li>A generalized many-facet model with discrimination parameters will
-often fit empirical data better than a Rasch-MFRM.</li>
+often fit empirical data better than an equal-weighting
+<code>RSM</code>/<code>PCM</code> fit.</li>
 <li>That fit advantage does not, by itself, settle the operational
 scoring question.</li>
 </ol>
@@ -462,15 +494,48 @@ therefore treats <code>RSM</code> / <code>PCM</code> as the
 equal-weighting reference models and bounded <code>GPCM</code> as a
 supported alternative for users who explicitly want to inspect or allow
 discrimination-based reweighting.</p>
-<p>This is also why some score-side helpers remain out of scope for
-bounded <code>GPCM</code>. FACETS-style fair averages are Rasch-family
-score transformations, and a slope-aware analogue should not silently
-reuse the Rasch-family calculation.</p>
+<p>This is also why score-side FACETS output-contract routes (for
+example, score-side <code>facets_output_file_bundle()</code>),
+manuscript-grade APA text, and fit-based report/export bundles remain
+out of scope for bounded <code>GPCM</code> in this release: their
+published forms are Rasch-family score transformations, and the
+slope-aware analogue that would replace them in a free-discrimination
+context requires careful delta-method standard-error handling.
+<code>fair_average_table()</code> and <code>estimate_bias()</code>
+themselves are now available under bounded <code>GPCM</code> via the
+slope-aware element-conditional kernel. For fair averages,
+<code>fair_average_table(fair_se = TRUE)</code> adds structural
+delta-method SEs for non-person rows when the MML Hessian is available;
+the historical <code>SE</code> columns remain measure-level SEs.</p>
 <p>One additional distinction matters for implementation. The
 <code>weight</code> argument in <code>fit_mfrm()</code> is an
 observation-weight column. It changes how rating events enter estimation
 and summaries, but it is not the same thing as the equal-weighting
 versus discrimination-weighting question discussed above.</p>
+</div>
+<div id="practical-reading-order" class="section level2">
+<h2>Practical Reading Order</h2>
+<p>For users deciding among <code>RSM</code>, <code>PCM</code>, and
+bounded <code>GPCM</code>, use this reading order:</p>
+<ol style="list-style-type: decimal">
+<li>Start with the score claim. If category thresholds should be common,
+begin with <code>RSM</code>; if thresholds may vary by a designated step
+facet, begin with <code>PCM</code>.</li>
+<li>Fit the Rasch-family reference model with
+<code>method = &quot;MML&quot;</code> and read <code>summary(fit)</code> plus
+<code>summary(diagnose_mfrm(fit, diagnostic_mode = &quot;both&quot;))</code>.</li>
+<li>Fit bounded <code>GPCM</code> only when discrimination-based
+reweighting is a meaningful sensitivity question, not as a routine
+replacement for the equal-weighting model.</li>
+<li>If bounded <code>GPCM</code> fits better, report what changed:
+slopes, information redistribution, bias-screening rows, fair averages,
+or conclusions. Do not let fit improvement alone decide the operational
+model.</li>
+</ol>
+<p>This sequence keeps the interpretation aligned with the validation
+boundary: <code>RSM</code>/<code>PCM</code> support the full
+manuscript/reporting route, while bounded <code>GPCM</code> supports the
+documented direct and caveated routes.</p>
 </div>
 <div id="future-extensions" class="section level2">
 <h2>Future extensions</h2>
@@ -524,10 +589,9 @@ Psychological Measurement, 24, 50-64.</li>
 the performance of S-X2: An item fit index for use with dichotomous item
 response theory models</em>. Applied Psychological Measurement, 27,
 289-298.</li>
-<li>Robitzsch, A., &amp; Steinfeld, J. (2018). <em>Modeling rater
-effects in achievement tests by item response models: Facets,
-generalized linear mixed models, or signal detection models?</em>
-Journal of Educational and Behavioral Statistics, 43, 218-244.</li>
+<li>Robitzsch, A., &amp; Steinfeld, J. (2018). <em>Item response models
+for human ratings: Overview, estimation methods, and implementation in
+R</em>. Psychological Test and Assessment Modeling, 60(1), 101-139.</li>
 <li>Sinharay, S., &amp; Monroe, S. (2025). <em>Assessment of fit of item
 response theory models: A critical review of the status quo and some
 future directions</em>. British Journal of Mathematical and Statistical

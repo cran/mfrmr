@@ -8,11 +8,13 @@ vignette: >
 ---
 
 ```{r, include = FALSE}
+is_cran_check <- !isTRUE(as.logical(Sys.getenv("NOT_CRAN", "false")))
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
   fig.width = 7,
-  fig.height = 5
+  fig.height = 5,
+  eval = !is_cran_check
 )
 ```
 
@@ -126,7 +128,9 @@ Interpretation:
 
 When you need the package's latent-integrated follow-up path, switch to `MML`
 and request `diagnostic_mode = "both"` so the legacy and strict branches stay
-visible side by side.
+visible side by side. The chunk below uses compact quadrature for optional
+local execution; final reporting should be refit with the package default or a
+higher quadrature setting.
 
 ```{r strict-marginal}
 fit_strict <- fit_mfrm(
@@ -234,6 +238,28 @@ Interpretation:
 - Facet profiles are useful for seeing whether a small number of levels drives most flagged interaction cells.
 - Treat these plots as screening evidence; confirm with the corresponding tables and narrative reports.
 
+## 5. Secondary visual layer
+
+The package ships a second-wave visual layer for teaching and
+diagnostic follow-up. These helpers are not default reporting figures;
+use them after the main screens above.
+
+- `plot_guttman_scalogram(fit, diagnostics)` renders a person x
+  facet-level response matrix with an unexpected-response overlay, for
+  teaching-oriented scalogram intuition and local triage.
+- `plot_residual_qq(fit, diagnostics)` plots a Normal Q-Q of
+  person-level standardized residual aggregates as exploratory
+  follow-up on residual tail behavior.
+- `plot_rater_trajectory(list(T1 = fit_a, T2 = fit_b))` tracks rater
+  severity across named waves. The helper does not perform linking;
+  supply waves that have already been placed on a common anchored
+  scale (see `vignette("mfrmr-linking-and-dff")`) before interpreting
+  movement as rater drift.
+- `plot_rater_agreement_heatmap(fit, diagnostics)` renders a
+  compact pairwise rater x rater agreement matrix; pass
+  `metric = "correlation"` to colour by the Pearson-style `Corr`
+  column instead of exact agreement.
+
 ## Recommended sequence
 
 For a compact visual workflow:
@@ -243,6 +269,9 @@ For a compact visual workflow:
 3. `plot_unexpected()`, `plot_displacement()`, `plot_marginal_fit()`, and `plot_interrater_agreement()` for local follow-up.
 4. `plot(fit, type = "wright")` and `plot(fit, type = "pathway")` for targeting and scale interpretation.
 5. `plot_residual_pca()`, `plot_bias_interaction()`, and `plot_information()` for deeper structural review.
+6. `plot_guttman_scalogram()`, `plot_residual_qq()`,
+   `plot_rater_trajectory()`, and `plot_rater_agreement_heatmap()` as
+   the teaching / drift / agreement-heatmap follow-up layer.
 
 ## Related help
 

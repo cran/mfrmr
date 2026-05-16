@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Migrating from Facets to mfrmr</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Migrating from Facets to mfrmr</h1>
+
+
+
+<p>This vignette walks Facets users through the equivalent
+<code>mfrmr</code> workflow: preparing data, fitting an
+<code>RSM</code>/<code>PCM</code> many-facet Rasch-family model with
+Facets-compatible defaults, generating the diagnostic and reporting
+tables that the canonical Facets output stack provides, and reviewing
+the output-contract boundary between the two systems. Bounded
+<code>GPCM</code> can be fit in <code>mfrmr</code>, but its slope-aware
+score semantics are intentionally outside the score-side Facets
+output-contract route.</p>
+<div id="mental-model" class="section level2">
+<h2>Mental model</h2>
+<p>The two stacks share the same psychometric framework but differ in
+operating model.</p>
+<p>Before treating a legacy workflow as covered, inspect the public
+coverage boundary:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">facets_feature_coverage</span>()</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="fu">facets_feature_coverage</span>(<span class="st">&quot;not_implemented&quot;</span>)</span></code></pre></div>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Concept</th>
+<th>Facets (Linacre 2026)</th>
+<th>mfrmr</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Input</td>
+<td>Specification file plus data file</td>
+<td><code>data.frame</code> in long format</td>
+</tr>
+<tr class="even">
+<td>Estimation</td>
+<td>JMLE by default</td>
+<td><code>JML</code> (legacy default) or <code>MML</code> (recommended
+for new analyses)</td>
+</tr>
+<tr class="odd">
+<td>Models</td>
+<td>Rating-scale, partial-credit, polytomous step models</td>
+<td><code>RSM</code>, <code>PCM</code>, bounded <code>GPCM</code></td>
+</tr>
+<tr class="even">
+<td>Output</td>
+<td>Tables 0-30 plus graphic files</td>
+<td>Returned R objects with <code>summary()</code> and
+<code>plot()</code> methods</td>
+</tr>
+<tr class="odd">
+<td>Anchoring</td>
+<td><code>D=</code>, <code>A=</code> fields in the specification</td>
+<td><code>anchors</code> and <code>group_anchors</code> arguments to
+<code>fit_mfrm()</code></td>
+</tr>
+<tr class="even">
+<td>Bias / interaction</td>
+<td>Table 14</td>
+<td><code>estimate_bias()</code> and
+<code>bias_interaction_report()</code></td>
+</tr>
+<tr class="odd">
+<td>Wright map / variable map</td>
+<td>Graphic variable-map output</td>
+<td><code>plot(fit, type = &quot;wright&quot;)</code> and
+<code>plot_wright_unified()</code></td>
+</tr>
+<tr class="even">
+<td>Fair average</td>
+<td>Table 7 fair-M average</td>
+<td><code>fair_average_table()</code></td>
+</tr>
+<tr class="odd">
+<td>Reproducibility</td>
+<td>Specification file is the manifest</td>
+<td><code>build_mfrm_manifest()</code> plus
+<code>build_mfrm_replay_script()</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="a-one-shot-legacy-compatible-call" class="section level2">
+<h2>A one-shot legacy-compatible call</h2>
+<p>If the goal is to reproduce a Facets-style script with minimal R-side
+plumbing, use <code>run_mfrm_facets()</code> (alias
+<code>mfrmRFacets()</code>):</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="fu">data</span>(<span class="st">&quot;ej2021_study1&quot;</span>, <span class="at">package =</span> <span class="st">&quot;mfrmr&quot;</span>)</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>run <span class="ot">&lt;-</span> <span class="fu">run_mfrm_facets</span>(</span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>  <span class="at">data =</span> ej2021_study1,</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;JML&quot;</span></span>
+<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a>)</span>
+<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a></span>
+<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a><span class="fu">names</span>(run)</span></code></pre></div>
+<p>The wrapper returns the same <code>fit_mfrm()</code> and
+<code>diagnose_mfrm()</code> objects that a step-by-step pipeline
+produces, plus the iteration log, fair-average table, and rating-scale
+table:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">summary</span>(run<span class="sc">$</span>fit)</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="fu">head</span>(run<span class="sc">$</span>fair_average)</span></code></pre></div>
+<p>For new analysis scripts, prefer
+<code>fit_mfrm(method = &quot;MML&quot;)</code> directly. MML integrates over the
+person distribution under an N(0, 1) prior and exposes per-person
+posterior SEs that JML cannot produce.</p>
+</div>
+<div id="translating-the-specification-file" class="section level2">
+<h2>Translating the specification file</h2>
+<p>The mapping below covers the most common Facets specification
+keywords.</p>
+<div id="facets-and-labels" class="section level3">
+<h3>Facets and labels</h3>
+<pre><code>Facets = 3
+Models = ?,?,?,R5
+Labels =
+  1, Examinee
+    1 = P01
+    ...
+  2, Rater
+    1 = R1
+    ...
+  3, Criterion
+    1 = Content
+    ...</code></pre>
+<p>translates to:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">fit_mfrm</span>(</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>  <span class="at">data =</span> examinee_long,</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Examinee&quot;</span>,</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>  <span class="at">rating_min =</span> <span class="dv">1</span>,</span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>  <span class="at">rating_max =</span> <span class="dv">5</span>,</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span></span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>)</span></code></pre></div>
+<p><code>Models = ?,?,?,R5</code> becomes <code>model = &quot;RSM&quot;</code> and
+the <code>R5</code> rating-scale declaration becomes
+<code>rating_min = 1, rating_max = 5</code>. For a partial-credit
+specification, pass <code>model = &quot;PCM&quot;</code> and identify the facet
+that carries the step thresholds with <code>step_facet = &quot;Rater&quot;</code>
+(or the appropriate facet name).</p>
+</div>
+<div id="anchoring" class="section level3">
+<h3>Anchoring</h3>
+<p>A Facets <code>D = 2, A =</code> block:</p>
+<pre><code>D = 2
+A = 1, 0.0
+    2, 0.5</code></pre>
+<p>becomes an <code>anchors</code> data frame:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>anchors <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>  <span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span>,</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="at">level =</span> <span class="fu">c</span>(<span class="st">&quot;R1&quot;</span>, <span class="st">&quot;R2&quot;</span>),</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>  <span class="at">estimate =</span> <span class="fu">c</span>(<span class="fl">0.0</span>, <span class="fl">0.5</span>),</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>  <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span></span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>)</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(..., <span class="at">anchors =</span> anchors)</span></code></pre></div>
+<p><code>review_mfrm_anchors()</code> validates and reports on the
+anchor block before the fit runs, surfacing connectivity, overlap, and
+minimum-sample issues.</p>
+</div>
+<div id="bias-and-interaction" class="section level3">
+<h3>Bias and interaction</h3>
+<p>Facets Table 14 bias output between Rater and Criterion has a direct
+equivalent:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>diag <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit)</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>bias <span class="ot">&lt;-</span> <span class="fu">estimate_bias</span>(fit, diag,</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>                      <span class="at">facet_a =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">facet_b =</span> <span class="st">&quot;Criterion&quot;</span>)</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="fu">summary</span>(bias)</span></code></pre></div>
+<p><code>estimate_all_bias()</code> enumerates every non-person facet
+pair in one call.</p>
+</div>
+<div id="wright-map-variable-map" class="section level3">
+<h3>Wright map / variable map</h3>
+<p>For a shared-logit visual display of persons, facet levels, and step
+thresholds, use the Wright map route:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="fu">plot</span>(fit, <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>, <span class="at">show_ci =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+<p><code>plot_wright_unified()</code> is the corresponding explicit
+helper when the Wright map is the main figure rather than one panel in a
+larger visual workflow. Use <code>draw = FALSE</code> or
+<code>plot_data(fit, type = &quot;wright&quot;)</code> when you need the
+underlying coordinates for a custom <code>ggplot2</code>, base-R, or
+Quarto graphic.</p>
+</div>
+<div id="fit-df-and-zstd-review" class="section level3">
+<h3>Fit df and ZSTD review</h3>
+<p>Facets users often compare Infit/Outfit MnSq together with ZStd
+columns. In <code>mfrmr</code>, treat MnSq as the primary fit statistic
+and use the df/ZSTD columns to explain how the same MnSq values were
+standardized. The direct review path is:</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>diag <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit, <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>, <span class="at">fit_df_method =</span> <span class="st">&quot;both&quot;</span>)</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>fm <span class="ot">&lt;-</span> <span class="fu">fit_measures_table</span>(fit, <span class="at">diagnostics =</span> diag,</span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>                         <span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">fit_df_method =</span> <span class="st">&quot;both&quot;</span>)</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a></span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>fm<span class="sc">$</span>facets_table</span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>fm<span class="sc">$</span>df_sensitive</span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a><span class="fu">plot</span>(fm, <span class="at">type =</span> <span class="st">&quot;df_sensitivity&quot;</span>)</span></code></pre></div>
+<p><code>df_sensitivity</code> reports the engine-vs-FACETS-style df
+comparison row by row; <code>df_sensitive</code> keeps only rows where
+the df convention changes the |ZSTD| flag or materially changes the ZSTD
+interpretation. The same status taxonomy is used by
+<code>facets_fit_review()</code>, so a table-oriented review and an
+external FACETS comparison use the same language.</p>
+</div>
+<div id="group-anchoring-and-dff" class="section level3">
+<h3>Group anchoring and DFF</h3>
+<p>Facets <code>D = ..., G =</code> group-anchor blocks for differential
+facet functioning translate to the <code>group_anchors</code> argument
+and the <code>analyze_dff()</code> follow-up:</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>group_anchors <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>  <span class="at">facet =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>  <span class="at">level =</span> <span class="st">&quot;Content&quot;</span>,</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>  <span class="at">group =</span> <span class="fu">c</span>(<span class="st">&quot;Native&quot;</span>, <span class="st">&quot;Non-native&quot;</span>),</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>  <span class="at">estimate =</span> <span class="fu">c</span>(<span class="fl">0.0</span>, <span class="fl">0.0</span>),</span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>  <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span></span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>)</span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>fit_g <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(..., <span class="at">group_anchors =</span> group_anchors)</span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>dff <span class="ot">&lt;-</span> <span class="fu">analyze_dff</span>(fit_g, diag, <span class="at">facet =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>                   <span class="at">group =</span> <span class="st">&quot;FirstLanguage&quot;</span>, <span class="at">method =</span> <span class="st">&quot;refit&quot;</span>)</span></code></pre></div>
+</div>
+</div>
+<div id="reviewing-output-contracts-and-fit-tables" class="section level2">
+<h2>Reviewing output contracts and fit tables</h2>
+<p>When migrating an existing study,
+<code>facets_output_contract_review()</code> checks whether the
+package-generated report components satisfy the FACETS-style output
+contract encoded in the package:</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>contract_review <span class="ot">&lt;-</span> <span class="fu">facets_output_contract_review</span>(</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>  fit,</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag,</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>  <span class="at">branch =</span> <span class="st">&quot;facets&quot;</span></span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>)</span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a><span class="fu">summary</span>(contract_review)</span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>contract_review<span class="sc">$</span>missing_preview</span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>contract_review<span class="sc">$</span>metric_checks</span></code></pre></div>
+<p>The resulting object reviews column coverage and package-native
+metric checks. It is not a claim that <code>mfrmr</code> has reproduced
+FACETS estimates numerically. For external numerical comparison, use an
+exported FACETS fit table and <code>facets_fit_review()</code>.</p>
+<p>If you already have a FACETS fit table on disk, read it first and
+then run the fit review. This does not run FACETS; it consumes an
+exported or otherwise harmonized table.</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>facets_fit <span class="ot">&lt;-</span> <span class="fu">read_facets_fit_table</span>(</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>  <span class="st">&quot;score.2.txt&quot;</span>,</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>  <span class="at">facet_map =</span> <span class="fu">c</span>(<span class="st">&quot;1&quot;</span> <span class="ot">=</span> <span class="st">&quot;Person&quot;</span>, <span class="st">&quot;2&quot;</span> <span class="ot">=</span> <span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;3&quot;</span> <span class="ot">=</span> <span class="st">&quot;Criterion&quot;</span>)</span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>)</span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>review <span class="ot">&lt;-</span> <span class="fu">facets_fit_review</span>(</span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a>  fit,</span>
+<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag,</span>
+<span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a>  <span class="at">facets_fit =</span> facets_fit,</span>
+<span id="cb13-9"><a href="#cb13-9" tabindex="-1"></a>  <span class="at">external_zstd_tolerance =</span> <span class="fl">0.05</span></span>
+<span id="cb13-10"><a href="#cb13-10" tabindex="-1"></a>)</span>
+<span id="cb13-11"><a href="#cb13-11" tabindex="-1"></a></span>
+<span id="cb13-12"><a href="#cb13-12" tabindex="-1"></a>review<span class="sc">$</span>df_sensitivity</span>
+<span id="cb13-13"><a href="#cb13-13" tabindex="-1"></a>review<span class="sc">$</span>df_sensitive</span>
+<span id="cb13-14"><a href="#cb13-14" tabindex="-1"></a>review<span class="sc">$</span>external_table_quality</span>
+<span id="cb13-15"><a href="#cb13-15" tabindex="-1"></a>review<span class="sc">$</span>external_comparison</span>
+<span id="cb13-16"><a href="#cb13-16" tabindex="-1"></a><span class="fu">plot</span>(review, <span class="at">type =</span> <span class="st">&quot;df_sensitivity&quot;</span>)</span></code></pre></div>
+<p>Use <code>external_comparison</code> for the supplied FACETS table
+and <code>df_sensitivity</code> for the engine-vs-FACETS-style df
+convention check. This separation keeps external numerical differences
+distinct from ZSTD differences caused by df standardization.
+<code>external_table_quality</code> is the first place to look if the
+FACETS export only contains ZStd and T.Count columns, or if duplicate
+<code>Facet</code> x <code>Level</code> rows were supplied.</p>
+</div>
+<div id="producing-facets-style-output-files" class="section level2">
+<h2>Producing Facets-style output files</h2>
+<p>For traceability or downstream tools that expect Facets output files,
+<code>facets_output_file_bundle()</code> writes a parallel set of
+fixed-width or CSV exports:</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>files <span class="ot">&lt;-</span> <span class="fu">facets_output_file_bundle</span>(</span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>  fit,</span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag,</span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>  <span class="at">out_dir =</span> <span class="fu">tempdir</span>(),</span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>  <span class="at">include =</span> <span class="fu">c</span>(<span class="st">&quot;graph&quot;</span>, <span class="st">&quot;score&quot;</span>)</span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a>)</span></code></pre></div>
+<p>For RSM and PCM the score-side helpers are available. Under bounded
+<code>GPCM</code> the score-side bundle is intentionally restricted; see
+<code>?gpcm_capability_matrix</code> and the
+<code>mfrmr-gpcm-scope</code> vignette for the binding contract.</p>
+</div>
+<div id="recommended-next-steps" class="section level2">
+<h2>Recommended next steps</h2>
+<p>After a Facets-equivalent fit is in hand, the canonical mfrmr
+reporting route extends the analysis with:</p>
+<ul>
+<li><code>review_mfrm_anchors()</code> before anchored fitting, and
+<code>detect_anchor_drift()</code> / <code>plot_anchor_drift()</code>
+when common elements define a cross-form or cross-wave link.</li>
+<li><code>diagnose_mfrm(diagnostic_mode = &quot;both&quot;)</code> for the strict
+marginal screen alongside the residual stack.</li>
+<li><code>rating_scale_table()</code>,
+<code>category_structure_report()</code>, and
+<code>category_curves_report()</code> for category-functioning
+evidence.</li>
+<li><code>fair_average_table()</code> when FACETS Table 12-style
+fair-average review is needed.</li>
+<li><code>plot(fit, type = &quot;wright&quot;)</code> or
+<code>plot_wright_unified()</code> for a variable-map view of targeting
+and threshold placement.</li>
+<li><code>estimate_bias()</code>,
+<code>bias_interaction_report()</code>, and
+<code>bias_pairwise_report()</code> when FACETS Table 14-style local
+interaction screening is substantively relevant.</li>
+<li><code>reporting_checklist()</code> for a manuscript-readiness
+summary.</li>
+<li><code>build_apa_outputs()</code> for Method and Results paragraphs
+and APA tables.</li>
+<li><code>build_mfrm_manifest()</code> and
+<code>build_mfrm_replay_script()</code> for the reproducibility bundle
+that Facets specifications cannot produce out of the box.</li>
+</ul>
+<p>The <code>mfrmr-workflow</code> vignette covers the full sequence end
+to end; the <code>mfrmr-reporting-and-apa</code> vignette focuses on the
+manuscript surface; the <code>mfrmr-linking-and-dff</code> vignette
+covers anchoring, drift, and DFF in detail.</p>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

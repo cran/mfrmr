@@ -56,8 +56,8 @@ and \code{apa$table_figure_captions} as draft components for final-text review.
 
 \examples{
 toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
-diag <- diagnose_mfrm(fit, residual_pca = "both")
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
+diag <- diagnose_mfrm(fit, residual_pca = "none")
 apa <- build_apa_outputs(fit, diag)
 summary(apa)
 }

@@ -606,7 +606,7 @@ test_that("invalid anchor (non-existent level) with warn policy triggers warning
       method = "JML", maxit = 60,
       anchors = anchor_tbl,
       anchor_policy = "warn"),
-    regex = "Anchor audit"
+    regex = "Anchor review"
   )
 })
 

@@ -109,11 +109,17 @@ infer_facets_mode_mapping <- function(dat, person = NULL, facets = NULL, score =
 #' - `mapping`: resolved column mapping
 #'
 #' @section Estimation-method notes:
-#' - `method = "JML"` (default): legacy-compatible joint estimation route.
-#' - `method = "JMLE"`: explicit JMLE label; internally equivalent to JML route.
-#' - `method = "MML"`: marginal maximum likelihood route using `quad_points`.
-#'   Use `mml_engine = "em"` or `"hybrid"` only for `RSM` / `PCM` fits when
-#'   you want the staged MML alternatives.
+#' - `method = "JML"` (default): legacy-compatible joint estimation
+#'   route; the default preserves the FACETS-style output continuity
+#'   that existing one-shot scripts expect. For new analysis scripts,
+#'   prefer `fit_mfrm(..., method = "MML")` -- MML is the package-wide
+#'   recommended route because person parameters are integrated out
+#'   under an N(0, 1) prior and per-person posterior SEs are available.
+#' - `method = "JMLE"`: explicit JMLE label; internally equivalent to
+#'   JML route.
+#' - `method = "MML"`: marginal maximum likelihood route using
+#'   `quad_points`. Use `mml_engine = "em"` or `"hybrid"` only for
+#'   `RSM` / `PCM` fits when you want the staged MML alternatives.
 #'
 #' `model = "PCM"` is supported; set `step_facet` when facet-specific step
 #' structure is needed.
@@ -162,7 +168,7 @@ infer_facets_mode_mapping <- function(dat, person = NULL, facets = NULL, score =
 #'   person = "Person",
 #'   facets = c("Rater", "Criterion"),
 #'   score = "Score",
-#'   maxit = 6
+#'   maxit = 30
 #' )
 #' out$fit$summary[, c("Model", "Method", "MethodUsed")]
 #' s <- summary(out)
@@ -179,7 +185,7 @@ infer_facets_mode_mapping <- function(dat, person = NULL, facets = NULL, score =
 #'     score = "Score",
 #'     method = "MML",
 #'     quad_points = 5,
-#'     maxit = 6
+#'     maxit = 30
 #'   )
 #'   out_mml$fit$summary[, c("Model", "Method", "MethodUsed")]
 #' }

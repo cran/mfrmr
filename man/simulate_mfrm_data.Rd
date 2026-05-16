@@ -2,7 +2,7 @@
 % Please edit documentation in R/api-simulation.R
 \name{simulate_mfrm_data}
 \alias{simulate_mfrm_data}
-\title{Simulate long-format many-facet Rasch data for design studies}
+\title{Simulate long-format ordered many-facet data for design studies}
 \usage{
 simulate_mfrm_data(
   n_person = 50,
@@ -80,15 +80,19 @@ vary across levels. Currently \code{"Criterion"} and \code{"Rater"} are supporte
 \item{slope_facet}{Slope facet used when \code{model = "GPCM"}. The current
 bounded \code{GPCM} branch requires \code{slope_facet == step_facet}.}
 
-\item{thresholds}{Optional threshold specification. Use either a numeric
-vector of common thresholds or a data frame with columns \code{StepFacet},
-\code{Step}/\code{StepIndex}, and \code{Estimate}.}
+\item{thresholds}{Optional threshold specification. Use a numeric vector of
+common thresholds; a named list such as \code{list(C01 = c(-1, 0, 1))}; a
+numeric matrix with one row per \code{StepFacet} and one column per step; or a
+long data frame with columns \code{StepFacet}, \code{Step}/\code{StepIndex}, and
+\code{Estimate}.}
 
 \item{slopes}{Optional slope specification used when \code{model = "GPCM"}.
 Use either a numeric vector aligned to the generated slope-facet levels or
-a data frame with columns \code{SlopeFacet} and \code{Estimate}. When omitted,
-slopes default to 1 for every slope-facet level, giving an exact \code{PCM}
-reduction.}
+a data frame with columns \code{SlopeFacet} and \code{Estimate}. Supplied slopes are
+treated as relative discriminations and normalized to the package's
+geometric-mean-one identification convention on the log scale. When
+omitted, slopes default to 1 for every slope-facet level, giving an exact
+\code{PCM} reduction.}
 
 \item{assignment}{Assignment design. \code{"crossed"} means every person sees
 every rater; \code{"rotating"} uses a balanced rotating subset; \code{"resampled"}
@@ -118,10 +122,11 @@ included. If a weighted response skeleton is reused, a \code{Weight} column is
 also included.
 }
 \description{
-Simulate long-format many-facet Rasch data for design studies
+Simulate long-format ordered many-facet data for design studies
 }
 \details{
-This function generates synthetic MFRM data from the Rasch model.
+This function generates synthetic ordered many-facet data under \code{RSM},
+\code{PCM}, or the package's bounded \code{GPCM} branch.
 The data-generating process is:
 \enumerate{
 \item Draw person abilities: \eqn{\theta_n \sim N(0, \texttt{theta\_sd}^2)}
@@ -162,16 +167,17 @@ Threshold handling is intentionally explicit:
 \item if \code{thresholds = NULL}, common equally spaced thresholds are generated
 from \code{step_span}
 \item if \code{thresholds} is a numeric vector, it is used as one common threshold set
-\item if \code{thresholds} is a data frame, threshold values may vary by \code{StepFacet}
-(currently \code{Criterion} or \code{Rater})
+\item if \code{thresholds} is a named list, numeric matrix, or data frame, threshold
+values may vary by \code{StepFacet} (currently \code{Criterion} or \code{Rater})
 }
 
 For bounded \code{GPCM}, the generator now requires an explicit slope
 contract in parallel with the threshold table. The current public branch
-keeps \code{slope_facet == step_facet} and uses the internal \code{category_prob_gpcm()}
-helper for
-response sampling. Broader design-planning helpers remain restricted until
-that slope-aware contract is generalized beyond direct data generation.
+keeps \code{slope_facet == step_facet}, normalizes supplied slopes to the same
+geometric-mean-one log-slope identification used by \code{\link[=fit_mfrm]{fit_mfrm()}}, and uses
+the internal \code{category_prob_gpcm()} helper for response sampling. Broader
+design-planning helpers remain restricted until that slope-aware contract is
+generalized beyond direct data generation.
 
 Assignment handling is also explicit:
 \itemize{

@@ -15,12 +15,14 @@ build_summary_table_bundle(
 )
 }
 \arguments{
-\item{x}{An \code{mfrm_fit}, \code{mfrm_diagnostics}, \code{mfrm_data_description},
+\item{x}{An \code{mfrm_fit}, \code{mfrm_diagnostics},
+\code{mfrm_person_fit_indices}, \code{mfrm_data_description},
 \code{mfrm_reporting_checklist}, \code{mfrm_apa_outputs},
 \code{mfrm_design_evaluation}, \code{mfrm_signal_detection},
+\code{mfrm_recovery_simulation}, \code{mfrm_recovery_assessment},
 \code{mfrm_population_prediction}, \code{mfrm_future_branch_active_branch},
-\code{mfrm_facets_run}, \code{mfrm_bias}, \code{mfrm_anchor_audit},
-\code{mfrm_linking_review}, \code{mfrm_misfit_casebook}, \code{mfrm_weighting_audit},
+\code{mfrm_facets_run}, \code{mfrm_bias}, \code{mfrm_anchor_review},
+\code{mfrm_linking_review}, \code{mfrm_misfit_casebook}, \code{mfrm_weighting_review},
 \code{mfrm_unit_prediction}, or \code{mfrm_plausible_values} object, or one of
 their \code{summary()} outputs.}
 
@@ -81,19 +83,22 @@ manuscript-facing subset before plotting or export.
 \itemize{
 \item \code{\link[=fit_mfrm]{fit_mfrm()}} or \code{summary(fit)}
 \item \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} or \code{summary(diag)}
+\item \code{\link[=compute_person_fit_indices]{compute_person_fit_indices()}} or \code{summary(person_fit)}
 \item \code{\link[=describe_mfrm_data]{describe_mfrm_data()}} or \code{summary(ds)}
 \item \code{\link[=reporting_checklist]{reporting_checklist()}} or \code{summary(chk)}
 \item \code{\link[=build_apa_outputs]{build_apa_outputs()}} or \code{summary(apa)}
 \item \code{\link[=evaluate_mfrm_design]{evaluate_mfrm_design()}} or \code{summary(sim_eval)}
 \item \code{\link[=evaluate_mfrm_signal_detection]{evaluate_mfrm_signal_detection()}} or \code{summary(sig_eval)}
+\item \code{\link[=evaluate_mfrm_recovery]{evaluate_mfrm_recovery()}} or \code{summary(rec)}
+\item \code{\link[=assess_mfrm_recovery]{assess_mfrm_recovery()}} or \code{summary(rec_assessment)}
 \item \code{\link[=predict_mfrm_population]{predict_mfrm_population()}} or \code{summary(pred)}
 \item \code{planning_schema$future_branch_active_branch} or \code{summary(...)}
 \item \code{\link[=run_mfrm_facets]{run_mfrm_facets()}} or \code{summary(out)}
 \item \code{\link[=estimate_bias]{estimate_bias()}} or \code{summary(bias)}
-\item \code{\link[=audit_mfrm_anchors]{audit_mfrm_anchors()}} or \code{summary(audit)}
+\item \code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}} or \code{summary(review)}
 \item \code{\link[=build_linking_review]{build_linking_review()}} or \code{summary(review)}
 \item \code{\link[=build_misfit_casebook]{build_misfit_casebook()}} or \code{summary(casebook)}
-\item \code{\link[=build_weighting_audit]{build_weighting_audit()}} or \code{summary(audit)}
+\item \code{\link[=build_weighting_review]{build_weighting_review()}} or \code{summary(review)}
 \item \code{\link[=predict_mfrm_units]{predict_mfrm_units()}} or \code{summary(pred_units)}
 \item \code{\link[=sample_mfrm_plausible_values]{sample_mfrm_plausible_values()}} or \code{summary(pv)}
 }
@@ -135,7 +140,7 @@ documented with the coefficient table.
 \donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 25)
+                method = "JML", maxit = 30)
 bundle <- build_summary_table_bundle(fit)
 bundle$table_index
 summary(bundle)$role_summary

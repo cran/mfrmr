@@ -39,6 +39,21 @@ test_that("visual_reporting_template returns beginner-oriented figure guidance",
   )
 })
 
+test_that("visual_reporting_template covers second-wave plots", {
+  tbl <- visual_reporting_template()
+  for (fam in c("Guttman scalogram", "Residual Q-Q",
+                "Rater trajectory (linked waves)",
+                "Rater agreement heatmap")) {
+    expect_true(fam %in% tbl$FigureFamily,
+                info = paste("missing row for", fam))
+  }
+  expect_match(
+    tbl$WhatNotToClaim[tbl$FigureFamily == "Rater trajectory (linked waves)"][1],
+    "anchor-linking",
+    fixed = TRUE
+  )
+})
+
 test_that("visual_reporting_template filters by reporting scope", {
   full_tbl <- visual_reporting_template()
   manuscript_tbl <- visual_reporting_template("manuscript")

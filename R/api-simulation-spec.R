@@ -20,9 +20,11 @@
 #' @param noise_sd Optional observation-level noise added to the linear predictor.
 #' @param step_span Spread used to generate equally spaced thresholds when
 #'   `thresholds = NULL`.
-#' @param thresholds Optional threshold specification. Use either a numeric
-#'   vector of common thresholds or a data frame with columns `StepFacet`,
-#'   `Step`/`StepIndex`, and `Estimate`.
+#' @param thresholds Optional threshold specification. Use a numeric vector of
+#'   common thresholds; a named list such as `list(C01 = c(-1, 0, 1))`; a
+#'   numeric matrix with one row per `StepFacet` and one column per step; or a
+#'   long data frame with columns `StepFacet`, `Step`/`StepIndex`, and
+#'   `Estimate`.
 #' @param model Measurement model recorded in the simulation specification.
 #' @param step_facet Step facet used when `model = "PCM"` and threshold values
 #'   vary across levels.
@@ -30,7 +32,9 @@
 #'   bounded `GPCM` branch requires `slope_facet == step_facet`.
 #' @param slopes Optional slope specification for `model = "GPCM"`. Use either
 #'   a numeric vector aligned to the generated slope-facet levels or a data
-#'   frame with columns `SlopeFacet` and `Estimate`. When omitted, slopes
+#'   frame with columns `SlopeFacet` and `Estimate`. Supplied slopes are treated
+#'   as relative discriminations and normalized to the package's geometric-mean-
+#'   one identification convention on the log scale. When omitted, slopes
 #'   default to 1 for every slope-facet level, giving an exact `PCM`
 #'   reduction.
 #' @param facet_names Optional public names for the two simulated non-person
@@ -104,7 +108,7 @@
 #'   a reusable template of person-level covariates, including model-matrix
 #'   xlevel/contrast provenance for categorical covariates
 #' - `planning_scope`, an explicit record that the current planning/forecasting
-#'   helpers still target the role-based person x rater-like x criterion-like
+#'   helpers target the role-based person x rater-like x criterion-like
 #'   design contract rather than a fully arbitrary-facet planner
 #' - `planning_constraints`, an explicit record of which design variables can
 #'   currently be changed from that specification without rebuilding it
@@ -118,15 +122,17 @@
 #'   `design_schema` is now the authoritative schema-only branch object
 #' - optional signal tables for DIF and interaction bias
 #'
-#' The current generator still targets the package's standard person x rater x
+#' The current generator targets the package's standard person x rater x
 #' criterion workflow, but the public output names for those two facet roles
 #' can now be customized with `facet_names`. This naming layer improves public
 #' ergonomics; it does not yet turn the generator into a fully arbitrary-facet
-#' simulator. Internally, helper objects still keep canonical role mappings so
-#' that planning functions can treat the first non-person facet as rater-like
-#' and the second as criterion-like. When threshold values are provided by
+#' simulator. Internally, helper objects keep canonical role mappings so that
+#' planning functions can treat the first non-person facet as rater-like and
+#' the second as criterion-like. When threshold values are provided by
 #' `StepFacet`, the supported step facets are the generated levels of the
-#' chosen public rater-like or criterion-like column.
+#' chosen public rater-like or criterion-like column. For convenience,
+#' step-facet-specific thresholds can be supplied as a named list or as a
+#' numeric matrix whose row names are `StepFacet` labels.
 #' When `model = "GPCM"`, the same public facet naming rules apply to the
 #' slope table; the current bounded branch keeps `slope_facet` equal to
 #' `step_facet`.
@@ -387,11 +393,12 @@ build_mfrm_sim_spec <- function(n_person = 50,
 #' mechanism. Users should review and, if necessary, edit the returned
 #' specification before using it for design planning.
 #'
-#' First-release `GPCM` fits are now supported here for direct data generation,
-#' provided that the returned simulation specification stores both a threshold
-#' table and a parallel slope table. The broader planning/reporting helpers
-#' still remain restricted until slope-aware downstream contracts are widened
-#' explicitly.
+#' First-release `GPCM` fits are now supported here for direct data generation
+#' and parameter-recovery checks, provided that the returned simulation
+#' specification stores both a threshold table and a parallel slope table.
+#' Design planning, forecasting, and fit-based report/export bundles still
+#' remain outside the bounded-`GPCM` boundary until those downstream contracts
+#' are widened explicitly.
 #'
 #' If you want to carry person-level group labels into a fit-derived observed
 #' response skeleton, provide the original `source_data` together with
@@ -406,14 +413,14 @@ build_mfrm_sim_spec <- function(n_person = 50,
 #' @return An object of class `mfrm_sim_spec`.
 #' @seealso [build_mfrm_sim_spec()], [simulate_mfrm_data()]
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' toy <- simulate_mfrm_data(
 #'   n_person = 8,
 #'   n_rater = 3,
 #'   n_criterion = 2,
 #'   seed = 123
 #' )
-#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 5)
+#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 #' spec <- extract_mfrm_sim_spec(fit, latent_distribution = "empirical")
 #' spec$assignment
 #' spec$model
@@ -1062,6 +1069,82 @@ simulation_normalize_design_skeleton <- function(design_skeleton,
   tbl
 }
 
+simulation_threshold_list_to_table <- function(thresholds) {
+  if (length(thresholds) == 0L) {
+    stop("`thresholds` list must contain at least one threshold set.", call. = FALSE)
+  }
+
+  step_facets <- names(thresholds)
+  if (is.null(step_facets)) {
+    if (length(thresholds) == 1L) {
+      step_facets <- "Common"
+    } else {
+      stop("`thresholds` lists with multiple entries must name each `StepFacet`.", call. = FALSE)
+    }
+  } else {
+    step_facets <- as.character(step_facets)
+    missing_names <- !nzchar(step_facets)
+    if (length(thresholds) == 1L && all(missing_names)) {
+      step_facets <- "Common"
+    } else if (any(missing_names)) {
+      stop("Every entry in a `thresholds` list must have a non-empty `StepFacet` name.", call. = FALSE)
+    }
+  }
+  if (anyDuplicated(step_facets)) {
+    stop("`thresholds` list names must be unique `StepFacet` labels.", call. = FALSE)
+  }
+
+  pieces <- vector("list", length(thresholds))
+  for (i in seq_along(thresholds)) {
+    est <- thresholds[[i]]
+    if (!is.numeric(est) || is.matrix(est) || length(dim(est)) > 0L) {
+      stop("Each entry in a `thresholds` list must be a numeric vector.", call. = FALSE)
+    }
+    pieces[[i]] <- tibble::tibble(
+      StepFacet = step_facets[[i]],
+      StepIndex = seq_along(est),
+      Step = paste0("Step_", seq_along(est)),
+      Estimate = as.numeric(est)
+    )
+  }
+
+  dplyr::bind_rows(pieces)
+}
+
+simulation_threshold_matrix_to_table <- function(thresholds) {
+  if (!is.numeric(thresholds)) {
+    stop("`thresholds` matrices must be numeric.", call. = FALSE)
+  }
+  if (nrow(thresholds) == 0L || ncol(thresholds) == 0L) {
+    stop("`thresholds` matrices must have at least one row and one column.", call. = FALSE)
+  }
+
+  step_facets <- rownames(thresholds)
+  if (is.null(step_facets)) {
+    if (nrow(thresholds) == 1L) {
+      step_facets <- "Common"
+    } else {
+      stop("`thresholds` matrices with multiple rows must have row names for `StepFacet` labels.", call. = FALSE)
+    }
+  } else {
+    step_facets <- as.character(step_facets)
+    if (any(!nzchar(step_facets))) {
+      stop("Every row in a `thresholds` matrix must have a non-empty `StepFacet` name.", call. = FALSE)
+    }
+  }
+  if (anyDuplicated(step_facets)) {
+    stop("`thresholds` matrix row names must be unique `StepFacet` labels.", call. = FALSE)
+  }
+
+  step_index <- rep(seq_len(ncol(thresholds)), times = nrow(thresholds))
+  tibble::tibble(
+    StepFacet = rep(step_facets, each = ncol(thresholds)),
+    StepIndex = step_index,
+    Step = paste0("Step_", step_index),
+    Estimate = as.numeric(t(thresholds))
+  )
+}
+
 simulation_build_threshold_table <- function(thresholds, score_levels, step_span, model) {
   if (is.null(thresholds)) {
     est <- if (score_levels == 2L) 0 else seq(-abs(step_span), abs(step_span), length.out = score_levels - 1L)
@@ -1073,7 +1156,11 @@ simulation_build_threshold_table <- function(thresholds, score_levels, step_span
     ))
   }
 
-  if (is.numeric(thresholds)) {
+  if (is.matrix(thresholds)) {
+    thresholds <- simulation_threshold_matrix_to_table(thresholds)
+  } else if (is.list(thresholds) && !is.data.frame(thresholds)) {
+    thresholds <- simulation_threshold_list_to_table(thresholds)
+  } else if (is.numeric(thresholds)) {
     est <- as.numeric(thresholds)
     if (length(est) != score_levels - 1L) {
       stop("Numeric `thresholds` must have length `score_levels - 1`.", call. = FALSE)
@@ -1087,7 +1174,7 @@ simulation_build_threshold_table <- function(thresholds, score_levels, step_span
   }
 
   if (!is.data.frame(thresholds)) {
-    stop("`thresholds` must be NULL, a numeric vector, or a data.frame.", call. = FALSE)
+    stop("`thresholds` must be NULL, a numeric vector, a named list, a numeric matrix, or a data.frame.", call. = FALSE)
   }
 
   tbl <- tibble::as_tibble(thresholds)
@@ -1172,6 +1259,14 @@ simulation_build_slope_table <- function(slopes,
     stop("Could not resolve expected slope-facet levels for bounded `GPCM`.", call. = FALSE)
   }
 
+  normalize_slopes <- function(x) {
+    x <- as.numeric(x)
+    if (any(!is.finite(x)) || any(x <= 0)) {
+      stop("`GPCM` slopes must contain strictly positive finite values.", call. = FALSE)
+    }
+    exp(log(x) - mean(log(x)))
+  }
+
   if (is.null(slopes)) {
     return(tibble::tibble(
       SlopeFacet = expected_levels,
@@ -1191,9 +1286,7 @@ simulation_build_slope_table <- function(slopes,
         call. = FALSE
       )
     }
-    if (any(!is.finite(slope_vals)) || any(slope_vals <= 0)) {
-      stop("Numeric `slopes` must contain strictly positive finite values.", call. = FALSE)
-    }
+    slope_vals <- normalize_slopes(slope_vals)
     return(tibble::tibble(
       SlopeFacet = expected_levels,
       Estimate = slope_vals
@@ -1219,9 +1312,7 @@ simulation_build_slope_table <- function(slopes,
   if (nrow(tbl) == 0L) {
     stop("`slopes` did not contain any valid slope rows.", call. = FALSE)
   }
-  if (any(!is.finite(tbl$Estimate)) || any(tbl$Estimate <= 0)) {
-    stop("`slopes$Estimate` must contain strictly positive finite values.", call. = FALSE)
-  }
+  tbl$Estimate <- normalize_slopes(tbl$Estimate)
   if (!setequal(tbl$SlopeFacet, expected_levels)) {
     stop(
       "`slopes` must cover exactly the generated `", slope_facet, "` levels: ",

@@ -184,6 +184,134 @@ test_that("GPCM probabilities and log-likelihood reduce exactly to PCM", {
   expect_equal(ll_gpcm, ll_pcm, tolerance = 1e-12)
 })
 
+test_that("RSM probabilities and log-likelihood reduce to common-threshold PCM", {
+  step_cum <- c(0, -0.3, 0.2, 0.5)
+  step_cum_mat <- matrix(rep(step_cum, times = 3L), nrow = 3L, byrow = TRUE)
+  eta <- c(-1.2, -0.4, 0.2, 0.9, 1.4, 0.0)
+  score_k <- c(0L, 1L, 2L, 3L, 1L, 2L)
+  crit_idx <- c(1L, 2L, 3L, 1L, 2L, 3L)
+  weights <- c(1, 0.5, 2, 1.5, 1, 0.75)
+
+  probs_rsm <- mfrmr:::category_prob_rsm(eta, step_cum)
+  probs_pcm <- mfrmr:::category_prob_pcm(
+    eta = eta,
+    step_cum_mat = step_cum_mat,
+    criterion_idx = crit_idx
+  )
+  expect_equal(unname(probs_rsm), unname(probs_pcm), tolerance = 1e-12)
+
+  ll_rsm <- mfrmr:::loglik_rsm(eta, score_k, step_cum)
+  ll_pcm <- mfrmr:::loglik_pcm(eta, score_k, step_cum_mat, crit_idx)
+  expect_equal(ll_rsm, ll_pcm, tolerance = 1e-12)
+
+  ll_rsm_w <- mfrmr:::loglik_rsm(eta, score_k, step_cum, weight = weights)
+  ll_pcm_w <- mfrmr:::loglik_pcm(
+    eta, score_k, step_cum_mat, crit_idx, weight = weights
+  )
+  expect_equal(ll_rsm_w, ll_pcm_w, tolerance = 1e-12)
+})
+
+test_that("RSM response bundle reduces to common-threshold PCM diagnostics", {
+  steps <- c(-0.3, 0.5, 0.3)
+  steps_mat <- matrix(rep(steps, times = 3L), nrow = 3L, byrow = TRUE)
+  eta <- c(-1.2, -0.4, 0.2, 0.9, 1.4, 0.0)
+  step_idx <- c(1L, 2L, 3L, 1L, 2L, 3L)
+  idx <- list(
+    step_idx = step_idx,
+    criterion_splits = split(seq_along(step_idx), step_idx)
+  )
+
+  rsm <- mfrmr:::compute_response_probability_bundle(
+    config = list(model = "RSM", n_cat = 4L),
+    idx = idx,
+    params = list(steps = steps),
+    eta = eta
+  )
+  pcm <- mfrmr:::compute_response_probability_bundle(
+    config = list(model = "PCM", n_cat = 4L),
+    idx = idx,
+    params = list(steps_mat = steps_mat),
+    eta = eta
+  )
+
+  expect_equal(unname(rsm$probs), unname(pcm$probs), tolerance = 1e-12)
+  expect_equal(rsm$expected_k, pcm$expected_k, tolerance = 1e-12)
+  expect_equal(rsm$var_k, pcm$var_k, tolerance = 1e-12)
+  expect_equal(rsm$fourth_central_moment, pcm$fourth_central_moment,
+               tolerance = 1e-12)
+  expect_equal(rsm$score_information, pcm$score_information, tolerance = 1e-12)
+  expect_equal(rsm$slope_obs, rep(1, length(eta)), tolerance = 1e-12)
+  expect_equal(pcm$slope_obs, rep(1, length(eta)), tolerance = 1e-12)
+})
+
+test_that("unit-slope GPCM response bundle reduces to PCM diagnostics", {
+  steps_mat <- matrix(c(-0.3, 0.5, 0.3,
+                        -0.1, 0.5, 0.4), nrow = 2, byrow = TRUE)
+  eta <- c(-1.2, -0.4, 0.2, 0.9, 1.4)
+  step_idx <- c(1L, 2L, 1L, 2L, 1L)
+  idx <- list(
+    step_idx = step_idx,
+    slope_idx = step_idx,
+    criterion_splits = split(seq_along(step_idx), step_idx)
+  )
+  params_pcm <- list(steps_mat = steps_mat)
+  params_gpcm <- list(steps_mat = steps_mat, slopes = c(1, 1))
+
+  pcm <- mfrmr:::compute_response_probability_bundle(
+    config = list(model = "PCM", n_cat = 4L),
+    idx = idx,
+    params = params_pcm,
+    eta = eta
+  )
+  gpcm <- mfrmr:::compute_response_probability_bundle(
+    config = list(model = "GPCM", n_cat = 4L),
+    idx = idx,
+    params = params_gpcm,
+    eta = eta
+  )
+
+  expect_equal(unname(gpcm$probs), unname(pcm$probs), tolerance = 1e-12)
+  expect_equal(gpcm$expected_k, pcm$expected_k, tolerance = 1e-12)
+  expect_equal(gpcm$var_k, pcm$var_k, tolerance = 1e-12)
+  expect_equal(gpcm$fourth_central_moment, pcm$fourth_central_moment,
+               tolerance = 1e-12)
+  expect_equal(gpcm$score_information, pcm$score_information,
+               tolerance = 1e-12)
+  expect_equal(gpcm$slope_obs, rep(1, length(eta)), tolerance = 1e-12)
+})
+
+test_that("non-unit GPCM response bundle departs from PCM diagnostics", {
+  steps_mat <- matrix(c(-0.3, 0.5, 0.3,
+                        -0.1, 0.5, 0.4), nrow = 2, byrow = TRUE)
+  eta <- c(-1.2, -0.4, 0.2, 0.9, 1.4)
+  step_idx <- c(1L, 2L, 1L, 2L, 1L)
+  idx <- list(
+    step_idx = step_idx,
+    slope_idx = step_idx,
+    criterion_splits = split(seq_along(step_idx), step_idx)
+  )
+
+  pcm <- mfrmr:::compute_response_probability_bundle(
+    config = list(model = "PCM", n_cat = 4L),
+    idx = idx,
+    params = list(steps_mat = steps_mat),
+    eta = eta
+  )
+  gpcm <- mfrmr:::compute_response_probability_bundle(
+    config = list(model = "GPCM", n_cat = 4L),
+    idx = idx,
+    params = list(steps_mat = steps_mat, slopes = c(0.75, 1.25)),
+    eta = eta
+  )
+
+  expect_equal(rowSums(gpcm$probs), rep(1, length(eta)), tolerance = 1e-12)
+  expect_gt(max(abs(unname(gpcm$probs) - unname(pcm$probs))), 1e-4)
+  expect_gt(max(abs(gpcm$expected_k - pcm$expected_k)), 1e-4)
+  expect_gt(max(abs(gpcm$score_information - pcm$score_information)), 1e-4)
+  expect_equal(gpcm$slope_obs, c(0.75, 1.25, 0.75, 1.25, 0.75),
+               tolerance = 1e-12)
+})
+
 # ---- 2.6  JML vs MML consistency ----------------------------------------
 
 test_that("JML and MML facet estimates are highly correlated", {

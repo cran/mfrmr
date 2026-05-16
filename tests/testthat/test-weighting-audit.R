@@ -1,4 +1,4 @@
-test_that("build_weighting_audit returns a structured review bundle", {
+test_that("build_weighting_review returns a structured review bundle", {
   toy <- load_mfrmr_data("example_core")
   keep_people <- unique(toy$Person)[1:12]
   toy <- toy[toy$Person %in% keep_people, , drop = FALSE]
@@ -26,9 +26,9 @@ test_that("build_weighting_audit returns a structured review bundle", {
     maxit = 25
   ))
 
-  audit <- build_weighting_audit(rasch_fit, gpcm_fit, theta_points = 31, top_n = 6)
+  audit <- build_weighting_review(rasch_fit, gpcm_fit, theta_points = 31, top_n = 6)
 
-  expect_s3_class(audit, "mfrm_weighting_audit")
+  expect_s3_class(audit, "mfrm_weighting_review")
   expect_s3_class(audit, "mfrm_bundle")
   expect_true(all(c(
     "overview", "status", "model_comparison", "facet_shift", "slope_profile",
@@ -50,7 +50,7 @@ test_that("build_weighting_audit returns a structured review bundle", {
   ) %in% names(audit$information_redistribution)))
 })
 
-test_that("summary methods for build_weighting_audit expose front-door tables", {
+test_that("summary methods for build_weighting_review expose front-door tables", {
   toy <- load_mfrmr_data("example_core")
   keep_people <- unique(toy$Person)[1:12]
   toy <- toy[toy$Person %in% keep_people, , drop = FALSE]
@@ -79,10 +79,10 @@ test_that("summary methods for build_weighting_audit expose front-door tables", 
     maxit = 25
   ))
 
-  audit <- build_weighting_audit(rasch_fit, gpcm_fit, theta_points = 21, top_n = 5)
+  audit <- build_weighting_review(rasch_fit, gpcm_fit, theta_points = 21, top_n = 5)
   sx <- summary(audit, top_n = 3)
 
-  expect_s3_class(sx, "summary.mfrm_weighting_audit")
+  expect_s3_class(sx, "summary.mfrm_weighting_review")
   expect_true(all(c(
     "overview", "status", "key_warnings", "next_actions",
     "top_measure_shifts", "top_reweighted_levels",
@@ -92,7 +92,7 @@ test_that("summary methods for build_weighting_audit expose front-door tables", 
   expect_lte(nrow(sx$top_reweighted_levels), 3)
 })
 
-test_that("build_weighting_audit requires shared prepared response data", {
+test_that("build_weighting_review requires shared prepared response data", {
   toy <- load_mfrmr_data("example_core")
   keep_people <- unique(toy$Person)[1:12]
   toy <- toy[toy$Person %in% keep_people, , drop = FALSE]
@@ -123,7 +123,7 @@ test_that("build_weighting_audit requires shared prepared response data", {
   ))
 
   expect_error(
-    build_weighting_audit(rasch_fit, gpcm_fit, theta_points = 21),
+    build_weighting_review(rasch_fit, gpcm_fit, theta_points = 21),
     "same prepared response data"
   )
 })

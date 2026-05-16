@@ -81,8 +81,10 @@ By default that replay-ready table is embedded inline; when
 sidecar CSV relative to the replay script location.
 
 This replay layer is intentionally unavailable for bounded \code{GPCM}, because
-the current bundle/export contract still depends on the diagnostics/reporting
-route that remains formalized only for the Rasch-family branch.
+the fit-based bundle/export contract depends on the full
+diagnostics/reporting route that is currently retained for the
+Rasch-family branch. Use the summary-table appendix route for documented
+direct \code{GPCM} outputs.
 }
 \section{When to use this}{
 
@@ -137,7 +139,7 @@ you.
 \examples{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 25)
+                method = "JML", maxit = 30)
 replay <- build_mfrm_replay_script(fit, data_file = "your_data.csv")
 replay$summary[, c("ScriptMode", "ResidualPCA", "BiasPairs")]
 cat(substr(replay$script, 1, 120))

@@ -260,50 +260,50 @@ test_that("plot.mfrm_data_description error guards for empty data", {
 })
 
 # ---------------------------------------------------------------------------
-# 8. anchor_audit print/summary (lines 970-971, 1051, 1055, 1076)
+# 8. anchor review print/summary (lines 970-971, 1051, 1055, 1076)
 # ---------------------------------------------------------------------------
-test_that("anchor audit print and summary cover lines 970-1076", {
+test_that("anchor review print and summary cover lines 970-1076", {
   skip_on_cran()
   old_opt <- options(lifecycle_verbosity = "quiet")
   on.exit(options(old_opt), add = TRUE)
 
   d <- mfrmr:::sample_mfrm_data(seed = 42)
 
-  # Create audit with anchors that trigger issues
+  # Create review with anchors that trigger issues
   anchor_tbl <- mfrmr::make_anchor_table(fit, facets = "Rater")
-  aud <- mfrmr::audit_mfrm_anchors(
+  aud <- mfrmr::review_mfrm_anchors(
     data = d, person = "Person",
     facets = c("Rater", "Task", "Criterion"), score = "Score",
     anchors = anchor_tbl
   )
-  expect_s3_class(aud, "mfrm_anchor_audit")
+  expect_s3_class(aud, "mfrm_anchor_review")
 
   # print covers lines 970-971 if there are nonzero issue counts
   out_print <- capture.output(print(aud))
-  expect_true(any(grepl("mfrm anchor audit", out_print, fixed = TRUE)))
+  expect_true(any(grepl("mfrm anchor review", out_print, fixed = TRUE)))
 
   # summary covers lines 1051, 1055, 1076
   s <- summary(aud)
-  expect_s3_class(s, "summary.mfrm_anchor_audit")
+  expect_s3_class(s, "summary.mfrm_anchor_review")
 
   out_sum <- capture.output(print(s))
-  expect_true(any(grepl("mfrm Anchor Audit Summary", out_sum, fixed = TRUE)))
+  expect_true(any(grepl("mfrm Anchor Review Summary", out_sum, fixed = TRUE)))
 })
 
 # ---------------------------------------------------------------------------
-# 9. format_anchor_audit_message edge cases (lines 260, 265)
+# 9. format_anchor_review_message edge cases (lines 260, 265)
 # ---------------------------------------------------------------------------
-test_that("format_anchor_audit_message handles edge cases", {
+test_that("format_anchor_review_message handles edge cases", {
   skip_on_cran()
   old_opt <- options(lifecycle_verbosity = "quiet")
   on.exit(options(old_opt), add = TRUE)
 
   # line 260: NULL/empty issue_counts
- msg1 <- mfrmr:::format_anchor_audit_message(list(issue_counts = NULL))
+  msg1 <- mfrmr:::format_anchor_review_message(list(issue_counts = NULL))
   expect_match(msg1, "no issues")
 
   # line 265: all N == 0
-  msg2 <- mfrmr:::format_anchor_audit_message(
+  msg2 <- mfrmr:::format_anchor_review_message(
     list(issue_counts = data.frame(Issue = "dup", N = 0L))
   )
   expect_match(msg2, "no issues")
@@ -408,7 +408,7 @@ test_that("legacy table2_data_summary WITH raw data (lines 3034-3093)", {
     score = "Score"
   )
   expect_true(is.list(t2))
-  expect_true(nrow(t2$row_audit) > 0)
+  expect_true(nrow(t2$row_review) > 0)
 
   # line 3034: data is not a data.frame
   expect_error(
@@ -782,8 +782,10 @@ test_that("summary.mfrm_bias covers lines 10867-10964", {
   out <- capture.output(print(s))
   expect_true(any(grepl("Bias Summary", out, fixed = TRUE)))
 
-  # line 10867: empty bias
-  expect_error(summary.mfrm_bias(list(table = data.frame())), "non-empty")
+  # line 10867: empty bias. Use S3 dispatch via an `mfrm_bias`-classed
+  # list so the test does not depend on the un-exported method name.
+  empty_bias <- structure(list(table = data.frame()), class = "mfrm_bias")
+  expect_error(summary(empty_bias), "non-empty")
 })
 
 # ---------------------------------------------------------------------------
@@ -983,17 +985,17 @@ test_that("print_bundle_section handles NULL/empty table", {
 })
 
 # ---------------------------------------------------------------------------
-# 40. summarize_parity_bundle / parity report paths (lines 8319-8332)
+# 40. summarize_facets_contract_bundle / contract review paths (lines 8319-8332)
 # ---------------------------------------------------------------------------
-test_that("facets_parity_report summary covers lines 8319-8332", {
+test_that("facets_output_contract_review summary covers lines 8319-8332", {
   skip_on_cran()
   old_opt <- options(lifecycle_verbosity = "quiet")
   on.exit(options(old_opt), add = TRUE)
 
-  parity <- mfrmr::facets_parity_report(fit, diagnostics = dx, bias_results = bias_res)
-  expect_s3_class(parity, "mfrm_parity_report")
+  contract_review <- mfrmr::facets_output_contract_review(fit, diagnostics = dx, bias_results = bias_res)
+  expect_s3_class(contract_review, "mfrm_facets_contract_review")
 
-  s <- summary(parity)
+  s <- summary(contract_review)
   expect_s3_class(s, "summary.mfrm_bundle")
   expect_true("notes" %in% names(s))
 })

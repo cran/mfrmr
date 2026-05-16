@@ -30,9 +30,12 @@
 #'
 #' - **Severity**: elements with \eqn{|\mathrm{Estimate}| >}
 #'   `severity_warn` logits are flagged as unusually harsh or lenient.
-#' - **Misfit**: elements with Infit or Outfit MnSq outside
+#' - **Misfit**: elements with Infit or Outfit MnSq outside the
+#'   acceptance band are flagged. The band defaults to the package
+#'   pair returned by [mfrm_misfit_thresholds()] (Linacre 0.5-1.5);
+#'   pass `misfit_warn = 1.5` to keep the older symmetric
 #'   \eqn{[1/}\code{misfit_warn}\eqn{,\;}\code{misfit_warn}\eqn{]}
-#'   (default 0.67--1.5) are flagged.
+#'   form (0.67-1.5).
 #' - **Central tendency**: elements with
 #'   \eqn{|\mathrm{Estimate}| <} `central_tendency_max` logits
 #'   are flagged.  Near-zero estimates may indicate a rater who avoids
@@ -60,7 +63,11 @@
 #'
 #' @section Output:
 #' The returned object is a bundle-like list with class
-#' `mfrm_facet_dashboard` and components such as:
+#' `mfrm_facet_dashboard` and components:
+#' - `facet`: character scalar naming the dashboard's target facet
+#' - `facet_source`: character scalar describing whether the target
+#'   facet was inferred from the fit configuration or supplied
+#'   explicitly
 #' - `overview`: one-row structural overview
 #' - `summary`: one-row screening summary
 #' - `detail`: level-level detail table
@@ -69,12 +76,17 @@
 #' - `bias_sources`: per-bundle bias aggregation metadata
 #' - `settings`: resolved threshold settings
 #' - `notes`: short interpretation notes
+#' - `diagnostics`: the `mfrm_diagnostics` bundle the dashboard was
+#'   built from (echoed for downstream helpers that need to traverse
+#'   the same diagnostics object)
+#' - `bias_results`: the `mfrm_bias` bundle (or list of bundles)
+#'   when `bias_results` was supplied; `NULL` otherwise
 #'
 #' @seealso [diagnose_mfrm()], [estimate_bias()], [plot_qc_dashboard()]
 #' @examples
 #' toy <- load_mfrmr_data("example_core")
 #' toy <- toy[toy$Person %in% unique(toy$Person)[1:8], ]
-#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 50)
+#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 #' diag <- diagnose_mfrm(fit, residual_pca = "none")
 #' dash <- facet_quality_dashboard(fit, diagnostics = diag)
 #' summary(dash)
@@ -84,12 +96,23 @@ facet_quality_dashboard <- function(fit,
                                     facet = NULL,
                                     bias_results = NULL,
                                     severity_warn = 1.0,
-                                    misfit_warn = 1.5,
+                                    misfit_warn = NULL,
                                     central_tendency_max = 0.25,
                                     bias_count_warn = 1L,
                                     bias_abs_t_warn = 2,
                                     bias_abs_size_warn = 0.5,
                                     bias_p_max = 0.05) {
+  # When `misfit_warn` is NULL, defer to the package-level threshold
+  # pair so all helpers (summary.mfrm_diagnostics, build_apa_outputs,
+  # build_misfit_casebook, this dashboard) can be steered together via
+  # `mfrm_misfit_thresholds()`.
+  thresholds <- mfrm_misfit_thresholds()
+  if (is.null(misfit_warn)) {
+    misfit_warn <- as.numeric(thresholds["upper"])
+    misfit_lower_band <- as.numeric(thresholds["lower"])
+  } else {
+    misfit_lower_band <- 1 / abs(as.numeric(misfit_warn[1]))
+  }
   if (!inherits(fit, "mfrm_fit")) {
     stop("`fit` must be an mfrm_fit object from fit_mfrm().", call. = FALSE)
   }
@@ -150,7 +173,7 @@ facet_quality_dashboard <- function(fit,
   fit_hi <- pmax(detail$Infit, detail$Outfit, na.rm = TRUE)
   fit_lo <- pmin(detail$Infit, detail$Outfit, na.rm = TRUE)
   detail$MisfitFlag <- is.finite(fit_hi) & (
-    fit_hi >= abs(misfit_warn) | fit_lo <= (1 / abs(misfit_warn))
+    fit_hi >= abs(misfit_warn) | fit_lo <= misfit_lower_band
   )
   detail$CentralTendencyFlag <- is.finite(detail$AbsEstimate) & detail$AbsEstimate <= abs(central_tendency_max)
   detail$BiasCount <- 0L
@@ -550,7 +573,7 @@ dashboard_draw_plot <- function(tbl,
 #' @seealso [facet_quality_dashboard()], [plot_facet_quality_dashboard()]
 #' @examples
 #' toy <- load_mfrmr_data("example_core")
-#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 #' diag <- diagnose_mfrm(fit, residual_pca = "none")
 #' summary(facet_quality_dashboard(fit, diagnostics = diag))
 #' @export
@@ -647,7 +670,7 @@ print.summary.mfrm_facet_dashboard <- function(x, ...) {
 #' @seealso [facet_quality_dashboard()], [summary.mfrm_facet_dashboard()]
 #' @examples
 #' toy <- load_mfrmr_data("example_core")
-#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 #' diag <- diagnose_mfrm(fit, residual_pca = "none")
 #' p <- plot_facet_quality_dashboard(fit, diagnostics = diag, draw = FALSE)
 #' p$data$plot

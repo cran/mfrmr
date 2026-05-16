@@ -93,7 +93,7 @@ names listed in \code{build_summary_table_bundle(x)$table_index}
 
 \examples{
 toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 25)
+fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 tbl <- apa_table(fit, which = "summary", caption = "Model summary", note = "Toy example")
 tbl_facets <- apa_table(fit, which = "summary", branch = "facets")
 fit_bundle <- build_summary_table_bundle(summary(fit))

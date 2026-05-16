@@ -199,12 +199,12 @@ test_that("print.summary.mfrm_bundle: facet_statistics", {
   expect_true(any(grepl("Facet", out)))
 })
 
-# ---- parity_report summary_kind ----
-test_that("print.summary.mfrm_bundle: parity_report", {
-  pr <- facets_parity_report(.fit, diagnostics = .diag, bias_results = .bias)
+# ---- facets_contract_review summary_kind ----
+test_that("print.summary.mfrm_bundle: facets_contract_review", {
+  pr <- facets_output_contract_review(.fit, diagnostics = .diag, bias_results = .bias)
   s <- summary(pr)
   out <- capture.output(print(s))
-  expect_true(any(grepl("Parity", out)) || length(out) > 0)
+  expect_true(any(grepl("Contract", out)) || length(out) > 0)
 })
 
 # ============================================================================
@@ -295,10 +295,35 @@ test_that("plot.mfrm_bundle dispatches for mfrm_category_structure", {
 # ---- mfrm_category_curves via plot.mfrm_bundle ----
 test_that("plot.mfrm_bundle dispatches for mfrm_category_curves", {
   cc <- category_curves_report(.fit)
+  p0 <- plot(cc, draw = FALSE)
+  expect_s3_class(p0, "mfrm_plot_data")
+  expect_identical(p0$data$plot, "overview")
+  expect_true(all(c("PlotType", "DataComponent") %in% names(p0$data$overview_panels)))
+  expect_true(all(c("plot_long", "plot_annotations", "curve_summary", "curve_style") %in% names(p0$data)))
+  expect_true(all(c("PlotType", "Value", "Series") %in% names(p0$data$plot_long)))
+  expect_true(all(c("AnnotationType", "Axis", "Value", "Label") %in% names(p0$data$plot_annotations)))
+  expect_true(all(c("PlotType", "ValueName", "Rows", "DisplayedRows") %in% names(p0$data$curve_summary)))
   p <- plot(cc, type = "ogive", draw = FALSE)
   expect_s3_class(p, "mfrm_plot_data")
   p2 <- plot(cc, type = "ccc", draw = FALSE)
   expect_s3_class(p2, "mfrm_plot_data")
+  p2_alias <- plot(cc, type = "conditional_probability", draw = FALSE)
+  expect_s3_class(p2_alias, "mfrm_plot_data")
+  expect_identical(p2_alias$data$plot, "ccc")
+  expect_identical(p2_alias$data$plot_settings$RequestedType[1], "conditional_probability")
+  expect_identical(p2_alias$data$plot_settings$PlotType[1], "ccc")
+  expect_true(any(p2_alias$data$plot_long$PlotType == "ccc" &
+                    p2_alias$data$plot_long$DisplayedByDefault))
+  p3 <- plot(cc, type = "cumulative", preset = "monochrome", boundary_status = "none", draw = FALSE)
+  expect_s3_class(p3, "mfrm_plot_data")
+  expect_identical(p3$data$preset, "monochrome")
+  expect_identical(p3$data$plot_settings$BoundaryStatus[1], "none")
+  expect_false(isTRUE(p3$data$plot_settings$ShowCumulativeBoundaries[1]))
+  expect_equal(nrow(p3$data$boundary_lines), 0L)
+  expect_true(all(c("axis", "value", "role") %in% names(p3$data$reference_lines)))
+  p4 <- plot(cc, type = "cumulative", boundary_status = "all", draw = FALSE)
+  expect_identical(p4$data$plot_settings$BoundaryStatus[1], "all")
+  expect_true(all(names(p4$data$boundary_lines) %in% names(cc$cumulative_boundaries)))
 })
 
 # ---- mfrm_rating_scale via plot.mfrm_bundle ----
@@ -354,6 +379,12 @@ test_that("plot.mfrm_bundle dispatches for mfrm_residual_pca", {
   expect_s3_class(p3, "mfrm_plot_data")
   p4 <- plot(pca, type = "facet_loadings", draw = FALSE)
   expect_s3_class(p4, "mfrm_plot_data")
+
+  pca_parallel <- analyze_residual_pca(.diag, mode = "both", parallel = TRUE, parallel_reps = 3, seed = 22)
+  p5 <- plot(pca_parallel, type = "overall_parallel_scree", draw = FALSE)
+  expect_s3_class(p5, "mfrm_plot_data")
+  p6 <- plot(pca_parallel, type = "facet_parallel_excess", draw = FALSE)
+  expect_s3_class(p6, "mfrm_plot_data")
 })
 
 # ---- mfrm_specifications via plot.mfrm_bundle: facet_elements, convergence ----
@@ -367,16 +398,32 @@ test_that("plot.mfrm_bundle dispatches for mfrm_specifications -- all sub-types"
   expect_s3_class(p3, "mfrm_plot_data")
 })
 
-# ---- mfrm_data_quality via plot.mfrm_bundle: row_audit, category_counts, missing_rows ----
+# ---- mfrm_data_quality via plot.mfrm_bundle: dashboard, quality_flags, row_review, category_counts, score_support, facet_category_usage, facet_response_patterns, score_map, missing_rows ----
 test_that("plot.mfrm_bundle dispatches for mfrm_data_quality -- all sub-types", {
   d <- mfrmr:::sample_mfrm_data(seed = 42)
   dq <- data_quality_report(.fit, data = d)
-  p1 <- plot(dq, type = "row_audit", draw = FALSE)
+  p0 <- plot(dq, draw = FALSE)
+  expect_identical(p0$data$plot, "dashboard")
+  p1 <- plot(dq, type = "row_review", draw = FALSE)
   expect_s3_class(p1, "mfrm_plot_data")
-  p2 <- plot(dq, type = "category_counts", draw = FALSE)
+  p2 <- plot(dq, type = "quality_flags", draw = FALSE)
   expect_s3_class(p2, "mfrm_plot_data")
-  p3 <- plot(dq, type = "missing_rows", draw = FALSE)
+  p3 <- plot(dq, type = "category_counts", draw = FALSE)
   expect_s3_class(p3, "mfrm_plot_data")
+  p4 <- plot(dq, type = "score_support", draw = FALSE)
+  expect_s3_class(p4, "mfrm_plot_data")
+  p5 <- plot(dq, type = "facet_category_usage", draw = FALSE)
+  expect_s3_class(p5, "mfrm_plot_data")
+  p6 <- plot(dq, type = "score_map", draw = FALSE)
+  expect_s3_class(p6, "mfrm_plot_data")
+  p7 <- plot(dq, type = "facet_response_patterns", draw = FALSE)
+  expect_s3_class(p7, "mfrm_plot_data")
+  p8 <- plot(dq, type = "missing_rows", draw = FALSE)
+  expect_s3_class(p8, "mfrm_plot_data")
+  p9 <- plot(dq, type = "dashboard", draw = FALSE)
+  expect_s3_class(p9, "mfrm_plot_data")
+  expect_identical(p9$data$plot, "dashboard")
+  expect_true(all(c("row_review", "quality_overview", "quality_flags", "score_map", "score_support", "facet_category_usage", "facet_response_patterns", "missing_rows") %in% names(p9$data)))
 })
 
 # ---- mfrm_iteration_report via plot.mfrm_bundle: residual, logit_change, objective ----
@@ -410,9 +457,9 @@ test_that("plot.mfrm_bundle dispatches for mfrm_facet_statistics -- all sub-type
   expect_s3_class(p3, "mfrm_plot_data")
 })
 
-# ---- mfrm_parity_report via plot.mfrm_bundle: column_coverage, table_coverage, metric_status, metric_by_table ----
-test_that("plot.mfrm_bundle dispatches for mfrm_parity_report -- all sub-types", {
-  pr <- facets_parity_report(.fit, diagnostics = .diag, bias_results = .bias)
+# ---- mfrm_facets_contract_review via plot.mfrm_bundle: column_coverage, table_coverage, metric_status, metric_by_table ----
+test_that("plot.mfrm_bundle dispatches for mfrm_facets_contract_review -- all sub-types", {
+  pr <- facets_output_contract_review(.fit, diagnostics = .diag, bias_results = .bias)
   p1 <- plot(pr, type = "column_coverage", draw = FALSE)
   expect_s3_class(p1, "mfrm_plot_data")
   p2 <- plot(pr, type = "table_coverage", draw = FALSE)
@@ -446,8 +493,14 @@ test_that("draw_category_structure_bundle draws all sub-types", {
 # ---- draw_category_curves_bundle: ogive, ccc ----
 test_that("draw_category_curves_bundle draws all sub-types", {
   cc <- category_curves_report(.fit)
+  with_null_device(plot(cc, type = "overview", draw = TRUE))
   with_null_device(plot(cc, type = "ogive", draw = TRUE))
   with_null_device(plot(cc, type = "ccc", draw = TRUE))
+  with_null_device(plot(cc, type = "cumulative", draw = TRUE))
+  with_null_device(plot(cc, type = "cumulative", cumulative_direction = "at_or_above", draw = TRUE))
+  with_null_device(plot(cc, type = "cumulative", preset = "monochrome", boundary_status = "none", draw = TRUE))
+  with_null_device(plot(cc, type = "information", draw = TRUE))
+  with_null_device(plot(cc, type = "category_information", draw = TRUE))
 })
 
 # ---- draw_rating_scale_bundle: counts, thresholds ----
@@ -494,13 +547,19 @@ test_that("draw_specifications_bundle draws all sub-types", {
   with_null_device(plot(spec, type = "convergence", draw = TRUE))
 })
 
-# ---- draw_data_quality_bundle: row_audit, category_counts, missing_rows ----
+# ---- draw_data_quality_bundle: dashboard, quality_flags, row_review, category_counts, score_support, facet_category_usage, facet_response_patterns, score_map, missing_rows ----
 test_that("draw_data_quality_bundle draws all sub-types", {
   d <- mfrmr:::sample_mfrm_data(seed = 42)
   dq <- data_quality_report(.fit, data = d)
-  with_null_device(plot(dq, type = "row_audit", draw = TRUE))
+  with_null_device(plot(dq, type = "row_review", draw = TRUE))
+  with_null_device(plot(dq, type = "quality_flags", draw = TRUE))
   with_null_device(plot(dq, type = "category_counts", draw = TRUE))
+  with_null_device(plot(dq, type = "score_support", draw = TRUE))
+  with_null_device(plot(dq, type = "facet_category_usage", draw = TRUE))
+  with_null_device(plot(dq, type = "facet_response_patterns", draw = TRUE))
+  with_null_device(plot(dq, type = "score_map", draw = TRUE))
   with_null_device(plot(dq, type = "missing_rows", draw = TRUE))
+  with_null_device(plot(dq, type = "dashboard", draw = TRUE))
 })
 
 # ---- draw_iteration_report_bundle: residual, logit_change, objective ----
@@ -526,9 +585,9 @@ test_that("draw_facet_statistics_bundle draws all sub-types", {
   with_null_device(plot(fs, type = "ranges", draw = TRUE))
 })
 
-# ---- draw_parity_bundle: column_coverage, table_coverage, metric_status, metric_by_table ----
-test_that("draw_parity_bundle draws all sub-types", {
-  pr <- facets_parity_report(.fit, diagnostics = .diag, bias_results = .bias)
+# ---- draw_facets_contract_bundle: column_coverage, table_coverage, metric_status, metric_by_table ----
+test_that("draw_facets_contract_bundle draws all sub-types", {
+  pr <- facets_output_contract_review(.fit, diagnostics = .diag, bias_results = .bias)
   with_null_device(plot(pr, type = "column_coverage", draw = TRUE))
   with_null_device(plot(pr, type = "table_coverage", draw = TRUE))
   with_null_device(plot(pr, type = "metric_status", draw = TRUE))
@@ -569,6 +628,10 @@ test_that("draw_residual_pca_bundle draws all sub-types", {
   with_null_device(plot(pca, type = "overall_loadings", draw = TRUE))
   with_null_device(plot(pca, type = "facet_scree", draw = TRUE))
   with_null_device(plot(pca, type = "facet_loadings", draw = TRUE))
+
+  pca_parallel <- analyze_residual_pca(.diag, mode = "both", parallel = TRUE, parallel_reps = 3, seed = 23)
+  with_null_device(plot(pca_parallel, type = "overall_parallel_scree", draw = TRUE))
+  with_null_device(plot(pca_parallel, type = "facet_parallel_excess", draw = TRUE))
 })
 
 # ============================================================================
@@ -585,7 +648,7 @@ test_that("plot.mfrm_bundle passes custom main and palette to draw functions", {
   d2 <- mfrmr:::sample_mfrm_data(seed = 42)
   dq <- data_quality_report(.fit, data = d2)
   with_null_device(
-    plot(dq, type = "row_audit", draw = TRUE,
+    plot(dq, type = "row_review", draw = TRUE,
          main = "Custom DQ Title", label_angle = 60)
   )
 })

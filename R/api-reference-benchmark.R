@@ -179,7 +179,7 @@ reference_benchmark_source_profile <- function() {
       "linking_common_elements",
       "latent_population_omission_check",
       "conquest_overlap_bundle_check",
-      "conquest_overlap_audit_check"
+      "conquest_overlap_review_check"
     ),
     Domain = c("bias", "bias", "bias", "linking", "latent_regression", "conquest_overlap", "conquest_overlap"),
     SourceLabel = c(
@@ -189,7 +189,7 @@ reference_benchmark_source_profile <- function() {
       "FACETS equating guidance",
       "mfrmr population-policy check",
       "ACER ConQuest Command Reference / mfrmr overlap boundary",
-      "ACER ConQuest show-cases workflow / mfrmr audit workflow"
+      "ACER ConQuest show-cases workflow / mfrmr review workflow"
     ),
     SourceURL = c(
       "https://www.winsteps.com/a/ftutorial3.pdf",
@@ -204,10 +204,10 @@ reference_benchmark_source_profile <- function() {
       "Observed-minus-expected average should equal (Observed Score - Expected Score) / Observed Count.",
       "Local target measure in a context should equal the target's overall measure plus the context-specific bias term.",
       "Pairwise local contrasts are reported with a Rasch-Welch t statistic and approximate degrees of freedom.",
-      "A practical linking audit should confirm at least 5 common elements per linking facet when equating forms or datasets.",
+      "A practical linking review should confirm at least 5 common elements per linking facet when equating forms or datasets.",
       "Population-model complete-case omission should be explicit in fitted metadata, response-row counts, and active person estimates.",
-      "The ConQuest-overlap package-side fixture checks bundle, normalized-table, and audit preparation without claiming an executed ConQuest comparison.",
-      "Case-level EAP and item/population tables must be normalized before numerical audit against the exact-overlap bundle."
+      "The ConQuest-overlap package-side fixture checks bundle, normalized-table, and review preparation without claiming an executed ConQuest comparison.",
+      "Case-level EAP and item/population tables must be normalized before numerical review against the exact-overlap bundle."
     )
   )
 }
@@ -768,7 +768,7 @@ build_linking_guideline_checks <- function(case_id, primary_fit_obj, reference_f
       GuidelineMinimum = as.integer(guideline_min),
       Status = status,
       Detail = if (identical(status, "Pass")) {
-        "Common-element coverage satisfied the package's linking audit rule."
+        "Common-element coverage satisfied the package's linking review rule."
       } else if (identical(status, "Warn")) {
         "Common-element coverage fell below the preferred linking rule-of-thumb."
       } else {
@@ -939,7 +939,7 @@ build_conquest_overlap_dry_run_checks <- function(case_id, fit_obj) {
     conquest_case_person = "PID",
     conquest_case_estimate = "EAP"
   )
-  audit <- audit_conquest_overlap(bundle, normalized)
+  audit <- review_conquest_overlap(bundle, normalized)
   overall <- as.data.frame(audit$overall, stringsAsFactors = FALSE)
 
   row_metric <- function(metric, value, pass_max, warn_max, detail) {
@@ -964,28 +964,28 @@ build_conquest_overlap_dry_run_checks <- function(case_id, fit_obj) {
       overall$AttentionItems[1],
       pass_max = 0,
       warn_max = 0,
-      detail = "The package-side check should produce no missing, duplicate, or non-numeric audit attention items."
+      detail = "The package-side check should produce no missing, duplicate, or non-numeric review attention items."
     ),
     row_metric(
       "PopulationMaxAbsDifference",
       overall$PopulationMaxAbsDifference[1],
       pass_max = 1e-10,
       warn_max = 1e-8,
-      detail = "Copied population parameters should round-trip through the normalized-table audit workflow."
+      detail = "Copied population parameters should round-trip through the normalized-table review workflow."
     ),
     row_metric(
       "ItemCenteredMaxAbsDifference",
       overall$ItemCenteredMaxAbsDifference[1],
       pass_max = 1e-10,
       warn_max = 1e-8,
-      detail = "Copied item estimates should agree after centering under the overlap audit workflow."
+      detail = "Copied item estimates should agree after centering under the overlap review workflow."
     ),
     row_metric(
       "CaseMaxAbsDifference",
       overall$CaseMaxAbsDifference[1],
       pass_max = 1e-10,
       warn_max = 1e-8,
-      detail = "Copied case EAP estimates should round-trip through the overlap audit workflow."
+      detail = "Copied case EAP estimates should round-trip through the overlap review workflow."
     )
   )
 }
@@ -1061,7 +1061,7 @@ build_latent_omission_contract_checks <- function(case_id, fit_obj) {
       all(expected_omitted %in% replay_persons),
       TRUE,
       length(expected_omitted) > 0L && all(expected_omitted %in% replay_persons),
-      "The replay provenance table should preserve omitted person IDs for auditability."
+      "The replay provenance table should preserve omitted person IDs for traceability."
     )
   )
 }
@@ -1239,10 +1239,10 @@ summarize_reference_benchmark_case <- function(case_id, case_type, fit_runs, des
 #'   direction from a synthetic overlap case.
 #' - `synthetic_latent_regression_omit`: checks whether the population-model
 #'   complete-case omission policy is reflected in the fitted metadata,
-#'   response-row audit, active person estimates, and replay provenance.
+#'   response-row review, active person estimates, and replay provenance.
 #' - `synthetic_conquest_overlap_dry_run`: builds the narrow ConQuest-overlap
 #'   bundle for the latent-regression synthetic case, round-trips package tables
-#'   through the normalization/audit helpers, and confirms the package-side
+#'   through the normalization/review helpers, and confirms the package-side
 #'   workflow without claiming that ConQuest itself was executed.
 #' - `synthetic_gpcm`: checks whether the bounded `GPCM` branch recovers
 #'   known criterion-specific slopes, row-centered step parameters, and
@@ -1277,9 +1277,9 @@ summarize_reference_benchmark_case <- function(case_id, case_type, fit_runs, des
 #'   including the latent-regression reference case.
 #' - `bias_checks`: source-backed bias/local-measure identity checks.
 #' - `pair_checks`: paired-dataset stability screens for the iterated cases.
-#' - `linking_checks`: common-element audits for paired calibration datasets.
+#' - `linking_checks`: common-element reviews for paired calibration datasets.
 #' - `conquest_overlap_checks`: package-side checks for the
-#'   ConQuest-overlap bundle/normalization/audit workflow; this remains a
+#'   ConQuest-overlap bundle/normalization/review workflow; this remains a
 #'   package-side check until actual ConQuest output tables are supplied.
 #' - `population_policy_checks`: complete-case omission checks for population
 #'   model benchmark fixtures.
@@ -1440,7 +1440,7 @@ reference_case_benchmark <- function(cases = c(
 
   notes <- c(
     "Synthetic truth checks compare recovered facet measures against known generating values from the package simulation design.",
-    "ConQuest-overlap package-side checks cover only export/normalization/audit preparation; actual external ConQuest output is still required for external validation.",
+    "ConQuest-overlap package-side checks cover only export/normalization/review preparation; actual external ConQuest output is still required for external validation.",
     "Bias checks review package identities for observed-minus-expected averages, local measures, and pairwise Rasch-Welch contrasts.",
     "Pair stability checks review baseline and iterative-calibration packaged datasets using facet-measure alignment, fit deltas, reliability deltas, and common-element linking coverage.",
     "Use this reference check as package evidence, not as a substitute for external validation against commercial software or published studies."
@@ -1448,7 +1448,7 @@ reference_case_benchmark <- function(cases = c(
   if (!identical(toupper(method), "MML")) {
     notes <- c(
       notes,
-      "Non-MML benchmark runs remain useful for stability auditing, but formal-inference expectations should be interpreted more conservatively."
+      "Non-MML benchmark runs remain useful for stability review, but formal-inference expectations should be interpreted more conservatively."
     )
   }
 

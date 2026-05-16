@@ -1,40 +1,43 @@
 Package: mfrmr
 Type: Package
 Title: Estimation and Diagnostics for Many-Facet Measurement Models
-Version: 0.1.5
+Version: 0.2.0
 Authors@R: 
-    person(given = "Ryuya", family = "Komuro", role = c("aut", "cre"),
+    person(given = "Ryuya", family = "Komuro", role = c("aut", "cre", "cph"),
            email = "ryuya.komuro.c4@tohoku.ac.jp",
            comment = c(ORCID = "0000-0001-9205-0926"))
-Author: Ryuya Komuro [aut, cre] (ORCID:
-    <https://orcid.org/0000-0001-9205-0926>)
-Maintainer: Ryuya Komuro <ryuya.komuro.c4@tohoku.ac.jp>
-Description: Fits many-facet measurement models and returns diagnostics,
-    reporting helpers, and reproducible analysis bundles using a native R
-    implementation. Supports arbitrary facet counts, rating-scale and
-    partial-credit parameterizations ('Andrich' (1978)
-    <doi:10.1007/BF02293814>; 'Masters' (1982)
-    <doi:10.1007/BF02296272>), marginal maximum likelihood estimation with
-    Gauss-Hermite quadrature and direct optimization of the marginal
-    log-likelihood, joint maximum likelihood estimation, plus tools for
-    anchor review, interaction screening, linking workflows, and
-    publication-oriented summaries.
-URL: https://ryuya-dot-com.github.io/R_package_mfrmr/,
-        https://github.com/Ryuya-dot-com/R_package_mfrmr
-BugReports: https://github.com/Ryuya-dot-com/R_package_mfrmr/issues
+Description: Native R implementation of many-facet ordered-response
+    measurement models with arbitrary facet counts, rating-scale and
+    partial-credit parameterizations, a bounded generalized partial-credit
+    extension, and both marginal and joint maximum likelihood estimation.
+    The package provides a fit / diagnose / report pipeline covering
+    anchoring, linking, bias and differential-functioning screening, and
+    publication-oriented reporting summaries, with reproducibility manifests
+    for replay. See 'Andrich'
+    (1978) <doi:10.1007/BF02293814>, 'Masters' (1982)
+    <doi:10.1007/BF02296272>, and 'Muraki' (1992)
+    <doi:10.1177/014662169201600206> for the underlying ordered-response
+    models.
+URL: https://github.com/Ryuya-dot-com/mfrmr
+BugReports: https://github.com/Ryuya-dot-com/mfrmr/issues
 License: MIT + file LICENSE
 Language: en
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 7.3.3
 Depends: R (>= 4.1)
-Imports: dplyr, tidyr, tibble, purrr, stringr, psych, lifecycle, rlang,
-        stats, utils
+Imports: cli, dplyr, grDevices, graphics, tidyr, tibble, purrr,
+        stringr, psych, lifecycle, rlang, methods, stats, utils
 LinkingTo: cpp11
-Suggests: testthat (>= 3.0.0), covr, knitr, rmarkdown
+Suggests: testthat (>= 3.0.0), covr, knitr, rmarkdown, igraph, lme4,
+        digest, kableExtra, flextable, future.apply, mirt, TAM, eRm
 VignetteBuilder: knitr
 Config/testthat/edition: 3
+Config/Needs/website: pkgdown
 NeedsCompilation: yes
-Packaged: 2026-04-12 05:37:09 UTC; ryuyakomuro
+Packaged: 2026-05-16 17:53:05 UTC; tohokusla
+Author: Ryuya Komuro [aut, cre, cph] (ORCID:
+    <https://orcid.org/0000-0001-9205-0926>)
+Maintainer: Ryuya Komuro <ryuya.komuro.c4@tohoku.ac.jp>
 Repository: CRAN
-Date/Publication: 2026-04-12 06:20:02 UTC
+Date/Publication: 2026-05-16 21:40:02 UTC

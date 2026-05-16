@@ -43,6 +43,9 @@ Build a case-level misfit review bundle
 outputs. It does not invent a new misfit statistic. Instead, it organizes
 existing evidence families into one case-level review surface:
 \itemize{
+\item element-level Infit / Outfit MnSq misfit from \code{diagnostics$fit}
+(rows whose Infit or Outfit MnSq falls outside the 0.5-1.5 Linacre
+acceptance band)
 \item strict marginal cell screens from \code{diagnostics$marginal_fit$top_cells}
 \item strict pairwise screens from \code{diagnostics$marginal_fit$pairwise$top_pairs}
 \item unexpected responses from \code{\link[=unexpected_response_table]{unexpected_response_table()}}
@@ -78,7 +81,7 @@ marginal sources; it should not be read as a formal inferential case test.
 \donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "MML", model = "RSM", quad_points = 11)
+                method = "MML", model = "RSM", quad_points = 5)
 diag <- diagnose_mfrm(fit, diagnostic_mode = "both", residual_pca = "none")
 casebook <- build_misfit_casebook(fit, diagnostics = diag, top_n = 10)
 summary(casebook)

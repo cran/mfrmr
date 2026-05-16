@@ -24,7 +24,9 @@ evaluate_mfrm_design(
   quad_points = 7,
   residual_pca = c("none", "overall", "facet", "both"),
   sim_spec = NULL,
-  seed = NULL
+  seed = NULL,
+  progress = interactive(),
+  parallel = c("no", "future")
 )
 }
 \arguments{
@@ -88,6 +90,20 @@ generator, this helper currently requires \code{fit_method = "MML"} so each
 replication can refit the population model.}
 
 \item{seed}{Optional seed for reproducible replications.}
+
+\item{progress}{Logical. Whether to show a progress bar across
+design-by-replication cells. Defaults to \code{\link[=interactive]{interactive()}}, so interactive
+exploratory runs show progress while non-interactive tests, scripts, and
+report rendering stay quiet. Set \code{TRUE} or \code{FALSE} explicitly to override.}
+
+\item{parallel}{Parallelisation strategy for the rep loop within
+each design row. \code{"no"} (default) runs serially; \code{"future"}
+uses \code{future.apply::future_lapply} and respects whatever
+\code{future::plan()} is currently active. The Suggests package
+\code{future.apply} must be installed for the parallel path to
+activate; otherwise the call falls back to serial execution
+with a single message. Cross-design-row parallelism is planned
+for a future release.}
 }
 \value{
 An object of class \code{mfrm_design_evaluation} with components:
@@ -157,12 +173,15 @@ study under explicit assumptions; it is not a closed-form predictive
 distribution for one future administration.
 
 First-release \code{GPCM} is not yet available in this design-evaluation helper.
-The missing pieces are not just software wiring: the current package still
-needs a validated slope-generating simulation contract and downstream
-diagnostics compatible with the generalized ordered kernel. More broadly,
-the current planning layer is still role-based for exactly two non-person
-facets (\code{rater}-like and \code{criterion}-like), even though the estimation core
-supports arbitrary facet counts.
+Direct bounded-\code{GPCM} data generation and parameter-recovery checks are
+available through \code{\link[=simulate_mfrm_data]{simulate_mfrm_data()}}, \code{\link[=evaluate_mfrm_recovery]{evaluate_mfrm_recovery()}}, and
+\code{\link[=assess_mfrm_recovery]{assess_mfrm_recovery()}}, but this helper asks a broader design operating-
+characteristic question. The remaining gap is a validated slope-aware
+design-planning contract with downstream diagnostics compatible with the
+generalized ordered kernel. More broadly, the current planning layer is
+role-based for exactly two non-person facets (\code{rater}-like and
+\code{criterion}-like), even though the estimation core supports arbitrary facet
+counts.
 
 Recovery metrics are reported only when the generator and fitted model target
 the same facet-parameter contract. In practice this means the same
@@ -207,6 +226,13 @@ separation and RMSE---this identifies the cost-effective design
 frontier.  \code{ConvergedRuns / reps} should be near 1.0; low
 convergence rates indicate the design is too small for the chosen
 estimation method.
+
+This is a Monte Carlo design-evaluation helper. It can visualize how
+separation, reliability, strata, RMSE, and fit-screen rates change when
+you vary person, rater, criterion, or assignment counts. For analytic
+generalizability-theory planning, pair observed variance-component review
+from \code{\link[=mfrm_generalizability]{mfrm_generalizability()}} with D-study projections from
+\code{\link[=mfrm_d_study]{mfrm_d_study()}}.
 }
 
 \section{References}{
@@ -233,7 +259,7 @@ reporting}. Psychological Methods.
 sim_eval <- suppressWarnings(evaluate_mfrm_design(
   design = list(person = c(8, 12), rater = 2, criterion = 2, assignment = 1),
   reps = 1,
-  maxit = 8,
+  maxit = 30,
   seed = 123
 ))
 s_eval <- summary(sim_eval)

@@ -25,7 +25,7 @@ A data.frame with columns:
 the fitted object and diagnostics.
 \item \code{WhatNotToClaim}: common overclaim to avoid.
 \item \code{BeginnerCheck}: first thing a new user should inspect.
-\item \code{ThreeDPolicy}: whether 3D is recommended, discouraged, or payload-only.
+\item \code{ThreeDPolicy}: whether 3D is recommended, discouraged, or data-only.
 }
 }
 \description{

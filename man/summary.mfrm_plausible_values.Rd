@@ -18,8 +18,8 @@ An object of class \code{summary.mfrm_plausible_values} with:
 \itemize{
 \item \code{draw_summary}: empirical summaries of the sampled values by person
 \item \code{estimates}: companion posterior EAP summaries
-\item \code{audit}: row-preparation audit
-\item \code{population_audit}: optional person-level omission audit for
+\item \code{row_review}: row-preparation review
+\item \code{population_review}: optional person-level omission review for
 latent-regression scoring
 \item \code{settings}: scoring settings
 \item \code{notes}: interpretation notes
@@ -37,7 +37,7 @@ toy_fit <- suppressWarnings(
     "Person", c("Rater", "Criterion"), "Score",
     method = "MML",
     quad_points = 5,
-    maxit = 15
+    maxit = 30
   )
 )
 new_units <- data.frame(

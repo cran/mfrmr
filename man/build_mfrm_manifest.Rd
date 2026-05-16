@@ -11,7 +11,8 @@ build_mfrm_manifest(
   population_prediction = NULL,
   unit_prediction = NULL,
   plausible_values = NULL,
-  include_person_anchors = FALSE
+  include_person_anchors = FALSE,
+  data = NULL
 )
 }
 \arguments{
@@ -32,6 +33,13 @@ bias bundles.}
 
 \item{include_person_anchors}{If \code{TRUE}, include person measures in the
 exported anchor table.}
+
+\item{data}{Optional original analysis data frame. When supplied,
+the manifest's \code{input_hash} row for \code{data} is computed against
+the user's untouched input rather than the package's internal
+\code{prep$data} (which carries synthesised \code{Weight} / \code{score_k}
+columns) so the recorded fingerprint matches what
+\code{read.csv()} will produce in a replay session.}
 }
 \value{
 A named list with class \code{mfrm_manifest}.
@@ -67,8 +75,14 @@ The returned bundle has class \code{mfrm_manifest} and includes:
 \item \code{estimation_control}: key-value optimizer settings table
 \item \code{anchor_summary}: facet-level anchor summary
 \item \code{anchors}: machine-readable anchor table
+\item \code{hierarchical_review}: retained traceability table for hierarchical /
+small-sample design flags
+\item \code{missing_recoding}: retained traceability table for missing-code recoding
+\item \code{shrinkage_review}: retained traceability table for shrinkage settings
 \item \code{available_outputs}: availability table for diagnostics/bias/PCA/prediction
 outputs
+\item \code{dependencies}, \code{input_hash}, and \code{session_info}: reproducibility
+metadata tables
 \item \code{settings}: manifest build settings
 }
 }
@@ -77,7 +91,8 @@ outputs
 
 The \code{summary} table is the quickest place to confirm that you are looking at
 the intended analysis. The \code{model_settings}, \code{source_columns}, and
-\code{estimation_control} tables are designed for audit trails and method write-up.
+\code{estimation_control} tables are designed for reproducibility records and
+method write-up.
 Active latent-regression fits also record their population-model provenance
 there, including the fitted scoring basis, stored \code{population_formula}, and
 person-level contract used by the fitted population model. When categorical
@@ -102,16 +117,16 @@ control over residual PCA.
 \code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}}.
 }
 
-This manifest/export layer currently depends on diagnostics-compatible
-workflow objects. For bounded \code{GPCM} fits, that means the layer is
-intentionally unavailable until the diagnostics/reporting contract has been
-generalized beyond the ordered Rasch-family branch.
+This fit-based manifest/export layer currently depends on the full
+diagnostics/reporting workflow contract. For bounded \code{GPCM} fits, that means
+the layer is intentionally unavailable even though direct summary-table
+appendix export is supported for documented \code{GPCM} outputs.
 }
 
 \examples{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 25)
+                method = "JML", maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "none")
 manifest <- build_mfrm_manifest(fit, diagnostics = diag)
 manifest$summary[, c("Model", "Method", "Observations", "Facets")]

@@ -71,6 +71,134 @@ render_r_object_literal <- function(x) {
   paste(utils::capture.output(dput(x)), collapse = "\n")
 }
 
+# Build the multi-line `fit_mfrm(...)` call used in `replay.R`, from
+# the `replay_inputs` list that `fit_mfrm()` stores on `fit$config`.
+# The helper emits every argument that materially affects the fit
+# (including the ones that were silently dropped before 0.1.6:
+# `missing_codes`, `mml_engine`, `slope_facet`, `anchor_policy`,
+# `min_obs_per_*`, `min_common_anchors`, `facet_shrinkage`,
+# `facet_prior_sd`, `shrink_person`, `attach_diagnostics`).
+#
+# `anchors` and `group_anchors` are passed by name through the
+# script-local variables defined earlier; latent-regression args
+# (`population_formula`, `person_data`, `person_id`,
+# `population_policy`) are emitted only when the population model is
+# active, so the call signature mirrors the user's original.
+build_replay_fit_mfrm_lines <- function(replay_inputs,
+                                        fit_population,
+                                        fit_population_person_id,
+                                        src,
+                                        cfg = list()) {
+  ri <- replay_inputs %||% list()
+  # If the user did not pass `rating_min` / `rating_max`, fall back
+  # to the resolved value the original `fit_mfrm()` recorded on the
+  # config so the replay reproduces the same range rather than
+  # re-inferring from data that may have changed.
+  if (is.null(ri$rating_min) && !is.null(cfg$rating_min) &&
+      is.finite(suppressWarnings(as.numeric(cfg$rating_min)))) {
+    ri$rating_min <- as.integer(cfg$rating_min)
+  }
+  if (is.null(ri$rating_max) && !is.null(cfg$rating_max) &&
+      is.finite(suppressWarnings(as.numeric(cfg$rating_max)))) {
+    ri$rating_max <- as.integer(cfg$rating_max)
+  }
+
+  # If the fit predates 0.1.6 (no `replay_inputs`), fall back to the
+  # subset that older releases recorded. This keeps cross-version
+  # bundles loadable; it does not magically recover dropped args.
+  if (length(ri) == 0L) {
+    ri <- list(
+      person = as.character(src$person %||% "Person"),
+      facets = as.character(src$facets %||% character(0)),
+      score = as.character(src$score %||% "Score")
+    )
+  }
+
+  emit <- function(name, value, suffix = ",", literal = NULL) {
+    if (!is.null(literal)) {
+      paste0("  ", name, " = ", literal, suffix)
+    } else {
+      paste0("  ", name, " = ", render_r_object_literal(value), suffix)
+    }
+  }
+
+  # Required (non-NULL) args.
+  out <- list(
+    "fit <- fit_mfrm(",
+    "  data = data,",
+    emit("person", as.character(ri$person)),
+    emit("facets", as.character(ri$facets)),
+    emit("score", as.character(ri$score))
+  )
+
+  # Optional, NULL-when-absent args.
+  add_optional <- function(name, value, render_fn = identity) {
+    if (is.null(value)) return(NULL)
+    if (is.character(value) && length(value) == 1L && !nzchar(value)) return(NULL)
+    emit(name, render_fn(value))
+  }
+
+  out <- c(
+    out,
+    add_optional("weight", ri$weight),
+    add_optional("rating_min", ri$rating_min, as.integer),
+    add_optional("rating_max", ri$rating_max, as.integer),
+    emit("keep_original", isTRUE(ri$keep_original)),
+    add_optional("missing_codes", ri$missing_codes),
+    emit("model", as.character(ri$model %||% "RSM")),
+    emit("method", as.character(ri$method %||% "JML")),
+    add_optional("step_facet", ri$step_facet),
+    add_optional("slope_facet", ri$slope_facet),
+    "  anchors = anchors,",
+    "  group_anchors = group_anchors,",
+    emit("noncenter_facet", as.character(ri$noncenter_facet %||% "Person")),
+    add_optional("dummy_facets", ri$dummy_facets),
+    add_optional("positive_facets", ri$positive_facets),
+    emit("anchor_policy", as.character(ri$anchor_policy %||% "warn")),
+    emit("min_common_anchors", as.integer(ri$min_common_anchors %||% 5L)),
+    emit("min_obs_per_element", as.numeric(ri$min_obs_per_element %||% 30)),
+    emit("min_obs_per_category", as.numeric(ri$min_obs_per_category %||% 10)),
+    emit("quad_points", as.integer(ri$quad_points %||% 31L)),
+    emit("maxit", as.integer(ri$maxit %||% 400L)),
+    emit("reltol", as.numeric(ri$reltol %||% 1e-6)),
+    emit("mml_engine", as.character(ri$mml_engine %||% "direct")),
+    emit("facet_shrinkage", as.character(ri$facet_shrinkage %||% "none"))
+  )
+
+  if (!is.null(ri$facet_prior_sd)) {
+    out <- c(out, emit("facet_prior_sd", as.numeric(ri$facet_prior_sd)))
+  }
+  out <- c(out,
+    emit("shrink_person", isTRUE(ri$shrink_person)),
+    emit("attach_diagnostics", isTRUE(ri$attach_diagnostics))
+  )
+
+  # Latent-regression block, conditional on the original fit having
+  # used a population model.
+  if (isTRUE(fit_population$active)) {
+    out <- c(out,
+      paste0("  population_formula = ",
+             render_r_object_literal(
+               fit_population$formula %||% stats::as.formula(~ 1)
+             ), ","),
+      "  person_data = fit_person_data,",
+      paste0("  person_id = ",
+             render_r_object_literal(fit_population_person_id), ","),
+      paste0("  population_policy = ",
+             render_r_object_literal(
+               as.character(fit_population$policy %||% "error")
+             ))
+    )
+  } else {
+    # Drop the trailing comma from the last emitted line to keep the
+    # call syntactically valid.
+    last <- length(out)
+    out[[last]] <- sub(",[[:space:]]*$", "", out[[last]])
+  }
+
+  c(unlist(out, use.names = FALSE), ")")
+}
+
 compact_population_coding_variables <- function(x) {
   x <- x %||% list()
   if (!is.list(x) || length(x) == 0L) {
@@ -252,6 +380,12 @@ validate_bias_results_input <- function(bias_results,
 #' @param plausible_values Optional output from [sample_mfrm_plausible_values()].
 #' @param include_person_anchors If `TRUE`, include person measures in the
 #'   exported anchor table.
+#' @param data Optional original analysis data frame. When supplied,
+#'   the manifest's `input_hash` row for `data` is computed against
+#'   the user's untouched input rather than the package's internal
+#'   `prep$data` (which carries synthesised `Weight` / `score_k`
+#'   columns) so the recorded fingerprint matches what
+#'   `read.csv()` will produce in a replay session.
 #'
 #' @details
 #' This helper captures the package-native equivalent of the Streamlit app's
@@ -275,14 +409,21 @@ validate_bias_results_input <- function(bias_results,
 #' - `estimation_control`: key-value optimizer settings table
 #' - `anchor_summary`: facet-level anchor summary
 #' - `anchors`: machine-readable anchor table
+#' - `hierarchical_review`: retained traceability table for hierarchical /
+#'   small-sample design flags
+#' - `missing_recoding`: retained traceability table for missing-code recoding
+#' - `shrinkage_review`: retained traceability table for shrinkage settings
 #' - `available_outputs`: availability table for diagnostics/bias/PCA/prediction
 #'   outputs
+#' - `dependencies`, `input_hash`, and `session_info`: reproducibility
+#'   metadata tables
 #' - `settings`: manifest build settings
 #'
 #' @section Interpreting output:
 #' The `summary` table is the quickest place to confirm that you are looking at
 #' the intended analysis. The `model_settings`, `source_columns`, and
-#' `estimation_control` tables are designed for audit trails and method write-up.
+#' `estimation_control` tables are designed for reproducibility records and
+#' method write-up.
 #' Active latent-regression fits also record their population-model provenance
 #' there, including the fitted scoring basis, stored `population_formula`, and
 #' person-level contract used by the fitted population model. When categorical
@@ -303,10 +444,10 @@ validate_bias_results_input <- function(bias_results,
 #' 4. If you need files on disk, pass the same objects to
 #'    [export_mfrm_bundle()].
 #'
-#' This manifest/export layer currently depends on diagnostics-compatible
-#' workflow objects. For bounded `GPCM` fits, that means the layer is
-#' intentionally unavailable until the diagnostics/reporting contract has been
-#' generalized beyond the ordered Rasch-family branch.
+#' This fit-based manifest/export layer currently depends on the full
+#' diagnostics/reporting workflow contract. For bounded `GPCM` fits, that means
+#' the layer is intentionally unavailable even though direct summary-table
+#' appendix export is supported for documented `GPCM` outputs.
 #'
 #' @return A named list with class `mfrm_manifest`.
 #' @seealso [export_mfrm_bundle()], [build_mfrm_replay_script()],
@@ -314,7 +455,7 @@ validate_bias_results_input <- function(bias_results,
 #' @examples
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-#'                 method = "JML", maxit = 25)
+#'                 method = "JML", maxit = 30)
 #' diag <- diagnose_mfrm(fit, residual_pca = "none")
 #' manifest <- build_mfrm_manifest(fit, diagnostics = diag)
 #' manifest$summary[, c("Model", "Method", "Observations", "Facets")]
@@ -326,7 +467,8 @@ build_mfrm_manifest <- function(fit,
                                 population_prediction = NULL,
                                 unit_prediction = NULL,
                                 plausible_values = NULL,
-                                include_person_anchors = FALSE) {
+                                include_person_anchors = FALSE,
+                                data = NULL) {
   ctx <- resolve_mfrm_export_context(
     x = fit,
     diagnostics = diagnostics,
@@ -390,12 +532,26 @@ build_mfrm_manifest <- function(fit,
     stringsAsFactors = FALSE
   )
 
+  # RNG seed snapshot. .Random.seed may not exist yet (e.g. if no RNG
+  # has been touched); `set.seed(NULL)` to prime it would change state,
+  # so we just record the absence instead.
+  rng_state <- if (exists(".Random.seed", envir = globalenv(), inherits = FALSE)) {
+    seed_vec <- get(".Random.seed", envir = globalenv(), inherits = FALSE)
+    paste(utils::head(seed_vec, 8L), collapse = ",")
+  } else {
+    NA_character_
+  }
+  rng_kind <- paste(RNGkind(), collapse = ", ")
+
   environment_tbl <- data.frame(
     Package = "mfrmr",
     PackageVersion = as.character(utils::packageVersion("mfrmr")),
     RVersion = as.character(getRversion()),
     Platform = R.version$platform,
-    Timestamp = format(Sys.time(), "%Y-%m-%d %H:%M:%S %z"),
+    Timestamp = format(as.POSIXct(Sys.time()), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
+    RNGKind = rng_kind,
+    RNGSeedDigest = rng_state,
+    Locale = Sys.getlocale("LC_CTYPE"),
     stringsAsFactors = FALSE
   )
 
@@ -495,6 +651,128 @@ build_mfrm_manifest <- function(fit,
     input_mode = ctx$input_mode
   ))
 
+  # Hierarchical structure review (0.1.6). Lightweight descriptive
+  # summary so manifests document the observed nesting / sample-adequacy
+  # state even when the full review table is not stored alongside the fit.
+  hierarchical_review <- tryCatch({
+    flag <- as.character(fit$summary$FacetSampleSizeFlag %||% NA_character_)
+    min_n <- suppressWarnings(as.integer(fit$summary$FacetMinLevelN %||% NA_integer_))
+    sparse_n <- suppressWarnings(as.integer(fit$summary$FacetSparseCount %||% NA_integer_))
+    ext_hi <- suppressWarnings(as.integer(fit$summary$ExtremeHighN %||% NA_integer_))
+    ext_lo <- suppressWarnings(as.integer(fit$summary$ExtremeLowN %||% NA_integer_))
+    data.frame(
+      FacetSampleSizeFlag = flag,
+      FacetMinLevelN = min_n,
+      FacetSparseCount = sparse_n,
+      # Extreme-person counts (added in 0.1.6). These were computed
+      # in fit$summary but not surfaced in any bundle; manifest consumers
+      # need them to review JML extreme-score behaviour.
+      ExtremeHighN = ext_hi,
+      ExtremeLowN = ext_lo,
+      Note = paste0(
+        "FacetSampleSizeFlag aggregates non-Person facets only (see ",
+        "?fit_mfrm 'Fixed effects assumption'). For Person-level and ",
+        "per-level detail, run `facet_small_sample_review(fit)` and ",
+        "`analyze_hierarchical_structure(data, facets)`."
+      ),
+      stringsAsFactors = FALSE
+    )
+  }, error = function(e) data.frame(
+    FacetSampleSizeFlag = NA_character_,
+    FacetMinLevelN = NA_integer_,
+    FacetSparseCount = NA_integer_,
+    ExtremeHighN = NA_integer_,
+    ExtremeLowN = NA_integer_,
+    Note = "Hierarchical review summary unavailable.",
+    stringsAsFactors = FALSE
+  ))
+
+  # Surface any missing-code recoding that `recode_missing_codes()` or
+  # `fit_mfrm(..., missing_codes = ...)` performed before the fit. The
+  # integrated path stores the review in `prep$missing_recoding`; the
+  # older helper-only path leaves it on an attr() of `prep$data`.
+  missing_recoding_review <- tryCatch({
+    review <- prep$missing_recoding
+    if (is.null(review)) {
+      review <- attr(prep$data, "mfrm_missing_recoding")
+    }
+    if (is.null(review) || !is.data.frame(review) || nrow(review) == 0L) {
+      data.frame(
+        Column = character(0),
+        Replaced = integer(0),
+        stringsAsFactors = FALSE
+      )
+    } else {
+      review
+    }
+  }, error = function(e) data.frame(
+    Column = character(0),
+    Replaced = integer(0),
+    stringsAsFactors = FALSE
+  ))
+
+  # Reproducibility additions (0.1.6 polish). These tables are always
+  # populated (never NULL) so downstream writers can rely on the column
+  # contract, but individual fields may be NA when the underlying
+  # helper is unavailable (e.g. `digest` in Suggests but not installed).
+  dependencies_tbl <- build_mfrm_dependency_table(
+    c("dplyr", "tidyr", "tibble", "purrr", "stringr", "psych",
+      "lifecycle", "rlang", "cpp11",
+      "igraph", "lme4", "digest", "kableExtra", "flextable")
+  )
+
+  # Hash the user's *original* data when supplied, so the recorded
+  # fingerprint matches what `read.csv()` will produce in the replay
+  # session. `prep$data` carries synthesized `Weight` / `score_k`
+  # columns that the user could not reconstruct from their CSV.
+  hash_data <- if (is.data.frame(data) && nrow(data) > 0L) {
+    data
+  } else {
+    prep$data %||% NULL
+  }
+  input_hash_tbl <- build_mfrm_input_hash_table(
+    data = hash_data,
+    anchors = anchor_tbl,
+    group_anchors = fit$config$group_anchors %||% NULL,
+    score_map = prep$score_map %||% NULL
+  )
+
+  session_info_tbl <- build_mfrm_session_info_table()
+
+  # Empirical-Bayes shrinkage trail (0.1.6). Records the mode and per-facet
+  # tau^2 / mean shrinkage values so reproducibility bundles mirror
+  # what `build_apa_outputs()` puts in the Methods narrative. When no
+  # shrinkage is applied, return a single-row sentinel so downstream
+  # writers always see a schema with Mode + NA values rather than a
+  # zero-row frame that confuses column-count checks.
+  empty_shrinkage_review <- function(mode_val) {
+    data.frame(
+      Mode = mode_val,
+      Facet = NA_character_,
+      Tau2 = NA_real_,
+      MeanShrinkage = NA_real_,
+      EffectiveDF = NA_real_,
+      stringsAsFactors = FALSE
+    )
+  }
+  shrinkage_review <- tryCatch({
+    mode <- as.character(fit$config$facet_shrinkage %||% "none")
+    report <- fit$shrinkage_report
+    if (identical(mode, "none") || is.null(report) || !is.data.frame(report) ||
+        nrow(report) == 0L) {
+      empty_shrinkage_review(mode)
+    } else {
+      data.frame(
+        Mode = rep(mode, nrow(report)),
+        Facet = as.character(report$Facet),
+        Tau2 = suppressWarnings(as.numeric(report$Tau2)),
+        MeanShrinkage = suppressWarnings(as.numeric(report$MeanShrinkage)),
+        EffectiveDF = suppressWarnings(as.numeric(report$EffectiveDF)),
+        stringsAsFactors = FALSE
+      )
+    }
+  }, error = function(e) empty_shrinkage_review(NA_character_))
+
   out <- list(
     summary = summary_tbl,
     environment = environment_tbl,
@@ -503,10 +781,132 @@ build_mfrm_manifest <- function(fit,
     estimation_control = estimation_control,
     anchor_summary = anchor_summary,
     anchors = as.data.frame(anchor_tbl, stringsAsFactors = FALSE),
+    hierarchical_review = hierarchical_review,
+    missing_recoding = missing_recoding_review,
+    shrinkage_review = shrinkage_review,
+    dependencies = dependencies_tbl,
+    input_hash = input_hash_tbl,
+    session_info = session_info_tbl,
     available_outputs = available_outputs,
     settings = settings
   )
   as_mfrm_bundle(out, "mfrm_manifest")
+}
+
+# ---- internal helpers for manifest reproducibility (0.1.6 polish) --------
+
+#' @keywords internal
+#' @noRd
+build_mfrm_dependency_table <- function(pkgs) {
+  pkgs <- as.character(pkgs %||% character(0))
+  if (length(pkgs) == 0L) {
+    return(data.frame(Package = character(0),
+                      Version = character(0),
+                      Role = character(0),
+                      stringsAsFactors = FALSE))
+  }
+  desc <- utils::packageDescription("mfrmr")
+  imports <- trimws(strsplit(as.character(desc$Imports %||% ""), ",")[[1]])
+  suggests <- trimws(strsplit(as.character(desc$Suggests %||% ""), ",")[[1]])
+  # Strip version tags like "pkg (>= 1.0)" to bare names.
+  imports <- sub("\\s*\\(.*\\)$", "", imports)
+  suggests <- sub("\\s*\\(.*\\)$", "", suggests)
+  imports <- imports[nzchar(imports)]
+  suggests <- suggests[nzchar(suggests)]
+
+  rows <- lapply(pkgs, function(p) {
+    role <- if (p %in% imports) "imports"
+            else if (p %in% suggests) "suggests"
+            else "other"
+    ver <- tryCatch(as.character(utils::packageVersion(p)),
+                    error = function(e) NA_character_)
+    data.frame(Package = p,
+               Version = ver,
+               Role = role,
+               stringsAsFactors = FALSE)
+  })
+  do.call(rbind, rows)
+}
+
+#' @keywords internal
+#' @noRd
+build_mfrm_input_hash_table <- function(data = NULL, anchors = NULL,
+                                        group_anchors = NULL,
+                                        score_map = NULL) {
+  hash_one <- function(x) {
+    if (is.null(x)) return(NA_character_)
+    if (requireNamespace("digest", quietly = TRUE)) {
+      return(digest::digest(x, algo = "sha256"))
+    }
+    # Fallback: serialize + tools::md5sum via a temp file so we still
+    # record a stable fingerprint even when digest is absent.
+    tf <- tempfile()
+    on.exit(unlink(tf), add = TRUE)
+    saveRDS(x, tf)
+    unname(tools::md5sum(tf))
+  }
+  n_rows <- function(x) if (is.null(x)) NA_integer_ else {
+    if (is.data.frame(x)) nrow(x) else length(x)
+  }
+
+  data.frame(
+    Object = c("data", "anchors", "group_anchors", "score_map"),
+    Hash = c(hash_one(data),
+             hash_one(anchors),
+             hash_one(group_anchors),
+             hash_one(score_map)),
+    NRows = c(n_rows(data),
+              n_rows(anchors),
+              n_rows(group_anchors),
+              n_rows(score_map)),
+    Algorithm = c(rep(
+      if (requireNamespace("digest", quietly = TRUE)) "sha256"
+      else "md5-of-rds",
+      4L)),
+    stringsAsFactors = FALSE
+  )
+}
+
+#' @keywords internal
+#' @noRd
+build_mfrm_session_info_table <- function() {
+  info <- utils::sessionInfo()
+  attached <- if (!is.null(info$otherPkgs)) {
+    vapply(info$otherPkgs, function(p) as.character(p$Version %||% NA_character_),
+           character(1))
+  } else character(0)
+  loaded <- if (!is.null(info$loadedOnly)) {
+    vapply(info$loadedOnly, function(p) as.character(p$Version %||% NA_character_),
+           character(1))
+  } else character(0)
+
+  pkg_rows <- function(tbl, scope) {
+    if (length(tbl) == 0L) return(NULL)
+    data.frame(
+      Scope = scope,
+      Package = names(tbl),
+      Version = as.character(unname(tbl)),
+      stringsAsFactors = FALSE
+    )
+  }
+  pkg_df <- rbind(pkg_rows(attached, "attached"),
+                  pkg_rows(loaded, "loaded"))
+
+  meta_df <- data.frame(
+    Scope = c("platform", "running", "base"),
+    Package = c("platform", "os", "base_R"),
+    Version = c(as.character(info$platform %||% NA_character_),
+                as.character(info$running %||% NA_character_),
+                paste0(info$R.version$major, ".", info$R.version$minor)),
+    stringsAsFactors = FALSE
+  )
+  res <- rbind(meta_df, pkg_df %||%
+                 data.frame(Scope = character(0),
+                            Package = character(0),
+                            Version = character(0),
+                            stringsAsFactors = FALSE))
+  rownames(res) <- NULL
+  res
 }
 
 #' Build a package-native replay script for an MFRM analysis
@@ -555,8 +955,10 @@ build_mfrm_manifest <- function(fit,
 #' sidecar CSV relative to the replay script location.
 #'
 #' This replay layer is intentionally unavailable for bounded `GPCM`, because
-#' the current bundle/export contract still depends on the diagnostics/reporting
-#' route that remains formalized only for the Rasch-family branch.
+#' the fit-based bundle/export contract depends on the full
+#' diagnostics/reporting route that is currently retained for the
+#' Rasch-family branch. Use the summary-table appendix route for documented
+#' direct `GPCM` outputs.
 #'
 #' @section When to use this:
 #' Use `build_mfrm_replay_script()` when you want a package-native recipe that
@@ -597,7 +999,7 @@ build_mfrm_manifest <- function(fit,
 #' @examples
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-#'                 method = "JML", maxit = 25)
+#'                 method = "JML", maxit = 30)
 #' replay <- build_mfrm_replay_script(fit, data_file = "your_data.csv")
 #' replay$summary[, c("ScriptMode", "ResidualPCA", "BiasPairs")]
 #' cat(substr(replay$script, 1, 120))
@@ -710,6 +1112,9 @@ build_mfrm_replay_script <- function(fit,
     }
   }
 
+  recorded_pkg_version <- as.character(
+    cfg$replay_inputs$package_version %||% utils::packageVersion("mfrmr")
+  )
   lines <- c(
     "#!/usr/bin/env Rscript",
     "# Generated by mfrmr::build_mfrm_replay_script()",
@@ -720,8 +1125,20 @@ build_mfrm_replay_script <- function(fit,
            } else {
              ""
            }),
+    paste0("# Recorded mfrmr version: ", recorded_pkg_version),
     "",
     "library(mfrmr)",
+    "",
+    "# Version-mismatch warning. The replay script was generated against",
+    "# the recorded mfrmr version above. If the installed version differs",
+    "# the fit will still run, but estimates may diverge.",
+    paste0(
+      "if (utils::packageVersion(\"mfrmr\") != \"", recorded_pkg_version,
+      "\") warning(\"replay.R was generated under mfrmr ",
+      recorded_pkg_version,
+      "; you are running \", as.character(utils::packageVersion(\"mfrmr\")), \". \", ",
+      "\"Estimates may differ.\")"
+    ),
     "",
     paste0("data <- utils::read.csv(", render_r_object_literal(as.character(data_file[1])), ", stringsAsFactors = FALSE)")
   )
@@ -832,51 +1249,29 @@ build_mfrm_replay_script <- function(fit,
           )
         }
       }
-	    lines <- c(
-	      lines,
-	      "",
-	      "# Fit the model",
-	      "fit <- fit_mfrm(",
-	      "  data = data,",
-	      paste0("  person = ", render_r_object_literal(as.character(src$person %||% "Person")), ","),
-	      paste0("  facets = ", render_r_object_literal(as.character(src$facets %||% character(0))), ","),
-	      paste0("  score = ", render_r_object_literal(as.character(src$score %||% "Score")), ","),
-	      paste0("  weight = ", if (!is.null(src$weight)) render_r_object_literal(as.character(src$weight)) else "NULL", ","),
-        paste0("  rating_min = ", render_r_object_literal(as.integer(cfg$rating_min %||% NA_integer_)), ","),
-        paste0("  rating_max = ", render_r_object_literal(as.integer(cfg$rating_max %||% NA_integer_)), ","),
-	      paste0("  keep_original = ", render_r_object_literal(isTRUE(cfg$keep_original)), ","),
-	      paste0("  model = ", render_r_object_literal(as.character(cfg$model %||% "RSM")), ","),
-	      paste0("  method = ", render_r_object_literal(as.character(cfg$method_input %||% cfg$method %||% "JML")), ","),
-	      paste0("  step_facet = ", if (!is.null(cfg$step_facet) && nzchar(as.character(cfg$step_facet))) render_r_object_literal(as.character(cfg$step_facet)) else "NULL", ","),
-	      "  anchors = anchors,",
-	      "  group_anchors = group_anchors,",
-	      paste0("  noncenter_facet = ", render_r_object_literal(as.character(cfg$noncenter_facet %||% "Person")), ","),
-      paste0("  dummy_facets = ", if (length(cfg$dummy_facets %||% character(0)) > 0) render_r_object_literal(as.character(cfg$dummy_facets)) else "NULL", ","),
-      paste0("  positive_facets = ", if (length(cfg$positive_facets %||% character(0)) > 0) render_r_object_literal(as.character(cfg$positive_facets)) else "NULL", ","),
-	      paste0("  quad_points = ", render_r_object_literal(as.integer(est_ctl$quad_points %||% 15L)), ","),
-	      paste0("  maxit = ", render_r_object_literal(as.integer(est_ctl$maxit %||% 400L)), ","),
-	      paste0(
-          "  reltol = ",
-          render_r_object_literal(as.numeric(est_ctl$reltol %||% 1e-6)),
-          if (isTRUE(fit_population$active)) "," else ""
-        ),
-        if (isTRUE(fit_population$active)) paste0(
-          "  population_formula = ",
-          render_r_object_literal(fit_population$formula %||% stats::as.formula(~ 1)),
-          ","
-        ) else NULL,
-        if (isTRUE(fit_population$active)) "  person_data = fit_person_data," else NULL,
-        if (isTRUE(fit_population$active)) paste0(
-          "  person_id = ",
-          render_r_object_literal(fit_population_person_id),
-          ","
-        ) else NULL,
-        if (isTRUE(fit_population$active)) paste0(
-          "  population_policy = ",
-          render_r_object_literal(as.character(fit_population$policy %||% "error"))
-        ) else NULL,
-	      ")"
-	    )
+      # Build the `fit_mfrm()` call from the captured `replay_inputs`
+      # so every argument that affected the original fit appears in the
+      # script, not only the most common subset. `replay_inputs` is
+      # written by `fit_mfrm()` itself (see api-estimation.R) and is
+      # the single source of truth for replay.
+      # `cfg$rating_min` / `cfg$rating_max` carry the resolved range
+      # used by the original fit (whether the user supplied them or
+      # `prepare_mfrm_data()` inferred them). Pass them as fallback
+      # so the replayed fit pins the same range and does not depend
+      # on re-inference from a possibly-changed input file.
+      fit_call_lines <- build_replay_fit_mfrm_lines(
+        replay_inputs = cfg$replay_inputs,
+        fit_population = fit_population,
+        fit_population_person_id = fit_population_person_id,
+        src = src,
+        cfg = cfg
+      )
+      lines <- c(
+        lines,
+        "",
+        "# Fit the model",
+        fit_call_lines
+      )
 
     if (include_diagnostics) {
       lines <- c(
@@ -1326,7 +1721,7 @@ build_conquest_overlap_command_template <- function(data_file,
     "Generated by mfrmr::build_conquest_overlap_bundle()",
     "Scope: ordered-response RSM/PCM, presently operationalized as binary item-only latent regression with one numeric person covariate.",
     "Official-manual alignment: block comments, CSV PID/keeps widths, and machine-readable export/show CSV outputs are requested.",
-    "Combine exported reg_coefficients and covariance outputs into the population table before audit normalization.",
+    "Combine exported reg_coefficients and covariance outputs into the population table before review normalization.",
     "Confirm local ConQuest syntax/options before treating this as an external benchmark run.",
     "*/",
     paste0(
@@ -1368,14 +1763,14 @@ build_conquest_overlap_output_contract <- function(prefix = "conquest_overlap") 
       "show cases ! estimates=eap, filetype=csv, regressors=yes",
       "show parameters ! tables=1:4, estimates=eap"
     ),
-    AuditHandoff = c(
+    ReviewHandoff = c(
       "Use as the extracted item-estimate table after confirming item labels/parameter rows.",
       "Combine into the normalized population table as regression-coefficient rows.",
       "Combine into the normalized population table as the residual variance/covariance row.",
       "Use as the normalized case-level EAP table after selecting the EAP column.",
-      "Human-readable review only; do not treat this text file as a parsed audit table."
+      "Human-readable review only; do not treat this text file as a parsed review table."
     ),
-    RequiredForAudit = c(TRUE, TRUE, TRUE, TRUE, FALSE),
+    RequiredForReview = c(TRUE, TRUE, TRUE, TRUE, FALSE),
     stringsAsFactors = FALSE
   )
 }
@@ -1410,7 +1805,7 @@ build_conquest_overlap_readme <- function(summary_tbl,
       "- ",
       output_contract$ExternalFile,
       ": ",
-      output_contract$AuditHandoff
+      output_contract$ReviewHandoff
     ),
     "",
     "Comparison rules:",
@@ -1466,9 +1861,9 @@ build_conquest_overlap_readme <- function(summary_tbl,
 #' The `conquest_command` component is a conservative starting template, not a
 #' guaranteed version-invariant automation. The `conquest_output_contract`
 #' component records which requested external output should feed each
-#' normalized audit table.
+#' normalized review table.
 #' Use [normalize_conquest_overlap_files()] or
-#' [normalize_conquest_overlap_tables()] and then [audit_conquest_overlap()] only
+#' [normalize_conquest_overlap_tables()] and then [review_conquest_overlap()] only
 #' after the matching ConQuest run has been executed externally and the relevant
 #' output tables have been extracted. The bundle and command template alone are
 #' not external validation evidence.
@@ -1484,9 +1879,9 @@ build_conquest_overlap_readme <- function(summary_tbl,
 #' @section Output:
 #' The returned object has class `mfrm_conquest_overlap_bundle` and includes:
 #' - `summary`: one-row scope summary with posterior-basis and
-#'   population-model audit fields
+#'   population-model review fields
 #' - `comparison_targets`: comparison rules for the exported tables
-#' - `conquest_output_contract`: requested ConQuest outputs and audit handoff
+#' - `conquest_output_contract`: requested ConQuest outputs and review handoff
 #' - `response_long`: long-format binary response data used by the bundle
 #' - `response_wide`: wide CSV-ready response matrix for the ConQuest template
 #' - `person_data`: one-row-per-person covariate table
@@ -1501,11 +1896,11 @@ build_conquest_overlap_readme <- function(summary_tbl,
 #'
 #' @return A named list with class `mfrm_conquest_overlap_bundle`.
 #' @seealso [normalize_conquest_overlap_files()],
-#'   [normalize_conquest_overlap_tables()], [audit_conquest_overlap()],
+#'   [normalize_conquest_overlap_tables()], [review_conquest_overlap()],
 #'   [reference_case_benchmark()], [build_mfrm_replay_script()],
 #'   [export_mfrm_bundle()]
 #' @examples
-#' bundle <- build_conquest_overlap_bundle()
+#' bundle <- build_conquest_overlap_bundle(quad_points = 3, maxit = 30)
 #' bundle$summary[, c("Case", "Facet", "Covariate", "Persons", "Items")]
 #' summary(bundle)$conquest_command_scope
 #' summary(bundle)$conquest_output_contract
@@ -2004,7 +2399,7 @@ max_abs_conquest_overlap_label <- function(x, label) {
   if (length(out) == 0L || is.na(out) || !nzchar(out)) NA_character_ else out
 }
 
-#' Normalize extracted ConQuest overlap tables to the `mfrmr` audit contract
+#' Normalize extracted ConQuest overlap tables to the `mfrmr` review contract
 #'
 #' @param conquest_population Extracted ConQuest population-parameter table as a
 #'   data.frame.
@@ -2035,7 +2430,7 @@ max_abs_conquest_overlap_label <- function(x, label) {
 #'
 #' @details
 #' This helper does not parse raw ConQuest text output. It standardizes already
-#' extracted tables to the contract used by [audit_conquest_overlap()]:
+#' extracted tables to the contract used by [review_conquest_overlap()]:
 #'
 #' - population parameters become columns `Parameter`, `Estimate`, and
 #'   `EstimateNonNumeric`;
@@ -2046,7 +2441,7 @@ max_abs_conquest_overlap_label <- function(x, label) {
 #'
 #' The resulting object is intentionally conservative. It does not infer
 #' whether item IDs correspond to exported response variables or original item
-#' levels; that matching step remains part of [audit_conquest_overlap()], where
+#' levels; that matching step remains part of [review_conquest_overlap()], where
 #' the standardized ConQuest tables are compared against a concrete overlap
 #' bundle.
 #'
@@ -2059,13 +2454,13 @@ max_abs_conquest_overlap_label <- function(x, label) {
 #' - `settings`: source-column metadata
 #' - `notes`: interpretation notes
 #'
-#' Read `summary(normalized)$normalization_scope` before auditing to confirm
+#' Read `summary(normalized)$normalization_scope` before review to confirm
 #' that the object contains extracted tabular inputs, not parsed raw ConQuest
-#' report text, and to check duplicate-ID / non-numeric-estimate pre-audit
+#' report text, and to check duplicate-ID / non-numeric-estimate pre-review
 #' flags.
 #'
 #' @return A named list with class `mfrm_conquest_overlap_tables`.
-#' @seealso [build_conquest_overlap_bundle()], [audit_conquest_overlap()]
+#' @seealso [build_conquest_overlap_bundle()], [review_conquest_overlap()]
 #' @examples
 #' normalized <- normalize_conquest_overlap_tables(
 #'   conquest_population = data.frame(
@@ -2158,7 +2553,7 @@ normalize_conquest_overlap_tables <- function(conquest_population,
 
   notes <- c(
     "This helper standardizes extracted ConQuest tables but does not parse raw ConQuest text output.",
-    "Item identifiers remain user-supplied labels until audit_conquest_overlap() matches them against the exported overlap bundle.",
+    "Item identifiers remain user-supplied labels until review_conquest_overlap() matches them against the exported overlap bundle.",
     "Non-numeric estimate cells are converted to NA and counted in the summary table."
   )
 
@@ -2173,7 +2568,7 @@ normalize_conquest_overlap_tables <- function(conquest_population,
   as_mfrm_bundle(out, "mfrm_conquest_overlap_tables")
 }
 
-#' Normalize extracted ConQuest overlap files to the `mfrmr` audit contract
+#' Normalize extracted ConQuest overlap files to the `mfrmr` review contract
 #'
 #' @param population_file Path to an extracted ConQuest population-parameter
 #'   table in CSV/TSV/TXT form.
@@ -2217,14 +2612,14 @@ normalize_conquest_overlap_tables <- function(conquest_population,
 #' 1. export an exact-overlap bundle with [build_conquest_overlap_bundle()];
 #' 2. extract the relevant ConQuest tables to CSV/TSV/TXT files;
 #' 3. call `normalize_conquest_overlap_files()` on those files;
-#' 4. pass the result to [audit_conquest_overlap()].
+#' 4. pass the result to [review_conquest_overlap()].
 #'
-#' Read `summary(normalized)$normalization_scope` before auditing to confirm
+#' Read `summary(normalized)$normalization_scope` before review to confirm
 #' that the files were treated as extracted tables, not raw ConQuest report
-#' text, and to check duplicate-ID / non-numeric-estimate pre-audit flags.
+#' text, and to check duplicate-ID / non-numeric-estimate pre-review flags.
 #'
 #' @return A named list with class `mfrm_conquest_overlap_tables`.
-#' @seealso [normalize_conquest_overlap_tables()], [audit_conquest_overlap()]
+#' @seealso [normalize_conquest_overlap_tables()], [review_conquest_overlap()]
 #' @examples
 #' bundle <- build_conquest_overlap_bundle()
 #' tmp_dir <- tempdir()
@@ -2268,8 +2663,8 @@ normalize_conquest_overlap_tables <- function(conquest_population,
 #'   conquest_case_estimate = "EAP"
 #' )
 #' summary(normalized)$normalization_scope
-#' audit <- audit_conquest_overlap(bundle, normalized)
-#' summary(audit)$summary
+#' review <- review_conquest_overlap(bundle, normalized)
+#' summary(review)$summary
 #' @export
 normalize_conquest_overlap_files <- function(population_file,
                                              item_file,
@@ -2329,7 +2724,7 @@ normalize_conquest_overlap_files <- function(population_file,
   normalized
 }
 
-#' Audit an exact-overlap ConQuest comparison against an `mfrmr` overlap bundle
+#' Review an exact-overlap ConQuest comparison against an `mfrmr` overlap bundle
 #'
 #' @param bundle Output from [build_conquest_overlap_bundle()].
 #' @param conquest_population Normalized ConQuest population-parameter table as a
@@ -2374,10 +2769,10 @@ normalize_conquest_overlap_files <- function(population_file,
 #' - and it reports numerical differences and missing elements without claiming
 #'   that any fixed tolerance implies software equivalence.
 #'
-#' This is the package's external-table audit path. It is distinct from
+#' This is the package's external-table review path. It is distinct from
 #' `reference_case_benchmark(cases = "synthetic_conquest_overlap_dry_run")`,
 #' which only round-trips package-native tables through the same normalization
-#' and audit contract without executing ConQuest.
+#' and review contract without executing ConQuest.
 #'
 #' The intended workflow is:
 #'
@@ -2388,19 +2783,19 @@ normalize_conquest_overlap_files <- function(population_file,
 #'    agreement, and case-level EAP agreement.
 #'
 #' @section Output:
-#' The returned object has class `mfrm_conquest_overlap_audit` and includes:
+#' The returned object has class `mfrm_conquest_overlap_review` and includes:
 #' - `overall`: one-row comparison summary with missing/duplicate/non-numeric
 #'   attention-item counts and worst-row labels
 #' - `population_comparison`: parameter-by-parameter comparison table
 #' - `item_comparison`: centered item-estimate comparison table
 #' - `case_comparison`: case-level EAP comparison table
 #' - `attention_items`: missing, malformed, or unmatched elements
-#' - `settings`: audit settings
+#' - `settings`: review settings
 #' - `notes`: interpretation notes
 #'
 #' @section Interpretation:
-#' - Read `summary(audit)$audit_scope` first to confirm that the result is a
-#'   supplied-table audit, not raw ConQuest text parsing or a software-
+#' - Read `summary(review)$review_scope` first to confirm that the result is a
+#'   supplied-table review, not raw ConQuest text parsing or a software-
 #'   equivalence claim.
 #' - Population slopes and `sigma2` are intended for direct comparison.
 #' - Item estimates should be interpreted after centering.
@@ -2414,7 +2809,7 @@ normalize_conquest_overlap_files <- function(population_file,
 #' - Missing or non-numeric rows in `attention_items` indicate that the external
 #'   tables do not yet align cleanly with the exported overlap bundle.
 #'
-#' @return A named list with class `mfrm_conquest_overlap_audit`.
+#' @return A named list with class `mfrm_conquest_overlap_review`.
 #' @seealso [build_conquest_overlap_bundle()],
 #'   [normalize_conquest_overlap_files()], [normalize_conquest_overlap_tables()],
 #'   [reference_case_benchmark()]
@@ -2443,20 +2838,21 @@ normalize_conquest_overlap_files <- function(population_file,
 #'   conquest_case_person = "PID",
 #'   conquest_case_estimate = "EAP"
 #' )
-#' audit <- audit_conquest_overlap(bundle, normalized)
-#' summary(audit)$summary
+#' review <- review_conquest_overlap(bundle, normalized)
+#' summary(review)$summary
+#' @name review_conquest_overlap
 #' @export
-audit_conquest_overlap <- function(bundle,
-                                   conquest_population = NULL,
-                                   conquest_item_estimates = NULL,
-                                   conquest_case_eap = NULL,
-                                   conquest_population_term = "auto",
-                                   conquest_population_estimate = "auto",
-                                   conquest_item_id = "auto",
-                                   conquest_item_estimate = "auto",
-                                   item_id_source = c("auto", "response_var", "level"),
-                                   conquest_case_person = "auto",
-                                   conquest_case_estimate = "auto") {
+review_conquest_overlap <- function(bundle,
+                                    conquest_population = NULL,
+                                    conquest_item_estimates = NULL,
+                                    conquest_case_eap = NULL,
+                                    conquest_population_term = "auto",
+                                    conquest_population_estimate = "auto",
+                                    conquest_item_id = "auto",
+                                    conquest_item_estimate = "auto",
+                                    item_id_source = c("auto", "response_var", "level"),
+                                    conquest_case_person = "auto",
+                                    conquest_case_estimate = "auto") {
   item_id_source <- match.arg(item_id_source)
   bundle <- validate_conquest_overlap_bundle_object(bundle)
   inputs <- coerce_conquest_overlap_tables_for_audit(
@@ -2739,8 +3135,8 @@ audit_conquest_overlap <- function(bundle,
   ))
 
   notes <- c(
-    "This audit compares normalized ConQuest tables against the exact-overlap mfrmr bundle.",
-    "No raw ConQuest text parsing is assumed here; normalize external tables before auditing.",
+    "This review compares normalized ConQuest tables against the exact-overlap mfrmr bundle.",
+    "No raw ConQuest text parsing is assumed here; normalize external tables before review.",
     "Population slopes and sigma2 are intended for direct comparison, whereas item estimates are compared after centering.",
     "Non-numeric external estimate cells are treated as attention items rather than silently as ordinary missing rows."
   )
@@ -2755,7 +3151,7 @@ audit_conquest_overlap <- function(bundle,
     settings = settings,
     notes = notes
   )
-  as_mfrm_bundle(out, "mfrm_conquest_overlap_audit")
+  as_mfrm_bundle(out, "mfrm_conquest_overlap_review")
 }
 
 #' Export manuscript appendix tables from validated summary surfaces
@@ -2795,6 +3191,12 @@ audit_conquest_overlap <- function(bundle,
 #' they remain available under `"recommended"` and `"diagnostics"` presets when
 #' the source summary contains caveat rows.
 #'
+#' Parameter-recovery studies can be exported by passing
+#' [evaluate_mfrm_recovery()] or [assess_mfrm_recovery()] output directly. The
+#' exported bundle keeps the ADEMP-style simulation basis, recovery metrics,
+#' replication status, adequacy checklist, thresholds, and next actions in
+#' separate appendix-ready tables.
+#'
 #' Unlike [export_mfrm_bundle()], this helper does not require a fitted model.
 #' It is intended for the stage where compact reporting summaries already exist
 #' and the task is to hand off appendix-ready tables, catalogs, and reporting
@@ -2831,7 +3233,7 @@ audit_conquest_overlap <- function(bundle,
 #' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-#'                 method = "JML", maxit = 25)
+#'                 method = "JML", maxit = 30)
 #' diag <- diagnose_mfrm(fit, residual_pca = "none")
 #' appendix <- export_summary_appendix(
 #'   list(fit = fit, diagnostics = diag),
@@ -3293,6 +3695,14 @@ export_summary_appendix <- function(x,
 #'   archive using [utils::zip()]. This is best-effort and may depend on the
 #'   local R installation.
 #' @param zip_name Optional zip-file name. Defaults to `"{prefix}_bundle.zip"`.
+#' @param data Optional original analysis data frame. When supplied,
+#'   `export_mfrm_bundle()` co-locates a CSV copy of the data
+#'   alongside the replay script and updates the script's
+#'   `read.csv()` path to point at it. The manifest's `input_hash`
+#'   row for `data` is also computed against the user's untouched
+#'   input so the recorded fingerprint matches what the replay
+#'   script will load. Default `NULL` falls back to the legacy
+#'   `your_data.csv` placeholder path.
 #'
 #' @details
 #' This function is the package-native counterpart to the app's download bundle.
@@ -3349,9 +3759,10 @@ export_summary_appendix <- function(x,
 #' `*_population_prediction_settings.csv` or ADeMP CSVs; the compact simulation
 #' specification files carry the replay-relevant settings instead.
 #'
-#' This exporter is intentionally unavailable for bounded `GPCM`, because the
-#' current bundle surface would otherwise depend on blocked narrative/QC/export
-#' semantics from the free-discrimination branch.
+#' This fit-based exporter is intentionally unavailable for bounded `GPCM`,
+#' because the current bundle surface would otherwise depend on blocked
+#' narrative/QC/export semantics from the free-discrimination branch. Use
+#' [export_summary_appendix()] for documented direct `GPCM` outputs.
 #'
 #' @section Interpreting output:
 #' The returned object reports both high-level bundle status and the exact files
@@ -3372,7 +3783,7 @@ export_summary_appendix <- function(x,
 #' @examples
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-#'                 method = "JML", maxit = 25)
+#'                 method = "JML", maxit = 30)
 #' diag <- diagnose_mfrm(fit, residual_pca = "none")
 #' bundle <- export_mfrm_bundle(
 #'   fit,
@@ -3399,7 +3810,8 @@ export_mfrm_bundle <- function(fit,
                                include_person_anchors = FALSE,
                                overwrite = FALSE,
                                zip_bundle = FALSE,
-                               zip_name = NULL) {
+                               zip_name = NULL,
+                               data = NULL) {
   include <- unique(tolower(as.character(include)))
   allowed <- c("core_tables", "checklist", "dashboard", "apa", "anchors", "manifest", "visual_summaries", "predictions", "summary_tables", "script", "html")
   bad <- setdiff(include, allowed)
@@ -3859,13 +4271,13 @@ export_mfrm_bundle <- function(fit,
     if (!is.null(unit_prediction)) {
       unit_sum <- summary(unit_prediction, digits = 6)
       write_csv(unit_prediction$estimates, paste0(prefix, "_unit_prediction_estimates.csv"), "unit_prediction_estimates")
-      write_csv(unit_prediction$audit, paste0(prefix, "_unit_prediction_audit.csv"), "unit_prediction_audit")
+      write_csv(unit_prediction$row_review, paste0(prefix, "_unit_prediction_row_review.csv"), "unit_prediction_row_review")
       write_settings_table(unit_prediction$settings, paste0(prefix, "_unit_prediction_settings.csv"), "unit_prediction_settings")
-      if (nrow(as.data.frame(unit_prediction$population_audit %||% data.frame(), stringsAsFactors = FALSE)) > 0) {
+      if (nrow(as.data.frame(unit_prediction$population_review %||% data.frame(), stringsAsFactors = FALSE)) > 0) {
         write_csv(
-          unit_prediction$population_audit,
-          paste0(prefix, "_unit_prediction_population_audit.csv"),
-          "unit_prediction_population_audit"
+          unit_prediction$population_review,
+          paste0(prefix, "_unit_prediction_population_review.csv"),
+          "unit_prediction_population_review"
         )
       }
       if (nrow(as.data.frame(unit_prediction$person_data %||% data.frame(), stringsAsFactors = FALSE)) > 0) {
@@ -3889,9 +4301,9 @@ export_mfrm_bundle <- function(fit,
         )
       }
       html_tables$unit_prediction_estimates <- unit_sum$estimates
-      html_tables$unit_prediction_audit <- unit_sum$audit
-      if (nrow(as.data.frame(unit_sum$population_audit %||% data.frame(), stringsAsFactors = FALSE)) > 0) {
-        html_tables$unit_prediction_population_audit <- unit_sum$population_audit
+      html_tables$unit_prediction_row_review <- unit_sum$row_review
+      if (nrow(as.data.frame(unit_sum$population_review %||% data.frame(), stringsAsFactors = FALSE)) > 0) {
+        html_tables$unit_prediction_population_review <- unit_sum$population_review
       }
     }
 
@@ -3899,13 +4311,13 @@ export_mfrm_bundle <- function(fit,
       pv_sum <- summary(plausible_values, digits = 6)
       write_csv(plausible_values$values, paste0(prefix, "_plausible_values.csv"), "plausible_values")
       write_csv(plausible_values$estimates, paste0(prefix, "_plausible_value_estimates.csv"), "plausible_value_estimates")
-      write_csv(plausible_values$audit, paste0(prefix, "_plausible_value_audit.csv"), "plausible_value_audit")
+      write_csv(plausible_values$row_review, paste0(prefix, "_plausible_value_row_review.csv"), "plausible_value_row_review")
       write_settings_table(plausible_values$settings, paste0(prefix, "_plausible_value_settings.csv"), "plausible_value_settings")
-      if (nrow(as.data.frame(plausible_values$population_audit %||% data.frame(), stringsAsFactors = FALSE)) > 0) {
+      if (nrow(as.data.frame(plausible_values$population_review %||% data.frame(), stringsAsFactors = FALSE)) > 0) {
         write_csv(
-          plausible_values$population_audit,
-          paste0(prefix, "_plausible_value_population_audit.csv"),
-          "plausible_value_population_audit"
+          plausible_values$population_review,
+          paste0(prefix, "_plausible_value_population_review.csv"),
+          "plausible_value_population_review"
         )
       }
       if (nrow(as.data.frame(plausible_values$person_data %||% data.frame(), stringsAsFactors = FALSE)) > 0) {
@@ -3928,8 +4340,8 @@ export_mfrm_bundle <- function(fit,
       if (nrow(as.data.frame(pv_sum$draw_summary %||% data.frame(), stringsAsFactors = FALSE)) > 0) {
         html_tables$plausible_value_summary <- pv_sum$draw_summary
       }
-      if (nrow(as.data.frame(pv_sum$population_audit %||% data.frame(), stringsAsFactors = FALSE)) > 0) {
-        html_tables$plausible_value_population_audit <- pv_sum$population_audit
+      if (nrow(as.data.frame(pv_sum$population_review %||% data.frame(), stringsAsFactors = FALSE)) > 0) {
+        html_tables$plausible_value_population_review <- pv_sum$population_review
       }
     }
   }
@@ -3943,7 +4355,8 @@ export_mfrm_bundle <- function(fit,
       population_prediction = population_prediction,
       unit_prediction = unit_prediction,
       plausible_values = plausible_values,
-      include_person_anchors = include_person_anchors
+      include_person_anchors = include_person_anchors,
+      data = data
     )
   }
 
@@ -4007,6 +4420,15 @@ export_mfrm_bundle <- function(fit,
         "replay_fit_person_data"
       )
     }
+    # Bundle the user's original input data when supplied so the
+    # replay script and its hash record point to a co-located file.
+    # Falls back to the legacy `your_data.csv` placeholder when the
+    # user did not pass `data` to `export_mfrm_bundle()`.
+    replay_data_file <- "your_data.csv"
+    if (is.data.frame(data) && nrow(data) > 0L) {
+      replay_data_file <- paste0(prefix, "_replay_data.csv")
+      write_csv(data, replay_data_file, "replay_data")
+    }
     replay <- build_mfrm_replay_script(
       fit = if (ctx$input_mode == "facets_run") ctx$run else fit,
       diagnostics = diagnostics,
@@ -4014,6 +4436,7 @@ export_mfrm_bundle <- function(fit,
       population_prediction = population_prediction,
       unit_prediction = unit_prediction,
       plausible_values = plausible_values,
+      data_file = replay_data_file,
       fit_person_data_file = replay_fit_person_data_file,
       include_bundle = TRUE,
       bundle_dir = "replayed_bundle",
@@ -4028,6 +4451,21 @@ export_mfrm_bundle <- function(fit,
       Detail = "Executable package-native replay script.",
       stringsAsFactors = FALSE
     )
+    if (!identical(replay_data_file, "your_data.csv")) {
+      replay_artifacts <- rbind(
+        replay_artifacts,
+        data.frame(
+          Artifact = "replay_data",
+          Format = "csv",
+          File = replay_data_file,
+          Detail = paste0(
+            "Original analysis data co-located with the replay script (",
+            nrow(data), " row(s)."
+          ),
+          stringsAsFactors = FALSE
+        )
+      )
+    }
     if (!is.null(replay_fit_person_data_file)) {
       replay_artifacts <- rbind(
         replay_artifacts,
@@ -4216,14 +4654,16 @@ export_normalize_summary_table_inputs <- function(summary_tables,
     "mfrm_apa_outputs",
     "mfrm_design_evaluation",
     "mfrm_signal_detection",
+    "mfrm_recovery_simulation",
+    "mfrm_recovery_assessment",
     "mfrm_population_prediction",
     "mfrm_future_branch_active_branch",
     "mfrm_facets_run",
     "mfrm_bias",
-    "mfrm_anchor_audit",
+    "mfrm_anchor_review",
     "mfrm_linking_review",
     "mfrm_misfit_casebook",
-    "mfrm_weighting_audit",
+    "mfrm_weighting_review",
     "mfrm_unit_prediction",
     "mfrm_plausible_values",
     "summary.mfrm_fit",
@@ -4233,14 +4673,16 @@ export_normalize_summary_table_inputs <- function(summary_tables,
     "summary.mfrm_apa_outputs",
     "summary.mfrm_design_evaluation",
     "summary.mfrm_signal_detection",
+    "summary.mfrm_recovery_simulation",
+    "summary.mfrm_recovery_assessment",
     "summary.mfrm_population_prediction",
     "summary.mfrm_future_branch_active_branch",
     "summary.mfrm_facets_run",
     "summary.mfrm_bias",
-    "summary.mfrm_anchor_audit",
+    "summary.mfrm_anchor_review",
     "summary.mfrm_linking_review",
     "summary.mfrm_misfit_casebook",
-    "summary.mfrm_weighting_audit",
+    "summary.mfrm_weighting_review",
     "summary.mfrm_unit_prediction",
     "summary.mfrm_plausible_values"
   )

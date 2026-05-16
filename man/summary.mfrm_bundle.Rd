@@ -45,9 +45,11 @@ Additional class-aware summaries are provided for:
 \item \code{mfrm_interrater}, \code{mfrm_facets_chisq}, \code{mfrm_bias_interaction}
 \item \code{mfrm_rating_scale}, \code{mfrm_category_structure}, \code{mfrm_category_curves}
 \item \code{mfrm_measurable}, \code{mfrm_unexpected_after_bias}, \code{mfrm_output_bundle}
-\item \code{mfrm_residual_pca}, \code{mfrm_specifications}, \code{mfrm_data_quality}
+\item \code{mfrm_residual_pca}, \code{mfrm_specifications}, \code{mfrm_data_quality},
+\code{mfrm_fit_measures}
 \item \code{mfrm_iteration_report}, \code{mfrm_subset_connectivity}, \code{mfrm_facet_statistics}
-\item \code{mfrm_parity_report}, \code{mfrm_reference_benchmark}
+\item \code{mfrm_facets_contract_review}, \code{mfrm_facets_fit_review},
+\code{mfrm_facets_fit_df_guide}, \code{mfrm_reference_benchmark}
 }
 }
 \section{Interpreting output}{
@@ -61,12 +63,12 @@ Additional class-aware summaries are provided for:
 summarizing \code{mfrm_reference_benchmark}.
 \item \code{conquest_command_scope}: ConQuest command-template scope when summarizing
 \code{mfrm_conquest_overlap_bundle}.
-\item \code{conquest_output_contract}: requested ConQuest outputs and audit handoff
+\item \code{conquest_output_contract}: requested ConQuest outputs and review handoff
 when summarizing \code{mfrm_conquest_overlap_bundle}.
 \item \code{normalization_scope}: extracted-table normalization scope when summarizing
 \code{mfrm_conquest_overlap_tables}.
-\item \code{audit_scope}: supplied-table audit scope when summarizing
-\code{mfrm_conquest_overlap_audit}.
+\item \code{review_scope}: supplied-table review scope when summarizing
+\code{mfrm_conquest_overlap_review}.
 \item \code{conquest_overlap_checks} / \code{population_policy_checks}: specialized
 benchmark check previews when summarizing \code{mfrm_reference_benchmark}.
 }
@@ -87,7 +89,7 @@ toy_full <- load_mfrmr_data("example_core")
 toy_people <- unique(toy_full$Person)[1:12]
 toy <- toy_full[toy_full$Person \%in\% toy_people, , drop = FALSE]
 fit <- suppressWarnings(
-  fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 10)
+  fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 )
 t4 <- unexpected_response_table(fit, abs_z_min = 1.5, prob_max = 0.4, top_n = 5)
 summary(t4)

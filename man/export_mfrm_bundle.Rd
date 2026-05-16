@@ -20,7 +20,8 @@ export_mfrm_bundle(
   include_person_anchors = FALSE,
   overwrite = FALSE,
   zip_bundle = FALSE,
-  zip_name = NULL
+  zip_name = NULL,
+  data = NULL
 )
 }
 \arguments{
@@ -69,6 +70,15 @@ archive using \code{\link[utils:zip]{utils::zip()}}. This is best-effort and may
 local R installation.}
 
 \item{zip_name}{Optional zip-file name. Defaults to \code{"{prefix}_bundle.zip"}.}
+
+\item{data}{Optional original analysis data frame. When supplied,
+\code{export_mfrm_bundle()} co-locates a CSV copy of the data
+alongside the replay script and updates the script's
+\code{read.csv()} path to point at it. The manifest's \code{input_hash}
+row for \code{data} is also computed against the user's untouched
+input so the recorded fingerprint matches what the replay
+script will load. Default \code{NULL} falls back to the legacy
+\code{your_data.csv} placeholder path.}
 }
 \value{
 A named list with class \code{mfrm_export_bundle}.
@@ -140,9 +150,10 @@ from scenario-level population predictions are not flattened into
 \verb{*_population_prediction_settings.csv} or ADeMP CSVs; the compact simulation
 specification files carry the replay-relevant settings instead.
 
-This exporter is intentionally unavailable for bounded \code{GPCM}, because the
-current bundle surface would otherwise depend on blocked narrative/QC/export
-semantics from the free-discrimination branch.
+This fit-based exporter is intentionally unavailable for bounded \code{GPCM},
+because the current bundle surface would otherwise depend on blocked
+narrative/QC/export semantics from the free-discrimination branch. Use
+\code{\link[=export_summary_appendix]{export_summary_appendix()}} for documented direct \code{GPCM} outputs.
 }
 
 \section{Interpreting output}{
@@ -167,7 +178,7 @@ replay script, and HTML summary.
 \examples{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 25)
+                method = "JML", maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "none")
 bundle <- export_mfrm_bundle(
   fit,

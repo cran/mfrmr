@@ -27,7 +27,7 @@ summary_table_bundle_workflow_fixture <- local({
     facet_b = "Criterion",
     max_iter = 2
   ))
-  audit <- audit_mfrm_anchors(
+  row_review <- review_mfrm_anchors(
     toy,
     person = "Person",
     facets = c("Rater", "Criterion"),
@@ -53,12 +53,12 @@ summary_table_bundle_workflow_fixture <- local({
   ))
   drift <- suppressWarnings(detect_anchor_drift(list(W1 = fit_wave_a, W2 = fit_wave_b)))
   chain <- suppressWarnings(build_equating_chain(list(W1 = fit_wave_a, W2 = fit_wave_b)))
-  linking_review <- build_linking_review(anchor_audit = audit, drift = drift, chain = chain)
+  linking_review <- build_linking_review(anchor_review = row_review, drift = drift, chain = chain)
 
   list(
     run = run,
     bias = bias,
-    audit = audit,
+    row_review = row_review,
     linking_review = linking_review
   )
 })
@@ -129,7 +129,7 @@ summary_table_bundle_weighting_fixture <- local({
     maxit = 25
   ))
 
-  build_weighting_audit(rasch_fit, gpcm_fit, theta_points = 21, top_n = 5)
+  build_weighting_review(rasch_fit, gpcm_fit, theta_points = 21, top_n = 5)
 })
 
 summary_table_bundle_casebook_fixture <- local({
@@ -196,11 +196,22 @@ test_that("summary table bundle role registry covers every supported spec role",
       overview = df,
       overall_fit = df,
       precision_profile = df,
-      precision_audit = df,
+      precision_review = df,
       flags = df,
       reliability = df,
       top_fit = df,
       reporting_map = df
+    ),
+    summary.mfrm_person_fit_indices = list(
+      overview = df,
+      status_summary = df,
+      report_index_summary = df,
+      lz_star_status_summary = df,
+      top_review = df,
+      caveats = df,
+      thresholds = df,
+      reporting_map = df,
+      notes = character()
     ),
     summary.mfrm_data_description = list(
       overview = df,
@@ -214,6 +225,7 @@ test_that("summary table bundle role registry covers every supported spec role",
     summary.mfrm_reporting_checklist = list(
       overview = df,
       section_summary = df,
+      facets_positioning = df,
       action_items = df,
       settings = list()
     ),
@@ -231,6 +243,22 @@ test_that("summary table bundle role registry covers every supported spec role",
     summary.mfrm_signal_detection = list(
       overview = df,
       detection_summary = df
+    ),
+    summary.mfrm_recovery_simulation = list(
+      overview = df,
+      recovery_summary = df,
+      rep_overview = df,
+      ademp = list(),
+      settings = list(),
+      notes = character()
+    ),
+    summary.mfrm_recovery_assessment = list(
+      overview = df,
+      checklist = df,
+      metric_review = df,
+      next_actions = character(),
+      thresholds = list(),
+      notes = character()
     ),
     summary.mfrm_population_prediction = list(
       design = df,
@@ -276,7 +304,7 @@ test_that("summary table bundle role registry covers every supported spec role",
       top_rows = df,
       notes = character()
     ),
-    summary.mfrm_anchor_audit = list(
+    summary.mfrm_anchor_review = list(
       issue_counts = df,
       facet_summary = df,
       level_observation_summary = df,
@@ -314,7 +342,7 @@ test_that("summary table bundle role registry covers every supported spec role",
       notes = character(),
       settings = list()
     ),
-    summary.mfrm_weighting_audit = list(
+    summary.mfrm_weighting_review = list(
       overview = df,
       status = df,
       top_measure_shifts = df,
@@ -329,16 +357,16 @@ test_that("summary table bundle role registry covers every supported spec role",
     ),
     summary.mfrm_unit_prediction = list(
       estimates = df,
-      audit = df,
-      population_audit = df,
+      row_review = df,
+      population_review = df,
       settings = list(),
       notes = character()
     ),
     summary.mfrm_plausible_values = list(
       draw_summary = df,
       estimates = df,
-      audit = df,
-      population_audit = df,
+      row_review = df,
+      population_review = df,
       settings = list(),
       notes = character()
     )
@@ -417,17 +445,46 @@ test_that("build_summary_table_bundle converts supported reporting summaries int
   diag_bundle <- build_summary_table_bundle(diag, which = c("overview", "flags"))
   expect_identical(names(diag_bundle$tables), c("overview", "flags"))
   expect_identical(diag_bundle$source_class, "mfrm_diagnostics")
+  diag_full_bundle <- build_summary_table_bundle(diag)
+  expect_true("precision_review" %in% names(diag_full_bundle$tables))
+  expect_false("precision_audit" %in% names(diag_full_bundle$tables))
+  expect_false(any(as.character(diag_full_bundle$table_index$Role) == "precision_audit"))
+
+  pf <- compute_person_fit_indices(diag, fit = fit)
+  pf_summary <- summary(pf, top_n = 5)
+  expect_s3_class(pf_summary, "summary.mfrm_person_fit_indices")
+  pf_bundle <- build_summary_table_bundle(pf)
+  expect_s3_class(pf_bundle, "mfrm_summary_table_bundle")
+  expect_identical(pf_bundle$source_class, "mfrm_person_fit_indices")
+  expect_identical(pf_bundle$summary_class, "summary.mfrm_person_fit_indices")
+  expect_true(all(c("overview", "status_summary", "top_review", "thresholds") %in%
+                    names(pf_bundle$tables)))
+  expect_true(any(as.character(pf_bundle$table_index$Role) == "extreme_fit_rows"))
 
   ds_bundle <- build_summary_table_bundle(summary(ds))
   expect_identical(ds_bundle$source_class, "summary.mfrm_data_description")
   expect_true(all(c("overview", "missing", "score_distribution") %in% names(ds_bundle$tables)))
 
   chk_bundle <- build_summary_table_bundle(chk)
-  expect_true(all(c("overview", "section_summary", "action_items") %in% names(chk_bundle$tables)))
+  expect_true(all(c("overview", "section_summary", "facets_positioning", "action_items") %in%
+                    names(chk_bundle$tables)))
+  expect_identical(
+    as.character(chk_bundle$table_index$Role[chk_bundle$table_index$Table == "facets_positioning"]),
+    "facets_relationship_wording"
+  )
+  chk_bundle_summary <- summary(chk_bundle)
+  chk_facets_row <- chk_bundle_summary$table_catalog[
+    chk_bundle_summary$table_catalog$Table == "facets_positioning",
+    ,
+    drop = FALSE
+  ]
+  expect_identical(as.character(chk_facets_row$AppendixSection[1]), "methods")
+  expect_true(isTRUE(chk_facets_row$RecommendedAppendix[1]))
+  expect_true(isTRUE(chk_facets_row$CompactAppendix[1]))
 
   apa_bundle <- build_summary_table_bundle(apa, which = c("overview", "components", "preview"))
   expect_identical(names(apa_bundle$tables), c("overview", "components", "preview"))
-  expect_summary_bundle_roles_registered(fit_bundle, diag_bundle, ds_bundle, chk_bundle, apa_bundle)
+  expect_summary_bundle_roles_registered(fit_bundle, diag_bundle, pf_bundle, ds_bundle, chk_bundle, apa_bundle)
 })
 
 test_that("build_summary_table_bundle carries fit and score-support caveats", {
@@ -535,9 +592,9 @@ test_that("build_summary_table_bundle supports workflow, bias, anchor, linking, 
   expect_identical(bias_bundle$summary_class, "summary.mfrm_bias")
   expect_true(all(c("overview", "chi_sq", "top_rows", "notes") %in% names(bias_bundle$tables)))
 
-  audit_bundle <- build_summary_table_bundle(summary_table_bundle_workflow_fixture$audit)
-  expect_identical(audit_bundle$source_class, "mfrm_anchor_audit")
-  expect_identical(audit_bundle$summary_class, "summary.mfrm_anchor_audit")
+  audit_bundle <- build_summary_table_bundle(summary_table_bundle_workflow_fixture$row_review)
+  expect_identical(audit_bundle$source_class, "mfrm_anchor_review")
+  expect_identical(audit_bundle$summary_class, "summary.mfrm_anchor_review")
   expect_true(all(c(
     "overview",
     "issue_counts",
@@ -574,8 +631,8 @@ test_that("build_summary_table_bundle supports workflow, bias, anchor, linking, 
   ) %in% names(pv_bundle$tables)))
 
   weighting_bundle <- build_summary_table_bundle(summary_table_bundle_weighting_fixture)
-  expect_identical(weighting_bundle$source_class, "mfrm_weighting_audit")
-  expect_identical(weighting_bundle$summary_class, "summary.mfrm_weighting_audit")
+  expect_identical(weighting_bundle$source_class, "mfrm_weighting_review")
+  expect_identical(weighting_bundle$summary_class, "summary.mfrm_weighting_review")
   expect_true(all(c(
     "overview",
     "status",
@@ -767,6 +824,119 @@ test_that("build_summary_table_bundle supports planning and forecast summaries w
                     "future_branch_load_balance", "future_branch_coverage") %in%
                     names(pred_bundle$tables)))
   expect_summary_bundle_roles_registered(design_bundle, signal_bundle, pred_bundle)
+})
+
+test_that("build_summary_table_bundle supports recovery simulation and assessment summaries", {
+  rec <- structure(
+    list(
+      recovery = tibble::tibble(
+        rep = 1L,
+        ParameterType = "facet",
+        Facet = "Rater",
+        Level = "R1",
+        Truth = 0.1,
+        Estimate = 0.12,
+        EstimateAligned = 0.11,
+        ErrorAligned = 0.01
+      ),
+      recovery_summary = tibble::tibble(
+        ParameterType = "facet",
+        Facet = "Rater",
+        ComparisonScale = "logit",
+        Rows = 1L,
+        Reps = 1L,
+        Bias = 0.01,
+        RMSE = 0.01,
+        MAE = 0.01,
+        Coverage95 = 1,
+        McseBias = NA_real_,
+        McseRMSE = NA_real_
+      ),
+      rep_overview = tibble::tibble(
+        rep = 1L,
+        RunOK = TRUE,
+        Converged = TRUE,
+        RecoveryRows = 1L,
+        ElapsedSec = 0.2
+      ),
+      settings = list(reps = 1L, fit_method = "MML", model = "RSM"),
+      notes = "Use more replications before treating this as a final recovery study.",
+      ademp = list(
+        aims = "Assess parameter recovery under a fixed MFRM design.",
+        data_generating_mechanism = list(
+          model = "RSM",
+          assignment = "rotating",
+          step_facet = "Criterion"
+        ),
+        methods = list(fit_method = "MML", fitted_model = "RSM"),
+        estimands = "Facet location recovery",
+        performance_measures = c("Bias", "RMSE")
+      )
+    ),
+    class = "mfrm_recovery_simulation"
+  )
+
+  recovery_bundle <- build_summary_table_bundle(rec)
+  expect_identical(recovery_bundle$source_class, "mfrm_recovery_simulation")
+  expect_true(all(c("overview", "recovery_summary", "rep_overview", "ademp",
+                    "settings", "notes") %in% names(recovery_bundle$tables)))
+  expect_true("recovery_performance" %in% recovery_bundle$table_index$Role)
+
+  recovery_compact <- build_summary_table_bundle(rec, appendix_preset = "compact")
+  expect_true("recovery_summary" %in% names(recovery_compact$tables))
+  expect_false("settings" %in% names(recovery_compact$tables))
+
+  assessment <- structure(
+    list(
+      overview = tibble::tibble(
+        Reps = 1L,
+        SuccessfulRuns = 1L,
+        SuccessRate = 1,
+        ConvergedRuns = 1L,
+        ConvergenceRate = 1,
+        RecoveryRows = 1L,
+        RecoveryGroups = 1L,
+        OverallStatus = "review"
+      ),
+      checklist = tibble::tibble(
+        Section = "Run completion",
+        Item = "Replication count",
+        Status = "review",
+        Evidence = "1 replication; requested minimum is 30.",
+        NextAction = "Increase the replication count."
+      ),
+      metric_review = tibble::tibble(
+        ParameterType = "facet",
+        Facet = "Rater",
+        ComparisonScale = "logit",
+        RMSE = 0.01,
+        Bias = 0.01,
+        RMSEStatus = "ok",
+        BiasStatus = "ok",
+        CoverageStatus = "ok",
+        OverallStatus = "ok",
+        NextAction = "No immediate action."
+      ),
+      next_actions = "Increase the replication count.",
+      thresholds = list(min_reps = 30L, max_rmse = c(default = 0.5)),
+      notes = "RMSE and bias statuses depend on supplied practical thresholds.",
+      source = rec,
+      digits = 3L
+    ),
+    class = "mfrm_recovery_assessment"
+  )
+
+  assessment_bundle <- build_summary_table_bundle(assessment)
+  expect_identical(assessment_bundle$source_class, "mfrm_recovery_assessment")
+  expect_true(all(c("overview", "checklist", "metric_review", "next_actions",
+                    "thresholds", "notes") %in% names(assessment_bundle$tables)))
+
+  assessment_diag <- build_summary_table_bundle(summary(assessment),
+                                                appendix_preset = "diagnostics")
+  expect_true(all(c("overview", "checklist", "metric_review") %in%
+                    names(assessment_diag$tables)))
+  expect_summary_bundle_roles_registered(recovery_bundle, recovery_compact,
+                                         assessment_bundle, assessment_diag)
 })
 
 test_that("build_summary_table_bundle supports future arbitrary-facet active-branch inputs", {
@@ -983,7 +1153,7 @@ test_that("apa_table consumes workflow, bias, anchor, and prediction summaries d
   expect_identical(bias_tbl$which, "top_rows")
   expect_true(nrow(bias_tbl$table) > 0L)
 
-  anchor_tbl <- apa_table(summary(summary_table_bundle_workflow_fixture$audit), which = "facet_summary")
+  anchor_tbl <- apa_table(summary(summary_table_bundle_workflow_fixture$row_review), which = "facet_summary")
   expect_s3_class(anchor_tbl, "apa_table")
   expect_identical(anchor_tbl$which, "facet_summary")
   expect_true(nrow(anchor_tbl$table) > 0L)
