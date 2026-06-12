@@ -1,5 +1,5 @@
 # test-reporting-gaps.R
-# Targeted tests for uncovered branches in reporting.R and facets_mode files.
+# Regression tests for less-traveled branches in reporting.R and facets_mode files.
 
 # ---- py_style_format fallback (line 20) ----
 

@@ -63,6 +63,7 @@ An object of class \code{mfrm_dff} (with compatibility class \code{mfrm_dif}) wi
 \item \code{cell_table}: (residual method) per-cell detail table.
 \item \code{summary}: counts by screening or ETS classification.
 \item \code{group_fits}: (refit method) per-group facet estimates.
+\item \code{gpcm_boundary}: for bounded \code{GPCM} fits, a capability-boundary table.
 \item \code{config}: list with facet, group, method, min_obs, p_adjust settings.
 }
 }
@@ -156,7 +157,18 @@ category plus linked-screening and insufficient-linking rows
 (\code{method = "refit"}).
 \item \verb{$group_fits}: (refit method only) list of per-group facet estimates and
 subgroup linking diagnostics.
+\item \verb{$gpcm_boundary}: for bounded \code{GPCM} fits, a capability-boundary table
+marking the DFF/DIF output as caveated screening evidence.
 }
+}
+
+\section{GPCM boundary}{
+
+For bounded \code{GPCM}, DFF/DIF rows are available as slope-aware screening
+evidence over the fitted expected-score and residual scale. Keep
+residual-method contrasts and interaction cells in screening language.
+Refit contrasts require explicit subgroup linking and precision support
+before stronger subgroup-comparison language is used.
 }
 
 \section{Typical workflow}{

@@ -47,7 +47,8 @@ bias bundles.}
 \code{build_summary_table_bundle()}, or a named list of such objects. When
 \code{NULL} and \code{"summary_tables"} is requested in \code{include}, a default set is
 built from \code{fit}, \code{diagnostics}, \code{\link[=reporting_checklist]{reporting_checklist()}}, and
-\code{\link[=build_apa_outputs]{build_apa_outputs()}}.}
+\code{\link[=build_apa_outputs]{build_apa_outputs()}}. Recovery-validation summaries can be supplied here
+to co-locate release-review appendix tables with a fit-based export bundle.}
 
 \item{output_dir}{Directory where files will be written.}
 
@@ -150,16 +151,18 @@ from scenario-level population predictions are not flattened into
 \verb{*_population_prediction_settings.csv} or ADeMP CSVs; the compact simulation
 specification files carry the replay-relevant settings instead.
 
-This fit-based exporter is intentionally unavailable for bounded \code{GPCM},
-because the current bundle surface would otherwise depend on blocked
-narrative/QC/export semantics from the free-discrimination branch. Use
-\code{\link[=export_summary_appendix]{export_summary_appendix()}} for documented direct \code{GPCM} outputs.
+For bounded \code{GPCM}, this exporter is available as a caveated partial bundle
+over supported diagnostics, report text, visual summaries, manifests, and
+replay scripts. The returned object and manifest include \code{gpcm_boundary}.
+Package-native bounded-\code{GPCM} scorefile export is available with caveats,
+while full FACETS-style score-side contract review and design forecasting
+remain outside this bundle contract.
 }
 
 \section{Interpreting output}{
 
 The returned object reports both high-level bundle status and the exact files
-written. In practice, \code{bundle$summary} is the quickest sanity check, while
+written. In practice, \code{bundle$summary} is the direct status check, while
 \code{bundle$written_files} is the file inventory to inspect or hand off to other
 tools.
 }

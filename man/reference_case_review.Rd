@@ -61,7 +61,7 @@ inspect the compatibility layer.
 \item \code{overall}: one-row review summary with schema coverage and metric
 pass rate.
 \item \code{component_summary}: per-component coverage summary.
-\item \code{attention_items}: quickest list of components needing review.
+\item \code{attention_items}: direct list of components needing review.
 \item \code{metric_summary} / \code{metric_checks}: numerical consistency status.
 }
 }

@@ -1,5 +1,5 @@
 # test-coverage-push-95.R
-# Targeted tests for remaining uncovered draw paths, error guards, and edge cases.
+# Regression tests for draw paths, error guards, and edge cases.
 
 with_null_device <- function(expr) {
   grDevices::pdf(NULL)
@@ -661,7 +661,7 @@ test_that("summary.mfrm_anchor_review exercises issue count and recommendation b
   expect_true(any(grepl("Review", out)))
 })
 
-# ==== Additional type-check errors for remaining uncovered stop() lines ====
+# ==== Additional type-check error guards ====
 
 test_that("make_anchor_table rejects non-mfrm_fit", {
   expect_error(make_anchor_table(list()), "mfrm_fit")

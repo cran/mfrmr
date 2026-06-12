@@ -9,15 +9,16 @@
 #' @useDynLib mfrmr, .registration = TRUE
 #'
 #' @details
-#' If you are new to the package, read the next four steps first and ignore the
-#' longer `GPCM`, simulation, and planning notes until the basic route works:
+#' Start with the following core workflow before branching into the longer
+#' `GPCM`, simulation, and planning notes:
 #'
 #' 1. Fit with [fit_mfrm()] using `method = "MML"`
 #' 2. For `RSM` / `PCM`, run [diagnose_mfrm()] with
 #'    `diagnostic_mode = "both"`; for bounded `GPCM`, use the direct
 #'    diagnostic route and read [gpcm_capability_matrix()]
-#' 3. Read `summary(fit)` and `summary(diag)` before branching
-#' 4. Use [plot_qc_dashboard()] and [reporting_checklist()] as the first visual
+#' 3. Build a comprehensive first screen with [mfrm_results()]
+#' 4. Read `summary(fit)`, `summary(diag)`, and `summary(res)` before branching
+#' 5. Use [plot_qc_dashboard()] and [reporting_checklist()] as the first visual
 #'    and reporting screens
 #'
 #' Recommended workflow:
@@ -41,6 +42,7 @@
 #'    after the basic `RSM` / `PCM` route is working cleanly.
 #'
 #' Guide pages:
+#' - [mfrmr_output_guide()] for the compact purpose-to-helper map
 #' - [mfrmr_workflow_methods]
 #' - [mfrmr_visual_diagnostics]
 #' - [mfrmr_reports_and_tables]
@@ -68,13 +70,15 @@
 #' 1. [fit_mfrm()] with `method = "MML"`
 #' 2. [diagnose_mfrm()] with `diagnostic_mode = "both"` for `RSM` / `PCM`;
 #'    for bounded `GPCM`, keep diagnostics on the direct exploratory route
-#' 3. `summary(fit)` and `summary(diag)`
-#' 4. [plot_qc_dashboard()] for first-pass triage
-#' 5. Choose the next branch:
+#' 3. [mfrm_results()] for a FACETS-style first screen
+#' 4. `summary(fit)`, `summary(diag)`, and `summary(res)`
+#' 5. [plot_qc_dashboard()] for first-pass triage
+#' 6. Choose the next branch:
 #'    [reporting_checklist()] for reporting,
 #'    [build_weighting_review()] for Rasch-versus-`GPCM` weighting review,
 #'    [build_misfit_casebook()] for operational case review, or
-#'    [build_linking_review()] for `RSM` / `PCM` operational linking review
+#'    [build_linking_review()] for operational linking review (`RSM` / `PCM`)
+#'    or caveated bounded-`GPCM` linking synthesis
 #'
 #' @section Advanced scope:
 #' After the basic route above:
@@ -93,9 +97,12 @@
 #'   [extract_mfrm_sim_spec()], and [simulate_mfrm_data()] is available when
 #'   the specification carries both thresholds and slopes
 #' - slope-aware [fair_average_table()] and [estimate_bias()] are available for
-#'   bounded `GPCM` with explicit caveats; the APA writer, QC pass/fail,
-#'   fit-based export/replay, score-side FACETS compatibility, and broader
-#'   planning semantics remain validated for `RSM` / `PCM`
+#'   bounded `GPCM` with explicit caveats; [build_apa_outputs()],
+#'   [build_visual_summaries()], [run_qc_pipeline()],
+#'   [build_mfrm_manifest()], [build_mfrm_replay_script()], and
+#'   [export_mfrm_bundle()] are available as caveated partial reporting/export
+#'   surfaces; score-side FACETS compatibility and broader planning semantics
+#'   remain validated for `RSM` / `PCM`
 #' - `predict_mfrm_population()` remains a scenario-level forecast helper and
 #'   should not be described as the latent-regression estimator itself
 #' - the current simulation/planning layer remains role-based for two
@@ -124,6 +131,12 @@
 #' they do not create a free-form facet-weighting scheme and do not alter the
 #' fixed-discrimination meaning of `RSM` / `PCM`.
 #'
+#' Public entry map:
+#' - First-screen results: [mfrm_results()], `summary(res)$next_actions`,
+#'   and `mfrmr_output_guide("entry")`
+#' - Interactive exploration: [mfrm_results_interactive()] only when prompts
+#'   are explicitly wanted at the console
+#'
 #' Function families:
 #' - Model fitting: [fit_mfrm()], [summary.mfrm_fit()], [plot.mfrm_fit()]
 #' - Legacy-compatible workflow wrapper: [run_mfrm_facets()], [mfrmRFacets()]
@@ -144,10 +157,11 @@
 #'   model when scored units also provide one-row-per-person background data,
 #'   and `JML` fits through a post hoc reference-prior EAP layer;
 #'   fit-derived simulation specifications also support direct bounded
-#'   `GPCM` data generation and recovery checks, while planning/forecasting
-#'   helpers remain restricted to `RSM` / `PCM`; curve reports, graph-only
-#'   exports, fair-average tables, and bias screening are also available for
-#'   bounded `GPCM` with documented caveats)
+#'   `GPCM` data generation, recovery checks, role-based design evaluation,
+#'   population forecasting, diagnostic-screening, and signal-detection
+#'   helpers with documented caveats; curve reports, graph-only exports,
+#'   fair-average tables, and bias screening are also available for bounded
+#'   `GPCM` with documented caveats)
 #' - Reporting: [build_apa_outputs()], [build_visual_summaries()],
 #'   [reporting_checklist()], [apa_table()] for the full `RSM` / `PCM` route;
 #'   bounded `GPCM` currently stays on the checklist / direct-table / direct-
@@ -248,9 +262,11 @@
 #'    graph-only [facets_output_file_bundle()], direct simulation-spec
 #'    generation/data generation, recovery checks, [fair_average_table()],
 #'    [estimate_bias()], and the residual-based table helpers with their
-#'    documented caveats. The APA writer, QC pass/fail pipeline, score-side
-#'    FACETS exports, fit-based export/replay, linking synthesis, and planning
-#'    semantics remain outside the bounded `GPCM` route. Use
+#'    documented caveats. Caveated APA/QC/export bundles and exploratory
+#'    linking review plus role-based design evaluation, population
+#'    forecasting, diagnostic-screening, and signal-detection helpers are
+#'    available, while full score-side FACETS review, posterior-predictive
+#'    checks, and heavy backends remain outside the bounded `GPCM` route. Use
 #'    [gpcm_capability_matrix()] as the formal boundary statement.
 #'
 #' @section Model formulation:
@@ -421,7 +437,22 @@
 #' Values near 0 indicate expected fit; \eqn{|\mathrm{ZSTD}| > 2} flags
 #' potential misfit at the 5\% level, and \eqn{|\mathrm{ZSTD}| > 3} at the
 #' 1\% level (Wright & Linacre, 1994; see also Wilson & Hilferty, 1931).
-#' ZSTD is reported alongside every Infit and Outfit value.
+#' ZSTD is reported alongside every Infit and Outfit value. ZSTD is
+#' withheld (`NA`) when the applicable df falls below 1, where the
+#' Wilson-Hilferty transformation is numerically unstable; FACETS/Winsteps
+#' under `WHEXACT` can continue with a linear approximation on such cells.
+#'
+#' **Residual basis under MML vs JMLE engines**
+#'
+#' For `method = "MML"` fits, the standardized residuals behind Infit,
+#' Outfit, and ZSTD are evaluated at EAP person measures, which are
+#' shrunken toward the population mean. JMLE engines such as FACETS
+#' evaluate the same formulas at unshrunken JMLE estimates, so MnSq and
+#' ZSTD values are not numerically interchangeable across the two residual
+#' bases, most visibly for extreme-scoring persons. Use `method = "JML"`
+#' when an external FACETS fit comparison requires a JMLE-style residual
+#' basis, and see [facets_fit_df_guide()] for the separate
+#' standardization-side df/ZSTD conventions.
 #'
 #' **PTMEA (Point-Measure Correlation)**
 #'
@@ -452,6 +483,23 @@
 #' `RealReliability` gives the conservative companion based on `RealSE`. For
 #' `MML`, these are anchored to observed-information `ModelSE`
 #' estimates for non-person facets; `JML` keeps them as exploratory summaries.
+#'
+#' For the person facet under `MML`, the same \eqn{G} and \eqn{R} formulas
+#' are applied to EAP person measures with posterior SDs in the error slot.
+#' EAP measures are shrunken, so their observed variance is already deflated
+#' (approximately the true variance times the reliability), and subtracting
+#' the mean posterior variance deflates it again. The reported MML person
+#' separation/reliability is therefore a conservative summary: it is
+#' systematically lower than the IRT empirical-reliability convention
+#' \eqn{\mathrm{Var}(\mathrm{EAP}) / (\mathrm{Var}(\mathrm{EAP}) +
+#' \overline{\mathrm{PSD}^2})} and is not numerically comparable to
+#' JMLE-based person separation reliability from FACETS. The gap is small
+#' when measurement is precise and grows as precision drops. Person rows can
+#' still carry the model-based precision tier because posterior SDs are
+#' model-based quantities; that tier describes the SE source, not FACETS
+#' comparability. Use `method = "JML"` when a FACETS-style person separation
+#' table is required, and treat MML person rows as conservative summaries.
+#'
 #' This is a Rasch/FACETS-style separation reliability on the fitted logit
 #' scale, not an intra-class correlation. Use [compute_facet_icc()] only when
 #' you want the complementary random-effects variance-share view on the

@@ -569,7 +569,93 @@ interpreting movement as rater drift.</li>
 a compact pairwise rater x rater agreement matrix; pass
 <code>metric = &quot;correlation&quot;</code> to colour by the Pearson-style
 <code>Corr</code> column instead of exact agreement.</li>
+<li><code>response_time_review(data, person, facets, time)</code>
+summarizes response-time metadata by person, facet, and score category.
+Pair it with <code>plot_response_time_review()</code> for distribution
+and grouped timing plots. This is a descriptive QC layer, not a joint
+speed-accuracy model.</li>
+<li><code>plot_shrinkage_funnel(fit_eb, show_ci = TRUE)</code> draws raw
+and empirical-Bayes shrunken facet estimates on the same row, with
+optional confidence whiskers for both estimates. Use this only after
+<code>apply_empirical_bayes_shrinkage()</code> or
+<code>fit_mfrm(..., facet_shrinkage = &quot;empirical_bayes&quot;)</code>.</li>
 </ul>
+<div id="response-time-qc-context" class="section level3">
+<h3>Response-time QC context</h3>
+<p>If your rating-event data include response times, review them
+separately from the MFRM likelihood. Rapid and slow response-time flags
+are descriptive quality-control prompts; they do not change measures and
+should not be treated as proof of disengagement, cheating, or
+speededness.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>toy_rt <span class="ot">&lt;-</span> toy</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>toy_rt<span class="sc">$</span>ResponseTime <span class="ot">&lt;-</span> <span class="dv">12</span> <span class="sc">+</span> (<span class="fu">seq_len</span>(<span class="fu">nrow</span>(toy_rt)) <span class="sc">%%</span> <span class="dv">7</span>) <span class="sc">+</span></span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>  <span class="fu">as.numeric</span>(toy_rt<span class="sc">$</span>Score)</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>toy_rt<span class="sc">$</span>ResponseTime[<span class="dv">1</span>] <span class="ot">&lt;-</span> <span class="dv">2</span></span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>toy_rt<span class="sc">$</span>ResponseTime[<span class="dv">2</span>] <span class="ot">&lt;-</span> <span class="dv">38</span></span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a></span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>rt <span class="ot">&lt;-</span> <span class="fu">response_time_review</span>(</span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>  toy_rt,</span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a>  <span class="at">time =</span> <span class="st">&quot;ResponseTime&quot;</span>,</span>
+<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a>  <span class="at">rapid_quantile =</span> <span class="fl">0.10</span>,</span>
+<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a>  <span class="at">slow_quantile =</span> <span class="fl">0.90</span></span>
+<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a>)</span>
+<span id="cb11-16"><a href="#cb11-16" tabindex="-1"></a></span>
+<span id="cb11-17"><a href="#cb11-17" tabindex="-1"></a><span class="fu">summary</span>(rt)</span>
+<span id="cb11-18"><a href="#cb11-18" tabindex="-1"></a><span class="fu">plot_response_time_review</span>(rt, <span class="at">type =</span> <span class="st">&quot;distribution&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span>
+<span id="cb11-19"><a href="#cb11-19" tabindex="-1"></a><span class="fu">plot_response_time_review</span>(rt, <span class="at">type =</span> <span class="st">&quot;person&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
+<p>Interpretation:</p>
+<ul>
+<li>Start with the distribution plot to see whether the rapid/slow
+thresholds are sensible for this administration.</li>
+<li>Inspect person and facet summaries for concentrated rapid or slow
+rates rather than isolated events.</li>
+<li>Keep timing flags separate from fit, bias, and validity claims
+unless the study design explicitly supports stronger speed-accuracy
+modeling.</li>
+</ul>
+</div>
+<div id="small-n-shrinkage-with-uncertainty" class="section level3">
+<h3>Small-N shrinkage with uncertainty</h3>
+<p>When a non-person facet has few levels or sparse observations, a
+large raw severity estimate can be a noisy estimate rather than a stable
+facet signal. The shrinkage funnel shows how far empirical-Bayes pooling
+moved each level toward the facet mean and whether the uncertainty
+remains wide after pooling.</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>fit_eb <span class="ot">&lt;-</span> <span class="fu">apply_empirical_bayes_shrinkage</span>(fit)</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a></span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>shrink <span class="ot">&lt;-</span> <span class="fu">plot_shrinkage_funnel</span>(</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>  fit_eb,</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>  <span class="at">show_ci =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>  <span class="at">ci_level =</span> <span class="fl">0.95</span>,</span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>,</span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>  <span class="at">draw =</span> <span class="cn">FALSE</span></span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>)</span>
+<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a></span>
+<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a><span class="fu">head</span>(shrink<span class="sc">$</span>data<span class="sc">$</span>table[, <span class="fu">c</span>(</span>
+<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a>  <span class="st">&quot;Facet&quot;</span>, <span class="st">&quot;Level&quot;</span>, <span class="st">&quot;RawEstimate&quot;</span>, <span class="st">&quot;RawCI_Lower&quot;</span>, <span class="st">&quot;RawCI_Upper&quot;</span>,</span>
+<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a>  <span class="st">&quot;ShrunkEstimate&quot;</span>, <span class="st">&quot;ShrunkCI_Lower&quot;</span>, <span class="st">&quot;ShrunkCI_Upper&quot;</span>,</span>
+<span id="cb12-14"><a href="#cb12-14" tabindex="-1"></a>  <span class="st">&quot;ShrinkageFactor&quot;</span></span>
+<span id="cb12-15"><a href="#cb12-15" tabindex="-1"></a>)])</span>
+<span id="cb12-16"><a href="#cb12-16" tabindex="-1"></a></span>
+<span id="cb12-17"><a href="#cb12-17" tabindex="-1"></a><span class="fu">plot_shrinkage_funnel</span>(</span>
+<span id="cb12-18"><a href="#cb12-18" tabindex="-1"></a>  fit_eb,</span>
+<span id="cb12-19"><a href="#cb12-19" tabindex="-1"></a>  <span class="at">show_ci =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb12-20"><a href="#cb12-20" tabindex="-1"></a>  <span class="at">ci_level =</span> <span class="fl">0.95</span>,</span>
+<span id="cb12-21"><a href="#cb12-21" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
+<span id="cb12-22"><a href="#cb12-22" tabindex="-1"></a>)</span></code></pre></div>
+<p>Interpretation:</p>
+<ul>
+<li>Long raw-to-shrunken segments identify levels most affected by the
+partial-pooling prior.</li>
+<li>Wide raw whiskers that narrow after pooling indicate estimation
+instability, not automatic rater-quality failure.</li>
+<li>Report the shrinkage method and keep this display separate from
+bias, fit, or validity claims.</li>
+</ul>
+</div>
 </div>
 <div id="recommended-sequence" class="section level2">
 <h2>Recommended sequence</h2>
@@ -587,6 +673,11 @@ interpretation.</li>
 <li><code>plot_residual_pca()</code>,
 <code>plot_bias_interaction()</code>, and
 <code>plot_information()</code> for deeper structural review.</li>
+<li><code>response_time_review()</code> and
+<code>plot_response_time_review()</code> when response-time metadata are
+available.</li>
+<li><code>plot_shrinkage_funnel(show_ci = TRUE)</code> when
+empirical-Bayes shrinkage was applied.</li>
 <li><code>plot_guttman_scalogram()</code>,
 <code>plot_residual_qq()</code>, <code>plot_rater_trajectory()</code>,
 and <code>plot_rater_agreement_heatmap()</code> as the teaching / drift
@@ -598,6 +689,7 @@ and <code>plot_rater_agreement_heatmap()</code> as the teaching / drift
 <ul>
 <li><code>help(&quot;mfrmr_visual_diagnostics&quot;, package = &quot;mfrmr&quot;)</code></li>
 <li><code>help(&quot;mfrmr_workflow_methods&quot;, package = &quot;mfrmr&quot;)</code></li>
+<li><code>mfrmr_interval_guide(&quot;shrinkage&quot;)</code></li>
 </ul>
 </div>
 

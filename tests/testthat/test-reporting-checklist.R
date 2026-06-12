@@ -75,6 +75,7 @@ test_that("reporting_checklist returns a bundle with checklist coverage tables",
   expect_true(any(chk$checklist$Item == "PCA of residuals"))
   expect_true(any(chk$checklist$Item == "Facet pairs tested"))
   expect_true(any(chk$checklist$Item == "QC / facet dashboard"))
+  expect_true(any(chk$checklist$Item == "Fit/separation reporting boundary"))
   expect_true(any(chk$checklist$Item == "Residual PCA visuals"))
   expect_true(any(chk$checklist$Item == "Connectivity / design-matrix visual"))
   expect_true(any(chk$checklist$Item == "Inter-rater / displacement visuals"))
@@ -88,6 +89,11 @@ test_that("reporting_checklist returns a bundle with checklist coverage tables",
   expect_false(chk$checklist$ReadyForAPA[chk$checklist$Item == "95% confidence intervals"][1])
   expect_false(chk$checklist$ReadyForAPA[chk$checklist$Item == "Separation / strata / reliability"][1])
   expect_false(chk$checklist$ReadyForAPA[chk$checklist$Item == "Strict marginal visuals"][1])
+  boundary_row <- chk$checklist[chk$checklist$Item == "Fit/separation reporting boundary", , drop = FALSE]
+  expect_true(boundary_row$Available[1])
+  expect_true(boundary_row$DraftReady[1])
+  expect_match(boundary_row$SourceComponent[1], "precision_review_report", fixed = TRUE)
+  expect_match(boundary_row$NextAction[1], "fit_separation_basis", fixed = TRUE)
   expect_true(any(nzchar(chk$checklist$NextAction)))
   visual_rows <- chk$checklist[chk$checklist$Section == "Visual Displays", , drop = FALSE]
   expect_true(all(nzchar(visual_rows$PlotHelper)))

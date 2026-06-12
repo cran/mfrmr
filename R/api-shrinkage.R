@@ -469,8 +469,53 @@ apply_empirical_bayes_shrinkage <- function(fit,
 
 #' @keywords internal
 #' @noRd
+.validate_shrinkage_ci_level <- function(ci_level) {
+  if (!is.numeric(ci_level) || length(ci_level) != 1L ||
+      !is.finite(ci_level) || ci_level <= 0 || ci_level >= 1) {
+    stop("`ci_level` must be a single number in (0, 1).", call. = FALSE)
+  }
+  as.numeric(ci_level)
+}
+
+#' @keywords internal
+#' @noRd
+.add_shrinkage_ci_columns <- function(tbl,
+                                      ci_level = 0.95,
+                                      raw_estimate_col = "Estimate",
+                                      raw_se_col = "SE",
+                                      raw_prefix = "",
+                                      shrunk_estimate_col = "ShrunkEstimate",
+                                      shrunk_se_col = "ShrunkSE",
+                                      shrunk_prefix = "Shrunk") {
+  ci_level <- .validate_shrinkage_ci_level(ci_level)
+  z_ci <- stats::qnorm(1 - (1 - ci_level) / 2)
+  raw_lower <- if (nzchar(raw_prefix)) paste0(raw_prefix, "CI_Lower") else "CI_Lower"
+  raw_upper <- if (nzchar(raw_prefix)) paste0(raw_prefix, "CI_Upper") else "CI_Upper"
+  shrunk_lower <- paste0(shrunk_prefix, "CI_Lower")
+  shrunk_upper <- paste0(shrunk_prefix, "CI_Upper")
+
+  raw_est <- if (raw_estimate_col %in% names(tbl)) suppressWarnings(as.numeric(tbl[[raw_estimate_col]])) else rep(NA_real_, nrow(tbl))
+  raw_se <- if (raw_se_col %in% names(tbl)) suppressWarnings(as.numeric(tbl[[raw_se_col]])) else rep(NA_real_, nrow(tbl))
+  shrunk_est <- if (shrunk_estimate_col %in% names(tbl)) suppressWarnings(as.numeric(tbl[[shrunk_estimate_col]])) else rep(NA_real_, nrow(tbl))
+  shrunk_se <- if (shrunk_se_col %in% names(tbl)) suppressWarnings(as.numeric(tbl[[shrunk_se_col]])) else rep(NA_real_, nrow(tbl))
+
+  tbl[[raw_lower]] <- ifelse(is.finite(raw_est) & is.finite(raw_se),
+                             raw_est - z_ci * raw_se, NA_real_)
+  tbl[[raw_upper]] <- ifelse(is.finite(raw_est) & is.finite(raw_se),
+                             raw_est + z_ci * raw_se, NA_real_)
+  tbl[[shrunk_lower]] <- ifelse(is.finite(shrunk_est) & is.finite(shrunk_se),
+                                shrunk_est - z_ci * shrunk_se, NA_real_)
+  tbl[[shrunk_upper]] <- ifelse(is.finite(shrunk_est) & is.finite(shrunk_se),
+                                shrunk_est + z_ci * shrunk_se, NA_real_)
+  tbl$CI_Level <- ci_level
+  tbl
+}
+
+#' @keywords internal
+#' @noRd
 .draw_shrinkage_plot <- function(data_list, style, title,
-                                  show_ci = FALSE) {
+                                  show_ci = FALSE,
+                                  ci_level = 0.95) {
   tbl <- data_list$table
   if (nrow(tbl) == 0L) {
     graphics::plot.new()
@@ -491,14 +536,18 @@ apply_empirical_bayes_shrinkage <- function(fit,
   se_vals <- c(tbl$SE, tbl$ShrunkSE)
   x_vals <- x_vals[is.finite(x_vals)]
   if (isTRUE(show_ci) && any(is.finite(se_vals))) {
-    x_vals <- c(x_vals, tbl$Estimate - 1.96 * tbl$SE,
-                tbl$Estimate + 1.96 * tbl$SE,
-                tbl$ShrunkEstimate - 1.96 * tbl$ShrunkSE,
-                tbl$ShrunkEstimate + 1.96 * tbl$ShrunkSE)
+    ci_level <- .validate_shrinkage_ci_level(ci_level)
+    z_ci <- stats::qnorm(1 - (1 - ci_level) / 2)
+    x_vals <- c(x_vals, tbl$Estimate - z_ci * tbl$SE,
+                tbl$Estimate + z_ci * tbl$SE,
+                tbl$ShrunkEstimate - z_ci * tbl$ShrunkSE,
+                tbl$ShrunkEstimate + z_ci * tbl$ShrunkSE)
     x_vals <- x_vals[is.finite(x_vals)]
   }
   if (length(x_vals) == 0L) x_vals <- c(-1, 1)
-  xlim <- range(x_vals, na.rm = TRUE) + c(-0.1, 0.1) * diff(range(x_vals, na.rm = TRUE))
+  xr <- range(x_vals, na.rm = TRUE)
+  if (diff(xr) == 0) xr <- xr + c(-0.5, 0.5)
+  xlim <- xr + c(-0.1, 0.1) * diff(xr)
 
   old_par <- graphics::par(no.readonly = TRUE)
   on.exit(graphics::par(old_par), add = TRUE)
@@ -540,20 +589,22 @@ apply_empirical_bayes_shrinkage <- function(fit,
     col = style$accent_tertiary, cex = 1.1
   )
 
-  # Optional 95% CI error bars for both.
+  # Optional CI error bars for both.
   if (isTRUE(show_ci)) {
+    ci_level <- .validate_shrinkage_ci_level(ci_level)
+    z_ci <- stats::qnorm(1 - (1 - ci_level) / 2)
     for (i in seq_len(nrow(tbl))) {
       if (is.finite(tbl$Estimate[i]) && is.finite(tbl$SE[i])) {
         graphics::segments(
-          x0 = tbl$Estimate[i] - 1.96 * tbl$SE[i], y0 = i - 0.12,
-          x1 = tbl$Estimate[i] + 1.96 * tbl$SE[i], y1 = i - 0.12,
+          x0 = tbl$Estimate[i] - z_ci * tbl$SE[i], y0 = i - 0.12,
+          x1 = tbl$Estimate[i] + z_ci * tbl$SE[i], y1 = i - 0.12,
           col = style$accent_primary
         )
       }
       if (is.finite(tbl$ShrunkEstimate[i]) && is.finite(tbl$ShrunkSE[i])) {
         graphics::segments(
-          x0 = tbl$ShrunkEstimate[i] - 1.96 * tbl$ShrunkSE[i], y0 = i + 0.12,
-          x1 = tbl$ShrunkEstimate[i] + 1.96 * tbl$ShrunkSE[i], y1 = i + 0.12,
+          x0 = tbl$ShrunkEstimate[i] - z_ci * tbl$ShrunkSE[i], y0 = i + 0.12,
+          x1 = tbl$ShrunkEstimate[i] + z_ci * tbl$ShrunkSE[i], y1 = i + 0.12,
           col = style$accent_tertiary
         )
       }
@@ -566,13 +617,25 @@ apply_empirical_bayes_shrinkage <- function(fit,
     graphics::abline(h = b + 0.5, lty = 3, col = style$grid)
   }
 
+  legend_labels <- c("Original", "Shrunk", "Shrinkage direction")
+  legend_pch <- c(16, 21, NA)
+  legend_lty <- c(NA, NA, 1)
+  legend_col <- c(style$accent_primary, style$accent_tertiary, style$neutral)
+  legend_bg <- c(NA, "white", NA)
+  if (isTRUE(show_ci)) {
+    legend_labels <- c(legend_labels, sprintf("%g%% CI", round(100 * ci_level)))
+    legend_pch <- c(legend_pch, NA)
+    legend_lty <- c(legend_lty, 1)
+    legend_col <- c(legend_col, style$accent_primary)
+    legend_bg <- c(legend_bg, NA)
+  }
   graphics::legend(
     "topright",
-    legend = c("Original", "Shrunk", "Shrinkage direction"),
-    pch = c(16, 21, NA),
-    lty = c(NA, NA, 1),
-    col = c(style$accent_primary, style$accent_tertiary, style$neutral),
-    pt.bg = c(NA, "white", NA),
+    legend = legend_labels,
+    pch = legend_pch,
+    lty = legend_lty,
+    col = legend_col,
+    pt.bg = legend_bg,
     bg = "white",
     cex = 0.85
   )

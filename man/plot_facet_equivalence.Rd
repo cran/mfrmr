@@ -91,3 +91,6 @@ c(pdat$facet, pdat$type)
 \seealso{
 \code{\link[=analyze_facet_equivalence]{analyze_facet_equivalence()}}
 }
+\concept{confidence intervals}
+\concept{facet equivalence}
+\concept{visual diagnostics}

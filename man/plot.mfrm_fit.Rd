@@ -97,8 +97,17 @@ the \code{mfrm_plot_data} contract, even when the plot is drawn
 immediately.
 
 \code{type = "wright"} shows persons, facet levels, and step thresholds on
-a shared logit scale. \code{type = "pathway"} shows expected score traces
-and dominant-category regions across theta. Its draw-free plot data also
+a shared logit scale. Estimates are plotted as fitted, so the sign
+convention follows the fit: higher person values indicate higher
+ability, and higher non-person facet values indicate greater
+severity/difficulty under the default negative facet orientation.
+Facets listed in \code{fit_mfrm(positive_facets = ...)} are reversed
+(higher values raise expected scores); state the active orientation in
+figure captions when reporting. \code{type = "pathway"} shows expected score
+traces and dominant-category regions across theta. This expected-score
+display is distinct from the Bond-and-Fox-style measure-versus-fit
+"pathway" bubble chart used around FACETS/Winsteps output; for that
+display, use \code{\link[=plot_bubble]{plot_bubble()}}. Its draw-free plot data also
 includes \code{pathway_long}, \code{pathway_annotations}, \code{fit_measures},
 \code{fit_status}, and \code{curve_fit_status}, so R users can rebuild the pathway
 map in ggplot2, plotly, or a report pipeline while keeping the same
@@ -187,3 +196,6 @@ if (interactive()) {
 \code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=plot_wright_unified]{plot_wright_unified()}}, \code{\link[=plot_bubble]{plot_bubble()}},
 \link{mfrmr_visual_diagnostics}
 }
+\concept{confidence intervals}
+\concept{shrinkage}
+\concept{visual diagnostics}

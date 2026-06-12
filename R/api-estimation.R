@@ -391,19 +391,22 @@
 #'   [displacement_table()], [measurable_summary_table()],
 #'   [rating_scale_table()], [facet_quality_dashboard()],
 #'   [reporting_checklist()], [category_structure_report()],
-#'   [category_curves_report()], and graph-only (not score-side)
-#'   [facets_output_file_bundle()] are available. Direct simulation
+#'   [category_curves_report()], and graph/scorefile
+#'   [facets_output_file_bundle()] routes are available with score-side
+#'   caveats. Direct simulation
 #'   specifications and data generation are also supported through
 #'   [build_mfrm_sim_spec()], [extract_mfrm_sim_spec()], and
 #'   [simulate_mfrm_data()] when the slope-aware generator contract is stored
 #'   explicitly; direct recovery checks are available through
 #'   [evaluate_mfrm_recovery()] and [assess_mfrm_recovery()]. Slope-aware
 #'   [fair_average_table()] and [estimate_bias()] are available with their
-#'   documented caveats. Planning/forecasting, FACETS-style scorefile exports,
-#'   the APA writer, QC pass/fail pipelines, and fit-based report/export
-#'   bundles should be treated as unsupported unless documented
-#'   otherwise. Use [gpcm_capability_matrix()] as the formal boundary statement
-#'   for the current `GPCM` scope.
+#'   documented caveats. Role-based design evaluation, population forecasting,
+#'   diagnostic-screening, and signal-detection helpers are available as
+#'   caveated sensitivity evidence. Full FACETS-style score-side contract
+#'   review, posterior predictive checks, and heavy backend routes should be
+#'   treated as unsupported unless documented otherwise. Use
+#'   [gpcm_capability_matrix()] as the formal boundary statement for the
+#'   current `GPCM` scope.
 #'
 #' Latent-regression status:
 #' - `population_formula = NULL` keeps the legacy unconditional `MML` / `JML`
@@ -428,8 +431,8 @@
 #'   fits (`population_formula = ~ 1`) can reconstruct that minimal person
 #'   table internally during scoring.
 #'
-#' @section Latent-regression quick start:
-#' For a first latent-regression run, keep the setup explicit:
+#' @section Latent-regression workflow:
+#' For an initial latent-regression run, keep the setup explicit:
 #' 1. Put response data in `data`, with one row per rating event.
 #' 2. Put background variables in `person_data`, with exactly one row per
 #'    person. The ID column must match `person`, or be supplied through
@@ -3076,6 +3079,17 @@ make_anchor_table <- function(fit,
 #' `fit_df_method = "both"` to review these two standardization conventions
 #' side by side without changing the primary `InfitZSTD` / `OutfitZSTD`
 #' columns.
+#'
+#' **Residual basis under MML.** For `method = "MML"` fits, residuals,
+#' MnSq, and ZSTD are computed at the EAP person measures from the
+#' marginal model. EAP measures are shrunken toward the population mean,
+#' so expected scores -- and therefore fit statistics -- differ
+#' systematically from JMLE-based engines such as FACETS, especially for
+#' persons with extreme raw scores. The df conventions above do not remove
+#' this difference: it is a residual-basis difference, not a
+#' standardization difference. Refit with `method = "JML"` when an
+#' external FACETS fit comparison requires a JMLE-style residual basis
+#' (see [facets_fit_review()]).
 #'
 #' **Misfit flagging guidelines (Bond & Fox, 2015):**
 #' - MnSq < 0.5: overfit (too predictable; may inflate reliability)

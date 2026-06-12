@@ -14,6 +14,35 @@ documentation_source_root <- function() {
                dir.exists(file.path(candidates, "vignettes"))][1]
 }
 
+test_that("high-level help pages expose searchable concepts", {
+  pkg_root <- documentation_source_root()
+  testthat::skip_if(is.na(pkg_root), "source documentation files are not available")
+  expected <- list(
+    "mfrmr_interval_guide.Rd" = c("confidence intervals", "uncertainty displays"),
+    "mfrmr_visual_diagnostics.Rd" = c("visual diagnostics", "confidence intervals"),
+    "visual_reporting_template.Rd" = c("visual diagnostics", "figure captions"),
+    "mfrmr_output_guide.Rd" = c("reporting workflow", "route selection"),
+    "gpcm_capability_matrix.Rd" = c("GPCM boundaries", "route selection"),
+    "fit_measures_table.Rd" = c("confidence intervals"),
+    "plot_fair_average.Rd" = c("confidence intervals"),
+    "plot_bias_interaction.Rd" = c("confidence intervals"),
+    "plot_wright_unified.Rd" = c("Wright maps"),
+    "plot.mfrm_fit.Rd" = c("shrinkage")
+  )
+  missing <- character(0)
+  for (rd in names(expected)) {
+    text <- paste(readLines(file.path(pkg_root, "man", rd), warn = FALSE),
+                  collapse = "\n")
+    for (concept in expected[[rd]]) {
+      tag <- paste0("\\concept{", concept, "}")
+      if (!grepl(tag, text, fixed = TRUE)) {
+        missing <- c(missing, paste(rd, concept, sep = ": "))
+      }
+    }
+  }
+  expect_identical(missing, character(0))
+})
+
 test_that("documentation keeps RSM/PCM and bounded GPCM wording separated", {
   pkg_root <- documentation_source_root()
   testthat::skip_if(is.na(pkg_root), "source documentation files are not available")
@@ -105,8 +134,7 @@ test_that("FACETS output-contract route avoids old equivalence terminology", {
     file.path(pkg_root, "NEWS.md"),
     list.files(file.path(pkg_root, "R"), pattern = "\\.R$", full.names = TRUE, recursive = TRUE),
     list.files(file.path(pkg_root, "man"), pattern = "\\.Rd$", full.names = TRUE, recursive = TRUE),
-    list.files(file.path(pkg_root, "inst", "references"), pattern = "\\.(md|csv)$", full.names = TRUE, recursive = TRUE),
-    list.files(file.path(pkg_root, "tests", "testthat"), pattern = "\\.R$", full.names = TRUE, recursive = TRUE)
+    list.files(file.path(pkg_root, "inst", "references"), pattern = "\\.(md|csv)$", full.names = TRUE, recursive = TRUE)
   )
   doc_files <- doc_files[file.exists(doc_files)]
   doc_files <- doc_files[basename(doc_files) != "test-documentation-terminology.R"]
@@ -140,59 +168,180 @@ test_that("release validation docs separate recovery decision from uncertainty s
 
   readme <- read_file("README.md")
   workflow <- read_file("vignettes/mfrmr-workflow.Rmd")
+  gpcm_vignette <- read_file("vignettes/mfrmr-gpcm-scope.Rmd")
   readme_flat <- gsub("\\s+", " ", readme)
   workflow_flat <- gsub("\\s+", " ", workflow)
 
   expect_true(grepl("topline_release_decision", readme, fixed = TRUE))
   expect_true(grepl("ReleaseRecoveryStatus", readme, fixed = TRUE))
+  expect_true(grepl("ExtendedSensitivityStatus", readme, fixed = TRUE))
   expect_true(grepl("summary(validation)", readme, fixed = TRUE))
+  expect_true(grepl("condition_review", readme, fixed = TRUE))
+  expect_true(grepl("condition_summary", readme, fixed = TRUE))
   expect_true(grepl("do not treat `OverallStatus = \"review\"` as a release-level", readme_flat, fixed = TRUE))
   expect_true(grepl("SE/coverage evidence is intentionally reported as a separate limitation", readme_flat, fixed = TRUE))
   expect_true(grepl("The recommended reading order is: `summary(recovery_review)`", readme_flat, fixed = TRUE))
+  expect_true(grepl("summary(recovery_review)$reading_order", readme, fixed = TRUE))
   expect_true(grepl("`reading_order` and `guidance` fields", readme_flat, fixed = TRUE))
 
+  expect_true(grepl("summary(recovery_review)$condition_review", workflow, fixed = TRUE))
+  expect_true(grepl("summary(recovery_review)$diagnostic_reporting_notes", workflow, fixed = TRUE))
+  expect_true(grepl("validation_summary$condition_reporting_notes", workflow, fixed = TRUE))
+  expect_true(grepl("summary(recovery_review)$reading_order", workflow, fixed = TRUE))
   expect_true(grepl("# summary(validation)", workflow, fixed = TRUE))
+  expect_true(grepl("validation_summary$reading_order", workflow, fixed = TRUE))
   expect_true(grepl("validation_summary$topline_release_decision", workflow, fixed = TRUE))
   expect_true(grepl("validation_summary$release_decision_table", workflow, fixed = TRUE))
+  expect_true(grepl("validation_summary$condition_summary", workflow, fixed = TRUE))
+  expect_true(grepl("validation_summary$diagnostic_reporting_notes", workflow, fixed = TRUE))
   expect_true(grepl("validation_summary$domain_decision_table", workflow, fixed = TRUE))
-  expect_true(grepl("OverallStatus = # \"review\" is not read as a recovery-metric failure", workflow_flat, fixed = TRUE))
+  expect_true(grepl("validation_bundle$tables$condition_summary", workflow, fixed = TRUE))
+  expect_true(grepl("validation_bundle$tables$condition_reporting_notes", workflow, fixed = TRUE))
+  expect_true(grepl("validation_bundle$tables$diagnostic_reporting_notes", workflow, fixed = TRUE))
+  expect_true(grepl("validation_bundle$tables$reading_order", workflow, fixed = TRUE))
+  expect_true(grepl("ExtendedSensitivityStatus reports non-core stress", workflow, fixed = TRUE))
+  expect_true(grepl("so OverallStatus = \"review\" is not", workflow, fixed = TRUE))
   expect_true(grepl("status_plot$data$section_status", workflow, fixed = TRUE))
   expect_true(grepl("metric_plot$data$guidance", workflow, fixed = TRUE))
+
+  expect_true(grepl("Source-grounded recovery interpretation", gpcm_vignette, fixed = TRUE))
+  expect_true(grepl("slope_regime", gpcm_vignette, fixed = TRUE))
+  expect_true(grepl("not literature-derived adequacy cut points", gpcm_vignette, fixed = TRUE))
+  expect_true(grepl("recovery_review$condition_review", gpcm_vignette, fixed = TRUE))
+  expect_true(grepl("recovery_review$condition_reporting_notes", gpcm_vignette, fixed = TRUE))
+  expect_true(grepl("summary(review_gpcm)$reading_order", gpcm_vignette, fixed = TRUE))
+  expect_true(grepl("ExtendedSensitivityStatus", gpcm_vignette, fixed = TRUE))
+  expect_true(grepl("diagnostic_reporting_notes", gpcm_vignette, fixed = TRUE))
+  expect_true(grepl("build_summary_table_bundle(validation_summary)", gpcm_vignette, fixed = TRUE))
+})
+
+test_that("GPCM source-grounding docs keep operational labels separate from literature", {
+  pkg_root <- documentation_source_root()
+  testthat::skip_if(is.na(pkg_root), "source documentation files are not available")
+  read_file <- function(path) paste(readLines(file.path(pkg_root, path), warn = FALSE), collapse = "\n")
+
+  readme <- read_file("README.md")
+  gpcm_vignette <- read_file("vignettes/mfrmr-gpcm-scope.Rmd")
+  sim_spec_help <- read_file("man/build_mfrm_sim_spec.Rd")
+  evidence_021 <- read_file("inst/validation/release-evidence-map-0.2.1.md")
+
+  combined <- paste(readme, gpcm_vignette, sim_spec_help, evidence_021, sep = "\n")
+  expect_true(grepl("Muraki (1992", combined, fixed = TRUE))
+  expect_true(grepl("Muraki (1993", combined, fixed = TRUE))
+  expect_true(grepl("Morris, White, and Crowther (2019", combined, fixed = TRUE))
+  expect_true(grepl("slope_regime", combined, fixed = TRUE))
+  expect_true(grepl("not psychometric fit or\nadequacy cut points", readme, fixed = TRUE) ||
+                grepl("not psychometric fit or adequacy cut points", gsub("\\s+", " ", readme), fixed = TRUE))
+  expect_true(grepl("not model-fit tests and\nthey are not literature-derived adequacy cut points", gpcm_vignette, fixed = TRUE) ||
+                grepl("not model-fit tests and they are not literature-derived adequacy cut points",
+                      gsub("\\s+", " ", gpcm_vignette), fixed = TRUE))
+  expect_true(grepl("Samejima (1974)", evidence_021, fixed = TRUE))
+  expect_true(grepl("do not add a\nSamejima normal-ogive or graded-response-model implementation", evidence_021, fixed = TRUE) ||
+                grepl("do not add a Samejima normal-ogive or graded-response-model implementation",
+                      gsub("\\s+", " ", evidence_021), fixed = TRUE))
+})
+
+test_that("fit and separation reporting docs keep diagnostics separate from validation gates", {
+  pkg_root <- documentation_source_root()
+  testthat::skip_if(is.na(pkg_root), "source documentation files are not available")
+  read_file <- function(path) paste(readLines(file.path(pkg_root, path), warn = FALSE), collapse = "\n")
+
+  readme <- read_file("README.md")
+  reporting_vignette <- read_file("vignettes/mfrmr-reporting-and-apa.Rmd")
+  precision_help <- read_file("man/precision_review_report.Rd")
+  evidence_021 <- read_file("inst/validation/release-evidence-map-0.2.1.md")
+  combined <- paste(readme, reporting_vignette, precision_help, evidence_021, sep = "\n")
+
+  expect_true(grepl("fit_separation_basis", combined, fixed = TRUE))
+  expect_true(grepl("diagnostic operating characteristics", combined, fixed = TRUE))
+  expect_true(grepl("diagnostic_only_not_release_gate", combined, fixed = TRUE))
+  expect_true(grepl("Wright and Linacre (1994)", evidence_021, fixed = TRUE))
+  expect_true(grepl("Linacre (2002)", evidence_021, fixed = TRUE))
+  expect_true(grepl("Wright and Masters (1982)", evidence_021, fixed = TRUE))
+  expect_true(grepl("not inter-rater agreement", combined, fixed = TRUE))
+  expect_true(grepl("should not be treated as automatic\nvalidation success criteria", readme, fixed = TRUE) ||
+                grepl("should not be treated as automatic validation success criteria",
+                      gsub("\\s+", " ", readme), fixed = TRUE))
+  expect_true(grepl("not standalone success criteria", precision_help, fixed = TRUE))
+  expect_true(grepl("ZSTD standardization", gsub("\\s+", " ", reporting_vignette), fixed = TRUE))
+})
+
+test_that("0.2.1 NEWS keeps public changes separate from validation internals", {
+  pkg_root <- documentation_source_root()
+  testthat::skip_if(is.na(pkg_root), "source documentation files are not available")
+
+  news_lines <- readLines(file.path(pkg_root, "NEWS.md"), warn = FALSE)
+  starts <- grep("^# mfrmr ", news_lines)
+  current <- starts[1]
+  next_heading <- starts[starts > current][1]
+  if (is.na(next_heading)) next_heading <- length(news_lines) + 1L
+  news_021 <- paste(news_lines[current:(next_heading - 1L)], collapse = "\n")
+
+  expect_true(grepl("condition_review", news_021, fixed = TRUE))
+  expect_true(grepl("slope_regime", news_021, fixed = TRUE))
+  expect_true(grepl("extended sensitivity evidence", news_021, fixed = TRUE))
+  expect_true(grepl("fit/separation operating characteristics", news_021, fixed = TRUE))
+  expect_true(grepl("`reading_order`", news_021, fixed = TRUE))
+  expect_false(grepl("inst/validation/release-evidence-map-0.2.1.md", news_021, fixed = TRUE))
+
+  internal_terms <- c(
+    "gpcm_high_dispersion_sparse",
+    "summary.mfrmr_recovery_validation",
+    "registered recovery-validation appendix roles",
+    "recovery_condition_review",
+    "recovery_uncertainty_review",
+    "ScoreLevelsObserved",
+    "ZeroScoreLevels",
+    "MinScoreCount",
+    "ADEMP method metadata",
+    "Regression tests cover"
+  )
+  hits <- internal_terms[vapply(internal_terms, grepl, logical(1),
+                                x = news_021, fixed = TRUE)]
+  expect_identical(
+    hits,
+    character(0),
+    info = "0.2.1 NEWS should summarize public-facing changes; implementation and fixture details belong in validation artifacts or tests."
+  )
 })
 
 test_that("release evidence map is source-grounded and user-facing", {
   pkg_root <- documentation_source_root()
   testthat::skip_if(is.na(pkg_root), "source documentation files are not available")
 
-  path <- file.path(pkg_root, "inst", "validation", "release-evidence-map-0.2.0.md")
-  checklist_path <- file.path(pkg_root, "inst", "validation", "release-evidence-checklist-0.2.0.csv")
+  path <- file.path(pkg_root, "inst", "validation", "release-evidence-map-0.2.1.md")
+  checklist_path <- file.path(pkg_root, "inst", "validation", "release-evidence-checklist-0.2.1.csv")
+  historical_path <- file.path(pkg_root, "inst", "validation", "release-evidence-map-0.2.0.md")
   external_path <- file.path(pkg_root, "inst", "validation", "external-parameter-recovery-simulation-0.2.0.md")
   external_helper_path <- file.path(pkg_root, "inst", "validation", "external-recovery-audit.R")
   expect_true(file.exists(path))
   expect_true(file.exists(checklist_path))
+  expect_true(file.exists(historical_path))
   expect_true(file.exists(external_path))
   expect_true(file.exists(external_helper_path))
   doc <- paste(readLines(path, warn = FALSE), collapse = "\n")
+  historical_doc <- paste(readLines(historical_path, warn = FALSE), collapse = "\n")
   external_doc <- paste(readLines(external_path, warn = FALSE), collapse = "\n")
   external_helper <- paste(readLines(external_helper_path, warn = FALSE), collapse = "\n")
   readme <- paste(readLines(file.path(pkg_root, "README.md"), warn = FALSE), collapse = "\n")
   checklist <- utils::read.csv(checklist_path, stringsAsFactors = FALSE)
 
-  expect_true(grepl("release-evidence-map-0.2.0.md", readme, fixed = TRUE))
-  expect_true(grepl("release-evidence-checklist-0.2.0.csv", readme, fixed = TRUE))
+  expect_true(grepl("release-evidence-map-0.2.1.md", readme, fixed = TRUE))
+  expect_true(grepl("release-evidence-checklist-0.2.1.csv", readme, fixed = TRUE))
   expect_true(grepl("external-parameter-recovery-simulation-0.2.0.md", readme, fixed = TRUE))
   expect_true(grepl("Andrich (1978)", doc, fixed = TRUE))
-  expect_true(grepl("Masters (1982)", doc, fixed = TRUE))
+  expect_true(grepl("Wright and Masters (1982)", doc, fixed = TRUE))
   expect_true(grepl("Muraki (1992)", doc, fixed = TRUE))
   expect_true(grepl("Morris, White, and Crowther (2019)", doc, fixed = TRUE))
-  expect_true(grepl("External common-data parameter-recovery evidence", doc, fixed = TRUE))
+  expect_true(grepl("Implementation boundary", doc, fixed = TRUE))
+  expect_true(grepl("0.2.1 checks added", doc, fixed = TRUE))
   expect_true(grepl("Parameter_Recovery_Simulation", external_doc, fixed = TRUE))
   expect_true(grepl("mfrmr_review_external_recovery_simulation", external_helper, fixed = TRUE))
   expect_true(grepl("Review limits", external_doc, fixed = TRUE))
-  expect_true(grepl("Decision rule", doc, fixed = TRUE))
-  expect_true(grepl("Scorecard template", doc, fixed = TRUE))
-  expect_true(grepl("Pre-release action plan for 0.2.0", doc, fixed = TRUE))
-  expect_true(grepl("Post-release roadmap", doc, fixed = TRUE))
+  expect_true(grepl("Decision rule", historical_doc, fixed = TRUE))
+  expect_true(grepl("Scorecard template", historical_doc, fixed = TRUE))
+  expect_true(grepl("Pre-release action plan for 0.2.0", historical_doc, fixed = TRUE))
+  expect_true(grepl("Post-release roadmap", historical_doc, fixed = TRUE))
   expect_true(all(c("Domain", "Item", "SourceBasis", "PackageSurface",
                     "RequiredEvidence", "ReleaseDecision", "UserImplication",
                     "FollowUp") %in% names(checklist)))
@@ -367,16 +516,15 @@ test_that("remaining audit wording in public docs is limited to source-path head
 
 test_that("FACETS-facing docs use output-contract wording consistently", {
   pkg_root <- normalizePath(test_path("..", ".."), winslash = "/", mustWork = TRUE)
-  doc_files <- list.files(
-    pkg_root,
-    pattern = "\\.(R|Rd|md|Rmd)$",
-    recursive = TRUE,
-    full.names = TRUE
+  doc_files <- c(
+    file.path(pkg_root, "README.md"),
+    list.files(file.path(pkg_root, "R"), pattern = "\\.R$", full.names = TRUE, recursive = TRUE),
+    list.files(file.path(pkg_root, "man"), pattern = "\\.Rd$", full.names = TRUE, recursive = TRUE),
+    list.files(file.path(pkg_root, "inst", "references"), pattern = "\\.(md|csv)$", full.names = TRUE, recursive = TRUE),
+    list.files(file.path(pkg_root, "vignettes"), pattern = "\\.Rmd$", full.names = TRUE, recursive = TRUE)
   )
-  doc_files <- doc_files[
-    grepl("^(R|man|README\\.md|inst/references|vignettes|tests/testthat)/", sub(paste0("^", pkg_root, "/?"), "", doc_files)) &
-      !grepl("tests/testthat/test-documentation-terminology\\.R$", doc_files)
-  ]
+  doc_files <- doc_files[file.exists(doc_files)]
+  doc_files <- doc_files[basename(doc_files) != "test-documentation-terminology.R"]
 
   old_contract <- paste0("compatibility", "[- ]contract")
   old_spec <- paste0("compatibility", " specification")

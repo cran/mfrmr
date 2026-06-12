@@ -9,7 +9,7 @@ plot_residual_matrix(
   diagnostics = NULL,
   facet = "Rater",
   top_n_persons = 40L,
-  preset = c("standard", "publication", "compact"),
+  preset = c("standard", "publication", "compact", "monochrome"),
   draw = TRUE
 )
 }

@@ -10,7 +10,7 @@ plot_guttman_scalogram(
   column_facet = NULL,
   top_n_persons = 40L,
   highlight_unexpected = TRUE,
-  preset = c("standard", "publication", "compact"),
+  preset = c("standard", "publication", "compact", "monochrome"),
   draw = TRUE
 )
 }

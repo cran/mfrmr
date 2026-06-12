@@ -8,7 +8,7 @@ plot_rater_trajectory(
   fits,
   facet = "Rater",
   ci_level = 0.95,
-  preset = c("standard", "publication", "compact"),
+  preset = c("standard", "publication", "compact", "monochrome"),
   draw = TRUE
 )
 }
@@ -74,3 +74,6 @@ head(p$data$data)
 \seealso{
 \code{\link[=plot_anchor_drift]{plot_anchor_drift()}}, \link{mfrmr_linking_and_dff}
 }
+\concept{confidence intervals}
+\concept{linking}
+\concept{visual diagnostics}

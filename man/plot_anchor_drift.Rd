@@ -9,7 +9,7 @@ plot_anchor_drift(
   type = c("drift", "chain", "heatmap", "forest"),
   facet = NULL,
   ci_level = 0.95,
-  preset = c("standard", "publication", "compact"),
+  preset = c("standard", "publication", "compact", "monochrome"),
   draw = TRUE,
   ...
 )
@@ -30,7 +30,7 @@ facets.}
 anchor-estimate whiskers (default \code{0.95}). Ignored for other
 plot types.}
 
-\item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, or \code{"compact"}).}
+\item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, \code{"compact"}, or \code{"monochrome"}).}
 
 \item{draw}{If \code{FALSE}, return the plot data invisibly without drawing.}
 
@@ -144,3 +144,6 @@ if (interactive()) {
 \code{\link[=detect_anchor_drift]{detect_anchor_drift()}}, \code{\link[=build_equating_chain]{build_equating_chain()}},
 \code{\link[=plot_dif_heatmap]{plot_dif_heatmap()}}, \code{\link[=plot_bubble]{plot_bubble()}}, \link{mfrmr_visual_diagnostics}
 }
+\concept{confidence intervals}
+\concept{linking}
+\concept{visual diagnostics}

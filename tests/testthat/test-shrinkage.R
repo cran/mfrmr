@@ -198,6 +198,16 @@ test_that("plot.mfrm_fit(type = 'shrinkage') returns a plot bundle", {
   expect_true(all(c("Facet", "Level", "Estimate", "ShrunkEstimate",
                     "ShrinkageFactor") %in% names(out$data$data)))
   expect_identical(out$data$mode, "empirical_bayes")
+
+  out_ci <- plot(fit, type = "shrinkage", show_ci = TRUE, ci_level = 0.90,
+                 draw = FALSE)
+  expect_s3_class(out_ci, "mfrm_plot_data")
+  expect_true(isTRUE(out_ci$data$show_ci))
+  expect_equal(out_ci$data$ci_level, 0.90)
+  expect_true(all(c("CI_Lower", "CI_Upper", "ShrunkCI_Lower",
+                    "ShrunkCI_Upper", "CI_Level")
+                  %in% names(out_ci$data$data)))
+  expect_true(all(out_ci$data$data$CI_Level == 0.90))
 })
 
 test_that("plot.mfrm_fit(type = 'shrinkage') gracefully renders with no shrinkage", {

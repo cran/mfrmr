@@ -1,5 +1,5 @@
-# Tests targeting uncovered line ranges in R/mfrm_core.R
-# Each test_that block documents which lines it targets.
+# Edge-path regression tests for R/mfrm_core.R internals.
+# Each test_that block documents the behavior it pins.
 
 with_null_device <- function(expr) {
   grDevices::pdf(NULL)
@@ -828,7 +828,7 @@ test_that("summarize_displacement_table handles missing Flag column", {
 
 # ===========================================================================
 # 36b. summarize_displacement_table: all-NA Displacement / DisplacementT
-# (regression test for commit 8806749 -- guards against the
+# (regression test: guards against the
 # `MaxAbsDisplacement = -Inf` warning when every flagged level has zero
 # information and Displacement is therefore NA upstream).
 # ===========================================================================
@@ -842,7 +842,7 @@ test_that("summarize_displacement_table returns NA, not -Inf, when all displacem
     AnchorType       = c("Anchor", "Free"),
     Flag             = c(TRUE, FALSE)
   )
-  # Before commit 8806749 this called `max(abs(NA), na.rm = TRUE)` which
+  # A previous implementation called `max(abs(NA), na.rm = TRUE)` which
   # returns -Inf and emits "no non-missing arguments to max; returning -Inf".
   result <- expect_no_warning(fn(tbl))
   expect_true(is.data.frame(result))

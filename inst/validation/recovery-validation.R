@@ -50,34 +50,38 @@ mfrmr_recovery_validation_case_plan <- function() {
       "rsm_equal_slope_location",
       "pcm_step_profiles",
       "gpcm_slope_profile",
+      "gpcm_high_dispersion_sparse",
       "rsm_latent_regression"
     ),
-    Tier = c("core", "core", "core", "extended"),
-    Model = c("RSM", "PCM", "GPCM", "RSM"),
-    Estimation = c("JML", "JML", "MML", "MML"),
-    StepFacet = c(NA, "Criterion", "Criterion", NA),
-    SlopeFacet = c(NA, NA, "Criterion", NA),
-    RecommendedReps = c(50L, 50L, 40L, 30L),
-    SmokeReps = c(2L, 2L, 1L, 1L),
-    Maxit = c(60L, 70L, 90L, 80L),
-    QuadPoints = c(NA_integer_, NA_integer_, 11L, 11L),
-    IncludePerson = c(TRUE, TRUE, FALSE, FALSE),
+    Tier = c("core", "core", "core", "extended", "extended"),
+    Model = c("RSM", "PCM", "GPCM", "GPCM", "RSM"),
+    Estimation = c("JML", "JML", "MML", "MML", "MML"),
+    StepFacet = c(NA, "Criterion", "Criterion", "Criterion", NA),
+    SlopeFacet = c(NA, NA, "Criterion", "Criterion", NA),
+    RecommendedReps = c(50L, 50L, 40L, 30L, 30L),
+    SmokeReps = c(2L, 2L, 1L, 1L, 1L),
+    Maxit = c(60L, 70L, 90L, 100L, 80L),
+    QuadPoints = c(NA_integer_, NA_integer_, 11L, 11L, 11L),
+    IncludePerson = c(TRUE, TRUE, FALSE, FALSE, FALSE),
     Purpose = c(
       "Equal-slope location and common-step recovery under the baseline ordered MFRM route.",
       "Step-facet-specific threshold recovery under the partial-credit route.",
       "Bounded GPCM relative-discrimination and threshold recovery on the identified log-slope scale.",
+      "High-dispersion bounded GPCM recovery under intentionally sparse score-category stress.",
       "Latent-regression coefficient and variance recovery under the MML population branch."
     ),
     PrimaryRisk = c(
       "Location indeterminacy or step-centering mistakes.",
       "Mixing common-step and step-facet threshold contracts.",
       "Comparing unnormalized generator slopes with identified fitted slopes.",
+      "Misreading sparse generated categories as a generic slope-recovery failure.",
       "Treating population recovery as a design-forecasting claim."
     ),
     SummaryFocus = c(
       "facet, person, and step RMSE/Bias after location alignment",
       "step-profile RMSE/Bias and facet recovery",
       "identified log-slope RMSE/Bias plus GPCM step recovery",
+      "condition_review score support plus high-dispersion log-slope recovery",
       "population coefficient and variance recovery"
     ),
     stringsAsFactors = FALSE
@@ -125,6 +129,33 @@ mfrmr_recovery_validation_fun <- function(name) {
   getExportedValue("mfrmr", name)
 }
 
+mfrmr_recovery_validation_slope_regime <- function(slope_table,
+                                                  near_flat_log = log(1.05),
+                                                  high_dispersion_log = log(1.50)) {
+  if (!is.data.frame(slope_table) || nrow(slope_table) == 0L ||
+      !"Estimate" %in% names(slope_table)) {
+    return(NA_character_)
+  }
+  slopes <- suppressWarnings(as.numeric(slope_table$Estimate))
+  slopes <- slopes[is.finite(slopes) & slopes > 0]
+  if (length(slopes) == 0L) return(NA_character_)
+  log_slopes <- log(slopes) - mean(log(slopes))
+  max_abs_log <- max(abs(log_slopes), na.rm = TRUE)
+  if (!is.finite(max_abs_log)) return(NA_character_)
+  if (max_abs_log <= sqrt(.Machine$double.eps)) return("unit_slopes")
+  if (max_abs_log <= near_flat_log) return("near_flat")
+  if (max_abs_log <= high_dispersion_log) return("moderate")
+  "high_dispersion"
+}
+
+mfrmr_recovery_validation_finalize_spec <- function(spec) {
+  if (is.list(spec) && identical(as.character(spec$model %||% NA_character_)[1], "GPCM") &&
+      (is.null(spec$slope_regime) || is.na(spec$slope_regime) || !nzchar(spec$slope_regime))) {
+    spec$slope_regime <- mfrmr_recovery_validation_slope_regime(spec$slope_table)
+  }
+  spec
+}
+
 mfrmr_recovery_validation_spec <- function(case_id) {
   if (!requireNamespace("mfrmr", quietly = TRUE)) {
     stop("The `mfrmr` package must be available before running validation.", call. = FALSE)
@@ -132,7 +163,7 @@ mfrmr_recovery_validation_spec <- function(case_id) {
   case_id <- as.character(case_id[1])
   build_spec <- mfrmr_recovery_validation_fun("build_mfrm_sim_spec")
 
-  switch(
+  spec <- switch(
     case_id,
     rsm_equal_slope_location = build_spec(
       n_person = 60,
@@ -175,7 +206,28 @@ mfrmr_recovery_validation_spec <- function(case_id) {
         levels = sprintf("C%02d", 1:3),
         offsets = c(-0.25, 0.00, 0.25)
       ),
-      slopes = c(C01 = 0.70, C02 = 1.00, C03 = 1.45)
+      slopes = c(C01 = 0.70, C02 = 1.00, C03 = 1 / 0.70)
+    ),
+    gpcm_high_dispersion_sparse = build_spec(
+      n_person = 20,
+      n_rater = 2,
+      n_criterion = 2,
+      raters_per_person = 2,
+      score_levels = 5,
+      theta_sd = 0.80,
+      rater_sd = 0.25,
+      criterion_sd = 0.20,
+      model = "GPCM",
+      step_facet = "Criterion",
+      slope_facet = "Criterion",
+      assignment = "crossed",
+      thresholds = mfrmr_recovery_validation_threshold_table(
+        levels = sprintf("C%02d", 1:2),
+        score_levels = 5,
+        base = seq(-2.4, 2.4, length.out = 4L),
+        offsets = c(-0.35, 0.35)
+      ),
+      slopes = c(C01 = 0.45, C02 = 1 / 0.45)
     ),
     rsm_latent_regression = build_spec(
       n_person = 70,
@@ -192,6 +244,7 @@ mfrmr_recovery_validation_spec <- function(case_id) {
     ),
     stop("Unknown recovery-validation case: ", case_id, call. = FALSE)
   )
+  mfrmr_recovery_validation_finalize_spec(spec)
 }
 
 mfrmr_recovery_validation_case_thresholds <- function(case_id) {
@@ -210,6 +263,11 @@ mfrmr_recovery_validation_case_thresholds <- function(case_id) {
     gpcm_slope_profile = list(
       max_rmse = c(slope = 0.40, facet = 0.90, step = 1.05, default = 1.35),
       max_abs_bias = c(slope = 0.25, default = 0.70),
+      min_se_available = NULL
+    ),
+    gpcm_high_dispersion_sparse = list(
+      max_rmse = c(slope = 0.65, facet = 1.10, step = 1.35, default = 1.50),
+      max_abs_bias = c(slope = 0.45, default = 0.90),
       min_se_available = NULL
     ),
     rsm_latent_regression = list(
@@ -279,6 +337,8 @@ mfrmr_run_recovery_validation <- function(case_ids = NULL,
         maxit = case$Maxit,
         quad_points = if (is.na(case$QuadPoints)) 7L else case$QuadPoints,
         include_person = isTRUE(case$IncludePerson),
+        include_diagnostics = TRUE,
+        diagnostic_fit_df_method = "both",
         seed = case_seed
       ),
       error = function(e) e
@@ -330,7 +390,7 @@ mfrmr_run_recovery_validation <- function(case_ids = NULL,
 }
 
 mfrmr_recovery_validation_status_rank <- function(x) {
-  ranks <- c(ok = 1L, not_assessed = 2L, not_available = 2L,
+  ranks <- c(ok = 1L, available = 1L, not_assessed = 2L, not_available = 2L,
              review = 3L, concern = 4L, fail = 4L)
   out <- unname(ranks[as.character(x)])
   out[is.na(out)] <- 0L
@@ -349,7 +409,9 @@ mfrmr_recovery_validation_compact_status <- function(status,
   if (any(status %in% unavailable_values)) {
     if (identical(unavailable, "review")) return("review")
     if (all(status %in% unavailable_values)) return("not_available")
+    if (any(status == "available")) return("available")
   }
+  if (all(status == "available")) return("available")
   "ok"
 }
 
@@ -430,6 +492,9 @@ mfrmr_recovery_validation_uncertainty_limitation <- function(uncertainty_status)
 mfrmr_recovery_validation_add_release_status <- function(case_summary) {
   case_summary <- as.data.frame(case_summary, stringsAsFactors = FALSE)
   if (nrow(case_summary) == 0L) return(case_summary)
+  if (!"DiagnosticStatus" %in% names(case_summary)) {
+    case_summary$DiagnosticStatus <- "not_available"
+  }
   release_status <- vapply(seq_len(nrow(case_summary)), function(i) {
     mfrmr_recovery_validation_release_status(
       recovery_metric_status = case_summary$RecoveryMetricStatus[i],
@@ -456,6 +521,11 @@ mfrmr_recovery_validation_add_release_status <- function(case_summary) {
     RecoveryMetricStatus = case_summary$RecoveryMetricStatus,
     MonteCarloStatus = case_summary$MonteCarloStatus,
     UncertaintyStatus = case_summary$UncertaintyStatus,
+    DiagnosticStatus = case_summary$DiagnosticStatus,
+    GPCMSlopeRegime = case_summary$GPCMSlopeRegime,
+    ScoreSupportStatus = case_summary$ScoreSupportStatus,
+    MinScoreCount = case_summary$MinScoreCount,
+    MaxZeroScoreLevels = case_summary$MaxZeroScoreLevels,
     OverallStatus = case_summary$OverallStatus,
     ConcernMetrics = case_summary$ConcernMetrics,
     ReviewMetrics = case_summary$ReviewMetrics,
@@ -475,33 +545,61 @@ mfrmr_recovery_validation_release_decision <- function(case_summary) {
   if (nrow(case_summary) == 0L) {
     return(data.frame(
       Cases = 0L,
+      CoreCases = 0L,
+      ExtendedCases = 0L,
       ReleaseRecoveryStatus = "not_available",
+      IncludedCaseStatus = "not_available",
+      ExtendedSensitivityStatus = "not_available",
       CasesOK = 0L,
       CasesReview = 0L,
       CasesConcern = 0L,
       RecoveryMetricStatus = "not_available",
       MonteCarloStatus = "not_available",
       UncertaintyStatus = "not_available",
+      DiagnosticStatus = "not_available",
       PrimaryDecisionBasis = "recovery metrics, convergence, and Monte Carlo precision",
       Conclusion = "No validation cases were summarized.",
       stringsAsFactors = FALSE
     ))
   }
   release_status <- as.character(case_summary$ReleaseRecoveryStatus %||% "not_available")
-  overall_release_status <- mfrmr_recovery_validation_compact_status(
+  is_core <- as.character(case_summary$Tier %||% "core") == "core"
+  core_status <- release_status[is_core]
+  if (length(core_status) == 0L) core_status <- release_status
+  sensitivity_status <- release_status[!is_core]
+  included_case_status <- mfrmr_recovery_validation_compact_status(
     release_status,
     unavailable = "review"
   )
+  overall_release_status <- mfrmr_recovery_validation_compact_status(
+    core_status,
+    unavailable = "review"
+  )
+  extended_sensitivity_status <- if (length(sensitivity_status) > 0L) {
+    mfrmr_recovery_validation_compact_status(sensitivity_status, unavailable = "review")
+  } else {
+    "not_available"
+  }
   conclusion <- switch(
     overall_release_status,
-    ok = "Release recovery evidence is supported for the summarized cases.",
-    review = "Release recovery evidence is partly supported, but at least one case needs review.",
-    concern = "Release recovery evidence is not yet sufficient for at least one summarized case.",
+    ok = "Core release recovery evidence is supported for the summarized core cases.",
+    review = "Core release recovery evidence is partly supported, but at least one core case needs review.",
+    concern = "Core release recovery evidence is not yet sufficient for at least one summarized core case.",
     "Release recovery evidence could not be summarized."
   )
+  if (length(sensitivity_status) > 0L && extended_sensitivity_status %in% c("review", "concern")) {
+    conclusion <- paste0(
+      conclusion,
+      " Extended sensitivity cases are reported separately and should not be read as core release blockers by themselves."
+    )
+  }
   data.frame(
     Cases = nrow(case_summary),
+    CoreCases = sum(is_core, na.rm = TRUE),
+    ExtendedCases = sum(!is_core, na.rm = TRUE),
     ReleaseRecoveryStatus = overall_release_status,
+    IncludedCaseStatus = included_case_status,
+    ExtendedSensitivityStatus = extended_sensitivity_status,
     CasesOK = sum(release_status == "ok", na.rm = TRUE),
     CasesReview = sum(release_status == "review", na.rm = TRUE),
     CasesConcern = sum(release_status == "concern", na.rm = TRUE),
@@ -517,10 +615,175 @@ mfrmr_recovery_validation_release_decision <- function(case_summary) {
       case_summary$UncertaintyStatus,
       unavailable = "review"
     ),
+    DiagnosticStatus = mfrmr_recovery_validation_compact_status(
+      case_summary$DiagnosticStatus,
+      unavailable = "ignore"
+    ),
     PrimaryDecisionBasis = "recovery metrics, convergence, and Monte Carlo precision",
     Conclusion = conclusion,
     stringsAsFactors = FALSE
   )
+}
+
+mfrmr_recovery_validation_reading_order <- function() {
+  data.frame(
+    Step = seq_len(6L),
+    Route = c(
+      "summary(validation)$topline_release_decision",
+      "summary(validation)$release_decision_table",
+      "summary(validation)$condition_reporting_notes, then summary(validation)$condition_summary",
+      "summary(validation)$diagnostic_reporting_notes, then summary(validation)$diagnostic_oc_summary",
+      "summary(validation)$domain_decision_table",
+      "mfrmr_summarize_recovery_validation(validation)$metric_summary"
+    ),
+    WhatToRead = c(
+      "Core release-recovery status, included-case status, and extended sensitivity status.",
+      "Case-level release decisions and uncertainty limitations.",
+      "Generator-condition caveats, then bounded-GPCM slope-regime and score-support evidence.",
+      "Reporting notes for fit/separation diagnostic signals, followed by the raw operating-characteristic summary.",
+      "Status split by recovery metrics, uncertainty, Monte Carlo precision, score support, and overall status.",
+      "Parameter-group recovery rows for cases that need follow-up."
+    ),
+    Purpose = c(
+      "Decide whether the validation result is release-ready or needs review.",
+      "Find which case is driving the top-line status.",
+      "Separate generator stress conditions and sparse score support from recovery performance.",
+      "Identify reporting caveats without turning fit or separation into release gates.",
+      "Identify whether a status is caused by metrics, uncertainty, precision, score support, or an overall summary.",
+      "Diagnose the specific parameter group before changing the validation case or thresholds."
+    ),
+    stringsAsFactors = FALSE
+  )
+}
+
+mfrmr_recovery_validation_diagnostic_reporting_notes <- function(diagnostic_oc_summary) {
+  empty <- data.frame(
+    CaseID = character(),
+    Tier = character(),
+    Model = character(),
+    Estimation = character(),
+    Facet = character(),
+    ReportingAttention = character(),
+    DiagnosticFinding = character(),
+    Evidence = character(),
+    ReportingImplication = character(),
+    NextAction = character(),
+    ValidationUse = character(),
+    stringsAsFactors = FALSE
+  )
+  diagnostic_oc_summary <- as.data.frame(diagnostic_oc_summary %||% data.frame(), stringsAsFactors = FALSE)
+  if (nrow(diagnostic_oc_summary) == 0L) return(empty)
+
+  row_chr <- function(row, name, default = NA_character_) {
+    if (!name %in% names(row)) return(default)
+    val <- row[[name]][1]
+    if (is.na(val)) default else as.character(val)
+  }
+  row_num <- function(row, name) {
+    if (!name %in% names(row)) return(NA_real_)
+    suppressWarnings(as.numeric(row[[name]][1]))
+  }
+  fmt_num <- function(x) {
+    if (!is.finite(x)) return("NA")
+    formatC(x, digits = 3L, format = "fg", flag = "#")
+  }
+  build_evidence <- function(row) {
+    parts <- c(
+      paste0("replications=", row_chr(row, "Replications", "NA")),
+      paste0("mean_separation=", fmt_num(row_num(row, "MeanSeparation"))),
+      paste0("mean_reliability=", fmt_num(row_num(row, "MeanReliability"))),
+      paste0("mean_abs_zstd_flag_rate=", fmt_num(row_num(row, "MeanMisfitRateAbsZ2"))),
+      paste0("mean_df_sensitive_flag_rate=", fmt_num(row_num(row, "MeanDfSensitiveFlagRate")))
+    )
+    paste(parts, collapse = "; ")
+  }
+  make_note <- function(row,
+                        attention,
+                        finding,
+                        implication,
+                        next_action) {
+    data.frame(
+      CaseID = row_chr(row, "CaseID"),
+      Tier = row_chr(row, "Tier"),
+      Model = row_chr(row, "Model"),
+      Estimation = row_chr(row, "Estimation"),
+      Facet = row_chr(row, "Facet"),
+      ReportingAttention = attention,
+      DiagnosticFinding = finding,
+      Evidence = build_evidence(row),
+      ReportingImplication = implication,
+      NextAction = next_action,
+      ValidationUse = "diagnostic_only_not_release_gate",
+      stringsAsFactors = FALSE
+    )
+  }
+
+  rows <- lapply(seq_len(nrow(diagnostic_oc_summary)), function(i) {
+    row <- diagnostic_oc_summary[i, , drop = FALSE]
+    availability <- row_chr(row, "DiagnosticAvailability", row_chr(row, "Status", "not_available"))
+    if (!"DiagnosticAvailability" %in% names(row)) {
+      reps <- row_num(row, "Replications")
+      if (is.finite(reps) && reps > 0) availability <- "available"
+    }
+    if (!identical(availability, "available")) {
+      return(make_note(
+        row,
+        attention = "not_available",
+        finding = "diagnostic_not_available",
+        implication = "Fit/separation diagnostics were not available for this facet; do not infer fit or separation behavior from the validation run.",
+        next_action = "Re-run the validation with include_diagnostics = TRUE if diagnostic operating characteristics are needed."
+      ))
+    }
+
+    sep <- row_num(row, "MeanSeparation")
+    rel <- row_num(row, "MeanReliability")
+    misfit_rate <- row_num(row, "MeanMisfitRateAbsZ2")
+    df_rate <- row_num(row, "MeanDfSensitiveFlagRate")
+    notes <- list()
+
+    if ((is.finite(sep) && sep <= 0) || (is.finite(rel) && rel <= 0)) {
+      notes[[length(notes) + 1L]] <- make_note(
+        row,
+        attention = "reporting_review",
+        finding = "zero_separation_or_reliability",
+        implication = "The Rasch/FACETS-style separation signal collapsed to zero for this simulated condition; report this as diagnostic context, not as release failure.",
+        next_action = "Inspect the generated condition and facet design before using this facet's separation/reliability language in examples or release notes."
+      )
+    }
+    if (is.finite(misfit_rate) && misfit_rate > 0) {
+      notes[[length(notes) + 1L]] <- make_note(
+        row,
+        attention = "reporting_review",
+        finding = "abs_zstd_flags_present",
+        implication = "At least one replication produced absolute fit-ZSTD flags for this facet; this is a diagnostic signal rather than a release gate.",
+        next_action = "Review the corresponding fit rows before making strong fit-language claims for this validation condition."
+      )
+    }
+    if (is.finite(df_rate) && df_rate > 0) {
+      notes[[length(notes) + 1L]] <- make_note(
+        row,
+        attention = "reporting_review",
+        finding = "df_sensitive_zstd_flags_present",
+        implication = "Fit-ZSTD flagging changed under the engine-vs-FACETS degrees-of-freedom convention; keep df convention language explicit.",
+        next_action = "Use fit_measures_table(fit_df_method = \"both\") or the diagnostic rows when explaining fit-ZSTD sensitivity."
+      )
+    }
+    if (length(notes) == 0L) {
+      notes[[1L]] <- make_note(
+        row,
+        attention = "context",
+        finding = "diagnostic_context_available",
+        implication = "Fit/separation diagnostics are available for context; no automatic reporting caveat was triggered by the retained operating-characteristic fields.",
+        next_action = "Keep this row as diagnostic context and continue to base release status on recovery metrics, convergence, and Monte Carlo precision."
+      )
+    }
+    do.call(rbind, notes)
+  })
+
+  out <- do.call(rbind, rows)
+  if (is.null(out)) return(empty)
+  row.names(out) <- NULL
+  out
 }
 
 mfrmr_summarize_recovery_validation <- function(x) {
@@ -545,6 +808,11 @@ mfrmr_summarize_recovery_validation <- function(x) {
         RecoveryMetricStatus = "concern",
         UncertaintyStatus = "not_available",
         MonteCarloStatus = "not_available",
+        DiagnosticStatus = "not_available",
+        GPCMSlopeRegime = NA_character_,
+        ScoreSupportStatus = "not_available",
+        MinScoreCount = NA_integer_,
+        MaxZeroScoreLevels = NA_integer_,
         ConcernMetrics = NA_integer_,
         ReviewMetrics = NA_integer_,
         MaxRMSE = NA_real_,
@@ -556,7 +824,19 @@ mfrmr_summarize_recovery_validation <- function(x) {
     }
     overview <- as.data.frame(assessment$overview, stringsAsFactors = FALSE)
     metric <- as.data.frame(assessment$metric_review, stringsAsFactors = FALSE)
+    condition <- as.data.frame(assessment$condition_review %||% data.frame(), stringsAsFactors = FALSE)
+    diagnostic <- as.data.frame(assessment$diagnostic_review %||% data.frame(), stringsAsFactors = FALSE)
     domain_status <- mfrmr_recovery_validation_domain_status(metric)
+    diagnostic_source <- if ("DiagnosticAvailability" %in% names(diagnostic)) {
+      diagnostic$DiagnosticAvailability
+    } else {
+      diagnostic$Status %||% character(0)
+    }
+    diagnostic_status <- if (nrow(diagnostic) > 0L) {
+      mfrmr_recovery_validation_compact_status(diagnostic_source, unavailable = "ignore")
+    } else {
+      "not_available"
+    }
     worst_metric <- NA_character_
     if (nrow(metric) > 0L && "OverallStatus" %in% names(metric)) {
       worst_idx <- order(
@@ -583,6 +863,11 @@ mfrmr_summarize_recovery_validation <- function(x) {
       RecoveryMetricStatus = domain_status$recovery_metric_status,
       UncertaintyStatus = domain_status$uncertainty_status,
       MonteCarloStatus = domain_status$monte_carlo_status,
+      DiagnosticStatus = diagnostic_status,
+      GPCMSlopeRegime = if (nrow(condition) > 0L) condition$GPCMSlopeRegime[1] %||% NA_character_ else NA_character_,
+      ScoreSupportStatus = if (nrow(condition) > 0L) condition$ScoreSupportStatus[1] %||% "not_available" else "not_available",
+      MinScoreCount = if (nrow(condition) > 0L) condition$MinScoreCount[1] %||% NA_integer_ else NA_integer_,
+      MaxZeroScoreLevels = if (nrow(condition) > 0L) condition$MaxZeroScoreLevels[1] %||% NA_integer_ else NA_integer_,
       ConcernMetrics = if (nrow(metric) > 0L) sum(metric$OverallStatus == "concern", na.rm = TRUE) else 0L,
       ReviewMetrics = if (nrow(metric) > 0L) sum(metric$OverallStatus == "review", na.rm = TRUE) else 0L,
       MaxRMSE = if (nrow(metric) > 0L) max(suppressWarnings(as.numeric(metric$RMSE)), na.rm = TRUE) else NA_real_,
@@ -601,6 +886,7 @@ mfrmr_summarize_recovery_validation <- function(x) {
     "RecoveryMetricStatus",
     "MonteCarloStatus",
     "UncertaintyStatus",
+    "DiagnosticStatus",
     "OverallStatus",
     "ReleaseInterpretation",
     "UncertaintyLimitation"
@@ -629,6 +915,76 @@ mfrmr_summarize_recovery_validation <- function(x) {
   metric_summary <- do.call(rbind, metric_rows)
   if (is.null(metric_summary)) metric_summary <- data.frame()
 
+  condition_rows <- lapply(x$results, function(res) {
+    assessment <- res$assessment
+    if (inherits(assessment, "error") || is.null(assessment)) return(NULL)
+    condition <- as.data.frame(assessment$condition_review %||% data.frame(), stringsAsFactors = FALSE)
+    if (nrow(condition) == 0L) return(NULL)
+    case <- res$case
+    out <- cbind(
+      data.frame(
+        CaseID = case$CaseID,
+        Tier = case$Tier,
+        Model = case$Model,
+        Estimation = case$Estimation,
+        stringsAsFactors = FALSE
+      ),
+      condition
+    )
+    row.names(out) <- NULL
+    out
+  })
+  condition_summary <- do.call(rbind, condition_rows)
+  if (is.null(condition_summary)) condition_summary <- data.frame()
+
+  condition_note_rows <- lapply(x$results, function(res) {
+    assessment <- res$assessment
+    if (inherits(assessment, "error") || is.null(assessment)) return(NULL)
+    notes <- as.data.frame(assessment$condition_reporting_notes %||% data.frame(), stringsAsFactors = FALSE)
+    if (nrow(notes) == 0L) return(NULL)
+    case <- res$case
+    notes <- notes[, setdiff(names(notes), c("CaseID", "Tier", "Model", "Estimation")), drop = FALSE]
+    out <- cbind(
+      data.frame(
+        CaseID = case$CaseID,
+        Tier = case$Tier,
+        Model = case$Model,
+        Estimation = case$Estimation,
+        stringsAsFactors = FALSE
+      ),
+      notes
+    )
+    row.names(out) <- NULL
+    out
+  })
+  condition_reporting_notes <- do.call(rbind, condition_note_rows)
+  if (is.null(condition_reporting_notes)) condition_reporting_notes <- data.frame()
+
+  diagnostic_rows <- lapply(x$results, function(res) {
+    assessment <- res$assessment
+    if (inherits(assessment, "error") || is.null(assessment)) return(NULL)
+    diagnostic <- as.data.frame(assessment$diagnostic_review %||% data.frame(), stringsAsFactors = FALSE)
+    if (nrow(diagnostic) == 0L) return(NULL)
+    case <- res$case
+    out <- cbind(
+      data.frame(
+        CaseID = case$CaseID,
+        Tier = case$Tier,
+        Model = case$Model,
+        Estimation = case$Estimation,
+        stringsAsFactors = FALSE
+      ),
+      diagnostic
+    )
+    row.names(out) <- NULL
+    out
+  })
+  diagnostic_oc_summary <- do.call(rbind, diagnostic_rows)
+  if (is.null(diagnostic_oc_summary)) diagnostic_oc_summary <- data.frame()
+  diagnostic_reporting_notes <- mfrmr_recovery_validation_diagnostic_reporting_notes(
+    diagnostic_oc_summary
+  )
+
   decision_table <- if (nrow(metric_summary) > 0L) {
     as.data.frame(
       stats::xtabs(~ CaseID + OverallStatus, data = metric_summary),
@@ -651,6 +1007,14 @@ mfrmr_summarize_recovery_validation <- function(x) {
       data.frame(CaseID = case_summary$CaseID,
                  StatusDomain = "monte_carlo",
                  Status = case_summary$MonteCarloStatus,
+                 stringsAsFactors = FALSE),
+      data.frame(CaseID = case_summary$CaseID,
+                 StatusDomain = "score_support",
+                 Status = case_summary$ScoreSupportStatus,
+                 stringsAsFactors = FALSE),
+      data.frame(CaseID = case_summary$CaseID,
+                 StatusDomain = "diagnostic_operating_characteristics",
+                 Status = case_summary$DiagnosticStatus,
                  stringsAsFactors = FALSE),
       data.frame(CaseID = case_summary$CaseID,
                  StatusDomain = "overall",
@@ -676,9 +1040,14 @@ mfrmr_summarize_recovery_validation <- function(x) {
   list(
     prompt_steps = x$prompt_steps,
     case_plan = x$plan,
+    reading_order = mfrmr_recovery_validation_reading_order(),
     topline_release_decision = topline_release_decision,
     release_decision_table = release_decision_table,
     case_summary = case_summary,
+    condition_summary = condition_summary,
+    condition_reporting_notes = condition_reporting_notes,
+    diagnostic_reporting_notes = diagnostic_reporting_notes,
+    diagnostic_oc_summary = diagnostic_oc_summary,
     metric_summary = metric_summary,
     decision_table = decision_table,
     domain_decision_table = domain_decision_table,
@@ -715,6 +1084,10 @@ mfrmr_recovery_validation_markdown <- function(x) {
     "",
     mfrmr_validation_markdown_table(s$topline_release_decision, max_rows = 5L),
     "",
+    "## Recommended reading order",
+    "",
+    mfrmr_validation_markdown_table(s$reading_order, max_rows = 10L),
+    "",
     "## Release decision by case",
     "",
     mfrmr_validation_markdown_table(s$release_decision_table, max_rows = 20L),
@@ -735,6 +1108,22 @@ mfrmr_recovery_validation_markdown <- function(x) {
     "",
     mfrmr_validation_markdown_table(s$domain_decision_table, max_rows = 80L),
     "",
+    "## Condition reporting notes",
+    "",
+    mfrmr_validation_markdown_table(s$condition_reporting_notes, max_rows = 50L),
+    "",
+    "## Condition summary",
+    "",
+    mfrmr_validation_markdown_table(s$condition_summary, max_rows = 50L),
+    "",
+    "## Diagnostic reporting notes",
+    "",
+    mfrmr_validation_markdown_table(s$diagnostic_reporting_notes, max_rows = 50L),
+    "",
+    "## Diagnostic operating-characteristic summary",
+    "",
+    mfrmr_validation_markdown_table(s$diagnostic_oc_summary, max_rows = 50L),
+    "",
     "## Metric summary",
     "",
     mfrmr_validation_markdown_table(s$metric_summary, max_rows = 50L),
@@ -751,8 +1140,13 @@ summary.mfrmr_recovery_validation <- function(object, ...) {
   structure(
     list(
       topline_release_decision = s$topline_release_decision,
+      reading_order = s$reading_order,
       release_decision_table = s$release_decision_table,
       case_summary = s$case_summary,
+      condition_reporting_notes = s$condition_reporting_notes,
+      condition_summary = s$condition_summary,
+      diagnostic_reporting_notes = s$diagnostic_reporting_notes,
+      diagnostic_oc_summary = s$diagnostic_oc_summary,
       domain_decision_table = s$domain_decision_table,
       started_at = s$started_at,
       completed_at = s$completed_at
@@ -780,18 +1174,64 @@ print.summary.mfrmr_recovery_validation <- function(x, ...) {
     cat("Primary basis: ", as.character(top$PrimaryDecisionBasis[1]), "\n", sep = "")
     cat(as.character(top$Conclusion[1]), "\n", sep = "")
   }
+  order_tbl <- as.data.frame(x$reading_order %||% data.frame(), stringsAsFactors = FALSE)
+  keep_order <- intersect(c("Step", "Route", "WhatToRead"), names(order_tbl))
+  if (nrow(order_tbl) > 0L && length(keep_order) > 0L) {
+    cat("\nRecommended reading order:\n")
+    print(order_tbl[, keep_order, drop = FALSE], row.names = FALSE)
+  }
   tbl <- as.data.frame(x$release_decision_table, stringsAsFactors = FALSE)
   keep <- intersect(
     c("CaseID", "ReleaseRecoveryStatus", "RecoveryMetricStatus",
-      "MonteCarloStatus", "UncertaintyStatus", "OverallStatus"),
+      "MonteCarloStatus", "UncertaintyStatus", "DiagnosticStatus",
+      "OverallStatus"),
     names(tbl)
   )
   if (nrow(tbl) > 0L && length(keep) > 0L) {
     cat("\nCase decisions:\n")
     display <- tbl[, keep, drop = FALSE]
-    names(display) <- c("Case", "Release", "Recovery", "MC",
-                        "Uncertainty", "Overall")[seq_along(keep)]
+    display_names <- c(
+      CaseID = "Case",
+      ReleaseRecoveryStatus = "Release",
+      RecoveryMetricStatus = "Recovery",
+      MonteCarloStatus = "MC",
+      UncertaintyStatus = "Uncertainty",
+      DiagnosticStatus = "Diagnostic",
+      OverallStatus = "Overall"
+    )
+    names(display) <- unname(display_names[names(display)])
     print(display, row.names = FALSE)
+  }
+  condition_notes <- as.data.frame(x$condition_reporting_notes %||% data.frame(), stringsAsFactors = FALSE)
+  keep_condition_notes <- intersect(
+    c("CaseID", "ConditionArea", "ReportingAttention",
+      "ConditionFinding", "Evidence", "ValidationUse"),
+    names(condition_notes)
+  )
+  if (nrow(condition_notes) > 0L && length(keep_condition_notes) > 0L) {
+    cat("\nCondition reporting notes:\n")
+    print(condition_notes[, keep_condition_notes, drop = FALSE], row.names = FALSE)
+  }
+  notes_tbl <- as.data.frame(x$diagnostic_reporting_notes %||% data.frame(), stringsAsFactors = FALSE)
+  keep_notes <- intersect(
+    c("CaseID", "Facet", "ReportingAttention", "DiagnosticFinding",
+      "Evidence", "ValidationUse"),
+    names(notes_tbl)
+  )
+  if (nrow(notes_tbl) > 0L && length(keep_notes) > 0L) {
+    cat("\nDiagnostic reporting notes:\n")
+    print(notes_tbl[, keep_notes, drop = FALSE], row.names = FALSE)
+  }
+  diagnostic_tbl <- as.data.frame(x$diagnostic_oc_summary %||% data.frame(), stringsAsFactors = FALSE)
+  keep_diag <- intersect(
+    c("CaseID", "Facet", "MeanSeparation", "MeanReliability",
+      "MeanMisfitRateAbsZ2", "DiagnosticAvailability", "Status",
+      "ValidationUse"),
+    names(diagnostic_tbl)
+  )
+  if (nrow(diagnostic_tbl) > 0L && length(keep_diag) > 0L) {
+    cat("\nDiagnostic operating-characteristic summary:\n")
+    print(diagnostic_tbl[, keep_diag, drop = FALSE], row.names = FALSE)
   }
   invisible(x)
 }
@@ -806,10 +1246,15 @@ mfrmr_write_recovery_validation_outputs <- function(x,
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   s <- mfrmr_summarize_recovery_validation(x)
   utils::write.csv(s$topline_release_decision, file.path(output_dir, paste0(prefix, "_topline_release_decision.csv")), row.names = FALSE)
+  utils::write.csv(s$reading_order, file.path(output_dir, paste0(prefix, "_reading_order.csv")), row.names = FALSE)
   utils::write.csv(s$release_decision_table, file.path(output_dir, paste0(prefix, "_release_decision_table.csv")), row.names = FALSE)
   utils::write.csv(s$prompt_steps, file.path(output_dir, paste0(prefix, "_prompt_steps.csv")), row.names = FALSE)
   utils::write.csv(s$case_plan, file.path(output_dir, paste0(prefix, "_case_plan.csv")), row.names = FALSE)
   utils::write.csv(s$case_summary, file.path(output_dir, paste0(prefix, "_case_summary.csv")), row.names = FALSE)
+  utils::write.csv(s$condition_reporting_notes, file.path(output_dir, paste0(prefix, "_condition_reporting_notes.csv")), row.names = FALSE)
+  utils::write.csv(s$condition_summary, file.path(output_dir, paste0(prefix, "_condition_summary.csv")), row.names = FALSE)
+  utils::write.csv(s$diagnostic_reporting_notes, file.path(output_dir, paste0(prefix, "_diagnostic_reporting_notes.csv")), row.names = FALSE)
+  utils::write.csv(s$diagnostic_oc_summary, file.path(output_dir, paste0(prefix, "_diagnostic_oc_summary.csv")), row.names = FALSE)
   utils::write.csv(s$metric_summary, file.path(output_dir, paste0(prefix, "_metric_summary.csv")), row.names = FALSE)
   utils::write.csv(s$decision_table, file.path(output_dir, paste0(prefix, "_decision_table.csv")), row.names = FALSE)
   utils::write.csv(s$domain_decision_table, file.path(output_dir, paste0(prefix, "_domain_decision_table.csv")), row.names = FALSE)

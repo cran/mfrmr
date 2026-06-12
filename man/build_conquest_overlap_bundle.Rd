@@ -106,11 +106,13 @@ population-model review fields
 }
 
 \examples{
+\donttest{
 bundle <- build_conquest_overlap_bundle(quad_points = 3, maxit = 30)
 bundle$summary[, c("Case", "Facet", "Covariate", "Persons", "Items")]
 summary(bundle)$conquest_command_scope
 summary(bundle)$conquest_output_contract
 cat(substr(bundle$conquest_command, 1, 120))
+}
 }
 \seealso{
 \code{\link[=normalize_conquest_overlap_files]{normalize_conquest_overlap_files()}},

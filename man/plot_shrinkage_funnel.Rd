@@ -8,7 +8,9 @@ plot_shrinkage_funnel(
   fit,
   facet = NULL,
   top_n = 30L,
-  preset = c("standard", "publication", "compact"),
+  preset = c("standard", "publication", "compact", "monochrome"),
+  show_ci = FALSE,
+  ci_level = 0.95,
   draw = TRUE
 )
 }
@@ -22,12 +24,19 @@ shrinkage columns present).}
 
 \item{preset}{Visual preset.}
 
+\item{show_ci}{Logical. When \code{TRUE}, draw approximate confidence-interval
+whiskers for raw and shrunken estimates when \code{SE} / \code{ShrunkSE} evidence is
+available.}
+
+\item{ci_level}{Confidence level used when \code{show_ci = TRUE}; default 0.95.}
+
 \item{draw}{If \code{TRUE}, draw with base graphics.}
 }
 \value{
 An \code{mfrm_plot_data} whose \code{data} slot bundles the long
-\code{Level}, \code{RawEstimate}, \code{ShrunkEstimate}, \code{ShrinkageFactor}
-table.
+\code{Level}, \code{RawEstimate}, \code{ShrunkEstimate}, \code{ShrinkageFactor} table.
+When \code{show_ci = TRUE}, the table also includes \code{RawCI_Lower},
+\code{RawCI_Upper}, \code{ShrunkCI_Lower}, \code{ShrunkCI_Upper}, and \code{CI_Level}.
 }
 \description{
 Visualizes empirical-Bayes shrinkage by drawing one row per facet

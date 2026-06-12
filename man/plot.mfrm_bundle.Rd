@@ -40,7 +40,8 @@ category-specific-information plots
 \item \code{mfrm_rating_scale} -> category-counts/threshold plots
 \item \code{mfrm_measurable} -> measurable-data coverage/count plots
 \item \code{mfrm_unexpected_after_bias} -> post-bias unexpected-response plots
-\item \code{mfrm_output_bundle} -> graph/score output-file diagnostics
+\item \code{mfrm_output_bundle} -> graph/score output-file diagnostics,
+including \code{type = "score_se"} when scorefile SE columns are available
 \item \code{mfrm_residual_pca} -> residual PCA scree, parallel-analysis, or
 loadings views via \code{\link[=plot_residual_pca]{plot_residual_pca()}}
 \item \code{mfrm_specifications} -> facet/anchor/convergence plots

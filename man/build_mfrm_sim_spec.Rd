@@ -22,13 +22,14 @@ build_mfrm_sim_spec(
   slope_facet = NULL,
   slopes = NULL,
   facet_names = NULL,
-  assignment = c("crossed", "rotating", "resampled", "skeleton"),
+  assignment = c("crossed", "rotating", "sparse_linked", "resampled", "skeleton"),
   latent_distribution = c("normal", "empirical"),
   empirical_person = NULL,
   empirical_rater = NULL,
   empirical_criterion = NULL,
   assignment_profiles = NULL,
   design_skeleton = NULL,
+  sparse_controls = NULL,
   group_levels = NULL,
   dif_effects = NULL,
   interaction_effects = NULL,
@@ -90,7 +91,9 @@ frame with columns \code{SlopeFacet} and \code{Estimate}. Supplied slopes are tr
 as relative discriminations and normalized to the package's geometric-mean-
 one identification convention on the log scale. When omitted, slopes
 default to 1 for every slope-facet level, giving an exact \code{PCM}
-reduction.}
+reduction. The \code{GPCM} model form follows Muraki's generalized partial
+credit model; the package's slope-regime labels are validation stress
+labels, not published psychometric cut points.}
 
 \item{facet_names}{Optional public names for the two simulated non-person
 facet columns. Supply either an unnamed character vector of length 2
@@ -98,9 +101,10 @@ in rater-like / criterion-like order, or a named vector with names
 \code{c("rater", "criterion")}.}
 
 \item{assignment}{Assignment design. \code{"crossed"} means every person sees
-every rater; \code{"rotating"} uses a balanced rotating subset; \code{"resampled"}
-reuses empirical person-level rater-assignment profiles; \code{"skeleton"}
-reuses an observed person-by-facet design skeleton.}
+every rater; \code{"rotating"} uses a balanced rotating subset;
+\code{"sparse_linked"} uses an incomplete rating design with optional linking
+persons; \code{"resampled"} reuses empirical person-level rater-assignment
+profiles; \code{"skeleton"} reuses an observed person-by-facet design skeleton.}
 
 \item{latent_distribution}{Latent-value generator. \code{"normal"} samples from
 centered normal distributions using the supplied standard deviations.
@@ -124,9 +128,19 @@ accepted.}
 
 \item{design_skeleton}{Optional data frame with columns \code{TemplatePerson},
 the public rater-like facet column, and the public criterion-like facet
-column (optionally \code{Group} and \code{Weight}) describing an observed response
-skeleton used when \code{assignment = "skeleton"}. The canonical names
-\code{Rater} and \code{Criterion} are also accepted.}
+column (optionally \code{Group}, \code{Weight}, and \code{TemplatePersonReuse})
+describing an observed response skeleton used when
+\code{assignment = "skeleton"}. The canonical names \code{Rater} and \code{Criterion}
+are also accepted. \code{TemplatePersonReuse = TRUE} asks
+\code{\link[=simulate_mfrm_data]{simulate_mfrm_data()}} to keep the template-person order instead of
+resampling templates, which is used by \code{\link[=build_peer_review_sim_spec]{build_peer_review_sim_spec()}}.}
+
+\item{sparse_controls}{Optional named list used when
+\code{assignment = "sparse_linked"}. Supported entries are \code{link_fraction}
+(default \code{0.1}), \code{link_persons} (overrides \code{link_fraction}),
+\code{link_raters_per_person} (default \code{n_rater}), \code{assignment_mode}
+(\code{"balanced"} or \code{"random"}), and
+\code{min_common_persons_per_rater_pair} (diagnostic target, default \code{1}).}
 
 \item{group_levels}{Optional character vector of group labels.}
 
@@ -171,9 +185,11 @@ The resulting object records:
 \item latent spread assumptions (\code{theta_sd}, \code{rater_sd}, \code{criterion_sd})
 \item optional empirical latent support values for semi-parametric simulation
 \item threshold structure (\code{threshold_table})
-\item optional discrimination structure for bounded \code{GPCM}
-(\code{slope_table})
+\item optional discrimination structure for bounded \code{GPCM} (\code{slope_table}) and
+its identified log-slope spread label (\code{slope_regime})
 \item assignment design (\code{assignment})
+\item optional sparse linked-design controls (\code{sparse_controls}) when
+\code{assignment = "sparse_linked"}
 \item optional empirical assignment profiles (\code{assignment_profiles}) with
 optional person-level \code{Group} labels
 \item optional observed response skeleton (\code{design_skeleton})
@@ -213,6 +229,29 @@ numeric matrix whose row names are \code{StepFacet} labels.
 When \code{model = "GPCM"}, the same public facet naming rules apply to the
 slope table; the current bounded branch keeps \code{slope_facet} equal to
 \code{step_facet}.
+The \code{slope_regime} field summarizes the centered log-slope spread so
+recovery simulations can be read against the intended generator stress
+level. Its labels (\code{unit_slopes}, \code{near_flat}, \code{moderate}, and
+\code{high_dispersion}) are package validation labels; they are not model-fit
+decisions and should not be interpreted as literature-derived adequacy
+thresholds. The GPCM data-generating form follows Muraki (1992,
+doi:10.1177/014662169201600206), while information-function interpretation
+follows Muraki (1993, doi:10.1177/014662169301700403). The explicit
+simulation-specification metadata is intended to support ADEMP-style
+simulation reporting as described by Morris, White, and Crowther (2019,
+doi:10.1002/sim.8086).
+
+The \code{assignment = "sparse_linked"} branch follows sparse
+rater-mediated assessment work in treating incomplete rater assignment as
+planned missingness rather than incidental nonresponse. Its \code{link_persons}
+and \code{link_raters_per_person} controls emulate a common linking set so users
+can inspect rater-pair common-person counts before using the generated data
+in recovery or design studies. This is a design generator and diagnostic
+metadata layer; it does not impose a universal minimum-linking cutoff.
+Sparse-design motivation follows Wind, Jones, and Grajeda (2023,
+doi:10.1177/01466216231182148), Wind and Jones (2018,
+doi:10.1177/0013164417703733), and DeMars, Shapovalov, and Hathcoat
+(2023).
 
 If \code{population_formula} is supplied, the simulation specification carries a
 first-version person-level latent-regression generator. This affects only the

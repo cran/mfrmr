@@ -1,6 +1,7 @@
 resolve_mfrm_export_context <- function(x,
                                         diagnostics = NULL,
-                                        residual_pca = c("none", "overall", "facet", "both")) {
+                                        residual_pca = c("none", "overall", "facet", "both"),
+                                        gpcm_helper = "export bundle helpers") {
   residual_pca <- match.arg(tolower(as.character(residual_pca[1] %||% "none")),
                             c("none", "overall", "facet", "both"))
   diagnostics_supplied <- !is.null(diagnostics)
@@ -23,7 +24,7 @@ resolve_mfrm_export_context <- function(x,
   if (!inherits(fit, "mfrm_fit")) {
     stop("Resolved `fit` must be an mfrm_fit object from fit_mfrm().", call. = FALSE)
   }
-  stop_if_gpcm_out_of_scope(fit, "export bundle helpers")
+  stop_if_gpcm_out_of_scope(fit, gpcm_helper)
 
   if (is.null(diagnostics) && !is.null(run_obj$diagnostics)) {
     diagnostics <- run_obj$diagnostics
@@ -420,7 +421,7 @@ validate_bias_results_input <- function(bias_results,
 #' - `settings`: manifest build settings
 #'
 #' @section Interpreting output:
-#' The `summary` table is the quickest place to confirm that you are looking at
+#' The `summary` table is the direct place to confirm that you are looking at
 #' the intended analysis. The `model_settings`, `source_columns`, and
 #' `estimation_control` tables are designed for reproducibility records and
 #' method write-up.
@@ -444,10 +445,10 @@ validate_bias_results_input <- function(bias_results,
 #' 4. If you need files on disk, pass the same objects to
 #'    [export_mfrm_bundle()].
 #'
-#' This fit-based manifest/export layer currently depends on the full
-#' diagnostics/reporting workflow contract. For bounded `GPCM` fits, that means
-#' the layer is intentionally unavailable even though direct summary-table
-#' appendix export is supported for documented `GPCM` outputs.
+#' For bounded `GPCM` fits, the manifest is available with an explicit
+#' `gpcm_boundary` table. It records supported direct diagnostics/reporting
+#' surfaces while keeping full FACETS score-side contract review blocked and
+#' routing design forecasting through its separate caveated capability row.
 #'
 #' @return A named list with class `mfrm_manifest`.
 #' @seealso [export_mfrm_bundle()], [build_mfrm_replay_script()],
@@ -472,7 +473,8 @@ build_mfrm_manifest <- function(fit,
   ctx <- resolve_mfrm_export_context(
     x = fit,
     diagnostics = diagnostics,
-    residual_pca = "none"
+    residual_pca = "none",
+    gpcm_helper = "build_mfrm_manifest()"
   )
   fit <- ctx$fit
   diagnostics <- ctx$diagnostics
@@ -788,6 +790,15 @@ build_mfrm_manifest <- function(fit,
     input_hash = input_hash_tbl,
     session_info = session_info_tbl,
     available_outputs = available_outputs,
+    gpcm_boundary = gpcm_capability_boundary_table(
+      fit,
+      helper = "build_mfrm_manifest()",
+      extra_areas = c(
+        "Score-side scorefile export under bounded GPCM",
+        "FACETS output-contract score-side review",
+        "Design planning and forecasting"
+      )
+    ),
     settings = settings
   )
   as_mfrm_bundle(out, "mfrm_manifest")
@@ -954,11 +965,11 @@ build_mfrm_session_info_table <- function() {
 #' `fit_person_data_file` is supplied, the generated script reads it from that
 #' sidecar CSV relative to the replay script location.
 #'
-#' This replay layer is intentionally unavailable for bounded `GPCM`, because
-#' the fit-based bundle/export contract depends on the full
-#' diagnostics/reporting route that is currently retained for the
-#' Rasch-family branch. Use the summary-table appendix route for documented
-#' direct `GPCM` outputs.
+#' For bounded `GPCM`, replay scripts are available with an explicit
+#' `gpcm_boundary` table. The generated script records `step_facet` and
+#' `slope_facet` settings, but full FACETS score-side contract review remains
+#' outside this replay contract. Role-based design forecasting is available
+#' through [predict_mfrm_population()] as a separate caveated helper route.
 #'
 #' @section When to use this:
 #' Use `build_mfrm_replay_script()` when you want a package-native recipe that
@@ -1021,7 +1032,8 @@ build_mfrm_replay_script <- function(fit,
   ctx <- resolve_mfrm_export_context(
     x = fit,
     diagnostics = diagnostics,
-    residual_pca = "none"
+    residual_pca = "none",
+    gpcm_helper = "build_mfrm_replay_script()"
   )
   fit <- ctx$fit
   diagnostics <- ctx$diagnostics
@@ -1509,6 +1521,15 @@ build_mfrm_replay_script <- function(fit,
     summary = summary_tbl,
     script = script_text,
     settings = settings,
+    gpcm_boundary = gpcm_capability_boundary_table(
+      fit,
+      helper = "build_mfrm_replay_script()",
+      extra_areas = c(
+        "Score-side scorefile export under bounded GPCM",
+        "FACETS output-contract score-side review",
+        "Design planning and forecasting"
+      )
+    ),
     anchors = anchor_df,
     group_anchors = group_anchor_df
   )
@@ -1900,11 +1921,13 @@ build_conquest_overlap_readme <- function(summary_tbl,
 #'   [reference_case_benchmark()], [build_mfrm_replay_script()],
 #'   [export_mfrm_bundle()]
 #' @examples
+#' \donttest{
 #' bundle <- build_conquest_overlap_bundle(quad_points = 3, maxit = 30)
 #' bundle$summary[, c("Case", "Facet", "Covariate", "Persons", "Items")]
 #' summary(bundle)$conquest_command_scope
 #' summary(bundle)$conquest_output_contract
 #' cat(substr(bundle$conquest_command, 1, 120))
+#' }
 #' @export
 build_conquest_overlap_bundle <- function(fit = NULL,
                                           case = c("synthetic_latent_regression"),
@@ -2621,6 +2644,7 @@ normalize_conquest_overlap_tables <- function(conquest_population,
 #' @return A named list with class `mfrm_conquest_overlap_tables`.
 #' @seealso [normalize_conquest_overlap_tables()], [review_conquest_overlap()]
 #' @examples
+#' \donttest{
 #' bundle <- build_conquest_overlap_bundle()
 #' tmp_dir <- tempdir()
 #' pop_path <- file.path(tmp_dir, "cq_pop.csv")
@@ -2665,6 +2689,7 @@ normalize_conquest_overlap_tables <- function(conquest_population,
 #' summary(normalized)$normalization_scope
 #' review <- review_conquest_overlap(bundle, normalized)
 #' summary(review)$summary
+#' }
 #' @export
 normalize_conquest_overlap_files <- function(population_file,
                                              item_file,
@@ -2814,6 +2839,7 @@ normalize_conquest_overlap_files <- function(population_file,
 #'   [normalize_conquest_overlap_files()], [normalize_conquest_overlap_tables()],
 #'   [reference_case_benchmark()]
 #' @examples
+#' \donttest{
 #' bundle <- build_conquest_overlap_bundle()
 #' raw_pop <- data.frame(
 #'   Term = bundle$mfrmr_population$Parameter,
@@ -2840,6 +2866,7 @@ normalize_conquest_overlap_files <- function(population_file,
 #' )
 #' review <- review_conquest_overlap(bundle, normalized)
 #' summary(review)$summary
+#' }
 #' @name review_conquest_overlap
 #' @export
 review_conquest_overlap <- function(bundle,
@@ -3191,11 +3218,22 @@ review_conquest_overlap <- function(bundle,
 #' they remain available under `"recommended"` and `"diagnostics"` presets when
 #' the source summary contains caveat rows.
 #'
+#' Precision-review summaries keep `fit_separation_basis` in the exported
+#' precision-review role so fit, ZSTD, separation/reliability/strata, and
+#' package QC thresholds can be reported without turning them into release or
+#' recovery success gates.
+#' Fit-measure and FACETS fit-review summaries keep df/ZSTD sensitivity and
+#' optional external FACETS matching tables in the same precision-review lane.
+#'
 #' Parameter-recovery studies can be exported by passing
 #' [evaluate_mfrm_recovery()] or [assess_mfrm_recovery()] output directly. The
 #' exported bundle keeps the ADEMP-style simulation basis, recovery metrics,
 #' replication status, adequacy checklist, thresholds, and next actions in
 #' separate appendix-ready tables.
+#'
+#' Recovery-validation summaries from the packaged validation protocol can be
+#' exported by passing `summary(validation)`, including top-line release
+#' decisions, condition notes, diagnostic notes, and domain decisions.
 #'
 #' Unlike [export_mfrm_bundle()], this helper does not require a fitted model.
 #' It is intended for the stage where compact reporting summaries already exist
@@ -3680,7 +3718,8 @@ export_summary_appendix <- function(x,
 #'   `build_summary_table_bundle()`, or a named list of such objects. When
 #'   `NULL` and `"summary_tables"` is requested in `include`, a default set is
 #'   built from `fit`, `diagnostics`, [reporting_checklist()], and
-#'   [build_apa_outputs()].
+#'   [build_apa_outputs()]. Recovery-validation summaries can be supplied here
+#'   to co-locate release-review appendix tables with a fit-based export bundle.
 #' @param output_dir Directory where files will be written.
 #' @param prefix File-name prefix.
 #' @param include Components to export. Supported values are
@@ -3759,14 +3798,16 @@ export_summary_appendix <- function(x,
 #' `*_population_prediction_settings.csv` or ADeMP CSVs; the compact simulation
 #' specification files carry the replay-relevant settings instead.
 #'
-#' This fit-based exporter is intentionally unavailable for bounded `GPCM`,
-#' because the current bundle surface would otherwise depend on blocked
-#' narrative/QC/export semantics from the free-discrimination branch. Use
-#' [export_summary_appendix()] for documented direct `GPCM` outputs.
+#' For bounded `GPCM`, this exporter is available as a caveated partial bundle
+#' over supported diagnostics, report text, visual summaries, manifests, and
+#' replay scripts. The returned object and manifest include `gpcm_boundary`.
+#' Package-native bounded-`GPCM` scorefile export is available with caveats,
+#' while full FACETS-style score-side contract review and design forecasting
+#' remain outside this bundle contract.
 #'
 #' @section Interpreting output:
 #' The returned object reports both high-level bundle status and the exact files
-#' written. In practice, `bundle$summary` is the quickest sanity check, while
+#' written. In practice, `bundle$summary` is the direct status check, while
 #' `bundle$written_files` is the file inventory to inspect or hand off to other
 #' tools.
 #'
@@ -3838,7 +3879,8 @@ export_mfrm_bundle <- function(fit,
   ctx <- resolve_mfrm_export_context(
     x = fit,
     diagnostics = diagnostics,
-    residual_pca = if ("visual_summaries" %in% include) "both" else "none"
+    residual_pca = if ("visual_summaries" %in% include) "both" else "none",
+    gpcm_helper = "export_mfrm_bundle()"
   )
   fit <- ctx$fit
   diagnostics <- ctx$diagnostics
@@ -4374,6 +4416,10 @@ export_mfrm_bundle <- function(fit,
       write_csv(manifest$anchors, paste0(prefix, "_manifest_anchors.csv"), "manifest_anchors")
     }
     write_csv(manifest$available_outputs, paste0(prefix, "_manifest_available_outputs.csv"), "manifest_available_outputs")
+    if (nrow(as.data.frame(manifest$gpcm_boundary %||% data.frame(), stringsAsFactors = FALSE)) > 0) {
+      write_csv(manifest$gpcm_boundary, paste0(prefix, "_manifest_gpcm_boundary.csv"), "manifest_gpcm_boundary")
+      html_tables$manifest_gpcm_boundary <- manifest$gpcm_boundary
+    }
     write_text(render_mfrm_manifest_text(manifest), paste0(prefix, "_manifest.txt"), "manifest_text")
     html_tables$manifest_summary <- manifest$summary
     html_tables$manifest_available_outputs <- manifest$available_outputs
@@ -4563,6 +4609,15 @@ export_mfrm_bundle <- function(fit,
     manifest = manifest,
     visual_summaries = visual,
     replay_script = replay,
+    gpcm_boundary = gpcm_capability_boundary_table(
+      fit,
+      helper = "export_mfrm_bundle()",
+      extra_areas = c(
+        "Score-side scorefile export under bounded GPCM",
+        "FACETS output-contract score-side review",
+        "Design planning and forecasting"
+      )
+    ),
     settings = settings,
     notes = notes
   )
@@ -4649,6 +4704,10 @@ export_normalize_summary_table_inputs <- function(summary_tables,
   summary_table_input_classes <- c(
     "mfrm_fit",
     "mfrm_diagnostics",
+    "mfrm_precision_review",
+    "mfrm_fit_measures",
+    "mfrm_facets_fit_review",
+    "mfrm_person_fit_indices",
     "mfrm_data_description",
     "mfrm_reporting_checklist",
     "mfrm_apa_outputs",
@@ -4668,6 +4727,10 @@ export_normalize_summary_table_inputs <- function(summary_tables,
     "mfrm_plausible_values",
     "summary.mfrm_fit",
     "summary.mfrm_diagnostics",
+    "summary.mfrm_precision_review",
+    "summary.mfrm_fit_measures",
+    "summary.mfrm_facets_fit_review",
+    "summary.mfrm_person_fit_indices",
     "summary.mfrm_data_description",
     "summary.mfrm_reporting_checklist",
     "summary.mfrm_apa_outputs",
@@ -4675,6 +4738,7 @@ export_normalize_summary_table_inputs <- function(summary_tables,
     "summary.mfrm_signal_detection",
     "summary.mfrm_recovery_simulation",
     "summary.mfrm_recovery_assessment",
+    "summary.mfrmr_recovery_validation",
     "summary.mfrm_population_prediction",
     "summary.mfrm_future_branch_active_branch",
     "summary.mfrm_facets_run",
@@ -5433,7 +5497,10 @@ render_mfrm_manifest_text <- function(manifest) {
   paste(parts, collapse = "\n")
 }
 
-build_mfrm_bundle_html <- function(title, tables = list(), text_sections = list()) {
+build_mfrm_bundle_html <- function(title,
+                                   tables = list(),
+                                   text_sections = list(),
+                                   text_sections_after = list()) {
   parts <- c(
     "<!DOCTYPE html>",
     "<html><head>",
@@ -5470,6 +5537,17 @@ build_mfrm_bundle_html <- function(title, tables = list(), text_sections = list(
       parts,
       paste0("<h2>", html_escape(nm), "</h2>"),
       dataframe_to_html_table(tbl)
+    )
+  }
+
+  text_sections_after <- text_sections_after[!vapply(text_sections_after, is.null, logical(1))]
+  for (nm in names(text_sections_after)) {
+    txt <- paste(as.character(text_sections_after[[nm]]), collapse = "\n")
+    if (!nzchar(trimws(txt))) next
+    parts <- c(
+      parts,
+      paste0("<h2>", html_escape(nm), "</h2>"),
+      paste0("<pre>", html_escape(txt), "</pre>")
     )
   }
 

@@ -80,11 +80,11 @@ By default that replay-ready table is embedded inline; when
 \code{fit_person_data_file} is supplied, the generated script reads it from that
 sidecar CSV relative to the replay script location.
 
-This replay layer is intentionally unavailable for bounded \code{GPCM}, because
-the fit-based bundle/export contract depends on the full
-diagnostics/reporting route that is currently retained for the
-Rasch-family branch. Use the summary-table appendix route for documented
-direct \code{GPCM} outputs.
+For bounded \code{GPCM}, replay scripts are available with an explicit
+\code{gpcm_boundary} table. The generated script records \code{step_facet} and
+\code{slope_facet} settings, but full FACETS score-side contract review remains
+outside this replay contract. Role-based design forecasting is available
+through \code{\link[=predict_mfrm_population]{predict_mfrm_population()}} as a separate caveated helper route.
 }
 \section{When to use this}{
 

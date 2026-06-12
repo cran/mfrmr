@@ -13,7 +13,7 @@ plot_marginal_fit(
   main = NULL,
   palette = NULL,
   label_angle = 45,
-  preset = c("standard", "publication", "compact"),
+  preset = c("standard", "publication", "compact", "monochrome"),
   draw = TRUE
 )
 }

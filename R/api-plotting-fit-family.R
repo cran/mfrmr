@@ -1345,8 +1345,17 @@ draw_facet_plot <- function(facet_tbl,
 #' immediately.
 #'
 #' `type = "wright"` shows persons, facet levels, and step thresholds on
-#' a shared logit scale. `type = "pathway"` shows expected score traces
-#' and dominant-category regions across theta. Its draw-free plot data also
+#' a shared logit scale. Estimates are plotted as fitted, so the sign
+#' convention follows the fit: higher person values indicate higher
+#' ability, and higher non-person facet values indicate greater
+#' severity/difficulty under the default negative facet orientation.
+#' Facets listed in `fit_mfrm(positive_facets = ...)` are reversed
+#' (higher values raise expected scores); state the active orientation in
+#' figure captions when reporting. `type = "pathway"` shows expected score
+#' traces and dominant-category regions across theta. This expected-score
+#' display is distinct from the Bond-and-Fox-style measure-versus-fit
+#' "pathway" bubble chart used around FACETS/Winsteps output; for that
+#' display, use [plot_bubble()]. Its draw-free plot data also
 #' includes `pathway_long`, `pathway_annotations`, `fit_measures`,
 #' `fit_status`, and `curve_fit_status`, so R users can rebuild the pathway
 #' map in ggplot2, plotly, or a report pipeline while keeping the same
@@ -1378,6 +1387,9 @@ draw_facet_plot <- function(facet_tbl,
 #'   `type = "bundle"` / `"all"` / `"default"`.
 #' @seealso [fit_mfrm()], [plot_wright_unified()], [plot_bubble()],
 #'   [mfrmr_visual_diagnostics]
+#' @concept confidence intervals
+#' @concept visual diagnostics
+#' @concept shrinkage
 #' @examples
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(
@@ -1573,10 +1585,32 @@ plot.mfrm_fit <- function(x,
 
   if (type == "shrinkage") {
     data_list <- .build_shrinkage_plot_data(x)
+    if (isTRUE(show_ci)) {
+      ci_level <- .validate_shrinkage_ci_level(ci_level)
+      data_list$table <- .add_shrinkage_ci_columns(
+        data_list$table,
+        ci_level = ci_level
+      )
+    }
+    legend_label <- c("Original estimate", "Shrunk estimate",
+                      "Shrinkage direction", "Sum-to-zero (reference)")
+    legend_role <- c("location", "location", "arrow", "reference")
+    legend_aesthetic <- c("point", "point", "arrow", "line")
+    legend_value <- c(style$accent_primary, style$accent_tertiary,
+                      style$neutral, style$neutral)
+    if (isTRUE(show_ci)) {
+      legend_label <- c(legend_label, sprintf("%g%% CI whisker",
+                                              round(100 * ci_level)))
+      legend_role <- c(legend_role, "interval")
+      legend_aesthetic <- c(legend_aesthetic, "line")
+      legend_value <- c(legend_value, style$accent_primary)
+    }
     out <- as_plot_data("shrinkage", list(
       data = data_list$table,
       shrinkage_report = data_list$report,
       mode = data_list$mode,
+      show_ci = isTRUE(show_ci),
+      ci_level = if (isTRUE(show_ci)) ci_level else NA_real_,
       title = title %||% "Empirical-Bayes shrinkage",
       subtitle = sprintf(
         "Original (filled) vs shrunk (open) estimates; mode = %s",
@@ -1584,12 +1618,10 @@ plot.mfrm_fit <- function(x,
       ),
       preset = style$name,
       legend = new_plot_legend(
-        label = c("Original estimate", "Shrunk estimate",
-                  "Shrinkage direction", "Sum-to-zero (reference)"),
-        role = c("location", "location", "arrow", "reference"),
-        aesthetic = c("point", "point", "arrow", "line"),
-        value = c(style$accent_primary, style$accent_tertiary,
-                  style$neutral, style$neutral)
+        label = legend_label,
+        role = legend_role,
+        aesthetic = legend_aesthetic,
+        value = legend_value
       ),
       reference_lines = new_reference_lines(
         "v", 0, "Sum-to-zero reference", "dashed", "reference"
@@ -1599,7 +1631,8 @@ plot.mfrm_fit <- function(x,
       apply_plot_preset(style)
       .draw_shrinkage_plot(data_list, style = style,
                            title = title %||% "Empirical-Bayes shrinkage",
-                           show_ci = isTRUE(show_ci))
+                           show_ci = isTRUE(show_ci),
+                           ci_level = ci_level)
     }
     return(invisible(out))
   }

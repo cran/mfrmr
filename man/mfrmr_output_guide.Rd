@@ -5,15 +5,23 @@
 \title{Choose an mfrmr output helper by user goal}
 \usage{
 mfrmr_output_guide(
-  scope = c("all", "tables", "reports", "reviews", "bundles", "exports", "compatibility",
-    "gpcm", "facets", "conquest", "r")
+  scope = c("all", "public", "entry", "viewer", "binary", "tables", "reports", "reviews",
+    "bundles", "exports", "compatibility", "gpcm", "simulation", "linking", "network",
+    "response_time", "facets", "conquest", "r")
 )
 }
 \arguments{
 \item{scope}{Which rows to return. \code{"all"} returns the full guide.
-Other values filter to one output family or to bounded-\code{GPCM}-relevant
-routes. \code{"facets"}, \code{"conquest"}, and \code{"r"} return user-pathway rows for
-people arriving from those workflows.}
+\code{"public"} returns the small top-level public surface for most users.
+\code{"entry"} returns the recommended first-screen routes. \code{"viewer"} returns
+local-viewer routes built around \code{mfrm_results(include = ...)}. \code{"binary"}
+returns the two-category person-item Rasch route and checks. Other values
+filter to one output family or to bounded-\code{GPCM}-relevant routes.
+\code{"linking"} returns anchor, drift, and equating route rows.
+\code{"simulation"} and \code{"network"} return advanced design-review rows.
+\code{"response_time"} returns descriptive response-time QC rows.
+\code{"facets"}, \code{"conquest"}, and \code{"r"} return user-pathway rows for people
+arriving from those workflows.}
 }
 \value{
 A data.frame with one row per recommended route and columns:
@@ -21,6 +29,12 @@ A data.frame with one row per recommended route and columns:
 \item \code{Scope}
 \item \code{Question}
 \item \code{OutputFamily}
+\item \code{Lifecycle}
+\item \code{UserLevel}
+\item \code{APILayer}
+\item \code{ObjectRole}
+\item \code{DecisionBoundary}
+\item \code{RecommendedEntry}
 \item \code{MainFunction}
 \item \code{UseWhen}
 \item \code{TypicalInput}
@@ -44,11 +58,47 @@ Naming convention used by the guide:
 \item \verb{export_*}: writes files or appendix artifacts
 }
 }
-\examples{
-mfrmr_output_guide()
-mfrmr_output_guide("reviews")
-mfrmr_output_guide("gpcm")
-mfrmr_output_guide("facets")
-mfrmr_output_guide("conquest")
-mfrmr_output_guide("r")
+\section{First-screen route}{
+
+Use \code{mfrmr_output_guide("public")} when you want the shortest top-level API
+map. Use \code{mfrmr_output_guide("entry")} when you specifically want
+first-screen creation routes. The entry guide points new scripts to
+\code{\link[=fit_mfrm]{fit_mfrm()}} -> \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} -> \code{\link[=mfrm_results]{mfrm_results()}}, existing fits to
+\code{\link[=mfrm_results]{mfrm_results()}}, and exploratory console
+work to \code{\link[=mfrm_results_interactive]{mfrm_results_interactive()}}. After creating \code{res}, use
+\code{summary(res)$next_actions} to choose the next purpose-specific helper.
+Use \code{mfrmr_output_guide("viewer")} when the next step is the optional local
+Shiny reader; it shows which \code{include} preset to use before calling
+\code{\link[=launch_mfrmr_viewer]{launch_mfrmr_viewer()}}.
 }
+
+\section{How to use this guide}{
+
+Treat \code{MainFunction} as the route to try next and \code{UseWhen} as the guardrail.
+The guide is not a replacement for the help pages of the listed functions;
+it is a namespace map for deciding which page to open.
+For bounded \code{GPCM}, use \code{scope = "gpcm"} to find both the support matrix
+and the table that explains how out-of-scope routes are handled.
+}
+
+\examples{
+public <- mfrmr_output_guide("public")
+public[, c("Question", "APILayer", "ObjectRole", "MainFunction")]
+
+entry <- mfrmr_output_guide("entry")
+entry[, c("Question", "Lifecycle", "UserLevel", "MainFunction")]
+
+reviews <- mfrmr_output_guide("reviews")
+reviews[, c("Question", "MainFunction", "UseWhen")]
+
+mfrmr_output_guide("gpcm")[, c("Question", "MainFunction", "GPCMStatus")]
+mfrmr_output_guide("simulation")[, c("Question", "Lifecycle")]
+mfrmr_output_guide("linking")[, c("Question", "MainFunction")]
+mfrmr_output_guide("facets")[, c("Question", "MainFunction")]
+mfrmr_output_guide("binary")[, c("Question", "MainFunction")]
+mfrmr_output_guide("viewer")[, c("Question", "MainFunction")]
+mfrmr_output_guide("response_time")[, c("Question", "MainFunction")]
+}
+\concept{GPCM boundaries}
+\concept{reporting workflow}
+\concept{route selection}

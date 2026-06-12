@@ -41,6 +41,7 @@ knitr::opts_chunk$set(
 # 
 # prec$profile
 # prec$checks
+# prec$fit_separation_basis
 
 ## ----apa----------------------------------------------------------------------
 # apa <- build_apa_outputs(

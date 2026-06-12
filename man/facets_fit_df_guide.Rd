@@ -34,6 +34,17 @@ outfit MnSq values answer how large the residual noise or predictability
 signal is. ZSTD values standardize those MnSq values using a degrees-of-
 freedom convention and a Wilson-Hilferty-style transformation, so ZSTD can
 differ even when the underlying MnSq values are nearly identical.
+
+Two boundaries sit upstream of any df comparison. First, the residual
+basis: \code{method = "MML"} fits evaluate residuals at shrunken EAP person
+measures, whereas FACETS evaluates them at JMLE estimates, so MnSq values
+themselves can differ before any standardization is applied; refit with
+\code{method = "JML"} when the comparison requires a JMLE-style residual basis.
+Second, small df: \code{mfrmr} returns \code{NA} ZSTD when \code{df < 1} because the
+Wilson-Hilferty transformation is numerically unstable there, while
+FACETS/Winsteps under \code{WHEXACT} can continue with a linear approximation,
+so sparse cells can show \code{NA} against a finite external value without
+indicating a fit difference.
 }
 \examples{
 facets_fit_df_guide()

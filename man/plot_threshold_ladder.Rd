@@ -7,7 +7,7 @@
 plot_threshold_ladder(
   fit,
   highlight_disorder = TRUE,
-  preset = c("standard", "publication", "compact"),
+  preset = c("standard", "publication", "compact", "monochrome"),
   draw = TRUE
 )
 }
@@ -18,8 +18,8 @@ plot_threshold_ladder(
 disordered segments with the preset's \code{fail} colour and add a
 subtitle counting the disordered groups.}
 
-\item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, or
-\code{"compact"}).}
+\item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, \code{"compact"},
+or \code{"monochrome"}).}
 
 \item{draw}{If \code{TRUE}, draw with base graphics.}
 }

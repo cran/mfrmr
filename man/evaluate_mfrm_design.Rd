@@ -20,6 +20,10 @@ evaluate_mfrm_design(
   fit_method = c("JML", "MML"),
   model = c("RSM", "PCM", "GPCM"),
   step_facet = NULL,
+  slope_facet = NULL,
+  slopes = NULL,
+  assignment = NULL,
+  sparse_controls = NULL,
   maxit = 25,
   quad_points = 7,
   residual_pca = c("none", "overall", "facet", "both"),
@@ -64,13 +68,29 @@ variable through both \code{design} and the scalar design-grid arguments.}
 
 \item{fit_method}{Estimation method passed to \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
-\item{model}{Measurement model passed to \code{\link[=fit_mfrm]{fit_mfrm()}}. The current design
-evaluator supports \code{RSM} and \code{PCM}; bounded \code{GPCM} is accepted only
-to produce an explicit unsupported-path error.}
+\item{model}{Measurement model passed to \code{\link[=fit_mfrm]{fit_mfrm()}}. \code{RSM} and \code{PCM} use
+the validated Rasch-family design-planning layer. Bounded \code{GPCM} is
+available as a caveated simulation/refit operating-characteristic route.}
 
-\item{step_facet}{Step facet passed to \code{\link[=fit_mfrm]{fit_mfrm()}} when \code{model = "PCM"}.
+\item{step_facet}{Step facet passed to \code{\link[=fit_mfrm]{fit_mfrm()}} when \code{model = "PCM"} or
+\code{model = "GPCM"}.
 When left \code{NULL}, the function inherits the generator step facet from
 \code{sim_spec} when available and otherwise defaults to \code{"Criterion"}.}
+
+\item{slope_facet}{Slope facet passed to \code{\link[=fit_mfrm]{fit_mfrm()}} when
+\code{model = "GPCM"}. The current bounded branch requires
+\code{slope_facet == step_facet}.}
+
+\item{slopes}{Optional bounded-\code{GPCM} generator slopes used when
+\code{sim_spec = NULL}. See \code{\link[=build_mfrm_sim_spec]{build_mfrm_sim_spec()}} for accepted formats.}
+
+\item{assignment}{Optional assignment design used when \code{sim_spec = NULL}.
+\code{"sparse_linked"} activates planned-missing sparse rating designs; use
+\code{sparse_controls} to specify the linking set.}
+
+\item{sparse_controls}{Optional named list used when
+\code{assignment = "sparse_linked"} and \code{sim_spec = NULL}, or retained from
+a sparse linked \code{sim_spec}. See \code{\link[=build_mfrm_sim_spec]{build_mfrm_sim_spec()}}.}
 
 \item{maxit}{Maximum iterations passed to \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
@@ -122,6 +142,9 @@ summaries and plots
 mutable under the current simulation specification
 \item \code{planning_schema}: combined planner-schema contract bundling the role
 descriptor, scope boundary, and current mutability map
+\item \code{gpcm_boundary}: bounded-\code{GPCM} caveat row when a \code{GPCM} design route is
+used
+\item \code{notes}: short interpretation notes
 \item \code{settings}: simulation settings
 \item \code{ademp}: simulation-study metadata (aims, DGM, estimands, methods, performance measures)
 }
@@ -166,22 +189,26 @@ data-generating mechanism. This is the recommended route when you want a
 design study to stay close to a previously fitted run while still varying the
 candidate sample sizes or rater-assignment counts.
 
+Sparse linked simulation specifications and direct
+\code{assignment = "sparse_linked"} calls are carried into the design-evaluation
+output. The resulting sparse-design columns report planned-missingness and
+rater-link diagnostics (for example design density and rater-pair common
+persons). They are design diagnostics, not fit statistics or universal
+adequacy thresholds.
+
 If that specification also stores a latent-regression population generator,
 each replication carries forward the simulated one-row-per-person background
 data and refits the MML population-model branch. This remains a scenario
 study under explicit assumptions; it is not a closed-form predictive
 distribution for one future administration.
 
-First-release \code{GPCM} is not yet available in this design-evaluation helper.
-Direct bounded-\code{GPCM} data generation and parameter-recovery checks are
-available through \code{\link[=simulate_mfrm_data]{simulate_mfrm_data()}}, \code{\link[=evaluate_mfrm_recovery]{evaluate_mfrm_recovery()}}, and
-\code{\link[=assess_mfrm_recovery]{assess_mfrm_recovery()}}, but this helper asks a broader design operating-
-characteristic question. The remaining gap is a validated slope-aware
-design-planning contract with downstream diagnostics compatible with the
-generalized ordered kernel. More broadly, the current planning layer is
-role-based for exactly two non-person facets (\code{rater}-like and
-\code{criterion}-like), even though the estimation core supports arbitrary facet
-counts.
+Bounded \code{GPCM} design evaluation is available with caveats. It repeatedly
+generates data from the supplied or fit-derived slope-aware specification,
+refits bounded \code{GPCM}, and summarizes facet-level operating characteristics.
+The route remains a role-based person x rater-like x criterion-like planner:
+it does not validate diagnostic-screening or signal-detection rules, does
+not provide a fully arbitrary-facet planner, and does not replace
+\code{\link[=evaluate_mfrm_recovery]{evaluate_mfrm_recovery()}} for slope-recovery adequacy review.
 
 Recovery metrics are reported only when the generator and fitted model target
 the same facet-parameter contract. In practice this means the same
@@ -201,6 +228,10 @@ how many statistically distinct strata the facet resolves.
 \item \code{Strata} (\eqn{(4G + 1) / 3}): number of distinguishable groups.
 \item Mean \code{Infit} and \code{Outfit}: average fit mean-squares across elements.
 \item \code{MisfitRate}: share of elements with \eqn{|\mathrm{ZSTD}| > 2}.
+\item Sparse-design diagnostics when \code{assignment = "sparse_linked"}:
+\code{MeanDesignDensity}, \code{MeanPlannedMissingRate}, \code{MeanLinkPersons},
+\code{MeanMinCommonPersonsPerRaterPair}, \code{MaxZeroCommonRaterPairs}, and
+\code{MaxRaterPairsBelowTarget}.
 \item \code{SeverityRMSE}: root-mean-square error of recovered parameters vs
 the known truth \strong{after facet-wise mean alignment}, so that the
 usual Rasch/MFRM location indeterminacy does not inflate recovery

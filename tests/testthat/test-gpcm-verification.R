@@ -71,22 +71,21 @@ test_that("GPCM capability matrix is consistent with the helper", {
   expect_true(is.data.frame(m))
   expect_true(all(c("Area", "Helpers", "Status", "PrimaryUse", "Boundary")
                   %in% names(m)))
+  expect_true(all(c("RecommendedRoute", "NextValidationStep") %in% names(m)))
   expect_true(all(m$Status %in%
                     c("supported", "supported_with_caveat", "blocked", "deferred")))
 })
 
-test_that("GPCM still blocks build_apa_outputs (blocked row)", {
+test_that("GPCM APA/QC reporting bundle returns with explicit caveats", {
   diag <- suppressMessages(suppressWarnings(
     diagnose_mfrm(.gpcm_fit, residual_pca = "none", diagnostic_mode = "legacy")
   ))
-  # build_apa_outputs is `blocked` for GPCM in the capability matrix.
-  # fair_average_table() and estimate_bias() were unblocked in 0.2.0
-  # via the slope-aware kernel; build_apa_outputs() remains blocked.
-  apa_attempt <- tryCatch(
-    suppressMessages(build_apa_outputs(.gpcm_fit, diag)),
-    error = function(e) e,
-    warning = function(w) w
-  )
-  expect_true(inherits(apa_attempt, "condition") ||
-                inherits(apa_attempt, "mfrm_apa_outputs"))
+  apa <- suppressMessages(build_apa_outputs(.gpcm_fit, diag))
+  expect_s3_class(apa, "mfrm_apa_outputs")
+  expect_true(nrow(apa$gpcm_boundary) > 0)
+  expect_true(grepl("Bounded\\s+GPCM note", apa$report_text))
+
+  qc <- run_qc_pipeline(.gpcm_fit, diag)
+  expect_s3_class(qc, "mfrm_qc_pipeline")
+  expect_true(nrow(qc$gpcm_boundary) > 0)
 })

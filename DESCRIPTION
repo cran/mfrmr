@@ -1,7 +1,7 @@
 Package: mfrmr
 Type: Package
 Title: Estimation and Diagnostics for Many-Facet Measurement Models
-Version: 0.2.0
+Version: 0.2.1
 Authors@R: 
     person(given = "Ryuya", family = "Komuro", role = c("aut", "cre", "cph"),
            email = "ryuya.komuro.c4@tohoku.ac.jp",
@@ -24,20 +24,21 @@ License: MIT + file LICENSE
 Language: en
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 7.3.3
 Depends: R (>= 4.1)
 Imports: cli, dplyr, grDevices, graphics, tidyr, tibble, purrr,
         stringr, psych, lifecycle, rlang, methods, stats, utils
 LinkingTo: cpp11
 Suggests: testthat (>= 3.0.0), covr, knitr, rmarkdown, igraph, lme4,
-        digest, kableExtra, flextable, future.apply, mirt, TAM, eRm
+        digest, kableExtra, flextable, future.apply, shiny, mirt, TAM,
+        eRm
 VignetteBuilder: knitr
 Config/testthat/edition: 3
 Config/Needs/website: pkgdown
+Config/roxygen2/version: 8.0.0
 NeedsCompilation: yes
-Packaged: 2026-05-16 17:53:05 UTC; tohokusla
+Packaged: 2026-06-12 08:28:26 UTC; ryuyakomuro
 Author: Ryuya Komuro [aut, cre, cph] (ORCID:
     <https://orcid.org/0000-0001-9205-0926>)
 Maintainer: Ryuya Komuro <ryuya.komuro.c4@tohoku.ac.jp>
 Repository: CRAN
-Date/Publication: 2026-05-16 21:40:02 UTC
+Date/Publication: 2026-06-12 17:00:13 UTC

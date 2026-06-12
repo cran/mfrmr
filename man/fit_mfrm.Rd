@@ -532,19 +532,22 @@ Wright/pathway/CCC fit plots, \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, res
 \code{\link[=displacement_table]{displacement_table()}}, \code{\link[=measurable_summary_table]{measurable_summary_table()}},
 \code{\link[=rating_scale_table]{rating_scale_table()}}, \code{\link[=facet_quality_dashboard]{facet_quality_dashboard()}},
 \code{\link[=reporting_checklist]{reporting_checklist()}}, \code{\link[=category_structure_report]{category_structure_report()}},
-\code{\link[=category_curves_report]{category_curves_report()}}, and graph-only (not score-side)
-\code{\link[=facets_output_file_bundle]{facets_output_file_bundle()}} are available. Direct simulation
+\code{\link[=category_curves_report]{category_curves_report()}}, and graph/scorefile
+\code{\link[=facets_output_file_bundle]{facets_output_file_bundle()}} routes are available with score-side
+caveats. Direct simulation
 specifications and data generation are also supported through
 \code{\link[=build_mfrm_sim_spec]{build_mfrm_sim_spec()}}, \code{\link[=extract_mfrm_sim_spec]{extract_mfrm_sim_spec()}}, and
 \code{\link[=simulate_mfrm_data]{simulate_mfrm_data()}} when the slope-aware generator contract is stored
 explicitly; direct recovery checks are available through
 \code{\link[=evaluate_mfrm_recovery]{evaluate_mfrm_recovery()}} and \code{\link[=assess_mfrm_recovery]{assess_mfrm_recovery()}}. Slope-aware
 \code{\link[=fair_average_table]{fair_average_table()}} and \code{\link[=estimate_bias]{estimate_bias()}} are available with their
-documented caveats. Planning/forecasting, FACETS-style scorefile exports,
-the APA writer, QC pass/fail pipelines, and fit-based report/export
-bundles should be treated as unsupported unless documented
-otherwise. Use \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}} as the formal boundary statement
-for the current \code{GPCM} scope.
+documented caveats. Role-based design evaluation, population forecasting,
+diagnostic-screening, and signal-detection helpers are available as
+caveated sensitivity evidence. Full FACETS-style score-side contract
+review, posterior predictive checks, and heavy backend routes should be
+treated as unsupported unless documented otherwise. Use
+\code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}} as the formal boundary statement for the
+current \code{GPCM} scope.
 }
 
 Latent-regression status:
@@ -573,9 +576,9 @@ table internally during scoring.
 }
 }
 
-\section{Latent-regression quick start}{
+\section{Latent-regression workflow}{
 
-For a first latent-regression run, keep the setup explicit:
+For an initial latent-regression run, keep the setup explicit:
 \enumerate{
 \item Put response data in \code{data}, with one row per rating event.
 \item Put background variables in \code{person_data}, with exactly one row per

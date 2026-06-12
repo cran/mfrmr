@@ -30,9 +30,9 @@
 #' [plot_anchor_drift()] or `plot(anchor_review, ...)` for the specific flagged
 #' evidence family.
 #'
-#' For bounded `GPCM`, keep anchor/drift helpers as direct exploratory support
-#' only. [build_linking_review()] remains outside the current formal `GPCM`
-#' route.
+#' For bounded `GPCM`, use [build_linking_review()] as a caveated exploratory
+#' synthesis over direct anchor, drift, and chain evidence. It is not an
+#' operational `GPCM` linking decision or evidence that anchor drift is absent.
 #'
 #' @section Canonical misfit case-review route:
 #' When the main question is which observations, facet levels, or pairwise
@@ -100,9 +100,10 @@
 #'    Treat those residual-based
 #'    summaries as exploratory screens because the discrimination
 #'    parameter is free.
-#'    FACETS-style score exports and fit-based reporting bundles remain blocked
-#'    for bounded `GPCM`; direct fair-average and bias-screening tables carry
-#'    their own caveats.
+#'    Full FACETS-style score-side contract review remains blocked for bounded
+#'    `GPCM`; package-native scorefile export, fit-based reporting bundles,
+#'    direct fair-average tables, and bias-screening tables carry their own
+#'    caveats.
 #'    Posterior scoring with [predict_mfrm_units()] /
 #'    [sample_mfrm_plausible_values()], design-weighted information via
 #'    [compute_information()] / [plot_information()], Wright/pathway/CCC plots
@@ -112,9 +113,12 @@
 #'    and [simulate_mfrm_data()] are also available when the simulation
 #'    specification stores both thresholds and slopes. Use
 #'    [evaluate_mfrm_recovery()] and [assess_mfrm_recovery()] for direct
-#'    recovery checks. Planning/forecasting helpers, APA writer/QC pipelines,
-#'    and fit-based export bundles remain outside the validated `GPCM`
-#'    boundary. Use [gpcm_capability_matrix()] as the formal capability map
+#'    recovery checks plus caveated role-based design evaluation, population
+#'    forecasting, diagnostic-screening, and signal-detection helpers.
+#'    Caveated APA/QC/export bundles are available for sensitivity reporting,
+#'    while score-side FACETS helpers remain outside the validated `GPCM`
+#'    boundary. Use
+#'    [gpcm_capability_matrix()] as the formal capability map
 #'    before branching into less common helpers.
 #' 4. (Optional, `RSM` / `PCM`; bounded `GPCM` with caveat) Estimate
 #'    interaction bias with [estimate_bias()].
@@ -122,16 +126,17 @@
 #'    [reporting_checklist()] for direct report preparation, or
 #'    [build_weighting_review()] for Rasch-versus-bounded-`GPCM`
 #'    weighting review, or [build_misfit_casebook()] / [build_linking_review()]
-#'    for operational case review. Keep [build_linking_review()] on the
-#'    `RSM` / `PCM` route; bounded `GPCM` linking synthesis is deferred.
+#'    for operational case review. For bounded `GPCM`, use
+#'    [build_linking_review()] only as an exploratory index over direct
+#'    anchor/drift/chain evidence.
 #' 6. Generate reporting bundles:
 #'    [build_summary_table_bundle()], [apa_table()],
 #'    [export_summary_appendix()], [build_fixed_reports()],
-#'    [build_visual_summaries()]. For bounded `GPCM`, use
-#'    [build_summary_table_bundle()] and [export_summary_appendix()] only for
-#'    supported direct outputs; the APA writer, visual-summary bundle, and
-#'    fit-based export bundle remain out of scope. Weighting-review and
-#'    misfit-casebook surfaces can use the same summary-table export handoff.
+#'    [build_visual_summaries()]. For bounded `GPCM`, use the APA, visual,
+#'    QC, and fit-based export bundles as caveated sensitivity-reporting
+#'    surfaces; full score-side FACETS review stays blocked, while
+#'    diagnostic/signal-detection design screening has its own caveated
+#'    operating-characteristic route.
 #' 7. (Optional, `RSM` / `PCM`) Review report completeness with
 #'    [reference_case_review()]. Use `facets_output_contract_review()` only when you
 #'    explicitly need the compatibility layer.
@@ -148,9 +153,10 @@
 #'    [evaluate_mfrm_design()] / [predict_mfrm_population()] ->
 #'    [predict_mfrm_units()] / [sample_mfrm_plausible_values()]. Current
 #'    fit-derived simulation specs include direct `GPCM` data generation and
-#'    recovery checks, but design-evaluation / forecasting helpers remain on
-#'    the `RSM` / `PCM` route and target the role-based person x rater-like x
-#'    criterion-like contract.
+#'    recovery checks. Design-evaluation, population-forecasting, diagnostic-
+#'    screening, and signal-detection helpers also support bounded `GPCM` as
+#'    caveated role-based simulation/refit evidence; inspect `gpcm_boundary`
+#'    before using those results in design claims.
 #'    Unit scoring can use an ordinary `MML` fit directly, a latent-regression
 #'    `MML` fit when you also supply one-row-per-person background data for the
 #'    scored units, or a `JML` fit when a post hoc reference-prior EAP layer is
@@ -174,10 +180,10 @@
 #'   [compute_information()] -> [plot_information()] ->
 #'   [plot.mfrm_fit()] / [category_curves_report()] ->
 #'   [fair_average_table()] / [estimate_bias()] when those screening tables
-#'   answer the question. Keep bounded `GPCM` routes on the direct table/plot
-#'   side; the fit-based export family
+#'   answer the question. For bounded `GPCM`, the fit-based export family
 #'   ([build_mfrm_manifest()], [build_mfrm_replay_script()],
-#'   [export_mfrm_bundle()]) remains outside the formal `GPCM` boundary.
+#'   [export_mfrm_bundle()]) is available as caveated sensitivity-reporting
+#'   output with explicit `gpcm_boundary` rows.
 #' - Linking and coverage review:
 #'   [subset_connectivity_report()] -> `plot(..., type = "design_matrix")` ->
 #'   [plot_wright_unified()].
@@ -189,8 +195,8 @@
 #'   [export_summary_appendix()].
 #'   First-release `GPCM`:
 #'   [reporting_checklist()] -> direct table/plot helpers ->
-#'   [build_summary_table_bundle()] -> [export_summary_appendix()] while the
-#'   APA writer and fit-based export bundle remain outside scope.
+#'   [build_apa_outputs()] / [build_visual_summaries()] ->
+#'   [export_mfrm_bundle()] with `gpcm_boundary` caveats.
 #' - Weighting-policy review:
 #'   [compare_mfrm()] -> [build_weighting_review()] ->
 #'   [compute_information()] / [plot_information()] when you want to inspect
@@ -211,12 +217,13 @@
 #'   direct data generation via
 #'   [build_mfrm_sim_spec()], [extract_mfrm_sim_spec()], and
 #'   [simulate_mfrm_data()], [evaluate_mfrm_recovery()],
-#'   [assess_mfrm_recovery()], residual diagnostics, and direct curve/report
-#'   helpers, but still stops before planning/forecasting helpers. The current
-#'   planning layer remains role-based for two non-person facets even though
-#'   estimation itself supports arbitrary facet counts; future arbitrary-facet
-#'   planning fields should be treated as design metadata rather than finished
-#'   public behavior.
+#'   [assess_mfrm_recovery()], caveated role-based design evaluation and
+#'   population forecasting, diagnostic/signal-detection design screening,
+#'   residual diagnostics, and direct curve/report helpers. The current
+#'   planning layer remains role-based for two
+#'   non-person facets even though estimation itself supports arbitrary facet
+#'   counts; future arbitrary-facet planning fields should be treated as
+#'   design metadata rather than finished public behavior.
 #'
 #' @section Interpreting output:
 #' This help page is a map, not an estimator:

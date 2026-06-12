@@ -235,6 +235,221 @@ recovery_appendix_fixture <- delayed_export_fixture(function() {
   list(recovery = recovery, assessment = assessment)
 })
 
+export_recovery_validation_summary_fixture <- function() {
+  validation_summary <- list(
+    topline_release_decision = data.frame(
+      Cases = 1L,
+      ReleaseRecoveryStatus = "review",
+      PrimaryDecisionBasis = "recovery metrics, convergence, and Monte Carlo precision",
+      stringsAsFactors = FALSE
+    ),
+    reading_order = data.frame(
+      Step = 1L,
+      Route = "summary(validation)$topline_release_decision",
+      WhatToRead = "Release status.",
+      Purpose = "Start with the top-line decision.",
+      stringsAsFactors = FALSE
+    ),
+    release_decision_table = data.frame(
+      CaseID = "gpcm_high_dispersion_sparse",
+      ReleaseRecoveryStatus = "review",
+      RecoveryMetricStatus = "ok",
+      UncertaintyStatus = "review",
+      ScoreSupportStatus = "review",
+      stringsAsFactors = FALSE
+    ),
+    case_summary = data.frame(
+      CaseID = "gpcm_high_dispersion_sparse",
+      GPCMSlopeRegime = "high_dispersion",
+      ScoreSupportStatus = "review",
+      stringsAsFactors = FALSE
+    ),
+    condition_reporting_notes = data.frame(
+      CaseID = "gpcm_high_dispersion_sparse",
+      ConditionArea = "score_support",
+      ReportingAttention = "reporting_review",
+      ConditionFinding = "omitted_generated_score_categories",
+      Evidence = "max_zero_score_levels=1",
+      ReportingImplication = "Report sparse generated score support as condition stress.",
+      NextAction = "Inspect category-level recovery before generalizing.",
+      ValidationUse = "generator_condition_not_release_gate",
+      stringsAsFactors = FALSE
+    ),
+    condition_summary = data.frame(
+      CaseID = "gpcm_high_dispersion_sparse",
+      GPCMSlopeRegime = "high_dispersion",
+      ScoreSupportStatus = "review",
+      stringsAsFactors = FALSE
+    ),
+    diagnostic_reporting_notes = data.frame(
+      CaseID = "gpcm_high_dispersion_sparse",
+      Facet = "Rater",
+      ReportingAttention = "reporting_review",
+      DiagnosticFinding = "zero_separation_or_reliability",
+      Evidence = "mean_separation=0; mean_reliability=0",
+      ReportingImplication = "Report zero separation as diagnostic context.",
+      NextAction = "Inspect the generated condition before using reliability language.",
+      ValidationUse = "diagnostic_only_not_release_gate",
+      stringsAsFactors = FALSE
+    ),
+    diagnostic_oc_summary = data.frame(
+      CaseID = "gpcm_high_dispersion_sparse",
+      Facet = "Rater",
+      MeanSeparation = 0,
+      MeanReliability = 0,
+      DiagnosticAvailability = "available",
+      ValidationUse = "diagnostic_only_not_release_gate",
+      stringsAsFactors = FALSE
+    ),
+    domain_decision_table = data.frame(
+      CaseID = "gpcm_high_dispersion_sparse",
+      StatusDomain = "score_support",
+      Status = "review",
+      stringsAsFactors = FALSE
+    ),
+    started_at = Sys.time(),
+    completed_at = Sys.time()
+  )
+  class(validation_summary) <- "summary.mfrmr_recovery_validation"
+  validation_summary
+}
+
+diagnostic_screening_appendix_summary_fixture <- function() {
+  out <- list(
+    overview = data.frame(
+      Designs = 1L,
+      Reps = 1L,
+      Scenarios = "well_specified, local_dependence",
+      Models = "RSM",
+      ReplicateRows = 2L,
+      ScenarioRows = 2L,
+      PerformanceRows = 2L,
+      ReportSignalRows = 2L,
+      ContrastRows = 1L,
+      RunOKRate = 1,
+      ConvergenceRate = 1,
+      IncludeReport = TRUE,
+      PlotDataContract = "mfrm_plot_data",
+      stringsAsFactors = FALSE
+    ),
+    reading_order = data.frame(
+      Step = 1L,
+      Table = "scenario_summary",
+      WhatToRead = "Scenario-by-design screening summaries.",
+      Purpose = "Compare screening surfaces across scenarios.",
+      InterpretationBoundary = "Scenario means and flag rates are operating-characteristic readouts.",
+      stringsAsFactors = FALSE
+    ),
+    next_actions = data.frame(
+      Priority = 1L,
+      Area = "Appendix and plot-data handoff",
+      Status = "ok",
+      Evidence = "Summary tables and draw-free plot-data tables are available.",
+      Action = "Use build_summary_table_bundle() or export_summary_appendix().",
+      Route = "build_summary_table_bundle(diag_eval); export_summary_appendix(diag_eval)",
+      ReportingBoundary = "Exports and plot data are presentation handoffs over the same summary evidence.",
+      stringsAsFactors = FALSE
+    ),
+    reporting_notes = data.frame(
+      Area = "Diagnostic-screening scope",
+      Evidence = "Repeated simulation, fitting, diagnosis, and aggregation.",
+      ReportingBoundary = "Describe as an operating-characteristic study, not a calibrated hypothesis test.",
+      RecommendedAction = "Report scenarios, design grid, replication count, and fitting method.",
+      stringsAsFactors = FALSE
+    ),
+    figure_recipes = data.frame(
+      FigureID = "overview_rates",
+      RecommendedUse = "main_text_or_primary_supplement",
+      PrimaryQuestion = "How often do screening signals fire across scenarios?",
+      PlotCall = "plot(diag_eval, type = \"overview\", metric = \"rate\", draw = FALSE)",
+      PlotDataCall = "plot_data(diag_eval, type = \"overview\", metric = \"rate\", component = \"plot_long\")",
+      SummaryTable = "plot_overview_rate",
+      DisplaySuggestion = "Line or point plot by design variable.",
+      CaptionFocus = "Describe operating-characteristic signal rates.",
+      InterpretationBoundary = "Rates are simulation summaries, not calibrated inferential tests.",
+      Availability = "available_when_plot_rows_exist",
+      stringsAsFactors = FALSE
+    ),
+    scenario_summary = data.frame(
+      design_id = "D1",
+      Scenario = c("well_specified", "local_dependence"),
+      n_person = 12L,
+      LegacyAnyFlagRate = c(0, 1),
+      MarginalAnyFlagRate = c(0, 1),
+      PairwiseAnyFlagRate = c(0, 1),
+      stringsAsFactors = FALSE
+    ),
+    performance_summary = data.frame(
+      design_id = "D1",
+      Scenario = c("well_specified", "local_dependence"),
+      n_person = 12L,
+      EvaluationUse = c("type_I_proxy", "sensitivity_proxy"),
+      StrictAnyFlagRate = c(0, 1),
+      MeanElapsedSec = c(0.10, 0.12),
+      stringsAsFactors = FALSE
+    ),
+    report_signal_summary = data.frame(
+      design_id = "D1",
+      Scenario = c("well_specified", "local_dependence"),
+      n_person = 12L,
+      ReportIndexAvailabilityRate = c(1, 1),
+      FitReportReviewRate = c(0, 1),
+      stringsAsFactors = FALSE
+    ),
+    scenario_contrast = data.frame(
+      design_id = "D1",
+      Scenario = "local_dependence",
+      n_person = 12L,
+      DeltaLegacyFlaggedLevels = 2,
+      DeltaMarginalFlaggedGroups = 1,
+      stringsAsFactors = FALSE
+    ),
+    plot_overview_rate = data.frame(
+      design_id = "D1",
+      Scenario = c("well_specified", "local_dependence"),
+      n_person = 12L,
+      Signal = "Strict combined any-flag rate",
+      Value = c(0, 1),
+      SourceTable = "performance_summary",
+      Metric = "StrictAnyFlagRate",
+      stringsAsFactors = FALSE
+    ),
+    plot_overview_count = data.frame(),
+    plot_report_rate = data.frame(
+      design_id = "D1",
+      Scenario = "local_dependence",
+      n_person = 12L,
+      Signal = "Fit review rate",
+      Value = 1,
+      SourceTable = "report_signal_summary",
+      Metric = "FitReportReviewRate",
+      stringsAsFactors = FALSE
+    ),
+    plot_contrast_count = data.frame(),
+    plot_runtime = data.frame(
+      design_id = "D1",
+      Scenario = c("well_specified", "local_dependence"),
+      n_person = 12L,
+      Signal = "Mean elapsed seconds",
+      Value = c(0.10, 0.12),
+      SourceTable = "performance_summary",
+      Metric = "MeanElapsedSec",
+      stringsAsFactors = FALSE
+    ),
+    ademp = list(
+      aims = "Screen diagnostic operating characteristics",
+      data_generating_mechanism = list(model = "RSM", assignment = "complete", step_facet = NA_character_),
+      methods = list(fit_method = "MML", fitted_model = "RSM"),
+      estimands = "Screening signal rates",
+      performance_measures = "Type I and sensitivity proxies"
+    ),
+    settings = list(reps = 1L, model = "RSM", include_report = TRUE),
+    notes = "Draw-free diagnostic-screening plot tables are exported as operating-characteristic readouts."
+  )
+  class(out) <- "summary.mfrm_diagnostic_screening"
+  out
+}
+
 prediction_bundle_fixture <- delayed_export_fixture(function() {
   dat <- load_mfrmr_data("example_core")
   keep_people <- unique(dat$Person)[1:18]
@@ -584,7 +799,7 @@ test_that("build_mfrm_manifest records latent-regression omit provenance", {
   expect_match(value_of(manifest$settings, "plausible_value_population_formula"), "~\\s*X")
 })
 
-test_that("build_mfrm_manifest rejects bounded GPCM fits outside the validated export boundary", {
+test_that("build_mfrm_manifest returns bounded GPCM caveat boundary", {
   dat <- load_mfrmr_data("example_core")
   keep_people <- unique(dat$Person)[1:14]
   dat <- dat[dat$Person %in% keep_people, , drop = FALSE]
@@ -602,11 +817,12 @@ test_that("build_mfrm_manifest rejects bounded GPCM fits outside the validated e
     )
   )
 
-  expect_error(
-    build_mfrm_manifest(fit_gpcm),
-    "export bundle helpers",
-    fixed = TRUE
-  )
+  manifest <- build_mfrm_manifest(fit_gpcm)
+
+  expect_s3_class(manifest, "mfrm_manifest")
+  expect_true(is.data.frame(manifest$gpcm_boundary))
+  expect_true(any(manifest$gpcm_boundary$Area == "APA writer and fit-based export bundles"))
+  expect_true(any(manifest$gpcm_boundary$Status == "supported_with_caveat"))
 })
 
 test_that("build_mfrm_replay_script reproduces optional prediction artifacts", {
@@ -2706,6 +2922,258 @@ test_that("export_summary_appendix supports recovery simulation and assessment i
   expect_true(file.exists(file.path(
     out_dir,
     "appendix_recovery_summary_assessment_metric_review.csv"
+  )))
+})
+
+test_that("export_summary_appendix supports recovery-validation summaries", {
+  out_dir <- file.path(tempdir(), "mfrmr-summary-appendix-recovery-validation")
+  if (dir.exists(out_dir)) unlink(out_dir, recursive = TRUE, force = TRUE)
+  dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+  validation_summary <- export_recovery_validation_summary_fixture()
+
+  appendix <- export_summary_appendix(
+    list(validation = validation_summary),
+    output_dir = out_dir,
+    prefix = "appendix_recovery_validation",
+    preset = "recommended",
+    include_html = FALSE,
+    overwrite = TRUE
+  )
+
+  expect_s3_class(appendix, "mfrm_summary_appendix_export")
+  expect_true(any(appendix$written_files$Component ==
+                    "summary_validation_topline_release_decision"))
+  expect_true(any(appendix$written_files$Component ==
+                    "summary_validation_condition_reporting_notes"))
+  expect_true(any(appendix$written_files$Component ==
+                    "summary_validation_diagnostic_reporting_notes"))
+  expect_true(any(appendix$selection_catalog$Role ==
+                    "recovery_validation_diagnostic_reporting_notes" &
+                    appendix$selection_catalog$Selected %in% TRUE))
+  expect_true(file.exists(file.path(
+    out_dir,
+    "appendix_recovery_validation_summary_validation_diagnostic_reporting_notes.csv"
+  )))
+})
+
+test_that("export_summary_appendix supports diagnostic-screening summaries", {
+  out_dir <- file.path(tempdir(), "mfrmr-summary-appendix-diagnostic-screening")
+  if (dir.exists(out_dir)) unlink(out_dir, recursive = TRUE, force = TRUE)
+  dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+  diag_summary <- diagnostic_screening_appendix_summary_fixture()
+
+  appendix <- export_summary_appendix(
+    list(diag = diag_summary),
+    output_dir = out_dir,
+    prefix = "appendix_diagnostic",
+    preset = "recommended",
+    include_html = FALSE,
+    overwrite = TRUE
+  )
+
+  expect_s3_class(appendix, "mfrm_summary_appendix_export")
+  expect_true(any(appendix$written_files$Component ==
+                    "summary_diag_scenario_summary"))
+  expect_true(any(appendix$written_files$Component ==
+                    "summary_diag_reading_order"))
+  expect_true(any(appendix$written_files$Component ==
+                    "summary_diag_next_actions"))
+  expect_true(any(appendix$written_files$Component ==
+                    "summary_diag_reporting_notes"))
+  expect_true(any(appendix$written_files$Component ==
+                    "summary_diag_figure_recipes"))
+  expect_true(any(appendix$selection_catalog$Role ==
+                    "diagnostic_screening_next_actions" &
+                    appendix$selection_catalog$Selected %in% TRUE))
+  expect_true(any(appendix$written_files$Component ==
+                    "summary_diag_plot_overview_rate"))
+  expect_true(any(appendix$selection_catalog$Role ==
+                    "diagnostic_screening_reporting_notes" &
+                    appendix$selection_catalog$Selected %in% TRUE))
+  expect_true(any(appendix$selection_catalog$Role ==
+                    "diagnostic_screening_figure_recipes" &
+                    appendix$selection_catalog$Selected %in% TRUE))
+  expect_true(any(appendix$selection_catalog$Role ==
+                    "diagnostic_screening_plot_data" &
+                    appendix$selection_catalog$Selected %in% TRUE))
+  expect_true(file.exists(file.path(
+    out_dir,
+    "appendix_diagnostic_summary_diag_plot_overview_rate.csv"
+  )))
+})
+
+test_that("export_summary_appendix supports person-fit summary inputs", {
+  out_dir <- file.path(tempdir(), "mfrmr-summary-appendix-person-fit")
+  if (dir.exists(out_dir)) unlink(out_dir, recursive = TRUE, force = TRUE)
+  dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+  person_fit_summary <- list(
+    overview = data.frame(
+      Persons = 2L,
+      ReportableRows = 1L,
+      FlaggedRows = 1L,
+      stringsAsFactors = FALSE
+    ),
+    status_summary = data.frame(
+      Status = "review",
+      Rows = 1L,
+      stringsAsFactors = FALSE
+    ),
+    report_index_summary = data.frame(
+      ReportIndex = "lz_star",
+      Rows = 1L,
+      stringsAsFactors = FALSE
+    ),
+    lz_star_status_summary = data.frame(
+      Status = "available",
+      Rows = 1L,
+      stringsAsFactors = FALSE
+    ),
+    top_review = data.frame(
+      Person = "P1",
+      ReportIndex = "lz_star",
+      ReportValue = -2.5,
+      Status = "review",
+      stringsAsFactors = FALSE
+    ),
+    caveats = data.frame(),
+    thresholds = data.frame(
+      Threshold = "z",
+      Value = 2,
+      stringsAsFactors = FALSE
+    ),
+    reporting_map = data.frame(
+      Output = "top_review",
+      Use = "response-level follow-up",
+      stringsAsFactors = FALSE
+    ),
+    notes = "Person-fit rows are diagnostic follow-up, not automatic exclusions."
+  )
+  class(person_fit_summary) <- "summary.mfrm_person_fit_indices"
+
+  appendix <- export_summary_appendix(
+    person_fit_summary,
+    output_dir = out_dir,
+    prefix = "appendix_person_fit",
+    preset = "recommended",
+    include_html = FALSE,
+    overwrite = TRUE
+  )
+
+  expect_s3_class(appendix, "mfrm_summary_appendix_export")
+  expect_true(any(appendix$written_files$Component ==
+                    "summary_summary_mfrm_person_fit_indices_status_summary"))
+  expect_true(any(appendix$selection_catalog$Role == "review_status" &
+                    appendix$selection_catalog$Selected %in% TRUE))
+  expect_true(file.exists(file.path(
+    out_dir,
+    "appendix_person_fit_summary_summary_mfrm_person_fit_indices_status_summary.csv"
+  )))
+})
+
+test_that("export_summary_appendix supports precision-review summaries", {
+  out_dir <- file.path(tempdir(), "mfrmr-summary-appendix-precision-review")
+  if (dir.exists(out_dir)) unlink(out_dir, recursive = TRUE, force = TRUE)
+  dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+  precision <- precision_review_report(
+    export_core_fixture$fit,
+    diagnostics = export_core_fixture$diagnostics
+  )
+
+  appendix <- export_summary_appendix(
+    list(precision = summary(precision)),
+    output_dir = out_dir,
+    prefix = "appendix_precision",
+    preset = "recommended",
+    include_html = FALSE,
+    overwrite = TRUE
+  )
+
+  expect_s3_class(appendix, "mfrm_summary_appendix_export")
+  expect_true(any(appendix$written_files$Component ==
+                    "summary_precision_fit_separation_basis"))
+  expect_true(any(appendix$selection_catalog$Role == "precision_review" &
+                    appendix$selection_catalog$Selected %in% TRUE))
+  expect_true(file.exists(file.path(
+    out_dir,
+    "appendix_precision_summary_precision_fit_separation_basis.csv"
+  )))
+})
+
+test_that("export_summary_appendix supports fit-measure and FACETS fit-review summaries", {
+  out_dir <- file.path(tempdir(), "mfrmr-summary-appendix-fit-review")
+  if (dir.exists(out_dir)) unlink(out_dir, recursive = TRUE, force = TRUE)
+  dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+  fm <- fit_measures_table(
+    export_core_fixture$fit,
+    diagnostics = export_core_fixture$diagnostics,
+    fit_df_method = "both",
+    top_n = 5
+  )
+  facets_review <- facets_fit_review(
+    export_core_fixture$fit,
+    diagnostics = export_core_fixture$diagnostics
+  )
+
+  appendix <- export_summary_appendix(
+    list(
+      fit_measures = summary(fm),
+      facets_fit = facets_review
+    ),
+    output_dir = out_dir,
+    prefix = "appendix_fit_review",
+    preset = "recommended",
+    include_html = FALSE,
+    overwrite = TRUE
+  )
+
+  expect_s3_class(appendix, "mfrm_summary_appendix_export")
+  expect_true(any(appendix$written_files$Component ==
+                    "summary_fit_measures_df_sensitivity"))
+  expect_true(any(appendix$written_files$Component ==
+                    "summary_facets_fit_df_sensitivity"))
+  expect_true(any(appendix$selection_catalog$Role == "precision_review" &
+                    appendix$selection_catalog$Selected %in% TRUE))
+  expect_true(file.exists(file.path(
+    out_dir,
+    "appendix_fit_review_summary_fit_measures_df_sensitivity.csv"
+  )))
+  expect_true(file.exists(file.path(
+    out_dir,
+    "appendix_fit_review_summary_facets_fit_df_sensitivity.csv"
+  )))
+})
+
+test_that("export_mfrm_bundle supports recovery-validation summary tables", {
+  out_dir <- file.path(tempdir(), "mfrmr-export-bundle-recovery-validation")
+  if (dir.exists(out_dir)) unlink(out_dir, recursive = TRUE, force = TRUE)
+  dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+  validation_summary <- export_recovery_validation_summary_fixture()
+  bundle <- export_mfrm_bundle(
+    fit = export_core_fixture$fit,
+    diagnostics = export_core_fixture$diagnostics,
+    summary_tables = list(validation = validation_summary),
+    output_dir = out_dir,
+    prefix = "bundle_recovery_validation",
+    include = "summary_tables",
+    overwrite = TRUE
+  )
+
+  expect_s3_class(bundle, "mfrm_export_bundle")
+  expect_true(any(bundle$written_files$Component ==
+                    "summary_validation_topline_release_decision"))
+  expect_true(any(bundle$written_files$Component ==
+                    "summary_validation_condition_reporting_notes"))
+  expect_true(any(bundle$written_files$Component ==
+                    "summary_validation_diagnostic_reporting_notes"))
+  expect_true(file.exists(file.path(
+    out_dir,
+    "bundle_recovery_validation_summary_validation_diagnostic_reporting_notes.csv"
   )))
 })
 

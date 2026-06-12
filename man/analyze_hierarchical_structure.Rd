@@ -153,3 +153,6 @@ research. \emph{Journal of Chiropractic Medicine, 15}(2), 155-163.
 \code{\link[=compute_facet_icc]{compute_facet_icc()}}, \code{\link[=compute_facet_design_effect]{compute_facet_design_effect()}},
 \code{\link[=reporting_checklist]{reporting_checklist()}}, \code{\link[=build_mfrm_manifest]{build_mfrm_manifest()}}, \code{\link[=fit_mfrm]{fit_mfrm()}}.
 }
+\concept{confidence intervals}
+\concept{hierarchical structure}
+\concept{reporting workflow}

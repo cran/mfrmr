@@ -147,6 +147,17 @@ approximation (\code{df = 2 / q^2}) and caps reported ZSTD values. Use
 side by side without changing the primary \code{InfitZSTD} / \code{OutfitZSTD}
 columns.
 
+\strong{Residual basis under MML.} For \code{method = "MML"} fits, residuals,
+MnSq, and ZSTD are computed at the EAP person measures from the
+marginal model. EAP measures are shrunken toward the population mean,
+so expected scores -- and therefore fit statistics -- differ
+systematically from JMLE-based engines such as FACETS, especially for
+persons with extreme raw scores. The df conventions above do not remove
+this difference: it is a residual-basis difference, not a
+standardization difference. Refit with \code{method = "JML"} when an
+external FACETS fit comparison requires a JMLE-style residual basis
+(see \code{\link[=facets_fit_review]{facets_fit_review()}}).
+
 \strong{Misfit flagging guidelines (Bond & Fox, 2015):}
 \itemize{
 \item MnSq < 0.5: overfit (too predictable; may inflate reliability)

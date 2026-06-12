@@ -25,7 +25,7 @@ test_that("reference_case_benchmark returns package-native benchmark bundle", {
   expect_true(is.data.frame(bench$conquest_overlap_checks))
   expect_true(is.data.frame(bench$population_policy_checks))
   expect_true(is.data.frame(bench$source_profile))
-  expect_identical(bench$settings$intended_use, "internal_benchmark")
+  expect_identical(bench$settings$intended_use, "packaged_reference_benchmark")
   expect_false(isTRUE(bench$settings$external_validation))
   expect_true(all(c(
     "MMLEngineRequested", "MMLEngineUsed", "EMIterations",

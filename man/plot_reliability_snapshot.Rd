@@ -8,7 +8,7 @@ plot_reliability_snapshot(
   fit,
   diagnostics = NULL,
   metric = c("reliability", "separation", "strata"),
-  preset = c("standard", "publication", "compact"),
+  preset = c("standard", "publication", "compact", "monochrome"),
   draw = TRUE
 )
 }

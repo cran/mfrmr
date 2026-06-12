@@ -973,11 +973,23 @@ build_apa_note_map_from_contract <- function(contract) {
     threshold_note_label <- sub("^thresholds were\\s+", "", threshold_note_label, ignore.case = TRUE)
   }
 
+  positive_facets <- as.character(meta$positive_facets %||% character(0))
+  orientation_clause <- if (length(positive_facets) > 0) {
+    paste0(
+      "higher person values indicate higher ability; for non-person facets, higher values indicate greater severity/difficulty under the default negative orientation, except ",
+      paste(positive_facets, collapse = ", "),
+      ", which were fit with positive orientation (higher values raise expected scores)."
+    )
+  } else {
+    "higher person values indicate higher ability, and higher non-person facet values indicate greater severity/difficulty (all non-person facets used the default negative orientation in this fit)."
+  }
+
   note_map <- list()
   note_map$table1 <- paste0(
     "Table 1. Facet summary\n",
-    "Note. Measures are reported in logits; higher values indicate more of the modeled trait for that facet. ",
+    "Note. Measures are reported in logits; ", orientation_clause, " ",
     precision$se_note,
+    summaries$ci_table_note %||% "",
     "Model = ", meta$model, "; estimation = ", meta$method,
     "; N = ", fmt_count(meta$n_obs), " observations from ", fmt_count(meta$n_person),
     " persons on a ", fmt_count(meta$n_cat), "-category scale (",
@@ -1056,8 +1068,11 @@ build_apa_note_map_from_contract <- function(contract) {
     )
   }
 
-  note_map$wright_map <- "Wright map\nNote. Persons and facet elements are located on a common logit scale; higher values indicate higher ability or greater severity/difficulty depending on facet orientation."
-  note_map$pathway_map <- "Pathway map\nNote. Curves show expected score across theta/logit levels from estimated thresholds."
+  note_map$wright_map <- paste0(
+    "Wright map\nNote. Persons and facet elements are located on a common logit scale; ",
+    orientation_clause
+  )
+  note_map$pathway_map <- "Pathway map\nNote. Curves show expected score across theta/logit levels from estimated thresholds. This expected-score display is distinct from the Bond-and-Fox-style measure-versus-fit pathway bubble chart, which is available via plot_bubble()."
   note_map$facet_distribution <- "Facet estimate distribution\nNote. Distributions summarize severity/difficulty spread within each facet."
   note_map$step_thresholds <- "Step/threshold estimates\nNote. Step ordering should generally increase; disordered thresholds suggest category structure issues."
   note_map$category_curves <- "Category characteristic curves\nNote. Curves show category response probability across theta/logit levels; well-functioning categories show distinct peaks in order."
@@ -1510,8 +1525,22 @@ build_apa_reporting_contract <- function(res, diagnostics, bias_results = NULL, 
   if (identical(model, "PCM") && !is.null(config$step_facet) && nzchar(config$step_facet)) {
     model_sentence <- paste0(model_sentence, " The step structure varied by ", config$step_facet, ".")
   }
+  estimation_basis_sentence <- if (identical(method, "MML")) {
+    paste0(
+      "Person measures are expected a posteriori (EAP) estimates under the ",
+      "marginal person distribution, and residual-based fit statistics are ",
+      "evaluated at these EAP measures rather than at joint maximum ",
+      "likelihood (JMLE) estimates."
+    )
+  } else {
+    ""
+  }
   method_estimation_sentences <- c(method_estimation_sentences, model_sentence, precision_sentence)
   method_sentences <- c(method_sentences, model_sentence, precision_sentence)
+  if (nzchar(estimation_basis_sentence)) {
+    method_estimation_sentences <- c(method_estimation_sentences, estimation_basis_sentence)
+    method_sentences <- c(method_sentences, estimation_basis_sentence)
+  }
   if (isTRUE(population_summary$active)) {
     method_estimation_sentences <- c(
       method_estimation_sentences,
@@ -1610,10 +1639,14 @@ build_apa_reporting_contract <- function(res, diagnostics, bias_results = NULL, 
     outfit <- to_float(overall_fit$Outfit)
     fit_label <- if (is.finite(infit) && is.finite(outfit) &&
                      infit >= band_lower && infit <= band_upper &&
-                     outfit >= band_lower && outfit <= band_upper) "acceptable" else "elevated"
+                     outfit >= band_lower && outfit <= band_upper) "within" else "outside"
     fit_sentence <- paste0(
-      "Overall fit was ", fit_label, " (infit MnSq = ", fmt_num(infit),
-      ", outfit MnSq = ", fmt_num(outfit), ")."
+      "Overall mean-square fit was ", fit_label, " the ", band_text,
+      " screening band (infit MnSq = ", fmt_num(infit),
+      ", outfit MnSq = ", fmt_num(outfit), "). ",
+      "This band is the package's review convention; published mean-square ",
+      "guidelines differ, and band position is screening evidence rather ",
+      "than a model-validity decision."
     )
     results_fit_precision_sentences <- c(results_fit_precision_sentences, fit_sentence)
     results_sentences <- c(results_sentences, fit_sentence)
@@ -1628,7 +1661,8 @@ build_apa_reporting_contract <- function(res, diagnostics, bias_results = NULL, 
                             (Outfit < band_lower) | (Outfit > band_upper))
     misfit_n <- sum(misfit, na.rm = TRUE)
     misfit_sentence <- paste0(fmt_count(misfit_n), " of ", fmt_count(nrow(fit_tbl)),
-                               " elements exceeded the ", band_text, " fit range.")
+                               " elements fell outside the ", band_text,
+                               " mean-square screening band.")
     results_fit_precision_sentences <- c(results_fit_precision_sentences, misfit_sentence)
     results_sentences <- c(results_sentences, misfit_sentence)
     top_misfit_sentence <- summarize_top_misfit_levels(fit_tbl, top_n = 3L)
@@ -1652,7 +1686,24 @@ build_apa_reporting_contract <- function(res, diagnostics, bias_results = NULL, 
       row <- rel_tbl[i, , drop = FALSE]
       paste0(row$Facet, " ", reliability_label, " = ", fmt_num(row$Reliability), " (separation = ", fmt_num(row$Separation), ").")
     }, character(1))
-    reliability_sentence <- paste(rel_lines, collapse = " ")
+    reliability_basis_sentence <- paste0(
+      "These are Rasch/FACETS-style separation indices (measure spread ",
+      "relative to measurement error), not inter-rater agreement."
+    )
+    person_reliability_note <- if (identical(method, "MML") &&
+                                   any(rel_tbl$Facet == "Person", na.rm = TRUE)) {
+      paste0(
+        "The Person row uses EAP measures with posterior SDs, which yields ",
+        "a conservative summary that is not numerically comparable to ",
+        "JMLE-based person reliability from FACETS."
+      )
+    } else {
+      ""
+    }
+    reliability_sentence <- paste(
+      Filter(nzchar, c(rel_lines, reliability_basis_sentence, person_reliability_note)),
+      collapse = " "
+    )
     results_fit_precision_sentences <- c(results_fit_precision_sentences, reliability_sentence)
     results_sentences <- c(results_sentences, reliability_sentence)
   }
@@ -1667,9 +1718,50 @@ build_apa_reporting_contract <- function(res, diagnostics, bias_results = NULL, 
       if (is.finite(exact)) parts <- c(parts, paste0("exact agreement = ", fmt_num(exact)))
       if (is.finite(expected_exact)) parts <- c(parts, paste0("expected exact agreement = ", fmt_num(expected_exact)))
       if (is.finite(adjacent)) parts <- c(parts, paste0("adjacent agreement = ", fmt_num(adjacent)))
-      interrater_sentence <- paste0("For ", facet_label, ", ", paste(parts, collapse = ", "), ".")
+      interrater_sentence <- paste0(
+        "Observed inter-rater agreement is reported separately from separation reliability: for ",
+        facet_label, ", ", paste(parts, collapse = ", "), "."
+      )
       results_fit_precision_sentences <- c(results_fit_precision_sentences, interrater_sentence)
       results_sentences <- c(results_sentences, interrater_sentence)
+    }
+  }
+
+  measures_ci_tbl <- as.data.frame(diagnostics$measures %||% data.frame(), stringsAsFactors = FALSE)
+  ci_available_n <- 0L
+  ci_sentence <- ""
+  ci_table_note <- ""
+  if (nrow(measures_ci_tbl) > 0 && all(c("CI_Lower", "CI_Upper") %in% names(measures_ci_tbl))) {
+    ci_lower <- suppressWarnings(as.numeric(measures_ci_tbl$CI_Lower))
+    ci_upper <- suppressWarnings(as.numeric(measures_ci_tbl$CI_Upper))
+    ci_available_n <- sum(is.finite(ci_lower) & is.finite(ci_upper))
+    if (ci_available_n > 0) {
+      ci_level <- suppressWarnings(as.numeric(measures_ci_tbl$CI_Level[1] %||% NA_real_))
+      ci_level_text <- if (is.finite(ci_level)) paste0(format(round(100 * ci_level)), "%") else "95%"
+      ci_method_text <- trimws(as.character(measures_ci_tbl$CI_Method[1] %||% ""))
+      if (!nzchar(ci_method_text)) ci_method_text <- "normal approximation"
+      ci_eligible_n <- if ("CIEligible" %in% names(measures_ci_tbl)) {
+        sum(vapply(measures_ci_tbl$CIEligible, isTRUE, logical(1)))
+      } else {
+        NA_integer_
+      }
+      ci_sentence <- paste0(
+        "Element-level ", ci_level_text, " confidence intervals (",
+        ci_method_text, ") accompany the measures (CI_Lower / CI_Upper)",
+        if (is.finite(ci_eligible_n)) {
+          paste0("; ", fmt_count(ci_eligible_n), " of ", fmt_count(nrow(measures_ci_tbl)),
+                 " rows are flagged CIEligible for primary reporting")
+        } else {
+          ""
+        },
+        "."
+      )
+      ci_table_note <- paste0(
+        "Report CI_Lower / CI_Upper (", ci_level_text, ", ", ci_method_text,
+        ") alongside measures for rows flagged CIEligible. "
+      )
+      results_fit_precision_sentences <- c(results_fit_precision_sentences, ci_sentence)
+      results_sentences <- c(results_sentences, ci_sentence)
     }
   }
 
@@ -1805,6 +1897,27 @@ build_apa_reporting_contract <- function(res, diagnostics, bias_results = NULL, 
   } else {
     ""
   }
+  gpcm_caution <- if (identical(model, "GPCM")) {
+    paste(
+      "Bounded GPCM note: this APA/reporting bundle is a slope-aware",
+      "sensitivity-reporting surface over supported diagnostics, direct",
+      "tables, and plots. It is not FACETS score-side equivalence, an",
+      "automatic operational-scoring decision, or design-forecasting evidence."
+    )
+  } else {
+    ""
+  }
+  eap_fit_caution <- if (identical(method, "MML")) {
+    paste(
+      "Fit-basis note: MnSq/ZSTD fit statistics in this run were computed at",
+      "EAP person measures, which are shrunken toward the population mean;",
+      "they are therefore not numerically interchangeable with JMLE-based",
+      "engines such as FACETS. Refit with method = \"JML\" when a JMLE-style",
+      "residual basis is required for external comparison."
+    )
+  } else {
+    ""
+  }
 
   contract <- list(
     metadata = list(
@@ -1818,6 +1931,7 @@ build_apa_reporting_contract <- function(res, diagnostics, bias_results = NULL, 
       facet_names = facet_names,
       facet_counts = facet_counts,
       facets_text = facets_text,
+      positive_facets = as.character(config$positive_facets %||% character(0)),
       line_width = line_width,
       # Reflow vs wrapped controls whether section text uses hard line
       # breaks (wrapped, the current 92-col default) or returns one
@@ -1854,6 +1968,7 @@ build_apa_reporting_contract <- function(res, diagnostics, bias_results = NULL, 
       has_strict_pairwise = isTRUE(marginal_state$pairwise_available),
       has_rater_reliability = !is.null(rater_rel),
       has_interrater = nrow(interrater_summary) > 0,
+      has_measure_ci = ci_available_n > 0,
       has_population_model = isTRUE(population_summary$active),
       has_population_coding = isTRUE(population_summary$active) &&
         nrow(population_summary$coding) > 0L
@@ -1891,6 +2006,9 @@ build_apa_reporting_contract <- function(res, diagnostics, bias_results = NULL, 
       pca_overall_2 = pca_overall_2,
       pca_by_facet_first = pca_facet_1,
       pca_reference_text = pca_reference_text,
+      ci_availability_sentence = ci_sentence,
+      ci_table_note = ci_table_note,
+      ci_available_n = ci_available_n,
       bias_summary = summarize_bias_counts(bias_results),
       bias_sig_n = bias_sig_n,
       bias_facet_pair = bias_facet_pair,
@@ -1908,7 +2026,9 @@ build_apa_reporting_contract <- function(res, diagnostics, bias_results = NULL, 
     results_sentences = results_sentences,
     caution_sentences = Filter(nzchar, c(
       precision_caution,
+      eap_fit_caution,
       bias_caution,
+      gpcm_caution,
       population_summary$caution_sentence,
       population_summary$conquest_sentence
     )),

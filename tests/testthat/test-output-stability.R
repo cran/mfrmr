@@ -119,11 +119,10 @@ test_that("GPCM summaries expose slope overview and diagnostics are now availabl
   expect_true(isFALSE(qc$data$fair_average$available))
   expect_true(grepl("slope-aware", qc$data$fair_average$reason, fixed = TRUE))
 
-  expect_error(
-    run_qc_pipeline(fit),
-    "does not support `GPCM` fits",
-    fixed = TRUE
-  )
+  qc_pipe <- run_qc_pipeline(fit)
+  expect_s3_class(qc_pipe, "mfrm_qc_pipeline")
+  expect_equal(nrow(qc_pipe$verdicts), 10)
+  expect_true(any(qc_pipe$gpcm_boundary$Area == "APA writer and fit-based export bundles"))
   # `fair_average_table()` and `estimate_bias()` are both unblocked for
   # GPCM fits in 0.2.0 under the slope-aware element-conditional GPCM
   # construction. Confirm they return populated bundles with the GPCM
@@ -177,11 +176,29 @@ test_that("curve/report GPCM workflows open where the probability kernel is alre
     "does not support `GPCM` fits",
     fixed = TRUE
   )
-  expect_error(
-    facets_output_file_bundle(fit, include = "score", write_files = FALSE),
-    "does not support `GPCM` fits",
-    fixed = TRUE
-  )
+  out_score <- facets_output_file_bundle(fit, include = "score", write_files = FALSE)
+  expect_s3_class(out_score, "mfrm_output_bundle")
+  expect_true(all(c("scorefile", "gpcm_score_side_contract", "gpcm_boundary") %in% names(out_score)))
+  expect_true(all(c(
+    "ScoreSlope", "ObsProb", "ScoreSideStatus", "ScoreUncertaintyStatus",
+    "ScoreUncertaintyMethod", "ExpectedScoreSE", "ExpectedScoreCI_Lower",
+    "ExpectedScoreCI_Upper", "ResidualSE", "ScoreSideSE",
+    "ScoreSideCI_Lower", "ScoreSideCI_Upper", "ScoreSideSE_Status",
+    "ScoreSideSE_Method", "ScoreSideCaveat"
+  ) %in% names(out_score$scorefile)))
+  expect_identical(out_score$settings$score_se_method, "both")
+  expect_true(any(out_score$scorefile$ScoreSideStatus == "supported_with_caveat"))
+  expect_false(any(out_score$scorefile$ScoreUncertaintyStatus == "score_side_se_not_exported"))
+  expect_true(any(is.finite(out_score$scorefile$ExpectedScoreSE)))
+  expect_true(any(is.finite(out_score$scorefile$ScoreSideSE)))
+
+  score_se_plot <- plot(out_score, type = "score_se", draw = FALSE)
+  expect_s3_class(score_se_plot, "mfrm_plot_data")
+  expect_identical(score_se_plot$data$se_column, "ScoreSideSE")
+
+  out_summary <- summary(out_score)
+  expect_true("ScoreSEMethod" %in% names(out_summary$summary))
+  expect_identical(as.character(out_summary$summary$ScoreSEMethod[1]), "both")
 })
 
 # === 5.2 MML output has SD column =========================================

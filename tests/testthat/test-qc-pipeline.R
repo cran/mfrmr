@@ -6,7 +6,7 @@ test_that("run_qc_pipeline returns correct class and structure", {
 
   expect_s3_class(qc, "mfrm_qc_pipeline")
   expect_true(is.list(qc))
-  expect_named(qc, c("verdicts", "overall", "details", "recommendations", "config"),
+  expect_named(qc, c("verdicts", "overall", "details", "recommendations", "config", "gpcm_boundary"),
                ignore.order = TRUE)
 })
 

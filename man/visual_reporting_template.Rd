@@ -46,4 +46,8 @@ decide how to describe the resulting figure.
 visual_reporting_template()
 visual_reporting_template("manuscript")
 visual_reporting_template("surface")
+mfrmr_interval_guide("visual")[, c("Route", "PrimaryHelper", "DefaultLevel")]
 }
+\concept{figure captions}
+\concept{reporting workflow}
+\concept{visual diagnostics}

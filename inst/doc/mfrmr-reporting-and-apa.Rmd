@@ -86,6 +86,7 @@ prec <- precision_review_report(fit, diagnostics = diag)
 
 prec$profile
 prec$checks
+prec$fit_separation_basis
 ```
 
 Interpretation:
@@ -94,11 +95,15 @@ Interpretation:
   `model_based`.
 - Treat `hybrid` and `exploratory` outputs more conservatively, especially for
   SE-, CI-, and reliability-heavy prose.
+- Read `fit_separation_basis` as a boundary table: MnSq fit, ZSTD
+  standardization, Rasch/FACETS-style separation, and package QC thresholds
+  have different source bases and should not be collapsed into a single
+  validation pass/fail claim.
 
 ## 3. Build structured manuscript outputs
 
 `build_apa_outputs()` is the writing engine. It returns report text plus a
-section map, note map, and caption map that all share the same internal
+section map, note map, and caption map that all share the same output
 contract.
 
 ```{r apa}

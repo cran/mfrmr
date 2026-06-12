@@ -9,7 +9,7 @@ plot_rater_agreement_heatmap(
   diagnostics = NULL,
   rater_facet = "Rater",
   metric = c("exact", "correlation"),
-  preset = c("standard", "publication", "compact"),
+  preset = c("standard", "publication", "compact", "monochrome"),
   draw = TRUE
 )
 }

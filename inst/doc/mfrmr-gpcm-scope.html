@@ -422,16 +422,61 @@ contract.</p>
 returns one row per helper family with a <code>Status</code> column
 drawn from <code>supported</code>, <code>supported_with_caveat</code>,
 <code>blocked</code>, and <code>deferred</code>, plus the rationale and
-the evidence trail behind each classification.</p>
+the evidence trail behind each classification. The
+<code>RecommendedRoute</code> column states what to do instead when a
+helper is blocked or deferred, and <code>NextValidationStep</code>
+records what evidence would be needed before broadening that route.</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
 <span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="fu">gpcm_capability_matrix</span>(<span class="st">&quot;supported&quot;</span>)[, <span class="fu">c</span>(<span class="st">&quot;Area&quot;</span>, <span class="st">&quot;Status&quot;</span>)]</span></code></pre></div>
 <div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">gpcm_capability_matrix</span>(<span class="st">&quot;supported_with_caveat&quot;</span>)[, <span class="fu">c</span>(<span class="st">&quot;Area&quot;</span>, <span class="st">&quot;Status&quot;</span>)]</span></code></pre></div>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">gpcm_capability_matrix</span>(<span class="st">&quot;blocked&quot;</span>)[, <span class="fu">c</span>(<span class="st">&quot;Area&quot;</span>, <span class="st">&quot;Status&quot;</span>, <span class="st">&quot;Boundary&quot;</span>)]</span></code></pre></div>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">gpcm_capability_matrix</span>(<span class="st">&quot;deferred&quot;</span>)[, <span class="fu">c</span>(<span class="st">&quot;Area&quot;</span>, <span class="st">&quot;Status&quot;</span>)]</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">gpcm_capability_matrix</span>(<span class="st">&quot;blocked&quot;</span>)[, <span class="fu">c</span>(<span class="st">&quot;Area&quot;</span>, <span class="st">&quot;Status&quot;</span>, <span class="st">&quot;RecommendedRoute&quot;</span>)]</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">gpcm_capability_matrix</span>(<span class="st">&quot;deferred&quot;</span>)[, <span class="fu">c</span>(<span class="st">&quot;Area&quot;</span>, <span class="st">&quot;Status&quot;</span>, <span class="st">&quot;NextValidationStep&quot;</span>)]</span></code></pre></div>
 <p>The matrix is intentionally conservative. A row stays in
 <code>blocked</code> or <code>deferred</code> even when some lower-level
 component already runs, because the scope statement reflects the
 validation evidence rather than the raw code path.</p>
+</div>
+<div id="source-grounded-recovery-interpretation" class="section level2">
+<h2>Source-grounded recovery interpretation</h2>
+<p>The bounded <code>GPCM</code> route follows Muraki’s generalized
+partial credit model and its information-function extension. The
+package-specific <code>slope_regime</code> labels are narrower than that
+model theory: they summarize the centered log-slope spread of the
+simulation generator so recovery evidence can be read against a declared
+stress condition. They are not model-fit tests and they are not
+literature-derived adequacy cut points.</p>
+<p>For simulation reporting, read direct recovery checks in an
+ADEMP-style order: the data-generating mechanism first, then the
+estimands and performance measures, and only then the row-level recovery
+diagnostics. In practice, this means:</p>
+<ol style="list-style-type: decimal">
+<li>Build or extract an explicit <code>mfrm_sim_spec</code>.</li>
+<li>Run <code>evaluate_mfrm_recovery()</code> for the direct
+parameter-recovery question.</li>
+<li>Run <code>assess_mfrm_recovery()</code> with practical RMSE/bias
+limits.</li>
+<li>Read <code>summary(recovery_review)</code>, then
+<code>recovery_review$condition_reporting_notes</code> and
+<code>recovery_review$condition_review</code>, then
+<code>recovery_review$diagnostic_reporting_notes</code> and
+<code>recovery_review$diagnostic_review</code> when optional diagnostics
+were retained, then <code>plot(recovery_review, type = &quot;status&quot;)</code>,
+then
+<code>plot(recovery_review, type = &quot;metrics&quot;, metric = &quot;rmse&quot;)</code>.</li>
+</ol>
+<p>For release-scale checks, the packaged
+<code>recovery-validation.R</code> protocol separates core release
+evidence from extended sensitivity cases. Read
+<code>topline_release_decision</code> before
+<code>condition_reporting_notes</code>, <code>condition_summary</code>,
+or row-level case tables, and treat
+<code>ExtendedSensitivityStatus</code> as sensitivity evidence rather
+than as the core release gate by itself. Fit/separation operating
+characteristics belong in the diagnostic summary; they are not part of
+the top-line release-recovery gate. Read
+<code>diagnostic_reporting_notes</code> first when deciding whether zero
+separation, reliability collapse, or df-sensitive ZSTD flags need
+explicit report language.</p>
 </div>
 <div id="what-works-today" class="section level2">
 <h2>What works today</h2>
@@ -475,14 +520,40 @@ unexpected-response stack: <code>unexpected_response_table()</code>,
 <code>plot_marginal_pairwise()</code>.</li>
 <li><code>reporting_checklist()</code> and
 <code>precision_review_report()</code> route to the supported direct
-tables and plots only. They do not imply that the broader APA writer is
-available.</li>
+tables and plots. The broader APA/QC/export family is available as
+caveated sensitivity-reporting output with explicit
+<code>gpcm_boundary</code> rows.</li>
 <li><code>build_misfit_casebook()</code> inherits the exploratory
 screening framing of its underlying sources.</li>
 <li><code>estimate_bias()</code> now provides bounded-GPCM conditional
 screening rows with slope-aware information and profile-likelihood
 columns. Treat these rows as screening evidence for follow-up, not as
 standalone confirmatory fairness tests.</li>
+<li><code>analyze_dff()</code>, <code>analyze_dif()</code>,
+<code>dif_interaction_table()</code>, <code>dif_report()</code>,
+<code>plot_dif_heatmap()</code>, and <code>plot_dif_summary()</code>
+provide bounded-GPCM DFF/DIF screening and reporting surfaces with
+explicit <code>gpcm_boundary</code> rows.</li>
+<li><code>build_apa_outputs()</code>,
+<code>build_visual_summaries()</code>, <code>run_qc_pipeline()</code>,
+<code>build_mfrm_manifest()</code>,
+<code>build_mfrm_replay_script()</code>,
+<code>export_mfrm_bundle()</code>, package-native scorefile export, and
+<code>build_linking_review()</code> return caveated
+bounded-<code>GPCM</code> reporting or exploratory-review objects with
+explicit <code>gpcm_boundary</code> rows. The package-native scorefile
+can include native structural delta-method expected-score SEs and
+score-side delta SEs selected by <code>score_se_method</code> when the
+required MML diagnostics are available, but those SEs are not
+FACETS-equivalent score-side uncertainty.</li>
+<li><code>evaluate_mfrm_design()</code>,
+<code>predict_mfrm_population()</code>,
+<code>evaluate_mfrm_diagnostic_screening()</code>, and
+<code>evaluate_mfrm_signal_detection()</code> are available as caveated
+role-based repeated simulation/refit routes. Treat their outputs as
+design-level or screening sensitivity evidence, not as operational
+scoring, calibrated inferential testing, or arbitrary-facet planning
+validation.</li>
 </ul>
 <p>The dashboard marks the fair-average panel unavailable under
 <code>GPCM</code>; use <code>fair_average_table()</code> directly for
@@ -492,28 +563,25 @@ fair-average SEs for non-person rows.</p>
 </div>
 <div id="what-is-intentionally-restricted" class="section level2">
 <h2>What is intentionally restricted</h2>
-<p>The slope-aware <code>fair_average_table()</code> route is available
-under <code>GPCM</code>, but FACETS-style score-side compatibility and
-full narrative/export bundles remain restricted because free
-discrimination changes the relationship between the latent measure and
-operational score-side summaries. Specifically:</p>
+<p>The slope-aware <code>fair_average_table()</code> route and
+package-native scorefile route are available under <code>GPCM</code>,
+including native expected-score uncertainty and score-side delta SEs
+where the required MML diagnostics support them. Full FACETS-style
+score-side compatibility remains restricted because free discrimination
+changes the relationship between the latent measure and operational
+score-side summaries. Specifically:</p>
 <ul>
-<li><code>facets_output_contract_review()</code> and
-<code>facets_output_file_bundle(include = &quot;score&quot;)</code> still depend
-on Rasch-family score-side compatibility semantics that are not
-generalized to free discrimination.</li>
-<li><code>build_apa_outputs()</code>,
-<code>build_visual_summaries()</code>, <code>run_qc_pipeline()</code>,
-<code>build_mfrm_manifest()</code>,
-<code>build_mfrm_replay_script()</code>, and
-<code>export_mfrm_bundle()</code> would convert those score-side outputs
-into narrative or bundle claims, so they are also restricted.</li>
+<li><code>facets_output_contract_review()</code> still depends on
+FACETS-style compatibility semantics that are not generalized to free
+discrimination.</li>
+<li>posterior-predictive checks, MCMC, and heavy-backend extensions are
+still future scope.</li>
+<li>Caveated reporting, export, linking, design-forecast, and screening
+helpers must keep their <code>gpcm_boundary</code> wording visible and
+must not imply FACETS-equivalent score-side uncertainty, operational
+scoring, calibrated screening gates, or arbitrary-facet planning
+validation.</li>
 </ul>
-<p><code>build_linking_review()</code> is deferred under
-<code>GPCM</code> for the same reason. The underlying
-<code>review_mfrm_anchors()</code> and
-<code>detect_anchor_drift()</code> helpers can still be called directly
-as exploratory support.</p>
 </div>
 <div id="recommended-substitutes" class="section level2">
 <h2>Recommended substitutes</h2>
@@ -535,6 +603,22 @@ precision evidence.</li>
 reported side by side in the same document, with the <code>GPCM</code>
 fit footnoted as the discrimination-aware counterpart.</li>
 </ul>
+<p>Those restricted helpers use the same capability matrix at runtime. A
+blocked or deferred bounded-<code>GPCM</code> call stops with the
+relevant capability row, recommended route, and next validation step
+instead of producing a partial score-side or unsupported backend result.
+The condition class is <code>mfrmr_gpcm_scope_error</code>, and the
+condition object carries <code>helper</code>, <code>area</code>,
+<code>status</code>, <code>recommended_route</code>, and
+<code>next_validation_step</code> fields so wrappers can catch and route
+the failure without parsing the message text. The release-readiness
+protocol checks that the blocked/deferred rows in
+<code>gpcm_capability_matrix()</code> are represented in the runtime
+guard coverage table or explicitly marked as roadmap-only. Call
+<code>gpcm_runtime_guard_coverage()</code> to inspect that table. Use
+<code>mfrmr_output_guide(&quot;gpcm&quot;)</code> when you want the shorter
+user-facing route map that points to both the support matrix and guard
+coverage.</p>
 </div>
 <div id="a-worked-example" class="section level2">
 <h2>A worked example</h2>
@@ -582,13 +666,46 @@ higher quadrature setting and a larger recovery design.</p>
 <span id="cb5-37"><a href="#cb5-37" tabindex="-1"></a>  <span class="at">fit_method =</span> <span class="st">&quot;MML&quot;</span>,</span>
 <span id="cb5-38"><a href="#cb5-38" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">7</span>,</span>
 <span id="cb5-39"><a href="#cb5-39" tabindex="-1"></a>  <span class="at">maxit =</span> <span class="dv">20</span>,</span>
-<span id="cb5-40"><a href="#cb5-40" tabindex="-1"></a>  <span class="at">seed =</span> <span class="dv">1</span></span>
-<span id="cb5-41"><a href="#cb5-41" tabindex="-1"></a>)</span>
-<span id="cb5-42"><a href="#cb5-42" tabindex="-1"></a><span class="fu">assess_mfrm_recovery</span>(</span>
-<span id="cb5-43"><a href="#cb5-43" tabindex="-1"></a>  rec_gpcm,</span>
-<span id="cb5-44"><a href="#cb5-44" tabindex="-1"></a>  <span class="at">max_rmse =</span> <span class="fu">c</span>(<span class="at">facet =</span> <span class="fl">0.5</span>, <span class="at">step =</span> <span class="fl">0.5</span>, <span class="at">slope =</span> <span class="fl">0.25</span>),</span>
-<span id="cb5-45"><a href="#cb5-45" tabindex="-1"></a>  <span class="at">max_abs_bias =</span> <span class="fu">c</span>(<span class="at">default =</span> <span class="fl">0.25</span>)</span>
-<span id="cb5-46"><a href="#cb5-46" tabindex="-1"></a>)</span></code></pre></div>
+<span id="cb5-40"><a href="#cb5-40" tabindex="-1"></a>  <span class="at">include_diagnostics =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb5-41"><a href="#cb5-41" tabindex="-1"></a>  <span class="at">diagnostic_fit_df_method =</span> <span class="st">&quot;both&quot;</span>,</span>
+<span id="cb5-42"><a href="#cb5-42" tabindex="-1"></a>  <span class="at">seed =</span> <span class="dv">1</span></span>
+<span id="cb5-43"><a href="#cb5-43" tabindex="-1"></a>)</span>
+<span id="cb5-44"><a href="#cb5-44" tabindex="-1"></a>review_gpcm <span class="ot">&lt;-</span> <span class="fu">assess_mfrm_recovery</span>(</span>
+<span id="cb5-45"><a href="#cb5-45" tabindex="-1"></a>  rec_gpcm,</span>
+<span id="cb5-46"><a href="#cb5-46" tabindex="-1"></a>  <span class="at">max_rmse =</span> <span class="fu">c</span>(<span class="at">facet =</span> <span class="fl">0.5</span>, <span class="at">step =</span> <span class="fl">0.5</span>, <span class="at">slope =</span> <span class="fl">0.25</span>),</span>
+<span id="cb5-47"><a href="#cb5-47" tabindex="-1"></a>  <span class="at">max_abs_bias =</span> <span class="fu">c</span>(<span class="at">default =</span> <span class="fl">0.25</span>)</span>
+<span id="cb5-48"><a href="#cb5-48" tabindex="-1"></a>)</span>
+<span id="cb5-49"><a href="#cb5-49" tabindex="-1"></a></span>
+<span id="cb5-50"><a href="#cb5-50" tabindex="-1"></a><span class="fu">summary</span>(review_gpcm)<span class="sc">$</span>overview</span>
+<span id="cb5-51"><a href="#cb5-51" tabindex="-1"></a><span class="fu">summary</span>(review_gpcm)<span class="sc">$</span>reading_order</span>
+<span id="cb5-52"><a href="#cb5-52" tabindex="-1"></a>review_gpcm<span class="sc">$</span>condition_reporting_notes[, <span class="fu">c</span>(</span>
+<span id="cb5-53"><a href="#cb5-53" tabindex="-1"></a>  <span class="st">&quot;ConditionArea&quot;</span>, <span class="st">&quot;ReportingAttention&quot;</span>, <span class="st">&quot;ConditionFinding&quot;</span></span>
+<span id="cb5-54"><a href="#cb5-54" tabindex="-1"></a>)]</span>
+<span id="cb5-55"><a href="#cb5-55" tabindex="-1"></a>review_gpcm<span class="sc">$</span>condition_review[, <span class="fu">c</span>(</span>
+<span id="cb5-56"><a href="#cb5-56" tabindex="-1"></a>  <span class="st">&quot;Model&quot;</span>, <span class="st">&quot;GPCMSlopeRegime&quot;</span>, <span class="st">&quot;StressLevel&quot;</span>, <span class="st">&quot;ScoreSupportStatus&quot;</span></span>
+<span id="cb5-57"><a href="#cb5-57" tabindex="-1"></a>)]</span>
+<span id="cb5-58"><a href="#cb5-58" tabindex="-1"></a>review_gpcm<span class="sc">$</span>diagnostic_reporting_notes[, <span class="fu">c</span>(</span>
+<span id="cb5-59"><a href="#cb5-59" tabindex="-1"></a>  <span class="st">&quot;Facet&quot;</span>, <span class="st">&quot;ReportingAttention&quot;</span>, <span class="st">&quot;DiagnosticFinding&quot;</span></span>
+<span id="cb5-60"><a href="#cb5-60" tabindex="-1"></a>)]</span>
+<span id="cb5-61"><a href="#cb5-61" tabindex="-1"></a><span class="fu">summary</span>(review_gpcm)<span class="sc">$</span>diagnostic_review</span>
+<span id="cb5-62"><a href="#cb5-62" tabindex="-1"></a><span class="fu">plot</span>(review_gpcm, <span class="at">type =</span> <span class="st">&quot;status&quot;</span>)</span>
+<span id="cb5-63"><a href="#cb5-63" tabindex="-1"></a><span class="fu">plot</span>(review_gpcm, <span class="at">type =</span> <span class="st">&quot;metrics&quot;</span>, <span class="at">metric =</span> <span class="st">&quot;rmse&quot;</span>)</span>
+<span id="cb5-64"><a href="#cb5-64" tabindex="-1"></a></span>
+<span id="cb5-65"><a href="#cb5-65" tabindex="-1"></a><span class="co"># For a release-scale smoke read:</span></span>
+<span id="cb5-66"><a href="#cb5-66" tabindex="-1"></a><span class="co"># source(system.file(&quot;validation&quot;, &quot;recovery-validation.R&quot;, package = &quot;mfrmr&quot;))</span></span>
+<span id="cb5-67"><a href="#cb5-67" tabindex="-1"></a><span class="co"># validation &lt;- mfrmr_run_recovery_validation(</span></span>
+<span id="cb5-68"><a href="#cb5-68" tabindex="-1"></a><span class="co">#   case_ids = c(&quot;gpcm_slope_profile&quot;, &quot;gpcm_high_dispersion_sparse&quot;),</span></span>
+<span id="cb5-69"><a href="#cb5-69" tabindex="-1"></a><span class="co">#   quick = TRUE,</span></span>
+<span id="cb5-70"><a href="#cb5-70" tabindex="-1"></a><span class="co">#   verbose = FALSE</span></span>
+<span id="cb5-71"><a href="#cb5-71" tabindex="-1"></a><span class="co"># )</span></span>
+<span id="cb5-72"><a href="#cb5-72" tabindex="-1"></a><span class="co"># validation_summary &lt;- summary(validation)</span></span>
+<span id="cb5-73"><a href="#cb5-73" tabindex="-1"></a><span class="co"># validation_summary$reading_order</span></span>
+<span id="cb5-74"><a href="#cb5-74" tabindex="-1"></a><span class="co"># validation_summary$topline_release_decision</span></span>
+<span id="cb5-75"><a href="#cb5-75" tabindex="-1"></a><span class="co"># validation_summary$condition_reporting_notes</span></span>
+<span id="cb5-76"><a href="#cb5-76" tabindex="-1"></a><span class="co"># validation_summary$condition_summary</span></span>
+<span id="cb5-77"><a href="#cb5-77" tabindex="-1"></a><span class="co"># validation_summary$diagnostic_reporting_notes</span></span>
+<span id="cb5-78"><a href="#cb5-78" tabindex="-1"></a><span class="co"># build_summary_table_bundle(validation_summary)$tables$reading_order</span></span>
+<span id="cb5-79"><a href="#cb5-79" tabindex="-1"></a><span class="co"># build_summary_table_bundle(validation_summary)$tables$domain_decision_table</span></span></code></pre></div>
 <p>The fit, summary, residual diagnostics, information, recovery,
 fair-average, and conditional bias-screening helpers all run under
 <code>GPCM</code> with the caveats listed above. Trying

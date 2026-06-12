@@ -130,3 +130,5 @@ fm_facets$df_conversion_guide$decision_guide
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=facets_fit_review]{facets_fit_review()}}, \code{\link[=plot_bubble]{plot_bubble()}},
 \code{\link[=mfrm_misfit_thresholds]{mfrm_misfit_thresholds()}}
 }
+\concept{confidence intervals}
+\concept{fit statistics}

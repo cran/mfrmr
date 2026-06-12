@@ -67,7 +67,10 @@ specification before using it for design planning.
 First-release \code{GPCM} fits are now supported here for direct data generation
 and parameter-recovery checks, provided that the returned simulation
 specification stores both a threshold table and a parallel slope table.
-Design planning, forecasting, and fit-based report/export bundles still
+The same fit-derived specification can feed caveated role-based design
+evaluation, population forecasting, and fit-based report/export bundles.
+Diagnostic/signal-detection design screening, full FACETS score-side
+contract review, posterior predictive checks, and heavy backend extensions
 remain outside the bounded-\code{GPCM} boundary until those downstream contracts
 are widened explicitly.
 

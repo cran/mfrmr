@@ -79,7 +79,7 @@ and does not imply external FACETS equivalence.}
 \code{\link[=write_mfrm_subset_file]{write_mfrm_subset_file()}} over reusing graph/score compatibility exports.
 \item Instead of \code{\link[=facets_output_contract_review]{facets_output_contract_review()}} for routine QA, prefer:
 \code{\link[=reference_case_review]{reference_case_review()}} for package-native completeness review or
-\code{\link[=reference_case_benchmark]{reference_case_benchmark()}} for internal benchmark cases.
+\code{\link[=reference_case_benchmark]{reference_case_benchmark()}} for packaged benchmark cases.
 }
 }
 

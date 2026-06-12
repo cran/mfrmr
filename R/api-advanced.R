@@ -477,6 +477,15 @@ extract_dff_group_estimates <- function(sub_fit, sub_diag, facet, fallback_level
 #'   (`method = "refit"`).
 #' - `$group_fits`: (refit method only) list of per-group facet estimates and
 #'   subgroup linking diagnostics.
+#' - `$gpcm_boundary`: for bounded `GPCM` fits, a capability-boundary table
+#'   marking the DFF/DIF output as caveated screening evidence.
+#'
+#' @section GPCM boundary:
+#' For bounded `GPCM`, DFF/DIF rows are available as slope-aware screening
+#' evidence over the fitted expected-score and residual scale. Keep
+#' residual-method contrasts and interaction cells in screening language.
+#' Refit contrasts require explicit subgroup linking and precision support
+#' before stronger subgroup-comparison language is used.
 #'
 #' @section Typical workflow:
 #' 1. Fit a model with [fit_mfrm()]. For `RSM` / `PCM` fairness review, prefer
@@ -495,6 +504,7 @@ extract_dff_group_estimates <- function(sub_fit, sub_diag, facet, fallback_level
 #' - `cell_table`: (residual method) per-cell detail table.
 #' - `summary`: counts by screening or ETS classification.
 #' - `group_fits`: (refit method) per-group facet estimates.
+#' - `gpcm_boundary`: for bounded `GPCM` fits, a capability-boundary table.
 #' - `config`: list with facet, group, method, min_obs, p_adjust settings.
 #'
 #' @seealso [fit_mfrm()], [estimate_bias()], [compare_mfrm()],
@@ -1051,6 +1061,11 @@ analyze_dif <- function(...) {
     cell_table = cell_table,
     summary = dif_summary,
     group_fits = NULL,
+    gpcm_boundary = gpcm_capability_boundary_table(
+      fit,
+      helper = "analyze_dff()",
+      area = "Differential facet functioning screening under bounded GPCM"
+    ),
     config = list(facet = facet, group = group, method = "residual",
                   min_obs = min_obs, p_adjust = p_adjust,
                   focal = focal, group_levels = group_levels,
@@ -1346,6 +1361,11 @@ analyze_dif <- function(...) {
     cell_table = NULL,
     summary = dif_summary,
     group_fits = group_fits,
+    gpcm_boundary = gpcm_capability_boundary_table(
+      fit,
+      helper = "analyze_dff()",
+      area = "Differential facet functioning screening under bounded GPCM"
+    ),
     config = list(facet = facet, group = group, method = "refit",
                   min_obs = min_obs, p_adjust = p_adjust,
                   focal = focal, group_levels = group_levels,
@@ -1363,6 +1383,7 @@ summary.mfrm_dif <- function(object, ...) {
     dif_table = object$dif_table,
     cell_table = object$cell_table,
     summary = object$summary,
+    gpcm_boundary = object$gpcm_boundary %||% data.frame(),
     config = object$config
   )
   class(out) <- "summary.mfrm_dif"
@@ -1418,6 +1439,7 @@ print.summary.mfrm_dif <- function(x, ...) {
     cat("\nScreening Summary:\n")
   }
   print(as.data.frame(x$summary), row.names = FALSE)
+  .print_dff_gpcm_boundary(x$gpcm_boundary)
   invisible(x)
 }
 
@@ -1469,7 +1491,25 @@ print.mfrm_dff <- function(x, ...) {
   } else {
     cat("  Contrasts: 0 row(s)\n")
   }
+  boundary <- x$gpcm_boundary %||% data.frame()
+  if (is.data.frame(boundary) && nrow(boundary) > 0L) {
+    status <- as.character(boundary$Status[1] %||% "supported_with_caveat")
+    cat(sprintf("  GPCM boundary: %s\n", status))
+  }
   cat("  Use `summary()` for the contrast table and classification breakdown.\n")
+  invisible(NULL)
+}
+
+.print_dff_gpcm_boundary <- function(boundary) {
+  if (is.null(boundary) || !is.data.frame(boundary) || nrow(boundary) == 0L) {
+    return(invisible(NULL))
+  }
+  keep <- intersect(c("Area", "Status"), names(boundary))
+  if (length(keep) == 0L) {
+    return(invisible(NULL))
+  }
+  cat("\nGPCM Boundary:\n")
+  print(as.data.frame(boundary[, keep, drop = FALSE]), row.names = FALSE)
   invisible(NULL)
 }
 
@@ -1531,9 +1571,16 @@ print.mfrm_dff <- function(x, ...) {
 #' - `$table`: the full interaction table with one row per cell.
 #' - `$summary`: overview counts of flagged and sparse cells.
 #' - `$config`: analysis configuration parameters.
+#' - `$gpcm_boundary`: for bounded `GPCM` fits, a capability-boundary table
+#'   marking the table as caveated DFF screening evidence.
 #' - Cells with `|t| > abs_t_warn` or `|ObsExpAvg| > abs_bias_warn`
 #'   are flagged in the `flag_t` and `flag_bias` columns.
 #' - Sparse cells (N < min_obs) have `sparse = TRUE` and NA statistics.
+#'
+#' @section GPCM boundary:
+#' For bounded `GPCM`, the interaction table uses the fitted slope-aware
+#' expected-score/residual scale and should be reported as screening evidence,
+#' not as a standalone fairness, invariance, or operational subgroup decision.
 #'
 #' @section Typical workflow:
 #' 1. Fit a model with [fit_mfrm()].
@@ -1544,6 +1591,7 @@ print.mfrm_dff <- function(x, ...) {
 #' @return Object of class `mfrm_dif_interaction` with:
 #' - `table`: tibble with per-cell statistics and flags.
 #' - `summary`: tibble summarizing flagged and sparse cell counts.
+#' - `gpcm_boundary`: for bounded `GPCM` fits, a capability-boundary table.
 #' - `config`: list of analysis parameters.
 #'
 #' @seealso [analyze_dff()], [analyze_dif()], [plot_dif_heatmap()], [dif_report()],
@@ -1709,6 +1757,11 @@ dif_interaction_table <- function(fit, diagnostics, facet, group, data = NULL,
   out <- list(
     table = int_table,
     summary = int_summary,
+    gpcm_boundary = gpcm_capability_boundary_table(
+      fit,
+      helper = "dif_interaction_table()",
+      area = "Differential facet functioning screening under bounded GPCM"
+    ),
     config = list(facet = facet, group = group, min_obs = min_obs,
                   p_adjust = p_adjust, abs_t_warn = abs_t_warn,
                   abs_bias_warn = abs_bias_warn,
@@ -1724,6 +1777,7 @@ summary.mfrm_dif_interaction <- function(object, ...) {
   out <- list(
     table = object$table,
     summary = object$summary,
+    gpcm_boundary = object$gpcm_boundary %||% data.frame(),
     config = object$config
   )
   class(out) <- "summary.mfrm_dif_interaction"
@@ -1752,6 +1806,7 @@ print.summary.mfrm_dif_interaction <- function(x, ...) {
     print(as.data.frame(x$table |> select(all_of(show_cols))),
           row.names = FALSE, digits = 3)
   }
+  .print_dff_gpcm_boundary(x$gpcm_boundary)
   invisible(x)
 }
 
@@ -2022,6 +2077,7 @@ plot_dif_heatmap <- function(x, metric = c("obs_exp", "t", "contrast"),
         classification_system = classification_system,
         flag_threshold = flag_threshold
       ),
+      gpcm_boundary = x$gpcm_boundary %||% data.frame(),
       settings = list(
         show_values = show_values,
         value_digits = value_digits,
@@ -2882,7 +2938,7 @@ plot_information <- function(x,
 #' @param ci_level Confidence level used when `show_ci = TRUE`.
 #' @param draw If `TRUE` (default), draw the plot. If `FALSE`, return
 #'   plot data invisibly.
-#' @param preset Visual preset (`"standard"`, `"publication"`, `"compact"`).
+#' @param preset Visual preset (`"standard"`, `"publication"`, `"compact"`, or `"monochrome"`).
 #' @param palette Optional named color overrides passed to the shared Wright-map
 #'   drawer.
 #' @param label_angle Rotation angle for group labels on the facet panel.
@@ -2931,6 +2987,9 @@ plot_information <- function(x,
 #'   data used for the plot.
 #'
 #' @seealso [fit_mfrm()], [plot.mfrm_fit()], [mfrmr_visual_diagnostics]
+#' @concept confidence intervals
+#' @concept visual diagnostics
+#' @concept Wright maps
 #' @examples
 #' toy <- load_mfrmr_data("example_core")
 #' toy_small <- toy[toy$Person %in% unique(toy$Person)[1:12], , drop = FALSE]
@@ -2947,7 +3006,7 @@ plot_wright_unified <- function(fit,
                                 show_ci = FALSE,
                                 ci_level = 0.95,
                                 draw = TRUE,
-                                preset = c("standard", "publication", "compact"),
+                                preset = c("standard", "publication", "compact", "monochrome"),
                                 palette = NULL,
                                 label_angle = 45,
                                 ...) {
@@ -4055,7 +4114,7 @@ print.mfrm_equating_chain <- function(x, ...) {
 #' @export
 plot.mfrm_equating_chain <- function(x, y = NULL,
                                      type = c("common_anchors", "graph", "chain"),
-                                     preset = c("standard", "publication", "compact"),
+                                     preset = c("standard", "publication", "compact", "monochrome"),
                                      draw = TRUE, ...) {
   if (!inherits(x, "mfrm_equating_chain")) {
     stop("`x` must be an mfrm_equating_chain object.", call. = FALSE)
@@ -4232,13 +4291,13 @@ print.summary.mfrm_equating_chain <- function(x, ...) {
   gpcm_detected <- any(identical(source_models, "GPCM") | source_models == "GPCM")
   tibble::tibble(
     Scope = c("RSM / PCM", "bounded GPCM"),
-    Status = c("supported", if (gpcm_detected) "blocked" else "deferred"),
+    Status = c("supported", "supported_with_caveat"),
     Note = c(
       "Supported as a synthesis layer over validated anchor-review, drift, and equating-chain objects.",
       if (gpcm_detected) {
-        "Blocked: build_linking_review() is not yet validated for bounded GPCM source objects."
+        "Supported with caveat: bounded GPCM source objects are summarized as exploratory anchor/drift/chain evidence, not an operational linking decision."
       } else {
-        "Deferred: the helper family exists, but bounded GPCM support is not yet validated."
+        "Supported with caveat when bounded GPCM source objects are supplied; not active for this RSM/PCM review."
       }
     )
   )
@@ -4710,13 +4769,7 @@ build_linking_review <- function(anchor_review = NULL,
     as.character(drift$config$models %||% character(0)),
     as.character(chain$config$models %||% character(0))
   )))
-  if (any(source_models == "GPCM")) {
-    stop(
-      "build_linking_review() is not yet validated for bounded `GPCM`. ",
-      "Use the underlying anchor/drift/chain helpers directly and consult gpcm_capability_matrix().",
-      call. = FALSE
-    )
-  }
+  gpcm_detected <- any(source_models == "GPCM")
 
   anchor_risks <- .linking_review_anchor_risks(anchor_review)
   drift_risks <- .linking_review_drift_risks(drift)
@@ -4749,6 +4802,7 @@ build_linking_review <- function(anchor_review = NULL,
   review_status <- dplyr::case_when(
     insufficient_support ~ "insufficient_anchor_evidence",
     has_review_risks ~ "review_required",
+    gpcm_detected ~ "exploratory_gpcm_review",
     TRUE ~ "stable_for_linking_review"
   )
 
@@ -4859,9 +4913,22 @@ build_linking_review <- function(anchor_review = NULL,
   )
 
   notes <- clean_summary_lines(c(
-    "Linking review is an operational synthesis layer over existing package-native anchor, drift, and chain evidence.",
+    if (gpcm_detected) {
+      "Linking review is an exploratory synthesis layer over existing package-native bounded GPCM anchor, drift, and chain evidence."
+    } else {
+      "Linking review is an operational synthesis layer over existing package-native anchor, drift, and chain evidence."
+    },
     "Drift or thin-support warnings do not prove scale breakdown by themselves; they indicate where review is needed.",
-    "Repeated signals across anchor, drift, and chain evidence deserve priority, but this helper does not collapse them into one opaque composite score."
+    "Repeated signals across anchor, drift, and chain evidence deserve priority, but this helper does not collapse them into one opaque composite score.",
+    if (gpcm_detected) {
+      paste(
+        "Bounded GPCM linking review is exploratory: it indexes direct",
+        "anchor/drift/chain evidence and should not be reported as an",
+        "operational GPCM linking decision or as evidence that drift is absent."
+      )
+    } else {
+      ""
+    }
   ))
 
   out <- list(
@@ -4878,10 +4945,25 @@ build_linking_review <- function(anchor_review = NULL,
     plot_map = plot_map,
     reporting_map = reporting_map,
     support_status = support_status,
+    gpcm_boundary = gpcm_capability_boundary_table(
+      fit = if (gpcm_detected) {
+        structure(
+          list(config = list(model = "GPCM"), summary = data.frame(Model = "GPCM")),
+          class = "mfrm_fit"
+        )
+      } else {
+        NULL
+      },
+      helper = "build_linking_review()",
+      extra_areas = c(
+        "Score-side scorefile export under bounded GPCM",
+        "FACETS output-contract score-side review"
+      )
+    ),
     notes = notes,
     settings = list(
       top_n = top_n,
-      intended_use = "operational_linking_review",
+      intended_use = if (gpcm_detected) "exploratory_gpcm_linking_review" else "operational_linking_review",
       source_models = source_models,
       source_profile = data.frame(
         Source = c("anchor_review", "drift", "chain"),
@@ -4943,6 +5025,7 @@ summary.mfrm_linking_review <- function(object, digits = 3, top_n = 10, ...) {
     plot_map = tibble::as_tibble(object$plot_map %||% tibble::tibble()),
     reporting_map = tibble::as_tibble(object$reporting_map %||% tibble::tibble()),
     support_status = tibble::as_tibble(object$support_status %||% tibble::tibble()),
+    gpcm_boundary = tibble::as_tibble(object$gpcm_boundary %||% tibble::tibble()),
     notes = clean_summary_lines(object$notes %||% character(0)),
     settings = object$settings %||% list(),
     digits = digits
@@ -4982,6 +5065,10 @@ print.summary.mfrm_linking_review <- function(x, ...) {
   if (nrow(x$support_status) > 0) {
     cat("\nSupport Status\n")
     print(as.data.frame(x$support_status), row.names = FALSE)
+  }
+  if (nrow(x$gpcm_boundary) > 0) {
+    cat("\nGPCM Boundary\n")
+    print(as.data.frame(x$gpcm_boundary)[, c("Area", "Status"), drop = FALSE], row.names = FALSE)
   }
   print_bullet_section("Notes", x$notes)
   invisible(x)

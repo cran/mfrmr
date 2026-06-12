@@ -56,7 +56,7 @@ shown as a shaded region (default \code{c(0.5, 1.5)}).}
 
 \item{draw}{If \code{TRUE} (default), render the plot using base graphics.}
 
-\item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, or \code{"compact"}).}
+\item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, \code{"compact"}, or \code{"monochrome"}).}
 }
 \value{
 Invisibly, an object of class \code{mfrm_plot_data}.

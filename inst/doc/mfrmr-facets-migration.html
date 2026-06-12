@@ -384,40 +384,47 @@ coverage boundary:</p>
 for new analyses)</td>
 </tr>
 <tr class="odd">
+<td>Fit-statistic basis</td>
+<td>Residuals at JMLE estimates</td>
+<td>Residuals at EAP person measures under <code>MML</code> (shrunken
+toward the mean); refit with <code>method = &quot;JML&quot;</code> for a
+JMLE-style residual basis</td>
+</tr>
+<tr class="even">
 <td>Models</td>
 <td>Rating-scale, partial-credit, polytomous step models</td>
 <td><code>RSM</code>, <code>PCM</code>, bounded <code>GPCM</code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Output</td>
 <td>Tables 0-30 plus graphic files</td>
 <td>Returned R objects with <code>summary()</code> and
 <code>plot()</code> methods</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Anchoring</td>
 <td><code>D=</code>, <code>A=</code> fields in the specification</td>
 <td><code>anchors</code> and <code>group_anchors</code> arguments to
 <code>fit_mfrm()</code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Bias / interaction</td>
 <td>Table 14</td>
 <td><code>estimate_bias()</code> and
 <code>bias_interaction_report()</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Wright map / variable map</td>
 <td>Graphic variable-map output</td>
 <td><code>plot(fit, type = &quot;wright&quot;)</code> and
 <code>plot_wright_unified()</code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Fair average</td>
 <td>Table 7 fair-M average</td>
 <td><code>fair_average_table()</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Reproducibility</td>
 <td>Specification file is the manifest</td>
 <td><code>build_mfrm_manifest()</code> plus
@@ -586,6 +593,13 @@ contract encoded in the package:</p>
 metric checks. It is not a claim that <code>mfrmr</code> has reproduced
 FACETS estimates numerically. For external numerical comparison, use an
 exported FACETS fit table and <code>facets_fit_review()</code>.</p>
+<p>When that comparison involves an <code>MML</code> fit, remember that
+mfrmr evaluates residual-based fit statistics at shrunken EAP person
+measures while FACETS uses JMLE estimates, so MnSq differences can
+reflect the residual basis rather than a fit-computation difference;
+refit with <code>method = &quot;JML&quot;</code> before attributing such gaps. See
+<code>facets_fit_df_guide()</code> for this boundary and for the
+separate df/ZSTD standardization conventions.</p>
 <p>If you already have a FACETS fit table on disk, read it first and
 then run the fit review. This does not run FACETS; it consumes an
 exported or otherwise harmonized table.</p>

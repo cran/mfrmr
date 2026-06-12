@@ -408,7 +408,8 @@ for closing the gap.</li>
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>prec <span class="ot">&lt;-</span> <span class="fu">precision_review_report</span>(fit, <span class="at">diagnostics =</span> diag)</span>
 <span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a></span>
 <span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>prec<span class="sc">$</span>profile</span>
-<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>prec<span class="sc">$</span>checks</span></code></pre></div>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>prec<span class="sc">$</span>checks</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>prec<span class="sc">$</span>fit_separation_basis</span></code></pre></div>
 <p>Interpretation:</p>
 <ul>
 <li>Use stronger inferential phrasing only when the reported tier is
@@ -416,13 +417,17 @@ for closing the gap.</li>
 <li>Treat <code>hybrid</code> and <code>exploratory</code> outputs more
 conservatively, especially for SE-, CI-, and reliability-heavy
 prose.</li>
+<li>Read <code>fit_separation_basis</code> as a boundary table: MnSq
+fit, ZSTD standardization, Rasch/FACETS-style separation, and package QC
+thresholds have different source bases and should not be collapsed into
+a single validation pass/fail claim.</li>
 </ul>
 </div>
 <div id="build-structured-manuscript-outputs" class="section level2">
 <h2>3. Build structured manuscript outputs</h2>
 <p><code>build_apa_outputs()</code> is the writing engine. It returns
 report text plus a section map, note map, and caption map that all share
-the same internal contract.</p>
+the same output contract.</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>apa <span class="ot">&lt;-</span> <span class="fu">build_apa_outputs</span>(</span>
 <span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>  fit,</span>
 <span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag,</span>

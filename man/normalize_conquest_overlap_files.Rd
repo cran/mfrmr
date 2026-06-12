@@ -89,6 +89,7 @@ that the files were treated as extracted tables, not raw ConQuest report
 text, and to check duplicate-ID / non-numeric-estimate pre-review flags.
 }
 \examples{
+\donttest{
 bundle <- build_conquest_overlap_bundle()
 tmp_dir <- tempdir()
 pop_path <- file.path(tmp_dir, "cq_pop.csv")
@@ -133,6 +134,7 @@ normalized <- normalize_conquest_overlap_files(
 summary(normalized)$normalization_scope
 review <- review_conquest_overlap(bundle, normalized)
 summary(review)$summary
+}
 }
 \seealso{
 \code{\link[=normalize_conquest_overlap_tables]{normalize_conquest_overlap_tables()}}, \code{\link[=review_conquest_overlap]{review_conquest_overlap()}}

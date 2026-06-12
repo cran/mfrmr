@@ -8,7 +8,7 @@ plot_dif_summary(
   x,
   top_n = 30L,
   sort_by = c("abs_effect", "effect", "classification"),
-  preset = c("standard", "publication", "compact"),
+  preset = c("standard", "publication", "compact", "monochrome"),
   draw = TRUE,
   ci_level = NULL,
   effect_thresholds = NULL,
@@ -76,3 +76,6 @@ head(p$data$data)
 \seealso{
 \code{\link[=analyze_dff]{analyze_dff()}}, \code{\link[=analyze_dif]{analyze_dif()}}, \code{\link[=plot_dif_heatmap]{plot_dif_heatmap()}}.
 }
+\concept{DFF DIF}
+\concept{confidence intervals}
+\concept{visual diagnostics}

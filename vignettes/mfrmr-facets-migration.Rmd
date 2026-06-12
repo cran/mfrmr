@@ -43,6 +43,7 @@ facets_feature_coverage("not_implemented")
 |---|---|---|
 | Input | Specification file plus data file | `data.frame` in long format |
 | Estimation | JMLE by default | `JML` (legacy default) or `MML` (recommended for new analyses) |
+| Fit-statistic basis | Residuals at JMLE estimates | Residuals at EAP person measures under `MML` (shrunken toward the mean); refit with `method = "JML"` for a JMLE-style residual basis |
 | Models | Rating-scale, partial-credit, polytomous step models | `RSM`, `PCM`, bounded `GPCM` |
 | Output | Tables 0-30 plus graphic files | Returned R objects with `summary()` and `plot()` methods |
 | Anchoring | `D=`, `A=` fields in the specification | `anchors` and `group_anchors` arguments to `fit_mfrm()` |
@@ -242,6 +243,13 @@ The resulting object reviews column coverage and package-native metric checks.
 It is not a claim that `mfrmr` has reproduced FACETS estimates numerically.
 For external numerical comparison, use an exported FACETS fit table and
 `facets_fit_review()`.
+
+When that comparison involves an `MML` fit, remember that mfrmr evaluates
+residual-based fit statistics at shrunken EAP person measures while FACETS
+uses JMLE estimates, so MnSq differences can reflect the residual basis
+rather than a fit-computation difference; refit with `method = "JML"`
+before attributing such gaps. See `facets_fit_df_guide()` for this
+boundary and for the separate df/ZSTD standardization conventions.
 
 If you already have a FACETS fit table on disk, read it first and then run
 the fit review. This does not run FACETS; it consumes an exported or otherwise

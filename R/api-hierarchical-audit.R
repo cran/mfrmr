@@ -626,6 +626,10 @@ facet_small_sample_review <- function(fit, diagnostics = NULL,
 #'   [analyze_hierarchical_structure()], [detect_facet_nesting()],
 #'   [facet_small_sample_review()].
 #'
+#' @concept confidence intervals
+#' @concept hierarchical structure
+#' @concept ICC
+#'
 #' @references
 #' Koo, T. K., & Li, M. Y. (2016). A guideline of selecting and
 #' reporting intraclass correlation coefficients for reliability
@@ -1175,6 +1179,10 @@ compute_facet_design_effect <- function(data, facets, icc_table = NULL,
 #'   [compute_facet_icc()], [compute_facet_design_effect()],
 #'   [reporting_checklist()], [build_mfrm_manifest()], [fit_mfrm()].
 #'
+#' @concept confidence intervals
+#' @concept hierarchical structure
+#' @concept reporting workflow
+#'
 #' @references
 #' McEwen, M. R. (2018). *The effects of incomplete rating designs on
 #' results from many-facets-Rasch model analyses* (Doctoral thesis,
@@ -1420,7 +1428,7 @@ summary.mfrm_facet_nesting <- function(object, ...) {
 #' @param x An `mfrm_facet_sample_review` object.
 #' @param top_n Optional integer; trim the y-axis to the `top_n`
 #'   smallest level counts per facet. `NULL` (default) keeps all.
-#' @param preset One of `"standard"`, `"publication"`, `"compact"`.
+#' @param preset One of `"standard"`, `"publication"`, `"compact"`, `"monochrome"`.
 #' @param ... Reserved.
 #' @return Invisibly, the data.frame used for the plot.
 #' @seealso [facet_small_sample_review()].
@@ -1428,7 +1436,8 @@ summary.mfrm_facet_nesting <- function(object, ...) {
 plot.mfrm_facet_sample_review <- function(x, top_n = NULL,
                                           preset = c("standard",
                                                      "publication",
-                                                     "compact"),
+                                                     "compact",
+                                                     "monochrome"),
                                           ...) {
   style <- resolve_plot_preset(preset)
   tbl <- as.data.frame(x$table, stringsAsFactors = FALSE)
@@ -1509,7 +1518,8 @@ plot.mfrm_facet_sample_review <- function(x, top_n = NULL,
 plot.mfrm_facet_nesting <- function(x,
                                     preset = c("standard",
                                                "publication",
-                                               "compact"),
+                                               "compact",
+                                               "monochrome"),
                                     ...) {
   style <- resolve_plot_preset(preset)
   pair <- as.data.frame(x$pairwise_table, stringsAsFactors = FALSE)

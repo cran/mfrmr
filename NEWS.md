@@ -1,3 +1,349 @@
+# mfrmr 0.2.1
+
+This release focuses on a clearer public workflow, a more readable reporting
+surface, and source-aware review outputs. The main user-facing entry points are
+`mfrm_results()`, `mfrm_report()`, `export_mfrm_results()`,
+`launch_mfrmr_viewer()`, and `mfrmr_output_guide("public")`.
+
+Highlights:
+
+- A shorter public workflow now starts from `fit_mfrm()` -> `mfrm_results()` ->
+  `mfrm_report()` -> `export_mfrm_results()`.
+- `mfrm_report()` and `summary(mfrm_report(...))` provide first-screen report
+  readiness tables, report routes, and cautious interpretation boundaries.
+- Simulation and recovery summaries expose operating-characteristic,
+  sparse-design, peer-review, and recovery-review tables for appendix and
+  export workflows.
+- Linking, anchor, bias, misfit/pathway, and network review outputs are routed
+  through explicit result components and scoped follow-up helpers.
+- Release-review artifacts now distinguish CRAN-time lightweight checks from
+  full non-CRAN regression evidence, and the readiness gate checks that the
+  local `R CMD check` log matches the target package version.
+
+Detailed changes:
+
+- The generated APA narrative no longer labels overall fit as
+  "acceptable"/"elevated". It now reports whether mean-square fit fell
+  within or outside the active screening band, names the band, and states
+  that band position is screening evidence rather than a model-validity
+  decision. Element-level wording uses the same screening-band language.
+- The APA narrative now separates separation reliability from observed
+  inter-rater agreement explicitly: reliability sentences state that
+  separation indices are not inter-rater agreement, and agreement sentences
+  are introduced as a separate quantity.
+- APA Methods text for `MML` fits now states the estimation basis: person
+  measures are EAP estimates, and residual-based fit statistics are
+  evaluated at those EAP measures rather than at JMLE estimates. A matching
+  fit-basis caution routes external FACETS comparisons to
+  `method = "JML"`.
+- The APA narrative and Table 1 note now report measure-level confidence
+  intervals when available: the Results fit/precision section states the CI
+  level, method, and `CIEligible` counts, and the facet-summary table note
+  instructs reporting `CI_Lower` / `CI_Upper` for eligible rows.
+- APA Wright-map and facet-summary notes now state the fitted sign
+  convention explicitly (higher person values = higher ability; higher
+  non-person facet values = greater severity/difficulty under the default
+  negative orientation), including any `positive_facets` exceptions, instead
+  of the previous "depending on facet orientation" wording. The pathway-map
+  note and `plot.mfrm_fit()` help now state that the expected-score pathway
+  display is distinct from the Bond-and-Fox-style measure-versus-fit bubble
+  chart available via `plot_bubble()`.
+- The MML-vs-FACETS residual basis is now documented across the fit
+  surfaces: `diagnose_mfrm()`, `facets_fit_df_guide()`,
+  `facets_fit_review()` (including a new residual-basis guidance row and
+  interpretation-guide rows), the package statistical-background help, and
+  the FACETS migration vignette all state that MML fit statistics are
+  computed at shrunken EAP person measures and route JMLE-style comparisons
+  to `method = "JML"`.
+- Small-df ZSTD availability is now documented as an explicit boundary:
+  mfrmr withholds ZSTD as `NA` when the applicable df falls below 1
+  (Wilson-Hilferty instability), while FACETS/Winsteps under `WHEXACT` can
+  report a value on the same sparse cell. The fit guides and
+  `facets_fit_review()` now describe NA-vs-finite ZSTD pairs as availability
+  differences rather than fit differences.
+- The MML person-row separation/reliability convention is now documented:
+  person rows apply the separation formulas to EAP measures with posterior
+  SDs, which yields a conservative summary that is lower than the IRT
+  empirical-reliability convention and is not numerically comparable to
+  JMLE-based FACETS person reliability. The APA reliability sentence carries
+  the same note when a Person row is present under `MML`.
+- `preset = "monochrome"` is now accepted by all preset-based plot helpers,
+  including `plot_fair_average()`, `plot_displacement()`,
+  `plot_unexpected()`, `plot_interrater_agreement()`, `plot_marginal_fit()`,
+  `plot_marginal_pairwise()`, `plot_facets_chisq()`, `plot_qc_dashboard()`,
+  `plot_threshold_ladder()`, and the network/secondary plot methods, not
+  only the fit-family plots.
+- `assess_mfrm_recovery()` now reports uncertainty evidence separately from
+  recovery metrics. This makes unavailable SE/coverage evidence visible without
+  turning it into an implied RMSE or bias failure.
+- `inst/validation/release-readiness.R` now follows the target package version
+  from `DESCRIPTION`, selects versioned evidence-map/checklist files when
+  available, and reports stale `R CMD check` logs as package-check review
+  items when the check-log package version does not match the target release.
+- The release-readiness GPCM scope review now also works against an installed
+  package: when the `R/` capability-matrix source file is not present (for
+  example inside `R CMD check` runs or CI artifact reviews), it reads
+  `gpcm_capability_matrix()` and `gpcm_runtime_guard_coverage()` from the
+  installed namespace instead of reporting a missing-source concern.
+- `precision_review_report()` now includes a source-grounded fit/separation
+  basis table. This keeps mean-square fit, ZSTD standardization,
+  Rasch/FACETS-style separation, and package QC thresholds in separate
+  reporting lanes.
+- New `mfrm_results()` gives users a FACETS-style first-screen entry point:
+  it accepts an existing fit, a `run_mfrm_facets()` object, or a standard
+  long-format data frame, runs diagnostics automatically, gathers available
+  tables/reviews/plot routes, and can emit a lightweight temporary HTML
+  report. Its summary includes next-action routes and a replay-code scaffold.
+  Existing table, report, analysis, and review helpers remain supported as
+  detailed components. `mfrm_results_interactive()` adds an explicit opt-in
+  column-selection wizard for interactive sessions only.
+- `summary(mfrm_results(...))` now includes a `triage` table that orders
+  unavailable, review, information, and OK signals across diagnostics, plots,
+  tables, precision/reliability, reporting, model scope, and network review
+  surfaces. `next_actions` uses that triage layer for first-screen routing.
+- `mfrmr_output_guide("public")` now gives the shortest top-level public API
+  map: explicit fit, comprehensive results, report readiness, optional viewer,
+  download export, scoped guide, and opt-in interactive routes. The guide also
+  carries `APILayer`, `ObjectRole`, and `DecisionBoundary` columns so
+  top-level public surfaces, specialist follow-ups, advanced design-review
+  rows, and migration/integration routes are separated before users scan the
+  broader namespace, and so users can see whether a route estimates,
+  summarizes, displays, exports, or only points to the next helper.
+- `mfrmr_output_guide("entry")` still gives the first-screen creation routes,
+  including explicit-fit, comprehensive-results, purpose-specific guide, and
+  opt-in interactive routes. The guide labels lifecycle, user level,
+  recommended-entry status, and includes advanced simulation/network route
+  rows.
+- The README now starts from a shorter public-surface workflow:
+  `fit_mfrm()` -> `mfrm_results()` -> `mfrm_report()` ->
+  `export_mfrm_results()`. Detailed table, report, review, and export helpers
+  are presented as scoped follow-ups rather than as functions to memorize
+  before the first analysis.
+- `mfrmr_output_guide("viewer")` now maps local Shiny viewer workflows back
+  to the `mfrm_results(include = ...)` object that should be created first,
+  including publication, validation, bias-screen, pathway/misfit, and combined
+  review routes.
+- `plot.mfrm_diagnostic_screening()` now gives diagnostic-screening simulation
+  output an integrated visualization route. The default overview combines
+  legacy ZSTD, strict marginal, strict pairwise, strict combined, and optional
+  report-review rates; focused views cover report signals, scenario contrasts,
+  and runtime summaries. The draw-free return is an `mfrm_plot_data` object,
+  so `plot_data(diag_eval, type = "overview", component = "plot_long")` can be
+  used directly for ggplot2, plotly, Quarto, or custom export workflows.
+  Draw-free diagnostic-screening plot objects also carry `overview`,
+  `reading_order`, `next_actions`, `reporting_notes`, and `figure_recipes`,
+  keeping custom figure/report handoffs aligned with the same interpretation
+  boundaries used by `summary(diag_eval)`.
+- `summary(evaluate_mfrm_diagnostic_screening(...))` now provides an explicit
+  diagnostic-screening report surface, and `build_summary_table_bundle()` /
+  `export_summary_appendix()` can export its scenario, performance,
+  report-signal, contrast, and draw-free plot-data tables.
+- Diagnostic-screening summaries now include `reading_order`, `next_actions`,
+  `reporting_notes`, and `figure_recipes` tables so users can separate
+  first-read tables, follow-up actions, figure/caption planning,
+  appendix-only tables, operating-characteristic claims, and validation-gate
+  boundaries before writing report text.
+- `mfrmr_output_guide("simulation")` now routes users to diagnostic-screening
+  evaluation and appendix export alongside data generation, design/recovery
+  evaluation, network review, and peer-review design review.
+- `mfrm_results(include = ...)` now accepts purpose presets:
+  `"publication"`, `"validation"`, `"facets"`, `"bias"`, `"misfit_review"`,
+  `"network"`, and `"gpcm_review"` in addition to `"standard"` and `"all"`.
+  The bias preset surfaces facet-level bias-screen guidance while leaving
+  interaction-bias facet-pair selection explicit; the misfit preset bundles
+  unexpected responses, displacement review, and pathway-map fit annotations.
+- `mfrmr_output_guide("binary")` and the README now make the ordinary
+  person-item dichotomous route explicit: pass the item column as the single
+  non-person facet and use `model = "RSM"`; with exactly two ordered
+  categories this is the usual binary Rasch logit up to centering and
+  threshold-identification conventions.
+- New `launch_mfrmr_viewer()` provides an optional local Shiny reader for
+  existing `mfrm_results` objects. It does not estimate models, read external
+  web applications, or change diagnostics; it displays the already-built
+  overview, triage, status, QC evidence, APA-style report text when available,
+  bias screens, pathway/misfit review, tables, plots, and replay code. The QC,
+  Report, Bias, and Pathway/Misfit tabs now include local section-status
+  tables so unavailable or not-requested sections are visible at the point of
+  inspection.
+- New `export_mfrm_results()` writes a lightweight download folder from an
+  existing `mfrm_results` object: summary CSVs, collected tables, HTML, RDS,
+  replay code, and a written-files manifest, with optional PNG plot export and
+  best-effort zip creation. This is the compact result-object handoff route;
+  `export_mfrm_bundle()` remains the broader fit-centered analysis archive.
+- `export_mfrm_results()` now accepts `include = "report"` to write
+  `mfrm_report()` artifacts into the same download folder: report-table CSVs
+  such as `report_index`, evidence summaries, and reporting templates, plus
+  report Markdown and report HTML.
+- New `mfrm_report()` turns an existing `mfrm_results` object into
+  report-ready QC, APA, validation, reviewer, or technical section plans with
+  claim-readiness, report-gap, evidence-boundary, and next-action tables. It
+  is a reporting layer over existing results, not a new estimator, diagnostic,
+  or acceptance rule.
+- `mfrm_report()` now includes `first_screen`, a FACETS-like entry table with
+  an overall row and one row per major evidence area. It reports status,
+  readiness, the main issue, next action, and primary route before users open
+  the detailed evidence and template tables.
+- `print(mfrm_report(...))`, the help-page examples, and the README now follow
+  the same short reading order: read `summary(report)` and `report$first_screen`
+  first, use `report$report_index` and `report$template_index` as table
+  indexes, and open detailed evidence tables only when those indexes point to
+  them.
+- `summary(mfrm_report(...))` now provides a shorter reader-facing report
+  summary: overview status, first-screen rows, immediate actions, optional
+  not-requested sections, claim-readiness counts, report gaps, boundary rows,
+  and standard routes. This keeps the comprehensive report object easier to
+  read without creating a new diagnostic decision rule.
+- `mfrm_report(output = "html")` now starts from the same reader-facing
+  guidance and report-summary tables before the full Markdown report. This
+  keeps browser output aligned with the `summary(report)` and `first_screen`
+  workflow.
+- `mfrm_report()` now includes a compact `report_index` table that lists
+  the major evidence areas, evidence status, readiness label, review-signal
+  count, and the primary/template tables to inspect next. This keeps the
+  expanded report surface navigable without hiding the detailed tables.
+- `mfrm_report()` `report_index` now also includes explicit evidence,
+  template, plot, export, and `mfrm_results(include = ...)` routes. These
+  columns keep report drafting, figure review, and download handoff connected
+  to the same evidence surface without adding a new diagnostic decision rule.
+- `mfrm_report()` now also exposes fit-specific `fit_criteria`,
+  `zstd_conventions`, and `fit_decision_policy` tables. These make the
+  selected MnSq threshold band, alternative published fit bands, and
+  engine-vs-FACETS-style df/ZSTD conventions visible before users write fit,
+  separation, or reliability claims.
+- `mfrm_report()` now adds result-specific fit evidence tables from the stored
+  `mfrm_results()` fit-measures component: observed fit-status counts,
+  threshold-profile sensitivity, df/ZSTD sensitivity counts, and row-level
+  df-sensitive prompts. This keeps FACETS-style ZSTD differences visible
+  without turning them into a new acceptance rule or a different MnSq signal.
+- `mfrm_report()` now includes `fit_reporting_templates`, a cautious wording
+  scaffold for APA, QC, validation, reviewer, and technical reports. The
+  templates summarize observed fit counts, threshold-profile sensitivity,
+  ZSTD convention, and df sensitivity in separate sentences so fit,
+  separation, and reliability are not collapsed into one pass/fail claim.
+- All `mfrm_report()` reporting-template tables now share evidence and claim
+  boundary columns: `EvidenceTable`, `EvidenceRoute`, `BoundaryType`,
+  `ClaimStrength`, and `RecommendedUse`. This makes template wording easier to
+  trace back to its source table and helps keep descriptive, caveated, and
+  follow-up-only claims separate.
+- `mfrm_report()` now includes `template_index`, a stacked template index
+  over all fit, precision, bias, misfit/pathway, and linking/anchor reporting
+  templates. It lets users review boundary type, claim strength, recommended
+  use, and evidence route before opening full template text.
+- `mfrm_report()` now also includes precision-specific reporting surfaces:
+  `precision_evidence_summary`, `precision_basis`, and
+  `precision_reporting_templates`. These summarize separation, reliability,
+  strata, precision tier, and review/warn checks while keeping
+  Rasch/FACETS-style separation reliability distinct from inter-rater
+  agreement, model fit, and standalone validity evidence.
+- `mfrm_report()` now includes bias-specific reporting surfaces when the
+  source result was built with `include = "bias"`: `bias_evidence_summary`
+  and `bias_reporting_templates`. These keep facet-level bias screens,
+  interaction-bias contrasts, DFF follow-up, and fairness conclusions
+  separated so screen-positive rows are not reported as final fairness or
+  invariance decisions.
+- `mfrm_report()` now includes misfit/pathway reporting surfaces when the
+  source result was built with `include = "misfit_review"`:
+  `misfit_evidence_summary` and `misfit_reporting_templates`. These keep
+  unexpected-response rows, displacement review, pathway-map evidence, and
+  case-review wording separate so local misfit prompts are not reported as
+  automatic exclusion, fairness, or validity decisions.
+- `mfrm_report()` now includes linking/anchor reporting surfaces when the
+  source result was built with `include = "linking"`:
+  `linking_evidence_summary` and `linking_reporting_templates`. These keep
+  anchor readiness, drift review, screened equating-chain review, and GPCM
+  support boundaries separate so anchor evidence is not reported as automatic
+  drift absence, completed equating, DFF support, or validity proof.
+- `mfrm_results(include = "linking")` now adds the fitted object's stored
+  anchor-review evidence and an operational linking-readiness surface to the
+  comprehensive results object. It exposes `plot(res, type = "anchors")` for
+  anchor-readiness visualization and routes drift/equating follow-up to
+  explicit multi-fit calls such as `detect_anchor_drift()` and
+  `build_equating_chain()`.
+- Recovery review can now retain fit/separation operating characteristics as
+  diagnostic context. These summaries help users inspect MnSq, ZSTD,
+  separation, and reliability behavior without making them top-line recovery
+  gates. Recovery assessment and validation summaries also expose
+  `diagnostic_reporting_notes` so zero separation/reliability and ZSTD
+  sensitivity are routed into report caveats rather than recovery or release
+  decisions.
+- `assess_mfrm_recovery()` now includes `condition_review` and
+  `condition_reporting_notes` for recovery simulations. For bounded `GPCM`,
+  these tables separate slope-regime context and generated score-category
+  support from recovery metrics before users interpret stress cases.
+- Bounded-`GPCM` simulation specifications now carry `slope_regime` metadata.
+  These labels are documented as package recovery-review labels, not
+  literature-derived fit or adequacy cut points.
+- The optional recovery-validation summary now separates the core release
+  recovery decision from extended sensitivity evidence. This keeps stress
+  cases visible without treating them as top-line release failures by default.
+- `build_summary_table_bundle()` can now convert recovery-validation summaries
+  into appendix-ready tables, including top-line decision, case, condition, and
+  diagnostic reporting tables. `export_summary_appendix()` accepts the same
+  recovery-validation summaries for CSV/HTML appendix handoff, and
+  `export_mfrm_bundle(summary_tables = ...)` can co-locate those tables with a
+  fit-based export bundle.
+- `export_summary_appendix()` and `export_mfrm_bundle(summary_tables = ...)`
+  now accept person-fit summary objects consistently with
+  `build_summary_table_bundle()`.
+- `precision_review_report()` can now be sent through
+  `build_summary_table_bundle()` and appendix/export helpers. Its
+  `fit_separation_basis` table remains a precision-review surface so fit,
+  ZSTD, separation/reliability/strata, and QC thresholds are not mistaken for
+  release or recovery success gates.
+- `fit_measures_table()` and `facets_fit_review()` summaries can now be sent
+  through the same appendix/export helpers. Their df/ZSTD sensitivity and
+  optional external FACETS matching tables stay separate from MnSq fit status
+  and top-line validation decisions.
+- `reporting_checklist()` now includes a Global Fit row for the
+  fit/separation reporting boundary, pointing users to
+  `precision_review_report()`, `fit_measures_table()`, and
+  `facets_fit_review()` before drafting fit, ZSTD, separation, or reliability
+  claims.
+- New observed-data resampling helpers, `build_mfrm_resampling_spec()` and
+  `draw_mfrm_resamples()`, create person-clustered stratified subsample or
+  bootstrap inputs with manifest tables for stratum representation and
+  rater/facet coverage. These helpers are explicitly framed as stability or
+  reproducibility inputs against a full-data reference, not true-parameter
+  recovery evidence.
+- `build_mfrm_sim_spec()` and `simulate_mfrm_data()` now support
+  `assignment = "sparse_linked"` for planned-missing sparse rating designs.
+  The generated data retain sparse-design metadata for design density,
+  planned missingness, rater coverage, and rater-pair common-person links.
+- `evaluate_mfrm_design()` and `evaluate_mfrm_recovery()` now carry sparse
+  linked generators directly, including run-level and summary columns for
+  planned missingness and rater-pair linking diagnostics.
+- `build_summary_table_bundle()` now separates those sparse linked diagnostics
+  into appendix-ready `sparse_design` tables for design-evaluation and
+  recovery-simulation outputs, so planned missingness and rater linkage are
+  not buried inside performance or recovery metrics. The table also labels
+  zero common-person rater pairs and requested-link target shortfalls as
+  design-review issues, not recovery failures.
+- `summary(evaluate_mfrm_design(...))`, `summary(evaluate_mfrm_recovery(...))`,
+  and `build_summary_table_bundle()` now include a compact `sparse_review`
+  table when sparse linked designs are active. `plot.mfrm_design_evaluation()`
+  also accepts sparse-design metrics such as `plannedmissingrate`,
+  `mincommonpersons`, `zerocommonpairs`, and `pairsshorttarget`.
+- New `build_mfrm_network_review()` synthesizes the existing design-network
+  analysis into a reportable review surface: connectedness, articulation
+  points, bridge edges, facet-level vulnerability, optional sparse-linking
+  diagnostics, and a reporting map that keeps network evidence separate from
+  MFRM estimates, fit, separation, and recovery gates.
+- New `build_peer_review_sim_spec()` creates peer-review / peer-assessment
+  simulation specifications where submissions and reviewers share the same ID
+  universe, self-review can be structurally excluded, and common-link anchor
+  submissions can be assigned many reviewers. Generated data carry
+  peer-review design metadata for assignment density, reviewer load,
+  reciprocal review pairs, and common submissions per reviewer pair.
+  `build_peer_review_design_review()` turns the same metadata into
+  appendix-ready assignment diagnostics, and `build_mfrm_network_review()` can
+  include the metadata alongside graph connectedness review.
+- README, help pages, and vignettes now show the recommended reading order for
+  recovery review: `summary(recovery_review)`, condition notes/review,
+  diagnostic notes/review, status plot, metric plot, then row-level recovery
+  rows that need follow-up. Recovery assessment and validation summaries now
+  expose this as a `reading_order` table so users can find the next table to
+  inspect without opening plot data.
+
 # mfrmr 0.2.0
 
 Documentation accuracy pass plus research-grounded visualization and
@@ -292,18 +638,95 @@ The detailed notes below are organized as follows:
   `plot_data_components()` lists each reusable plot-data component, its shape,
   role, accessor call, and custom-graphics notes so users can discover
   `plot_long`, annotation, settings, style, and review tables without reading
-  list internals.
+  the underlying list structure.
 - **Monochrome plot preset**: plot helpers that use the package visual preset
   system now accept `preset = "monochrome"`. Color remains the default
   (`"standard"`), while monochrome supports print-oriented figures and
   color-independent review.
+- **Interval-aware visualization guide**: new `mfrmr_interval_guide()` maps
+  public 95% CI / uncertainty routes across fit-measure tables, Wright maps,
+  fair averages, bias screens, displacement, DFF/DIF summaries, anchor drift,
+  rater severity profiles, rater trajectories, manuscript Figure 1 composites,
+  shrinkage, and ICC review. The guide records the interval basis and
+  interpretation boundary so CI displays remain precision or screening
+  evidence rather than automatic fit, fairness, or validity decisions.
+- **Searchable help concepts**: high-level route guides and CI-capable plot /
+  table helpers now carry Rd concept tags such as `confidence intervals`,
+  `visual diagnostics`, `reporting workflow`, `route selection`, and
+  `GPCM boundaries`. This makes `help.search()` useful for finding the right
+  help page before users know the function name.
+- **Shrinkage CI plot data**: `plot_shrinkage_funnel(show_ci = TRUE,
+  ci_level = ...)` now draws approximate raw and shrunken estimate whiskers and
+  returns `RawCI_Lower`, `RawCI_Upper`, `ShrunkCI_Lower`, `ShrunkCI_Upper`,
+  and `CI_Level` for downstream graphics. `plot(fit, type = "shrinkage")` now
+  uses the requested `ci_level` for CI whiskers instead of a fixed 95% level.
+- **Shrinkage figure guidance**: `visual_reporting_template()` and the visual
+  diagnostics vignette now include an empirical-Bayes shrinkage funnel route,
+  caption skeleton, beginner check, and interpretation guardrails so users can
+  report shrinkage movement without treating it as automatic rater-quality,
+  bias, or validity evidence.
+- **Response-time diagnostic layer**: new `response_time_review()` and
+  `plot_response_time_review()` summarize response-time metadata outside the
+  fitted MFRM likelihood. The review returns rapid/slow thresholds,
+  event-level flags, person/facet/score summaries, and grouped plot data so
+  timing patterns can be reviewed as descriptive QC rather than joint
+  speed-accuracy parameters or automatic exclusion rules.
+  `mfrmr_output_guide("response_time")` and the R-user pathway now expose this
+  route alongside other review and reusable plot-data helpers.
+  `mfrm_results(include = "response_time", response_time = ...,
+  response_time_data = ...)` can now carry the same descriptive review into
+  the first-screen result object, `summary(res)$next_actions`,
+  `plot(res, type = "response_time")`, the local viewer payload, and
+  `export_mfrm_results()` table exports without changing fitted MFRM
+  estimates.
 - **Bounded GPCM boundary text**: README, vignettes, help pages, and
   unsupported-path messages now state the current `GPCM` scope consistently:
   direct data generation, parameter recovery, fair averages, bias screening,
-  summary-table bundles, and appendix export are available within documented
-  caveats, while scenario planning/forecasting, FACETS-style score-side
-  exports, APA writing, QC pass/fail pipelines, linking synthesis, and
-  fit-based export bundles remain outside the validated route.
+  summary-table bundles, appendix export, caveated APA/QC/export bundles, and
+  exploratory linking review are available within documented caveats. Role-based
+  design evaluation and population forecasting are also available as caveated
+  bounded-`GPCM` sensitivity evidence when the requested design preserves the
+  simulation specification's slope structure. Role-based diagnostic and
+  signal-detection design screening is available as caveated slope-aware
+  operating-characteristic evidence with `gpcm_boundary` output. Full
+  FACETS-style score-side contract review or score-side equivalence, posterior
+  predictive checks, and heavy backend routes remain outside the validated
+  route. The validation artifacts now include a bounded-`GPCM` roadmap so
+  those `supported_with_caveat`, `blocked`, and `deferred` rows are tracked as
+  explicit release-scope decisions instead of implicit support gaps.
+- **GPCM score-side boundary checks**: blocked bounded-`GPCM` score-side
+  helpers now stop before producing partial outputs. The
+  `facets_output_file_bundle()` and
+  `facets_output_contract_review()` help pages also state that graph and
+  package-native scorefile output are caveated bounded-`GPCM` routes while
+  full FACETS output-contract review remains outside the bounded-`GPCM`
+  boundary. `gpcm_score_side_contract()` records
+  the estimand, uncertainty, reduction-test, schema, guard, and release-wording
+  requirements that separate caveated scorefile output from full FACETS-style
+  score-side review.
+- **GPCM route guidance**: `gpcm_capability_matrix()` now includes
+  `RecommendedRoute` and `NextValidationStep` columns, so each supported,
+  caveated, blocked, or deferred helper family states both the current
+  substitute workflow and the validation evidence needed before the boundary
+  can move.
+- **GPCM out-of-scope route guidance**: blocked and deferred bounded-`GPCM`
+  routes now report the matching capability-matrix row, recommended substitute
+  route, and next validation step before returning an error. The errors carry
+  class `mfrmr_gpcm_scope_error` with helper, area, status, recommended-route,
+  and next-validation-step fields for programmatic handling.
+- **GPCM route-boundary coverage**: the capability-matrix tests and validation
+  review now verify that every blocked or deferred bounded-`GPCM` row is
+  represented by a structured stop condition or an explicit future-scope entry,
+  and that those messages stay synchronized with the matrix's area, status,
+  route, and next-validation-step fields. `gpcm_runtime_guard_coverage()` is
+  exported as the public table for this route-boundary check.
+  `mfrmr_output_guide("gpcm")` now points users to both
+  `gpcm_capability_matrix()` and this coverage table.
+- **GPCM release-readiness alignment**: `inst/validation/release-readiness.R`
+  now checks that blocked and deferred `gpcm_capability_matrix()` rows have
+  non-empty route guidance, are represented in the installed bounded-`GPCM`
+  scope notes, and are covered by future-scope rows in the release-evidence
+  checklist.
 - **User-facing wording**: public visualization and reporting documentation now
   uses "plot data", "surface data", or "data handoff" instead of implementation
   terminology where possible, while retaining actual field names such as
@@ -628,9 +1051,9 @@ The detailed notes below are organized as follows:
   review plan for 0.2.0. It links the release checks to Andrich's `RSM`,
   Masters' `PCM`, Muraki's `GPCM` and information-function work,
   FACETS/Winsteps fit conventions, and ADEMP-style simulation-study reporting,
-  then separates release-gate checks from post-release roadmap items. The
+  then separates release-gate checks from future-scope items. The
   companion `release-evidence-checklist-0.2.0.csv` provides a structured
-  blocker / caveat / roadmap checklist for release review.
+  required / caveat / future-scope checklist for release review.
   `external-parameter-recovery-simulation-0.2.0.md` summarizes the separate
   common-data recovery and cross-engine agreement workflow and its limits without bundling the
   generated simulation datasets; the validation bundle also includes a sourceable
@@ -1359,6 +1782,14 @@ future-branch design-schema layer. Public simulation entry points
 (`simulate_mfrm_data`, `evaluate_mfrm_design`,
 `evaluate_mfrm_diagnostic_screening`,
 `evaluate_mfrm_signal_detection`) remain in `R/api-simulation.R`.
+- `evaluate_mfrm_diagnostic_screening(include_report = TRUE)` can now retain
+  `mfrm_results()` / `mfrm_report()` `report_index` signals at the replicate
+  level and summarize them in `report_signal_summary`, keeping report-layer
+  readiness separate from diagnostic-screening Type I and sensitivity proxies.
+- `plot.mfrm_diagnostic_screening()` can now turn diagnostic-screening
+  summaries into integrated plot-data bundles for overview rates, report
+  signals, scenario contrasts, and runtime checks. The draw-free return follows
+  the `mfrm_plot_data` / `plot_data()` contract.
 
 `R/api-plotting-extras2.R` was renamed to
 `R/api-plotting-screening.R` to drop the numerical suffix in favour

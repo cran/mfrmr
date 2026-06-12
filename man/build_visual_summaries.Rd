@@ -67,9 +67,10 @@ in UI code.
 \item \code{top_misfit_n}: number of top misfit entries included
 }
 
-For bounded \code{GPCM}, this helper is intentionally unavailable. Use
-\code{\link[=reporting_checklist]{reporting_checklist()}}, \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}}, the residual/category table
-helpers, and \code{\link[=compute_information]{compute_information()}} / \code{\link[=plot_information]{plot_information()}} instead.
+For bounded \code{GPCM}, this helper returns caveated warning/summary maps over
+supported diagnostics, direct tables, and plots. The returned object includes
+\code{gpcm_boundary} so score-side, design-forecasting, DFF, and linking routes
+remain visibly separate capability rows.
 }
 \section{Interpreting output}{
 

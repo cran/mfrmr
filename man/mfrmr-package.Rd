@@ -12,14 +12,15 @@ many-facet ordered-response measurement models: the Rasch-family \code{RSM} /
 documented.
 }
 \details{
-If you are new to the package, read the next four steps first and ignore the
-longer \code{GPCM}, simulation, and planning notes until the basic route works:
+Start with the following core workflow before branching into the longer
+\code{GPCM}, simulation, and planning notes:
 \enumerate{
 \item Fit with \code{\link[=fit_mfrm]{fit_mfrm()}} using \code{method = "MML"}
 \item For \code{RSM} / \code{PCM}, run \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} with
 \code{diagnostic_mode = "both"}; for bounded \code{GPCM}, use the direct
 diagnostic route and read \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}}
-\item Read \code{summary(fit)} and \code{summary(diag)} before branching
+\item Build a comprehensive first screen with \code{\link[=mfrm_results]{mfrm_results()}}
+\item Read \code{summary(fit)}, \code{summary(diag)}, and \code{summary(res)} before branching
 \item Use \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}} and \code{\link[=reporting_checklist]{reporting_checklist()}} as the first visual
 and reporting screens
 }
@@ -47,6 +48,7 @@ after the basic \code{RSM} / \code{PCM} route is working cleanly.
 
 Guide pages:
 \itemize{
+\item \code{\link[=mfrmr_output_guide]{mfrmr_output_guide()}} for the compact purpose-to-helper map
 \item \link{mfrmr_workflow_methods}
 \item \link{mfrmr_visual_diagnostics}
 \item \link{mfrmr_reports_and_tables}
@@ -78,13 +80,15 @@ Use this order before exploring the broader feature surface:
 \item \code{\link[=fit_mfrm]{fit_mfrm()}} with \code{method = "MML"}
 \item \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} with \code{diagnostic_mode = "both"} for \code{RSM} / \code{PCM};
 for bounded \code{GPCM}, keep diagnostics on the direct exploratory route
-\item \code{summary(fit)} and \code{summary(diag)}
+\item \code{\link[=mfrm_results]{mfrm_results()}} for a FACETS-style first screen
+\item \code{summary(fit)}, \code{summary(diag)}, and \code{summary(res)}
 \item \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}} for first-pass triage
 \item Choose the next branch:
 \code{\link[=reporting_checklist]{reporting_checklist()}} for reporting,
 \code{\link[=build_weighting_review]{build_weighting_review()}} for Rasch-versus-\code{GPCM} weighting review,
 \code{\link[=build_misfit_casebook]{build_misfit_casebook()}} for operational case review, or
-\code{\link[=build_linking_review]{build_linking_review()}} for \code{RSM} / \code{PCM} operational linking review
+\code{\link[=build_linking_review]{build_linking_review()}} for operational linking review (\code{RSM} / \code{PCM})
+or caveated bounded-\code{GPCM} linking synthesis
 }
 }
 
@@ -107,9 +111,12 @@ current bounded \code{GPCM} route
 \code{\link[=extract_mfrm_sim_spec]{extract_mfrm_sim_spec()}}, and \code{\link[=simulate_mfrm_data]{simulate_mfrm_data()}} is available when
 the specification carries both thresholds and slopes
 \item slope-aware \code{\link[=fair_average_table]{fair_average_table()}} and \code{\link[=estimate_bias]{estimate_bias()}} are available for
-bounded \code{GPCM} with explicit caveats; the APA writer, QC pass/fail,
-fit-based export/replay, score-side FACETS compatibility, and broader
-planning semantics remain validated for \code{RSM} / \code{PCM}
+bounded \code{GPCM} with explicit caveats; \code{\link[=build_apa_outputs]{build_apa_outputs()}},
+\code{\link[=build_visual_summaries]{build_visual_summaries()}}, \code{\link[=run_qc_pipeline]{run_qc_pipeline()}},
+\code{\link[=build_mfrm_manifest]{build_mfrm_manifest()}}, \code{\link[=build_mfrm_replay_script]{build_mfrm_replay_script()}}, and
+\code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}} are available as caveated partial reporting/export
+surfaces; score-side FACETS compatibility and broader planning semantics
+remain validated for \code{RSM} / \code{PCM}
 \item \code{predict_mfrm_population()} remains a scenario-level forecast helper and
 should not be described as the latent-regression estimator itself
 \item the current simulation/planning layer remains role-based for two
@@ -141,6 +148,14 @@ columns change how observed rating events enter estimation and summaries, but
 they do not create a free-form facet-weighting scheme and do not alter the
 fixed-discrimination meaning of \code{RSM} / \code{PCM}.
 
+Public entry map:
+\itemize{
+\item First-screen results: \code{\link[=mfrm_results]{mfrm_results()}}, \code{summary(res)$next_actions},
+and \code{mfrmr_output_guide("entry")}
+\item Interactive exploration: \code{\link[=mfrm_results_interactive]{mfrm_results_interactive()}} only when prompts
+are explicitly wanted at the console
+}
+
 Function families:
 \itemize{
 \item Model fitting: \code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=summary.mfrm_fit]{summary.mfrm_fit()}}, \code{\link[=plot.mfrm_fit]{plot.mfrm_fit()}}
@@ -162,10 +177,11 @@ directly, latent-regression \code{MML} fits through the fitted population
 model when scored units also provide one-row-per-person background data,
 and \code{JML} fits through a post hoc reference-prior EAP layer;
 fit-derived simulation specifications also support direct bounded
-\code{GPCM} data generation and recovery checks, while planning/forecasting
-helpers remain restricted to \code{RSM} / \code{PCM}; curve reports, graph-only
-exports, fair-average tables, and bias screening are also available for
-bounded \code{GPCM} with documented caveats)
+\code{GPCM} data generation, recovery checks, role-based design evaluation,
+population forecasting, diagnostic-screening, and signal-detection
+helpers with documented caveats; curve reports, graph-only exports,
+fair-average tables, and bias screening are also available for bounded
+\code{GPCM} with documented caveats)
 \item Reporting: \code{\link[=build_apa_outputs]{build_apa_outputs()}}, \code{\link[=build_visual_summaries]{build_visual_summaries()}},
 \code{\link[=reporting_checklist]{reporting_checklist()}}, \code{\link[=apa_table]{apa_table()}} for the full \code{RSM} / \code{PCM} route;
 bounded \code{GPCM} currently stays on the checklist / direct-table / direct-
@@ -276,9 +292,11 @@ acceptable; then score with
 graph-only \code{\link[=facets_output_file_bundle]{facets_output_file_bundle()}}, direct simulation-spec
 generation/data generation, recovery checks, \code{\link[=fair_average_table]{fair_average_table()}},
 \code{\link[=estimate_bias]{estimate_bias()}}, and the residual-based table helpers with their
-documented caveats. The APA writer, QC pass/fail pipeline, score-side
-FACETS exports, fit-based export/replay, linking synthesis, and planning
-semantics remain outside the bounded \code{GPCM} route. Use
+documented caveats. Caveated APA/QC/export bundles and exploratory
+linking review plus role-based design evaluation, population
+forecasting, diagnostic-screening, and signal-detection helpers are
+available, while full score-side FACETS review, posterior-predictive
+checks, and heavy backends remain outside the bounded \code{GPCM} route. Use
 \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}} as the formal boundary statement.
 }
 }
@@ -458,7 +476,22 @@ mean-square chi-square ratio to an approximate standard normal deviate:
 Values near 0 indicate expected fit; \eqn{|\mathrm{ZSTD}| > 2} flags
 potential misfit at the 5\\% level, and \eqn{|\mathrm{ZSTD}| > 3} at the
 1\\% level (Wright & Linacre, 1994; see also Wilson & Hilferty, 1931).
-ZSTD is reported alongside every Infit and Outfit value.
+ZSTD is reported alongside every Infit and Outfit value. ZSTD is
+withheld (\code{NA}) when the applicable df falls below 1, where the
+Wilson-Hilferty transformation is numerically unstable; FACETS/Winsteps
+under \code{WHEXACT} can continue with a linear approximation on such cells.
+
+\strong{Residual basis under MML vs JMLE engines}
+
+For \code{method = "MML"} fits, the standardized residuals behind Infit,
+Outfit, and ZSTD are evaluated at EAP person measures, which are
+shrunken toward the population mean. JMLE engines such as FACETS
+evaluate the same formulas at unshrunken JMLE estimates, so MnSq and
+ZSTD values are not numerically interchangeable across the two residual
+bases, most visibly for extreme-scoring persons. Use \code{method = "JML"}
+when an external FACETS fit comparison requires a JMLE-style residual
+basis, and see \code{\link[=facets_fit_df_guide]{facets_fit_df_guide()}} for the separate
+standardization-side df/ZSTD conventions.
 
 \strong{PTMEA (Point-Measure Correlation)}
 
@@ -489,6 +522,23 @@ ordering. In \code{mfrmr}, \code{Reliability} is the model-based value and
 \code{RealReliability} gives the conservative companion based on \code{RealSE}. For
 \code{MML}, these are anchored to observed-information \code{ModelSE}
 estimates for non-person facets; \code{JML} keeps them as exploratory summaries.
+
+For the person facet under \code{MML}, the same \eqn{G} and \eqn{R} formulas
+are applied to EAP person measures with posterior SDs in the error slot.
+EAP measures are shrunken, so their observed variance is already deflated
+(approximately the true variance times the reliability), and subtracting
+the mean posterior variance deflates it again. The reported MML person
+separation/reliability is therefore a conservative summary: it is
+systematically lower than the IRT empirical-reliability convention
+\eqn{\mathrm{Var}(\mathrm{EAP}) / (\mathrm{Var}(\mathrm{EAP}) +
+\overline{\mathrm{PSD}^2})} and is not numerically comparable to
+JMLE-based person separation reliability from FACETS. The gap is small
+when measurement is precise and grows as precision drops. Person rows can
+still carry the model-based precision tier because posterior SDs are
+model-based quantities; that tier describes the SE source, not FACETS
+comparability. Use \code{method = "JML"} when a FACETS-style person separation
+table is required, and treat MML person rows as conservative summaries.
+
 This is a Rasch/FACETS-style separation reliability on the fitted logit
 scale, not an intra-class correlation. Use \code{\link[=compute_facet_icc]{compute_facet_icc()}} only when
 you want the complementary random-effects variance-share view on the

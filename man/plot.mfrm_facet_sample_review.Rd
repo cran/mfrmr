@@ -4,7 +4,12 @@
 \alias{plot.mfrm_facet_sample_review}
 \title{Plot a facet sample-size review}
 \usage{
-\method{plot}{mfrm_facet_sample_review}(x, top_n = NULL, preset = c("standard", "publication", "compact"), ...)
+\method{plot}{mfrm_facet_sample_review}(
+  x,
+  top_n = NULL,
+  preset = c("standard", "publication", "compact", "monochrome"),
+  ...
+)
 }
 \arguments{
 \item{x}{An \code{mfrm_facet_sample_review} object.}
@@ -12,7 +17,7 @@
 \item{top_n}{Optional integer; trim the y-axis to the \code{top_n}
 smallest level counts per facet. \code{NULL} (default) keeps all.}
 
-\item{preset}{One of \code{"standard"}, \code{"publication"}, \code{"compact"}.}
+\item{preset}{One of \code{"standard"}, \code{"publication"}, \code{"compact"}, \code{"monochrome"}.}
 
 \item{...}{Reserved.}
 }

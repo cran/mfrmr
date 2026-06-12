@@ -567,7 +567,9 @@ test_that("core fit/diagnostics workflow runs", {
   expect_match(apa$report_text, "Terminal gradient sup-norm", fixed = TRUE)
   expect_match(apa$report_text, "Constraint settings:", fixed = TRUE)
   expect_match(apa$report_text, "Step/threshold summary:", fixed = TRUE)
-  expect_match(apa$report_text, "Largest misfit", fixed = TRUE)
+  # Wrap-insensitive: the wrapped report text may hard-break inside the
+  # sentence, so match across whitespace instead of a fixed string.
+  expect_match(apa$report_text, "Largest\\s+misfit", perl = TRUE)
   expect_match(apa$report_text, "Design and data\\.", perl = TRUE)
   expect_match(apa$report_text, "Fit and precision\\.", perl = TRUE)
   printed_apa_text <- capture.output(print(apa$report_text))

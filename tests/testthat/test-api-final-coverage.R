@@ -1,5 +1,5 @@
 ## tests/testthat/test-api-final-coverage.R
-## Targeted coverage tests for api.R uncovered lines.
+## Focused behavior and error-path regression tests for the api.R helpers.
 
 # ── shared fixtures ──────────────────────────────────────────────────────────
 local({

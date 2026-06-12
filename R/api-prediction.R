@@ -57,14 +57,12 @@
 #' branch, and summarizes the resulting facet-level behavior. This is distinct
 #' from the fitted-model posterior scoring provided by [predict_mfrm_units()].
 #'
-#' This scenario-level forecast helper does not yet support bounded `GPCM`.
-#' Direct bounded-`GPCM` fitting, fixed-calibration scoring, information,
-#' diagnostics, direct curve/report helpers, simulation-spec generation, data
-#' generation, and parameter-recovery checks are available elsewhere. In the
-#' present package state, scenario-level simulation/planning remains validated
-#' only for the ordered Rasch-family `RSM` / `PCM` workflow. More broadly, the
-#' current planning layer targets the role-based person x rater-like x
-#' criterion-like design contract rather than a fully arbitrary-facet planner.
+#' Bounded `GPCM` forecasts are available with caveats through the same
+#' repeated simulation/refit design route used by [evaluate_mfrm_design()].
+#' They summarize design-level operating characteristics under the supplied or
+#' fit-derived slope-aware specification; they do not validate operational
+#' scoring, diagnostic-screening or signal-detection rules, slope-recovery
+#' adequacy, or arbitrary-facet planning.
 #'
 #' @section Interpreting output:
 #' - `forecast` contains facet-level expected summaries for the requested
@@ -121,6 +119,8 @@
 #' - `planning_schema`: combined planner-schema contract carrying the role
 #'   table, current boundary, mutability map, facet manifest, and a
 #'   schema-only future facet-count table
+#' - `gpcm_boundary`: bounded-`GPCM` caveat row when a `GPCM` forecast route is
+#'   used
 #' - `settings`: forecasting settings
 #' - `ademp`: simulation-study metadata
 #' - `notes`: interpretation notes
@@ -181,12 +181,8 @@ predict_mfrm_population <- function(fit = NULL,
       default_model <- as.character(fit$config$model)
     }
     if (identical(default_model, "GPCM")) {
-      stop(
-        "`predict_mfrm_population()` is not yet validated for `GPCM` fits. ",
-        "Current bounded `GPCM` support includes fitting, core summaries, fixed-calibration posterior scoring, information, direct diagnostics, direct curve/report helpers, and parameter-recovery checks; it does not yet include scenario-level planning or forecasting. ",
-        gpcm_planning_scope_rationale(),
-        call. = FALSE
-      )
+      # GPCM fit-derived forecasts are caveated design-level simulations, not
+      # operational score predictions.
     }
     base_spec <- extract_mfrm_sim_spec(fit)
   } else {
@@ -197,19 +193,14 @@ predict_mfrm_population <- function(fit = NULL,
     default_fit_method <- "MML"
     default_model <- as.character(base_spec$model)
     if (identical(default_model, "GPCM")) {
-      stop(
-        "`predict_mfrm_population()` is not yet validated for `GPCM` simulation specifications. ",
-        "Current bounded `GPCM` support includes direct data generation and parameter-recovery checks, but not scenario-level planning or forecasting. ",
-        gpcm_planning_scope_rationale(),
-        call. = FALSE
-      )
+      # GPCM sim-spec forecasts are caveated design-level simulations.
     }
   }
 
   fit_method <- toupper(as.character(fit_method[1] %||% default_fit_method))
   fit_method <- match.arg(fit_method, c("JML", "MML"))
   model <- toupper(as.character(model[1] %||% default_model))
-  model <- match.arg(model, c("RSM", "PCM"))
+  model <- match.arg(model, c("RSM", "PCM", "GPCM"))
 
   design <- simulation_resolve_design_counts(
     sim_spec = base_spec,
@@ -253,6 +244,7 @@ predict_mfrm_population <- function(fit = NULL,
   planning_scope <- simulation_object_planning_scope(sim_eval)
   planning_constraints <- simulation_object_planning_constraints(sim_eval)
   planning_schema <- simulation_object_planning_schema(sim_eval)
+  gpcm_boundary <- sim_eval$gpcm_boundary %||% data.frame()
   facet_names <- simulation_spec_output_facet_names(forecast_spec)
   design_public <- simulation_append_design_alias_columns(design, design_variable_aliases)
   notes <- c(
@@ -260,6 +252,7 @@ predict_mfrm_population <- function(fit = NULL,
     "MCSE columns quantify Monte Carlo uncertainty from using a finite number of replications.",
     "Do not interpret this output as deterministic future person/rater true values."
   )
+  notes <- unique(c(notes, sim_eval$notes %||% character(0)))
   scope_note <- simulation_planning_scope_note(planning_scope)
   if (length(scope_note) > 0L && !scope_note %in% notes) {
     notes <- c(notes, scope_note)
@@ -286,6 +279,7 @@ predict_mfrm_population <- function(fit = NULL,
       planning_scope = planning_scope,
       planning_constraints = planning_constraints,
       planning_schema = planning_schema,
+      gpcm_boundary = gpcm_boundary,
       settings = list(
         reps = as.integer(reps[1]),
         fit_method = fit_method,
@@ -300,7 +294,13 @@ predict_mfrm_population <- function(fit = NULL,
         design_descriptor = design_descriptor,
         planning_scope = planning_scope,
         planning_constraints = planning_constraints,
-        planning_schema = planning_schema
+        planning_schema = planning_schema,
+        gpcm_design_status = if (identical(model, "GPCM") ||
+          identical(as.character(forecast_spec$model %||% NA_character_), "GPCM")) {
+          "supported_with_caveat"
+        } else {
+          NA_character_
+        }
       ),
       ademp = sim_eval$ademp,
       notes = notes
@@ -325,6 +325,7 @@ predict_mfrm_population <- function(fit = NULL,
 #' - `planning_scope`: explicit record of the current planning contract
 #' - `planning_constraints`: explicit record of mutable/locked design variables
 #' - `planning_schema`: combined planner-schema contract
+#' - `gpcm_boundary`: bounded-`GPCM` caveat row when present
 #' - `future_branch_active_summary`: compact deterministic summary of the
 #'   schema-only future arbitrary-facet planning branch embedded in the current
 #'   planning schema
@@ -376,6 +377,7 @@ summary.mfrm_population_prediction <- function(object, digits = 3, ...) {
     planning_scope = object$planning_scope %||% object$settings$planning_scope %||% simulation_planning_scope(object$sim_spec),
     planning_constraints = object$planning_constraints %||% object$settings$planning_constraints %||% simulation_planning_constraints(object$sim_spec),
     planning_schema = object$planning_schema %||% object$settings$planning_schema %||% simulation_planning_schema(object$sim_spec),
+    gpcm_boundary = object$gpcm_boundary %||% data.frame(),
     future_branch_active_summary = simulation_compact_future_branch_active_summary(
       object,
       digits = digits

@@ -28,9 +28,12 @@ Use \code{\link[=subset_connectivity_report]{subset_connectivity_report()}} and 
 \item "What should go into the manuscript text and tables?"
 For \code{RSM} / \code{PCM}, use \code{\link[=reporting_checklist]{reporting_checklist()}}, \code{\link[=build_apa_outputs]{build_apa_outputs()}},
 and \code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}} or \code{\link[=export_summary_appendix]{export_summary_appendix()}}. For
-bounded \code{GPCM}, stay on \code{\link[=reporting_checklist]{reporting_checklist()}}, direct table/plot helpers,
-and summary-table appendix export; \code{\link[=build_apa_outputs]{build_apa_outputs()}} and
-\code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}} remain out of scope.
+bounded \code{GPCM}, use the same route only where
+\code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}} marks it as \code{supported_with_caveat}: direct
+table/plot helpers, summary-table appendix export, caveated
+\code{\link[=build_apa_outputs]{build_apa_outputs()}}, and caveated \code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}} are available
+with a \code{gpcm_boundary}; score-side exports and design-forecasting evidence
+use their own caveated or blocked \code{GPCM} routes.
 \item "Did a simulation recover the known generating parameters well enough?"
 Use \code{\link[=evaluate_mfrm_recovery]{evaluate_mfrm_recovery()}} for the recovery study,
 \code{\link[=assess_mfrm_recovery]{assess_mfrm_recovery()}} for the adequacy checklist, and then
@@ -54,9 +57,10 @@ describe spread, linkage, and measurability.
 \code{\link[=build_apa_outputs]{build_apa_outputs()}} for manuscript-oriented output, then
 \code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}} for reusable handoff tables or
 \code{\link[=export_summary_appendix]{export_summary_appendix()}} for direct appendix export. For bounded
-\code{GPCM}, skip \code{\link[=build_apa_outputs]{build_apa_outputs()}} and \code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}}; use
-\code{\link[=reporting_checklist]{reporting_checklist()}}, direct summaries/plots, and the summary-table
-appendix route only.
+\code{GPCM}, the same report/export route is available only as a caveated
+sensitivity-reporting layer with \code{gpcm_boundary}; keep FACETS-style
+score-side review and design forecasting on their separate capability
+rows.
 }
 
 If you are unsure which helper to call, start with
@@ -153,7 +157,9 @@ or \code{\link[=export_summary_appendix]{export_summary_appendix()}} /
 \code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}}(include = "summary_tables").
 \item Bounded \code{GPCM} handoff:
 \code{\link[=reporting_checklist]{reporting_checklist()}} -> direct summaries/plots ->
-\code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}} -> \code{\link[=export_summary_appendix]{export_summary_appendix()}}.
+\code{\link[=build_apa_outputs]{build_apa_outputs()}} or \code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}} ->
+\code{\link[=export_summary_appendix]{export_summary_appendix()}} or caveated \code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}}, with
+\code{gpcm_boundary} retained in report/export objects.
 \item Recovery simulation handoff:
 \code{\link[=evaluate_mfrm_recovery]{evaluate_mfrm_recovery()}} -> \code{\link[=plot]{plot()}} / \code{\link[=assess_mfrm_recovery]{assess_mfrm_recovery()}} ->
 \code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}} -> \code{\link[=export_summary_appendix]{export_summary_appendix()}}.

@@ -62,7 +62,7 @@ A named list with:
 \itemize{
 \item \code{by_facet}: named list of formatted data.frames
 \item \code{stacked}: one stacked data.frame across facets
-\item \code{raw_by_facet}: unformatted internal tables
+\item \code{raw_by_facet}: unformatted component tables
 \item \code{settings}: resolved options
 }
 }

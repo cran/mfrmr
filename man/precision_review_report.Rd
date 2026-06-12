@@ -16,6 +16,7 @@ A named list with:
 \itemize{
 \item \code{profile}: one-row precision overview
 \item \code{checks}: package-native precision review checks
+\item \code{fit_separation_basis}: source-grounded fit/separation reporting boundary
 \item \code{approximation_notes}: detailed method notes
 \item \code{settings}: resolved model and method labels
 }
@@ -25,9 +26,10 @@ Build a precision review report
 }
 \details{
 This helper summarizes how \code{mfrmr} derived SE, CI, and reliability values
-for the current run. It is package-native and is intended to help users
-distinguish model-based precision paths from exploratory ones without
-requiring external software conventions.
+for the current run. It also includes a source-grounded fit/separation
+basis table so users can keep mean-square fit, ZSTD standardization,
+Rasch/FACETS-style separation, and package QC thresholds in separate
+reporting lanes.
 }
 \section{What this review means}{
 
@@ -43,6 +45,8 @@ run and how cautiously those summaries should be written up.
 conclusions.
 \item A favorable precision tier does not override convergence, fit, linking,
 or design problems elsewhere in the analysis.
+\item Fit and separation rows in this report are reporting/validation
+boundaries, not standalone success criteria.
 }
 }
 
@@ -52,6 +56,8 @@ or design problems elsewhere in the analysis.
 \item \code{profile}: one-row overview of the active precision tier and recommended use.
 \item \code{checks}: package-native review checks for SE ordering, reliability ordering,
 coverage of sample/population summaries, and SE source labels.
+\item \code{fit_separation_basis}: source-grounded boundary table for fit and
+separation reporting.
 \item \code{approximation_notes}: method notes copied from \code{diagnose_mfrm()}.
 }
 }

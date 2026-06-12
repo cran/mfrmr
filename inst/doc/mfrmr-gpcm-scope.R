@@ -16,8 +16,8 @@ knitr::opts_chunk$set(
 # gpcm_capability_matrix("supported_with_caveat")[, c("Area", "Status")]
 
 ## ----capability-blocked-------------------------------------------------------
-# gpcm_capability_matrix("blocked")[, c("Area", "Status", "Boundary")]
+# gpcm_capability_matrix("blocked")[, c("Area", "Status", "RecommendedRoute")]
 
 ## ----capability-deferred------------------------------------------------------
-# gpcm_capability_matrix("deferred")[, c("Area", "Status")]
+# gpcm_capability_matrix("deferred")[, c("Area", "Status", "NextValidationStep")]
 

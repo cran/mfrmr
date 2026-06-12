@@ -56,6 +56,10 @@
 #'   package's documented caveats. `ReadyForAPA` is a backward-compatible alias
 #'   of the same flag; neither field certifies formal inferential adequacy.
 #' - `section_summary`: available items by section.
+#' - The Global Fit section includes a "Fit/separation reporting boundary"
+#'   row that points to [precision_review_report()], [fit_measures_table()],
+#'   and [facets_fit_review()] before users phrase fit, ZSTD, separation, or
+#'   reliability claims.
 #' - `software_scope`: external-software relationship summary for `mfrmr`,
 #'   FACETS, ConQuest, and SPSS-style tabular handoffs.
 #' - `facets_positioning`: report-ready wording that states `mfrmr` is not a
@@ -225,6 +229,15 @@ reporting_checklist <- function(fit,
         "Strict marginal diagnostics are unavailable for the current run."
     )
   }
+  fit_df_review_available <- nrow(measures) > 0 &&
+    all(c("DF_Infit_FACETS", "DF_Outfit_FACETS",
+          "InfitZSTD_FACETS", "OutfitZSTD_FACETS") %in% names(measures))
+  fit_separation_boundary_available <- has_fit || has_rel || fit_df_review_available
+  fit_separation_boundary_detail <- paste0(
+    "MnSq fit=", if (has_fit) "available" else "missing",
+    "; separation/reliability=", if (has_rel) "available" else "missing",
+    "; df/ZSTD review=", if (fit_df_review_available) "available" else "not requested"
+  )
   population <- fit$population %||% list()
   population_active <- isTRUE(population$active)
   population_coefficients <- as.numeric(population$coefficients %||% numeric(0))
@@ -596,6 +609,26 @@ reporting_checklist <- function(fit,
         severity = "recommended",
         missing_action = "Run residual PCA if you want to comment on unexplained residual structure.",
         available_action = "Report residual PCA as exploratory residual-structure follow-up, not as a standalone dimensionality test."
+      ),
+      add_item(
+        "Global Fit",
+        "Fit/separation reporting boundary",
+        fit_separation_boundary_available,
+        detail = fit_separation_boundary_detail,
+        source_component = "precision_review_report()$fit_separation_basis + fit_measures_table() + facets_fit_review()",
+        severity = "recommended",
+        ready_for_apa = fit_separation_boundary_available,
+        missing_action = paste0(
+          "Run `diagnose_mfrm()` before writing fit, separation, reliability, ",
+          "or ZSTD language. Use `diagnose_mfrm(..., fit_df_method = \"both\")` ",
+          "when FACETS-style df/ZSTD review is needed."
+        ),
+        available_action = paste0(
+          "Use `precision_review_report(fit, diagnostics)$fit_separation_basis` ",
+          "before drafting fit/separation wording; export `fit_measures_table()` ",
+          "or `facets_fit_review()` when df/ZSTD sensitivity or external FACETS ",
+          "matching is part of the report."
+        )
       ),
       add_item(
         "Facet-Level Statistics",

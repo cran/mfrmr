@@ -134,6 +134,17 @@ fit_measure_validate_nonnegative_finite <- function(x, arg) {
 #' freedom convention and a Wilson-Hilferty-style transformation, so ZSTD can
 #' differ even when the underlying MnSq values are nearly identical.
 #'
+#' Two boundaries sit upstream of any df comparison. First, the residual
+#' basis: `method = "MML"` fits evaluate residuals at shrunken EAP person
+#' measures, whereas FACETS evaluates them at JMLE estimates, so MnSq values
+#' themselves can differ before any standardization is applied; refit with
+#' `method = "JML"` when the comparison requires a JMLE-style residual basis.
+#' Second, small df: `mfrmr` returns `NA` ZSTD when `df < 1` because the
+#' Wilson-Hilferty transformation is numerically unstable there, while
+#' FACETS/Winsteps under `WHEXACT` can continue with a linear approximation,
+#' so sparse cells can show `NA` against a finite external value without
+#' indicating a fit difference.
+#'
 #' @return A bundle of class `mfrm_facets_fit_df_guide` with:
 #' - `summary`: one-row scope summary
 #' - `formula_guide`: formulas and package columns
@@ -250,21 +261,27 @@ facets_fit_df_guide <- function(include_references = TRUE) {
     Pattern = c(
       "MnSq same, df different, ZSTD different",
       "MnSq different",
+      "MnSq different and the mfrmr fit used method = \"MML\"",
       "Small df with counterintuitive ZSTD sign",
+      "mfrmr ZSTD is NA but the external table reports a value",
       "FACETS-style flag but engine flag absent",
       "Engine flag but FACETS-style flag absent"
     ),
     Interpretation = c(
       "Usually a standardization-convention difference, not a different residual fit signal.",
       "Potential estimation, weighting, missing-data, or table-matching difference.",
+      "MML residuals are evaluated at shrunken EAP person measures, while FACETS uses JMLE estimates; the residual basis itself differs, most visibly for extreme-scoring persons.",
       "Known small-df behavior of Wilson-Hilferty-style standardization; prioritize MnSq and context.",
+      "mfrmr withholds ZSTD when df < 1 (Wilson-Hilferty instability); FACETS/Winsteps WHEXACT can continue with a linear approximation on the same cell.",
       "The FACETS-style df makes the same MnSq more statistically extreme.",
       "The engine df makes the same MnSq more statistically extreme."
     ),
     ReportingAction = c(
       "State the df convention and compare MnSq separately from ZSTD.",
       "Do not explain the difference as only a df issue until MnSq matching is resolved.",
+      "Refit with method = \"JML\" before attributing the gap to fit computation; report the residual basis in methods notes.",
       "Avoid strong claims from ZSTD alone; show MnSq and df together.",
+      "Treat as a small-df availability difference, not a fit difference; compare MnSq for that row instead.",
       "Label as convention-sensitive and review the actual MnSq band.",
       "Label as convention-sensitive and review the actual MnSq band."
     ),
@@ -669,6 +686,8 @@ summarize_fit_measure_df_sensitivity <- function(df_sensitivity) {
 #'
 #' @seealso [diagnose_mfrm()], [facets_fit_review()], [plot_bubble()],
 #'   [mfrm_misfit_thresholds()]
+#' @concept confidence intervals
+#' @concept fit statistics
 #' @examples
 #' \donttest{
 #' toy <- load_mfrmr_data("example_core")
@@ -1624,6 +1643,785 @@ mfrm_network_analysis <- function(fit,
     out$graph <- graph
   }
   as_mfrm_bundle(out, "mfrm_network_analysis")
+}
+
+network_review_top_rows <- function(x, top_n = 10) {
+  x <- as.data.frame(x %||% data.frame(), stringsAsFactors = FALSE)
+  if (nrow(x) == 0L) return(x)
+  top_n <- max(1L, as.integer(top_n))
+  x[seq_len(min(nrow(x), top_n)), , drop = FALSE]
+}
+
+network_review_sparse_design_table <- function(sparse_design = NULL) {
+  if (is.null(sparse_design)) {
+    return(data.frame())
+  }
+  if (is.data.frame(sparse_design)) {
+    sparse_attr <- attr(sparse_design, "mfrm_sparse_design")
+    if (is.list(sparse_attr) && is.data.frame(sparse_attr$overview)) {
+      tbl <- as.data.frame(sparse_attr$overview, stringsAsFactors = FALSE)
+    } else {
+      tbl <- as.data.frame(sparse_design, stringsAsFactors = FALSE)
+    }
+  } else if (is.list(sparse_design) && is.data.frame(sparse_design$overview)) {
+    tbl <- as.data.frame(sparse_design$overview, stringsAsFactors = FALSE)
+  } else {
+    stop(
+      "`sparse_design` must be `NULL`, a sparse-design overview data frame, ",
+      "or the `mfrm_sparse_design` attribute from simulate_mfrm_data().",
+      call. = FALSE
+    )
+  }
+  if (nrow(tbl) == 0L) {
+    return(tbl)
+  }
+  if (!"SparseDesignActive" %in% names(tbl)) {
+    tbl$SparseDesignActive <- if ("Active" %in% names(tbl)) {
+      simulation_sparse_design_active(tbl$Active)
+    } else {
+      TRUE
+    }
+  }
+  tbl
+}
+
+network_review_peer_review_table <- function(peer_review_design = NULL) {
+  if (is.null(peer_review_design)) {
+    return(data.frame())
+  }
+  if (is.data.frame(peer_review_design)) {
+    peer_attr <- attr(peer_review_design, "mfrm_peer_review_design")
+    if (is.list(peer_attr) && is.data.frame(peer_attr$overview)) {
+      tbl <- as.data.frame(peer_attr$overview, stringsAsFactors = FALSE)
+    } else {
+      tbl <- as.data.frame(peer_review_design, stringsAsFactors = FALSE)
+    }
+  } else if (is.list(peer_review_design) && is.data.frame(peer_review_design$overview)) {
+    tbl <- as.data.frame(peer_review_design$overview, stringsAsFactors = FALSE)
+  } else {
+    stop(
+      "`peer_review_design` must be `NULL`, a peer-review overview data frame, ",
+      "or the `mfrm_peer_review_design` attribute from simulate_mfrm_data().",
+      call. = FALSE
+    )
+  }
+  if (nrow(tbl) == 0L) {
+    return(tbl)
+  }
+  if (!"Active" %in% names(tbl)) {
+    tbl$Active <- TRUE
+  }
+  if (!"Scenario" %in% names(tbl)) {
+    tbl$Scenario <- "peer_review"
+  }
+  if (!"ReviewUse" %in% names(tbl)) {
+    tbl$ReviewUse <- "design_diagnostic_not_measurement_gate"
+  }
+  tbl
+}
+
+peer_review_design_bundle <- function(peer_review_design) {
+  if (is.null(peer_review_design)) {
+    stop("`peer_review_design` must not be `NULL`.", call. = FALSE)
+  }
+  if (is.data.frame(peer_review_design)) {
+    peer_attr <- attr(peer_review_design, "mfrm_peer_review_design")
+    if (is.list(peer_attr) && is.data.frame(peer_attr$overview)) {
+      src <- peer_attr
+    } else {
+      src <- list(overview = as.data.frame(peer_review_design, stringsAsFactors = FALSE))
+    }
+  } else if (is.list(peer_review_design) && is.data.frame(peer_review_design$overview)) {
+    src <- peer_review_design
+  } else {
+    stop(
+      "`peer_review_design` must be a generated data frame carrying ",
+      "`mfrm_peer_review_design`, the attribute itself, or a peer-review ",
+      "overview data frame.",
+      call. = FALSE
+    )
+  }
+  list(
+    overview = as.data.frame(src$overview %||% data.frame(), stringsAsFactors = FALSE),
+    submission_load = as.data.frame(src$submission_load %||% data.frame(), stringsAsFactors = FALSE),
+    reviewer_load = as.data.frame(src$reviewer_load %||% data.frame(), stringsAsFactors = FALSE),
+    reviewer_pair_common_submissions = as.data.frame(
+      src$reviewer_pair_common_submissions %||% data.frame(),
+      stringsAsFactors = FALSE
+    ),
+    review_pairs = as.data.frame(src$review_pairs %||% data.frame(), stringsAsFactors = FALSE),
+    notes = clean_summary_lines(src$notes %||% character(0))
+  )
+}
+
+peer_review_design_status <- function(overview) {
+  overview <- as.data.frame(overview %||% data.frame(), stringsAsFactors = FALSE)
+  if (nrow(overview) == 0L) {
+    return(data.frame(
+      PeerReviewStatus = "insufficient_data",
+      PeerReviewReason = "No peer-review design overview is available.",
+      ReviewUse = "design_diagnostic_not_measurement_gate",
+      stringsAsFactors = FALSE
+    ))
+  }
+  active <- if ("Active" %in% names(overview)) {
+    simulation_sparse_design_active(overview$Active[1])
+  } else {
+    TRUE
+  }
+  self_reviews <- suppressWarnings(as.integer(overview$SelfReviews[1] %||% NA_integer_))
+  avoid_self <- if ("AvoidSelfReview" %in% names(overview)) {
+    simulation_sparse_design_active(overview$AvoidSelfReview[1])
+  } else {
+    NA
+  }
+  min_reviewer_load <- suppressWarnings(as.numeric(overview$MinSubmissionsPerReviewer[1] %||% NA_real_))
+  min_common <- suppressWarnings(as.numeric(overview$MinCommonSubmissionsPerReviewerPair[1] %||% NA_real_))
+  zero_common <- suppressWarnings(as.integer(overview$ZeroCommonReviewerPairs[1] %||% NA_integer_))
+
+  status <- "ok"
+  reason <- "Recorded peer-review assignment checks are satisfied."
+  if (!isTRUE(active)) {
+    status <- "insufficient_data"
+    reason <- "The supplied metadata does not describe an active peer-review design."
+  } else if (isTRUE(avoid_self) && is.finite(self_reviews) && self_reviews > 0L) {
+    status <- "warning"
+    reason <- "Self-review was requested to be excluded, but at least one self-review pair is present."
+  } else if (is.finite(min_reviewer_load) && min_reviewer_load <= 0) {
+    status <- "review"
+    reason <- "At least one reviewer has no assigned submissions."
+  } else if (is.finite(zero_common) && zero_common > 0L) {
+    status <- "review"
+    reason <- "At least one reviewer pair has no common submissions."
+  } else if (!is.finite(min_common)) {
+    status <- "review"
+    reason <- "Reviewer-pair common-submission counts are unavailable."
+  }
+
+  data.frame(
+    PeerReviewStatus = status,
+    PeerReviewReason = reason,
+    ReviewUse = "design_diagnostic_not_measurement_gate",
+    stringsAsFactors = FALSE
+  )
+}
+
+peer_review_load_summary <- function(submission_load, reviewer_load) {
+  submission_load <- as.data.frame(submission_load %||% data.frame(), stringsAsFactors = FALSE)
+  reviewer_load <- as.data.frame(reviewer_load %||% data.frame(), stringsAsFactors = FALSE)
+  sub_counts <- if ("ReviewersAssigned" %in% names(submission_load)) {
+    suppressWarnings(as.numeric(submission_load$ReviewersAssigned))
+  } else {
+    numeric(0)
+  }
+  rev_counts <- if ("SubmissionsReviewed" %in% names(reviewer_load)) {
+    suppressWarnings(as.numeric(reviewer_load$SubmissionsReviewed))
+  } else {
+    numeric(0)
+  }
+  safe_min <- function(x) if (length(x) == 0L || all(!is.finite(x))) NA_real_ else min(x, na.rm = TRUE)
+  safe_mean <- function(x) if (length(x) == 0L || all(!is.finite(x))) NA_real_ else mean(x, na.rm = TRUE)
+  safe_max <- function(x) if (length(x) == 0L || all(!is.finite(x))) NA_real_ else max(x, na.rm = TRUE)
+  data.frame(
+    Submissions = nrow(submission_load),
+    Reviewers = nrow(reviewer_load),
+    MinReviewersPerSubmission = safe_min(sub_counts),
+    MeanReviewersPerSubmission = safe_mean(sub_counts),
+    MaxReviewersPerSubmission = safe_max(sub_counts),
+    MinSubmissionsPerReviewer = safe_min(rev_counts),
+    MeanSubmissionsPerReviewer = safe_mean(rev_counts),
+    MaxSubmissionsPerReviewer = safe_max(rev_counts),
+    LoadReviewUse = "assignment_diagnostic_not_quality_gate",
+    stringsAsFactors = FALSE
+  )
+}
+
+peer_review_reciprocal_pair_rows <- function(review_pairs) {
+  review_pairs <- as.data.frame(review_pairs %||% data.frame(), stringsAsFactors = FALSE)
+  if (nrow(review_pairs) == 0L || !all(c("Person", "Reviewer") %in% names(review_pairs))) {
+    return(data.frame())
+  }
+  pairs <- unique(review_pairs[, c("Person", "Reviewer"), drop = FALSE])
+  pairs$Person <- as.character(pairs$Person)
+  pairs$Reviewer <- as.character(pairs$Reviewer)
+  key <- paste(pairs$Person, pairs$Reviewer, sep = "\r")
+  reciprocal <- paste(pairs$Reviewer, pairs$Person, sep = "\r")
+  idx <- key %in% reciprocal & pairs$Person != pairs$Reviewer
+  if (!any(idx)) {
+    return(data.frame())
+  }
+  p1 <- pmin(pairs$Person[idx], pairs$Reviewer[idx])
+  p2 <- pmax(pairs$Person[idx], pairs$Reviewer[idx])
+  unique(data.frame(
+    Participant1 = p1,
+    Participant2 = p2,
+    ReciprocalReviewPair = TRUE,
+    ReviewUse = "design_diagnostic_not_measurement_gate",
+    stringsAsFactors = FALSE
+  ))
+}
+
+peer_review_reporting_map <- function() {
+  data.frame(
+    Area = c(
+      "Peer-review assignment",
+      "Reviewer load",
+      "Common-submission links",
+      "Reciprocal review pairs",
+      "MFRM measurement model"
+    ),
+    PrimaryTable = c(
+      "overview",
+      "load_summary; reviewer_load; submission_load",
+      "reviewer_pair_common_submissions; low_common_pairs",
+      "reciprocal_pairs",
+      "fit_mfrm(); diagnose_mfrm()"
+    ),
+    Use = c(
+      "Check self-review exclusion, design density, anchor counts, and front-door assignment status.",
+      "Inspect whether submissions and reviewers received the intended assignment load.",
+      "Inspect reviewer linkage through shared reviewed submissions.",
+      "Flag participant pairs that reviewed each other's submissions for design transparency.",
+      "Estimate and diagnose person/submission measures, reviewer severity, criterion difficulty, fit, and precision."
+    ),
+    Boundary = c(
+      "Design diagnostic; not evidence of peer quality or rating fairness.",
+      "Assignment diagnostic; not a reviewer-quality score.",
+      "Design-link diagnostic; not a universal adequacy threshold.",
+      "Design-transparency diagnostic; not automatically a bias finding.",
+      "Measurement model; keep separate from assignment-design diagnostics."
+    ),
+    stringsAsFactors = FALSE
+  )
+}
+
+peer_review_top_rows <- function(x, top_n = 10) {
+  x <- as.data.frame(x %||% data.frame(), stringsAsFactors = FALSE)
+  if (nrow(x) == 0L) return(x)
+  top_n <- max(1L, as.integer(top_n))
+  x[seq_len(min(nrow(x), top_n)), , drop = FALSE]
+}
+
+#' Build a peer-review design review
+#'
+#' @param peer_review_design A generated data frame carrying the
+#'   `mfrm_peer_review_design` attribute, the attribute itself, or its
+#'   `overview` data frame.
+#' @param top_n Number of reviewer-load, submission-load, common-link, and
+#'   reciprocal-pair rows to keep in compact summary tables.
+#'
+#' @details
+#' `build_peer_review_design_review()` converts peer-review simulation metadata
+#' into a reportable design-review object. The review summarizes self-review
+#' checks, reviewer and submission load, common submissions per reviewer pair,
+#' and reciprocal review pairs. These rows are assignment-design diagnostics:
+#' they do not replace MFRM estimates, fit, separation, reliability, or
+#' substantive review-quality evidence.
+#'
+#' Peer-review use of MFRM follows studies that model peer/self/teacher rater
+#' severity and leniency. Common-link anchor interpretation follows sparse
+#' rater-mediated design work; the review status is therefore descriptive and
+#' conservative rather than a literature-derived universal adequacy cutoff.
+#'
+#' @section References:
+#' - Farrokhi, F., Esfandiari, R., & Schaefer, E. (2012). A many-facet Rasch
+#'   measurement of differential rater severity/leniency in three types of
+#'   assessment. *JALT Journal*, 34(1), 79-102.
+#'   doi:10.37546/JALTJJ34.1-3.
+#' - Uto, M., & Ueno, M. (2020). A generalized many-facet Rasch model and its
+#'   Bayesian estimation using Hamiltonian Monte Carlo. *Behaviormetrika*,
+#'   47, 469-496. doi:10.1007/s41237-020-00115-7.
+#' - DeMars, C. E., Shapovalov, Y. A., & Hathcoat, J. D. (2023).
+#'   *Many-Facet Rasch Designs: How Should Raters be Assigned to Examinees?*
+#'   NCME presentation.
+#'
+#' @return A bundle of class `mfrm_peer_review_design_review`.
+#' @seealso [build_peer_review_sim_spec()], [simulate_mfrm_data()],
+#'   [build_mfrm_network_review()], [build_summary_table_bundle()]
+#' @examples
+#' peer_spec <- build_peer_review_sim_spec(
+#'   n_submission = 12,
+#'   n_criterion = 3,
+#'   reviewers_per_submission = 2,
+#'   anchor_submissions = 2
+#' )
+#' peer_sim <- simulate_mfrm_data(sim_spec = peer_spec, seed = 123)
+#' review <- build_peer_review_design_review(peer_sim)
+#' summary(review)$overview
+#' @export
+build_peer_review_design_review <- function(peer_review_design, top_n = 10) {
+  top_n <- max(1L, as.integer(top_n))
+  src <- peer_review_design_bundle(peer_review_design)
+  overview <- src$overview
+  status <- peer_review_design_status(overview)
+  if ("ReviewUse" %in% names(overview)) {
+    overview$ReviewUse <- NULL
+  }
+  overview <- data.frame(overview, status, check.names = FALSE, stringsAsFactors = FALSE)
+
+  load_summary <- peer_review_load_summary(src$submission_load, src$reviewer_load)
+  reviewer_load <- src$reviewer_load
+  if (nrow(reviewer_load) > 0L && "SubmissionsReviewed" %in% names(reviewer_load)) {
+    reviewer_load <- reviewer_load |>
+      dplyr::arrange(dplyr::desc(.data$SubmissionsReviewed), .data$Reviewer)
+  }
+  submission_load <- src$submission_load
+  if (nrow(submission_load) > 0L && "ReviewersAssigned" %in% names(submission_load)) {
+    submission_load <- submission_load |>
+      dplyr::arrange(dplyr::desc(.data$ReviewersAssigned), .data$Person)
+  }
+  common_pairs <- src$reviewer_pair_common_submissions
+  low_common <- common_pairs
+  if (nrow(low_common) > 0L && "CommonSubmissions" %in% names(low_common)) {
+    low_common <- low_common |>
+      dplyr::arrange(.data$CommonSubmissions, .data$Reviewer1, .data$Reviewer2)
+  }
+  reciprocal <- peer_review_reciprocal_pair_rows(src$review_pairs)
+
+  caveats <- data.frame(
+    Area = "interpretation_boundary",
+    Severity = "info",
+    Message = "Peer-review design diagnostics summarize assignment structure and linkage; they are not MFRM fit statistics, reviewer-quality estimates, or fairness evidence.",
+    stringsAsFactors = FALSE
+  )
+  out <- list(
+    overview = overview,
+    load_summary = load_summary,
+    submission_load = peer_review_top_rows(submission_load, top_n = top_n),
+    reviewer_load = peer_review_top_rows(reviewer_load, top_n = top_n),
+    reviewer_pair_common_submissions = peer_review_top_rows(common_pairs, top_n = top_n),
+    low_common_pairs = peer_review_top_rows(low_common, top_n = top_n),
+    reciprocal_pairs = peer_review_top_rows(reciprocal, top_n = top_n),
+    reporting_map = peer_review_reporting_map(),
+    caveats = caveats,
+    settings = list(
+      top_n = top_n,
+      review_use = "design_diagnostic_not_measurement_gate"
+    ),
+    notes = c(
+      src$notes,
+      "Peer-review design status is a routing aid for assignment review, not a measurement adequacy decision."
+    )
+  )
+  as_mfrm_bundle(out, "mfrm_peer_review_design_review")
+}
+
+#' @export
+print.mfrm_peer_review_design_review <- function(x, ...) {
+  print(summary(x), ...)
+  invisible(x)
+}
+
+#' Summarize a peer-review design review
+#'
+#' @param object Output from [build_peer_review_design_review()].
+#' @param digits Number of digits for printed numeric values.
+#' @param top_n Number of rows to keep in compact follow-up tables.
+#' @param ... Reserved for generic compatibility.
+#'
+#' @return An object of class `summary.mfrm_peer_review_design_review`.
+#' @seealso [build_peer_review_design_review()]
+#' @export
+summary.mfrm_peer_review_design_review <- function(object, digits = 3, top_n = 10, ...) {
+  if (!inherits(object, "mfrm_peer_review_design_review")) {
+    stop("`object` must be output from build_peer_review_design_review().", call. = FALSE)
+  }
+  digits <- max(0L, as.integer(digits))
+  top_n <- max(1L, as.integer(top_n))
+  out <- list(
+    overview = tibble::as_tibble(object$overview %||% tibble::tibble()),
+    load_summary = tibble::as_tibble(object$load_summary %||% tibble::tibble()),
+    submission_load = tibble::as_tibble(peer_review_top_rows(object$submission_load, top_n = top_n)),
+    reviewer_load = tibble::as_tibble(peer_review_top_rows(object$reviewer_load, top_n = top_n)),
+    reviewer_pair_common_submissions = tibble::as_tibble(
+      peer_review_top_rows(object$reviewer_pair_common_submissions, top_n = top_n)
+    ),
+    low_common_pairs = tibble::as_tibble(peer_review_top_rows(object$low_common_pairs, top_n = top_n)),
+    reciprocal_pairs = tibble::as_tibble(peer_review_top_rows(object$reciprocal_pairs, top_n = top_n)),
+    reporting_map = tibble::as_tibble(object$reporting_map %||% tibble::tibble()),
+    caveats = tibble::as_tibble(object$caveats %||% tibble::tibble()),
+    notes = clean_summary_lines(object$notes %||% character(0)),
+    settings = object$settings %||% list(),
+    digits = digits
+  )
+  class(out) <- "summary.mfrm_peer_review_design_review"
+  out
+}
+
+#' @export
+print.summary.mfrm_peer_review_design_review <- function(x, ...) {
+  digits <- as.integer(x$digits %||% 3L)
+  if (!is.finite(digits)) digits <- 3L
+
+  cat("mfrm Peer-Review Design Review Summary\n")
+  if (is.data.frame(x$overview) && nrow(x$overview) > 0L) {
+    cat("\nOverview\n")
+    print(round_numeric_df(as.data.frame(x$overview), digits = digits), row.names = FALSE)
+  }
+  if (is.data.frame(x$load_summary) && nrow(x$load_summary) > 0L) {
+    cat("\nLoad summary\n")
+    print(round_numeric_df(as.data.frame(x$load_summary), digits = digits), row.names = FALSE)
+  }
+  if (is.data.frame(x$low_common_pairs) && nrow(x$low_common_pairs) > 0L) {
+    cat("\nLowest common-submission reviewer pairs\n")
+    print(round_numeric_df(as.data.frame(x$low_common_pairs), digits = digits), row.names = FALSE)
+  }
+  if (is.data.frame(x$reciprocal_pairs) && nrow(x$reciprocal_pairs) > 0L) {
+    cat("\nReciprocal review pairs\n")
+    print(as.data.frame(x$reciprocal_pairs), row.names = FALSE)
+  }
+  if (is.data.frame(x$caveats) && nrow(x$caveats) > 0L) {
+    cat("\nCaveats\n")
+    print(as.data.frame(x$caveats), row.names = FALSE)
+  }
+  if (length(x$notes) > 0L) {
+    cat("\nNotes\n")
+    for (line in x$notes) cat(" - ", line, "\n", sep = "")
+  }
+  invisible(x)
+}
+
+network_review_status <- function(summary_tbl) {
+  summary_tbl <- as.data.frame(summary_tbl %||% data.frame(), stringsAsFactors = FALSE)
+  if (nrow(summary_tbl) == 0L) {
+    return(data.frame(
+      NetworkReviewStatus = "insufficient_data",
+      NetworkReviewReason = "No design-network summary is available.",
+      ReviewUse = "design_diagnostic_not_measurement_gate",
+      stringsAsFactors = FALSE
+    ))
+  }
+
+  nodes <- suppressWarnings(as.integer(summary_tbl$Nodes[1] %||% NA_integer_))
+  edges <- suppressWarnings(as.integer(summary_tbl$Edges[1] %||% NA_integer_))
+  components <- suppressWarnings(as.integer(summary_tbl$Components[1] %||% NA_integer_))
+  connected <- if ("Connected" %in% names(summary_tbl)) {
+    as.logical(summary_tbl$Connected[1])
+  } else {
+    NA
+  }
+  articulation <- suppressWarnings(as.integer(summary_tbl$ArticulationPoints[1] %||% NA_integer_))
+  bridges <- suppressWarnings(as.integer(summary_tbl$Bridges[1] %||% NA_integer_))
+
+  status <- "ok"
+  reason <- "The observed design graph is connected and has no recorded articulation points or bridge edges."
+  if (!is.finite(nodes) || !is.finite(edges) || nodes == 0L || edges == 0L) {
+    status <- "insufficient_data"
+    reason <- "No node/edge design graph could be constructed from the fitted data."
+  } else if (identical(connected, FALSE) || (is.finite(components) && components > 1L)) {
+    status <- "warning"
+    reason <- "The design graph has more than one connected component; interpret common-scale claims only with explicit linking or anchoring support."
+  } else if ((is.finite(articulation) && articulation > 0L) ||
+             (is.finite(bridges) && bridges > 0L)) {
+    status <- "review"
+    reason <- "The design graph is connected but contains articulation points or bridge edges that indicate linking vulnerability."
+  }
+
+  data.frame(
+    NetworkReviewStatus = status,
+    NetworkReviewReason = reason,
+    ReviewUse = "design_diagnostic_not_measurement_gate",
+    stringsAsFactors = FALSE
+  )
+}
+
+network_review_overview <- function(summary_tbl) {
+  summary_tbl <- as.data.frame(summary_tbl %||% data.frame(), stringsAsFactors = FALSE)
+  status <- network_review_status(summary_tbl)
+  if (nrow(summary_tbl) == 0L) {
+    base <- data.frame(
+      Nodes = NA_integer_,
+      Edges = NA_integer_,
+      Components = NA_integer_,
+      Connected = NA,
+      ArticulationPoints = NA_integer_,
+      Bridges = NA_integer_,
+      LargestComponentShare = NA_real_,
+      Density = NA_real_,
+      stringsAsFactors = FALSE
+    )
+  } else {
+    keep <- intersect(
+      c(
+        "Nodes", "Edges", "Components", "Connected", "ArticulationPoints",
+        "Bridges", "LargestComponentShare", "Density"
+      ),
+      names(summary_tbl)
+    )
+    base <- summary_tbl[1, keep, drop = FALSE]
+  }
+  data.frame(base, status, check.names = FALSE, stringsAsFactors = FALSE)
+}
+
+network_review_reporting_map <- function() {
+  data.frame(
+    Area = c(
+      "MFRM measurement model",
+      "Design network",
+      "Sparse linked design",
+      "Peer-review design",
+      "Rater-effect network"
+    ),
+    PrimaryHelper = c(
+      "fit_mfrm(); diagnose_mfrm()",
+      "mfrm_network_analysis(); build_mfrm_network_review()",
+      "simulate_mfrm_data(..., assignment = \"sparse_linked\")",
+      "build_peer_review_sim_spec(); simulate_mfrm_data()",
+      "rater_network_analysis(); rater_halo_network_analysis()"
+    ),
+    Use = c(
+      "Estimate and diagnose person/facet measures, fit, precision, and bias.",
+      "Inspect observed co-observation connectedness, articulation points, bridge edges, and design-level linking vulnerability.",
+      "Inspect planned missingness, rater coverage, and common-person links in sparse simulation designs.",
+      "Simulate peer-review or peer-assessment assignments with shared submission/reviewer IDs, no-self-review checks, reviewer-load diagnostics, and common-submission reviewer links.",
+      "Screen observed rater relationship or halo patterns as descriptive diagnostics."
+    ),
+    Boundary = c(
+      "Primary measurement model.",
+      "Design diagnostic; not person ability, rater quality, or formal fit.",
+      "Design diagnostic; not a recovery, fit, or separation gate.",
+      "Design diagnostic; not peer quality, reviewer fairness, or a universal common-link adequacy threshold.",
+      "Descriptive network diagnostic; not a Rasch logit estimate or causal halo conclusion."
+    ),
+    stringsAsFactors = FALSE
+  )
+}
+
+#' Build an MFRM network review
+#'
+#' @param fit Output from [fit_mfrm()].
+#' @param diagnostics Optional output from [diagnose_mfrm()].
+#' @param sparse_design Optional sparse-design metadata. Supply either the
+#'   generated data frame that carries the `mfrm_sparse_design` attribute, the
+#'   attribute itself, or a data frame with sparse design columns such as
+#'   `SparseDesignActive`, `DesignDensity`, `MinCommonPersonsPerRaterPair`,
+#'   and `ZeroCommonRaterPairs`.
+#' @param peer_review_design Optional peer-review design metadata. Supply
+#'   either the generated data frame that carries the `mfrm_peer_review_design`
+#'   attribute, the attribute itself, or its `overview` data frame.
+#' @param top_n_subsets Optional maximum number of connected-subset rows to
+#'   retain before constructing the graph; passed to [mfrm_network_analysis()].
+#' @param min_observations Minimum observations required to keep a subset row;
+#'   passed to [mfrm_network_analysis()].
+#' @param top_n Number of central/cut/bridge rows to retain in the review.
+#' @param include_graph Logical; if `TRUE`, keep the underlying `igraph` object
+#'   in the nested `source_network` bundle.
+#'
+#' @details
+#' `build_mfrm_network_review()` is a synthesis layer over
+#' [mfrm_network_analysis()]. It keeps the measurement model and graph view in
+#' separate lanes: MFRM estimates remain the measurement results, while the
+#' network review summarizes co-observation connectedness and linking
+#' vulnerability in the observed design. This is especially useful for sparse
+#' or incomplete rater-mediated designs, where common-person links, connected
+#' subsets, articulation points, and bridge edges can explain why an otherwise
+#' estimable model depends on fragile design links.
+#'
+#' The review status is deliberately conservative and descriptive. It is not a
+#' literature-derived adequacy cut point for fit, separation, recovery, or
+#' rater quality. Use it to decide which design links, anchors, or additional
+#' observations need inspection before making common-scale claims.
+#'
+#' @section References:
+#' - Wind, S. A., & Jones, E. (2018). The stabilizing influences of linking set
+#'   size and model-data fit in sparse rater-mediated assessment networks.
+#'   *Educational and Psychological Measurement*. doi:10.1177/0013164417703733.
+#' - Wind, S. A., Jones, E., & Grajeda, S. (2023). Does sparseness matter?
+#'   Examining the use of generalizability theory and many-facet Rasch
+#'   measurement in sparse rating designs. *Applied Psychological
+#'   Measurement*, 47(5-6), 351-364. doi:10.1177/01466216231182148.
+#' - DeMars, C. E., Shapovalov, Y. A., & Hathcoat, J. D. (2023).
+#'   *Many-Facet Rasch Designs: How Should Raters be Assigned to Examinees?*
+#'   NCME presentation.
+#'
+#' @return A bundle of class `mfrm_network_review` containing:
+#' - `overview`: connectedness and front-door review status
+#' - `network_summary`: graph-level metrics from [mfrm_network_analysis()]
+#' - `facet_summary`: facet-level vulnerability summaries
+#' - `top_central_nodes`, `top_cut_nodes`, `top_bridge_edges`: follow-up rows
+#' - `sparse_review`: optional sparse-design linking review
+#' - `peer_review`: optional peer-review assignment and linkage diagnostics
+#' - `reporting_map`: boundary between MFRM, design network, sparse design,
+#'   peer-review design, and rater-effect network routes
+#'
+#' @seealso [mfrm_network_analysis()], [subset_connectivity_report()],
+#'   [build_summary_table_bundle()], [rater_network_analysis()],
+#'   [rater_halo_network_analysis()]
+#' @examples
+#' \donttest{
+#' toy <- load_mfrmr_data("example_core")
+#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
+#'                 method = "JML", maxit = 30)
+#' if (requireNamespace("igraph", quietly = TRUE)) {
+#'   review <- build_mfrm_network_review(fit)
+#'   summary(review)
+#'   build_summary_table_bundle(review)
+#' }
+#' }
+#' @export
+build_mfrm_network_review <- function(fit,
+                                      diagnostics = NULL,
+                                      sparse_design = NULL,
+                                      peer_review_design = NULL,
+                                      top_n_subsets = NULL,
+                                      min_observations = 0,
+                                      top_n = 10,
+                                      include_graph = FALSE) {
+  if (!inherits(fit, "mfrm_fit")) {
+    stop("`fit` must be an mfrm_fit object from fit_mfrm().", call. = FALSE)
+  }
+  top_n <- max(1L, as.integer(top_n))
+
+  net <- mfrm_network_analysis(
+    fit = fit,
+    diagnostics = diagnostics,
+    top_n_subsets = top_n_subsets,
+    min_observations = min_observations,
+    include_graph = include_graph
+  )
+  net_summary <- as.data.frame(net$summary %||% data.frame(), stringsAsFactors = FALSE)
+  sparse_tbl <- network_review_sparse_design_table(sparse_design)
+  sparse_review <- simulation_sparse_design_review_summary(sparse_tbl)
+  peer_tbl <- network_review_peer_review_table(peer_review_design)
+
+  caveats <- as.data.frame(net$caveats %||% data.frame(), stringsAsFactors = FALSE)
+  boundary_caveat <- data.frame(
+    Area = "interpretation_boundary",
+    Severity = "info",
+    Message = "Network-review metrics summarize observation-design connectedness and linking vulnerability; they are not Rasch fit statistics, person measures, or rater-quality estimates.",
+    stringsAsFactors = FALSE
+  )
+  caveats <- rbind(caveats, boundary_caveat)
+
+  central <- as.data.frame(net$node_metrics %||% data.frame(), stringsAsFactors = FALSE)
+  if (nrow(central) > 0L && all(c("Betweenness", "Strength") %in% names(central))) {
+    central <- central |>
+      dplyr::arrange(
+        dplyr::desc(.data$Betweenness),
+        dplyr::desc(.data$Strength),
+        .data$Facet,
+        .data$Level
+      )
+  }
+
+  out <- list(
+    overview = network_review_overview(net_summary),
+    network_summary = net_summary,
+    facet_summary = as.data.frame(net$facet_summary %||% data.frame(), stringsAsFactors = FALSE),
+    top_central_nodes = network_review_top_rows(central, top_n = top_n),
+    top_cut_nodes = network_review_top_rows(net$cut_nodes, top_n = top_n),
+    top_bridge_edges = network_review_top_rows(net$bridge_edges, top_n = top_n),
+    sparse_review = as.data.frame(sparse_review, stringsAsFactors = FALSE),
+    peer_review = as.data.frame(peer_tbl, stringsAsFactors = FALSE),
+    reporting_map = network_review_reporting_map(),
+    caveats = caveats,
+    source_network = net,
+    settings = list(
+      top_n = top_n,
+      top_n_subsets = top_n_subsets %||% NA_integer_,
+      min_observations = min_observations,
+      include_graph = isTRUE(include_graph),
+      review_use = "design_diagnostic_not_measurement_gate"
+    ),
+    notes = c(
+      "MFRM estimates remain the measurement-model results; network rows summarize observed design links.",
+      "Articulation points and bridge edges identify levels or links whose removal would fragment the co-observation graph.",
+      "Sparse-design review rows, when supplied, report planned-missingness and rater-link diagnostics rather than recovery or fit gates.",
+      "Peer-review design rows, when supplied, report assignment structure and reviewer linkage rather than reviewer quality or fairness."
+    )
+  )
+  as_mfrm_bundle(out, "mfrm_network_review")
+}
+
+#' @export
+print.mfrm_network_review <- function(x, ...) {
+  print(summary(x), ...)
+  invisible(x)
+}
+
+#' Summarize an MFRM network review
+#'
+#' @param object Output from [build_mfrm_network_review()].
+#' @param digits Number of digits for printed numeric values.
+#' @param top_n Number of central/cut/bridge rows to keep in the compact
+#'   summary.
+#' @param ... Reserved for generic compatibility.
+#'
+#' @return An object of class `summary.mfrm_network_review`.
+#' @seealso [build_mfrm_network_review()]
+#' @export
+summary.mfrm_network_review <- function(object, digits = 3, top_n = 10, ...) {
+  if (!inherits(object, "mfrm_network_review")) {
+    stop("`object` must be output from build_mfrm_network_review().", call. = FALSE)
+  }
+  digits <- max(0L, as.integer(digits))
+  top_n <- max(1L, as.integer(top_n))
+  out <- list(
+    overview = tibble::as_tibble(object$overview %||% tibble::tibble()),
+    network_summary = tibble::as_tibble(object$network_summary %||% tibble::tibble()),
+    facet_summary = tibble::as_tibble(object$facet_summary %||% tibble::tibble()),
+    top_central_nodes = tibble::as_tibble(network_review_top_rows(object$top_central_nodes, top_n = top_n)),
+    top_cut_nodes = tibble::as_tibble(network_review_top_rows(object$top_cut_nodes, top_n = top_n)),
+    top_bridge_edges = tibble::as_tibble(network_review_top_rows(object$top_bridge_edges, top_n = top_n)),
+    sparse_review = tibble::as_tibble(object$sparse_review %||% tibble::tibble()),
+    peer_review = tibble::as_tibble(object$peer_review %||% tibble::tibble()),
+    reporting_map = tibble::as_tibble(object$reporting_map %||% tibble::tibble()),
+    caveats = tibble::as_tibble(object$caveats %||% tibble::tibble()),
+    notes = clean_summary_lines(object$notes %||% character(0)),
+    settings = object$settings %||% list(),
+    digits = digits
+  )
+  class(out) <- "summary.mfrm_network_review"
+  out
+}
+
+#' @export
+print.summary.mfrm_network_review <- function(x, ...) {
+  digits <- as.integer(x$digits %||% 3L)
+  if (!is.finite(digits)) digits <- 3L
+
+  cat("mfrm Network Review Summary\n")
+  if (is.data.frame(x$overview) && nrow(x$overview) > 0L) {
+    cat("\nOverview\n")
+    print(round_numeric_df(as.data.frame(x$overview), digits = digits), row.names = FALSE)
+  }
+  if (is.data.frame(x$network_summary) && nrow(x$network_summary) > 0L) {
+    cat("\nNetwork summary\n")
+    print(round_numeric_df(as.data.frame(x$network_summary), digits = digits), row.names = FALSE)
+  }
+  if (is.data.frame(x$facet_summary) && nrow(x$facet_summary) > 0L) {
+    cat("\nFacet vulnerability summary\n")
+    print(round_numeric_df(as.data.frame(x$facet_summary), digits = digits), row.names = FALSE)
+  }
+  if (is.data.frame(x$top_central_nodes) && nrow(x$top_central_nodes) > 0L) {
+    cat("\nTop central nodes\n")
+    print(round_numeric_df(as.data.frame(x$top_central_nodes), digits = digits), row.names = FALSE)
+  }
+  if (is.data.frame(x$top_cut_nodes) && nrow(x$top_cut_nodes) > 0L) {
+    cat("\nArticulation nodes\n")
+    print(round_numeric_df(as.data.frame(x$top_cut_nodes), digits = digits), row.names = FALSE)
+  }
+  if (is.data.frame(x$top_bridge_edges) && nrow(x$top_bridge_edges) > 0L) {
+    cat("\nBridge edges\n")
+    print(round_numeric_df(as.data.frame(x$top_bridge_edges), digits = digits), row.names = FALSE)
+  }
+  if (is.data.frame(x$sparse_review) && nrow(x$sparse_review) > 0L) {
+    cat("\nSparse design review\n")
+    print(round_numeric_df(as.data.frame(x$sparse_review), digits = digits), row.names = FALSE)
+  }
+  if (is.data.frame(x$peer_review) && nrow(x$peer_review) > 0L) {
+    cat("\nPeer-review design\n")
+    print(round_numeric_df(as.data.frame(x$peer_review), digits = digits), row.names = FALSE)
+  }
+  if (is.data.frame(x$caveats) && nrow(x$caveats) > 0L) {
+    cat("\nCaveats\n")
+    print(as.data.frame(x$caveats), row.names = FALSE)
+  }
+  if (length(x$notes) > 0L) {
+    cat("\nNotes\n")
+    for (line in x$notes) cat(" - ", line, "\n", sep = "")
+  }
+  invisible(x)
 }
 
 rater_network_score_wide <- function(obs_df, facet_cols, rater_facet) {
@@ -2983,6 +3781,95 @@ facet_statistics_report <- function(fit,
   as_mfrm_bundle(out, "mfrm_facet_statistics")
 }
 
+build_fit_separation_reporting_basis <- function(fit, diagnostics) {
+  measures_tbl <- as.data.frame(
+    diagnostics$measures %||% data.frame(),
+    stringsAsFactors = FALSE
+  )
+  reliability_tbl <- as.data.frame(
+    diagnostics$reliability %||% data.frame(),
+    stringsAsFactors = FALSE
+  )
+  facet_precision_tbl <- as.data.frame(
+    diagnostics$facet_precision %||% data.frame(),
+    stringsAsFactors = FALSE
+  )
+  model <- toupper(as.character(fit$summary$Model[1] %||% fit$config$model %||% NA_character_))
+
+  has_mnsq <- nrow(measures_tbl) > 0L &&
+    any(c("Infit", "Outfit", "InfitMnSq", "OutfitMnSq") %in% names(measures_tbl))
+  has_zstd <- nrow(measures_tbl) > 0L &&
+    any(c(
+      "InfitZSTD", "OutfitZSTD",
+      "InfitZSTD_ENGINE", "OutfitZSTD_ENGINE",
+      "InfitZSTD_FACETS", "OutfitZSTD_FACETS"
+    ) %in% names(measures_tbl))
+  has_df_review <- nrow(measures_tbl) > 0L &&
+    any(c(
+      "DF_Infit_ENGINE", "DF_Outfit_ENGINE",
+      "DF_Infit_FACETS", "DF_Outfit_FACETS"
+    ) %in% names(measures_tbl))
+  has_separation <- nrow(reliability_tbl) > 0L ||
+    (nrow(facet_precision_tbl) > 0L &&
+       any(c(
+         "Separation", "RealSeparation", "Reliability",
+         "RealReliability", "Strata", "RealStrata"
+       )
+           %in% names(facet_precision_tbl)))
+
+  availability <- c(
+    if (has_mnsq) "available_in_diagnostics" else "not_available_in_diagnostics",
+    if (has_zstd && has_df_review) {
+      "available_with_df_review"
+    } else if (has_zstd) {
+      "available_without_df_review"
+    } else {
+      "not_available_in_diagnostics"
+    },
+    if (has_separation) "available_in_precision_tables" else "not_available_in_precision_tables",
+    if (identical(model, "GPCM")) {
+      "restricted_for_gpcm_bundles"
+    } else {
+      "available_where_qc_pipeline_supports_model"
+    }
+  )
+
+  data.frame(
+    Topic = c(
+      "Fit MnSq",
+      "Fit ZSTD",
+      "Separation reliability and strata",
+      "Operational QC thresholds"
+    ),
+    SourceBasis = c(
+      "Wright & Linacre (1994); Linacre (2002)",
+      "Linacre (2002); FACETS WHEXACT documentation",
+      "Wright & Masters (1982); Wright & Masters (2002); FACETS manual",
+      "Package QC policy layered on the fit and separation conventions above"
+    ),
+    PackageSurface = c(
+      "diagnose_mfrm(); fit_measures_table()",
+      "diagnose_mfrm(fit_df_method = \"both\"); facets_fit_review()",
+      "diagnostics$reliability; facet_statistics_report(); precision_review_report()",
+      "run_qc_pipeline(); evaluate_mfrm_design()"
+    ),
+    Interpretation = c(
+      "Mean-square fit is the primary size diagnostic; values are read relative to the expected value of 1.",
+      "ZSTD standardizes mean-square fit and is sensitive to df, transformation, and sample-size conventions.",
+      "Separation/reliability/strata summarize spread relative to average measurement error; they are not inter-rater agreement.",
+      "Pass/warn/fail cutoffs are reporting policy overlays and should remain separate from formula validation."
+    ),
+    ValidationUse = c(
+      "Use as diagnostic evidence and external comparison input; not a standalone validation success criterion.",
+      "Compare MnSq first; label df-driven ZSTD changes convention-sensitive when validating against FACETS-style output.",
+      "Report with precision tier and model/real basis; do not use separation alone as measurement-quality proof.",
+      "Use for operational triage after formula/source checks; calibrate thresholds with simulations or external reference cases."
+    ),
+    Availability = availability,
+    stringsAsFactors = FALSE
+  )
+}
+
 #' Build a precision review report
 #'
 #' @param fit Output from [fit_mfrm()].
@@ -2990,9 +3877,10 @@ facet_statistics_report <- function(fit,
 #'
 #' @details
 #' This helper summarizes how `mfrmr` derived SE, CI, and reliability values
-#' for the current run. It is package-native and is intended to help users
-#' distinguish model-based precision paths from exploratory ones without
-#' requiring external software conventions.
+#' for the current run. It also includes a source-grounded fit/separation
+#' basis table so users can keep mean-square fit, ZSTD standardization,
+#' Rasch/FACETS-style separation, and package QC thresholds in separate
+#' reporting lanes.
 #'
 #' @section What this review means:
 #' `precision_review_report()` is a reporting gatekeeper for precision claims.
@@ -3004,11 +3892,15 @@ facet_statistics_report <- function(fit,
 #'   conclusions.
 #' - A favorable precision tier does not override convergence, fit, linking,
 #'   or design problems elsewhere in the analysis.
+#' - Fit and separation rows in this report are reporting/validation
+#'   boundaries, not standalone success criteria.
 #'
 #' @section Interpreting output:
 #' - `profile`: one-row overview of the active precision tier and recommended use.
 #' - `checks`: package-native review checks for SE ordering, reliability ordering,
 #'   coverage of sample/population summaries, and SE source labels.
+#' - `fit_separation_basis`: source-grounded boundary table for fit and
+#'   separation reporting.
 #' - `approximation_notes`: method notes copied from `diagnose_mfrm()`.
 #'
 #' @section Recommended next step:
@@ -3025,6 +3917,7 @@ facet_statistics_report <- function(fit,
 #' @return A named list with:
 #' - `profile`: one-row precision overview
 #' - `checks`: package-native precision review checks
+#' - `fit_separation_basis`: source-grounded fit/separation reporting boundary
 #' - `approximation_notes`: detailed method notes
 #' - `settings`: resolved model and method labels
 #'
@@ -3061,6 +3954,7 @@ precision_review_report <- function(fit, diagnostics = NULL) {
   out <- list(
     profile = profile_tbl,
     checks = checks_tbl,
+    fit_separation_basis = build_fit_separation_reporting_basis(fit, diagnostics),
     approximation_notes = notes_tbl,
     settings = settings
   )
@@ -3667,7 +4561,7 @@ bias_pairwise_report <- function(x,
 #' @param palette Optional named color overrides (`normal`, `flag`, `hist`,
 #'   `profile`).
 #' @param label_angle Label angle hint for ranked/profile labels.
-#' @param preset Visual preset (`"standard"`, `"publication"`, or `"compact"`).
+#' @param preset Visual preset (`"standard"`, `"publication"`, `"compact"`, or `"monochrome"`).
 #' @param draw If `TRUE`, draw with base graphics.
 #'
 #' @details
@@ -3713,6 +4607,9 @@ bias_pairwise_report <- function(x,
 #' 3. Cross-check using `plot = "scatter"` and `plot = "facet_profile"`.
 #' @return A plotting-data object of class `mfrm_plot_data`.
 #' @seealso [bias_interaction_report()], [estimate_bias()], [plot_displacement()]
+#' @concept confidence intervals
+#' @concept visual diagnostics
+#' @concept bias screening
 #' @examples
 #' toy <- load_mfrmr_data("example_bias")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
@@ -3741,7 +4638,7 @@ plot_bias_interaction <- function(x,
                                   main = NULL,
                                   palette = NULL,
                                   label_angle = 45,
-                                  preset = c("standard", "publication", "compact"),
+                                  preset = c("standard", "publication", "compact", "monochrome"),
                                   draw = TRUE) {
   with_legacy_name_warning_suppressed(
     plot_table13_bias(
@@ -3786,10 +4683,11 @@ plot_bias_interaction <- function(x,
 #' Output text includes residual-PCA screening commentary if PCA diagnostics are
 #' available in `diagnostics`.
 #'
-#' For bounded `GPCM`, this helper is intentionally unavailable. Use
-#' [reporting_checklist()], [precision_review_report()], and the direct
-#' table/plot helpers instead, and treat [gpcm_capability_matrix()] as the
-#' formal boundary statement for that branch.
+#' For bounded `GPCM`, this helper returns a caveated partial reporting bundle
+#' over supported diagnostics, direct tables, and plots. It also includes a
+#' `gpcm_boundary` table. Treat the output as slope-aware sensitivity-reporting
+#' text, not FACETS score-side equivalence, automatic operational scoring, or
+#' design-forecasting evidence.
 #'
 #' By default, `report_text` includes:
 #' - model/data design summary (N, facet counts, scale range)
@@ -3925,6 +4823,15 @@ build_apa_outputs <- function(fit,
     table_figure_notes = as.character(contract$note_text),
     table_figure_captions = as.character(contract$caption_text),
     section_map = as.data.frame(contract$section_table %||% data.frame(), stringsAsFactors = FALSE),
+    gpcm_boundary = gpcm_capability_boundary_table(
+      fit,
+      helper = "build_apa_outputs()",
+      extra_areas = c(
+        "Score-side scorefile export under bounded GPCM",
+        "FACETS output-contract score-side review",
+        "Design planning and forecasting"
+      )
+    ),
     contract = contract
   )
   class(out) <- c("mfrm_apa_outputs", "list")
@@ -4305,6 +5212,7 @@ summary.mfrm_apa_outputs <- function(object, top_n = 3, preview_chars = 160, ...
     components = stats_tbl,
     sections = sections_tbl,
     content_checks = content_checks,
+    gpcm_boundary = object$gpcm_boundary %||% data.frame(),
     preview = preview_tbl,
     notes = notes,
     top_n = top_n,
@@ -4333,6 +5241,10 @@ print.summary.mfrm_apa_outputs <- function(x, ...) {
   if (!is.null(x$content_checks) && nrow(x$content_checks) > 0) {
     cat("\nContent checks\n")
     print(as.data.frame(x$content_checks), row.names = FALSE)
+  }
+  if (!is.null(x$gpcm_boundary) && nrow(as.data.frame(x$gpcm_boundary)) > 0) {
+    cat("\nGPCM Boundary\n")
+    print(as.data.frame(x$gpcm_boundary)[, c("Area", "Status"), drop = FALSE], row.names = FALSE)
   }
   if (!is.null(x$preview) && nrow(x$preview) > 0) {
     cat("\nPreview\n")
@@ -4420,23 +5332,86 @@ summary_table_bundle_recovery_ademp_df <- function(ademp) {
   out[nzchar(out$Value), , drop = FALSE]
 }
 
+summary_table_bundle_sparse_active <- function(x) {
+  if (is.logical(x)) return(x %in% TRUE)
+  if (is.numeric(x)) return(is.finite(x) & x != 0)
+  tolower(trimws(as.character(x))) %in% c("true", "yes", "1")
+}
+
+summary_table_bundle_sparse_design_df <- function(x) {
+  tbl <- summary_table_bundle_df(x)
+  if (nrow(tbl) == 0L || !"SparseDesignActive" %in% names(tbl)) {
+    return(data.frame())
+  }
+  active <- summary_table_bundle_sparse_active(tbl$SparseDesignActive)
+  active[is.na(active)] <- FALSE
+  if (!any(active)) {
+    return(data.frame())
+  }
+  tbl <- tbl[active, , drop = FALSE]
+  review_tbl <- simulation_sparse_design_review_fields(tbl)
+  tbl <- cbind(tbl, review_tbl)
+  id_cols <- intersect(
+    c("Facet", "design_id", "rep", "Seed", "RunOK", "Converged",
+      "Observations", "RecoveryRows", "n_person", "n_rater", "n_criterion",
+      "raters_per_person"),
+    names(tbl)
+  )
+  alias_cols <- names(tbl)[grepl("^(n_|[A-Za-z0-9_.]+_per_person$)", names(tbl))]
+  sparse_cols <- intersect(
+    c(
+      "SparseDesignActive",
+      "DesignDensity",
+      "PlannedMissingRate",
+      "LinkPersons",
+      "LinkFractionActual",
+      "LinkRatersPerPerson",
+      "MinCommonPersonsPerRaterPair",
+      "ZeroCommonRaterPairs",
+      "RaterPairsBelowTarget",
+      "TargetCommonPersonsPerRaterPair",
+      "MeanDesignDensity",
+      "MeanPlannedMissingRate",
+      "MeanLinkPersons",
+      "MeanLinkFractionActual",
+      "MeanLinkRatersPerPerson",
+      "MeanMinCommonPersonsPerRaterPair",
+      "MaxZeroCommonRaterPairs",
+      "MaxRaterPairsBelowTarget"
+    ),
+    names(tbl)
+  )
+  review_cols <- intersect(c("LinkReviewStatus", "LinkReviewReason", "ReviewUse"), names(tbl))
+  keep <- unique(c(id_cols, setdiff(alias_cols, c(sparse_cols, review_cols)), review_cols, sparse_cols))
+  tbl[, keep, drop = FALSE]
+}
+
 summary_table_bundle_supported_summary_classes <- function() {
   c(
     "summary.mfrm_fit",
     "summary.mfrm_diagnostics",
+    "summary.mfrm_precision_review",
+    "summary.mfrm_fit_measures",
+    "summary.mfrm_facets_fit_review",
     "summary.mfrm_person_fit_indices",
     "summary.mfrm_data_description",
     "summary.mfrm_reporting_checklist",
     "summary.mfrm_apa_outputs",
     "summary.mfrm_design_evaluation",
     "summary.mfrm_signal_detection",
+    "summary.mfrm_diagnostic_screening",
     "summary.mfrm_recovery_simulation",
     "summary.mfrm_recovery_assessment",
+    "summary.mfrmr_recovery_validation",
     "summary.mfrm_population_prediction",
     "summary.mfrm_future_branch_active_branch",
     "summary.mfrm_facets_run",
+    "summary.mfrm_results",
+    "summary.mfrm_report",
     "summary.mfrm_bias",
     "summary.mfrm_anchor_review",
+    "summary.mfrm_peer_review_design_review",
+    "summary.mfrm_network_review",
     "summary.mfrm_linking_review",
     "summary.mfrm_misfit_casebook",
     "summary.mfrm_weighting_review",
@@ -4455,8 +5430,7 @@ resolve_summary_table_bundle_input <- function(x,
                                                preview_chars = 160) {
   summary_classes <- summary_table_bundle_supported_summary_classes()
   if (inherits(x, summary_classes)) {
-    cls <- class(x)
-    cls <- cls[startsWith(cls, "summary.mfrm_")][1]
+    cls <- intersect(class(x), summary_classes)[1]
     return(list(
       summary = x,
       source_class = cls,
@@ -4476,6 +5450,27 @@ resolve_summary_table_bundle_input <- function(x,
       summary = summary(x, digits = digits, top_n = top_n),
       source_class = "mfrm_diagnostics",
       summary_class = "summary.mfrm_diagnostics"
+    ))
+  }
+  if (inherits(x, "mfrm_precision_review")) {
+    return(list(
+      summary = summary(x, digits = digits, top_n = top_n),
+      source_class = "mfrm_precision_review",
+      summary_class = "summary.mfrm_precision_review"
+    ))
+  }
+  if (inherits(x, "mfrm_fit_measures")) {
+    return(list(
+      summary = summary(x, digits = digits, top_n = top_n),
+      source_class = "mfrm_fit_measures",
+      summary_class = "summary.mfrm_fit_measures"
+    ))
+  }
+  if (inherits(x, "mfrm_facets_fit_review")) {
+    return(list(
+      summary = summary(x, digits = digits, top_n = top_n),
+      source_class = "mfrm_facets_fit_review",
+      summary_class = "summary.mfrm_facets_fit_review"
     ))
   }
   if (inherits(x, "mfrm_person_fit_indices")) {
@@ -4520,6 +5515,13 @@ resolve_summary_table_bundle_input <- function(x,
       summary_class = "summary.mfrm_signal_detection"
     ))
   }
+  if (inherits(x, "mfrm_diagnostic_screening")) {
+    return(list(
+      summary = summary(x, digits = digits),
+      source_class = "mfrm_diagnostic_screening",
+      summary_class = "summary.mfrm_diagnostic_screening"
+    ))
+  }
   if (inherits(x, "mfrm_recovery_simulation")) {
     return(list(
       summary = summary(x, digits = digits),
@@ -4555,6 +5557,20 @@ resolve_summary_table_bundle_input <- function(x,
       summary_class = "summary.mfrm_facets_run"
     ))
   }
+  if (inherits(x, "mfrm_results")) {
+    return(list(
+      summary = summary(x, digits = digits, top_n = top_n),
+      source_class = "mfrm_results",
+      summary_class = "summary.mfrm_results"
+    ))
+  }
+  if (inherits(x, "mfrm_report")) {
+    return(list(
+      summary = summary(x, top_n = top_n),
+      source_class = "mfrm_report",
+      summary_class = "summary.mfrm_report"
+    ))
+  }
   if (inherits(x, "mfrm_bias")) {
     return(list(
       summary = summary(x, digits = digits, top_n = top_n),
@@ -4567,6 +5583,20 @@ resolve_summary_table_bundle_input <- function(x,
       summary = summary(x, digits = digits, top_n = top_n),
       source_class = "mfrm_anchor_review",
       summary_class = "summary.mfrm_anchor_review"
+    ))
+  }
+  if (inherits(x, "mfrm_peer_review_design_review")) {
+    return(list(
+      summary = summary(x, digits = digits, top_n = top_n),
+      source_class = "mfrm_peer_review_design_review",
+      summary_class = "summary.mfrm_peer_review_design_review"
+    ))
+  }
+  if (inherits(x, "mfrm_network_review")) {
+    return(list(
+      summary = summary(x, digits = digits, top_n = top_n),
+      source_class = "mfrm_network_review",
+      summary_class = "summary.mfrm_network_review"
     ))
   }
   if (inherits(x, "mfrm_linking_review")) {
@@ -4606,12 +5636,16 @@ resolve_summary_table_bundle_input <- function(x,
   }
 
   stop(
-    "`x` must be an mfrm_fit, mfrm_diagnostics, mfrm_person_fit_indices, ",
+    "`x` must be an mfrm_fit, mfrm_diagnostics, mfrm_precision_review, ",
+    "mfrm_fit_measures, mfrm_facets_fit_review, mfrm_person_fit_indices, ",
     "mfrm_data_description, mfrm_reporting_checklist, mfrm_apa_outputs, ",
     "mfrm_design_evaluation, ",
-    "mfrm_signal_detection, mfrm_recovery_simulation, mfrm_recovery_assessment, ",
+    "mfrm_signal_detection, mfrm_diagnostic_screening, ",
+    "mfrm_recovery_simulation, mfrm_recovery_assessment, ",
     "mfrm_population_prediction, mfrm_future_branch_active_branch, ",
-    "mfrm_facets_run, mfrm_bias, mfrm_anchor_review, mfrm_linking_review, mfrm_misfit_casebook, ",
+    "mfrm_facets_run, mfrm_results, mfrm_report, mfrm_bias, mfrm_anchor_review, ",
+    "mfrm_peer_review_design_review, mfrm_network_review, ",
+    "mfrm_linking_review, mfrm_misfit_casebook, ",
     "mfrm_weighting_review, mfrm_unit_prediction, or ",
     "mfrm_plausible_values object, or one of their summary() outputs.",
     call. = FALSE
@@ -4623,19 +5657,28 @@ summary_table_bundle_required_components <- function(summary_class) {
     as.character(summary_class %||% NA_character_),
     "summary.mfrm_fit" = c("overview", "reporting_map"),
     "summary.mfrm_diagnostics" = c("overview", "reporting_map", "flags"),
+    "summary.mfrm_precision_review" = c("overview", "summary", "profile", "checks", "fit_separation_basis"),
+    "summary.mfrm_fit_measures" = c("overview", "summary", "status_summary", "table"),
+    "summary.mfrm_facets_fit_review" = c("overview", "summary", "df_sensitivity", "guidance"),
     "summary.mfrm_person_fit_indices" = c("overview", "status_summary", "top_review"),
     "summary.mfrm_data_description" = c("overview", "score_distribution"),
     "summary.mfrm_reporting_checklist" = c("overview", "action_items"),
     "summary.mfrm_apa_outputs" = c("overview", "components", "preview"),
     "summary.mfrm_design_evaluation" = c("overview", "design_summary"),
     "summary.mfrm_signal_detection" = c("overview", "detection_summary"),
+    "summary.mfrm_diagnostic_screening" = c("overview", "reading_order", "next_actions", "reporting_notes", "figure_recipes", "scenario_summary", "performance_summary", "plot_overview_rate"),
     "summary.mfrm_recovery_simulation" = c("overview", "recovery_summary", "rep_overview"),
-    "summary.mfrm_recovery_assessment" = c("overview", "checklist", "metric_review"),
+    "summary.mfrm_recovery_assessment" = c("overview", "reading_order", "checklist", "condition_reporting_notes", "condition_review", "diagnostic_reporting_notes", "diagnostic_review", "metric_review", "uncertainty_review"),
+    "summary.mfrmr_recovery_validation" = c("topline_release_decision", "reading_order", "release_decision_table", "case_summary", "condition_reporting_notes", "condition_summary", "diagnostic_reporting_notes", "diagnostic_oc_summary", "domain_decision_table"),
     "summary.mfrm_population_prediction" = c("overview", "design", "forecast"),
     "summary.mfrm_future_branch_active_branch" = c("overview", "profile_summary", "recommendation_table"),
     "summary.mfrm_facets_run" = c("overview", "mapping", "run_info", "fit", "diagnostics"),
+    "summary.mfrm_results" = c("overview", "triage", "status", "component_index", "table_index", "plot_map", "next_actions"),
+    "summary.mfrm_report" = c("overview", "first_screen", "status_counts", "immediate_actions", "optional_sections", "claim_readiness", "report_gaps", "boundary_index", "routes"),
     "summary.mfrm_bias" = c("overview", "top_rows"),
     "summary.mfrm_anchor_review" = c("facet_summary", "recommendations"),
+    "summary.mfrm_peer_review_design_review" = c("overview", "load_summary", "low_common_pairs", "reporting_map"),
+    "summary.mfrm_network_review" = c("overview", "network_summary", "reporting_map"),
     "summary.mfrm_linking_review" = c("overview", "top_linking_risks", "group_view_index", "reporting_map"),
     "summary.mfrm_misfit_casebook" = c("overview", "top_cases", "case_rollup", "group_view_index", "reporting_map"),
     "summary.mfrm_weighting_review" = c("overview", "top_reweighted_levels", "reporting_map"),
@@ -4999,6 +6042,150 @@ summary_table_bundle_spec <- function(summary_obj) {
         flags = "Counts of unexpected responses, displacement, interactions, and inter-rater pairs."
       )
     ),
+    "summary.mfrm_precision_review" = list(
+      title = "Precision Review Tables",
+      tables = list(
+        overview = summary_table_bundle_df(summary_obj$overview),
+        summary = summary_table_bundle_df(summary_obj$summary),
+        profile = summary_table_bundle_df(summary_obj$profile),
+        checks = summary_table_bundle_df(summary_obj$checks),
+        fit_separation_basis = summary_table_bundle_df(summary_obj$fit_separation_basis),
+        approximation_notes = summary_table_bundle_df(summary_obj$approximation_notes),
+        settings = summary_table_bundle_df(summary_obj$settings),
+        caveats = summary_table_bundle_df(summary_obj$caveats),
+        notes = summary_table_bundle_text_df(summary_obj$notes, column = "Note")
+      ),
+      roles = c(
+        overview = "run_overview",
+        summary = "precision_basis",
+        profile = "precision_basis",
+        checks = "precision_review",
+        fit_separation_basis = "precision_review",
+        approximation_notes = "interpretation_notes",
+        settings = "review_settings",
+        caveats = "analysis_caveats",
+        notes = "interpretation_notes"
+      ),
+      descriptions = c(
+        overview = "Run-level precision-review bundle metadata.",
+        summary = "One-row precision tier, formal-inference support, and fit/separation row counts.",
+        profile = "Precision basis, method tier, and formal-inference support for the current run.",
+        checks = "Precision checks that should be reviewed before reporting SE, CI, or reliability claims.",
+        fit_separation_basis = "Source-grounded boundary table for fit MnSq, ZSTD, separation/reliability/strata, and QC-threshold interpretation.",
+        approximation_notes = "Approximation notes carried from diagnostics for uncertainty-reporting caveats.",
+        settings = "Precision-review settings used for the current run.",
+        caveats = "Structured fit-level caveats carried with the precision review.",
+        notes = "Compact interpretation notes for precision, fit, and separation reporting."
+      )
+    ),
+    "summary.mfrm_fit_measures" = list(
+      title = "Fit-Measure Review Tables",
+      tables = list(
+        overview = summary_table_bundle_df(summary_obj$overview),
+        summary = summary_table_bundle_df(summary_obj$summary),
+        table = summary_table_bundle_df(summary_obj$table),
+        facets_table = summary_table_bundle_df(summary_obj$facets_table),
+        status_summary = summary_table_bundle_df(summary_obj$status_summary),
+        threshold_profiles = summary_table_bundle_df(summary_obj$threshold_profiles),
+        profile_summary = summary_table_bundle_df(summary_obj$profile_summary),
+        profile_summary_by_facet = summary_table_bundle_df(summary_obj$profile_summary_by_facet),
+        profile_summary_overall = summary_table_bundle_df(summary_obj$profile_summary_overall),
+        df_sensitivity = summary_table_bundle_df(summary_obj$df_sensitivity),
+        df_sensitive = summary_table_bundle_df(summary_obj$df_sensitive),
+        df_sensitivity_summary = summary_table_bundle_df(summary_obj$df_sensitivity_summary),
+        underfit = summary_table_bundle_df(summary_obj$underfit),
+        overfit = summary_table_bundle_df(summary_obj$overfit),
+        mixed = summary_table_bundle_df(summary_obj$mixed),
+        settings = summary_table_bundle_df(summary_obj$settings),
+        caveats = summary_table_bundle_df(summary_obj$caveats),
+        notes = summary_table_bundle_text_df(summary_obj$notes, column = "Note")
+      ),
+      roles = c(
+        overview = "run_overview",
+        summary = "overall_fit",
+        table = "extreme_fit_rows",
+        facets_table = "extreme_fit_rows",
+        status_summary = "review_status",
+        threshold_profiles = "review_settings",
+        profile_summary = "overall_fit",
+        profile_summary_by_facet = "facet_distribution",
+        profile_summary_overall = "overall_fit",
+        df_sensitivity = "precision_review",
+        df_sensitive = "precision_review",
+        df_sensitivity_summary = "review_status",
+        underfit = "extreme_fit_rows",
+        overfit = "extreme_fit_rows",
+        mixed = "extreme_fit_rows",
+        settings = "review_settings",
+        caveats = "analysis_caveats",
+        notes = "interpretation_notes"
+      ),
+      descriptions = c(
+        overview = "Run-level fit-measure bundle metadata.",
+        summary = "Overall fit-status counts, df-sensitivity counts, and displayed-row coverage.",
+        table = "Selected fit-measure rows with MnSq, ZSTD, confidence intervals, status labels, and df-sensitivity columns.",
+        facets_table = "FACETS-style fit table columns for manuscript or external-output review.",
+        status_summary = "Counts by facet and fit-review status.",
+        threshold_profiles = "Fit-threshold profiles used for status and sensitivity summaries.",
+        profile_summary = "Fit-flag rates under the requested threshold profiles.",
+        profile_summary_by_facet = "Facet-level fit-flag rates under the requested threshold profiles.",
+        profile_summary_overall = "Overall fit-flag rates under the requested threshold profiles.",
+        df_sensitivity = "Engine-vs-FACETS-style df/ZSTD comparison rows.",
+        df_sensitive = "Subset of df-sensitivity rows where df convention changes flag status or materially shifts ZSTD.",
+        df_sensitivity_summary = "Counts by df-sensitivity status for the selected fit-measure surface.",
+        underfit = "Rows labelled underfit under the selected fit bands.",
+        overfit = "Rows labelled overfit under the selected fit bands.",
+        mixed = "Rows with mixed underfit and overfit evidence across fit columns.",
+        settings = "Fit-measure review settings and thresholds.",
+        caveats = "Structured fit-level caveats carried with the fit-measure review.",
+        notes = "Compact interpretation notes for fit-measure reporting."
+      )
+    ),
+    "summary.mfrm_facets_fit_review" = list(
+      title = "FACETS Fit-Review Tables",
+      tables = list(
+        overview = summary_table_bundle_df(summary_obj$overview),
+        summary = summary_table_bundle_df(summary_obj$summary),
+        standardization = summary_table_bundle_df(summary_obj$standardization),
+        df_sensitivity = summary_table_bundle_df(summary_obj$df_sensitivity),
+        df_sensitive = summary_table_bundle_df(summary_obj$df_sensitive),
+        df_sensitivity_summary = summary_table_bundle_df(summary_obj$df_sensitivity_summary),
+        external_table_quality = summary_table_bundle_df(summary_obj$external_table_quality),
+        external_comparison = summary_table_bundle_df(summary_obj$external_comparison),
+        guidance = summary_table_bundle_df(summary_obj$guidance),
+        settings = summary_table_bundle_df(summary_obj$settings),
+        caveats = summary_table_bundle_df(summary_obj$caveats),
+        notes = summary_table_bundle_text_df(summary_obj$notes, column = "Note")
+      ),
+      roles = c(
+        overview = "run_overview",
+        summary = "overall_fit",
+        standardization = "review_settings",
+        df_sensitivity = "precision_review",
+        df_sensitive = "precision_review",
+        df_sensitivity_summary = "review_status",
+        external_table_quality = "review_status",
+        external_comparison = "precision_review",
+        guidance = "interpretation_notes",
+        settings = "review_settings",
+        caveats = "analysis_caveats",
+        notes = "interpretation_notes"
+      ),
+      descriptions = c(
+        overview = "Run-level FACETS fit-review bundle metadata.",
+        summary = "Overview of internal df/ZSTD sensitivity and optional external FACETS comparison coverage.",
+        standardization = "Primary fit-df method, companion columns, and ZSTD transform metadata from diagnostics.",
+        df_sensitivity = "Engine-vs-FACETS-style df/ZSTD comparison rows.",
+        df_sensitive = "Subset of df-sensitivity rows where df convention changes flag status or materially shifts ZSTD.",
+        df_sensitivity_summary = "Counts by df-sensitivity status.",
+        external_table_quality = "Completeness and duplicate-key review for supplied external FACETS fit rows.",
+        external_comparison = "Matched external FACETS-vs-mfrmr fit comparison rows when supplied.",
+        guidance = "Interpretation notes separating MnSq, ZSTD, df convention, external matching, and GPCM scope.",
+        settings = "FACETS fit-review tolerances and metadata.",
+        caveats = "Structured fit-level caveats carried with the FACETS fit review.",
+        notes = "Compact interpretation notes for FACETS fit-review reporting."
+      )
+    ),
     "summary.mfrm_person_fit_indices" = list(
       title = "Person-Fit Summary Tables",
       tables = list(
@@ -5123,18 +6310,24 @@ summary_table_bundle_spec <- function(summary_obj) {
         tables = c(
           list(
             overview = summary_table_bundle_df(summary_obj$overview),
-            design_summary = summary_table_bundle_df(summary_obj$design_summary)
+            design_summary = summary_table_bundle_df(summary_obj$design_summary),
+            sparse_review = summary_table_bundle_df(summary_obj$sparse_review),
+            sparse_design = summary_table_bundle_sparse_design_df(summary_obj$design_summary)
           ),
           future_spec$tables
         ),
         roles = c(
           overview = "run_overview",
           design_summary = "design_performance",
+          sparse_review = "sparse_design_diagnostics",
+          sparse_design = "sparse_design_diagnostics",
           future_spec$roles
         ),
         descriptions = c(
           overview = "Run-level overview for the current design-evaluation study.",
           design_summary = "Aggregated Monte Carlo design summaries for the active two-role planner.",
+          sparse_review = "Compact sparse linked design-review counts for planned missingness and rater-pair linkage.",
+          sparse_design = "Sparse linked planned-missingness and rater-link diagnostics for design-evaluation rows.",
           future_spec$descriptions
         )
       )
@@ -5162,12 +6355,76 @@ summary_table_bundle_spec <- function(summary_obj) {
         )
       )
     },
+    "summary.mfrm_diagnostic_screening" = list(
+      title = "Diagnostic Screening Tables",
+      tables = list(
+        overview = summary_table_bundle_df(summary_obj$overview),
+        reading_order = summary_table_bundle_df(summary_obj$reading_order),
+        next_actions = summary_table_bundle_df(summary_obj$next_actions),
+        reporting_notes = summary_table_bundle_df(summary_obj$reporting_notes),
+        figure_recipes = summary_table_bundle_df(summary_obj$figure_recipes),
+        scenario_summary = summary_table_bundle_df(summary_obj$scenario_summary),
+        performance_summary = summary_table_bundle_df(summary_obj$performance_summary),
+        report_signal_summary = summary_table_bundle_df(summary_obj$report_signal_summary),
+        scenario_contrast = summary_table_bundle_df(summary_obj$scenario_contrast),
+        plot_overview_rate = summary_table_bundle_df(summary_obj$plot_overview_rate),
+        plot_overview_count = summary_table_bundle_df(summary_obj$plot_overview_count),
+        plot_report_rate = summary_table_bundle_df(summary_obj$plot_report_rate),
+        plot_contrast_count = summary_table_bundle_df(summary_obj$plot_contrast_count),
+        plot_runtime = summary_table_bundle_df(summary_obj$plot_runtime),
+        ademp = summary_table_bundle_recovery_ademp_df(summary_obj$ademp),
+        settings = summary_table_bundle_settings_df(summary_obj$settings),
+        notes = summary_table_bundle_text_df(summary_obj$notes, column = "Note")
+      ),
+      roles = c(
+        overview = "diagnostic_screening_overview",
+        reading_order = "diagnostic_screening_reading_order",
+        next_actions = "diagnostic_screening_next_actions",
+        reporting_notes = "diagnostic_screening_reporting_notes",
+        figure_recipes = "diagnostic_screening_figure_recipes",
+        scenario_summary = "diagnostic_screening_scenario_summary",
+        performance_summary = "diagnostic_screening_performance",
+        report_signal_summary = "diagnostic_screening_report_signals",
+        scenario_contrast = "diagnostic_screening_contrast",
+        plot_overview_rate = "diagnostic_screening_plot_data",
+        plot_overview_count = "diagnostic_screening_plot_data",
+        plot_report_rate = "diagnostic_screening_plot_data",
+        plot_contrast_count = "diagnostic_screening_plot_data",
+        plot_runtime = "diagnostic_screening_runtime",
+        ademp = "diagnostic_screening_design_basis",
+        settings = "diagnostic_screening_settings",
+        notes = "interpretation_notes"
+      ),
+      descriptions = c(
+        overview = "Run-level overview for the current diagnostic-screening simulation study.",
+        reading_order = "Recommended reading order for diagnostic-screening summaries and appendix tables.",
+        next_actions = "Action-oriented triage for replication count, run completion, contrasts, report signals, and export.",
+        reporting_notes = "Report-facing boundaries and recommended wording safeguards for diagnostic-screening output.",
+        figure_recipes = "Figure/display recipes linking plot calls, plot_data extraction, caption focus, and interpretation boundaries.",
+        scenario_summary = "Aggregated scenario-by-design legacy and strict marginal/pairwise screening summaries.",
+        performance_summary = "Scenario-by-design any-flag rates, agreement rates, elapsed time, and Type I/sensitivity proxies.",
+        report_signal_summary = "Optional report-index availability/readiness and review-signal summaries when include_report = TRUE.",
+        scenario_contrast = "Misspecification-minus-well-specified contrasts for legacy and strict screening signals.",
+        plot_overview_rate = "Long-form overview-rate plot data for legacy, strict, and optional report-review signals.",
+        plot_overview_count = "Long-form overview-count plot data for flagged counts and report-signal counts.",
+        plot_report_rate = "Long-form report-rate plot data from report_signal_summary.",
+        plot_contrast_count = "Long-form scenario-contrast count plot data.",
+        plot_runtime = "Long-form runtime plot data.",
+        ademp = "ADEMP-style description of the diagnostic-screening simulation aim, data-generating mechanism, estimands, methods, and performance measures.",
+        settings = "Diagnostic-screening simulation settings used to generate, fit, diagnose, and optionally report repeated datasets.",
+        notes = "Compact interpretation notes for diagnostic-screening reporting."
+      )
+    ),
     "summary.mfrm_recovery_simulation" = list(
       title = "Recovery Simulation Tables",
       tables = list(
         overview = summary_table_bundle_df(summary_obj$overview),
         recovery_summary = summary_table_bundle_df(summary_obj$recovery_summary),
         rep_overview = summary_table_bundle_df(summary_obj$rep_overview),
+        sparse_review = summary_table_bundle_df(summary_obj$sparse_review),
+        sparse_design = summary_table_bundle_sparse_design_df(summary_obj$rep_overview),
+        diagnostic_oc = summary_table_bundle_df(summary_obj$diagnostic_oc),
+        diagnostic_oc_summary = summary_table_bundle_df(summary_obj$diagnostic_oc_summary),
         ademp = summary_table_bundle_recovery_ademp_df(summary_obj$ademp),
         settings = summary_table_bundle_settings_df(summary_obj$settings),
         notes = summary_table_bundle_text_df(summary_obj$notes, column = "Note")
@@ -5176,6 +6433,10 @@ summary_table_bundle_spec <- function(summary_obj) {
         overview = "recovery_overview",
         recovery_summary = "recovery_performance",
         rep_overview = "recovery_replications",
+        sparse_review = "recovery_sparse_design_diagnostics",
+        sparse_design = "recovery_sparse_design_diagnostics",
+        diagnostic_oc = "recovery_diagnostic_operating_characteristics",
+        diagnostic_oc_summary = "recovery_diagnostic_oc_summary",
         ademp = "recovery_design_basis",
         settings = "recovery_settings",
         notes = "interpretation_notes"
@@ -5184,6 +6445,10 @@ summary_table_bundle_spec <- function(summary_obj) {
         overview = "Run-level overview for the current parameter-recovery simulation.",
         recovery_summary = "Parameter-group recovery metrics, including bias, RMSE, coverage, and Monte Carlo SE.",
         rep_overview = "Replication-level fit status, convergence status, recovery-row counts, and elapsed time.",
+        sparse_review = "Compact replication-level sparse linked design-review counts kept separate from recovery metrics.",
+        sparse_design = "Replication-level sparse linked planned-missingness and rater-link diagnostics retained separately from recovery metrics.",
+        diagnostic_oc = "Optional replication-by-facet fit/separation operating characteristics retained when include_diagnostics = TRUE.",
+        diagnostic_oc_summary = "Optional facet-level fit/separation operating-characteristic summary for diagnostic context.",
         ademp = "ADEMP-style description of the recovery simulation aim, data-generating mechanism, estimands, methods, and performance measures.",
         settings = "Recovery simulation settings used to generate and refit repeated datasets.",
         notes = "Compact interpretation notes for recovery simulation reporting."
@@ -5193,27 +6458,81 @@ summary_table_bundle_spec <- function(summary_obj) {
       title = "Recovery Assessment Tables",
       tables = list(
         overview = summary_table_bundle_df(summary_obj$overview),
+        reading_order = summary_table_bundle_df(summary_obj$reading_order),
         checklist = summary_table_bundle_df(summary_obj$checklist),
+        condition_reporting_notes = summary_table_bundle_df(summary_obj$condition_reporting_notes),
+        condition_review = summary_table_bundle_df(summary_obj$condition_review),
+        diagnostic_reporting_notes = summary_table_bundle_df(summary_obj$diagnostic_reporting_notes),
+        diagnostic_review = summary_table_bundle_df(summary_obj$diagnostic_review),
         metric_review = summary_table_bundle_df(summary_obj$metric_review),
+        uncertainty_review = summary_table_bundle_df(summary_obj$uncertainty_review),
         next_actions = summary_table_bundle_text_df(summary_obj$next_actions, column = "Action"),
         thresholds = summary_table_bundle_settings_df(summary_obj$thresholds),
         notes = summary_table_bundle_text_df(summary_obj$notes, column = "Note")
       ),
       roles = c(
         overview = "recovery_assessment_overview",
+        reading_order = "recovery_assessment_reading_order",
         checklist = "recovery_assessment_checklist",
+        condition_reporting_notes = "recovery_condition_reporting_notes",
+        condition_review = "recovery_condition_review",
+        diagnostic_reporting_notes = "recovery_diagnostic_reporting_notes",
+        diagnostic_review = "recovery_diagnostic_review",
         metric_review = "recovery_metric_review",
+        uncertainty_review = "recovery_uncertainty_review",
         next_actions = "repair_recommendations",
         thresholds = "review_settings",
         notes = "interpretation_notes"
       ),
       descriptions = c(
         overview = "Run-level recovery adequacy status for the current assessment.",
+        reading_order = "Recommended first-read order for recovery assessment summary, condition, plot, and row-level outputs.",
         checklist = "Reviewer-facing adequacy checklist for replication count, convergence, uncertainty, Monte Carlo precision, and practical thresholds.",
+        condition_reporting_notes = "Reporter-facing generator-condition notes for bounded-GPCM slope stress and generated score-category support.",
+        condition_review = "Generator-condition metadata for interpreting recovery evidence, including bounded-GPCM slope-regime labels and generated score-category support when available.",
+        diagnostic_reporting_notes = "Reporter-facing fit/separation diagnostic notes that flag caveats without treating them as recovery gates.",
+        diagnostic_review = "Fit/separation operating-characteristic review retained as diagnostic context rather than a release-recovery gate.",
         metric_review = "Parameter-group recovery review with threshold status and next-action guidance.",
+        uncertainty_review = "Parameter-group coverage and standard-error availability interpretation.",
         next_actions = "Prioritized follow-up actions for strengthening or documenting the recovery evidence.",
         thresholds = "Assessment thresholds used to classify recovery adequacy.",
         notes = "Compact interpretation notes for recovery assessment reporting."
+      )
+    ),
+    "summary.mfrmr_recovery_validation" = list(
+      title = "Recovery Validation Tables",
+      tables = list(
+        topline_release_decision = summary_table_bundle_df(summary_obj$topline_release_decision),
+        reading_order = summary_table_bundle_df(summary_obj$reading_order),
+        release_decision_table = summary_table_bundle_df(summary_obj$release_decision_table),
+        case_summary = summary_table_bundle_df(summary_obj$case_summary),
+        condition_reporting_notes = summary_table_bundle_df(summary_obj$condition_reporting_notes),
+        condition_summary = summary_table_bundle_df(summary_obj$condition_summary),
+        diagnostic_reporting_notes = summary_table_bundle_df(summary_obj$diagnostic_reporting_notes),
+        diagnostic_oc_summary = summary_table_bundle_df(summary_obj$diagnostic_oc_summary),
+        domain_decision_table = summary_table_bundle_df(summary_obj$domain_decision_table)
+      ),
+      roles = c(
+        topline_release_decision = "recovery_validation_topline",
+        reading_order = "recovery_validation_reading_order",
+        release_decision_table = "recovery_validation_release_decisions",
+        case_summary = "recovery_validation_case_summary",
+        condition_reporting_notes = "recovery_validation_condition_reporting_notes",
+        condition_summary = "recovery_validation_condition_summary",
+        diagnostic_reporting_notes = "recovery_validation_diagnostic_reporting_notes",
+        diagnostic_oc_summary = "recovery_validation_diagnostic_oc_summary",
+        domain_decision_table = "recovery_validation_domain_decisions"
+      ),
+      descriptions = c(
+        topline_release_decision = "Top-line release-recovery decision across the summarized validation cases.",
+        reading_order = "Recommended first-read order for recovery-validation summary outputs.",
+        release_decision_table = "Case-level release-recovery decision table with recovery, uncertainty, and Monte Carlo status.",
+        case_summary = "Case-level validation summary including recovery status and generator-condition fields.",
+        condition_reporting_notes = "Reporter-facing generator-condition notes for slope-regime and score-support caveats.",
+        condition_summary = "Generator-condition summary for slope-regime and score-support evidence across validation cases.",
+        diagnostic_reporting_notes = "Reporter-facing fit/separation diagnostic notes that flag caveats without treating them as release gates.",
+        diagnostic_oc_summary = "Fit/separation operating-characteristic summary across validation cases, retained as diagnostic-only context.",
+        domain_decision_table = "Long-form validation-domain status table for recovery metrics, uncertainty, Monte Carlo precision, score support, and overall status."
       )
     ),
     "summary.mfrm_population_prediction" = {
@@ -5287,6 +6606,81 @@ summary_table_bundle_spec <- function(summary_obj) {
         diagnostic_reporting_map = "Nested reporting-map follow-up routed from summary(out$diagnostics)."
       )
     ),
+    "summary.mfrm_results" = list(
+      title = "Comprehensive Results Tables",
+      tables = list(
+        overview = summary_table_bundle_df(summary_obj$overview),
+        triage = summary_table_bundle_df(summary_obj$triage),
+        status = summary_table_bundle_df(summary_obj$status),
+        component_index = summary_table_bundle_df(summary_obj$component_index),
+        table_index = summary_table_bundle_df(summary_obj$table_index),
+        plot_map = summary_table_bundle_df(summary_obj$plot_map),
+        next_actions = summary_table_bundle_df(summary_obj$next_actions),
+        mapping = summary_table_bundle_df(summary_obj$mapping),
+        reproducible_code = summary_table_bundle_df(summary_obj$reproducible_code),
+        notes = summary_table_bundle_text_df(summary_obj$notes, column = "Note")
+      ),
+      roles = c(
+        overview = "workflow_overview",
+        triage = "review_status",
+        status = "review_status",
+        component_index = "reporting_map",
+        table_index = "reporting_map",
+        plot_map = "plot_routing",
+        next_actions = "draft_actions",
+        mapping = "column_mapping",
+        reproducible_code = "workflow_settings",
+        notes = "interpretation_notes"
+      ),
+      descriptions = c(
+        overview = "High-level mfrm_results run overview with component, table, and plot-route counts.",
+        triage = "First-screen reading order for unavailable, review, information, and OK signals.",
+        status = "Section-level availability table for automatically assembled result components.",
+        component_index = "Classes of the fitted, diagnostic, report, review, and table components retained in the object.",
+        table_index = "Available table registry with size and numeric plotting readiness.",
+        plot_map = "User-facing plot routes exposed by plot.mfrm_results().",
+        next_actions = "Prioritized next-action routes after the comprehensive first screen.",
+        mapping = "Column mapping used when mfrm_results() started from a data.frame or run_mfrm_facets() object.",
+        reproducible_code = "Line-by-line replay scaffold for the mfrm_results() route.",
+        notes = "Compact interpretation notes carried by mfrm_results()."
+      )
+    ),
+    "summary.mfrm_report" = list(
+      title = "Report Summary Tables",
+      tables = list(
+        overview = summary_table_bundle_df(summary_obj$overview),
+        first_screen = summary_table_bundle_df(summary_obj$first_screen),
+        status_counts = summary_table_bundle_df(summary_obj$status_counts),
+        immediate_actions = summary_table_bundle_df(summary_obj$immediate_actions),
+        optional_sections = summary_table_bundle_df(summary_obj$optional_sections),
+        claim_readiness = summary_table_bundle_df(summary_obj$claim_readiness),
+        report_gaps = summary_table_bundle_df(summary_obj$report_gaps),
+        boundary_index = summary_table_bundle_df(summary_obj$boundary_index),
+        routes = summary_table_bundle_df(summary_obj$routes)
+      ),
+      roles = c(
+        overview = "report_overview",
+        first_screen = "first_screen",
+        status_counts = "review_status",
+        immediate_actions = "draft_actions",
+        optional_sections = "requested_followup",
+        claim_readiness = "claim_readiness",
+        report_gaps = "draft_actions",
+        boundary_index = "claim_boundary",
+        routes = "reporting_map"
+      ),
+      descriptions = c(
+        overview = "Reader-facing report status row derived from mfrm_report() first_screen.",
+        first_screen = "Compact FACETS-like first screen with status, main issue, next action, and route.",
+        status_counts = "Counts of evidence areas by first-screen status.",
+        immediate_actions = "Unavailable, review, and caveated areas to inspect before drafting.",
+        optional_sections = "Not-requested evidence areas to request only when the claim is needed.",
+        claim_readiness = "Claim-readiness counts summarized from the report object.",
+        report_gaps = "Highest-priority report gaps and recommended actions.",
+        boundary_index = "Template-boundary rows to review before using report wording.",
+        routes = "Standard report-reading and export routes."
+      )
+    ),
     "summary.mfrm_bias" = list(
       title = "Bias Summary Tables",
       tables = list(
@@ -5354,6 +6748,120 @@ summary_table_bundle_spec <- function(summary_obj) {
           category_counts = "Observed score-category usage for anchor-review screening.",
           recommendations = "Compact action list for anchor repair or review.",
           notes = "One-line interpretation note from the anchor review."
+        )
+      )
+    },
+    "summary.mfrm_peer_review_design_review" = {
+      overview_tbl <- summary_table_bundle_df(summary_obj$overview)
+      load_summary_tbl <- summary_table_bundle_df(summary_obj$load_summary)
+      submission_load_tbl <- summary_table_bundle_df(summary_obj$submission_load)
+      reviewer_load_tbl <- summary_table_bundle_df(summary_obj$reviewer_load)
+      common_tbl <- summary_table_bundle_df(summary_obj$reviewer_pair_common_submissions)
+      low_common_tbl <- summary_table_bundle_df(summary_obj$low_common_pairs)
+      reciprocal_tbl <- summary_table_bundle_df(summary_obj$reciprocal_pairs)
+      reporting_tbl <- summary_table_bundle_df(summary_obj$reporting_map)
+      caveat_tbl <- summary_table_bundle_df(summary_obj$caveats)
+      notes_tbl <- summary_table_bundle_text_df(summary_obj$notes, column = "Note")
+      settings_tbl <- summary_table_bundle_settings_df(summary_obj$settings)
+      list(
+        title = "Peer-Review Design Tables",
+        tables = list(
+          overview = overview_tbl,
+          load_summary = load_summary_tbl,
+          submission_load = submission_load_tbl,
+          reviewer_load = reviewer_load_tbl,
+          reviewer_pair_common_submissions = common_tbl,
+          low_common_pairs = low_common_tbl,
+          reciprocal_pairs = reciprocal_tbl,
+          reporting_map = reporting_tbl,
+          caveats = caveat_tbl,
+          notes = notes_tbl,
+          settings = settings_tbl
+        ),
+        roles = c(
+          overview = "peer_review_design_diagnostics",
+          load_summary = "peer_review_load_summary",
+          submission_load = "peer_review_submission_load",
+          reviewer_load = "peer_review_reviewer_load",
+          reviewer_pair_common_submissions = "peer_review_common_links",
+          low_common_pairs = "peer_review_low_common_links",
+          reciprocal_pairs = "peer_review_reciprocal_pairs",
+          reporting_map = "reporting_map",
+          caveats = "analysis_caveats",
+          notes = "interpretation_notes",
+          settings = "review_settings"
+        ),
+        descriptions = c(
+          overview = "Front-door peer-review assignment status and design-density diagnostics.",
+          load_summary = "Submission and reviewer assignment-load summary.",
+          submission_load = "Highest-load submission rows for assignment follow-up.",
+          reviewer_load = "Highest-load reviewer rows for assignment follow-up.",
+          reviewer_pair_common_submissions = "Reviewer-pair common-submission links retained for design review.",
+          low_common_pairs = "Reviewer pairs with the fewest common submissions.",
+          reciprocal_pairs = "Participant pairs that reviewed each other's submissions.",
+          reporting_map = "Map separating peer-review assignment diagnostics from MFRM measurement evidence.",
+          caveats = "Interpretation caveats for peer-review design diagnostics.",
+          notes = "Compact interpretation notes for peer-review design review.",
+          settings = "Settings recorded by build_peer_review_design_review()."
+        )
+      )
+    },
+    "summary.mfrm_network_review" = {
+      overview_tbl <- summary_table_bundle_df(summary_obj$overview)
+      network_tbl <- summary_table_bundle_df(summary_obj$network_summary)
+      facet_tbl <- summary_table_bundle_df(summary_obj$facet_summary)
+      central_tbl <- summary_table_bundle_df(summary_obj$top_central_nodes)
+      cut_tbl <- summary_table_bundle_df(summary_obj$top_cut_nodes)
+      bridge_tbl <- summary_table_bundle_df(summary_obj$top_bridge_edges)
+      sparse_tbl <- summary_table_bundle_df(summary_obj$sparse_review)
+      peer_tbl <- summary_table_bundle_df(summary_obj$peer_review)
+      reporting_tbl <- summary_table_bundle_df(summary_obj$reporting_map)
+      caveat_tbl <- summary_table_bundle_df(summary_obj$caveats)
+      notes_tbl <- summary_table_bundle_text_df(summary_obj$notes, column = "Note")
+      settings_tbl <- summary_table_bundle_settings_df(summary_obj$settings)
+      list(
+        title = "Network Review Tables",
+        tables = list(
+          overview = overview_tbl,
+          network_summary = network_tbl,
+          facet_summary = facet_tbl,
+          top_central_nodes = central_tbl,
+          top_cut_nodes = cut_tbl,
+          top_bridge_edges = bridge_tbl,
+          sparse_review = sparse_tbl,
+          peer_review = peer_tbl,
+          reporting_map = reporting_tbl,
+          caveats = caveat_tbl,
+          notes = notes_tbl,
+          settings = settings_tbl
+        ),
+        roles = c(
+          overview = "network_review_overview",
+          network_summary = "network_design_summary",
+          facet_summary = "network_facet_vulnerability",
+          top_central_nodes = "network_central_nodes",
+          top_cut_nodes = "network_articulation_nodes",
+          top_bridge_edges = "network_bridge_edges",
+          sparse_review = "sparse_design_diagnostics",
+          peer_review = "peer_review_design_diagnostics",
+          reporting_map = "reporting_map",
+          caveats = "analysis_caveats",
+          notes = "interpretation_notes",
+          settings = "review_settings"
+        ),
+        descriptions = c(
+          overview = "Front-door connectedness and design-network review status.",
+          network_summary = "Graph-level connectedness, density, articulation-point, and bridge-edge metrics.",
+          facet_summary = "Facet-level aggregation of node centrality and design-link vulnerability.",
+          top_central_nodes = "Highest-betweenness design-network nodes for follow-up inspection.",
+          top_cut_nodes = "Articulation-point rows whose removal would fragment the design graph.",
+          top_bridge_edges = "Bridge-edge rows indicating one-link dependencies between graph regions.",
+          sparse_review = "Optional sparse linked design-review counts for planned missingness and rater-pair linkage.",
+          peer_review = "Optional peer-review assignment, load, and common-submission linkage diagnostics.",
+          reporting_map = "Map separating MFRM measurement, design-network review, sparse-design review, peer-review design, and rater-effect network routes.",
+          caveats = "Interpretation caveats for network-design diagnostics.",
+          notes = "Compact interpretation notes for network-design review.",
+          settings = "Settings and provenance recorded by build_mfrm_network_review()."
         )
       )
     },
@@ -5652,7 +7160,8 @@ build_summary_table_index <- function(tables, roles, descriptions) {
 
 #' Build a manuscript-oriented table bundle from `summary()` outputs
 #'
-#' @param x An `mfrm_fit`, `mfrm_diagnostics`,
+#' @param x An `mfrm_fit`, `mfrm_diagnostics`, `mfrm_precision_review`,
+#'   `mfrm_fit_measures`, `mfrm_facets_fit_review`,
 #'   `mfrm_person_fit_indices`, `mfrm_data_description`,
 #'   `mfrm_reporting_checklist`, `mfrm_apa_outputs`,
 #'   `mfrm_design_evaluation`, `mfrm_signal_detection`,
@@ -5660,8 +7169,9 @@ build_summary_table_index <- function(tables, roles, descriptions) {
 #'   `mfrm_population_prediction`, `mfrm_future_branch_active_branch`,
 #'   `mfrm_facets_run`, `mfrm_bias`, `mfrm_anchor_review`,
 #'   `mfrm_linking_review`, `mfrm_misfit_casebook`, `mfrm_weighting_review`,
-#'   `mfrm_unit_prediction`, or `mfrm_plausible_values` object, or one of
-#'   their `summary()` outputs.
+#'   `mfrm_unit_prediction`, or `mfrm_plausible_values` object, one of their
+#'   `summary()` outputs, or a `summary.mfrmr_recovery_validation` object from
+#'   the packaged validation protocol.
 #' @param which Optional character vector selecting a subset of named tables.
 #' @param appendix_preset Optional appendix-oriented table preset:
 #'   `"all"`, `"recommended"`, `"compact"`, `"methods"`, `"results"`,
@@ -5696,6 +7206,9 @@ build_summary_table_index <- function(tables, roles, descriptions) {
 #' @section Supported inputs:
 #' - [fit_mfrm()] or `summary(fit)`
 #' - [diagnose_mfrm()] or `summary(diag)`
+#' - [precision_review_report()] or `summary(precision_review)`
+#' - [fit_measures_table()] or `summary(fit_measures)`
+#' - [facets_fit_review()] or `summary(facets_fit_review)`
 #' - [compute_person_fit_indices()] or `summary(person_fit)`
 #' - [describe_mfrm_data()] or `summary(ds)`
 #' - [reporting_checklist()] or `summary(chk)`
@@ -5704,6 +7217,7 @@ build_summary_table_index <- function(tables, roles, descriptions) {
 #' - [evaluate_mfrm_signal_detection()] or `summary(sig_eval)`
 #' - [evaluate_mfrm_recovery()] or `summary(rec)`
 #' - [assess_mfrm_recovery()] or `summary(rec_assessment)`
+#' - `summary(validation)` from `recovery-validation.R`
 #' - [predict_mfrm_population()] or `summary(pred)`
 #' - `planning_schema$future_branch_active_branch` or `summary(...)`
 #' - [run_mfrm_facets()] or `summary(out)`
@@ -5727,6 +7241,20 @@ build_summary_table_index <- function(tables, roles, descriptions) {
 #' - fit-level caveats use the `analysis_caveats` role; pre-fit data
 #'   score-support caveats use the `score_category_caveats` role. Both roles are
 #'   classified as diagnostics and stay in `recommended` appendix subsets.
+#' - recovery-assessment and recovery-validation summaries expose
+#'   `diagnostic_reporting_notes` before `diagnostic_review` or
+#'   `diagnostic_oc_summary` so fit/separation caveats can be reported without
+#'   treating them as recovery or release gates.
+#' - recovery-validation summaries expose `condition_reporting_notes` before
+#'   `condition_summary` so GPCM generator stress and sparse score support are
+#'   not mistaken for recovery-metric failures.
+#' - precision-review summaries expose `fit_separation_basis` so fit,
+#'   ZSTD, separation/reliability/strata, and QC thresholds remain separate
+#'   reporting surfaces rather than implicit validation gates.
+#' - fit-measure and FACETS fit-review summaries expose df/ZSTD sensitivity
+#'   tables under precision-review roles, keeping MnSq status, ZSTD
+#'   standardization, and external FACETS matching distinct in appendix
+#'   handoffs.
 #' - latent-regression fit summaries expose `population_coding` in the methods
 #'   appendix role so categorical levels, contrasts, and encoded columns can be
 #'   documented with the coefficient table.
@@ -5738,6 +7266,14 @@ build_summary_table_index <- function(tables, roles, descriptions) {
 #'    [apa_table()] for formatted manuscript output.
 #' 4. If you want a manuscript appendix subset up front, use a preset such as
 #'    `appendix_preset = "recommended"`, `"compact"`, or `"diagnostics"`.
+#' 5. For recovery-assessment or recovery-validation summaries, inspect
+#'    `bundle$tables$reading_order` first when it is available.
+#' 6. For recovery-assessment or recovery-validation summaries with retained
+#'    diagnostics, read `diagnostic_reporting_notes` before the raw
+#'    `diagnostic_review` or `diagnostic_oc_summary`. Read
+#'    `condition_reporting_notes` before `condition_review` or
+#'    `condition_summary` when bounded `GPCM` generator stress is part of the
+#'    plan.
 #'
 #' @return An object of class `mfrm_summary_table_bundle` with:
 #' - `overview`
@@ -5759,6 +7295,22 @@ build_summary_table_index <- function(tables, roles, descriptions) {
 #' bundle <- build_summary_table_bundle(fit)
 #' bundle$table_index
 #' summary(bundle)$role_summary
+#' }
+#'
+#' # Recovery-validation output can be converted to appendix-ready tables.
+#' \dontrun{
+#' source(system.file("validation", "recovery-validation.R", package = "mfrmr"))
+#' validation <- mfrmr_run_recovery_validation(
+#'   case_ids = c("gpcm_slope_profile", "gpcm_high_dispersion_sparse"),
+#'   quick = TRUE,
+#'   seed = 20260525
+#' )
+#' validation_bundle <- build_summary_table_bundle(summary(validation))
+#' validation_bundle$tables$reading_order
+#' validation_bundle$tables$topline_release_decision
+#' validation_bundle$tables$condition_reporting_notes
+#' validation_bundle$tables$condition_summary
+#' validation_bundle$tables$diagnostic_reporting_notes
 #' }
 #' @export
 build_summary_table_bundle <- function(x,
@@ -6230,15 +7782,15 @@ summary_table_bundle_appendix_role_registry <- function() {
       "Core priority distribution for reporting follow-up.",
       "Core manuscript-draft coverage overview.",
       "Core APA component inventory.",
-      "Internal draft QA surface; keep out of recommended presets.",
+      "Draft QA surface; keep out of recommended presets.",
       "Preview-only draft text; keep out of recommended presets.",
       "Bridge metadata, useful for workflow but not manuscript appendix.",
       "Exploratory extreme table; available only in full exports.",
       "Exploratory extreme table; available only in full exports.",
       "Exploratory extreme table; available only in full exports.",
       "Exploratory extreme table; available only in full exports.",
-      "Internal drafting action list; keep out of recommended presets.",
-      "Internal checklist settings; keep out of recommended presets.",
+      "Drafting action list; keep out of recommended presets.",
+      "Checklist settings; keep out of recommended presets.",
       "Recommended methods appendix overview for the future arbitrary-facet planning scaffold.",
       "Recommended exact-count profile for future arbitrary-facet planning methods appendices.",
       "Detailed load-balance diagnostics; retain for full exports but omit from recommended presets.",
@@ -6314,9 +7866,17 @@ summary_table_bundle_appendix_role_registry <- function() {
       "recovery_settings",
       "recovery_performance",
       "recovery_replications",
+      "recovery_diagnostic_operating_characteristics",
+      "recovery_diagnostic_oc_summary",
       "recovery_assessment_overview",
+      "recovery_assessment_reading_order",
       "recovery_assessment_checklist",
-      "recovery_metric_review"
+      "recovery_condition_reporting_notes",
+      "recovery_condition_review",
+      "recovery_diagnostic_reporting_notes",
+      "recovery_diagnostic_review",
+      "recovery_metric_review",
+      "recovery_uncertainty_review"
     ),
     AppendixSection = c(
       "methods",
@@ -6326,24 +7886,196 @@ summary_table_bundle_appendix_role_registry <- function() {
       "diagnostics",
       "diagnostics",
       "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
       "diagnostics"
     ),
-    RecommendedAppendix = c(TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE),
-    CompactAppendix = c(TRUE, FALSE, FALSE, TRUE, FALSE, TRUE, TRUE, TRUE),
-    PreferredAppendixOrder = 260:267,
+    RecommendedAppendix = rep(TRUE, 16),
+    CompactAppendix = c(TRUE, FALSE, FALSE, TRUE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE),
+    PreferredAppendixOrder = 260:275,
     AppendixRationale = c(
       "Recommended overview table for parameter-recovery simulation appendix handoff.",
       "Recommended ADEMP-style methods table documenting the recovery simulation basis.",
       "Methods/settings table for recovery simulation provenance; recommended but not compact.",
       "Recommended parameter-group recovery-performance table for simulation appendices.",
       "Recommended replication-status table for recovery simulation diagnostics.",
+      "Replication-by-facet fit/separation operating characteristics; retain for diagnostics exports.",
+      "Recommended facet-level fit/separation operating-characteristic summary for diagnostic context.",
       "Recommended overview table for recovery adequacy assessment appendix handoff.",
+      "Recommended reading-order table for recovery assessment handoff.",
       "Recommended checklist table for reviewer-facing recovery adequacy decisions.",
-      "Recommended parameter-group review table for recovery adequacy follow-up."
+      "Recommended reporter-facing table for generator-condition caveats kept separate from recovery metrics.",
+      "Recommended generator-condition table for interpreting GPCM slope-regime recovery evidence.",
+      "Recommended reporter-facing table for fit/separation diagnostic caveats kept separate from recovery gates.",
+      "Recommended diagnostic-only fit/separation review table for recovery assessment handoff.",
+      "Recommended parameter-group review table for recovery adequacy follow-up.",
+      "Recommended uncertainty-evidence table separating coverage availability, SE availability, and coverage decision status."
     ),
     stringsAsFactors = FALSE
   )
   out <- rbind(out, recovery_roles)
+  recovery_validation_roles <- data.frame(
+    Role = c(
+      "recovery_validation_topline",
+      "recovery_validation_reading_order",
+      "recovery_validation_release_decisions",
+      "recovery_validation_case_summary",
+      "recovery_validation_condition_reporting_notes",
+      "recovery_validation_condition_summary",
+      "recovery_validation_diagnostic_reporting_notes",
+      "recovery_validation_diagnostic_oc_summary",
+      "recovery_validation_domain_decisions"
+    ),
+    AppendixSection = c(
+      "results",
+      "results",
+      "results",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics"
+    ),
+    RecommendedAppendix = rep(TRUE, 9),
+    CompactAppendix = rep(TRUE, 9),
+    PreferredAppendixOrder = 276:284,
+    AppendixRationale = c(
+      "Recommended top-line recovery-validation decision table for release-review appendices.",
+      "Recommended reading-order table for recovery-validation handoff.",
+      "Recommended case-level release-decision table for validation handoff.",
+      "Recommended validation case summary table for release-review traceability.",
+      "Recommended reporter-facing table for generator-condition caveats kept out of release gates.",
+      "Recommended generator-condition summary table separating GPCM slope-regime and score-support stress.",
+      "Recommended reporter-facing table for fit/separation diagnostic caveats kept out of release gates.",
+      "Recommended fit/separation operating-characteristic summary kept separate from release-recovery gates.",
+      "Recommended long-form domain-decision table for validation diagnostics."
+    ),
+    stringsAsFactors = FALSE
+  )
+  out <- rbind(out, recovery_validation_roles)
+  sparse_roles <- data.frame(
+    Role = c(
+      "sparse_design_diagnostics",
+      "recovery_sparse_design_diagnostics",
+      "peer_review_design_diagnostics",
+      "peer_review_load_summary",
+      "peer_review_submission_load",
+      "peer_review_reviewer_load",
+      "peer_review_common_links",
+      "peer_review_low_common_links",
+      "peer_review_reciprocal_pairs"
+    ),
+    AppendixSection = c(
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics",
+      "diagnostics"
+    ),
+    RecommendedAppendix = c(TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, FALSE, TRUE, TRUE),
+    CompactAppendix = c(TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, TRUE, TRUE),
+    PreferredAppendixOrder = c(259.5, 263.5, 264.5, 264.6, 264.7, 264.8, 264.9, 265.1, 265.2),
+    AppendixRationale = c(
+      "Recommended planned-missingness and rater-link diagnostics for sparse linked design appendices.",
+      "Recommended replication-level sparse linked design diagnostics kept separate from recovery metrics.",
+      "Recommended peer-review assignment and reviewer-link diagnostics kept separate from measurement estimates.",
+      "Recommended compact load-balance summary for peer-review assignment appendices.",
+      "Full submission-load table; retain for detailed diagnostics exports.",
+      "Recommended reviewer-load table for assignment follow-up.",
+      "Full reviewer-pair common-submission table; retain for detailed diagnostics exports.",
+      "Recommended reviewer-pair low-common-link table for peer-review assignment follow-up.",
+      "Recommended reciprocal review-pair table for peer-review assignment transparency."
+    ),
+    stringsAsFactors = FALSE
+  )
+  out <- rbind(out, sparse_roles)
+  diagnostic_screening_roles <- data.frame(
+    Role = c(
+      "diagnostic_screening_design_basis",
+      "diagnostic_screening_settings",
+      "diagnostic_screening_overview",
+      "diagnostic_screening_reading_order",
+      "diagnostic_screening_next_actions",
+      "diagnostic_screening_reporting_notes",
+      "diagnostic_screening_figure_recipes",
+      "diagnostic_screening_scenario_summary",
+      "diagnostic_screening_performance",
+      "diagnostic_screening_report_signals",
+      "diagnostic_screening_contrast",
+      "diagnostic_screening_plot_data",
+      "diagnostic_screening_runtime"
+    ),
+    AppendixSection = c(
+      "methods",
+      "methods",
+      "methods",
+      "reporting",
+      "workflow",
+      "reporting",
+      "workflow",
+      "diagnostics",
+      "diagnostics",
+      "reporting",
+      "diagnostics",
+      "diagnostics",
+      "methods"
+    ),
+    RecommendedAppendix = rep(TRUE, 13),
+    CompactAppendix = c(TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE),
+    PreferredAppendixOrder = 291:303,
+    AppendixRationale = c(
+      "Recommended ADEMP-style methods table documenting the diagnostic-screening simulation basis.",
+      "Methods/settings table for diagnostic-screening provenance; recommended but not compact.",
+      "Recommended overview table for diagnostic-screening appendix handoff.",
+      "Recommended reading-order table for diagnostic-screening summaries and appendices.",
+      "Recommended action table for diagnostic-screening follow-up and export routing.",
+      "Recommended reporting-boundary table for cautious diagnostic-screening interpretation.",
+      "Recommended figure/display recipe table so custom graphics keep plot calls, captions, and boundaries explicit.",
+      "Recommended scenario-by-design screening summary for diagnostic appendices.",
+      "Recommended operating-characteristic table for diagnostic-screening interpretation.",
+      "Recommended report-signal table when mfrm_report() review signals were retained.",
+      "Recommended misspecification-minus-baseline contrast table for diagnostic follow-up.",
+      "Long-form draw-free plot data for interactive or custom visualization handoff; recommended but not compact.",
+      "Runtime operating-characteristic table; recommended for methods appendices but not compact."
+    ),
+    stringsAsFactors = FALSE
+  )
+  out <- rbind(out, diagnostic_screening_roles)
+  network_review_roles <- data.frame(
+    Role = c(
+      "network_review_overview",
+      "network_design_summary",
+      "network_facet_vulnerability",
+      "network_central_nodes",
+      "network_articulation_nodes",
+      "network_bridge_edges"
+    ),
+    AppendixSection = rep("diagnostics", 6),
+    RecommendedAppendix = rep(TRUE, 6),
+    CompactAppendix = c(TRUE, TRUE, TRUE, FALSE, TRUE, TRUE),
+    PreferredAppendixOrder = 285:290,
+    AppendixRationale = c(
+      "Recommended overview table for design-network connectedness and vulnerability review.",
+      "Recommended graph-level design-network summary for connectivity diagnostics.",
+      "Recommended facet-level design-network vulnerability table for follow-up appendices.",
+      "High-betweenness node table; retain for full diagnostics exports but omit from compact presets.",
+      "Recommended articulation-point table for fragile-link follow-up.",
+      "Recommended bridge-edge table for one-link dependency follow-up."
+    ),
+    stringsAsFactors = FALSE
+  )
+  out <- rbind(out, network_review_roles)
   capability_boundary <- out$Role %in% "capability_boundary"
   out$CompactAppendix[capability_boundary] <- TRUE
   out$PreferredAppendixOrder[capability_boundary] <- 240.5
@@ -8412,9 +10144,10 @@ print.summary.mfrm_threshold_profiles <- function(x, ...) {
 #' - `max_facet_ranges`: max facet-range snippets shown in visual summaries
 #' - `top_misfit_n`: number of top misfit entries included
 #'
-#' For bounded `GPCM`, this helper is intentionally unavailable. Use
-#' [reporting_checklist()], [plot_qc_dashboard()], the residual/category table
-#' helpers, and [compute_information()] / [plot_information()] instead.
+#' For bounded `GPCM`, this helper returns caveated warning/summary maps over
+#' supported diagnostics, direct tables, and plots. The returned object includes
+#' `gpcm_boundary` so score-side, design-forecasting, DFF, and linking routes
+#' remain visibly separate capability rows.
 #'
 #' @section Interpreting output:
 #' - `warning_map`: rule-triggered warning text by visual key.
@@ -8566,6 +10299,15 @@ build_visual_summaries <- function(fit,
     plot_payloads = NULL,
     public_plot_routes = NULL,
     crosswalk = crosswalk,
+    gpcm_boundary = gpcm_capability_boundary_table(
+      fit,
+      helper = "build_visual_summaries()",
+      extra_areas = c(
+        "Score-side scorefile export under bounded GPCM",
+        "FACETS output-contract score-side review",
+        "Design planning and forecasting"
+      )
+    ),
     branch = branch,
     style = style,
     threshold_profile = as.character(threshold_profile[1])
@@ -9723,6 +11465,7 @@ facets_fit_review_guidance <- function(model, external_supplied) {
   tibble::tibble(
     Topic = c(
       "Primary comparison",
+      "Residual basis",
       "ZSTD convention",
       "Small df",
       "External FACETS fit",
@@ -9730,8 +11473,9 @@ facets_fit_review_guidance <- function(model, external_supplied) {
     ),
     Guidance = c(
       "Compare MnSq values separately from ZSTD values; MnSq differences indicate fit-statistic or estimation differences.",
+      "MML fits evaluate residuals at shrunken EAP person measures while FACETS uses JMLE estimates, so MnSq itself can differ across the two bases; refit with method = \"JML\" before attributing MnSq gaps to fit computation.",
       "Use the FACETS-style companion columns for FACETS ZSTD comparison; engine ZSTD columns retain the package-native df convention.",
-      "FACETS permits chi-square df below 1 under WHEXACT=Y; small df can make Wilson-Hilferty ZSTD counterintuitive.",
+      "FACETS permits chi-square df below 1 under WHEXACT=Y; mfrmr withholds ZSTD as NA when df < 1, so an NA-vs-finite ZSTD pair on a sparse cell is an availability difference (compare MnSq for that row), not a fit difference.",
       if (isTRUE(external_supplied)) {
         "External rows are matched by Facet and Level. Rows without a match are marked no_external_match."
       } else {
@@ -9781,6 +11525,15 @@ facets_fit_review_guidance <- function(model, external_supplied) {
 #' The review is row-matched by `Facet` and `Level`. It treats MnSq, ZSTD, and df
 #' differences separately because FACETS documentation makes the df convention
 #' and Wilson-Hilferty/WHEXACT handling central to ZSTD interpretation.
+#'
+#' Two upstream boundaries also apply. For `method = "MML"` fits, residuals
+#' are evaluated at shrunken EAP person measures while FACETS uses JMLE
+#' estimates, so MnSq itself can differ before standardization; refit with
+#' `method = "JML"` for a JMLE-style residual basis. And mfrmr withholds
+#' ZSTD as `NA` when the applicable df falls below 1 (Wilson-Hilferty
+#' instability), while FACETS under `WHEXACT` can report a value on the same
+#' sparse cell; such NA-vs-finite pairs are availability differences, not
+#' fit differences. Both notes are repeated in the returned `guidance` table.
 #'
 #' @return An `mfrm_facets_fit_review` bundle with:
 #' - `summary`: one-row overview of internal and external comparison counts
@@ -9957,6 +11710,13 @@ facets_fit_review <- function(fit,
 #' not establish external validity or software equivalence beyond the specific
 #' schema/metric contract encoded in the contract file.
 #'
+#' @section Bounded GPCM boundary:
+#' This helper remains blocked for bounded `GPCM` fits in 0.2.1. The FACETS
+#' output contract includes score-side rows whose measure-to-score and
+#' uncertainty semantics are validated for the current Rasch-family route, not
+#' for free-discrimination bounded `GPCM`. Use [gpcm_capability_matrix()] before
+#' routing a bounded `GPCM` fit into score-side compatibility-output helpers.
+#'
 #' Coverage interpretation in `overall`:
 #' - `MeanColumnCoverage` and `MinColumnCoverage` are computed across all
 #'   contract rows (unavailable rows count as 0 coverage).
@@ -9975,7 +11735,7 @@ facets_fit_review <- function(fit,
 #'   occur.
 #' - `metric_summary` / `metric_checks`: numerical consistency checks tied to the
 #'   current contract.
-#' - `missing_preview`: quickest path to unresolved output-contract gaps.
+#' - `missing_preview`: direct path to unresolved output-contract gaps.
 #'
 #' @section Typical workflow:
 #' 1. Run `facets_output_contract_review(fit, branch = "facets")`.
@@ -10326,7 +12086,7 @@ facets_output_contract_review <- function(fit,
 #' - `overall`: one-row review summary with schema coverage and metric
 #'   pass rate.
 #' - `component_summary`: per-component coverage summary.
-#' - `attention_items`: quickest list of components needing review.
+#' - `attention_items`: direct list of components needing review.
 #' - `metric_summary` / `metric_checks`: numerical consistency status.
 #'
 #' @return An object of class `mfrm_reference_review`.
@@ -10395,7 +12155,7 @@ reference_case_review <- function(fit,
     settings = list(
       reference_profile = reference_profile,
       contract_branch = branch,
-      intended_use = "internal_contract_review",
+      intended_use = "reference_contract_review",
       external_validation = FALSE,
       include_metrics = isTRUE(include_metrics),
       top_n_attention = max(1L, as.integer(top_n_attention))
@@ -10525,7 +12285,15 @@ collect_bias_screening_summary <- function(diagnostics = NULL, bias_results = NU
 #' - `$counts`: named integer vector of method-appropriate counts.
 #' - `$large_dif`: tibble of large ETS results (`method = "refit"`) or
 #'   screening-positive contrasts/cells (`method = "residual"`).
+#' - `$gpcm_boundary`: for bounded `GPCM` inputs, a capability-boundary table
+#'   marking the narrative as caveated DFF screening output.
 #' - `$config`: analysis configuration inherited from the input.
+#'
+#' @section GPCM boundary:
+#' If the input comes from a bounded `GPCM` fit, the narrative includes a
+#' bounded-`GPCM` note and the returned report carries `gpcm_boundary`.
+#' Treat the text as slope-aware screening/reporting support, not as a
+#' standalone fairness, invariance, or operational subgroup decision.
 #'
 #' @section Typical workflow:
 #' 1. Run [analyze_dff()] / [analyze_dif()] or [dif_interaction_table()].
@@ -10534,7 +12302,7 @@ collect_bias_screening_summary <- function(diagnostics = NULL, bias_results = NU
 #'    manuscript.
 #'
 #' @return Object of class `mfrm_dif_report` with `narrative`,
-#'   `counts`, `large_dif`, and `config`.
+#'   `counts`, `large_dif`, `gpcm_boundary`, and `config`.
 #'
 #' @section References:
 #' The narrative caveat about distinguishing construct-relevant variation
@@ -10730,6 +12498,15 @@ dif_report <- function(dif_result, ...) {
     "distinguish between these possibilities (cf. Eckes, 2011; McNamara & ",
     "Knoch, 2012)."
   ))
+  gpcm_boundary <- dif_result$gpcm_boundary %||% data.frame()
+  if (is.data.frame(gpcm_boundary) && nrow(gpcm_boundary) > 0L) {
+    lines <- c(lines, paste0(
+      "\nBounded GPCM note: Treat these differential-functioning rows as ",
+      "slope-aware screening evidence under the current bounded-GPCM fit. ",
+      "They do not by themselves establish fairness, invariance, or an ",
+      "operational subgroup decision."
+    ))
+  }
 
   narrative <- paste(lines, collapse = "")
 
@@ -10737,6 +12514,7 @@ dif_report <- function(dif_result, ...) {
     narrative = narrative,
     counts = counts,
     large_dif = tibble::as_tibble(large_dif),
+    gpcm_boundary = gpcm_boundary,
     config = cfg
   )
   class(out) <- c("mfrm_dif_report", class(out))
@@ -10811,6 +12589,15 @@ dif_report <- function(dif_result, ...) {
     "distinguish between construct-relevant variation and unwanted bias ",
     "(cf. Eckes, 2011; McNamara & Knoch, 2012)."
   ))
+  gpcm_boundary <- dif_result$gpcm_boundary %||% data.frame()
+  if (is.data.frame(gpcm_boundary) && nrow(gpcm_boundary) > 0L) {
+    lines <- c(lines, paste0(
+      "\nBounded GPCM note: Treat these interaction-screening rows as ",
+      "slope-aware residual evidence under the current bounded-GPCM fit. ",
+      "They do not by themselves establish fairness, invariance, or an ",
+      "operational subgroup decision."
+    ))
+  }
 
   narrative <- paste(lines, collapse = "")
 
@@ -10818,6 +12605,7 @@ dif_report <- function(dif_result, ...) {
     narrative = narrative,
     counts = counts,
     large_dif = tibble::as_tibble(flagged_rows),
+    gpcm_boundary = gpcm_boundary,
     config = cfg
   )
   class(out) <- c("mfrm_dif_report", class(out))
@@ -10828,6 +12616,7 @@ dif_report <- function(dif_result, ...) {
 print.mfrm_dif_report <- function(x, ...) {
   cat("--- Differential Functioning Interpretation Report ---\n\n")
   cat(x$narrative, "\n")
+  .print_dff_gpcm_boundary(x$gpcm_boundary)
   invisible(x)
 }
 
@@ -10837,6 +12626,7 @@ summary.mfrm_dif_report <- function(object, ...) {
     narrative = object$narrative,
     counts = object$counts,
     large_dif = object$large_dif,
+    gpcm_boundary = object$gpcm_boundary %||% data.frame(),
     config = object$config
   )
   class(out) <- "summary.mfrm_dif_report"
@@ -10856,6 +12646,7 @@ print.summary.mfrm_dif_report <- function(x, ...) {
   } else {
     cat("No levels flagged.\n")
   }
+  .print_dff_gpcm_boundary(x$gpcm_boundary)
   invisible(x)
 }
 
@@ -10906,9 +12697,11 @@ print.summary.mfrm_dif_report <- function(x, ...) {
 #' Individual thresholds can be overridden via the `thresholds` argument
 #' (a named list keyed by the internal threshold names shown above).
 #'
-#' For bounded `GPCM`, this pipeline is intentionally unavailable because the
-#' current validated route stops before bundled pass/warn/fail synthesis for
-#' the free-discrimination branch.
+#' For bounded `GPCM`, this pipeline is available as caveated operational
+#' triage over supported diagnostics. Its pass/warn/fail labels remain package
+#' QC policy overlays; they are not FACETS score-side equivalence, operational
+#' scoring decisions, design-forecasting evidence, or automatic fairness /
+#' validity decisions.
 #'
 #' @section QC checks:
 #' The 10 checks are:
@@ -11509,6 +13302,15 @@ run_qc_pipeline <- function(fit,
     overall  = overall,
     details  = raw_details,
     recommendations = recommendations,
+    gpcm_boundary = gpcm_capability_boundary_table(
+      fit,
+      helper = "run_qc_pipeline()",
+      extra_areas = c(
+        "Score-side scorefile export under bounded GPCM",
+        "FACETS output-contract score-side review",
+        "Design planning and forecasting"
+      )
+    ),
     config   = list(threshold_profile = threshold_profile,
                     thresholds = effective_thresholds)
   )
@@ -11531,6 +13333,10 @@ print.mfrm_qc_pipeline <- function(x, ...) {
     cat("\nRecommendations:\n")
     for (r in x$recommendations) cat("  -", r, "\n")
   }
+  if (!is.null(x$gpcm_boundary) && nrow(as.data.frame(x$gpcm_boundary)) > 0) {
+    cat("\nGPCM Boundary:\n")
+    print(as.data.frame(x$gpcm_boundary)[, c("Area", "Status"), drop = FALSE], row.names = FALSE)
+  }
   invisible(x)
 }
 
@@ -11540,6 +13346,7 @@ summary.mfrm_qc_pipeline <- function(object, ...) {
     verdicts = object$verdicts,
     overall  = object$overall,
     recommendations = object$recommendations,
+    gpcm_boundary = object$gpcm_boundary %||% data.frame(),
     pass_count = sum(object$verdicts$Verdict == "Pass"),
     warn_count = sum(object$verdicts$Verdict == "Warn"),
     fail_count = sum(object$verdicts$Verdict == "Fail"),

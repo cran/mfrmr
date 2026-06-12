@@ -8,7 +8,9 @@
   x,
   facet = c("Rater", "Criterion", "Person"),
   metric = c("separation", "reliability", "infit", "outfit", "misfitrate",
-    "severityrmse", "severitybias", "convergencerate", "elapsedsec", "mincategorycount"),
+    "severityrmse", "severitybias", "convergencerate", "elapsedsec", "mincategorycount",
+    "designdensity", "plannedmissingrate", "linkpersons", "linkfraction", "linkraters",
+    "mincommonpersons", "zerocommonpairs", "pairsshorttarget"),
   x_var = c("n_person", "n_rater", "n_criterion", "raters_per_person"),
   group_var = NULL,
   draw = TRUE,
@@ -56,6 +58,9 @@ Useful first plots are:
 \item criterion \code{metric = "severityrmse"} against \code{x_var = "n_person"}
 when you want aligned recovery error rather than raw location shifts
 \item rater \code{metric = "convergencerate"} against \code{x_var = "raters_per_person"}
+\item sparse linked \code{metric = "plannedmissingrate"}, \code{"mincommonpersons"},
+\code{"zerocommonpairs"}, or \code{"pairsshorttarget"} to review planned
+missingness and rater-pair linkage separately from recovery metrics
 }
 }
 \examples{

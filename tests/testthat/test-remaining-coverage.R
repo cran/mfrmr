@@ -1,5 +1,5 @@
 # test-remaining-coverage.R
-# Targeted tests for remaining coverage gaps.
+# Assorted regression tests for remaining edge paths.
 
 with_null_device <- function(expr) {
   grDevices::pdf(NULL)

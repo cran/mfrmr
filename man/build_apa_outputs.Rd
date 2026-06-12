@@ -49,10 +49,11 @@ Frequently used fields include:
 Output text includes residual-PCA screening commentary if PCA diagnostics are
 available in \code{diagnostics}.
 
-For bounded \code{GPCM}, this helper is intentionally unavailable. Use
-\code{\link[=reporting_checklist]{reporting_checklist()}}, \code{\link[=precision_review_report]{precision_review_report()}}, and the direct
-table/plot helpers instead, and treat \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}} as the
-formal boundary statement for that branch.
+For bounded \code{GPCM}, this helper returns a caveated partial reporting bundle
+over supported diagnostics, direct tables, and plots. It also includes a
+\code{gpcm_boundary} table. Treat the output as slope-aware sensitivity-reporting
+text, not FACETS score-side equivalence, automatic operational scoring, or
+design-forecasting evidence.
 
 By default, \code{report_text} includes:
 \itemize{

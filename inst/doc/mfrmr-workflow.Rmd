@@ -339,6 +339,8 @@ recovery <- suppressWarnings(
     sim_spec = sim_spec,
     reps = 2,
     maxit = 30,
+    include_diagnostics = TRUE,
+    diagnostic_fit_df_method = "both",
     seed = 2
   )
 )
@@ -356,6 +358,12 @@ recovery_review <- assess_mfrm_recovery(
 )
 
 summary(recovery_review)$checklist[, c("Section", "Item", "Status")]
+summary(recovery_review)$reading_order
+summary(recovery_review)$condition_reporting_notes
+summary(recovery_review)$condition_review
+summary(recovery_review)$diagnostic_reporting_notes
+summary(recovery_review)$diagnostic_review
+
 status_plot <- plot(recovery_review, type = "status", draw = FALSE)
 status_plot$data$section_status
 status_plot$data$reading_order
@@ -374,14 +382,28 @@ recovery_bundle$table_index[, c("Table", "Rows", "Role")]
 # source(system.file("validation", "recovery-validation.R", package = "mfrmr"))
 # validation <- mfrmr_run_recovery_validation(tier = "core", output_dir = "recovery-validation")
 # summary(validation)
-# validation_summary <- mfrmr_summarize_recovery_validation(validation)
+# validation_summary <- summary(validation)
+# validation_summary$reading_order
 # validation_summary$topline_release_decision
 # validation_summary$release_decision_table
+# validation_summary$condition_reporting_notes
+# validation_summary$condition_summary
+# validation_summary$diagnostic_reporting_notes
 # validation_summary$domain_decision_table
+# validation_bundle <- build_summary_table_bundle(validation_summary)
+# validation_bundle$tables$reading_order
+# validation_bundle$tables$topline_release_decision
+# validation_bundle$tables$condition_reporting_notes
+# validation_bundle$tables$condition_summary
+# validation_bundle$tables$diagnostic_reporting_notes
 # The top-line table is the release-recovery conclusion. It uses recovery
-# metrics, convergence, and Monte Carlo precision as the primary evidence.
-# The domain table keeps uncertainty status separate, so OverallStatus =
-# "review" is not read as a recovery-metric failure by itself.
+# metrics, convergence, and Monte Carlo precision from core cases as the
+# primary evidence, while ExtendedSensitivityStatus reports non-core stress
+# cases separately. The condition notes and condition table keep generator
+# stress and score support separate from recovery metrics, so OverallStatus = "review" is not
+# read as a recovery-metric failure by itself. The diagnostic reporting notes
+# turn fit/separation operating characteristics into report caveats rather
+# than release gates.
 
 pred_pop <- predict_mfrm_population(
   sim_spec = sim_spec,

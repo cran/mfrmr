@@ -137,7 +137,7 @@ test_that("reference_case_review exposes package-native review wording", {
   ) %in% names(review)))
   expect_identical(as.character(review$overall$ReferenceProfile[1]), "core")
   expect_identical(as.character(review$overall$CompatibilityLayer[1]), "package-native")
-  expect_identical(review$settings$intended_use, "internal_contract_review")
+  expect_identical(review$settings$intended_use, "reference_contract_review")
   expect_false(isTRUE(review$settings$external_validation))
 
   s <- summary(review)

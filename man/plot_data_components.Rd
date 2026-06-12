@@ -33,5 +33,15 @@ plot_data_components(fit, type = "pathway")
 
 curves <- category_curves_report(fit, theta_points = 51)
 plot_data_components(curves, type = "category_probability")
+
+toy$ResponseTime <- 10 + seq_len(nrow(toy)) \%\% 6 + as.numeric(toy$Score)
+rt <- response_time_review(
+  toy,
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  score = "Score",
+  time = "ResponseTime"
+)
+plot_data_components(plot_response_time_review(rt, draw = FALSE))
 }
 }

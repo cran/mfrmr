@@ -175,3 +175,6 @@ Software, 67}(1), 1-48.
 \code{\link[=analyze_hierarchical_structure]{analyze_hierarchical_structure()}}, \code{\link[=detect_facet_nesting]{detect_facet_nesting()}},
 \code{\link[=facet_small_sample_review]{facet_small_sample_review()}}.
 }
+\concept{ICC}
+\concept{confidence intervals}
+\concept{hierarchical structure}

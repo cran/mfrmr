@@ -2720,7 +2720,7 @@ test_that("extract_mfrm_sim_spec captures bounded GPCM slope metadata", {
   expect_setequal(spec$slope_table$SlopeFacet, unique(toy$Criterion))
 })
 
-test_that("fit-derived GPCM specs generate data but remain blocked in planning helpers", {
+test_that("fit-derived GPCM specs generate data and support caveated design forecasts", {
   toy <- load_mfrmr_data("example_core")
   keep_people <- unique(toy$Person)[1:14]
   toy <- toy[toy$Person %in% keep_people, , drop = FALSE]
@@ -2744,74 +2744,54 @@ test_that("fit-derived GPCM specs generate data but remain blocked in planning h
   expect_true(is.data.frame(truth$slope_table))
   expect_equal(attr(sim, "mfrm_simulation_spec")$model, "GPCM")
 
-  expect_error(
-    evaluate_mfrm_design(
-      n_person = spec$n_person,
-      n_rater = spec$n_rater,
-      n_criterion = spec$n_criterion,
-      raters_per_person = spec$raters_per_person,
-      reps = 1,
-      maxit = 10,
+  design_eval <- suppressWarnings(evaluate_mfrm_design(
+    n_person = spec$n_person,
+    n_rater = spec$n_rater,
+    n_criterion = spec$n_criterion,
+    raters_per_person = spec$raters_per_person,
+    reps = 1,
+    maxit = 20,
+    sim_spec = spec,
+    seed = 720,
+    progress = FALSE
+  ))
+  expect_s3_class(design_eval, "mfrm_design_evaluation")
+  expect_identical(design_eval$settings$model, "GPCM")
+  expect_identical(design_eval$settings$gpcm_design_status, "supported_with_caveat")
+  expect_true(nrow(design_eval$gpcm_boundary) > 0L)
+  expect_true(any(design_eval$results$FitModel == "GPCM"))
+  signal_eval <- suppressWarnings(evaluate_mfrm_signal_detection(
+    n_person = spec$n_person,
+    n_rater = spec$n_rater,
+    n_criterion = spec$n_criterion,
+    raters_per_person = spec$raters_per_person,
+    reps = 1,
+    fit_method = "MML",
+    maxit = 10,
+    quad_points = 5,
+    bias_max_iter = 1,
+    dif_min_obs = 1,
+    sim_spec = spec,
+    seed = 721
+  ))
+  expect_s3_class(signal_eval, "mfrm_signal_detection")
+  expect_identical(signal_eval$settings$model, "GPCM")
+  expect_identical(signal_eval$settings$gpcm_screening_status, "supported_with_caveat")
+  expect_true(nrow(signal_eval$gpcm_boundary) > 0L)
+  expect_true(any(grepl("slope-aware operating-characteristic", signal_eval$notes, fixed = TRUE)))
+  pred <- suppressWarnings(
+    predict_mfrm_population(
       sim_spec = spec,
-      seed = 720
-    ),
-    "`evaluate_mfrm_design()` does not yet support bounded `GPCM` simulation specifications.",
-    fixed = TRUE
-  )
-  expect_error(
-    evaluate_mfrm_design(
       n_person = spec$n_person,
-      n_rater = spec$n_rater,
-      n_criterion = spec$n_criterion,
-      raters_per_person = spec$raters_per_person,
       reps = 1,
-      maxit = 10,
-      sim_spec = spec,
-      seed = 720
-    ),
-    "role-based person x rater-like x criterion-like",
-    fixed = TRUE
+      maxit = 20,
+      seed = 722
+    )
   )
-  expect_error(
-    evaluate_mfrm_signal_detection(
-      n_person = spec$n_person,
-      n_rater = spec$n_rater,
-      n_criterion = spec$n_criterion,
-      raters_per_person = spec$raters_per_person,
-      reps = 1,
-      maxit = 10,
-      bias_max_iter = 1,
-      sim_spec = spec,
-      seed = 721
-    ),
-    "`evaluate_mfrm_signal_detection()` does not yet support bounded `GPCM` simulation specifications.",
-    fixed = TRUE
-  )
-  expect_error(
-    evaluate_mfrm_signal_detection(
-      n_person = spec$n_person,
-      n_rater = spec$n_rater,
-      n_criterion = spec$n_criterion,
-      raters_per_person = spec$raters_per_person,
-      reps = 1,
-      maxit = 10,
-      bias_max_iter = 1,
-      sim_spec = spec,
-      seed = 721
-    ),
-    "role-based person x rater-like x criterion-like",
-    fixed = TRUE
-  )
-  expect_error(
-    predict_mfrm_population(sim_spec = spec, n_person = spec$n_person, reps = 1, seed = 722),
-    "`predict_mfrm_population()` is not yet validated for `GPCM` simulation specifications.",
-    fixed = TRUE
-  )
-  expect_error(
-    predict_mfrm_population(sim_spec = spec, n_person = spec$n_person, reps = 1, seed = 722),
-    "role-based person x rater-like x criterion-like",
-    fixed = TRUE
-  )
+  expect_s3_class(pred, "mfrm_population_prediction")
+  expect_identical(pred$settings$model, "GPCM")
+  expect_identical(pred$settings$gpcm_design_status, "supported_with_caveat")
+  expect_true(nrow(pred$gpcm_boundary) > 0L)
 })
 
 test_that("extract_mfrm_sim_spec can activate empirical latent support and resampled assignment", {

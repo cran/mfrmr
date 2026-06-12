@@ -22,10 +22,15 @@ evaluate_mfrm_diagnostic_screening(
   step_span = 1.4,
   model = c("RSM", "PCM", "GPCM"),
   step_facet = NULL,
+  slope_facet = NULL,
+  slopes = NULL,
   maxit = 25,
   quad_points = 7,
   residual_pca = c("none", "overall", "facet", "both"),
   sim_spec = NULL,
+  include_report = FALSE,
+  report_include = c("fit", "diagnostics", "tables", "precision", "reporting"),
+  report_style = c("qc", "apa", "validation", "reviewer", "technical"),
   seed = NULL
 )
 }
@@ -70,11 +75,17 @@ active public facet name. Defaults to the criterion-like facet.}
 
 \item{step_span}{Spread of step thresholds on the logit scale.}
 
-\item{model}{Measurement model passed to \code{\link[=fit_mfrm]{fit_mfrm()}}. The current helper
-supports \code{RSM} and \code{PCM}; bounded \code{GPCM} is accepted only to
-produce an explicit unsupported-path error.}
+\item{model}{Measurement model passed to \code{\link[=fit_mfrm]{fit_mfrm()}}. Bounded \code{GPCM} is
+supported with caveats as slope-aware screening sensitivity evidence.}
 
-\item{step_facet}{Step facet passed to \code{\link[=fit_mfrm]{fit_mfrm()}} when \code{model = "PCM"}.}
+\item{step_facet}{Step facet passed to \code{\link[=fit_mfrm]{fit_mfrm()}} when \code{model = "PCM"} or
+\code{model = "GPCM"}.}
+
+\item{slope_facet}{Slope facet passed to \code{\link[=fit_mfrm]{fit_mfrm()}} when
+\code{model = "GPCM"}. Defaults to the fitted step facet.}
+
+\item{slopes}{Optional bounded-\code{GPCM} slope specification used by direct
+simulation calls when \code{sim_spec = NULL}.}
 
 \item{maxit}{Maximum iterations passed to \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
@@ -84,6 +95,17 @@ produce an explicit unsupported-path error.}
 
 \item{sim_spec}{Optional output from \code{\link[=build_mfrm_sim_spec]{build_mfrm_sim_spec()}} or
 \code{\link[=extract_mfrm_sim_spec]{extract_mfrm_sim_spec()}} used as the base data-generating mechanism.}
+
+\item{include_report}{Logical; if \code{TRUE}, each successful replicate also
+builds \code{mfrm_results()} and \code{\link[=mfrm_report]{mfrm_report()}} and records the \code{report_index}
+readiness/signaling surface. This is intentionally opt-in because it
+repeats the comprehensive result-building workflow.}
+
+\item{report_include}{\code{include} vector passed to \code{\link[=mfrm_results]{mfrm_results()}} when
+\code{include_report = TRUE}.}
+
+\item{report_style}{Report style passed to \code{\link[=mfrm_report]{mfrm_report()}} when
+\code{include_report = TRUE}.}
 
 \item{seed}{Optional seed for reproducible replications.}
 }
@@ -96,12 +118,16 @@ when applicable
 \item \code{scenario_summary}: aggregated scenario-by-design screening summaries
 \item \code{performance_summary}: scenario-by-design screening-performance summary
 including runtime, agreement, Type I proxy, and sensitivity proxy columns
+\item \code{report_signal_summary}: optional scenario-by-design summary of
+\code{mfrm_report()} \code{report_index} availability, readiness, and review-signal
+counts when \code{include_report = TRUE}
 \item \code{scenario_contrast}: each misspecification scenario minus the
 well-specified baseline when the baseline scenario was evaluated
 \item \code{design_descriptor}: role-based design-variable metadata
 \item \code{planning_scope}: explicit record of the current planning contract
 \item \code{planning_constraints}: explicit record of mutable/locked design variables
 \item \code{planning_schema}: combined planner-schema contract
+\item \code{gpcm_boundary}: bounded-\code{GPCM} caveat row when present
 \item \code{settings}: simulation and fitting settings
 \item \code{ademp}: simulation-study metadata
 \item \code{notes}: short interpretation notes
@@ -120,7 +146,9 @@ For each design condition and scenario, the function:
 \item fits the model with \code{method = "MML"}
 \item computes diagnostics with \code{diagnostic_mode = "both"}
 \item stores legacy residual-screen metrics and strict marginal-fit metrics
-\item aggregates the results into \code{scenario_summary} and \code{scenario_contrast}
+\item optionally stores \code{mfrm_report()} \code{report_index} readiness signals
+\item aggregates the results into \code{scenario_summary}, \code{performance_summary},
+\code{report_signal_summary}, and \code{scenario_contrast}
 }
 
 The \code{"well_specified"} scenario uses the ordinary generator with no injected
@@ -131,15 +159,20 @@ facet-level mean effect contract. The \code{"latent_misspecification"} scenario
 keeps the same marginal spread targets but replaces the normal person
 distribution with a centered bimodal empirical support distribution, while
 leaving the non-person facets on the original scale contract. The
-\code{"step_structure_misspecification"} scenario uses a \code{PCM} generator with
-facet-specific threshold tables that intentionally mismatch the fitted step
-contract: \code{RSM} fits receive criterion-specific thresholds, and \code{PCM} fits
-receive thresholds indexed by the opposite non-person facet.
+\code{"step_structure_misspecification"} scenario uses a \code{PCM} or bounded-\code{GPCM}
+generator with facet-specific threshold tables that intentionally mismatch
+the fitted step contract: \code{RSM} fits receive criterion-specific thresholds,
+and \code{PCM} / \code{GPCM} fits receive threshold structures indexed by the opposite
+non-person facet. For bounded \code{GPCM}, the generator and fit each keep
+\code{slope_facet == step_facet}; the misspecification is the generator-versus-fit
+step/slope facet mismatch.
 
 This function is intentionally screening-oriented. The strict marginal branch
 remains exploratory in the current release, so the returned summaries should
 be used to compare relative sensitivity across scenarios rather than to claim
-calibrated inferential power.
+calibrated inferential power. Bounded-\code{GPCM} rows add explicit
+\code{gpcm_boundary} caveats and should be read as slope-aware operating
+characteristics under the evaluated role-based design.
 }
 \examples{
 \donttest{

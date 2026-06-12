@@ -13,7 +13,7 @@ plot_wright_unified(
   show_ci = FALSE,
   ci_level = 0.95,
   draw = TRUE,
-  preset = c("standard", "publication", "compact"),
+  preset = c("standard", "publication", "compact", "monochrome"),
   palette = NULL,
   label_angle = 45,
   ...
@@ -39,7 +39,7 @@ standard errors are available.}
 \item{draw}{If \code{TRUE} (default), draw the plot. If \code{FALSE}, return
 plot data invisibly.}
 
-\item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, \code{"compact"}).}
+\item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, \code{"compact"}, or \code{"monochrome"}).}
 
 \item{palette}{Optional named color overrides passed to the shared Wright-map
 drawer.}
@@ -121,3 +121,6 @@ names(map_data)
 \seealso{
 \code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=plot.mfrm_fit]{plot.mfrm_fit()}}, \link{mfrmr_visual_diagnostics}
 }
+\concept{Wright maps}
+\concept{confidence intervals}
+\concept{visual diagnostics}

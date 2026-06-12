@@ -28,6 +28,8 @@ evaluate_mfrm_signal_detection(
   fit_method = c("JML", "MML"),
   model = c("RSM", "PCM", "GPCM"),
   step_facet = NULL,
+  slope_facet = NULL,
+  slopes = NULL,
   maxit = 25,
   quad_points = 7,
   residual_pca = c("none", "overall", "facet", "both"),
@@ -105,13 +107,20 @@ criterion level in each design.}
 
 \item{fit_method}{Estimation method passed to \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
-\item{model}{Measurement model passed to \code{\link[=fit_mfrm]{fit_mfrm()}}. The current
-signal-detection evaluator supports \code{RSM} and \code{PCM}; bounded \code{GPCM}
-is accepted only to produce an explicit unsupported-path error.}
+\item{model}{Measurement model passed to \code{\link[=fit_mfrm]{fit_mfrm()}}. Bounded \code{GPCM} is
+supported with caveats as slope-aware signal-detection sensitivity
+evidence.}
 
-\item{step_facet}{Step facet passed to \code{\link[=fit_mfrm]{fit_mfrm()}} when \code{model = "PCM"}.
+\item{step_facet}{Step facet passed to \code{\link[=fit_mfrm]{fit_mfrm()}} when \code{model = "PCM"} or
+\code{model = "GPCM"}.
 When left \code{NULL}, the function inherits the generator step facet from
 \code{sim_spec} when available and otherwise defaults to \code{"Criterion"}.}
+
+\item{slope_facet}{Slope facet passed to \code{\link[=fit_mfrm]{fit_mfrm()}} when
+\code{model = "GPCM"}. Defaults to the fitted step facet.}
+
+\item{slopes}{Optional bounded-\code{GPCM} slope specification used by direct
+simulation calls when \code{sim_spec = NULL}.}
 
 \item{maxit}{Maximum iterations passed to \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
@@ -167,8 +176,11 @@ summaries and plots
 mutable under the current simulation specification
 \item \code{planning_schema}: combined planner-schema contract bundling the role
 descriptor, scope boundary, and current mutability map
+\item \code{gpcm_boundary}: bounded-\code{GPCM} caveat row when a \code{GPCM} screening route
+is used
 \item \code{settings}: signal-analysis settings
 \item \code{ademp}: simulation-study metadata (aims, DGM, estimands, methods, performance measures)
+\item \code{notes}: short interpretation notes
 }
 }
 \description{
@@ -192,6 +204,12 @@ effect (\code{bias_effect} logits)
 \item Records whether the injected signals were detected or screen-positive
 }
 
+Bounded-\code{GPCM} runs preserve the current package constraint
+\code{slope_facet == step_facet} within the generator and fitted model. The
+resulting DIF and bias rates are slope-aware screening summaries, not
+formal inferential power, alpha calibration, operational scoring, or
+arbitrary-facet planning evidence.
+
 \strong{Detection criteria}:
 A DIF signal is counted as "detected" when the target contrast has
 \eqn{p <} \code{dif_p_cut} \strong{and}, when an absolute contrast cutoff is in
@@ -205,15 +223,6 @@ screening metrics rather than formal inferential quantities. Here, a bias
 cell is counted as \strong{screen-positive} only when those screening metrics are
 available and satisfy
 
-First-release \code{GPCM} is not yet available in this helper because the helper
-estimates design-grid operating characteristics for injected DIF and
-interaction-bias signals. Direct bounded-\code{GPCM} data generation,
-fitted-model bias screening via \code{\link[=estimate_bias]{estimate_bias()}}, and parameter-recovery
-checks are available elsewhere, but this design-grid detection layer remains
-validated only for \code{RSM} / \code{PCM}. More broadly, the current planning layer is
-role-based for exactly two non-person facets (\code{rater}-like and
-\code{criterion}-like), even though the estimation core supports arbitrary facet
-counts.
 \eqn{p <} \code{bias_p_cut} \strong{and} \eqn{|t| \ge} \code{bias_abs_t}.
 
 \strong{Power} is the proportion of replications in which the target signal

@@ -21,7 +21,7 @@ build_equating_chain(
   x,
   y = NULL,
   type = c("common_anchors", "graph", "chain"),
-  preset = c("standard", "publication", "compact"),
+  preset = c("standard", "publication", "compact", "monochrome"),
   draw = TRUE,
   ...
 )

@@ -19,6 +19,8 @@ An object of class \code{summary.mfrm_design_evaluation} with components:
 \item \code{overview}: run-level overview
 \item \code{design_summary}: aggregated design-by-facet metrics, with design-variable
 alias columns when applicable
+\item \code{sparse_review}: compact planned-missingness and rater-link review counts
+when sparse linked designs are active
 \item \code{ademp}: simulation-study metadata carried forward from the original object
 \item \code{facet_names}: public facet labels carried from the simulation specification
 \item \code{design_variable_aliases}: accepted public aliases for design variables

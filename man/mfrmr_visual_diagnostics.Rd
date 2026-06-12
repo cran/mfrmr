@@ -48,8 +48,8 @@ Use \code{plot(fit, type = "wright")} or \code{\link[=plot_wright_unified]{plot_
 Use \code{plot(fit, type = "pathway")} and \code{plot(fit, type = "ccc")}.
 \item "Is the design linked well enough across subsets or administrations?"
 Use \code{plot(subset_connectivity_report(...), type = "design_matrix")},
-\code{\link[=mfrm_network_analysis]{mfrm_network_analysis()}}, \code{plot(..., type = "network")}, and
-\code{\link[=plot_anchor_drift]{plot_anchor_drift()}}.
+\code{\link[=mfrm_network_analysis]{mfrm_network_analysis()}}, \code{\link[=build_mfrm_network_review]{build_mfrm_network_review()}},
+\code{plot(..., type = "network")}, and \code{\link[=plot_anchor_drift]{plot_anchor_drift()}}.
 \item "Which responses or levels look locally problematic?"
 Use \code{\link[=plot_unexpected]{plot_unexpected()}} and \code{\link[=plot_displacement]{plot_displacement()}}.
 \item "Which facet/category cells drive strict marginal misfit?"
@@ -82,6 +82,10 @@ for the linking-scale review.
 \item "I have many raters and want a compact pairwise agreement / correlation
 overview instead of the bar chart?"
 Use \code{\link[=plot_rater_agreement_heatmap]{plot_rater_agreement_heatmap()}}.
+\item "Do response times suggest rapid responding, slow responding, or timing
+patterns by person, facet, or score category?"
+Use \code{\link[=response_time_review]{response_time_review()}} and \code{\link[=plot_response_time_review]{plot_response_time_review()}} as a
+descriptive QC layer outside the MFRM likelihood.
 \item "Are there pairs of facet levels whose residuals co-move beyond the
 main-effects MFRM? (Q3-style local-dependence screen)"
 Use \code{\link[=plot_local_dependence_heatmap]{plot_local_dependence_heatmap()}}.
@@ -239,6 +243,10 @@ the helper itself does not perform linking.}
 heatmap of exact agreement (default) or Pearson-style correlation. Best
 when the rater count makes the bar-chart form of
 \code{\link[=plot_interrater_agreement]{plot_interrater_agreement()}} too busy.}
+\item{\code{response_time_review()} / \code{plot_response_time_review()}}{Descriptive
+response-time screening by person, facet, and score category. Best for
+reviewing rapid/slow response patterns alongside MFRM diagnostics; it is
+not a joint speed-accuracy model and does not change fitted measures.}
 \item{\code{plot_local_dependence_heatmap()}}{Yen Q3-style heatmap of
 pairwise residual correlations between facet levels. Best for
 exploratory local-dependence screening; pairs with very strong
@@ -340,8 +348,8 @@ inspect \code{"Visual Displays"} rows -> chosen public plot helper.
 \code{plot(fit, type = "ccc")}.
 \item Linking review:
 \code{\link[=subset_connectivity_report]{subset_connectivity_report()}} -> \code{plot(..., type = "design_matrix")} /
-\code{\link[=mfrm_network_analysis]{mfrm_network_analysis()}} / \code{plot(..., type = "network")} ->
-\code{\link[=plot_anchor_drift]{plot_anchor_drift()}}.
+\code{\link[=mfrm_network_analysis]{mfrm_network_analysis()}} / \code{\link[=build_mfrm_network_review]{build_mfrm_network_review()}} /
+\code{plot(..., type = "network")} -> \code{\link[=plot_anchor_drift]{plot_anchor_drift()}}.
 \item Interaction review:
 \code{\link[=estimate_bias]{estimate_bias()}} -> \code{\link[=plot_bias_interaction]{plot_bias_interaction()}} ->
 \code{\link[=reporting_checklist]{reporting_checklist()}}.
@@ -398,6 +406,7 @@ scree$data$preset
 \link{mfrmr_workflow_methods}, \link{mfrmr_reports_and_tables},
 \link{mfrmr_reporting_and_apa}, \link{mfrmr_linking_and_dff},
 \link{gpcm_capability_matrix}, \code{\link[=visual_reporting_template]{visual_reporting_template()}},
+\code{\link[=mfrmr_interval_guide]{mfrmr_interval_guide()}},
 \code{\link[=plot.mfrm_fit]{plot.mfrm_fit()}}, \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}},
 \code{\link[=plot_unexpected]{plot_unexpected()}}, \code{\link[=plot_displacement]{plot_displacement()}}, \code{\link[=plot_marginal_fit]{plot_marginal_fit()}},
 \code{\link[=plot_marginal_pairwise]{plot_marginal_pairwise()}}, \code{\link[=plot_interrater_agreement]{plot_interrater_agreement()}},
@@ -405,5 +414,10 @@ scree$data$preset
 \code{\link[=plot_dif_heatmap]{plot_dif_heatmap()}}, \code{\link[=plot_dif_summary]{plot_dif_summary()}}, \code{\link[=plot_anchor_drift]{plot_anchor_drift()}},
 \code{\link[=plot_guttman_scalogram]{plot_guttman_scalogram()}},
 \code{\link[=plot_residual_qq]{plot_residual_qq()}}, \code{\link[=plot_rater_trajectory]{plot_rater_trajectory()}},
-\code{\link[=plot_rater_agreement_heatmap]{plot_rater_agreement_heatmap()}}
+\code{\link[=plot_rater_agreement_heatmap]{plot_rater_agreement_heatmap()}}, \code{\link[=response_time_review]{response_time_review()}},
+\code{\link[=plot_response_time_review]{plot_response_time_review()}}
 }
+\concept{GPCM boundaries}
+\concept{confidence intervals}
+\concept{reporting workflow}
+\concept{visual diagnostics}

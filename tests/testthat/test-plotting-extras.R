@@ -1,7 +1,6 @@
 # Smoke tests for the plot helpers in R/api-plotting-extras.R
 # (plot_threshold_ladder, plot_person_fit, plot_rater_severity_profile,
-# plot_apa_figure_one, plot_dif_summary). These target the 0%
-# coverage gap that appears on covr::package_coverage() for the new
+# plot_apa_figure_one, plot_dif_summary). These pin the contract of the
 # 0.1.6 visualization surface; the assertions focus on contract
 # (class, slot names, reference-free draw) rather than exact pixel
 # output so they remain stable across graphics-device variants.

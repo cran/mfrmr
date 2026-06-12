@@ -16,7 +16,7 @@ plot_interrater_agreement(
   main = NULL,
   palette = NULL,
   label_angle = 45,
-  preset = c("standard", "publication", "compact"),
+  preset = c("standard", "publication", "compact", "monochrome"),
   draw = TRUE
 )
 }
@@ -43,7 +43,7 @@ plot_interrater_agreement(
 
 \item{label_angle}{X-axis label angle for bar-style plots.}
 
-\item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, or \code{"compact"}).}
+\item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, \code{"compact"}, or \code{"monochrome"}).}
 
 \item{draw}{If \code{TRUE}, draw with base graphics.}
 }

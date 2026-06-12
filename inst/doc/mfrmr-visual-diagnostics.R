@@ -123,3 +123,48 @@ knitr::opts_chunk$set(
 #   preset = "publication"
 # )
 
+## ----response-time-review-----------------------------------------------------
+# toy_rt <- toy
+# toy_rt$ResponseTime <- 12 + (seq_len(nrow(toy_rt)) %% 7) +
+#   as.numeric(toy_rt$Score)
+# toy_rt$ResponseTime[1] <- 2
+# toy_rt$ResponseTime[2] <- 38
+# 
+# rt <- response_time_review(
+#   toy_rt,
+#   person = "Person",
+#   facets = c("Rater", "Criterion"),
+#   score = "Score",
+#   time = "ResponseTime",
+#   rapid_quantile = 0.10,
+#   slow_quantile = 0.90
+# )
+# 
+# summary(rt)
+# plot_response_time_review(rt, type = "distribution", preset = "publication")
+# plot_response_time_review(rt, type = "person", preset = "publication")
+
+## ----shrinkage-funnel---------------------------------------------------------
+# fit_eb <- apply_empirical_bayes_shrinkage(fit)
+# 
+# shrink <- plot_shrinkage_funnel(
+#   fit_eb,
+#   show_ci = TRUE,
+#   ci_level = 0.95,
+#   preset = "publication",
+#   draw = FALSE
+# )
+# 
+# head(shrink$data$table[, c(
+#   "Facet", "Level", "RawEstimate", "RawCI_Lower", "RawCI_Upper",
+#   "ShrunkEstimate", "ShrunkCI_Lower", "ShrunkCI_Upper",
+#   "ShrinkageFactor"
+# )])
+# 
+# plot_shrinkage_funnel(
+#   fit_eb,
+#   show_ci = TRUE,
+#   ci_level = 0.95,
+#   preset = "publication"
+# )
+

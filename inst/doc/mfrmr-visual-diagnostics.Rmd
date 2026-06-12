@@ -259,6 +259,88 @@ use them after the main screens above.
   compact pairwise rater x rater agreement matrix; pass
   `metric = "correlation"` to colour by the Pearson-style `Corr`
   column instead of exact agreement.
+- `response_time_review(data, person, facets, time)` summarizes
+  response-time metadata by person, facet, and score category. Pair it with
+  `plot_response_time_review()` for distribution and grouped timing plots.
+  This is a descriptive QC layer, not a joint speed-accuracy model.
+- `plot_shrinkage_funnel(fit_eb, show_ci = TRUE)` draws raw and
+  empirical-Bayes shrunken facet estimates on the same row, with
+  optional confidence whiskers for both estimates. Use this only after
+  `apply_empirical_bayes_shrinkage()` or `fit_mfrm(..., facet_shrinkage =
+  "empirical_bayes")`.
+
+### Response-time QC context
+
+If your rating-event data include response times, review them separately from
+the MFRM likelihood. Rapid and slow response-time flags are descriptive
+quality-control prompts; they do not change measures and should not be treated
+as proof of disengagement, cheating, or speededness.
+
+```{r response-time-review}
+toy_rt <- toy
+toy_rt$ResponseTime <- 12 + (seq_len(nrow(toy_rt)) %% 7) +
+  as.numeric(toy_rt$Score)
+toy_rt$ResponseTime[1] <- 2
+toy_rt$ResponseTime[2] <- 38
+
+rt <- response_time_review(
+  toy_rt,
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  score = "Score",
+  time = "ResponseTime",
+  rapid_quantile = 0.10,
+  slow_quantile = 0.90
+)
+
+summary(rt)
+plot_response_time_review(rt, type = "distribution", preset = "publication")
+plot_response_time_review(rt, type = "person", preset = "publication")
+```
+
+Interpretation:
+
+- Start with the distribution plot to see whether the rapid/slow thresholds are sensible for this administration.
+- Inspect person and facet summaries for concentrated rapid or slow rates rather than isolated events.
+- Keep timing flags separate from fit, bias, and validity claims unless the study design explicitly supports stronger speed-accuracy modeling.
+
+### Small-N shrinkage with uncertainty
+
+When a non-person facet has few levels or sparse observations, a large raw
+severity estimate can be a noisy estimate rather than a stable facet signal.
+The shrinkage funnel shows how far empirical-Bayes pooling moved each level
+toward the facet mean and whether the uncertainty remains wide after pooling.
+
+```{r shrinkage-funnel}
+fit_eb <- apply_empirical_bayes_shrinkage(fit)
+
+shrink <- plot_shrinkage_funnel(
+  fit_eb,
+  show_ci = TRUE,
+  ci_level = 0.95,
+  preset = "publication",
+  draw = FALSE
+)
+
+head(shrink$data$table[, c(
+  "Facet", "Level", "RawEstimate", "RawCI_Lower", "RawCI_Upper",
+  "ShrunkEstimate", "ShrunkCI_Lower", "ShrunkCI_Upper",
+  "ShrinkageFactor"
+)])
+
+plot_shrinkage_funnel(
+  fit_eb,
+  show_ci = TRUE,
+  ci_level = 0.95,
+  preset = "publication"
+)
+```
+
+Interpretation:
+
+- Long raw-to-shrunken segments identify levels most affected by the partial-pooling prior.
+- Wide raw whiskers that narrow after pooling indicate estimation instability, not automatic rater-quality failure.
+- Report the shrinkage method and keep this display separate from bias, fit, or validity claims.
 
 ## Recommended sequence
 
@@ -269,7 +351,9 @@ For a compact visual workflow:
 3. `plot_unexpected()`, `plot_displacement()`, `plot_marginal_fit()`, and `plot_interrater_agreement()` for local follow-up.
 4. `plot(fit, type = "wright")` and `plot(fit, type = "pathway")` for targeting and scale interpretation.
 5. `plot_residual_pca()`, `plot_bias_interaction()`, and `plot_information()` for deeper structural review.
-6. `plot_guttman_scalogram()`, `plot_residual_qq()`,
+6. `response_time_review()` and `plot_response_time_review()` when response-time metadata are available.
+7. `plot_shrinkage_funnel(show_ci = TRUE)` when empirical-Bayes shrinkage was applied.
+8. `plot_guttman_scalogram()`, `plot_residual_qq()`,
    `plot_rater_trajectory()`, and `plot_rater_agreement_heatmap()` as
    the teaching / drift / agreement-heatmap follow-up layer.
 
@@ -277,3 +361,4 @@ For a compact visual workflow:
 
 - `help("mfrmr_visual_diagnostics", package = "mfrmr")`
 - `help("mfrmr_workflow_methods", package = "mfrmr")`
+- `mfrmr_interval_guide("shrinkage")`

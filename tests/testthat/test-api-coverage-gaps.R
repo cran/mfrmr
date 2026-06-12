@@ -1,6 +1,6 @@
 # --------------------------------------------------------------------------
 # test-api-coverage-gaps.R
-# Targets uncovered lines in R/api.R to increase test coverage.
+# Behavior and error-path regression tests for less-traveled R/api.R branches.
 # --------------------------------------------------------------------------
 
 with_null_device <- function(expr) {

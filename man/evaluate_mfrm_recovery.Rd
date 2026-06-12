@@ -23,11 +23,14 @@ evaluate_mfrm_recovery(
   thresholds = NULL,
   slopes = NULL,
   assignment = NULL,
+  sparse_controls = NULL,
   sim_spec = NULL,
   fit_method = c("JML", "MML"),
   maxit = 25,
   quad_points = 7,
   include_person = TRUE,
+  include_diagnostics = FALSE,
+  diagnostic_fit_df_method = c("both", "engine", "facets"),
   seed = NULL
 )
 }
@@ -88,10 +91,17 @@ omitted, slopes default to 1 for every slope-facet level, giving an exact
 \item{assignment}{Assignment design. \code{"crossed"} means every person sees
 every rater; \code{"rotating"} uses a balanced rotating subset; \code{"resampled"}
 reuses person-level rater-assignment profiles stored in \code{sim_spec};
-\code{"skeleton"} reuses an observed response skeleton stored in \code{sim_spec},
-including optional \code{Group}/\code{Weight} columns when available. When omitted,
-the function chooses \code{"crossed"} if
+\code{"sparse_linked"} uses an incomplete rating design with optional linking
+persons; \code{"skeleton"} reuses an observed response skeleton stored in
+\code{sim_spec}, including optional \code{Group}/\code{Weight} columns when available.
+When omitted, the function chooses \code{"crossed"} if
 \code{raters_per_person == n_rater}, otherwise \code{"rotating"}.}
+
+\item{sparse_controls}{Optional named list used when
+\code{assignment = "sparse_linked"}. Supported entries are \code{link_fraction},
+\code{link_persons}, \code{link_raters_per_person}, \code{assignment_mode}, and
+\code{min_common_persons_per_rater_pair}. See \code{\link[=build_mfrm_sim_spec]{build_mfrm_sim_spec()}} for the
+same contract.}
 
 \item{sim_spec}{Optional output from \code{\link[=build_mfrm_sim_spec]{build_mfrm_sim_spec()}} or
 \code{\link[=extract_mfrm_sim_spec]{extract_mfrm_sim_spec()}}. When supplied, it defines the generator setup;
@@ -112,6 +122,15 @@ refit that population model later.}
 \item{include_person}{Logical. When \code{TRUE}, include person-measure recovery
 rows when the fitted object exposes person estimates.}
 
+\item{include_diagnostics}{Logical. When \code{TRUE}, run \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} after
+each successful refit and retain facet-level fit/separation operating
+characteristics. These diagnostics are reported separately from recovery
+metrics and are not release-success criteria by themselves.}
+
+\item{diagnostic_fit_df_method}{Fit-ZSTD degrees-of-freedom convention used
+for optional diagnostic operating-characteristic summaries. Use \code{"both"}
+when reviewing FACETS-style df sensitivity.}
+
 \item{seed}{Optional random seed.}
 }
 \value{
@@ -119,7 +138,12 @@ An object of class \code{mfrm_recovery_simulation} with components:
 \itemize{
 \item \code{recovery}: row-level truth/estimate comparisons by replication.
 \item \code{recovery_summary}: parameter-type summaries across replications.
-\item \code{rep_overview}: replication-level convergence, timing, and error status.
+\item \code{rep_overview}: replication-level convergence, timing, error status, and
+sparse-design diagnostics when applicable.
+\item \code{diagnostic_oc}: optional replication-by-facet fit/separation operating
+characteristics when \code{include_diagnostics = TRUE}.
+\item \code{diagnostic_oc_summary}: optional facet-level diagnostic operating-
+characteristic summary.
 \item \code{settings}: fitting and simulation settings.
 \item \code{ademp}: simulation-study metadata.
 }
@@ -149,6 +173,12 @@ identification used by the fitter. Slope recovery is therefore summarized on
 the identified log-slope scale without an additional mean-alignment step.
 Direct data generation and refitting are supported, but broader GPCM design-
 planning claims remain outside the current package boundary.
+
+Sparse linked generators are supported through \code{sim_spec} or direct
+\code{assignment = "sparse_linked"} plus \code{sparse_controls}. Their design-density
+and rater-link diagnostics are retained in \code{rep_overview}; recovery metrics
+remain parameter-recovery summaries and should not be read as evidence that
+a sparse linking design is adequate by itself.
 
 The returned \code{ademp} component follows the simulation-study framing of
 Morris, White, and Crowther (2019) and the ADEMP planning/reporting template

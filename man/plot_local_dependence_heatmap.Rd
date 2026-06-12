@@ -9,7 +9,7 @@ plot_local_dependence_heatmap(
   diagnostics = NULL,
   facet = "Rater",
   min_pairs = 5L,
-  preset = c("standard", "publication", "compact"),
+  preset = c("standard", "publication", "compact", "monochrome"),
   draw = TRUE
 )
 }

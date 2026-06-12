@@ -132,6 +132,10 @@
 #' @return A named list with class `mfrm_facet_equivalence`.
 #' @seealso [facets_chisq_table()], [fair_average_table()], [plot_facet_equivalence()]
 #'
+#' @concept confidence intervals
+#' @concept facet equivalence
+#' @concept reporting workflow
+#'
 #' @references
 #' Kass, R. E., & Raftery, A. E. (1995). Bayes factors. *Journal of the
 #' American Statistical Association, 90*(430), 773-795.
@@ -445,6 +449,9 @@ classify_equivalence_bf <- function(bf01) {
 #' @return Invisibly returns the plotting data. If `draw = FALSE`, the plotting
 #'   data are returned without drawing.
 #' @seealso [analyze_facet_equivalence()]
+#' @concept confidence intervals
+#' @concept facet equivalence
+#' @concept visual diagnostics
 #' @examples
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",

@@ -198,3 +198,6 @@ Biopharmaceutics, 15}(6), 657-680.
 \seealso{
 \code{\link[=facets_chisq_table]{facets_chisq_table()}}, \code{\link[=fair_average_table]{fair_average_table()}}, \code{\link[=plot_facet_equivalence]{plot_facet_equivalence()}}
 }
+\concept{confidence intervals}
+\concept{facet equivalence}
+\concept{reporting workflow}

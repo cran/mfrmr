@@ -14,7 +14,7 @@ plot_fair_average(
   show_ci = FALSE,
   ci_level = 0.95,
   draw = TRUE,
-  preset = c("standard", "publication", "compact"),
+  preset = c("standard", "publication", "compact", "monochrome"),
   ...
 )
 }
@@ -55,7 +55,7 @@ default \code{0.95}. The returned plot-data object gains \code{CI_Lower},
 
 \item{draw}{If \code{TRUE}, draw with base graphics.}
 
-\item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, or \code{"compact"}).}
+\item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, \code{"compact"}, or \code{"monochrome"}).}
 
 \item{...}{Additional arguments passed to \code{\link[=fair_average_table]{fair_average_table()}} when \code{x} is \code{mfrm_fit}.}
 }
@@ -142,3 +142,6 @@ if (interactive()) {
 \code{\link[=fair_average_table]{fair_average_table()}}, \code{\link[=plot_unexpected]{plot_unexpected()}}, \code{\link[=plot_displacement]{plot_displacement()}},
 \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}}, \link{mfrmr_visual_diagnostics}
 }
+\concept{confidence intervals}
+\concept{fair averages}
+\concept{visual diagnostics}

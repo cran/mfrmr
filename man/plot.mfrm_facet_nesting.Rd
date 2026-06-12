@@ -4,7 +4,7 @@
 \alias{plot.mfrm_facet_nesting}
 \title{Plot the pairwise nesting index matrix}
 \usage{
-\method{plot}{mfrm_facet_nesting}(x, preset = c("standard", "publication", "compact"), ...)
+\method{plot}{mfrm_facet_nesting}(x, preset = c("standard", "publication", "compact", "monochrome"), ...)
 }
 \arguments{
 \item{x}{An \code{mfrm_facet_nesting} object.}

@@ -6,6 +6,12 @@ test_that("mfrmr_output_guide returns a stable purpose-to-helper map", {
     "Scope",
     "Question",
     "OutputFamily",
+    "Lifecycle",
+    "UserLevel",
+    "APILayer",
+    "ObjectRole",
+    "DecisionBoundary",
+    "RecommendedEntry",
     "MainFunction",
     "UseWhen",
     "TypicalInput",
@@ -14,26 +20,154 @@ test_that("mfrmr_output_guide returns a stable purpose-to-helper map", {
     "Notes"
   ) %in% names(guide)))
   expect_true(nrow(guide) >= 10L)
+  expect_true(any(grepl("mfrm_results", guide$MainFunction, fixed = TRUE)))
+  expect_true(any(guide$RecommendedEntry))
+  expect_true(any(guide$APILayer == "top_level_public_surface"))
+  expect_true(any(guide$APILayer == "specialist_followup"))
+  expect_true(any(guide$ObjectRole == "comprehensive result object"))
+  expect_true(any(grepl("not a new estimator", guide$DecisionBoundary, fixed = TRUE)))
+  expect_true(any(guide$Lifecycle == "advanced"))
+  expect_true(any(guide$Lifecycle == "compatibility"))
   expect_true(any(grepl("precision_review_report", guide$MainFunction, fixed = TRUE)))
   expect_true(any(grepl("build_summary_table_bundle", guide$MainFunction, fixed = TRUE)))
   expect_true(any(grepl("facets_output_file_bundle", guide$MainFunction, fixed = TRUE)))
 })
 
 test_that("mfrmr_output_guide supports focused scopes", {
+  public <- mfrmr_output_guide("public")
+  expect_true(nrow(public) > 0L)
+  expect_true(all(public$Scope == "public"))
+  expect_true(all(public$RecommendedEntry))
+  expect_true(all(public$UserLevel == "beginner"))
+  expect_true(all(public$APILayer == "top_level_public_surface"))
+  expect_true(any(public$ObjectRole == "model estimation and result-object entry"))
+  expect_true(any(public$ObjectRole == "report-readiness surface"))
+  expect_true(any(grepl("does not recompute diagnostics", public$DecisionBoundary, fixed = TRUE)))
+  expect_true(any(grepl("mfrm_report", public$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("export_mfrm_results", public$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("launch_mfrmr_viewer", public$MainFunction, fixed = TRUE)))
+
+  entry <- mfrmr_output_guide("entry")
+  expect_true(nrow(entry) > 0L)
+  expect_true(all(entry$Scope == "entry"))
+  expect_true(any(grepl("mfrm_results", entry$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("fit_mfrm", entry$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("mfrm_results_interactive", entry$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("launch_mfrmr_viewer", entry$MainFunction, fixed = TRUE)))
+  expect_true(all(entry$RecommendedEntry))
+  expect_true(all(entry$UserLevel == "beginner"))
+
+  binary <- mfrmr_output_guide("binary")
+  expect_true(nrow(binary) > 0L)
+  expect_true(all(binary$Scope == "binary"))
+  expect_true(all(binary$RecommendedEntry))
+  expect_true(all(binary$UserLevel == "beginner"))
+  expect_true(any(grepl("fit_mfrm", binary$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("Categories is 2", binary$NextStep, fixed = TRUE)))
+  expect_true(any(grepl("Rasch", binary$Notes, fixed = TRUE)))
+
+  viewer <- mfrmr_output_guide("viewer")
+  expect_true(nrow(viewer) > 0L)
+  expect_true(all(viewer$Scope == "viewer"))
+  expect_true(all(viewer$OutputFamily == "viewer"))
+  expect_true(all(viewer$RecommendedEntry))
+  expect_true(all(viewer$UserLevel == "beginner"))
+  expect_true(any(grepl("launch_mfrmr_viewer", viewer$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("include = \"publication\"", viewer$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("include = \"bias\"", viewer$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("include = \"misfit_review\"", viewer$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("include = \"linking\"", viewer$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("bias_interaction_report", viewer$NextStep, fixed = TRUE)))
+  expect_true(any(grepl("does not estimate", viewer$Notes, fixed = TRUE)))
+
+  simulation <- mfrmr_output_guide("simulation")
+  expect_true(nrow(simulation) > 0L)
+  expect_true(all(simulation$Scope == "simulation"))
+  expect_true(all(simulation$Lifecycle == "advanced"))
+  expect_true(any(grepl("simulate_mfrm_data", simulation$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("evaluate_mfrm_diagnostic_screening", simulation$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("export_summary_appendix", simulation$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("plot_overview_rate", simulation$NextStep, fixed = TRUE)))
+  expect_true(any(grepl("operating-characteristic", simulation$Notes, fixed = TRUE)))
+
+  linking <- mfrmr_output_guide("linking")
+  expect_true(nrow(linking) > 0L)
+  expect_true(all(linking$Scope == "linking"))
+  expect_true(any(grepl("mfrm_results(fit, include = \"linking\")", linking$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("review_mfrm_anchors", linking$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("detect_anchor_drift", linking$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("build_equating_chain", linking$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("one fit", linking$Notes, fixed = TRUE)))
+
+  network <- mfrmr_output_guide("network")
+  expect_true(nrow(network) > 0L)
+  expect_true(all(network$Scope == "network"))
+  expect_true(all(network$Lifecycle == "advanced"))
+  expect_true(any(grepl("build_mfrm_network_review", network$MainFunction, fixed = TRUE)))
+
   reviews <- mfrmr_output_guide("reviews")
   expect_true(nrow(reviews) > 0L)
   expect_true(all(reviews$Scope == "reviews"))
   expect_true(all(reviews$OutputFamily == "review"))
+  expect_true(any(grepl("response_time_review", reviews$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("descriptive QC context",
+                        reviews$DecisionBoundary,
+                        fixed = TRUE)))
+
+  response_time <- mfrmr_output_guide("response_time")
+  expect_true(nrow(response_time) >= 2L)
+  expect_true(any(response_time$Scope == "reviews"))
+  expect_true(any(response_time$Scope == "r"))
+  expect_true(any(grepl("plot_response_time_review",
+                        response_time$MainFunction,
+                        fixed = TRUE)))
+  expect_true(any(grepl("speed-accuracy",
+                        response_time$DecisionBoundary,
+                        fixed = TRUE)))
+  expect_true(any(grepl("summary(res)$next_actions",
+                        response_time$NextStep,
+                        fixed = TRUE)))
+  expect_true(any(grepl("do not alter MFRM estimates",
+                        response_time$Notes,
+                        fixed = TRUE)))
+  expect_true(any(grepl("automatic exclusion rules",
+                        response_time$DecisionBoundary,
+                        fixed = TRUE)))
+
+  reports <- mfrmr_output_guide("reports")
+  expect_true(nrow(reports) > 0L)
+  expect_true(all(reports$Scope == "reports"))
+  expect_true(any(grepl("mfrm_report", reports$MainFunction, fixed = TRUE)))
 
   exports <- mfrmr_output_guide("exports")
   expect_true(nrow(exports) > 0L)
   expect_true(all(exports$Scope == "exports"))
+  expect_true(any(grepl("export_mfrm_results", exports$MainFunction, fixed = TRUE)))
   expect_true(any(grepl("export_summary_appendix", exports$MainFunction, fixed = TRUE)))
 
   gpcm <- mfrmr_output_guide("gpcm")
   expect_true(nrow(gpcm) > 0L)
   expect_false(any(gpcm$GPCMStatus == "supported"))
+  expect_false(any(grepl("fit_bundle_blocked", gpcm$GPCMStatus, fixed = TRUE)))
+  expect_false(any(grepl("rsm_pcm_only_for_strict_screening_currently", gpcm$GPCMStatus, fixed = TRUE)))
+  expect_false(any(grepl("rsm_pcm_linking_route", gpcm$GPCMStatus, fixed = TRUE)))
+  expect_true(any(
+    grepl("evaluate_mfrm_diagnostic_screening", gpcm$MainFunction, fixed = TRUE) &
+      gpcm$GPCMStatus == "supported_with_caveat"
+  ))
+  expect_true(any(
+    grepl("detect_anchor_drift", gpcm$MainFunction, fixed = TRUE) &
+      grepl("supported_with_caveat", gpcm$GPCMStatus, fixed = TRUE)
+  ))
   expect_true(any(grepl("GPCM", gpcm$NextStep, ignore.case = TRUE)))
+  expect_true(any(gpcm$Scope == "gpcm" &
+                    grepl("gpcm_capability_matrix", gpcm$MainFunction, fixed = TRUE)))
+  expect_true(any(gpcm$Scope == "gpcm" &
+                    grepl("gpcm_runtime_guard_coverage", gpcm$MainFunction, fixed = TRUE)))
+  expect_true(any(gpcm$ObjectRole == "out-of-scope route-status table"))
+  expect_true(any(grepl("does not broaden any route beyond its current capability row",
+                        gpcm$DecisionBoundary,
+                        fixed = TRUE)))
 })
 
 test_that("facets_feature_coverage separates implemented and unsupported FACETS surfaces", {
@@ -145,13 +279,19 @@ test_that("mfrmr_output_guide gives FACETS, ConQuest, and R user pathways", {
   expect_true(all(r_path$Scope == "r"))
   expect_true(any(grepl("plot_data", r_path$MainFunction, fixed = TRUE)))
   expect_true(any(grepl("plot_data_components", r_path$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("mfrmr_interval_guide", r_path$MainFunction, fixed = TRUE)))
   expect_true(any(grepl("plot_long", r_path$MainFunction, fixed = TRUE)))
   expect_true(any(grepl("type = \"pathway\"", r_path$MainFunction, fixed = TRUE)))
   expect_true(any(grepl("plot_bias_interaction", r_path$MainFunction, fixed = TRUE)))
   expect_true(any(grepl("plot_information", r_path$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("plot_response_time_review", r_path$MainFunction, fixed = TRUE)))
   expect_true(any(grepl("plot_data_components", r_path$NextStep, fixed = TRUE)))
+  expect_true(any(grepl("mfrmr_interval_guide", r_path$NextStep, fixed = TRUE)))
   expect_true(any(grepl("pathway_long", r_path$NextStep, fixed = TRUE)))
   expect_true(any(grepl("annotations/settings", r_path$NextStep, fixed = TRUE)))
+  expect_true(any(grepl("table, thresholds, overview, and notes",
+                        r_path$NextStep,
+                        fixed = TRUE)))
   expect_true(any(grepl("ggplot2", r_path$UseWhen, fixed = TRUE)))
 })
 

@@ -66,7 +66,7 @@ plot_local_dependence_heatmap <- function(fit,
                                           diagnostics = NULL,
                                           facet = "Rater",
                                           min_pairs = 5L,
-                                          preset = c("standard", "publication", "compact"),
+                                          preset = c("standard", "publication", "compact", "monochrome"),
                                           draw = TRUE) {
   if (!inherits(fit, "mfrm_fit")) {
     stop("`fit` must be an mfrm_fit object from fit_mfrm().", call. = FALSE)
@@ -231,7 +231,7 @@ plot_local_dependence_heatmap <- function(fit,
 plot_reliability_snapshot <- function(fit,
                                       diagnostics = NULL,
                                       metric = c("reliability", "separation", "strata"),
-                                      preset = c("standard", "publication", "compact"),
+                                      preset = c("standard", "publication", "compact", "monochrome"),
                                       draw = TRUE) {
   if (!inherits(fit, "mfrm_fit")) {
     stop("`fit` must be an mfrm_fit object from fit_mfrm().", call. = FALSE)
@@ -365,7 +365,7 @@ plot_residual_matrix <- function(fit,
                                  diagnostics = NULL,
                                  facet = "Rater",
                                  top_n_persons = 40L,
-                                 preset = c("standard", "publication", "compact"),
+                                 preset = c("standard", "publication", "compact", "monochrome"),
                                  draw = TRUE) {
   if (!inherits(fit, "mfrm_fit")) {
     stop("`fit` must be an mfrm_fit object from fit_mfrm().", call. = FALSE)
@@ -478,11 +478,16 @@ plot_residual_matrix <- function(fit,
 #'   shrinkage columns present).
 #' @param top_n Maximum number of rows to draw (default 30).
 #' @param preset Visual preset.
+#' @param show_ci Logical. When `TRUE`, draw approximate confidence-interval
+#'   whiskers for raw and shrunken estimates when `SE` / `ShrunkSE` evidence is
+#'   available.
+#' @param ci_level Confidence level used when `show_ci = TRUE`; default 0.95.
 #' @param draw If `TRUE`, draw with base graphics.
 #'
 #' @return An `mfrm_plot_data` whose `data` slot bundles the long
-#'   `Level`, `RawEstimate`, `ShrunkEstimate`, `ShrinkageFactor`
-#'   table.
+#'   `Level`, `RawEstimate`, `ShrunkEstimate`, `ShrinkageFactor` table.
+#'   When `show_ci = TRUE`, the table also includes `RawCI_Lower`,
+#'   `RawCI_Upper`, `ShrunkCI_Lower`, `ShrunkCI_Upper`, and `CI_Level`.
 #' @seealso [apply_empirical_bayes_shrinkage()],
 #'   [mfrmr_visual_diagnostics]
 #' @examples
@@ -501,10 +506,15 @@ plot_residual_matrix <- function(fit,
 plot_shrinkage_funnel <- function(fit,
                                   facet = NULL,
                                   top_n = 30L,
-                                  preset = c("standard", "publication", "compact"),
+                                  preset = c("standard", "publication", "compact", "monochrome"),
+                                  show_ci = FALSE,
+                                  ci_level = 0.95,
                                   draw = TRUE) {
   if (!inherits(fit, "mfrm_fit")) {
     stop("`fit` must be an mfrm_fit object from fit_mfrm().", call. = FALSE)
+  }
+  if (isTRUE(show_ci)) {
+    ci_level <- .validate_shrinkage_ci_level(ci_level)
   }
   others <- as.data.frame(fit$facets$others %||% data.frame(),
                            stringsAsFactors = FALSE)
@@ -527,6 +537,23 @@ plot_shrinkage_funnel <- function(fit,
   others$Estimate <- suppressWarnings(as.numeric(others$Estimate))
   others$ShrunkEstimate <- suppressWarnings(as.numeric(others$ShrunkEstimate))
   others$ShrinkageFactor <- suppressWarnings(as.numeric(others$ShrinkageFactor))
+  se_col <- if ("ModelSE" %in% names(others)) {
+    "ModelSE"
+  } else if ("SE" %in% names(others)) {
+    "SE"
+  } else {
+    NA_character_
+  }
+  others$SE <- if (!is.na(se_col)) {
+    suppressWarnings(as.numeric(others[[se_col]]))
+  } else {
+    rep(NA_real_, nrow(others))
+  }
+  others$ShrunkSE <- if ("ShrunkSE" %in% names(others)) {
+    suppressWarnings(as.numeric(others$ShrunkSE))
+  } else {
+    rep(NA_real_, nrow(others))
+  }
   others <- others[is.finite(others$Estimate) &
                      is.finite(others$ShrunkEstimate), , drop = FALSE]
   if (nrow(others) == 0L) {
@@ -544,13 +571,27 @@ plot_shrinkage_funnel <- function(fit,
     Facet = as.character(others$Facet),
     Level = as.character(others$Level),
     RawEstimate = others$Estimate,
+    SE = others$SE,
     ShrunkEstimate = others$ShrunkEstimate,
+    ShrunkSE = others$ShrunkSE,
     ShrinkageFactor = others$ShrinkageFactor,
     Movement = others$ShrunkEstimate - others$Estimate,
     stringsAsFactors = FALSE
   )
   payload <- payload[order(payload$RawEstimate), , drop = FALSE]
   payload$RowOrder <- seq_len(nrow(payload))
+  if (isTRUE(show_ci)) {
+    payload <- .add_shrinkage_ci_columns(
+      payload,
+      ci_level = ci_level,
+      raw_estimate_col = "RawEstimate",
+      raw_se_col = "SE",
+      raw_prefix = "Raw",
+      shrunk_estimate_col = "ShrunkEstimate",
+      shrunk_se_col = "ShrunkSE",
+      shrunk_prefix = "Shrunk"
+    )
+  }
 
   style <- resolve_plot_preset(preset)
   if (isTRUE(draw)) {
@@ -558,8 +599,15 @@ plot_shrinkage_funnel <- function(fit,
     old_par <- graphics::par(no.readonly = TRUE)
     on.exit(graphics::par(old_par), add = TRUE)
     graphics::par(mar = c(5, 6, 3, 2))
-    xr <- range(c(payload$RawEstimate, payload$ShrunkEstimate),
-                 na.rm = TRUE)
+    x_values <- c(payload$RawEstimate, payload$ShrunkEstimate)
+    if (isTRUE(show_ci)) {
+      x_values <- c(x_values, payload$RawCI_Lower, payload$RawCI_Upper,
+                    payload$ShrunkCI_Lower, payload$ShrunkCI_Upper)
+    }
+    xr <- range(x_values[is.finite(x_values)], na.rm = TRUE)
+    if (!all(is.finite(xr))) xr <- c(-1, 1)
+    if (diff(xr) == 0) xr <- xr + c(-0.5, 0.5)
+    xr <- xr + c(-0.06, 0.06) * diff(xr)
     graphics::plot(NA, xlim = xr, ylim = c(0.5, nrow(payload) + 0.5),
                     yaxt = "n",
                     xlab = "Estimate (logits)", ylab = facet,
@@ -571,25 +619,65 @@ plot_shrinkage_funnel <- function(fit,
     graphics::segments(payload$RawEstimate, payload$RowOrder,
                         payload$ShrunkEstimate, payload$RowOrder,
                         col = style$neutral, lwd = 1.2)
+    if (isTRUE(show_ci)) {
+      graphics::segments(payload$RawCI_Lower, payload$RowOrder - 0.12,
+                         payload$RawCI_Upper, payload$RowOrder - 0.12,
+                         col = style$accent_primary, lwd = 1)
+      graphics::segments(payload$ShrunkCI_Lower, payload$RowOrder + 0.12,
+                         payload$ShrunkCI_Upper, payload$RowOrder + 0.12,
+                         col = style$accent_tertiary, lwd = 1)
+    }
     graphics::points(payload$RawEstimate, payload$RowOrder,
                       pch = 1, col = style$accent_primary, cex = 1.0)
     graphics::points(payload$ShrunkEstimate, payload$RowOrder,
-                      pch = 19, col = style$accent_primary, cex = 1.0)
+                      pch = 19, col = style$accent_tertiary, cex = 1.0)
+    legend_labels <- c("Raw", "Shrunken")
+    legend_pch <- c(1, 19)
+    legend_lty <- c(NA, NA)
+    legend_col <- c(style$accent_primary, style$accent_tertiary)
+    if (isTRUE(show_ci)) {
+      legend_labels <- c(legend_labels,
+                         sprintf("%g%% CI whisker", round(100 * ci_level)))
+      legend_pch <- c(legend_pch, NA)
+      legend_lty <- c(legend_lty, 1)
+      legend_col <- c(legend_col, style$accent_primary)
+    }
     graphics::legend("topright",
-                      legend = c("Raw", "Shrunken"),
-                      pch = c(1, 19), col = style$accent_primary,
+                      legend = legend_labels,
+                      pch = legend_pch, lty = legend_lty, col = legend_col,
                       bty = "n", cex = 0.85, inset = 0.02)
   }
 
+  legend_label <- c("Raw estimate", "Shrunken estimate",
+                    "Shrinkage movement", "Sum-to-zero reference")
+  legend_role <- c("location", "location", "movement", "reference")
+  legend_aesthetic <- c("point", "point", "line", "line")
+  legend_value <- c(style$accent_primary, style$accent_tertiary,
+                    style$neutral, style$grid)
+  if (isTRUE(show_ci)) {
+    legend_label <- c(legend_label, sprintf("%g%% CI whisker",
+                                            round(100 * ci_level)))
+    legend_role <- c(legend_role, "interval")
+    legend_aesthetic <- c(legend_aesthetic, "line")
+    legend_value <- c(legend_value, style$accent_primary)
+  }
   invisible(new_mfrm_plot_data(
     "shrinkage_funnel",
     list(
       table = payload,
       facet = facet,
+      show_ci = isTRUE(show_ci),
+      ci_level = if (isTRUE(show_ci)) ci_level else NA_real_,
       title = sprintf("Empirical-Bayes shrinkage funnel: %s", facet),
       subtitle = sprintf("%d level(s); rows ordered by raw estimate",
                           nrow(payload)),
       preset = style$name,
+      legend = new_plot_legend(
+        label = legend_label,
+        role = legend_role,
+        aesthetic = legend_aesthetic,
+        value = legend_value
+      ),
       reference_lines = new_reference_lines(
         "v", 0, "Sum-to-zero reference", "dashed", "reference"
       )

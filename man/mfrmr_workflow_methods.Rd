@@ -36,9 +36,9 @@ inspect \code{review$group_view_index} for stable wave / link / facet rollups an
 \code{\link[=plot_anchor_drift]{plot_anchor_drift()}} or \code{plot(anchor_review, ...)} for the specific flagged
 evidence family.
 
-For bounded \code{GPCM}, keep anchor/drift helpers as direct exploratory support
-only. \code{\link[=build_linking_review]{build_linking_review()}} remains outside the current formal \code{GPCM}
-route.
+For bounded \code{GPCM}, use \code{\link[=build_linking_review]{build_linking_review()}} as a caveated exploratory
+synthesis over direct anchor, drift, and chain evidence. It is not an
+operational \code{GPCM} linking decision or evidence that anchor drift is absent.
 }
 
 \section{Canonical misfit case-review route}{
@@ -117,9 +117,10 @@ when you need the supported slope-aware element-conditional fair averages.
 Treat those residual-based
 summaries as exploratory screens because the discrimination
 parameter is free.
-FACETS-style score exports and fit-based reporting bundles remain blocked
-for bounded \code{GPCM}; direct fair-average and bias-screening tables carry
-their own caveats.
+Full FACETS-style score-side contract review remains blocked for bounded
+\code{GPCM}; package-native scorefile export, fit-based reporting bundles,
+direct fair-average tables, and bias-screening tables carry their own
+caveats.
 Posterior scoring with \code{\link[=predict_mfrm_units]{predict_mfrm_units()}} /
 \code{\link[=sample_mfrm_plausible_values]{sample_mfrm_plausible_values()}}, design-weighted information via
 \code{\link[=compute_information]{compute_information()}} / \code{\link[=plot_information]{plot_information()}}, Wright/pathway/CCC plots
@@ -129,9 +130,12 @@ data generation through \code{\link[=build_mfrm_sim_spec]{build_mfrm_sim_spec()}
 and \code{\link[=simulate_mfrm_data]{simulate_mfrm_data()}} are also available when the simulation
 specification stores both thresholds and slopes. Use
 \code{\link[=evaluate_mfrm_recovery]{evaluate_mfrm_recovery()}} and \code{\link[=assess_mfrm_recovery]{assess_mfrm_recovery()}} for direct
-recovery checks. Planning/forecasting helpers, APA writer/QC pipelines,
-and fit-based export bundles remain outside the validated \code{GPCM}
-boundary. Use \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}} as the formal capability map
+recovery checks plus caveated role-based design evaluation, population
+forecasting, diagnostic-screening, and signal-detection helpers.
+Caveated APA/QC/export bundles are available for sensitivity reporting,
+while score-side FACETS helpers remain outside the validated \code{GPCM}
+boundary. Use
+\code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}} as the formal capability map
 before branching into less common helpers.
 \item (Optional, \code{RSM} / \code{PCM}; bounded \code{GPCM} with caveat) Estimate
 interaction bias with \code{\link[=estimate_bias]{estimate_bias()}}.
@@ -139,16 +143,17 @@ interaction bias with \code{\link[=estimate_bias]{estimate_bias()}}.
 \code{\link[=reporting_checklist]{reporting_checklist()}} for direct report preparation, or
 \code{\link[=build_weighting_review]{build_weighting_review()}} for Rasch-versus-bounded-\code{GPCM}
 weighting review, or \code{\link[=build_misfit_casebook]{build_misfit_casebook()}} / \code{\link[=build_linking_review]{build_linking_review()}}
-for operational case review. Keep \code{\link[=build_linking_review]{build_linking_review()}} on the
-\code{RSM} / \code{PCM} route; bounded \code{GPCM} linking synthesis is deferred.
+for operational case review. For bounded \code{GPCM}, use
+\code{\link[=build_linking_review]{build_linking_review()}} only as an exploratory index over direct
+anchor/drift/chain evidence.
 \item Generate reporting bundles:
 \code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}}, \code{\link[=apa_table]{apa_table()}},
 \code{\link[=export_summary_appendix]{export_summary_appendix()}}, \code{\link[=build_fixed_reports]{build_fixed_reports()}},
-\code{\link[=build_visual_summaries]{build_visual_summaries()}}. For bounded \code{GPCM}, use
-\code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}} and \code{\link[=export_summary_appendix]{export_summary_appendix()}} only for
-supported direct outputs; the APA writer, visual-summary bundle, and
-fit-based export bundle remain out of scope. Weighting-review and
-misfit-casebook surfaces can use the same summary-table export handoff.
+\code{\link[=build_visual_summaries]{build_visual_summaries()}}. For bounded \code{GPCM}, use the APA, visual,
+QC, and fit-based export bundles as caveated sensitivity-reporting
+surfaces; full score-side FACETS review stays blocked, while
+diagnostic/signal-detection design screening has its own caveated
+operating-characteristic route.
 \item (Optional, \code{RSM} / \code{PCM}) Review report completeness with
 \code{\link[=reference_case_review]{reference_case_review()}}. Use \code{facets_output_contract_review()} only when you
 explicitly need the compatibility layer.
@@ -165,9 +170,10 @@ simulation/prediction layer:
 \code{\link[=evaluate_mfrm_design]{evaluate_mfrm_design()}} / \code{\link[=predict_mfrm_population]{predict_mfrm_population()}} ->
 \code{\link[=predict_mfrm_units]{predict_mfrm_units()}} / \code{\link[=sample_mfrm_plausible_values]{sample_mfrm_plausible_values()}}. Current
 fit-derived simulation specs include direct \code{GPCM} data generation and
-recovery checks, but design-evaluation / forecasting helpers remain on
-the \code{RSM} / \code{PCM} route and target the role-based person x rater-like x
-criterion-like contract.
+recovery checks. Design-evaluation, population-forecasting, diagnostic-
+screening, and signal-detection helpers also support bounded \code{GPCM} as
+caveated role-based simulation/refit evidence; inspect \code{gpcm_boundary}
+before using those results in design claims.
 Unit scoring can use an ordinary \code{MML} fit directly, a latent-regression
 \code{MML} fit when you also supply one-row-per-person background data for the
 scored units, or a \code{JML} fit when a post hoc reference-prior EAP layer is
@@ -195,10 +201,10 @@ bounded \code{GPCM}: \code{\link[=fit_mfrm]{fit_mfrm()}} -> \code{\link[=diagnos
 \code{\link[=compute_information]{compute_information()}} -> \code{\link[=plot_information]{plot_information()}} ->
 \code{\link[=plot.mfrm_fit]{plot.mfrm_fit()}} / \code{\link[=category_curves_report]{category_curves_report()}} ->
 \code{\link[=fair_average_table]{fair_average_table()}} / \code{\link[=estimate_bias]{estimate_bias()}} when those screening tables
-answer the question. Keep bounded \code{GPCM} routes on the direct table/plot
-side; the fit-based export family
+answer the question. For bounded \code{GPCM}, the fit-based export family
 (\code{\link[=build_mfrm_manifest]{build_mfrm_manifest()}}, \code{\link[=build_mfrm_replay_script]{build_mfrm_replay_script()}},
-\code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}}) remains outside the formal \code{GPCM} boundary.
+\code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}}) is available as caveated sensitivity-reporting
+output with explicit \code{gpcm_boundary} rows.
 \item Linking and coverage review:
 \code{\link[=subset_connectivity_report]{subset_connectivity_report()}} -> \code{plot(..., type = "design_matrix")} ->
 \code{\link[=plot_wright_unified]{plot_wright_unified()}}.
@@ -210,8 +216,8 @@ side; the fit-based export family
 \code{\link[=export_summary_appendix]{export_summary_appendix()}}.
 First-release \code{GPCM}:
 \code{\link[=reporting_checklist]{reporting_checklist()}} -> direct table/plot helpers ->
-\code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}} -> \code{\link[=export_summary_appendix]{export_summary_appendix()}} while the
-APA writer and fit-based export bundle remain outside scope.
+\code{\link[=build_apa_outputs]{build_apa_outputs()}} / \code{\link[=build_visual_summaries]{build_visual_summaries()}} ->
+\code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}} with \code{gpcm_boundary} caveats.
 \item Weighting-policy review:
 \code{\link[=compare_mfrm]{compare_mfrm()}} -> \code{\link[=build_weighting_review]{build_weighting_review()}} ->
 \code{\link[=compute_information]{compute_information()}} / \code{\link[=plot_information]{plot_information()}} when you want to inspect
@@ -232,12 +238,13 @@ requires actual prediction objects. First-release \code{GPCM} now supports
 direct data generation via
 \code{\link[=build_mfrm_sim_spec]{build_mfrm_sim_spec()}}, \code{\link[=extract_mfrm_sim_spec]{extract_mfrm_sim_spec()}}, and
 \code{\link[=simulate_mfrm_data]{simulate_mfrm_data()}}, \code{\link[=evaluate_mfrm_recovery]{evaluate_mfrm_recovery()}},
-\code{\link[=assess_mfrm_recovery]{assess_mfrm_recovery()}}, residual diagnostics, and direct curve/report
-helpers, but still stops before planning/forecasting helpers. The current
-planning layer remains role-based for two non-person facets even though
-estimation itself supports arbitrary facet counts; future arbitrary-facet
-planning fields should be treated as design metadata rather than finished
-public behavior.
+\code{\link[=assess_mfrm_recovery]{assess_mfrm_recovery()}}, caveated role-based design evaluation and
+population forecasting, diagnostic/signal-detection design screening,
+residual diagnostics, and direct curve/report helpers. The current
+planning layer remains role-based for two
+non-person facets even though estimation itself supports arbitrary facet
+counts; future arbitrary-facet planning fields should be treated as
+design metadata rather than finished public behavior.
 }
 }
 

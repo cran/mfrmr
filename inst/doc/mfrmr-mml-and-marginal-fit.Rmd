@@ -224,9 +224,12 @@ observed-information Hessian is available. Bias SE / `t` / `Prob.` columns are
 conditional plug-in screening quantities, and bounded-GPCM rows also carry
 profile-likelihood follow-up columns. Summary-table appendix export is
 available for supported direct outputs. The APA writer, fit-based
-report/export bundles, FACETS-style
-score-side exports, QC pass/fail pipelines, linking synthesis, and planning /
-forecasting helpers remain out of scope for `GPCM` in this release. See
+report/export bundles, package-native scorefile export, QC pass/fail
+pipelines, linking synthesis, role-based design forecasting, and
+diagnostic/signal-detection design screening are available only as caveated
+bounded-`GPCM` surfaces with explicit boundary output. Full FACETS-style
+score-side contract review, posterior predictive checks, and heavy backends
+remain out of scope for `GPCM` in this release. See
 `gpcm_capability_matrix()` for the full per-helper support contract.
 
 ## Why GPCM Is The Current Upper Scope
@@ -237,9 +240,10 @@ forecasting helpers remain out of scope for `GPCM` in this release. See
    generalize to the bounded `GPCM` branch without changing the main package
    architecture.
 2. The package has direct checks for that bounded route.
-3. The helpers that still depend on Rasch-family score semantics or on the
-   role-based planning layer are already blocked explicitly, so formal support
-   does not require pretending that every downstream helper has full coverage.
+3. The helpers that still depend on Rasch-family score semantics are blocked
+   explicitly, and role-based planning helpers carry explicit caveats, so
+   formal support does not require pretending that every downstream helper has
+   full coverage.
 
 This is a narrower but more defensible claim than saying the whole package is
 uniformly generalized to free-discrimination many-facet work.
@@ -261,14 +265,15 @@ equal-weighting reference models and bounded `GPCM` as a supported alternative
 for users who explicitly want to inspect or allow discrimination-based
 reweighting.
 
-This is also why score-side FACETS output-contract routes (for example,
-score-side `facets_output_file_bundle()`), manuscript-grade APA text, and
-fit-based report/export bundles remain out of scope for bounded `GPCM` in this
-release: their published forms are Rasch-family score transformations, and the
-slope-aware analogue that would replace them in a free-discrimination context
-requires careful delta-method standard-error handling. `fair_average_table()`
-and `estimate_bias()` themselves are now available under bounded `GPCM` via the
-slope-aware element-conditional kernel. For fair averages,
+This is also why full FACETS output-contract score-side review remains out of
+scope for bounded `GPCM` in this release: its published form is a Rasch-family
+score transformation, and the slope-aware analogue that would replace it in a
+free-discrimination context requires careful score-side uncertainty handling.
+Package-native scorefile export, manuscript-draft APA text, and fit-based
+report/export bundles are available only as caveated sensitivity-reporting
+surfaces, not as FACETS-equivalent or operational score transformations.
+`fair_average_table()` and `estimate_bias()` themselves are now available under
+bounded `GPCM` via the slope-aware element-conditional kernel. For fair averages,
 `fair_average_table(fair_se = TRUE)` adds structural delta-method SEs for
 non-person rows when the MML Hessian is available; the historical `SE` columns
 remain measure-level SEs.

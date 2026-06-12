@@ -79,6 +79,21 @@ test_that("plot_shrinkage_funnel works on an EB-augmented fit", {
   expect_true(is.data.frame(p$data$table))
   expect_true(all(c("RawEstimate", "ShrunkEstimate", "ShrinkageFactor")
                   %in% names(p$data$table)))
+
+  p_ci <- plot_shrinkage_funnel(fit_eb, show_ci = TRUE, ci_level = 0.90,
+                                 draw = FALSE)
+  expect_s3_class(p_ci, "mfrm_plot_data")
+  expect_true(isTRUE(p_ci$data$show_ci))
+  expect_equal(p_ci$data$ci_level, 0.90)
+  expect_true(all(c("SE", "ShrunkSE", "RawCI_Lower", "RawCI_Upper",
+                    "ShrunkCI_Lower", "ShrunkCI_Upper", "CI_Level")
+                  %in% names(p_ci$data$table)))
+  expect_true(all(p_ci$data$table$CI_Level == 0.90))
+  expect_error(
+    plot_shrinkage_funnel(fit_eb, show_ci = TRUE, ci_level = 1,
+                          draw = FALSE),
+    "ci_level"
+  )
 })
 
 test_that("plot_shrinkage_funnel rejects fits without EB columns", {

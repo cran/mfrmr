@@ -175,7 +175,7 @@
 #' @param ci_level Confidence level used by `type = "forest"` for the
 #'   anchor-estimate whiskers (default `0.95`). Ignored for other
 #'   plot types.
-#' @param preset Visual preset (`"standard"`, `"publication"`, or `"compact"`).
+#' @param preset Visual preset (`"standard"`, `"publication"`, `"compact"`, or `"monochrome"`).
 #' @param draw If `FALSE`, return the plot data invisibly without drawing.
 #' @param ... Additional graphical parameters passed to base plotting
 #'   functions.
@@ -244,6 +244,9 @@
 #'
 #' @seealso [detect_anchor_drift()], [build_equating_chain()],
 #'   [plot_dif_heatmap()], [plot_bubble()], [mfrmr_visual_diagnostics]
+#' @concept confidence intervals
+#' @concept visual diagnostics
+#' @concept linking
 #' @export
 #' @examples
 #' \donttest{
@@ -269,7 +272,7 @@
 plot_anchor_drift <- function(x, type = c("drift", "chain", "heatmap", "forest"),
                               facet = NULL,
                               ci_level = 0.95,
-                              preset = c("standard", "publication", "compact"),
+                              preset = c("standard", "publication", "compact", "monochrome"),
                               draw = TRUE, ...) {
   type <- match.arg(type)
   style <- resolve_plot_preset(preset)

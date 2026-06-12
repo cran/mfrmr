@@ -29,6 +29,7 @@ design-variable alias columns when applicable
 \item \code{future_branch_active_summary}: compact deterministic summary of the
 schema-only future arbitrary-facet planning branch embedded in the current
 planning schema
+\item \code{gpcm_boundary}: bounded-\code{GPCM} caveat row when present
 \item \code{notes}: short interpretation notes, including the bias-side screening caveat
 }
 }

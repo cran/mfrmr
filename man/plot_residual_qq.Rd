@@ -7,7 +7,7 @@
 plot_residual_qq(
   fit,
   diagnostics = NULL,
-  preset = c("standard", "publication", "compact"),
+  preset = c("standard", "publication", "compact", "monochrome"),
   draw = TRUE
 )
 }

@@ -4,7 +4,7 @@
 #
 # Each function in this file follows the established mfrmr plot conventions:
 #  * accepts an mfrm_fit (or related class) plus ergonomic options;
-#  * resolves a `preset = c("standard", "publication", "compact")` style via
+#  * resolves a `preset = c("standard", "publication", "compact", "monochrome")` style via
 #    `resolve_plot_preset()` and `apply_plot_preset()`;
 #  * returns an `mfrm_plot_data` object with a stable data contract so
 #    downstream pipelines can re-render or export the underlying tables.
@@ -23,8 +23,8 @@
 #' @param highlight_disorder Logical. When `TRUE` (default), draw
 #'   disordered segments with the preset's `fail` colour and add a
 #'   subtitle counting the disordered groups.
-#' @param preset Visual preset (`"standard"`, `"publication"`, or
-#'   `"compact"`).
+#' @param preset Visual preset (`"standard"`, `"publication"`, `"compact"`,
+#'   or `"monochrome"`).
 #' @param draw If `TRUE`, draw with base graphics.
 #'
 #' @return An `mfrm_plot_data` object with a `data` slot containing
@@ -50,7 +50,7 @@
 #' @export
 plot_threshold_ladder <- function(fit,
                                   highlight_disorder = TRUE,
-                                  preset = c("standard", "publication", "compact"),
+                                  preset = c("standard", "publication", "compact", "monochrome"),
                                   draw = TRUE) {
   if (!inherits(fit, "mfrm_fit")) {
     stop("`fit` must be an mfrm_fit object from fit_mfrm().", call. = FALSE)
@@ -525,6 +525,10 @@ plot_person_fit <- function(fit,
 #' @seealso [diagnose_mfrm()], [analyze_facet_equivalence()],
 #'   [plot_facet_equivalence()].
 #'
+#' @concept confidence intervals
+#' @concept visual diagnostics
+#' @concept rater severity
+#'
 #' @examples
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
@@ -537,7 +541,7 @@ plot_rater_severity_profile <- function(fit,
                                         facet = "Rater",
                                         ci_level = 0.95,
                                         show_bands = TRUE,
-                                        preset = c("standard", "publication", "compact"),
+                                        preset = c("standard", "publication", "compact", "monochrome"),
                                         draw = TRUE) {
   if (!inherits(fit, "mfrm_fit")) {
     stop("`fit` must be an mfrm_fit object from fit_mfrm().", call. = FALSE)
@@ -682,6 +686,10 @@ plot_rater_severity_profile <- function(fit,
 #'
 #' @seealso [analyze_dff()], [analyze_dif()], [plot_dif_heatmap()].
 #'
+#' @concept confidence intervals
+#' @concept visual diagnostics
+#' @concept DFF DIF
+#'
 #' @examples
 #' toy <- load_mfrmr_data("example_bias")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
@@ -696,7 +704,7 @@ plot_rater_severity_profile <- function(fit,
 plot_dif_summary <- function(x,
                              top_n = 30L,
                              sort_by = c("abs_effect", "effect", "classification"),
-                             preset = c("standard", "publication", "compact"),
+                             preset = c("standard", "publication", "compact", "monochrome"),
                              draw = TRUE,
                              ci_level = NULL,
                              effect_thresholds = NULL,
@@ -869,6 +877,7 @@ plot_dif_summary <- function(x,
         classification_system = classification_system,
         effect_thresholds = effect_thresholds
       ),
+      gpcm_boundary = x$gpcm_boundary %||% data.frame(),
       settings = list(
         ci_level = ci_level,
         effect_thresholds = effect_thresholds,
@@ -914,6 +923,10 @@ plot_dif_summary <- function(x,
 #'   [plot_rater_severity_profile()], [plot_threshold_ladder()],
 #'   [build_apa_outputs()].
 #'
+#' @concept confidence intervals
+#' @concept reporting workflow
+#' @concept visual diagnostics
+#'
 #' @examples
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
@@ -925,7 +938,7 @@ plot_apa_figure_one <- function(fit,
                                 diagnostics = NULL,
                                 rater_facet = "Rater",
                                 ci_level = 0.95,
-                                preset = c("standard", "publication", "compact"),
+                                preset = c("standard", "publication", "compact", "monochrome"),
                                 draw = TRUE) {
   if (!inherits(fit, "mfrm_fit")) {
     stop("`fit` must be an mfrm_fit object from fit_mfrm().", call. = FALSE)

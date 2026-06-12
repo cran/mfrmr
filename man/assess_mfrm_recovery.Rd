@@ -84,7 +84,19 @@ An object of class \code{mfrm_recovery_assessment} with:
 \itemize{
 \item \code{overview}: compact run-level status.
 \item \code{checklist}: reviewer-facing adequacy checks.
+\item \code{condition_review}: generator-condition metadata, including bounded
+\code{GPCM} slope-regime interpretation and generated score-category support
+when available.
+\item \code{condition_reporting_notes}: reporter-facing generator-condition caveats
+separated from recovery metrics and release-gate decisions.
+\item \code{diagnostic_reporting_notes}: reporter-facing fit/separation caveats
+retained as diagnostic context rather than recovery gates.
+\item \code{diagnostic_review}: optional fit/separation operating-characteristic
+context when retained by \code{\link[=evaluate_mfrm_recovery]{evaluate_mfrm_recovery()}}.
 \item \code{metric_review}: parameter-group metric checks.
+\item \code{uncertainty_review}: compact coverage / SE availability interpretation.
+\item \code{reading_order}: recommended first-read order for the summary, condition,
+plot, and row-level recovery outputs.
 \item \code{next_actions}: short action list sorted by severity.
 \item \code{thresholds}: thresholds used for the assessment.
 }
@@ -95,7 +107,8 @@ reviewer-facing adequacy checklist. The goal is not to impose one universal
 pass/fail rule; it is to make the main user questions explicit: Did the runs
 finish? Did the fitted models converge? Are uncertainty summaries available?
 Are coverage and Monte Carlo precision plausible? If practical RMSE or bias
-limits are supplied, which parameter groups need follow-up?
+limits are supplied, which parameter groups need follow-up? For bounded
+\code{GPCM}, which slope-regime generator condition frames the recovery evidence?
 }
 \details{
 RMSE and bias adequacy depends on the substantive scale and the use case, so
@@ -104,15 +117,35 @@ the function does not mark them as failed unless the user supplies
 marked \code{not_assessed} and the next action asks the user to set practical
 thresholds when a decision depends on the metric.
 
+The \code{condition_review} table is generator metadata for interpreting the
+recovery run. For bounded \code{GPCM}, \code{GPCMSlopeRegime}, \code{StressLevel}, and
+generated score-category support describe the data-generating condition;
+they are not model-fit tests and they are not literature-derived adequacy
+cut points. \code{condition_reporting_notes} turns those generator conditions
+into reporter-facing caveats, such as high-dispersion slope stress or sparse
+generated score support.
+
+The optional \code{diagnostic_review} table is available when
+\code{\link[=evaluate_mfrm_recovery]{evaluate_mfrm_recovery()}} was called with \code{include_diagnostics = TRUE}.
+It summarizes fit and separation operating characteristics as diagnostic
+context only. Its availability fields do not mean that fit or separation
+values are adequate, and those rows do not enter the recovery adequacy
+status. \code{diagnostic_reporting_notes} should be read first when drafting
+fit/separation language because it separates zero separation/reliability,
+absolute fit-ZSTD flags, and df-sensitive ZSTD flags from recovery gates.
+
 \code{plot.mfrm_recovery_assessment()} is a user-facing review aid. Use
 \code{type = "status"} first to see where checklist attention is needed, then
 \code{type = "metrics"} to inspect the parameter groups behind RMSE, bias,
 coverage, standard-error availability, or Monte Carlo precision statuses.
-The intended reading order is \code{summary(recovery_review)}, then the status
-plot, then the metric plot, then the row-level recovery table for the
-parameter groups that need follow-up. When \code{draw = FALSE}, the plot data
-include \code{reading_order}, \code{guidance}, and user-facing handoff tables such as
-\code{section_status} for status plots and \code{metric_review} for metric plots.
+The intended reading order is \code{summary(recovery_review)}, then
+\code{condition_reporting_notes} and \code{condition_review}, then
+\code{diagnostic_reporting_notes} and \code{diagnostic_review}, then the status plot,
+then the metric plot, then the row-level recovery table for the parameter
+groups that need follow-up. When \code{draw = FALSE}, the plot data also include
+\code{reading_order}, \code{guidance}, condition/diagnostic handoff tables, and
+user-facing plot tables such as \code{section_status} for status plots and
+\code{metric_review} for metric plots.
 }
 \examples{
 \donttest{
@@ -125,6 +158,47 @@ rec <- evaluate_mfrm_recovery(
   seed = 123
 )
 assess_mfrm_recovery(rec, min_reps = 1, max_rmse = 1)
+
+# Read the bounded-GPCM generator condition separately from recovery adequacy.
+gpcm_spec <- build_mfrm_sim_spec(
+  n_person = 14,
+  n_rater = 2,
+  n_criterion = 2,
+  raters_per_person = 2,
+  model = "GPCM",
+  step_facet = "Criterion",
+  slope_facet = "Criterion",
+  slopes = c(0.85, 1.15),
+  assignment = "crossed"
+)
+gpcm_rec <- suppressWarnings(evaluate_mfrm_recovery(
+  sim_spec = gpcm_spec,
+  reps = 1,
+  fit_method = "MML",
+  quad_points = 5,
+  maxit = 12,
+  include_diagnostics = TRUE,
+  include_person = FALSE,
+  seed = 456
+))
+gpcm_review <- assess_mfrm_recovery(
+  gpcm_rec,
+  min_reps = 1,
+  max_rmse = c(slope = 2),
+  max_abs_bias = c(slope = 1),
+  min_se_available = NULL,
+  max_mcse_rmse_ratio = NULL
+)
+gpcm_review$condition_reporting_notes[, c(
+  "ConditionArea", "ReportingAttention", "ConditionFinding"
+)]
+gpcm_review$condition_review[, c(
+  "Model", "GPCMSlopeRegime", "StressLevel", "ScoreSupportStatus"
+)]
+gpcm_review$diagnostic_reporting_notes[, c(
+  "Facet", "ReportingAttention", "DiagnosticFinding"
+)]
+summary(gpcm_review)$reading_order
 }
 }
 \seealso{

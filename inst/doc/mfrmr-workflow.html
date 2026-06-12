@@ -643,84 +643,106 @@ observed persons under a fixed <code>MML</code> calibration.</li>
 <span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a>    <span class="at">sim_spec =</span> sim_spec,</span>
 <span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a>    <span class="at">reps =</span> <span class="dv">2</span>,</span>
 <span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a>    <span class="at">maxit =</span> <span class="dv">30</span>,</span>
-<span id="cb12-14"><a href="#cb12-14" tabindex="-1"></a>    <span class="at">seed =</span> <span class="dv">2</span></span>
-<span id="cb12-15"><a href="#cb12-15" tabindex="-1"></a>  )</span>
-<span id="cb12-16"><a href="#cb12-16" tabindex="-1"></a>)</span>
-<span id="cb12-17"><a href="#cb12-17" tabindex="-1"></a></span>
-<span id="cb12-18"><a href="#cb12-18" tabindex="-1"></a><span class="fu">summary</span>(recovery)<span class="sc">$</span>recovery_summary[, <span class="fu">c</span>(<span class="st">&quot;ParameterType&quot;</span>, <span class="st">&quot;Facet&quot;</span>, <span class="st">&quot;RMSE&quot;</span>, <span class="st">&quot;Bias&quot;</span>)]</span>
-<span id="cb12-19"><a href="#cb12-19" tabindex="-1"></a><span class="fu">plot</span>(recovery, <span class="at">type =</span> <span class="st">&quot;summary&quot;</span>, <span class="at">metric =</span> <span class="st">&quot;rmse&quot;</span>, <span class="at">draw =</span> <span class="cn">FALSE</span>)<span class="sc">$</span>data<span class="sc">$</span>plot_table</span>
-<span id="cb12-20"><a href="#cb12-20" tabindex="-1"></a></span>
-<span id="cb12-21"><a href="#cb12-21" tabindex="-1"></a>recovery_review <span class="ot">&lt;-</span> <span class="fu">assess_mfrm_recovery</span>(</span>
-<span id="cb12-22"><a href="#cb12-22" tabindex="-1"></a>  recovery,</span>
-<span id="cb12-23"><a href="#cb12-23" tabindex="-1"></a>  <span class="at">min_reps =</span> <span class="dv">2</span>,</span>
-<span id="cb12-24"><a href="#cb12-24" tabindex="-1"></a>  <span class="at">min_se_available =</span> <span class="cn">NULL</span>,</span>
-<span id="cb12-25"><a href="#cb12-25" tabindex="-1"></a>  <span class="at">max_mcse_rmse_ratio =</span> <span class="cn">NULL</span>,</span>
-<span id="cb12-26"><a href="#cb12-26" tabindex="-1"></a>  <span class="at">max_rmse =</span> <span class="fu">c</span>(<span class="at">facet =</span> <span class="dv">1</span>, <span class="at">step =</span> <span class="dv">1</span>, <span class="at">default =</span> <span class="fl">1.5</span>),</span>
-<span id="cb12-27"><a href="#cb12-27" tabindex="-1"></a>  <span class="at">max_abs_bias =</span> <span class="fu">c</span>(<span class="at">default =</span> <span class="fl">0.75</span>)</span>
-<span id="cb12-28"><a href="#cb12-28" tabindex="-1"></a>)</span>
-<span id="cb12-29"><a href="#cb12-29" tabindex="-1"></a></span>
-<span id="cb12-30"><a href="#cb12-30" tabindex="-1"></a><span class="fu">summary</span>(recovery_review)<span class="sc">$</span>checklist[, <span class="fu">c</span>(<span class="st">&quot;Section&quot;</span>, <span class="st">&quot;Item&quot;</span>, <span class="st">&quot;Status&quot;</span>)]</span>
-<span id="cb12-31"><a href="#cb12-31" tabindex="-1"></a>status_plot <span class="ot">&lt;-</span> <span class="fu">plot</span>(recovery_review, <span class="at">type =</span> <span class="st">&quot;status&quot;</span>, <span class="at">draw =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb12-32"><a href="#cb12-32" tabindex="-1"></a>status_plot<span class="sc">$</span>data<span class="sc">$</span>section_status</span>
-<span id="cb12-33"><a href="#cb12-33" tabindex="-1"></a>status_plot<span class="sc">$</span>data<span class="sc">$</span>reading_order</span>
-<span id="cb12-34"><a href="#cb12-34" tabindex="-1"></a></span>
-<span id="cb12-35"><a href="#cb12-35" tabindex="-1"></a>metric_plot <span class="ot">&lt;-</span> <span class="fu">plot</span>(recovery_review, <span class="at">type =</span> <span class="st">&quot;metrics&quot;</span>, <span class="at">metric =</span> <span class="st">&quot;rmse&quot;</span>, <span class="at">draw =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb12-36"><a href="#cb12-36" tabindex="-1"></a>metric_plot<span class="sc">$</span>data<span class="sc">$</span>plot_table</span>
-<span id="cb12-37"><a href="#cb12-37" tabindex="-1"></a>metric_plot<span class="sc">$</span>data<span class="sc">$</span>guidance</span>
+<span id="cb12-14"><a href="#cb12-14" tabindex="-1"></a>    <span class="at">include_diagnostics =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb12-15"><a href="#cb12-15" tabindex="-1"></a>    <span class="at">diagnostic_fit_df_method =</span> <span class="st">&quot;both&quot;</span>,</span>
+<span id="cb12-16"><a href="#cb12-16" tabindex="-1"></a>    <span class="at">seed =</span> <span class="dv">2</span></span>
+<span id="cb12-17"><a href="#cb12-17" tabindex="-1"></a>  )</span>
+<span id="cb12-18"><a href="#cb12-18" tabindex="-1"></a>)</span>
+<span id="cb12-19"><a href="#cb12-19" tabindex="-1"></a></span>
+<span id="cb12-20"><a href="#cb12-20" tabindex="-1"></a><span class="fu">summary</span>(recovery)<span class="sc">$</span>recovery_summary[, <span class="fu">c</span>(<span class="st">&quot;ParameterType&quot;</span>, <span class="st">&quot;Facet&quot;</span>, <span class="st">&quot;RMSE&quot;</span>, <span class="st">&quot;Bias&quot;</span>)]</span>
+<span id="cb12-21"><a href="#cb12-21" tabindex="-1"></a><span class="fu">plot</span>(recovery, <span class="at">type =</span> <span class="st">&quot;summary&quot;</span>, <span class="at">metric =</span> <span class="st">&quot;rmse&quot;</span>, <span class="at">draw =</span> <span class="cn">FALSE</span>)<span class="sc">$</span>data<span class="sc">$</span>plot_table</span>
+<span id="cb12-22"><a href="#cb12-22" tabindex="-1"></a></span>
+<span id="cb12-23"><a href="#cb12-23" tabindex="-1"></a>recovery_review <span class="ot">&lt;-</span> <span class="fu">assess_mfrm_recovery</span>(</span>
+<span id="cb12-24"><a href="#cb12-24" tabindex="-1"></a>  recovery,</span>
+<span id="cb12-25"><a href="#cb12-25" tabindex="-1"></a>  <span class="at">min_reps =</span> <span class="dv">2</span>,</span>
+<span id="cb12-26"><a href="#cb12-26" tabindex="-1"></a>  <span class="at">min_se_available =</span> <span class="cn">NULL</span>,</span>
+<span id="cb12-27"><a href="#cb12-27" tabindex="-1"></a>  <span class="at">max_mcse_rmse_ratio =</span> <span class="cn">NULL</span>,</span>
+<span id="cb12-28"><a href="#cb12-28" tabindex="-1"></a>  <span class="at">max_rmse =</span> <span class="fu">c</span>(<span class="at">facet =</span> <span class="dv">1</span>, <span class="at">step =</span> <span class="dv">1</span>, <span class="at">default =</span> <span class="fl">1.5</span>),</span>
+<span id="cb12-29"><a href="#cb12-29" tabindex="-1"></a>  <span class="at">max_abs_bias =</span> <span class="fu">c</span>(<span class="at">default =</span> <span class="fl">0.75</span>)</span>
+<span id="cb12-30"><a href="#cb12-30" tabindex="-1"></a>)</span>
+<span id="cb12-31"><a href="#cb12-31" tabindex="-1"></a></span>
+<span id="cb12-32"><a href="#cb12-32" tabindex="-1"></a><span class="fu">summary</span>(recovery_review)<span class="sc">$</span>checklist[, <span class="fu">c</span>(<span class="st">&quot;Section&quot;</span>, <span class="st">&quot;Item&quot;</span>, <span class="st">&quot;Status&quot;</span>)]</span>
+<span id="cb12-33"><a href="#cb12-33" tabindex="-1"></a><span class="fu">summary</span>(recovery_review)<span class="sc">$</span>reading_order</span>
+<span id="cb12-34"><a href="#cb12-34" tabindex="-1"></a><span class="fu">summary</span>(recovery_review)<span class="sc">$</span>condition_reporting_notes</span>
+<span id="cb12-35"><a href="#cb12-35" tabindex="-1"></a><span class="fu">summary</span>(recovery_review)<span class="sc">$</span>condition_review</span>
+<span id="cb12-36"><a href="#cb12-36" tabindex="-1"></a><span class="fu">summary</span>(recovery_review)<span class="sc">$</span>diagnostic_reporting_notes</span>
+<span id="cb12-37"><a href="#cb12-37" tabindex="-1"></a><span class="fu">summary</span>(recovery_review)<span class="sc">$</span>diagnostic_review</span>
 <span id="cb12-38"><a href="#cb12-38" tabindex="-1"></a></span>
-<span id="cb12-39"><a href="#cb12-39" tabindex="-1"></a>recovery_bundle <span class="ot">&lt;-</span> <span class="fu">build_summary_table_bundle</span>(</span>
-<span id="cb12-40"><a href="#cb12-40" tabindex="-1"></a>  recovery_review,</span>
-<span id="cb12-41"><a href="#cb12-41" tabindex="-1"></a>  <span class="at">appendix_preset =</span> <span class="st">&quot;recommended&quot;</span></span>
-<span id="cb12-42"><a href="#cb12-42" tabindex="-1"></a>)</span>
-<span id="cb12-43"><a href="#cb12-43" tabindex="-1"></a>recovery_bundle<span class="sc">$</span>table_index[, <span class="fu">c</span>(<span class="st">&quot;Table&quot;</span>, <span class="st">&quot;Rows&quot;</span>, <span class="st">&quot;Role&quot;</span>)]</span>
-<span id="cb12-44"><a href="#cb12-44" tabindex="-1"></a></span>
-<span id="cb12-45"><a href="#cb12-45" tabindex="-1"></a><span class="co"># For a release-scale check, use the optional validation protocol:</span></span>
-<span id="cb12-46"><a href="#cb12-46" tabindex="-1"></a><span class="co"># source(system.file(&quot;validation&quot;, &quot;recovery-validation.R&quot;, package = &quot;mfrmr&quot;))</span></span>
-<span id="cb12-47"><a href="#cb12-47" tabindex="-1"></a><span class="co"># validation &lt;- mfrmr_run_recovery_validation(tier = &quot;core&quot;, output_dir = &quot;recovery-validation&quot;)</span></span>
-<span id="cb12-48"><a href="#cb12-48" tabindex="-1"></a><span class="co"># summary(validation)</span></span>
-<span id="cb12-49"><a href="#cb12-49" tabindex="-1"></a><span class="co"># validation_summary &lt;- mfrmr_summarize_recovery_validation(validation)</span></span>
-<span id="cb12-50"><a href="#cb12-50" tabindex="-1"></a><span class="co"># validation_summary$topline_release_decision</span></span>
-<span id="cb12-51"><a href="#cb12-51" tabindex="-1"></a><span class="co"># validation_summary$release_decision_table</span></span>
-<span id="cb12-52"><a href="#cb12-52" tabindex="-1"></a><span class="co"># validation_summary$domain_decision_table</span></span>
-<span id="cb12-53"><a href="#cb12-53" tabindex="-1"></a><span class="co"># The top-line table is the release-recovery conclusion. It uses recovery</span></span>
-<span id="cb12-54"><a href="#cb12-54" tabindex="-1"></a><span class="co"># metrics, convergence, and Monte Carlo precision as the primary evidence.</span></span>
-<span id="cb12-55"><a href="#cb12-55" tabindex="-1"></a><span class="co"># The domain table keeps uncertainty status separate, so OverallStatus =</span></span>
-<span id="cb12-56"><a href="#cb12-56" tabindex="-1"></a><span class="co"># &quot;review&quot; is not read as a recovery-metric failure by itself.</span></span>
-<span id="cb12-57"><a href="#cb12-57" tabindex="-1"></a></span>
-<span id="cb12-58"><a href="#cb12-58" tabindex="-1"></a>pred_pop <span class="ot">&lt;-</span> <span class="fu">predict_mfrm_population</span>(</span>
-<span id="cb12-59"><a href="#cb12-59" tabindex="-1"></a>  <span class="at">sim_spec =</span> sim_spec,</span>
-<span id="cb12-60"><a href="#cb12-60" tabindex="-1"></a>  <span class="at">reps =</span> <span class="dv">2</span>,</span>
-<span id="cb12-61"><a href="#cb12-61" tabindex="-1"></a>  <span class="at">maxit =</span> <span class="dv">30</span>,</span>
-<span id="cb12-62"><a href="#cb12-62" tabindex="-1"></a>  <span class="at">seed =</span> <span class="dv">1</span></span>
-<span id="cb12-63"><a href="#cb12-63" tabindex="-1"></a>)</span>
-<span id="cb12-64"><a href="#cb12-64" tabindex="-1"></a></span>
-<span id="cb12-65"><a href="#cb12-65" tabindex="-1"></a><span class="fu">summary</span>(pred_pop)<span class="sc">$</span>forecast[, <span class="fu">c</span>(<span class="st">&quot;Facet&quot;</span>, <span class="st">&quot;MeanSeparation&quot;</span>, <span class="st">&quot;McseSeparation&quot;</span>)]</span>
-<span id="cb12-66"><a href="#cb12-66" tabindex="-1"></a></span>
-<span id="cb12-67"><a href="#cb12-67" tabindex="-1"></a>keep_people <span class="ot">&lt;-</span> <span class="fu">unique</span>(toy<span class="sc">$</span>Person)[<span class="dv">1</span><span class="sc">:</span><span class="dv">18</span>]</span>
-<span id="cb12-68"><a href="#cb12-68" tabindex="-1"></a>toy_mml <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(</span>
-<span id="cb12-69"><a href="#cb12-69" tabindex="-1"></a>  <span class="fu">fit_mfrm</span>(</span>
-<span id="cb12-70"><a href="#cb12-70" tabindex="-1"></a>    toy[toy<span class="sc">$</span>Person <span class="sc">%in%</span> keep_people, , <span class="at">drop =</span> <span class="cn">FALSE</span>],</span>
-<span id="cb12-71"><a href="#cb12-71" tabindex="-1"></a>    <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
-<span id="cb12-72"><a href="#cb12-72" tabindex="-1"></a>    <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
-<span id="cb12-73"><a href="#cb12-73" tabindex="-1"></a>    <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb12-74"><a href="#cb12-74" tabindex="-1"></a>    <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
-<span id="cb12-75"><a href="#cb12-75" tabindex="-1"></a>    <span class="at">quad_points =</span> <span class="dv">5</span>,</span>
-<span id="cb12-76"><a href="#cb12-76" tabindex="-1"></a>    <span class="at">maxit =</span> <span class="dv">30</span></span>
-<span id="cb12-77"><a href="#cb12-77" tabindex="-1"></a>  )</span>
-<span id="cb12-78"><a href="#cb12-78" tabindex="-1"></a>)</span>
+<span id="cb12-39"><a href="#cb12-39" tabindex="-1"></a>status_plot <span class="ot">&lt;-</span> <span class="fu">plot</span>(recovery_review, <span class="at">type =</span> <span class="st">&quot;status&quot;</span>, <span class="at">draw =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb12-40"><a href="#cb12-40" tabindex="-1"></a>status_plot<span class="sc">$</span>data<span class="sc">$</span>section_status</span>
+<span id="cb12-41"><a href="#cb12-41" tabindex="-1"></a>status_plot<span class="sc">$</span>data<span class="sc">$</span>reading_order</span>
+<span id="cb12-42"><a href="#cb12-42" tabindex="-1"></a></span>
+<span id="cb12-43"><a href="#cb12-43" tabindex="-1"></a>metric_plot <span class="ot">&lt;-</span> <span class="fu">plot</span>(recovery_review, <span class="at">type =</span> <span class="st">&quot;metrics&quot;</span>, <span class="at">metric =</span> <span class="st">&quot;rmse&quot;</span>, <span class="at">draw =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb12-44"><a href="#cb12-44" tabindex="-1"></a>metric_plot<span class="sc">$</span>data<span class="sc">$</span>plot_table</span>
+<span id="cb12-45"><a href="#cb12-45" tabindex="-1"></a>metric_plot<span class="sc">$</span>data<span class="sc">$</span>guidance</span>
+<span id="cb12-46"><a href="#cb12-46" tabindex="-1"></a></span>
+<span id="cb12-47"><a href="#cb12-47" tabindex="-1"></a>recovery_bundle <span class="ot">&lt;-</span> <span class="fu">build_summary_table_bundle</span>(</span>
+<span id="cb12-48"><a href="#cb12-48" tabindex="-1"></a>  recovery_review,</span>
+<span id="cb12-49"><a href="#cb12-49" tabindex="-1"></a>  <span class="at">appendix_preset =</span> <span class="st">&quot;recommended&quot;</span></span>
+<span id="cb12-50"><a href="#cb12-50" tabindex="-1"></a>)</span>
+<span id="cb12-51"><a href="#cb12-51" tabindex="-1"></a>recovery_bundle<span class="sc">$</span>table_index[, <span class="fu">c</span>(<span class="st">&quot;Table&quot;</span>, <span class="st">&quot;Rows&quot;</span>, <span class="st">&quot;Role&quot;</span>)]</span>
+<span id="cb12-52"><a href="#cb12-52" tabindex="-1"></a></span>
+<span id="cb12-53"><a href="#cb12-53" tabindex="-1"></a><span class="co"># For a release-scale check, use the optional validation protocol:</span></span>
+<span id="cb12-54"><a href="#cb12-54" tabindex="-1"></a><span class="co"># source(system.file(&quot;validation&quot;, &quot;recovery-validation.R&quot;, package = &quot;mfrmr&quot;))</span></span>
+<span id="cb12-55"><a href="#cb12-55" tabindex="-1"></a><span class="co"># validation &lt;- mfrmr_run_recovery_validation(tier = &quot;core&quot;, output_dir = &quot;recovery-validation&quot;)</span></span>
+<span id="cb12-56"><a href="#cb12-56" tabindex="-1"></a><span class="co"># summary(validation)</span></span>
+<span id="cb12-57"><a href="#cb12-57" tabindex="-1"></a><span class="co"># validation_summary &lt;- summary(validation)</span></span>
+<span id="cb12-58"><a href="#cb12-58" tabindex="-1"></a><span class="co"># validation_summary$reading_order</span></span>
+<span id="cb12-59"><a href="#cb12-59" tabindex="-1"></a><span class="co"># validation_summary$topline_release_decision</span></span>
+<span id="cb12-60"><a href="#cb12-60" tabindex="-1"></a><span class="co"># validation_summary$release_decision_table</span></span>
+<span id="cb12-61"><a href="#cb12-61" tabindex="-1"></a><span class="co"># validation_summary$condition_reporting_notes</span></span>
+<span id="cb12-62"><a href="#cb12-62" tabindex="-1"></a><span class="co"># validation_summary$condition_summary</span></span>
+<span id="cb12-63"><a href="#cb12-63" tabindex="-1"></a><span class="co"># validation_summary$diagnostic_reporting_notes</span></span>
+<span id="cb12-64"><a href="#cb12-64" tabindex="-1"></a><span class="co"># validation_summary$domain_decision_table</span></span>
+<span id="cb12-65"><a href="#cb12-65" tabindex="-1"></a><span class="co"># validation_bundle &lt;- build_summary_table_bundle(validation_summary)</span></span>
+<span id="cb12-66"><a href="#cb12-66" tabindex="-1"></a><span class="co"># validation_bundle$tables$reading_order</span></span>
+<span id="cb12-67"><a href="#cb12-67" tabindex="-1"></a><span class="co"># validation_bundle$tables$topline_release_decision</span></span>
+<span id="cb12-68"><a href="#cb12-68" tabindex="-1"></a><span class="co"># validation_bundle$tables$condition_reporting_notes</span></span>
+<span id="cb12-69"><a href="#cb12-69" tabindex="-1"></a><span class="co"># validation_bundle$tables$condition_summary</span></span>
+<span id="cb12-70"><a href="#cb12-70" tabindex="-1"></a><span class="co"># validation_bundle$tables$diagnostic_reporting_notes</span></span>
+<span id="cb12-71"><a href="#cb12-71" tabindex="-1"></a><span class="co"># The top-line table is the release-recovery conclusion. It uses recovery</span></span>
+<span id="cb12-72"><a href="#cb12-72" tabindex="-1"></a><span class="co"># metrics, convergence, and Monte Carlo precision from core cases as the</span></span>
+<span id="cb12-73"><a href="#cb12-73" tabindex="-1"></a><span class="co"># primary evidence, while ExtendedSensitivityStatus reports non-core stress</span></span>
+<span id="cb12-74"><a href="#cb12-74" tabindex="-1"></a><span class="co"># cases separately. The condition notes and condition table keep generator</span></span>
+<span id="cb12-75"><a href="#cb12-75" tabindex="-1"></a><span class="co"># stress and score support separate from recovery metrics, so OverallStatus = &quot;review&quot; is not</span></span>
+<span id="cb12-76"><a href="#cb12-76" tabindex="-1"></a><span class="co"># read as a recovery-metric failure by itself. The diagnostic reporting notes</span></span>
+<span id="cb12-77"><a href="#cb12-77" tabindex="-1"></a><span class="co"># turn fit/separation operating characteristics into report caveats rather</span></span>
+<span id="cb12-78"><a href="#cb12-78" tabindex="-1"></a><span class="co"># than release gates.</span></span>
 <span id="cb12-79"><a href="#cb12-79" tabindex="-1"></a></span>
-<span id="cb12-80"><a href="#cb12-80" tabindex="-1"></a>new_units <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
-<span id="cb12-81"><a href="#cb12-81" tabindex="-1"></a>  <span class="at">Person =</span> <span class="fu">c</span>(<span class="st">&quot;NEW01&quot;</span>, <span class="st">&quot;NEW01&quot;</span>),</span>
-<span id="cb12-82"><a href="#cb12-82" tabindex="-1"></a>  <span class="at">Rater =</span> <span class="fu">unique</span>(toy<span class="sc">$</span>Rater)[<span class="dv">1</span>],</span>
-<span id="cb12-83"><a href="#cb12-83" tabindex="-1"></a>  <span class="at">Criterion =</span> <span class="fu">unique</span>(toy<span class="sc">$</span>Criterion)[<span class="dv">1</span><span class="sc">:</span><span class="dv">2</span>],</span>
-<span id="cb12-84"><a href="#cb12-84" tabindex="-1"></a>  <span class="at">Score =</span> <span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">3</span>)</span>
+<span id="cb12-80"><a href="#cb12-80" tabindex="-1"></a>pred_pop <span class="ot">&lt;-</span> <span class="fu">predict_mfrm_population</span>(</span>
+<span id="cb12-81"><a href="#cb12-81" tabindex="-1"></a>  <span class="at">sim_spec =</span> sim_spec,</span>
+<span id="cb12-82"><a href="#cb12-82" tabindex="-1"></a>  <span class="at">reps =</span> <span class="dv">2</span>,</span>
+<span id="cb12-83"><a href="#cb12-83" tabindex="-1"></a>  <span class="at">maxit =</span> <span class="dv">30</span>,</span>
+<span id="cb12-84"><a href="#cb12-84" tabindex="-1"></a>  <span class="at">seed =</span> <span class="dv">1</span></span>
 <span id="cb12-85"><a href="#cb12-85" tabindex="-1"></a>)</span>
 <span id="cb12-86"><a href="#cb12-86" tabindex="-1"></a></span>
-<span id="cb12-87"><a href="#cb12-87" tabindex="-1"></a>pred_units <span class="ot">&lt;-</span> <span class="fu">predict_mfrm_units</span>(toy_mml, new_units, <span class="at">n_draws =</span> <span class="dv">0</span>)</span>
-<span id="cb12-88"><a href="#cb12-88" tabindex="-1"></a>pv_units <span class="ot">&lt;-</span> <span class="fu">sample_mfrm_plausible_values</span>(toy_mml, new_units, <span class="at">n_draws =</span> <span class="dv">2</span>, <span class="at">seed =</span> <span class="dv">1</span>)</span>
-<span id="cb12-89"><a href="#cb12-89" tabindex="-1"></a></span>
-<span id="cb12-90"><a href="#cb12-90" tabindex="-1"></a><span class="fu">summary</span>(pred_units)<span class="sc">$</span>estimates[, <span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Estimate&quot;</span>, <span class="st">&quot;Lower&quot;</span>, <span class="st">&quot;Upper&quot;</span>)]</span>
-<span id="cb12-91"><a href="#cb12-91" tabindex="-1"></a><span class="fu">summary</span>(pv_units)<span class="sc">$</span>draw_summary[, <span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Draws&quot;</span>, <span class="st">&quot;MeanValue&quot;</span>)]</span></code></pre></div>
+<span id="cb12-87"><a href="#cb12-87" tabindex="-1"></a><span class="fu">summary</span>(pred_pop)<span class="sc">$</span>forecast[, <span class="fu">c</span>(<span class="st">&quot;Facet&quot;</span>, <span class="st">&quot;MeanSeparation&quot;</span>, <span class="st">&quot;McseSeparation&quot;</span>)]</span>
+<span id="cb12-88"><a href="#cb12-88" tabindex="-1"></a></span>
+<span id="cb12-89"><a href="#cb12-89" tabindex="-1"></a>keep_people <span class="ot">&lt;-</span> <span class="fu">unique</span>(toy<span class="sc">$</span>Person)[<span class="dv">1</span><span class="sc">:</span><span class="dv">18</span>]</span>
+<span id="cb12-90"><a href="#cb12-90" tabindex="-1"></a>toy_mml <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(</span>
+<span id="cb12-91"><a href="#cb12-91" tabindex="-1"></a>  <span class="fu">fit_mfrm</span>(</span>
+<span id="cb12-92"><a href="#cb12-92" tabindex="-1"></a>    toy[toy<span class="sc">$</span>Person <span class="sc">%in%</span> keep_people, , <span class="at">drop =</span> <span class="cn">FALSE</span>],</span>
+<span id="cb12-93"><a href="#cb12-93" tabindex="-1"></a>    <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb12-94"><a href="#cb12-94" tabindex="-1"></a>    <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb12-95"><a href="#cb12-95" tabindex="-1"></a>    <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb12-96"><a href="#cb12-96" tabindex="-1"></a>    <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
+<span id="cb12-97"><a href="#cb12-97" tabindex="-1"></a>    <span class="at">quad_points =</span> <span class="dv">5</span>,</span>
+<span id="cb12-98"><a href="#cb12-98" tabindex="-1"></a>    <span class="at">maxit =</span> <span class="dv">30</span></span>
+<span id="cb12-99"><a href="#cb12-99" tabindex="-1"></a>  )</span>
+<span id="cb12-100"><a href="#cb12-100" tabindex="-1"></a>)</span>
+<span id="cb12-101"><a href="#cb12-101" tabindex="-1"></a></span>
+<span id="cb12-102"><a href="#cb12-102" tabindex="-1"></a>new_units <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb12-103"><a href="#cb12-103" tabindex="-1"></a>  <span class="at">Person =</span> <span class="fu">c</span>(<span class="st">&quot;NEW01&quot;</span>, <span class="st">&quot;NEW01&quot;</span>),</span>
+<span id="cb12-104"><a href="#cb12-104" tabindex="-1"></a>  <span class="at">Rater =</span> <span class="fu">unique</span>(toy<span class="sc">$</span>Rater)[<span class="dv">1</span>],</span>
+<span id="cb12-105"><a href="#cb12-105" tabindex="-1"></a>  <span class="at">Criterion =</span> <span class="fu">unique</span>(toy<span class="sc">$</span>Criterion)[<span class="dv">1</span><span class="sc">:</span><span class="dv">2</span>],</span>
+<span id="cb12-106"><a href="#cb12-106" tabindex="-1"></a>  <span class="at">Score =</span> <span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">3</span>)</span>
+<span id="cb12-107"><a href="#cb12-107" tabindex="-1"></a>)</span>
+<span id="cb12-108"><a href="#cb12-108" tabindex="-1"></a></span>
+<span id="cb12-109"><a href="#cb12-109" tabindex="-1"></a>pred_units <span class="ot">&lt;-</span> <span class="fu">predict_mfrm_units</span>(toy_mml, new_units, <span class="at">n_draws =</span> <span class="dv">0</span>)</span>
+<span id="cb12-110"><a href="#cb12-110" tabindex="-1"></a>pv_units <span class="ot">&lt;-</span> <span class="fu">sample_mfrm_plausible_values</span>(toy_mml, new_units, <span class="at">n_draws =</span> <span class="dv">2</span>, <span class="at">seed =</span> <span class="dv">1</span>)</span>
+<span id="cb12-111"><a href="#cb12-111" tabindex="-1"></a></span>
+<span id="cb12-112"><a href="#cb12-112" tabindex="-1"></a><span class="fu">summary</span>(pred_units)<span class="sc">$</span>estimates[, <span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Estimate&quot;</span>, <span class="st">&quot;Lower&quot;</span>, <span class="st">&quot;Upper&quot;</span>)]</span>
+<span id="cb12-113"><a href="#cb12-113" tabindex="-1"></a><span class="fu">summary</span>(pv_units)<span class="sc">$</span>draw_summary[, <span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Draws&quot;</span>, <span class="st">&quot;MeanValue&quot;</span>)]</span></code></pre></div>
 <p>For a report or appendix handoff, pass the recovery objects through
 the same summary-table export route used by the rest of the package:</p>
 <div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="fu">export_summary_appendix</span>(</span>

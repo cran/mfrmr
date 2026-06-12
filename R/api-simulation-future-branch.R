@@ -1512,7 +1512,7 @@ simulation_future_branch_report_bundle <- function(x,
         "Schema-only future-branch report bundle is unavailable until the",
         "underlying branch grid is materialized. The contract still bundles",
         "summary metadata, branch-side table contracts, and draw-free plot",
-        "data views in one internal object."
+        "data views in one shared object."
       )
     ))
   }
@@ -1535,7 +1535,7 @@ simulation_future_branch_report_bundle <- function(x,
     tables = tables,
     plots = plots,
     note = paste(
-      "Schema-only future-branch report bundle combining the internal",
+      "Schema-only future-branch report bundle combining the shared",
       "summary, deterministic baseline recommendation, canonical/public/",
       "branch table views, and draw-free plot data without implying an",
       "active arbitrary-facet planner."
@@ -2066,7 +2066,7 @@ simulation_future_branch_report_digest <- function(x,
     note = paste(
       "Schema-only future-branch report digest exposing headline report",
       "availability, baseline design metadata, and compact surface/axis",
-      "summaries from one internal contract without implying an active",
+      "summaries from one shared contract without implying an active",
       "arbitrary-facet planner."
     )
   )
@@ -2292,7 +2292,7 @@ simulation_future_branch_report_surface_registry <- function(x,
     surfaces = surfaces,
     note = paste(
       "Schema-only future-branch report surface registry exposing digest,",
-      "catalog, and compact overview surfaces from one internal contract",
+      "catalog, and compact overview surfaces from one shared contract",
       "without implying an active arbitrary-facet planner."
     )
   )
@@ -2368,7 +2368,7 @@ simulation_future_branch_report_panel <- function(x,
     note = paste(
       "Schema-only future-branch report panel exposing one selected compact",
       "surface together with headline digest metadata and the surface index",
-      "from one internal contract without implying an active arbitrary-",
+      "from one shared contract without implying an active arbitrary-",
       "facet planner."
     )
   )
@@ -2485,7 +2485,7 @@ simulation_future_branch_report_operation <- function(x,
     note = paste(
       "Schema-only future-branch report operation exposing digest, compact",
       "overview tables, the current surface registry, and one selected",
-      "surface from one internal contract without implying an active",
+      "surface from one shared contract without implying an active",
       "arbitrary-facet planner."
     )
   )
@@ -6259,7 +6259,7 @@ simulation_planning_schema <- function(sim_spec = NULL, facet_names = NULL) {
       "plus a report-surface registry and compact report panel when default",
       "counts are available, alongside one combined report operation object",
       "plus one lightweight report snapshot, one selected-surface report brief,",
-      "one mode-based report consumer, one internal active pilot object,",
+      "one mode-based report consumer, one active pilot object,",
       "compact pilot-level summary/table/plot consumers, and one bundled",
       "active-branch object plus deterministic active-branch profile,",
       "load/balance diagnostics, coverage/connectivity diagnostics,",

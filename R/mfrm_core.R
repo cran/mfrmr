@@ -46,21 +46,201 @@ get_weights <- function(df) {
   rep(1, nrow(df))
 }
 
+gpcm_scope_helper_area <- function(helper) {
+  helper <- as.character(helper[1] %||% "")
+  helper_full <- helper
+  if (grepl("facets_output_file_bundle", helper_full, fixed = TRUE) &&
+      grepl("score", helper_full, fixed = TRUE)) {
+    return("Score-side scorefile export under bounded GPCM")
+  }
+  key <- sub("\\(.*$", "", helper)
+  key <- trimws(key)
+  switch(
+    key,
+    "export bundle helpers" =,
+    "build_mfrm_manifest" =,
+    "build_mfrm_replay_script" =,
+    "export_mfrm_bundle" =,
+    "build_apa_outputs" =,
+    "build_visual_summaries" =,
+    "run_qc_pipeline" = "APA writer and fit-based export bundles",
+    "facets_output_contract_review" = "FACETS output-contract score-side review",
+    "facets_output_file_bundle" = "Score-side scorefile export under bounded GPCM",
+    "predict_mfrm_population" =,
+    "evaluate_mfrm_design" = "Design evaluation and population forecasting under bounded GPCM",
+    "evaluate_mfrm_diagnostic_screening" =,
+    "evaluate_mfrm_signal_detection" = "Diagnostic and signal-detection design screening under bounded GPCM",
+    "analyze_dff" =,
+    "analyze_dif" =,
+    "dif_interaction_table" =,
+    "dif_report" =,
+    "plot_dif_heatmap" =,
+    "plot_dif_summary" = "Differential facet functioning screening under bounded GPCM",
+    "build_linking_review" = "Operational linking synthesis",
+    NULL
+  )
+}
+
+gpcm_scope_lookup <- function(helper = NULL, area = NULL) {
+  if (!exists("gpcm_capability_matrix", mode = "function")) {
+    return(NULL)
+  }
+  tbl <- gpcm_capability_matrix()
+  if (is.null(tbl) || nrow(tbl) == 0L) {
+    return(NULL)
+  }
+
+  area <- as.character(area[1] %||% gpcm_scope_helper_area(helper) %||% "")
+  if (nzchar(area)) {
+    row <- tbl[tbl$Area == area, , drop = FALSE]
+    if (nrow(row) > 0L) {
+      return(row[1, , drop = FALSE])
+    }
+  }
+
+  helper_key <- sub("\\(.*$", "", as.character(helper[1] %||% ""))
+  helper_key <- trimws(helper_key)
+  if (nzchar(helper_key)) {
+    row <- tbl[grepl(helper_key, tbl$Helpers, fixed = TRUE), , drop = FALSE]
+    if (nrow(row) > 0L) {
+      return(row[1, , drop = FALSE])
+    }
+  }
+
+  NULL
+}
+
+gpcm_scope_guidance_text <- function(helper = NULL, area = NULL) {
+  row <- gpcm_scope_lookup(helper = helper, area = area)
+  if (is.null(row) || nrow(row) == 0L) {
+    return("See `gpcm_capability_matrix()` for the current scope.")
+  }
+
+  score_side_note <- if (grepl("score-side", row$Area[1], fixed = TRUE) ||
+                         grepl("scorefile", row$Area[1], fixed = TRUE)) {
+    " See `gpcm_score_side_contract()` for score-side unblock criteria."
+  } else {
+    ""
+  }
+
+  paste0(
+    "GPCM capability row: ", row$Area[1], " (", row$Status[1], "). ",
+    "Recommended route: ", row$RecommendedRoute[1], " ",
+    "Next validation step: ", row$NextValidationStep[1], " ",
+    "See `gpcm_capability_matrix()` for the current scope.",
+    score_side_note
+  )
+}
+
+new_gpcm_scope_error <- function(message,
+                                 helper = NULL,
+                                 area = NULL,
+                                 status = NULL,
+                                 recommended_route = NULL,
+                                 next_validation_step = NULL,
+                                 supported = NULL) {
+  structure(
+    list(
+      message = as.character(message[1] %||% ""),
+      helper = as.character(helper[1] %||% NA_character_),
+      area = as.character(area[1] %||% NA_character_),
+      status = as.character(status[1] %||% NA_character_),
+      recommended_route = as.character(recommended_route[1] %||% NA_character_),
+      next_validation_step = as.character(next_validation_step[1] %||% NA_character_),
+      supported = as.character(supported[1] %||% NA_character_)
+    ),
+    class = c("mfrmr_gpcm_scope_error", "error", "condition")
+  )
+}
+
+stop_gpcm_scope_error <- function(message,
+                                  helper = NULL,
+                                  area = NULL,
+                                  supported = NULL) {
+  row <- gpcm_scope_lookup(helper = helper, area = area)
+  resolved_area <- area
+  status <- recommended_route <- next_validation_step <- NA_character_
+
+  if (!is.null(row) && nrow(row) > 0L) {
+    resolved_area <- row$Area[1]
+    status <- row$Status[1]
+    recommended_route <- row$RecommendedRoute[1]
+    next_validation_step <- row$NextValidationStep[1]
+  }
+
+  full_message <- paste0(
+    as.character(message[1] %||% ""),
+    if (grepl("\\s$", as.character(message[1] %||% ""))) "" else " ",
+    gpcm_scope_guidance_text(helper = helper, area = resolved_area)
+  )
+
+  stop(new_gpcm_scope_error(
+    message = full_message,
+    helper = helper,
+    area = resolved_area,
+    status = status,
+    recommended_route = recommended_route,
+    next_validation_step = next_validation_step,
+    supported = supported
+  ))
+}
+
 stop_if_gpcm_out_of_scope <- function(fit,
                                       helper,
-                                      supported = "fitting, core summary output, fixed-calibration posterior scoring, compute_information(), direct simulation and recovery checks, residual-based diagnostics, the curve/report helpers, and the slope-aware element-conditional fair_average_table() and estimate_bias() (with the SE caveats documented in their help pages)") {
+                                      supported = "fitting, core summary output, fixed-calibration posterior scoring, compute_information(), direct simulation and recovery checks, residual-based diagnostics, the curve/report helpers, and the slope-aware element-conditional fair_average_table() and estimate_bias() (with the SE caveats documented in their help pages)",
+                                      area = NULL) {
   if (!inherits(fit, "mfrm_fit")) return(invisible(NULL))
   model <- as.character(fit$config$model %||% fit$summary$Model[1] %||% NA_character_)
   if (identical(model, "GPCM")) {
-    stop(
-      "`", helper, "` does not support `GPCM` fits in this release. ",
-      "Supported `GPCM` workflows are: ",
-      supported,
-      ". See `gpcm_capability_matrix()` for the current scope.",
-      call. = FALSE
+    row <- gpcm_scope_lookup(helper = helper, area = area)
+    if (!is.null(row) && nrow(row) > 0L &&
+        row$Status[1] %in% c("supported", "supported_with_caveat")) {
+      return(invisible(NULL))
+    }
+    stop_gpcm_scope_error(
+      message = paste0(
+        "`", helper, "` does not support `GPCM` fits in this release. ",
+        "Supported `GPCM` workflows are: ",
+        supported,
+        "."
+      ),
+      helper = helper,
+      area = area,
+      supported = supported
     )
   }
   invisible(NULL)
+}
+
+gpcm_capability_boundary_table <- function(fit = NULL,
+                                           helper = NULL,
+                                           area = NULL,
+                                           extra_areas = character(0)) {
+  empty <- data.frame(
+    Area = character(0),
+    Status = character(0),
+    Boundary = character(0),
+    RecommendedRoute = character(0),
+    NextValidationStep = character(0),
+    stringsAsFactors = FALSE
+  )
+  if (!inherits(fit, "mfrm_fit")) return(empty)
+  model <- as.character(fit$config$model %||% fit$summary$Model[1] %||% NA_character_)
+  if (!identical(model, "GPCM")) return(empty)
+  if (!exists("gpcm_capability_matrix", mode = "function")) return(empty)
+
+  tbl <- gpcm_capability_matrix()
+  primary_area <- as.character(area[1] %||% gpcm_scope_helper_area(helper) %||% "")
+  areas <- unique(c(primary_area, as.character(extra_areas %||% character(0))))
+  areas <- areas[nzchar(areas)]
+  if (length(areas) == 0L) return(empty)
+
+  out <- tbl[tbl$Area %in% areas, c(
+    "Area", "Status", "Boundary", "RecommendedRoute", "NextValidationStep"
+  ), drop = FALSE]
+  out <- out[match(areas[areas %in% out$Area], out$Area), , drop = FALSE]
+  rownames(out) <- NULL
+  out
 }
 
 gpcm_fair_average_rationale <- function() {
@@ -4834,6 +5014,371 @@ finite_difference_gradient <- function(fn, par, rel_step = 1e-5) {
     }
   }
   grad
+}
+
+compute_expected_score_vector_from_par <- function(res,
+                                                   par,
+                                                   idx = NULL,
+                                                   theta_hat = NULL) {
+  prep <- res$prep
+  config <- res$config
+  idx <- idx %||% build_indices(
+    prep,
+    step_facet = config$step_facet,
+    slope_facet = config$slope_facet,
+    interaction_specs = config$interaction_specs
+  )
+  sizes <- build_param_sizes(config)
+  params <- expand_params(par, sizes, config)
+  if (is.null(theta_hat)) {
+    theta_hat <- if (identical(config$method, "JMLE")) {
+      params$theta
+    } else {
+      res$facets$person$Estimate
+    }
+  }
+  eta <- compute_eta(idx, params, config, theta_override = theta_hat)
+  prob_bundle <- compute_response_probability_bundle(config, idx, params, eta)
+  prep$rating_min + prob_bundle$expected_k
+}
+
+add_gpcm_scorefile_delta_se <- function(scorefile,
+                                         res,
+                                         covariance = NULL,
+                                         ci_level = 0.95) {
+  if (!is.data.frame(scorefile) || nrow(scorefile) == 0L ||
+      !identical(res$config$model, "GPCM")) {
+    return(scorefile)
+  }
+
+  add_unavailable <- function(tbl, status, detail, method = "not available") {
+    tbl$ExpectedScoreSE <- NA_real_
+    tbl$ExpectedScoreCI_Lower <- NA_real_
+    tbl$ExpectedScoreCI_Upper <- NA_real_
+    tbl$ExpectedScoreCI_Level <- ci_level
+    tbl$ResidualSE <- NA_real_
+    tbl$ResidualCI_Lower <- NA_real_
+    tbl$ResidualCI_Upper <- NA_real_
+    tbl$ResidualCI_Level <- ci_level
+    tbl$ScoreUncertaintyStatus <- status
+    tbl$ScoreUncertaintyMethod <- method
+    tbl$ScoreUncertaintyDetail <- detail
+    tbl
+  }
+
+  covariance <- covariance %||% compute_mml_parameter_covariance(res)
+  if (!covariance$status %in% c("ok", "regularized") || is.null(covariance$cov)) {
+    return(add_unavailable(
+      scorefile,
+      status = covariance$status,
+      detail = covariance$detail,
+      method = if (identical(covariance$status, "not_applicable")) "not applicable" else "not available"
+    ))
+  }
+
+  par <- as.numeric(res$opt$par %||% numeric(0))
+  cov_mat <- symmetrize_matrix(covariance$cov)
+  if (length(par) == 0L || ncol(cov_mat) != length(par)) {
+    return(add_unavailable(
+      scorefile,
+      status = "fallback",
+      detail = "Optimized parameter vector and covariance matrix dimensions did not align."
+    ))
+  }
+
+  prep <- res$prep
+  config <- res$config
+  idx <- build_indices(
+    prep,
+    step_facet = config$step_facet,
+    slope_facet = config$slope_facet,
+    interaction_specs = config$interaction_specs
+  )
+  theta_hat <- if (identical(config$method, "JMLE")) {
+    expand_params(par, build_param_sizes(config), config)$theta
+  } else {
+    res$facets$person$Estimate
+  }
+  fn <- function(p) {
+    compute_expected_score_vector_from_par(
+      res = res,
+      par = p,
+      idx = idx,
+      theta_hat = theta_hat
+    )
+  }
+  base <- suppressWarnings(as.numeric(fn(par)))
+  n <- length(base)
+  if (n != nrow(scorefile)) {
+    return(add_unavailable(
+      scorefile,
+      status = "fallback",
+      detail = "Expected-score vector did not align with the exported scorefile rows."
+    ))
+  }
+
+  jac <- matrix(NA_real_, nrow = n, ncol = length(par))
+  for (j in seq_along(par)) {
+    h <- 1e-5 * max(1, abs(par[j]))
+    par_p <- par
+    par_m <- par
+    par_p[j] <- par_p[j] + h
+    par_m[j] <- par_m[j] - h
+    f_p <- tryCatch(fn(par_p), error = function(e) rep(NA_real_, n))
+    f_m <- tryCatch(fn(par_m), error = function(e) rep(NA_real_, n))
+    f_p <- suppressWarnings(as.numeric(f_p))
+    f_m <- suppressWarnings(as.numeric(f_m))
+    if (length(f_p) == n && length(f_m) == n) {
+      both <- is.finite(f_p) & is.finite(f_m)
+      jac[both, j] <- (f_p[both] - f_m[both]) / (2 * h)
+      fp_only <- !both & is.finite(f_p) & is.finite(base)
+      jac[fp_only, j] <- (f_p[fp_only] - base[fp_only]) / h
+      fm_only <- !both & is.finite(f_m) & is.finite(base)
+      jac[fm_only, j] <- (base[fm_only] - f_m[fm_only]) / h
+    }
+  }
+  jac[!is.finite(jac)] <- 0
+  var <- rowSums((jac %*% cov_mat) * jac)
+  var[is.finite(var) & var < 0 & abs(var) < 1e-10] <- 0
+  se <- ifelse(is.finite(var) & var >= 0, sqrt(var), NA_real_)
+  z <- stats::qnorm((1 + ci_level) / 2)
+  expected_lower <- base - z * se
+  expected_upper <- base + z * se
+  rating_min <- suppressWarnings(as.numeric(prep$rating_min %||% NA_real_))
+  rating_max <- suppressWarnings(as.numeric(prep$rating_max %||% NA_real_))
+  if (is.finite(rating_min)) {
+    expected_lower <- pmax(expected_lower, rating_min)
+    expected_upper <- pmax(expected_upper, rating_min)
+  }
+  if (is.finite(rating_max)) {
+    expected_lower <- pmin(expected_lower, rating_max)
+    expected_upper <- pmin(expected_upper, rating_max)
+  }
+
+  observed <- suppressWarnings(as.numeric(scorefile$Observed %||% NA_real_))
+  residual <- suppressWarnings(as.numeric(scorefile$Residual %||% (observed - base)))
+  residual_lower <- residual - z * se
+  residual_upper <- residual + z * se
+  method <- if (identical(covariance$status, "regularized")) {
+    "Native structural delta method (MML observed information; regularized Hessian)"
+  } else {
+    "Native structural delta method (MML observed information)"
+  }
+  detail <- paste(
+    "Propagates structural covariance of facet, step, and slope parameters",
+    "to the bounded-GPCM expected score; MML person EAP estimates are",
+    "conditioned on rather than included in the Hessian. This is not a",
+    "FACETS-style score-side standard error."
+  )
+
+  scorefile$ExpectedScoreSE <- se
+  scorefile$ExpectedScoreCI_Lower <- expected_lower
+  scorefile$ExpectedScoreCI_Upper <- expected_upper
+  scorefile$ExpectedScoreCI_Level <- ci_level
+  scorefile$ResidualSE <- se
+  scorefile$ResidualCI_Lower <- residual_lower
+  scorefile$ResidualCI_Upper <- residual_upper
+  scorefile$ResidualCI_Level <- ci_level
+  scorefile$ScoreUncertaintyStatus <- ifelse(is.finite(se), covariance$status, "not_available")
+  scorefile$ScoreUncertaintyMethod <- ifelse(is.finite(se), method, "not available")
+  scorefile$ScoreUncertaintyDetail <- ifelse(is.finite(se), detail, "Delta-method variance was not available.")
+  scorefile
+}
+
+add_gpcm_scorefile_native_se_not_requested <- function(scorefile,
+                                                       ci_level = 0.95) {
+  if (!is.data.frame(scorefile) || nrow(scorefile) == 0L) {
+    return(scorefile)
+  }
+  scorefile$ExpectedScoreSE <- NA_real_
+  scorefile$ExpectedScoreCI_Lower <- NA_real_
+  scorefile$ExpectedScoreCI_Upper <- NA_real_
+  scorefile$ExpectedScoreCI_Level <- ci_level
+  scorefile$ResidualSE <- NA_real_
+  scorefile$ResidualCI_Lower <- NA_real_
+  scorefile$ResidualCI_Upper <- NA_real_
+  scorefile$ResidualCI_Level <- ci_level
+  scorefile$ScoreUncertaintyStatus <- "not_requested"
+  scorefile$ScoreUncertaintyMethod <- "not requested"
+  scorefile$ScoreUncertaintyDetail <- paste(
+    "Native structural expected-score uncertainty was not requested.",
+    "Set score_se_method to 'native' or 'both' to include it."
+  )
+  scorefile
+}
+
+add_gpcm_score_side_delta_se <- function(scorefile,
+                                         res,
+                                         diagnostics = NULL,
+                                         ci_level = 0.95) {
+  if (!is.data.frame(scorefile) || nrow(scorefile) == 0L ||
+      !identical(res$config$model, "GPCM")) {
+    return(scorefile)
+  }
+
+  add_unavailable <- function(tbl, status, detail, method = "not available") {
+    tbl$ScoreSideLogitSE <- NA_real_
+    tbl$ScoreSideSE <- NA_real_
+    tbl$ScoreSideCI_Lower <- NA_real_
+    tbl$ScoreSideCI_Upper <- NA_real_
+    tbl$ScoreSideCI_Level <- ci_level
+    tbl$ScoreSideResidualSE <- NA_real_
+    tbl$ScoreSideResidualCI_Lower <- NA_real_
+    tbl$ScoreSideResidualCI_Upper <- NA_real_
+    tbl$ScoreSideResidualCI_Level <- ci_level
+    tbl$ScoreSideSE_Status <- status
+    tbl$ScoreSideSE_Method <- method
+    tbl$ScoreSideSE_Detail <- detail
+    tbl$ScoreSideSE_ComponentCount <- 0L
+    tbl$ScoreSideSE_MissingComponents <- NA_integer_
+    tbl
+  }
+
+  measures <- as.data.frame(diagnostics$measures %||% data.frame(),
+                            stringsAsFactors = FALSE)
+  if (nrow(measures) == 0L || !"Facet" %in% names(measures) ||
+      !"Level" %in% names(measures) ||
+      !any(c("ModelSE", "SE") %in% names(measures))) {
+    return(add_unavailable(
+      scorefile,
+      status = "not_available",
+      detail = paste(
+        "Score-side delta SE was unavailable because diagnostics$measures",
+        "did not contain facet/level SE columns."
+      )
+    ))
+  }
+  if (!"Person" %in% names(scorefile) || !"ScoreSlope" %in% names(scorefile)) {
+    return(add_unavailable(
+      scorefile,
+      status = "not_available",
+      detail = "Score-side delta SE requires Person and ScoreSlope columns."
+    ))
+  }
+
+  model_se <- if ("ModelSE" %in% names(measures)) {
+    suppressWarnings(as.numeric(measures$ModelSE))
+  } else {
+    rep(NA_real_, nrow(measures))
+  }
+  fallback_se <- if ("SE" %in% names(measures)) {
+    suppressWarnings(as.numeric(measures$SE))
+  } else {
+    rep(NA_real_, nrow(measures))
+  }
+  se_values <- model_se
+  use_fallback <- !is.finite(se_values) & is.finite(fallback_se)
+  se_values[use_fallback] <- fallback_se[use_fallback]
+
+  keys <- paste(as.character(measures$Facet), as.character(measures$Level),
+                sep = "\r")
+  ord <- order(!is.finite(se_values), keys)
+  keys <- keys[ord]
+  se_values <- se_values[ord]
+  keep <- !duplicated(keys)
+  se_lookup <- stats::setNames(se_values[keep], keys[keep])
+
+  n <- nrow(scorefile)
+  eta_var <- rep(0, n)
+  component_count <- integer(n)
+  missing_count <- integer(n)
+  add_component <- function(facet, levels) {
+    component_key <- paste(facet, as.character(levels), sep = "\r")
+    se <- suppressWarnings(as.numeric(se_lookup[match(component_key, names(se_lookup))]))
+    ok <- is.finite(se) & se >= 0
+    eta_var[ok] <<- eta_var[ok] + se[ok]^2
+    component_count[ok] <<- component_count[ok] + 1L
+    missing_count[!ok] <<- missing_count[!ok] + 1L
+    invisible(NULL)
+  }
+
+  add_component("Person", scorefile$Person)
+  facet_names <- as.character(res$config$facet_names %||% character(0))
+  for (facet in facet_names) {
+    if (facet %in% names(scorefile)) {
+      add_component(facet, scorefile[[facet]])
+    } else {
+      missing_count <- missing_count + 1L
+    }
+  }
+  expected_components <- 1L + length(facet_names)
+  eta_se <- sqrt(eta_var)
+  score_slope <- abs(suppressWarnings(as.numeric(scorefile$ScoreSlope)))
+  se <- score_slope * eta_se
+  ok <- is.finite(se) & component_count == expected_components &
+    missing_count == 0L
+
+  expected <- suppressWarnings(as.numeric(scorefile$Expected %||% NA_real_))
+  observed <- suppressWarnings(as.numeric(scorefile$Observed %||% NA_real_))
+  residual <- suppressWarnings(as.numeric(scorefile$Residual %||% (observed - expected)))
+  z <- stats::qnorm((1 + ci_level) / 2)
+
+  expected_lower <- expected - z * se
+  expected_upper <- expected + z * se
+  rating_min <- suppressWarnings(as.numeric(res$prep$rating_min %||% NA_real_))
+  rating_max <- suppressWarnings(as.numeric(res$prep$rating_max %||% NA_real_))
+  if (is.finite(rating_min)) {
+    expected_lower <- pmax(expected_lower, rating_min)
+    expected_upper <- pmax(expected_upper, rating_min)
+  }
+  if (is.finite(rating_max)) {
+    expected_lower <- pmin(expected_lower, rating_max)
+    expected_upper <- pmin(expected_upper, rating_max)
+  }
+  residual_lower <- residual - z * se
+  residual_upper <- residual + z * se
+
+  method <- "Score-side delta method (measure SE components x ScoreSlope)"
+  detail <- paste(
+    "Delta transform from logit-side ModelSE components through ScoreSlope;",
+    "row component variances are summed without cross-component covariance.",
+    "This is not FACETS-equivalent score-side uncertainty."
+  )
+  missing_detail <- paste(
+    "Score-side delta SE unavailable because required measure SE components",
+    "or ScoreSlope were missing."
+  )
+
+  scorefile$ScoreSideLogitSE <- ifelse(ok, eta_se, NA_real_)
+  scorefile$ScoreSideSE <- ifelse(ok, se, NA_real_)
+  scorefile$ScoreSideCI_Lower <- ifelse(ok, expected_lower, NA_real_)
+  scorefile$ScoreSideCI_Upper <- ifelse(ok, expected_upper, NA_real_)
+  scorefile$ScoreSideCI_Level <- ci_level
+  scorefile$ScoreSideResidualSE <- ifelse(ok, se, NA_real_)
+  scorefile$ScoreSideResidualCI_Lower <- ifelse(ok, residual_lower, NA_real_)
+  scorefile$ScoreSideResidualCI_Upper <- ifelse(ok, residual_upper, NA_real_)
+  scorefile$ScoreSideResidualCI_Level <- ci_level
+  scorefile$ScoreSideSE_Status <- ifelse(ok, "ok", "not_available")
+  scorefile$ScoreSideSE_Method <- ifelse(ok, method, "not available")
+  scorefile$ScoreSideSE_Detail <- ifelse(ok, detail, missing_detail)
+  scorefile$ScoreSideSE_ComponentCount <- component_count
+  scorefile$ScoreSideSE_MissingComponents <- missing_count
+  scorefile
+}
+
+add_gpcm_score_side_se_not_requested <- function(scorefile,
+                                                 ci_level = 0.95) {
+  if (!is.data.frame(scorefile) || nrow(scorefile) == 0L) {
+    return(scorefile)
+  }
+  scorefile$ScoreSideLogitSE <- NA_real_
+  scorefile$ScoreSideSE <- NA_real_
+  scorefile$ScoreSideCI_Lower <- NA_real_
+  scorefile$ScoreSideCI_Upper <- NA_real_
+  scorefile$ScoreSideCI_Level <- ci_level
+  scorefile$ScoreSideResidualSE <- NA_real_
+  scorefile$ScoreSideResidualCI_Lower <- NA_real_
+  scorefile$ScoreSideResidualCI_Upper <- NA_real_
+  scorefile$ScoreSideResidualCI_Level <- ci_level
+  scorefile$ScoreSideSE_Status <- "not_requested"
+  scorefile$ScoreSideSE_Method <- "not requested"
+  scorefile$ScoreSideSE_Detail <- paste(
+    "Score-side delta SE was not requested.",
+    "Set score_se_method to 'score_side' or 'both' to include it."
+  )
+  scorefile$ScoreSideSE_ComponentCount <- 0L
+  scorefile$ScoreSideSE_MissingComponents <- NA_integer_
+  scorefile
 }
 
 add_gpcm_fair_average_delta_se <- function(raw_tbls,

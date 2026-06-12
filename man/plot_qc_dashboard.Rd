@@ -18,7 +18,7 @@ plot_qc_dashboard(
   random_p_max = 0.05,
   top_n = 20,
   draw = TRUE,
-  preset = c("standard", "publication", "compact")
+  preset = c("standard", "publication", "compact", "monochrome")
 )
 }
 \arguments{
@@ -48,7 +48,7 @@ plot_qc_dashboard(
 
 \item{draw}{If \code{TRUE}, draw with base graphics.}
 
-\item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, or \code{"compact"}).}
+\item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, \code{"compact"}, or \code{"monochrome"}).}
 }
 \value{
 A plotting-data object of class \code{mfrm_plot_data}.
@@ -122,10 +122,13 @@ Treat this dashboard as a screening layer; follow up with dedicated helpers
 \examples{
 # Fast smoke run: build the plot data only (no graphics device).
 toy <- load_mfrmr_data("example_core")
-fit_quick <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                      method = "JML", maxit = 30)
+toy_small <- toy[toy$Person \%in\% unique(toy$Person)[1:3], ]
+fit_quick <- suppressWarnings(
+  fit_mfrm(toy_small, "Person", c("Rater", "Criterion"), "Score",
+           method = "JML", maxit = 3)
+)
 qc_quick <- plot_qc_dashboard(fit_quick, draw = FALSE)
-nrow(qc_quick$data$panels)
+names(qc_quick$data)
 
 \donttest{
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)

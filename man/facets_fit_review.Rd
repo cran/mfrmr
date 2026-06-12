@@ -83,6 +83,15 @@ reporting.
 The review is row-matched by \code{Facet} and \code{Level}. It treats MnSq, ZSTD, and df
 differences separately because FACETS documentation makes the df convention
 and Wilson-Hilferty/WHEXACT handling central to ZSTD interpretation.
+
+Two upstream boundaries also apply. For \code{method = "MML"} fits, residuals
+are evaluated at shrunken EAP person measures while FACETS uses JMLE
+estimates, so MnSq itself can differ before standardization; refit with
+\code{method = "JML"} for a JMLE-style residual basis. And mfrmr withholds
+ZSTD as \code{NA} when the applicable df falls below 1 (Wilson-Hilferty
+instability), while FACETS under \code{WHEXACT} can report a value on the same
+sparse cell; such NA-vs-finite pairs are availability differences, not
+fit differences. Both notes are repeated in the returned \code{guidance} table.
 }
 \examples{
 toy <- load_mfrmr_data("example_core")

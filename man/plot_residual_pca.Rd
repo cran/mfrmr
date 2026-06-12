@@ -11,7 +11,7 @@ plot_residual_pca(
   plot_type = c("scree", "parallel_scree", "parallel_excess", "loadings"),
   component = 1L,
   top_n = 20L,
-  preset = c("standard", "publication", "compact"),
+  preset = c("standard", "publication", "compact", "monochrome"),
   draw = TRUE
 )
 }
@@ -29,7 +29,7 @@ plot_residual_pca(
 
 \item{top_n}{Maximum number of variables shown in loadings plot.}
 
-\item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, or \code{"compact"}).}
+\item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, \code{"compact"}, or \code{"monochrome"}).}
 
 \item{draw}{If \code{TRUE}, draws the plot using base graphics.}
 }

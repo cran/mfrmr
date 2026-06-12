@@ -63,6 +63,14 @@ returns:
 It is intended for output-contract QA and regression review. It does
 not establish external validity or software equivalence beyond the specific
 schema/metric contract encoded in the contract file.
+}
+\section{Bounded GPCM boundary}{
+
+This helper remains blocked for bounded \code{GPCM} fits in 0.2.1. The FACETS
+output contract includes score-side rows whose measure-to-score and
+uncertainty semantics are validated for the current Rasch-family route, not
+for free-discrimination bounded \code{GPCM}. Use \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}} before
+routing a bounded \code{GPCM} fit into score-side compatibility-output helpers.
 
 Coverage interpretation in \code{overall}:
 \itemize{
@@ -77,6 +85,7 @@ only rows whose source component is available.
 \code{mfrm_facets_contract_review} (\code{type = "column_coverage"}, \code{"table_coverage"},
 \code{"metric_status"}, \code{"metric_by_table"}).
 }
+
 \section{Interpreting output}{
 
 \itemize{
@@ -86,7 +95,7 @@ rates.
 occur.
 \item \code{metric_summary} / \code{metric_checks}: numerical consistency checks tied to the
 current contract.
-\item \code{missing_preview}: quickest path to unresolved output-contract gaps.
+\item \code{missing_preview}: direct path to unresolved output-contract gaps.
 }
 }
 

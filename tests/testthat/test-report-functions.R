@@ -476,6 +476,92 @@ test_that("mfrm_network_analysis returns graph metrics for the fitted design", {
   expect_s3_class(s, "summary.mfrm_bundle")
 })
 
+test_that("build_mfrm_network_review keeps design-network diagnostics separate from measurement results", {
+  if (!requireNamespace("igraph", quietly = TRUE)) {
+    skip("igraph (Suggests) not installed.")
+  }
+
+  sparse_spec <- build_mfrm_sim_spec(
+    n_person = 16,
+    n_rater = 4,
+    n_criterion = 2,
+    raters_per_person = 2,
+    assignment = "sparse_linked",
+    sparse_controls = list(
+      link_persons = 3,
+      link_raters_per_person = 4,
+      min_common_persons_per_rater_pair = 2
+    )
+  )
+  sparse_sim <- simulate_mfrm_data(sim_spec = sparse_spec, seed = 20260526)
+  peer_spec <- build_peer_review_sim_spec(
+    n_submission = 8,
+    n_criterion = 2,
+    reviewers_per_submission = 2,
+    anchor_submissions = 1
+  )
+  peer_sim <- simulate_mfrm_data(sim_spec = peer_spec, seed = 20260526)
+
+  review <- build_mfrm_network_review(
+    .fit,
+    diagnostics = .diag,
+    sparse_design = sparse_sim,
+    peer_review_design = peer_sim,
+    top_n = 3
+  )
+
+  expect_s3_class(review, "mfrm_bundle")
+  expect_s3_class(review, "mfrm_network_review")
+  expect_true(all(c(
+    "overview", "network_summary", "facet_summary", "top_central_nodes",
+    "top_cut_nodes", "top_bridge_edges", "sparse_review", "peer_review",
+    "reporting_map", "source_network"
+  ) %in% names(review)))
+  expect_true(all(c(
+    "NetworkReviewStatus", "NetworkReviewReason", "ReviewUse"
+  ) %in% names(review$overview)))
+  expect_identical(
+    review$overview$ReviewUse[1],
+    "design_diagnostic_not_measurement_gate"
+  )
+  expect_true(any(review$reporting_map$Area == "MFRM measurement model"))
+  expect_true(any(review$reporting_map$Area == "Peer-review design"))
+  expect_true(any(grepl("Design diagnostic", review$reporting_map$Boundary, fixed = TRUE)))
+  expect_true(nrow(review$top_central_nodes) <= 3L)
+  expect_true(nrow(review$sparse_review) == 1L)
+  expect_identical(
+    review$sparse_review$ReviewUse[1],
+    "design_diagnostic_not_recovery_gate"
+  )
+  expect_true(nrow(review$peer_review) == 1L)
+  expect_identical(
+    review$peer_review$ReviewUse[1],
+    "design_diagnostic_not_measurement_gate"
+  )
+  expect_equal(review$peer_review$SelfReviews[1], 0L)
+
+  s <- summary(review, top_n = 2)
+  expect_s3_class(s, "summary.mfrm_network_review")
+  expect_true(nrow(s$top_central_nodes) <= 2L)
+  expect_true(nrow(s$peer_review) == 1L)
+
+  bundle <- build_summary_table_bundle(review)
+  expect_identical(bundle$source_class, "mfrm_network_review")
+  expect_identical(bundle$summary_class, "summary.mfrm_network_review")
+  expect_true(all(c(
+    "overview", "network_summary", "facet_summary", "top_central_nodes",
+    "sparse_review", "peer_review", "reporting_map"
+  ) %in% names(bundle$tables)))
+  expect_identical(
+    as.character(bundle$table_index$Role[bundle$table_index$Table == "overview"]),
+    "network_review_overview"
+  )
+  expect_identical(
+    as.character(bundle$table_index$Role[bundle$table_index$Table == "peer_review"]),
+    "peer_review_design_diagnostics"
+  )
+})
+
 test_that("rater_network_analysis returns rater relationship graph metrics", {
   if (!requireNamespace("igraph", quietly = TRUE)) {
     skip("igraph (Suggests) not installed.")
@@ -559,12 +645,25 @@ test_that("facet_statistics_report returns a bundle", {
 test_that("precision_review_report returns a bundle", {
   pa <- precision_review_report(.fit, diagnostics = .diag)
   expect_s3_class(pa, "mfrm_bundle")
-  expect_true(all(c("profile", "checks", "approximation_notes", "settings") %in% names(pa)))
+  expect_true(all(c(
+    "profile", "checks", "fit_separation_basis", "approximation_notes", "settings"
+  ) %in% names(pa)))
   expect_true(is.data.frame(pa$profile))
   expect_true(is.data.frame(pa$checks))
+  expect_true(is.data.frame(pa$fit_separation_basis))
   expect_true(is.data.frame(pa$approximation_notes))
+  expect_true(all(c(
+    "Topic", "SourceBasis", "PackageSurface", "Interpretation",
+    "ValidationUse", "Availability"
+  ) %in% names(pa$fit_separation_basis)))
+  expect_true(any(grepl("Wright & Linacre (1994)", pa$fit_separation_basis$SourceBasis, fixed = TRUE)))
+  expect_true(any(grepl("Wright & Masters (1982)", pa$fit_separation_basis$SourceBasis, fixed = TRUE)))
+  expect_true(any(grepl("ZSTD", pa$fit_separation_basis$Topic, fixed = TRUE)))
+  expect_true(any(grepl("not a standalone validation success criterion",
+                        pa$fit_separation_basis$ValidationUse, fixed = TRUE)))
   s <- summary(pa)
   expect_s3_class(s, "summary.mfrm_bundle")
+  expect_equal(s$summary$FitSeparationRows[1], nrow(pa$fit_separation_basis))
 })
 
 test_that("precision_review_report marks JML runs as exploratory", {

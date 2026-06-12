@@ -62,7 +62,7 @@ plot_guttman_scalogram <- function(fit,
                                    column_facet = NULL,
                                    top_n_persons = 40L,
                                    highlight_unexpected = TRUE,
-                                   preset = c("standard", "publication", "compact"),
+                                   preset = c("standard", "publication", "compact", "monochrome"),
                                    draw = TRUE) {
   if (!inherits(fit, "mfrm_fit")) {
     stop("`fit` must be an mfrm_fit object from fit_mfrm().", call. = FALSE)
@@ -234,7 +234,7 @@ plot_guttman_scalogram <- function(fit,
 #' @export
 plot_residual_qq <- function(fit,
                              diagnostics = NULL,
-                             preset = c("standard", "publication", "compact"),
+                             preset = c("standard", "publication", "compact", "monochrome"),
                              draw = TRUE) {
   if (!inherits(fit, "mfrm_fit")) {
     stop("`fit` must be an mfrm_fit object from fit_mfrm().", call. = FALSE)
@@ -334,6 +334,10 @@ plot_residual_qq <- function(fit,
 #'
 #' @seealso [plot_anchor_drift()], [mfrmr_linking_and_dff]
 #'
+#' @concept confidence intervals
+#' @concept visual diagnostics
+#' @concept linking
+#'
 #' @examples
 #' \donttest{
 #' toy <- load_mfrmr_data("example_core")
@@ -354,7 +358,7 @@ plot_residual_qq <- function(fit,
 plot_rater_trajectory <- function(fits,
                                   facet = "Rater",
                                   ci_level = 0.95,
-                                  preset = c("standard", "publication", "compact"),
+                                  preset = c("standard", "publication", "compact", "monochrome"),
                                   draw = TRUE) {
   if (!is.list(fits) || length(fits) < 2L) {
     stop("`fits` must be a named list of at least two mfrm_fit objects.",
@@ -517,7 +521,7 @@ plot_rater_agreement_heatmap <- function(fit,
                                          diagnostics = NULL,
                                          rater_facet = "Rater",
                                          metric = c("exact", "correlation"),
-                                         preset = c("standard", "publication", "compact"),
+                                         preset = c("standard", "publication", "compact", "monochrome"),
                                          draw = TRUE) {
   if (!inherits(fit, "mfrm_fit")) {
     stop("`fit` must be an mfrm_fit object from fit_mfrm().", call. = FALSE)

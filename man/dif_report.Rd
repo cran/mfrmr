@@ -15,7 +15,7 @@ dif_report(dif_result, ...)
 }
 \value{
 Object of class \code{mfrm_dif_report} with \code{narrative},
-\code{counts}, \code{large_dif}, and \code{config}.
+\code{counts}, \code{large_dif}, \code{gpcm_boundary}, and \code{config}.
 }
 \description{
 Produces APA-style narrative text interpreting the results of a differential-
@@ -47,8 +47,18 @@ ETS labels.
 \item \verb{$counts}: named integer vector of method-appropriate counts.
 \item \verb{$large_dif}: tibble of large ETS results (\code{method = "refit"}) or
 screening-positive contrasts/cells (\code{method = "residual"}).
+\item \verb{$gpcm_boundary}: for bounded \code{GPCM} inputs, a capability-boundary table
+marking the narrative as caveated DFF screening output.
 \item \verb{$config}: analysis configuration inherited from the input.
 }
+}
+
+\section{GPCM boundary}{
+
+If the input comes from a bounded \code{GPCM} fit, the narrative includes a
+bounded-\code{GPCM} note and the returned report carries \code{gpcm_boundary}.
+Treat the text as slope-aware screening/reporting support, not as a
+standalone fairness, invariance, or operational subgroup decision.
 }
 
 \section{Typical workflow}{

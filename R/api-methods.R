@@ -531,6 +531,7 @@ summarize_output_bundle <- function(object, digits = 3, top_n = 10) {
     WrittenFiles = nrow(bundle_component_table(object, "written_files")),
     IncludeFixed = as.logical(settings$include_fixed %||% FALSE),
     WriteFiles = as.logical(settings$write_files %||% FALSE),
+    ScoreSEMethod = as.character(settings$score_se_method %||% NA_character_),
     stringsAsFactors = FALSE
   )
   summarize_known_bundle(
@@ -789,6 +790,7 @@ summarize_facet_statistics_bundle <- function(object, digits = 3, top_n = 10) {
 summarize_precision_review_bundle <- function(object, digits = 3, top_n = 10) {
   profile_tbl <- bundle_component_table(object, "profile")
   checks_tbl <- bundle_component_table(object, "checks")
+  fit_sep_tbl <- bundle_component_table(object, "fit_separation_basis")
   notes_tbl <- bundle_component_table(object, "approximation_notes")
 
   flagged_n <- if ("Status" %in% names(checks_tbl)) {
@@ -805,6 +807,7 @@ summarize_precision_review_bundle <- function(object, digits = 3, top_n = 10) {
     SupportsFormalInference = isTRUE(profile_tbl$SupportsFormalInference[1] %||% FALSE),
     Checks = nrow(checks_tbl),
     ReviewOrWarn = flagged_n,
+    FitSeparationRows = nrow(fit_sep_tbl),
     NoteRows = nrow(notes_tbl),
     stringsAsFactors = FALSE
   )
@@ -817,17 +820,23 @@ summarize_precision_review_bundle <- function(object, digits = 3, top_n = 10) {
     "Model-based precision path detected for the current run."
   }
 
-  summarize_known_bundle(
+  out <- summarize_known_bundle(
     object = object,
     obj_class = "mfrm_precision_review",
     summary_candidates = character(0),
-    preview_candidates = c("checks", "approximation_notes", "profile"),
+    preview_candidates = c("checks", "fit_separation_basis", "approximation_notes", "profile"),
     settings_candidates = "settings",
-    notes = notes,
+    notes = c(notes, "Fit/separation basis rows state source grounding and validation-use boundaries."),
     digits = digits,
     top_n = top_n,
     summary_override = summary_tbl
   )
+  out$profile <- profile_tbl
+  out$checks <- checks_tbl
+  out$fit_separation_basis <- fit_sep_tbl
+  out$approximation_notes <- notes_tbl
+  class(out) <- unique(c("summary.mfrm_precision_review", class(out)))
+  out
 }
 
 summarize_facets_contract_bundle <- function(object, digits = 3, top_n = 10) {
@@ -902,7 +911,7 @@ summarize_facets_fit_review_bundle <- function(object, digits = 3, top_n = 10) {
     c("df_sensitive", "df_sensitivity", "guidance", "standardization")
   }
 
-  summarize_known_bundle(
+  out <- summarize_known_bundle(
     object = object,
     obj_class = "mfrm_facets_fit_review",
     summary_candidates = character(0),
@@ -913,6 +922,15 @@ summarize_facets_fit_review_bundle <- function(object, digits = 3, top_n = 10) {
     top_n = top_n,
     summary_override = summary_tbl
   )
+  out$standardization <- bundle_component_table(object, "standardization")
+  out$df_sensitivity <- bundle_component_table(object, "df_sensitivity")
+  out$df_sensitive <- bundle_component_table(object, "df_sensitive")
+  out$df_sensitivity_summary <- bundle_component_table(object, "df_sensitivity_summary")
+  out$external_table_quality <- bundle_component_table(object, "external_table_quality")
+  out$external_comparison <- external_tbl
+  out$guidance <- bundle_component_table(object, "guidance")
+  class(out) <- unique(c("summary.mfrm_facets_fit_review", class(out)))
+  out
 }
 
 summarize_facets_fit_df_guide_bundle <- function(object, digits = 3, top_n = 10) {
@@ -944,7 +962,7 @@ summarize_fit_measures_bundle <- function(object, digits = 3, top_n = 10) {
     }
   }
 
-  summarize_known_bundle(
+  out <- summarize_known_bundle(
     object = object,
     obj_class = "mfrm_fit_measures",
     summary_candidates = character(0),
@@ -955,6 +973,21 @@ summarize_fit_measures_bundle <- function(object, digits = 3, top_n = 10) {
     top_n = top_n,
     summary_override = summary_tbl
   )
+  out$table <- bundle_component_table(object, "table")
+  out$facets_table <- bundle_component_table(object, "facets_table")
+  out$status_summary <- bundle_component_table(object, "status_summary")
+  out$threshold_profiles <- bundle_component_table(object, "threshold_profiles")
+  out$profile_summary <- bundle_component_table(object, "profile_summary")
+  out$profile_summary_by_facet <- bundle_component_table(object, "profile_summary_by_facet")
+  out$profile_summary_overall <- bundle_component_table(object, "profile_summary_overall")
+  out$df_sensitivity <- bundle_component_table(object, "df_sensitivity")
+  out$df_sensitive <- bundle_component_table(object, "df_sensitive")
+  out$df_sensitivity_summary <- bundle_component_table(object, "df_sensitivity_summary")
+  out$underfit <- bundle_component_table(object, "underfit")
+  out$overfit <- bundle_component_table(object, "overfit")
+  out$mixed <- bundle_component_table(object, "mixed")
+  class(out) <- unique(c("summary.mfrm_fit_measures", class(out)))
+  out
 }
 
 reference_benchmark_validation_scope <- function(object) {
@@ -3352,11 +3385,14 @@ draw_unexpected_after_bias_bundle <- function(x,
 }
 
 draw_output_bundle <- function(x,
-                               type = c("graph_expected", "score_residuals", "obs_probability"),
+                               type = c("graph_expected", "score_residuals", "obs_probability", "score_se"),
                                draw = TRUE,
                                main = NULL,
                                palette = NULL) {
-  type <- match.arg(tolower(as.character(type[1])), c("graph_expected", "score_residuals", "obs_probability"))
+  type <- match.arg(
+    tolower(as.character(type[1])),
+    c("graph_expected", "score_residuals", "obs_probability", "score_se")
+  )
   graph_tbl <- as.data.frame(x$graphfile %||% data.frame(), stringsAsFactors = FALSE)
   score_tbl <- as.data.frame(x$scorefile %||% data.frame(), stringsAsFactors = FALSE)
 
@@ -3414,6 +3450,39 @@ draw_output_bundle <- function(x,
     return(invisible(new_mfrm_plot_data(
       "output_bundle",
       list(plot = "score_residuals", values = vals)
+    )))
+  }
+
+  if (type == "score_se") {
+    se_col <- if ("ScoreSideSE" %in% names(score_tbl) &&
+                  any(is.finite(suppressWarnings(as.numeric(score_tbl$ScoreSideSE))))) {
+      "ScoreSideSE"
+    } else if ("ExpectedScoreSE" %in% names(score_tbl) &&
+               any(is.finite(suppressWarnings(as.numeric(score_tbl$ExpectedScoreSE))))) {
+      "ExpectedScoreSE"
+    } else {
+      NA_character_
+    }
+    if (is.na(se_col) || !nzchar(se_col)) {
+      stop("No finite scorefile SE column is available. Use `score_se_method` to request SE output.", call. = FALSE)
+    }
+    vals <- suppressWarnings(as.numeric(score_tbl[[se_col]]))
+    vals <- vals[is.finite(vals)]
+    if (length(vals) == 0) stop("No finite scorefile SE values available.")
+    if (isTRUE(draw)) {
+      graphics::hist(
+        x = vals,
+        breaks = "FD",
+        col = "#fdd49e",
+        border = "white",
+        main = if (is.null(main)) paste0(se_col, " distribution") else as.character(main[1]),
+        xlab = se_col,
+        ylab = "Count"
+      )
+    }
+    return(invisible(new_mfrm_plot_data(
+      "output_bundle",
+      list(plot = "score_se", se_column = se_col, values = vals)
     )))
   }
 
@@ -4415,7 +4484,7 @@ draw_network_analysis_bundle <- function(x,
                                          main = NULL,
                                          palette = NULL,
                                          label_angle = 45,
-                                         preset = c("standard", "publication", "compact")) {
+                                         preset = c("standard", "publication", "compact", "monochrome")) {
   type <- match.arg(tolower(as.character(type[1])), c("centrality", "facet_summary", "network"))
   if (identical(type, "network")) {
     sc <- x$source_connectivity %||% NULL
@@ -4526,7 +4595,7 @@ draw_rater_network_bundle <- function(x,
                                       main = NULL,
                                       palette = NULL,
                                       label_angle = 45,
-                                      preset = c("standard", "publication", "compact")) {
+                                      preset = c("standard", "publication", "compact", "monochrome")) {
   type <- match.arg(tolower(as.character(type[1])),
                     c("network", "centrality", "severity", "matrix"))
   style <- resolve_plot_preset(preset)
@@ -4749,7 +4818,7 @@ draw_halo_network_bundle <- function(x,
                                      main = NULL,
                                      palette = NULL,
                                      label_angle = 45,
-                                     preset = c("standard", "publication", "compact")) {
+                                     preset = c("standard", "publication", "compact", "monochrome")) {
   type <- match.arg(tolower(as.character(type[1])),
                     c("edge_distribution", "halo_summary", "network", "matrix"))
   style <- resolve_plot_preset(preset)
@@ -4995,7 +5064,7 @@ draw_subset_connectivity_bundle <- function(x,
                                             main = NULL,
                                             palette = NULL,
                                             label_angle = 45,
-                                            preset = c("standard", "publication", "compact")) {
+                                            preset = c("standard", "publication", "compact", "monochrome")) {
   requested_type <- match.arg(tolower(as.character(type[1])), c("subset_observations", "facet_levels", "coverage_matrix", "linking_matrix", "design_matrix", "network"))
   type <- requested_type
   if (type %in% c("linking_matrix", "design_matrix")) type <- "coverage_matrix"
@@ -5973,7 +6042,8 @@ plot_visual_summaries_bundle <- function(x,
 #' - `mfrm_rating_scale` -> category-counts/threshold plots
 #' - `mfrm_measurable` -> measurable-data coverage/count plots
 #' - `mfrm_unexpected_after_bias` -> post-bias unexpected-response plots
-#' - `mfrm_output_bundle` -> graph/score output-file diagnostics
+#' - `mfrm_output_bundle` -> graph/score output-file diagnostics,
+#'   including `type = "score_se"` when scorefile SE columns are available
 #' - `mfrm_residual_pca` -> residual PCA scree, parallel-analysis, or
 #'   loadings views via [plot_residual_pca()]
 #' - `mfrm_specifications` -> facet/anchor/convergence plots

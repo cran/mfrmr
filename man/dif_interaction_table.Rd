@@ -47,6 +47,7 @@ Object of class \code{mfrm_dif_interaction} with:
 \itemize{
 \item \code{table}: tibble with per-cell statistics and flags.
 \item \code{summary}: tibble summarizing flagged and sparse cell counts.
+\item \code{gpcm_boundary}: for bounded \code{GPCM} fits, a capability-boundary table.
 \item \code{config}: list of analysis parameters.
 }
 }
@@ -92,10 +93,19 @@ For plot selection and follow-up diagnostics, see
 \item \verb{$table}: the full interaction table with one row per cell.
 \item \verb{$summary}: overview counts of flagged and sparse cells.
 \item \verb{$config}: analysis configuration parameters.
+\item \verb{$gpcm_boundary}: for bounded \code{GPCM} fits, a capability-boundary table
+marking the table as caveated DFF screening evidence.
 \item Cells with \verb{|t| > abs_t_warn} or \verb{|ObsExpAvg| > abs_bias_warn}
 are flagged in the \code{flag_t} and \code{flag_bias} columns.
 \item Sparse cells (N < min_obs) have \code{sparse = TRUE} and NA statistics.
 }
+}
+
+\section{GPCM boundary}{
+
+For bounded \code{GPCM}, the interaction table uses the fitted slope-aware
+expected-score/residual scale and should be reported as screening evidence,
+not as a standalone fairness, invariance, or operational subgroup decision.
 }
 
 \section{Typical workflow}{

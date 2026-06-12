@@ -13,7 +13,7 @@ plot_displacement(
   top_n = 40,
   show_ci = FALSE,
   ci_level = 0.95,
-  preset = c("standard", "publication", "compact"),
+  preset = c("standard", "publication", "compact", "monochrome"),
   draw = TRUE,
   ...
 )
@@ -39,7 +39,7 @@ approximate confidence-interval whiskers from \code{DisplacementSE}
 \code{0.95}. The returned plot-data object gains \code{CI_Lower} / \code{CI_Upper}
 / \code{CI_Level} columns on the \code{table} element for downstream reuse.}
 
-\item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, or \code{"compact"}).}
+\item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, \code{"compact"}, or \code{"monochrome"}).}
 
 \item{draw}{If \code{TRUE}, draw with base graphics.}
 
@@ -129,3 +129,6 @@ if (interactive()) {
 \code{\link[=displacement_table]{displacement_table()}}, \code{\link[=plot_unexpected]{plot_unexpected()}}, \code{\link[=plot_fair_average]{plot_fair_average()}},
 \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}}, \link{mfrmr_visual_diagnostics}
 }
+\concept{confidence intervals}
+\concept{displacement}
+\concept{visual diagnostics}

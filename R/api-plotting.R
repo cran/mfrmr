@@ -366,6 +366,16 @@ plot_data <- function(x, component = NULL, type = NULL, ...) {
 #'
 #' curves <- category_curves_report(fit, theta_points = 51)
 #' plot_data_components(curves, type = "category_probability")
+#'
+#' toy$ResponseTime <- 10 + seq_len(nrow(toy)) %% 6 + as.numeric(toy$Score)
+#' rt <- response_time_review(
+#'   toy,
+#'   person = "Person",
+#'   facets = c("Rater", "Criterion"),
+#'   score = "Score",
+#'   time = "ResponseTime"
+#' )
+#' plot_data_components(plot_response_time_review(rt, draw = FALSE))
 #' }
 #' @export
 plot_data_components <- function(x, type = NULL, ...) {
@@ -989,7 +999,7 @@ plot_marginal_fit <- function(x,
                               main = NULL,
                               palette = NULL,
                               label_angle = 45,
-                              preset = c("standard", "publication", "compact"),
+                              preset = c("standard", "publication", "compact", "monochrome"),
                               draw = TRUE) {
   plot_type <- match.arg(tolower(plot_type), c("std_residual", "prop_diff"))
   top_n <- max(1L, as.integer(top_n))
@@ -1159,7 +1169,7 @@ plot_marginal_fit <- function(x,
 #' @param main Optional custom plot title.
 #' @param palette Optional named color overrides. Recognized names: `ok`, `flag`.
 #' @param label_angle X-axis label angle.
-#' @param preset Visual preset (`"standard"`, `"publication"`, or `"compact"`).
+#' @param preset Visual preset (`"standard"`, `"publication"`, `"compact"`, or `"monochrome"`).
 #' @param draw If `TRUE`, draw with base graphics.
 #'
 #' @details
@@ -1226,7 +1236,7 @@ plot_marginal_pairwise <- function(x,
                                    main = NULL,
                                    palette = NULL,
                                    label_angle = 45,
-                                   preset = c("standard", "publication", "compact"),
+                                   preset = c("standard", "publication", "compact", "monochrome"),
                                    draw = TRUE) {
   metric <- match.arg(tolower(metric), c("exact", "adjacent"))
   top_n <- max(1L, as.integer(top_n))
@@ -1367,7 +1377,7 @@ plot_marginal_pairwise <- function(x,
 #' @param main Optional custom plot title.
 #' @param palette Optional named color overrides (`higher`, `lower`, `bar`).
 #' @param label_angle X-axis label angle for `"severity"` bar plot.
-#' @param preset Visual preset (`"standard"`, `"publication"`, or `"compact"`).
+#' @param preset Visual preset (`"standard"`, `"publication"`, `"compact"`, or `"monochrome"`).
 #' @param draw If `TRUE`, draw with base graphics.
 #'
 #' @details
@@ -1458,7 +1468,7 @@ plot_unexpected <- function(x,
                             main = NULL,
                             palette = NULL,
                             label_angle = 45,
-                            preset = c("standard", "publication", "compact"),
+                            preset = c("standard", "publication", "compact", "monochrome"),
                             draw = TRUE) {
   rule <- match.arg(tolower(rule), c("either", "both"))
   plot_type <- match.arg(tolower(plot_type), c("scatter", "severity"))
@@ -1614,7 +1624,7 @@ plot_unexpected <- function(x,
 #'   default `0.95`. The returned plot-data object gains `CI_Lower`,
 #'   `CI_Upper`, and `CI_Level` columns for downstream reuse.
 #' @param draw If `TRUE`, draw with base graphics.
-#' @param preset Visual preset (`"standard"`, `"publication"`, or `"compact"`).
+#' @param preset Visual preset (`"standard"`, `"publication"`, `"compact"`, or `"monochrome"`).
 #' @param ... Additional arguments passed to [fair_average_table()] when `x` is `mfrm_fit`.
 #'
 #' @details
@@ -1671,6 +1681,9 @@ plot_unexpected <- function(x,
 #' `legend`, `reference_lines`, and the stacked fair-average data.
 #' @seealso [fair_average_table()], [plot_unexpected()], [plot_displacement()],
 #'   [plot_qc_dashboard()], [mfrmr_visual_diagnostics]
+#' @concept confidence intervals
+#' @concept visual diagnostics
+#' @concept fair averages
 #' @examples
 #' toy_full <- load_mfrmr_data("example_core")
 #' toy_people <- unique(toy_full$Person)[1:12]
@@ -1692,7 +1705,7 @@ plot_fair_average <- function(x,
                               show_ci = FALSE,
                               ci_level = 0.95,
                               draw = TRUE,
-                              preset = c("standard", "publication", "compact"),
+                              preset = c("standard", "publication", "compact", "monochrome"),
                               ...) {
   metric <- match.arg(metric, c("AdjustedAverage", "StandardizedAdjustedAverage", "FairM", "FairZ"))
   metric <- switch(
@@ -1998,7 +2011,7 @@ plot_fair_average <- function(x,
 #' @param ci_level Confidence level used when `show_ci = TRUE`; default
 #'   `0.95`. The returned plot-data object gains `CI_Lower` / `CI_Upper`
 #'   / `CI_Level` columns on the `table` element for downstream reuse.
-#' @param preset Visual preset (`"standard"`, `"publication"`, or `"compact"`).
+#' @param preset Visual preset (`"standard"`, `"publication"`, `"compact"`, or `"monochrome"`).
 #' @param draw If `TRUE`, draw with base graphics.
 #' @param ... Additional arguments passed to [displacement_table()] when `x` is `mfrm_fit`.
 #'
@@ -2056,6 +2069,9 @@ plot_fair_average <- function(x,
 #' @return A plotting-data object of class `mfrm_plot_data`.
 #' @seealso [displacement_table()], [plot_unexpected()], [plot_fair_average()],
 #'   [plot_qc_dashboard()], [mfrmr_visual_diagnostics]
+#' @concept confidence intervals
+#' @concept visual diagnostics
+#' @concept displacement
 #' @examples
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
@@ -2077,7 +2093,7 @@ plot_displacement <- function(x,
                               top_n = 40,
                               show_ci = FALSE,
                               ci_level = 0.95,
-                              preset = c("standard", "publication", "compact"),
+                              preset = c("standard", "publication", "compact", "monochrome"),
                               draw = TRUE,
                               ...) {
   plot_type <- match.arg(tolower(plot_type), c("lollipop", "hist"))
@@ -2238,7 +2254,7 @@ plot_displacement <- function(x,
 #' @param main Optional custom plot title.
 #' @param palette Optional named color overrides (`ok`, `flag`, `expected`).
 #' @param label_angle X-axis label angle for bar-style plots.
-#' @param preset Visual preset (`"standard"`, `"publication"`, or `"compact"`).
+#' @param preset Visual preset (`"standard"`, `"publication"`, `"compact"`, or `"monochrome"`).
 #' @param draw If `TRUE`, draw with base graphics.
 #'
 #' @details
@@ -2330,7 +2346,7 @@ plot_interrater_agreement <- function(x,
                                       main = NULL,
                                       palette = NULL,
                                       label_angle = 45,
-                                      preset = c("standard", "publication", "compact"),
+                                      preset = c("standard", "publication", "compact", "monochrome"),
                                       draw = TRUE) {
   plot_type <- match.arg(tolower(plot_type), c("exact", "corr", "difference"))
   top_n <- max(1L, as.integer(top_n))
@@ -2478,7 +2494,7 @@ plot_interrater_agreement <- function(x,
 #' @param palette Optional named color overrides (`fixed_ok`, `fixed_flag`,
 #' `random_ok`, `random_flag`, `variance`).
 #' @param label_angle X-axis label angle for bar-style plots.
-#' @param preset Visual preset (`"standard"`, `"publication"`, or `"compact"`).
+#' @param preset Visual preset (`"standard"`, `"publication"`, `"compact"`, or `"monochrome"`).
 #' @param draw If `TRUE`, draw with base graphics.
 #'
 #' @details
@@ -2552,7 +2568,7 @@ plot_facets_chisq <- function(x,
                               main = NULL,
                               palette = NULL,
                               label_angle = 45,
-                              preset = c("standard", "publication", "compact"),
+                              preset = c("standard", "publication", "compact", "monochrome"),
                               draw = TRUE) {
   plot_type <- match.arg(tolower(plot_type), c("fixed", "random", "variance"))
   style <- resolve_plot_preset(preset)
@@ -2697,7 +2713,7 @@ plot_facets_chisq <- function(x,
 #' @param fixed_p_max Warning cutoff for fixed-effect facet chi-square p-values.
 #' @param random_p_max Warning cutoff for random-effect facet chi-square p-values.
 #' @param top_n Maximum elements displayed in displacement panel.
-#' @param preset Visual preset (`"standard"`, `"publication"`, or `"compact"`).
+#' @param preset Visual preset (`"standard"`, `"publication"`, `"compact"`, or `"monochrome"`).
 #' @param draw If `TRUE`, draw with base graphics.
 #'
 #' @details
@@ -2758,10 +2774,13 @@ plot_facets_chisq <- function(x,
 #' @examples
 #' # Fast smoke run: build the plot data only (no graphics device).
 #' toy <- load_mfrmr_data("example_core")
-#' fit_quick <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-#'                       method = "JML", maxit = 30)
+#' toy_small <- toy[toy$Person %in% unique(toy$Person)[1:3], ]
+#' fit_quick <- suppressWarnings(
+#'   fit_mfrm(toy_small, "Person", c("Rater", "Criterion"), "Score",
+#'            method = "JML", maxit = 3)
+#' )
 #' qc_quick <- plot_qc_dashboard(fit_quick, draw = FALSE)
-#' nrow(qc_quick$data$panels)
+#' names(qc_quick$data)
 #'
 #' \donttest{
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
@@ -2790,7 +2809,7 @@ plot_qc_dashboard <- function(fit,
                               random_p_max = 0.05,
                               top_n = 20,
                               draw = TRUE,
-                              preset = c("standard", "publication", "compact")) {
+                              preset = c("standard", "publication", "compact", "monochrome")) {
   if (!inherits(fit, "mfrm_fit")) {
     stop("`fit` must be an mfrm_fit object from fit_mfrm().")
   }
@@ -3172,7 +3191,7 @@ resolve_bubble_measures <- function(x, diagnostics = NULL) {
 #' @param top_n Maximum number of elements to plot (default 60).
 #' @param main Optional custom plot title.
 #' @param palette Optional named colour vector keyed by facet name.
-#' @param preset Visual preset (`"standard"`, `"publication"`, or `"compact"`).
+#' @param preset Visual preset (`"standard"`, `"publication"`, `"compact"`, or `"monochrome"`).
 #' @param draw If \code{TRUE} (default), render the plot using base graphics.
 #'
 #' @details

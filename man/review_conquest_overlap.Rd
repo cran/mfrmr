@@ -129,6 +129,7 @@ tables do not yet align cleanly with the exported overlap bundle.
 }
 
 \examples{
+\donttest{
 bundle <- build_conquest_overlap_bundle()
 raw_pop <- data.frame(
   Term = bundle$mfrmr_population$Parameter,
@@ -155,6 +156,7 @@ normalized <- normalize_conquest_overlap_tables(
 )
 review <- review_conquest_overlap(bundle, normalized)
 summary(review)$summary
+}
 }
 \seealso{
 \code{\link[=build_conquest_overlap_bundle]{build_conquest_overlap_bundle()}},

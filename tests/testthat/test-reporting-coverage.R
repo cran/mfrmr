@@ -1,5 +1,5 @@
 # test-reporting-coverage.R
-# Exercises uncovered paths in reporting.R:
+# Exercises reporting.R edge paths:
 # - build_visual_warning_map (all warning stages)
 # - build_visual_summary_map (all summary stages, including detail="detailed")
 # - build_apa_report_text (with and without context/bias)

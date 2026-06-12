@@ -89,11 +89,22 @@ pre-fit score-support caveats are exported through the
 they remain available under \code{"recommended"} and \code{"diagnostics"} presets when
 the source summary contains caveat rows.
 
+Precision-review summaries keep \code{fit_separation_basis} in the exported
+precision-review role so fit, ZSTD, separation/reliability/strata, and
+package QC thresholds can be reported without turning them into release or
+recovery success gates.
+Fit-measure and FACETS fit-review summaries keep df/ZSTD sensitivity and
+optional external FACETS matching tables in the same precision-review lane.
+
 Parameter-recovery studies can be exported by passing
 \code{\link[=evaluate_mfrm_recovery]{evaluate_mfrm_recovery()}} or \code{\link[=assess_mfrm_recovery]{assess_mfrm_recovery()}} output directly. The
 exported bundle keeps the ADEMP-style simulation basis, recovery metrics,
 replication status, adequacy checklist, thresholds, and next actions in
 separate appendix-ready tables.
+
+Recovery-validation summaries from the packaged validation protocol can be
+exported by passing \code{summary(validation)}, including top-line release
+decisions, condition notes, diagnostic notes, and domain decisions.
 
 Unlike \code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}}, this helper does not require a fitted model.
 It is intended for the stage where compact reporting summaries already exist

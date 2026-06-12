@@ -1,6 +1,5 @@
 # test-final-coverage-boost.R
-# Targeted tests to boost coverage from 93.7% to 95%+
-# Targets uncovered lines in reporting.R and mfrm_core.R
+# Focused regression tests for reporting.R and mfrm_core.R edge paths.
 
 # ---- shared fixture ----
 local({
@@ -33,7 +32,7 @@ on.exit(options(old_opt), add = TRUE)
 })
 
 # ==========================================================================
-# reporting.R  --  targeted uncovered lines
+# reporting.R  --  edge-path regression tests
 # ==========================================================================
 
 # ---- lines 110-111: build_sectioned_fixed_report with non-df, non-char data ----
@@ -347,7 +346,7 @@ test_that("build_visual_summary_map PCA by-facet unavailable", {
 })
 
 # ==========================================================================
-# mfrm_core.R  --  targeted uncovered lines
+# mfrm_core.R  --  edge-path regression tests
 # ==========================================================================
 
 # ---- lines 108, 138, 146: count_facet_params / expand_facet_with_constraints
@@ -748,7 +747,7 @@ test_that("compute_pca_overall returns NULL for empty facets", {
   expect_null(r)
 })
 
-# ---- PCM model tests for uncovered PCM branches ----
+# ---- PCM model tests for PCM-specific branches ----
 test_that("PCM model covers PCM-specific branches", {
   d_pcm <- mfrmr:::sample_mfrm_data(seed = 42)
   fit_pcm <- suppressWarnings(mfrmr::fit_mfrm(
