@@ -2,7 +2,7 @@
 % Please edit documentation in R/api-plotting-extras.R
 \name{plot_apa_figure_one}
 \alias{plot_apa_figure_one}
-\title{Manuscript-ready four-panel composite (Wright + severity + threshold + summary)}
+\title{Manuscript-oriented four-panel draft (Wright + severity + threshold + summary)}
 \usage{
 plot_apa_figure_one(
   fit,
@@ -31,11 +31,13 @@ plot_apa_figure_one(
 \value{
 Invisibly, an \code{mfrm_plot_data} object whose \code{data} slot
 bundles the four panel data objects under \code{wright}, \code{severity},
-\code{threshold}, and \code{summary}.
+\code{threshold}, and \code{summary}. Fit readiness is retained in
+\code{data$fit_readiness}, \code{data$interpretation_status}, and
+\code{data$interpretation_note}.
 }
 \description{
-Builds a 2x2 publication composite for an \code{mfrm_fit}, suitable for a
-"Figure 1" in the Rasch-family \code{RSM}/\code{PCM} manuscript route. Panels: (1)
+Builds a 2x2 draft composite for an \code{mfrm_fit}, suitable for reviewing a
+possible "Figure 1" in the Rasch-family \code{RSM}/\code{PCM} manuscript route. Panels: (1)
 Wright map, (2)
 rater severity profile with CI whiskers, (3) threshold ladder, (4)
 a one-line reliability / separation summary block. Each panel reuses
@@ -44,18 +46,23 @@ with the rest of the package.
 }
 \section{Interpreting output}{
 
-Designed for a single-figure Methods or Results overview. The
+Designed as a single-figure Methods or Results draft. The
 summary panel prints the model class, sample size, log-likelihood,
 AIC/BIC, and the largest non-Person facet's separation /
-reliability if available.
+reliability if available. A fit that has not passed its numerical, data,
+design, and stability gates produces one warning and a visible
+\code{"REVIEW ONLY"} label. Resolve that review before treating the composite as
+report-ready evidence.
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                 method = "JML", maxit = 30)
 p <- plot_apa_figure_one(fit, draw = FALSE)
 names(p$data)
+}
 }
 \seealso{
 \code{\link[=plot.mfrm_fit]{plot.mfrm_fit()}} (\code{type = "wright"}),

@@ -206,8 +206,8 @@ reference_benchmark_source_profile <- function() {
       "Pairwise local contrasts are reported with a Rasch-Welch t statistic and approximate degrees of freedom.",
       "A practical linking review should confirm at least 5 common elements per linking facet when equating forms or datasets.",
       "Population-model complete-case omission should be explicit in fitted metadata, response-row counts, and active person estimates.",
-      "The ConQuest-overlap package-side fixture checks bundle, normalized-table, and review preparation without claiming an executed ConQuest comparison.",
-      "Case-level EAP and item/population tables must be normalized before numerical review against the exact-overlap bundle."
+      "The ConQuest-overlap reference case checks bundle preparation, table normalization, and review setup without claiming that ConQuest was executed.",
+      "Case-level EAP and item/population tables must be normalized before numerical review within the documented comparison scope."
     )
   )
 }
@@ -328,12 +328,14 @@ fit_reference_benchmark_dataset <- function(dataset,
     fit_args$slope_facet <- cfg$slope_facet
   }
   fit <- suppressWarnings(do.call(fit_mfrm, fit_args))
+  inference_ready <- mfrm_inference_ready(fit)
   diag <- if (identical(toupper(as.character(model)), "GPCM")) {
     list(
       overall_fit = tibble::tibble(Infit = NA_real_, Outfit = NA_real_),
       precision_profile = tibble::tibble(
         PrecisionTier = if (identical(toupper(as.character(method)), "MML")) "model_based" else "exploratory",
-        SupportsFormalInference = identical(toupper(as.character(method)), "MML")
+        SupportsFormalInference = identical(toupper(as.character(method)), "MML") &&
+          isTRUE(inference_ready)
       )
     )
   } else {
@@ -374,7 +376,9 @@ collect_reference_fit_run <- function(case_id, fit_obj) {
     Raters = as.integer(design$Raters[1]),
     Criteria = as.integer(design$Criteria[1]),
     Tasks = if ("Tasks" %in% names(design)) as.integer(design$Tasks[1]) else NA_integer_,
-    Converged = isTRUE(fit$summary$Converged),
+    Converged = mfrm_inference_ready(fit),
+    OptimizerCodeZero = mfrm_convergence_state(fit)$code_converged,
+    ConvergenceSeverity = mfrm_convergence_state(fit)$severity,
     LogLik = suppressWarnings(as.numeric(fit$summary$LogLik %||% NA_real_)),
     MMLEngineRequested = as.character(fit$summary$MMLEngineRequested[1] %||% NA_character_),
     MMLEngineUsed = as.character(fit$summary$MMLEngineUsed[1] %||% NA_character_),
@@ -399,7 +403,8 @@ collect_reference_fit_run <- function(case_id, fit_obj) {
     Infit = suppressWarnings(as.numeric(diag$overall_fit$Infit[1] %||% NA_real_)),
     Outfit = suppressWarnings(as.numeric(diag$overall_fit$Outfit[1] %||% NA_real_)),
     PrecisionTier = as.character(diag$precision_profile$PrecisionTier[1] %||% NA_character_),
-    SupportsFormalInference = isTRUE(diag$precision_profile$SupportsFormalInference[1] %||% FALSE)
+    SupportsFormalInference = isTRUE(mfrm_inference_ready(fit)) &&
+      isTRUE(diag$precision_profile$SupportsFormalInference[1] %||% FALSE)
   )
 }
 
@@ -1020,14 +1025,14 @@ build_latent_omission_contract_checks <- function(case_id, fit_obj) {
       pop$policy %||% NA_character_,
       "omit",
       identical(as.character(pop$policy %||% NA_character_), "omit"),
-      "The omission fixture should run under the documented complete-case omission policy."
+      "The reference case should use the documented complete-case omission policy."
     ),
     check_row(
       "PopulationOmittedPersons",
       length(actual_omitted),
       length(expected_omitted),
       setequal(actual_omitted, expected_omitted),
-      "The fitted population scaffold should omit exactly the background-incomplete person(s)."
+      "The fitted population model should omit exactly the person(s) with incomplete background data."
     ),
     check_row(
       "PopulationResponseRowsOmitted",
@@ -1047,7 +1052,7 @@ build_latent_omission_contract_checks <- function(case_id, fit_obj) {
         as.integer(pop$response_rows_retained %||% NA_integer_),
         as.integer(truth$response_rows_retained %||% NA_integer_)
       ),
-      "The retained-response count should match the complete-case scaffold after omission."
+      "The retained-response count should match the complete-case analysis set after omission."
     ),
     check_row(
       "OmittedPersonExcludedFromEstimates",
@@ -1094,8 +1099,23 @@ summarize_reference_benchmark_case <- function(case_id, case_type, fit_runs, des
   case_conquest <- subset_reference_case(conquest_overlap_checks, case_id)
   case_population_policy <- subset_reference_case(population_policy_checks, case_id)
 
+  fit_statuses <- if (nrow(case_fit) == 0L) {
+    character(0)
+  } else {
+    ifelse(
+      case_fit$Converged %in% TRUE,
+      "Pass",
+      ifelse(
+        case_fit$OptimizerCodeZero %in% TRUE &
+          as.character(case_fit$ConvergenceSeverity) == "review",
+        "Warn",
+        "Fail"
+      )
+    )
+  }
+
   statuses <- c(
-    case_fit$Converged == TRUE,
+    fit_statuses,
     case_statuses(case_design),
     case_statuses(case_recovery),
     case_statuses(case_pairs),
@@ -1233,7 +1253,7 @@ summarize_reference_benchmark_case <- function(case_id, case_type, fit_runs, des
 #' families:
 #' - `synthetic_truth`: checks whether recovered facet measures align with the
 #'   known generating values from the package's synthetic design.
-#' - `synthetic_latent_regression`: checks whether the first-version
+#' - `synthetic_latent_regression`: checks whether the
 #'   latent-regression `MML` branch recovers known population coefficients,
 #'   residual latent variance, criterion ordering, and posterior-shift
 #'   direction from a synthetic overlap case.
@@ -1282,7 +1302,7 @@ summarize_reference_benchmark_case <- function(case_id, case_type, fit_runs, des
 #'   ConQuest-overlap bundle/normalization/review workflow; this remains a
 #'   package-side check until actual ConQuest output tables are supplied.
 #' - `population_policy_checks`: complete-case omission checks for population
-#'   model benchmark fixtures.
+#'   model reference data.
 #' - `source_profile`: source-backed rules used by the reference checks.
 #'
 #' @return An object of class `mfrm_reference_benchmark`.
@@ -1324,7 +1344,7 @@ reference_case_benchmark <- function(cases = c(
     }
     if (!identical(toupper(as.character(method)), "MML")) {
       stop(
-        "The `synthetic_gpcm` benchmark case is currently validated only for `method = \"MML\"`.",
+        "The `synthetic_gpcm` benchmark case currently supports only `method = \"MML\"`.",
         call. = FALSE
       )
     }

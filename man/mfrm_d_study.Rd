@@ -41,7 +41,8 @@ is an \code{mfrm_fit}.}
 \value{
 An object of class \code{mfrm_d_study}, a data.frame with one row per
 design scenario and columns for planned facet counts, variance terms,
-projected \code{G}, projected \code{Phi}, and interpretation bands.
+projected \code{G}, projected \code{Phi}, interpretation bands, and identification
+status inherited from \code{\link[=mfrm_generalizability]{mfrm_generalizability()}}.
 }
 \description{
 \code{mfrm_d_study()} applies a practical D-study projection to the
@@ -76,7 +77,11 @@ fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                 method = "JML", maxit = 30)
 if (requireNamespace("lme4", quietly = TRUE)) {
   gt <- mfrm_generalizability(fit)
-  mfrm_d_study(gt, data.frame(Rater = c(2, 3, 4), Criterion = 4))
+  ds <- mfrm_d_study(gt, data.frame(Rater = c(2, 3, 4), Criterion = 4))
+  ds[, c("n_Rater", "n_Criterion", "G", "Phi",
+         "GStatus", "PhiStatus", "IdentificationStatus")]
+  # If IdentificationStatus is not "identified", even large G/Phi
+  # values remain identification warnings, not decision-ready evidence.
 }
 }
 }

@@ -14,13 +14,16 @@ test_that("plot APIs accept title/palette/label customization", {
   diag <- mfrmr::diagnose_mfrm(fit, residual_pca = "none")
 
   expect_no_error(
-    plot(
-      fit,
-      type = "wright",
-      draw = FALSE,
-      title = "Custom Wright",
-      palette = c(facet_level = "#1f78b4", step_threshold = "#d95f02"),
-      label_angle = 45
+    .mfrmr_muffle_expected_warnings(
+      plot(
+        fit,
+        type = "wright",
+        draw = FALSE,
+        title = "Custom Wright",
+        palette = c(facet_level = "#1f78b4", step_threshold = "#d95f02"),
+        label_angle = 45
+      ),
+      "^Review-only display:"
     )
   )
 
@@ -140,7 +143,10 @@ test_that("plot APIs accept title/palette/label customization", {
   expect_identical(as.character(p_pca$data$preset), "publication")
   expect_true(all(c("title", "subtitle", "legend", "reference_lines") %in% names(p_pca$data)))
 
-  p_wright <- plot(fit, type = "wright", draw = FALSE, preset = "publication")
+  p_wright <- .mfrmr_muffle_expected_warnings(
+    plot(fit, type = "wright", draw = FALSE, preset = "publication"),
+    "^Review-only display:"
+  )
   expect_true(all(c("title", "subtitle", "legend", "reference_lines") %in% names(p_wright$data)))
 
   p_bubble_mono <- mfrmr::plot_bubble(fit, draw = FALSE, preset = "monochrome")

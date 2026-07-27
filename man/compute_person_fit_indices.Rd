@@ -98,6 +98,7 @@ person-fit statistics beyond dichotomous items.
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                 method = "JML", maxit = 30)
@@ -111,6 +112,7 @@ summary(pf)
 #   a 1\% flag. lz_star is populated for JML/fixed-effect person
 #   estimates and left NA for MML/EAP estimates. Use ReportIndex /
 #   ReviewStatus for a compact report-ready reading.
+}
 }
 \seealso{
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}

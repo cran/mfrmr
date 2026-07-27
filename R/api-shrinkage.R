@@ -1,5 +1,5 @@
 # ==============================================================================
-# Empirical-Bayes and Laplace shrinkage for small-N facets (added in 0.1.6)
+# Empirical-Bayes and Laplace shrinkage for small-N facets
 # ==============================================================================
 #
 # mfrmr estimates every non-person facet as a fixed effect with a sum-to-zero
@@ -19,7 +19,7 @@
 # - `fit_mfrm(..., facet_shrinkage = "empirical_bayes")` wires the same
 #   helper into the primary entry point so users can opt in up front.
 #
-# The default `facet_shrinkage = "none"` keeps the 0.1.5 / 0.1.6 behaviour
+# The default `facet_shrinkage = "none"` keeps the unshrunk behavior
 # unchanged; every new column is additive.
 #
 # References:
@@ -391,6 +391,7 @@
 #' 78*(381), 47-55.
 #'
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
 #'                 method = "JML", maxit = 30)
@@ -410,6 +411,7 @@
 #'                                "ShrunkEstimate", "ShrinkageFactor")])
 #' # Look for: rows where `ShrinkageFactor` is large (close to 1) had
 #' #   their estimates pulled most strongly toward the facet mean (0).
+#' }
 #' @export
 apply_empirical_bayes_shrinkage <- function(fit,
                                             facet_prior_sd = NULL,
@@ -654,11 +656,13 @@ apply_empirical_bayes_shrinkage <- function(fit,
 #'   `"Person"`) or `NULL` when shrinkage has not been applied.
 #' @seealso [apply_empirical_bayes_shrinkage()], [fit_mfrm()].
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
 #'                 method = "JML", maxit = 30,
 #'                 facet_shrinkage = "empirical_bayes")
 #' shrinkage_report(fit)
+#' }
 #' @export
 shrinkage_report <- function(fit) {
   if (!inherits(fit, "mfrm_fit")) {

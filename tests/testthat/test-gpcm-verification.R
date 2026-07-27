@@ -34,6 +34,27 @@ test_that("GPCM print / summary do not error", {
   expect_no_error(invisible(utils::capture.output(print(summary(.gpcm_fit)))))
 })
 
+test_that("GPCM iteration report is an explicitly caveated replay", {
+  replay <- suppressWarnings(estimation_iteration_report(
+    .gpcm_fit,
+    max_iter = 2L
+  ))
+
+  expect_s3_class(replay, "mfrm_iteration_report")
+  expect_gt(nrow(replay$table), 0L)
+  expect_true(any(is.finite(replay$table$Objective)))
+  expect_equal(nrow(replay$gpcm_boundary), 1L)
+  expect_identical(
+    replay$gpcm_boundary$Area[1],
+    "Replayed optimization diagnostics under bounded GPCM"
+  )
+  expect_identical(
+    replay$gpcm_boundary$Status[1],
+    "supported_with_caveat"
+  )
+  expect_match(replay$gpcm_boundary$Boundary[1], "replay")
+})
+
 test_that("GPCM diagnose_mfrm returns measures with caveat status", {
   diag <- suppressMessages(suppressWarnings(
     diagnose_mfrm(.gpcm_fit, residual_pca = "none", diagnostic_mode = "legacy")
@@ -69,9 +90,10 @@ test_that("GPCM CCC / pathway / Wright plots return mfrm_plot_data", {
 test_that("GPCM capability matrix is consistent with the helper", {
   m <- gpcm_capability_matrix()
   expect_true(is.data.frame(m))
-  expect_true(all(c("Area", "Helpers", "Status", "PrimaryUse", "Boundary")
-                  %in% names(m)))
-  expect_true(all(c("RecommendedRoute", "NextValidationStep") %in% names(m)))
+  expect_identical(
+    names(m),
+    c("Area", "Helpers", "Status", "Boundary", "RecommendedRoute")
+  )
   expect_true(all(m$Status %in%
                     c("supported", "supported_with_caveat", "blocked", "deferred")))
 })

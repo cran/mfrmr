@@ -361,25 +361,24 @@ family shown here.</p>
 <h2>Minimal setup</h2>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
 <span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a></span>
-<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>toy <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_core&quot;</span>)</span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>toy <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_operational&quot;</span>)</span>
 <span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a></span>
 <span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
 <span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>  toy,</span>
 <span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
 <span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
 <span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;JML&quot;</span>,</span>
-<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
-<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>  <span class="at">maxit =</span> <span class="dv">20</span></span>
-<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a>)</span>
-<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a></span>
-<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a>diag <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit, <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>)</span>
-<span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a>checklist <span class="ot">&lt;-</span> <span class="fu">reporting_checklist</span>(fit, <span class="at">diagnostics =</span> diag)</span>
-<span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a><span class="fu">subset</span>(</span>
-<span id="cb1-18"><a href="#cb1-18" tabindex="-1"></a>  checklist<span class="sc">$</span>checklist,</span>
-<span id="cb1-19"><a href="#cb1-19" tabindex="-1"></a>  Section <span class="sc">==</span> <span class="st">&quot;Visual Displays&quot;</span>,</span>
-<span id="cb1-20"><a href="#cb1-20" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;Item&quot;</span>, <span class="st">&quot;Available&quot;</span>, <span class="st">&quot;NextAction&quot;</span>)</span>
-<span id="cb1-21"><a href="#cb1-21" tabindex="-1"></a>)</span></code></pre></div>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span></span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>)</span>
+<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a>diag <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit, <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>)</span>
+<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a>checklist <span class="ot">&lt;-</span> <span class="fu">reporting_checklist</span>(fit, <span class="at">diagnostics =</span> diag)</span>
+<span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a><span class="fu">subset</span>(</span>
+<span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a>  checklist<span class="sc">$</span>checklist,</span>
+<span id="cb1-18"><a href="#cb1-18" tabindex="-1"></a>  Section <span class="sc">==</span> <span class="st">&quot;Visual Displays&quot;</span>,</span>
+<span id="cb1-19"><a href="#cb1-19" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;Item&quot;</span>, <span class="st">&quot;Available&quot;</span>, <span class="st">&quot;NextAction&quot;</span>)</span>
+<span id="cb1-20"><a href="#cb1-20" tabindex="-1"></a>)</span></code></pre></div>
 </div>
 <div id="targeting-and-scale-structure" class="section level2">
 <h2>1. Targeting and scale structure</h2>
@@ -391,12 +390,37 @@ persons, facet levels, and step thresholds.</p>
 <li>Compare person density on the left to facet and step locations on
 the right.</li>
 <li>Large gaps suggest weaker targeting in that logit region.</li>
-<li>Wide overlap in confidence whiskers means neighboring levels are not
-cleanly separated.</li>
+<li>Wide overlap in marginal confidence whiskers suggests imprecision;
+estimate the relevant pairwise contrast directly before claiming that
+two levels are separated or indistinguishable.</li>
 </ul>
+<p>The native view above remains the recommended analytic figure because
+it keeps facet uncertainty and fitted step locations visible. For a
+closer FACETS-facing handoff, switch the renderer and leave
+<code>show_ci</code> at its default <code>FALSE</code>. The fitted
+coordinates do not change.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">plot</span>(</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>  fit,</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>  <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>,</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  <span class="at">renderer =</span> <span class="st">&quot;facets&quot;</span>,</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>  <span class="at">category_labels =</span> <span class="fu">c</span>(</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>    <span class="st">`</span><span class="at">1</span><span class="st">`</span> <span class="ot">=</span> <span class="st">&quot;Beginning&quot;</span>, <span class="st">`</span><span class="at">2</span><span class="st">`</span> <span class="ot">=</span> <span class="st">&quot;Developing&quot;</span>, <span class="st">`</span><span class="at">3</span><span class="st">`</span> <span class="ot">=</span> <span class="st">&quot;Secure&quot;</span>, <span class="st">`</span><span class="at">4</span><span class="st">`</span> <span class="ot">=</span> <span class="st">&quot;Advanced&quot;</span></span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>  )</span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>)</span></code></pre></div>
+<p>This renderer uses one common logit ruler, a <code>*</code>
+person-frequency column, signed facet headers, every facet level, and
+short labeled score-transition lines. It is FACETS-style visual
+correspondence, not a claim that <code>mfrmr</code> and FACETS produce
+numerically identical estimates. A numerical comparison requires output
+from a documented FACETS version and aligned estimator, identification,
+score, and orientation settings. Set <code>show_ci = TRUE</code> only
+when you deliberately want a hybrid FACETS-style ruler with the mfrmr
+uncertainty extension. Use <code>draw = FALSE</code> and inspect the
+<code>facets_style</code> tables when rebuilding the display with
+ggplot2 or another graphics system.</p>
 <p>Next, use the pathway map when you want to see how expected scores
 progress across theta.</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">plot</span>(fit, <span class="at">type =</span> <span class="st">&quot;pathway&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">plot</span>(fit, <span class="at">type =</span> <span class="st">&quot;pathway&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
 <p>Interpretation:</p>
 <ul>
 <li>Steeper rises indicate stronger score progression.</li>
@@ -404,18 +428,42 @@ progress across theta.</p>
 govern the score.</li>
 <li>Flat or compressed regions suggest weaker category separation.</li>
 </ul>
+<p>The expected-score pathway is not a fit pathway. To review measure
+against Infit, place Infit on the horizontal axis and include person
+rows explicitly:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">plot</span>(</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>  fit,</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  <span class="at">type =</span> <span class="st">&quot;fit_pathway&quot;</span>,</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag,</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>  <span class="at">fit_stat =</span> <span class="st">&quot;Infit&quot;</span>,</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>  <span class="at">fit_scale =</span> <span class="st">&quot;mnsq&quot;</span>,</span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>  <span class="at">include_person =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>  <span class="at">show_ci =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a>)</span></code></pre></div>
+<p>Interpretation:</p>
+<ul>
+<li>The vertical axis remains the fitted measure in logits.</li>
+<li>The horizontal axis is Infit MnSq; the 1.0 line is the
+model-expectation reference.</li>
+<li>Vertical whiskers show measure uncertainty; person and non-person
+rows have distinct uncertainty bases, recorded in the draw-free payload
+metadata.</li>
+<li>Treat displaced or flagged rows as review prompts, not automatic
+exclusions.</li>
+</ul>
 </div>
 <div id="local-response-and-level-issues" class="section level2">
 <h2>2. Local response and level issues</h2>
 <p>Unexpected-response screening is useful for case-level review.</p>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">plot_unexpected</span>(</span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>  fit,</span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag,</span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  <span class="at">abs_z_min =</span> <span class="fl">1.5</span>,</span>
-<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>  <span class="at">prob_max =</span> <span class="fl">0.4</span>,</span>
-<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>  <span class="at">plot_type =</span> <span class="st">&quot;scatter&quot;</span>,</span>
-<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
-<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">plot_unexpected</span>(</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  fit,</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag,</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="at">abs_z_min =</span> <span class="fl">1.5</span>,</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  <span class="at">prob_max =</span> <span class="fl">0.4</span>,</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>  <span class="at">plot_type =</span> <span class="st">&quot;scatter&quot;</span>,</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>)</span></code></pre></div>
 <p>Interpretation:</p>
 <ul>
 <li>Upper corners combine large residual mismatch with low model
@@ -425,13 +473,13 @@ informative than a single extreme point.</li>
 </ul>
 <p>Displacement focuses on level movement rather than individual
 responses.</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">plot_displacement</span>(</span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>  fit,</span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag,</span>
-<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>  <span class="at">anchored_only =</span> <span class="cn">FALSE</span>,</span>
-<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>  <span class="at">plot_type =</span> <span class="st">&quot;lollipop&quot;</span>,</span>
-<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
-<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="fu">plot_displacement</span>(</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>  fit,</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag,</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>  <span class="at">anchored_only =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>  <span class="at">plot_type =</span> <span class="st">&quot;lollipop&quot;</span>,</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>)</span></code></pre></div>
 <p>Interpretation:</p>
 <ul>
 <li>Large absolute displacement indicates stronger tension between
@@ -447,36 +495,36 @@ the legacy and strict branches stay visible side by side. The chunk
 below uses compact quadrature for optional local execution; final
 reporting should be refit with the package default or a higher
 quadrature setting.</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>fit_strict <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  toy,</span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
-<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
-<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">7</span>,</span>
-<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>  <span class="at">maxit =</span> <span class="dv">40</span></span>
-<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a>)</span>
-<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a></span>
-<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a>diag_strict <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(</span>
-<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a>  fit_strict,</span>
-<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a>  <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>,</span>
-<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a>  <span class="at">diagnostic_mode =</span> <span class="st">&quot;both&quot;</span></span>
-<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a>)</span>
-<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a></span>
-<span id="cb6-18"><a href="#cb6-18" tabindex="-1"></a>strict_checklist <span class="ot">&lt;-</span> <span class="fu">reporting_checklist</span>(fit_strict, <span class="at">diagnostics =</span> diag_strict)</span>
-<span id="cb6-19"><a href="#cb6-19" tabindex="-1"></a><span class="fu">subset</span>(</span>
-<span id="cb6-20"><a href="#cb6-20" tabindex="-1"></a>  strict_checklist<span class="sc">$</span>checklist,</span>
-<span id="cb6-21"><a href="#cb6-21" tabindex="-1"></a>  Section <span class="sc">==</span> <span class="st">&quot;Visual Displays&quot;</span> <span class="sc">&amp;</span></span>
-<span id="cb6-22"><a href="#cb6-22" tabindex="-1"></a>    Item <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;QC / facet dashboard&quot;</span>, <span class="st">&quot;Strict marginal visuals&quot;</span>),</span>
-<span id="cb6-23"><a href="#cb6-23" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;Item&quot;</span>, <span class="st">&quot;Available&quot;</span>, <span class="st">&quot;NextAction&quot;</span>)</span>
-<span id="cb6-24"><a href="#cb6-24" tabindex="-1"></a>)</span>
-<span id="cb6-25"><a href="#cb6-25" tabindex="-1"></a></span>
-<span id="cb6-26"><a href="#cb6-26" tabindex="-1"></a><span class="fu">plot_marginal_fit</span>(</span>
-<span id="cb6-27"><a href="#cb6-27" tabindex="-1"></a>  diag_strict,</span>
-<span id="cb6-28"><a href="#cb6-28" tabindex="-1"></a>  <span class="at">top_n =</span> <span class="dv">12</span>,</span>
-<span id="cb6-29"><a href="#cb6-29" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
-<span id="cb6-30"><a href="#cb6-30" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>fit_strict <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>  toy,</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">7</span>,</span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a>  <span class="at">maxit =</span> <span class="dv">40</span></span>
+<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a>)</span>
+<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a></span>
+<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a>diag_strict <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(</span>
+<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a>  fit_strict,</span>
+<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a>  <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>,</span>
+<span id="cb8-15"><a href="#cb8-15" tabindex="-1"></a>  <span class="at">diagnostic_mode =</span> <span class="st">&quot;both&quot;</span></span>
+<span id="cb8-16"><a href="#cb8-16" tabindex="-1"></a>)</span>
+<span id="cb8-17"><a href="#cb8-17" tabindex="-1"></a></span>
+<span id="cb8-18"><a href="#cb8-18" tabindex="-1"></a>strict_checklist <span class="ot">&lt;-</span> <span class="fu">reporting_checklist</span>(fit_strict, <span class="at">diagnostics =</span> diag_strict)</span>
+<span id="cb8-19"><a href="#cb8-19" tabindex="-1"></a><span class="fu">subset</span>(</span>
+<span id="cb8-20"><a href="#cb8-20" tabindex="-1"></a>  strict_checklist<span class="sc">$</span>checklist,</span>
+<span id="cb8-21"><a href="#cb8-21" tabindex="-1"></a>  Section <span class="sc">==</span> <span class="st">&quot;Visual Displays&quot;</span> <span class="sc">&amp;</span></span>
+<span id="cb8-22"><a href="#cb8-22" tabindex="-1"></a>    Item <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;QC / facet dashboard&quot;</span>, <span class="st">&quot;Strict marginal visuals&quot;</span>),</span>
+<span id="cb8-23"><a href="#cb8-23" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;Item&quot;</span>, <span class="st">&quot;Available&quot;</span>, <span class="st">&quot;NextAction&quot;</span>)</span>
+<span id="cb8-24"><a href="#cb8-24" tabindex="-1"></a>)</span>
+<span id="cb8-25"><a href="#cb8-25" tabindex="-1"></a></span>
+<span id="cb8-26"><a href="#cb8-26" tabindex="-1"></a><span class="fu">plot_marginal_fit</span>(</span>
+<span id="cb8-27"><a href="#cb8-27" tabindex="-1"></a>  diag_strict,</span>
+<span id="cb8-28"><a href="#cb8-28" tabindex="-1"></a>  <span class="at">top_n =</span> <span class="dv">12</span>,</span>
+<span id="cb8-29"><a href="#cb8-29" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
+<span id="cb8-30"><a href="#cb8-30" tabindex="-1"></a>)</span></code></pre></div>
 <p>Interpretation:</p>
 <ul>
 <li>Treat strict marginal plots as exploratory corroboration screens,
@@ -492,8 +540,8 @@ supports the strict branch before routing figures into a report.</li>
 <h2>3. Linking and coverage</h2>
 <p>When the design may be incomplete or spread across subsets, inspect
 the coverage matrix before interpreting cross-subset contrasts.</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>sc <span class="ot">&lt;-</span> <span class="fu">subset_connectivity_report</span>(fit, <span class="at">diagnostics =</span> diag)</span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="fu">plot</span>(sc, <span class="at">type =</span> <span class="st">&quot;design_matrix&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>sc <span class="ot">&lt;-</span> <span class="fu">subset_connectivity_report</span>(fit, <span class="at">diagnostics =</span> diag)</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="fu">plot</span>(sc, <span class="at">type =</span> <span class="st">&quot;design_matrix&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
 <p>Interpretation:</p>
 <ul>
 <li>Sparse rows or columns indicate weak subset coverage.</li>
@@ -502,15 +550,15 @@ comparisons.</li>
 </ul>
 <p>If you are working across administrations, follow up with
 anchor-drift plots:</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>drift <span class="ot">&lt;-</span> <span class="fu">detect_anchor_drift</span>(current_fit, <span class="at">baseline =</span> baseline_anchors)</span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="fu">plot_anchor_drift</span>(drift, <span class="at">type =</span> <span class="st">&quot;heatmap&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>drift <span class="ot">&lt;-</span> <span class="fu">detect_anchor_drift</span>(current_fit, <span class="at">baseline =</span> baseline_anchors)</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a><span class="fu">plot_anchor_drift</span>(drift, <span class="at">type =</span> <span class="st">&quot;heatmap&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
 </div>
 <div id="residual-structure-and-interaction-screens" class="section level2">
 <h2>4. Residual structure and interaction screens</h2>
 <p>Residual PCA is a follow-up layer after the main fit screen.</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>diag_pca <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit, <span class="at">residual_pca =</span> <span class="st">&quot;both&quot;</span>, <span class="at">pca_max_factors =</span> <span class="dv">4</span>)</span>
-<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>pca <span class="ot">&lt;-</span> <span class="fu">analyze_residual_pca</span>(diag_pca, <span class="at">mode =</span> <span class="st">&quot;both&quot;</span>)</span>
-<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="fu">plot_residual_pca</span>(pca, <span class="at">mode =</span> <span class="st">&quot;overall&quot;</span>, <span class="at">plot_type =</span> <span class="st">&quot;scree&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>diag_pca <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit, <span class="at">residual_pca =</span> <span class="st">&quot;both&quot;</span>, <span class="at">pca_max_factors =</span> <span class="dv">4</span>)</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>pca <span class="ot">&lt;-</span> <span class="fu">analyze_residual_pca</span>(diag_pca, <span class="at">mode =</span> <span class="st">&quot;both&quot;</span>)</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a><span class="fu">plot_residual_pca</span>(pca, <span class="at">mode =</span> <span class="st">&quot;overall&quot;</span>, <span class="at">plot_type =</span> <span class="st">&quot;scree&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
 <p>Interpretation:</p>
 <ul>
 <li>Early components with noticeably larger eigenvalues deserve
@@ -519,26 +567,26 @@ follow-up.</li>
 component of interest.</li>
 </ul>
 <p>For interaction screening, use the packaged bias example.</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>bias_df <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_bias&quot;</span>)</span>
-<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a></span>
-<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>fit_bias <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
-<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>  bias_df,</span>
-<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
-<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
-<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
-<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
-<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">7</span></span>
-<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a>)</span>
-<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a></span>
-<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a>diag_bias <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit_bias, <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>)</span>
-<span id="cb10-14"><a href="#cb10-14" tabindex="-1"></a>bias <span class="ot">&lt;-</span> <span class="fu">estimate_bias</span>(fit_bias, diag_bias, <span class="at">facet_a =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">facet_b =</span> <span class="st">&quot;Criterion&quot;</span>)</span>
-<span id="cb10-15"><a href="#cb10-15" tabindex="-1"></a></span>
-<span id="cb10-16"><a href="#cb10-16" tabindex="-1"></a><span class="fu">plot_bias_interaction</span>(</span>
-<span id="cb10-17"><a href="#cb10-17" tabindex="-1"></a>  bias,</span>
-<span id="cb10-18"><a href="#cb10-18" tabindex="-1"></a>  <span class="at">plot =</span> <span class="st">&quot;facet_profile&quot;</span>,</span>
-<span id="cb10-19"><a href="#cb10-19" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
-<span id="cb10-20"><a href="#cb10-20" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>bias_df <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_bias&quot;</span>)</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a></span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>fit_bias <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>  bias_df,</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
+<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">7</span></span>
+<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a>)</span>
+<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a></span>
+<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a>diag_bias <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit_bias, <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>)</span>
+<span id="cb12-14"><a href="#cb12-14" tabindex="-1"></a>bias <span class="ot">&lt;-</span> <span class="fu">estimate_bias</span>(fit_bias, diag_bias, <span class="at">facet_a =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">facet_b =</span> <span class="st">&quot;Criterion&quot;</span>)</span>
+<span id="cb12-15"><a href="#cb12-15" tabindex="-1"></a></span>
+<span id="cb12-16"><a href="#cb12-16" tabindex="-1"></a><span class="fu">plot_bias_interaction</span>(</span>
+<span id="cb12-17"><a href="#cb12-17" tabindex="-1"></a>  bias,</span>
+<span id="cb12-18"><a href="#cb12-18" tabindex="-1"></a>  <span class="at">plot =</span> <span class="st">&quot;facet_profile&quot;</span>,</span>
+<span id="cb12-19"><a href="#cb12-19" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
+<span id="cb12-20"><a href="#cb12-20" tabindex="-1"></a>)</span></code></pre></div>
 <p>Interpretation:</p>
 <ul>
 <li>Facet profiles are useful for seeing whether a small number of
@@ -547,9 +595,41 @@ levels drives most flagged interaction cells.</li>
 corresponding tables and narrative reports.</li>
 </ul>
 </div>
+<div id="custom-figures-without-losing-the-evidence-boundary" class="section level2">
+<h2>5. Custom figures without losing the evidence boundary</h2>
+<p>The built-in plots are intended as safe defaults. Use
+<code>preset = &quot;monochrome&quot;</code> when a journal, accessibility review,
+or print workflow needs grayscale output. For journal figures, teaching
+material, dashboards, or lab-specific styles, use
+<code>draw = FALSE</code> and the plot-data accessors instead of editing
+screenshots.</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="fu">plot</span>(fit, <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;monochrome&quot;</span>)</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a></span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>wright_payload <span class="ot">&lt;-</span> <span class="fu">plot</span>(fit, <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>, <span class="at">draw =</span> <span class="cn">FALSE</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a><span class="fu">plot_data_components</span>(wright_payload)</span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a></span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a>locations <span class="ot">&lt;-</span> <span class="fu">plot_data</span>(wright_payload, <span class="at">component =</span> <span class="st">&quot;locations&quot;</span>)</span>
+<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a><span class="fu">head</span>(locations)</span>
+<span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a></span>
+<span id="cb13-9"><a href="#cb13-9" tabindex="-1"></a>pathway_long <span class="ot">&lt;-</span> <span class="fu">plot_data</span>(</span>
+<span id="cb13-10"><a href="#cb13-10" tabindex="-1"></a>  fit,</span>
+<span id="cb13-11"><a href="#cb13-11" tabindex="-1"></a>  <span class="at">type =</span> <span class="st">&quot;pathway&quot;</span>,</span>
+<span id="cb13-12"><a href="#cb13-12" tabindex="-1"></a>  <span class="at">component =</span> <span class="st">&quot;pathway_long&quot;</span>,</span>
+<span id="cb13-13"><a href="#cb13-13" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
+<span id="cb13-14"><a href="#cb13-14" tabindex="-1"></a>)</span>
+<span id="cb13-15"><a href="#cb13-15" tabindex="-1"></a><span class="fu">head</span>(pathway_long[, <span class="fu">c</span>(<span class="st">&quot;Layer&quot;</span>, <span class="st">&quot;CurveGroup&quot;</span>, <span class="st">&quot;Theta&quot;</span>, <span class="st">&quot;Value&quot;</span>)])</span></code></pre></div>
+<p>When you build a custom figure, keep the helper’s guidance tables
+with the plot data:</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="fu">names</span>(wright_payload<span class="sc">$</span>data)</span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>wright_payload<span class="sc">$</span>data<span class="sc">$</span>reference_lines</span></code></pre></div>
+<p>Those metadata are the guardrails for captions and interpretation.
+They let you change colors, labels, panels, or rendering technology
+while preserving the same measurement scale, reference lines, caveats,
+and reporting role used by the package-native plot.</p>
+</div>
 <div id="secondary-visual-layer" class="section level2">
-<h2>5. Secondary visual layer</h2>
-<p>The package ships a second-wave visual layer for teaching and
+<h2>6. Secondary visual layer</h2>
+<p>The package ships a complementary visual layer for teaching and
 diagnostic follow-up. These helpers are not default reporting figures;
 use them after the main screens above.</p>
 <ul>
@@ -587,25 +667,25 @@ separately from the MFRM likelihood. Rapid and slow response-time flags
 are descriptive quality-control prompts; they do not change measures and
 should not be treated as proof of disengagement, cheating, or
 speededness.</p>
-<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>toy_rt <span class="ot">&lt;-</span> toy</span>
-<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>toy_rt<span class="sc">$</span>ResponseTime <span class="ot">&lt;-</span> <span class="dv">12</span> <span class="sc">+</span> (<span class="fu">seq_len</span>(<span class="fu">nrow</span>(toy_rt)) <span class="sc">%%</span> <span class="dv">7</span>) <span class="sc">+</span></span>
-<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>  <span class="fu">as.numeric</span>(toy_rt<span class="sc">$</span>Score)</span>
-<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>toy_rt<span class="sc">$</span>ResponseTime[<span class="dv">1</span>] <span class="ot">&lt;-</span> <span class="dv">2</span></span>
-<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>toy_rt<span class="sc">$</span>ResponseTime[<span class="dv">2</span>] <span class="ot">&lt;-</span> <span class="dv">38</span></span>
-<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a></span>
-<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>rt <span class="ot">&lt;-</span> <span class="fu">response_time_review</span>(</span>
-<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>  toy_rt,</span>
-<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
-<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
-<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a>  <span class="at">time =</span> <span class="st">&quot;ResponseTime&quot;</span>,</span>
-<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a>  <span class="at">rapid_quantile =</span> <span class="fl">0.10</span>,</span>
-<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a>  <span class="at">slow_quantile =</span> <span class="fl">0.90</span></span>
-<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a>)</span>
-<span id="cb11-16"><a href="#cb11-16" tabindex="-1"></a></span>
-<span id="cb11-17"><a href="#cb11-17" tabindex="-1"></a><span class="fu">summary</span>(rt)</span>
-<span id="cb11-18"><a href="#cb11-18" tabindex="-1"></a><span class="fu">plot_response_time_review</span>(rt, <span class="at">type =</span> <span class="st">&quot;distribution&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span>
-<span id="cb11-19"><a href="#cb11-19" tabindex="-1"></a><span class="fu">plot_response_time_review</span>(rt, <span class="at">type =</span> <span class="st">&quot;person&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>toy_rt <span class="ot">&lt;-</span> toy</span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>toy_rt<span class="sc">$</span>ResponseTime <span class="ot">&lt;-</span> <span class="dv">12</span> <span class="sc">+</span> (<span class="fu">seq_len</span>(<span class="fu">nrow</span>(toy_rt)) <span class="sc">%%</span> <span class="dv">7</span>) <span class="sc">+</span></span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a>  <span class="fu">as.numeric</span>(toy_rt<span class="sc">$</span>Score)</span>
+<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a>toy_rt<span class="sc">$</span>ResponseTime[<span class="dv">1</span>] <span class="ot">&lt;-</span> <span class="dv">2</span></span>
+<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a>toy_rt<span class="sc">$</span>ResponseTime[<span class="dv">2</span>] <span class="ot">&lt;-</span> <span class="dv">38</span></span>
+<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a></span>
+<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a>rt <span class="ot">&lt;-</span> <span class="fu">response_time_review</span>(</span>
+<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a>  toy_rt,</span>
+<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb15-10"><a href="#cb15-10" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb15-11"><a href="#cb15-11" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb15-12"><a href="#cb15-12" tabindex="-1"></a>  <span class="at">time =</span> <span class="st">&quot;ResponseTime&quot;</span>,</span>
+<span id="cb15-13"><a href="#cb15-13" tabindex="-1"></a>  <span class="at">rapid_quantile =</span> <span class="fl">0.10</span>,</span>
+<span id="cb15-14"><a href="#cb15-14" tabindex="-1"></a>  <span class="at">slow_quantile =</span> <span class="fl">0.90</span></span>
+<span id="cb15-15"><a href="#cb15-15" tabindex="-1"></a>)</span>
+<span id="cb15-16"><a href="#cb15-16" tabindex="-1"></a></span>
+<span id="cb15-17"><a href="#cb15-17" tabindex="-1"></a><span class="fu">summary</span>(rt)</span>
+<span id="cb15-18"><a href="#cb15-18" tabindex="-1"></a><span class="fu">plot_response_time_review</span>(rt, <span class="at">type =</span> <span class="st">&quot;distribution&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span>
+<span id="cb15-19"><a href="#cb15-19" tabindex="-1"></a><span class="fu">plot_response_time_review</span>(rt, <span class="at">type =</span> <span class="st">&quot;person&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
 <p>Interpretation:</p>
 <ul>
 <li>Start with the distribution plot to see whether the rapid/slow
@@ -624,28 +704,28 @@ large raw severity estimate can be a noisy estimate rather than a stable
 facet signal. The shrinkage funnel shows how far empirical-Bayes pooling
 moved each level toward the facet mean and whether the uncertainty
 remains wide after pooling.</p>
-<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>fit_eb <span class="ot">&lt;-</span> <span class="fu">apply_empirical_bayes_shrinkage</span>(fit)</span>
-<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a></span>
-<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>shrink <span class="ot">&lt;-</span> <span class="fu">plot_shrinkage_funnel</span>(</span>
-<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>  fit_eb,</span>
-<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>  <span class="at">show_ci =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>  <span class="at">ci_level =</span> <span class="fl">0.95</span>,</span>
-<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>,</span>
-<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>  <span class="at">draw =</span> <span class="cn">FALSE</span></span>
-<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>)</span>
-<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a></span>
-<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a><span class="fu">head</span>(shrink<span class="sc">$</span>data<span class="sc">$</span>table[, <span class="fu">c</span>(</span>
-<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a>  <span class="st">&quot;Facet&quot;</span>, <span class="st">&quot;Level&quot;</span>, <span class="st">&quot;RawEstimate&quot;</span>, <span class="st">&quot;RawCI_Lower&quot;</span>, <span class="st">&quot;RawCI_Upper&quot;</span>,</span>
-<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a>  <span class="st">&quot;ShrunkEstimate&quot;</span>, <span class="st">&quot;ShrunkCI_Lower&quot;</span>, <span class="st">&quot;ShrunkCI_Upper&quot;</span>,</span>
-<span id="cb12-14"><a href="#cb12-14" tabindex="-1"></a>  <span class="st">&quot;ShrinkageFactor&quot;</span></span>
-<span id="cb12-15"><a href="#cb12-15" tabindex="-1"></a>)])</span>
-<span id="cb12-16"><a href="#cb12-16" tabindex="-1"></a></span>
-<span id="cb12-17"><a href="#cb12-17" tabindex="-1"></a><span class="fu">plot_shrinkage_funnel</span>(</span>
-<span id="cb12-18"><a href="#cb12-18" tabindex="-1"></a>  fit_eb,</span>
-<span id="cb12-19"><a href="#cb12-19" tabindex="-1"></a>  <span class="at">show_ci =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb12-20"><a href="#cb12-20" tabindex="-1"></a>  <span class="at">ci_level =</span> <span class="fl">0.95</span>,</span>
-<span id="cb12-21"><a href="#cb12-21" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
-<span id="cb12-22"><a href="#cb12-22" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>fit_eb <span class="ot">&lt;-</span> <span class="fu">apply_empirical_bayes_shrinkage</span>(fit)</span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a></span>
+<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a>shrink <span class="ot">&lt;-</span> <span class="fu">plot_shrinkage_funnel</span>(</span>
+<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a>  fit_eb,</span>
+<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a>  <span class="at">show_ci =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a>  <span class="at">ci_level =</span> <span class="fl">0.95</span>,</span>
+<span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>,</span>
+<span id="cb16-8"><a href="#cb16-8" tabindex="-1"></a>  <span class="at">draw =</span> <span class="cn">FALSE</span></span>
+<span id="cb16-9"><a href="#cb16-9" tabindex="-1"></a>)</span>
+<span id="cb16-10"><a href="#cb16-10" tabindex="-1"></a></span>
+<span id="cb16-11"><a href="#cb16-11" tabindex="-1"></a><span class="fu">head</span>(shrink<span class="sc">$</span>data<span class="sc">$</span>table[, <span class="fu">c</span>(</span>
+<span id="cb16-12"><a href="#cb16-12" tabindex="-1"></a>  <span class="st">&quot;Facet&quot;</span>, <span class="st">&quot;Level&quot;</span>, <span class="st">&quot;RawEstimate&quot;</span>, <span class="st">&quot;RawCI_Lower&quot;</span>, <span class="st">&quot;RawCI_Upper&quot;</span>,</span>
+<span id="cb16-13"><a href="#cb16-13" tabindex="-1"></a>  <span class="st">&quot;ShrunkEstimate&quot;</span>, <span class="st">&quot;ShrunkCI_Lower&quot;</span>, <span class="st">&quot;ShrunkCI_Upper&quot;</span>,</span>
+<span id="cb16-14"><a href="#cb16-14" tabindex="-1"></a>  <span class="st">&quot;ShrinkageFactor&quot;</span></span>
+<span id="cb16-15"><a href="#cb16-15" tabindex="-1"></a>)])</span>
+<span id="cb16-16"><a href="#cb16-16" tabindex="-1"></a></span>
+<span id="cb16-17"><a href="#cb16-17" tabindex="-1"></a><span class="fu">plot_shrinkage_funnel</span>(</span>
+<span id="cb16-18"><a href="#cb16-18" tabindex="-1"></a>  fit_eb,</span>
+<span id="cb16-19"><a href="#cb16-19" tabindex="-1"></a>  <span class="at">show_ci =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb16-20"><a href="#cb16-20" tabindex="-1"></a>  <span class="at">ci_level =</span> <span class="fl">0.95</span>,</span>
+<span id="cb16-21"><a href="#cb16-21" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
+<span id="cb16-22"><a href="#cb16-22" tabindex="-1"></a>)</span></code></pre></div>
 <p>Interpretation:</p>
 <ul>
 <li>Long raw-to-shrunken segments identify levels most affected by the

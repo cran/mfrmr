@@ -272,7 +272,7 @@ export_recovery_validation_summary_fixture <- function() {
       Evidence = "max_zero_score_levels=1",
       ReportingImplication = "Report sparse generated score support as condition stress.",
       NextAction = "Inspect category-level recovery before generalizing.",
-      ValidationUse = "generator_condition_not_release_gate",
+      ValidationUse = "generator_condition_context",
       stringsAsFactors = FALSE
     ),
     condition_summary = data.frame(
@@ -289,7 +289,7 @@ export_recovery_validation_summary_fixture <- function() {
       Evidence = "mean_separation=0; mean_reliability=0",
       ReportingImplication = "Report zero separation as diagnostic context.",
       NextAction = "Inspect the generated condition before using reliability language.",
-      ValidationUse = "diagnostic_only_not_release_gate",
+      ValidationUse = "diagnostic_context_only",
       stringsAsFactors = FALSE
     ),
     diagnostic_oc_summary = data.frame(
@@ -298,7 +298,7 @@ export_recovery_validation_summary_fixture <- function() {
       MeanSeparation = 0,
       MeanReliability = 0,
       DiagnosticAvailability = "available",
-      ValidationUse = "diagnostic_only_not_release_gate",
+      ValidationUse = "diagnostic_context_only",
       stringsAsFactors = FALSE
     ),
     domain_decision_table = data.frame(
@@ -668,7 +668,7 @@ test_that("build_mfrm_manifest captures reproducibility metadata", {
     manifest$available_outputs$Available[manifest$available_outputs$Component == "bias_results"][1]
   )
   expect_equal(manifest$summary$Method[[1]], "JML")
-  expect_equal(manifest$summary$MethodUsed[[1]], "JMLE")
+  expect_equal(manifest$summary$MethodUsed[[1]], "JML")
   expect_equal(manifest$summary$Observations[[1]], nrow(export_core_fixture$fit$prep$data))
   expect_equal(manifest$summary$Persons[[1]], export_core_fixture$fit$config$n_person)
 })
@@ -1004,13 +1004,16 @@ test_that("build_mfrm_replay_script rejects omit latent-regression fits without 
   )
 })
 
-test_that("build_conquest_overlap_bundle returns a minimal exact-overlap bundle", {
+test_that("build_conquest_overlap_bundle returns a minimal supported-scope bundle", {
   bundle <- build_conquest_overlap_bundle()
 
+  expect_identical(formals(build_conquest_overlap_bundle)$reltol, 1e-9)
+  expect_identical(formals(mfrmr:::resolve_conquest_overlap_input)$reltol, 1e-9)
   expect_s3_class(bundle, "mfrm_conquest_overlap_bundle")
   expect_true(is.data.frame(bundle$summary))
   expect_true(is.data.frame(bundle$comparison_targets))
   expect_true(is.data.frame(bundle$conquest_output_contract))
+  expect_true(is.data.frame(bundle$privacy_notice))
   expect_true(is.data.frame(bundle$response_wide))
   expect_true(is.data.frame(bundle$person_data))
   expect_true(is.data.frame(bundle$item_map))
@@ -1027,13 +1030,61 @@ test_that("build_conquest_overlap_bundle returns a minimal exact-overlap bundle"
   expect_identical(bundle$summary$PopulationIncludedPersons[[1]], 60L)
   expect_identical(bundle$summary$PopulationOmittedPersons[[1]], 0L)
   expect_identical(bundle$summary$PopulationResponseRowsOmitted[[1]], 0L)
+  expect_identical(bundle$summary$MfrmrQuadraturePoints[[1]], 7L)
+  expect_identical(bundle$summary$ConQuestQuadratureNodes[[1]], 7L)
+  expect_identical(bundle$summary$MfrmrMaxit[[1]], 40L)
+  expect_equal(bundle$summary$MfrmrReltol[[1]], 1e-9)
+  expect_identical(bundle$summary$MfrmrMMLEngineUsed[[1]], "direct")
+  expect_true(nzchar(bundle$summary$MfrmrConvergenceStatus[[1]]))
+  expect_true(nzchar(bundle$summary$MfrmrConvergenceSeverity[[1]]))
+  expect_true(is.finite(bundle$summary$MfrmrTerminalGradientSupNorm[[1]]))
+  expect_true(is.logical(bundle$summary$MfrmrInferenceReady))
+  fit_setting <- function(key) {
+    as.character(bundle$settings$Value[bundle$settings$Setting == key][1])
+  }
+  expect_identical(fit_setting("mfrmr_maxit"), "40")
+  expect_identical(fit_setting("mfrmr_reltol"), "1e-09")
+  expect_identical(fit_setting("mfrmr_mml_engine_used"), "direct")
+  expect_identical(
+    fit_setting("mfrmr_convergence_status"),
+    as.character(bundle$summary$MfrmrConvergenceStatus[[1]])
+  )
+  expect_identical(
+    fit_setting("mfrmr_convergence_severity"),
+    as.character(bundle$summary$MfrmrConvergenceSeverity[[1]])
+  )
+  expect_equal(
+    as.numeric(fit_setting("mfrmr_terminal_gradient_sup_norm")),
+    bundle$summary$MfrmrTerminalGradientSupNorm[[1]]
+  )
+  expect_identical(
+    fit_setting("mfrmr_inference_ready"),
+    as.character(bundle$summary$MfrmrInferenceReady[[1]])
+  )
+  expect_identical(
+    bundle$summary$PrivacyClass[[1]],
+    "potentially_identifying_analysis_data"
+  )
+  expect_false(bundle$summary$Deidentified[[1]])
+  expect_false(bundle$summary$ShareableWithoutReview[[1]])
+  expect_true(all(bundle$privacy_notice$Deidentified %in% FALSE))
+  expect_true(any(grepl("item responses", bundle$privacy_notice$Contains, fixed = TRUE)))
+  expect_true(any(grepl("case", tolower(bundle$privacy_notice$Artifact), fixed = TRUE)))
   expect_true(all(c(
     "ExternalFile",
     "ConQuestCommand",
     "ReviewHandoff",
+    "DataHandling",
     "RequiredForReview"
   ) %in% names(bundle$conquest_output_contract)))
   expect_equal(sum(bundle$conquest_output_contract$RequiredForReview %in% TRUE), 4)
+  expect_match(
+    bundle$conquest_output_contract$DataHandling[
+      grepl("_conquest_cases_eap.csv", bundle$conquest_output_contract$ExternalFile, fixed = TRUE)
+    ][1],
+    "Contains person identifiers and person-level EAP estimates",
+    fixed = TRUE
+  )
   expect_true(any(grepl("_conquest_parameters_review.txt", bundle$conquest_output_contract$ExternalFile, fixed = TRUE)))
   expect_true(all(sort(unique(unlist(bundle$response_wide[sprintf("I%03d", 1:6)]))) %in% c(0, 1)))
   expect_identical(names(bundle$person_data), c("Person", "X"))
@@ -1047,16 +1098,30 @@ test_that("build_conquest_overlap_bundle returns a minimal exact-overlap bundle"
   expect_match(bundle$conquest_command, "keepswidth=32", fixed = TRUE)
   expect_match(bundle$conquest_command, "regression X;", fixed = TRUE)
   expect_match(bundle$conquest_command, "model item;", fixed = TRUE)
+  expect_match(
+    bundle$conquest_command,
+    "estimate ! method=quadrature, nodes=7, fit=no, stderr=quick;",
+    fixed = TRUE
+  )
+  expect_false(grepl("score (0,1);", bundle$conquest_command, fixed = TRUE))
   expect_match(bundle$conquest_command, "export parameters ! filetype=csv", fixed = TRUE)
   expect_match(bundle$conquest_command, "export reg_coefficients ! filetype=csv", fixed = TRUE)
   expect_match(bundle$conquest_command, "export covariance ! filetype=csv", fixed = TRUE)
   expect_match(bundle$conquest_command, "show cases ! estimates=eap, filetype=csv, regressors=yes", fixed = TRUE)
+  expect_match(bundle$conquest_command, "show parameters ! tables=1:2:3:4", fixed = TRUE)
+  expect_match(bundle$conquest_command, "quit;", fixed = TRUE)
 
   s <- summary(bundle)
   expect_s3_class(s, "summary.mfrm_bundle")
   expect_identical(as.character(s$overview$Class[1]), "mfrm_conquest_overlap_bundle")
   expect_true(is.data.frame(s$conquest_command_scope))
   expect_true(is.data.frame(s$conquest_output_contract))
+  expect_true(is.data.frame(s$mfrmr_fit_status))
+  expect_true(all(c("Item", "Value") %in% names(s$mfrmr_fit_status)))
+  expect_true(all(c(
+    "MML engine used", "Maximum iterations", "Relative tolerance",
+    "Convergence", "Severity", "Terminal gradient (sup-norm)", "Inference ready"
+  ) %in% s$mfrmr_fit_status$Item))
   expect_true(all(c(
     "ConQuest command template",
     "Command-comment syntax",
@@ -1079,11 +1144,60 @@ test_that("build_conquest_overlap_bundle returns a minimal exact-overlap bundle"
   )
   expect_true(any(grepl("reg_coefficients", s$conquest_output_contract$ConQuestCommand, fixed = TRUE)))
   printed <- paste(capture.output(print(s)), collapse = "\n")
+  expect_match(printed, "mfrmr fit status", fixed = TRUE)
+  expect_match(printed, "Relative tolerance", fixed = TRUE)
+  expect_match(printed, "Inference ready", fixed = TRUE)
   expect_match(printed, "ConQuest command scope", fixed = TRUE)
   expect_match(printed, "ConQuest output contract", fixed = TRUE)
   expect_match(printed, "block comments", fixed = TRUE)
   expect_match(printed, "explicit CSV widths", fixed = TRUE)
   expect_match(printed, "not claimed", fixed = TRUE)
+})
+
+test_that("build_conquest_overlap_bundle records controls from a supplied fit", {
+  fit <- latent_prediction_bundle_fixture$fit
+  bundle <- build_conquest_overlap_bundle(
+    fit = fit,
+    quad_points = 1L,
+    maxit = 1L,
+    reltol = 0.1
+  )
+  ctl <- fit$config$estimation_control
+  fit_summary <- as.data.frame(fit$summary, stringsAsFactors = FALSE)
+  convergence <- mfrmr:::mfrm_convergence_state(fit)
+
+  expect_identical(bundle$summary$MfrmrMaxit[[1]], as.integer(ctl$maxit))
+  expect_equal(bundle$summary$MfrmrReltol[[1]], as.numeric(ctl$reltol))
+  expect_identical(
+    bundle$summary$MfrmrMMLEngineUsed[[1]],
+    as.character(fit_summary$MMLEngineUsed[[1]])
+  )
+  expect_identical(
+    bundle$summary$MfrmrConvergenceStatus[[1]],
+    as.character(convergence$status)
+  )
+  expect_identical(
+    bundle$summary$MfrmrConvergenceSeverity[[1]],
+    as.character(convergence$severity)
+  )
+  expect_equal(
+    bundle$summary$MfrmrTerminalGradientSupNorm[[1]],
+    as.numeric(fit_summary$TerminalGradientSupNorm[[1]])
+  )
+  expect_identical(
+    bundle$summary$MfrmrInferenceReady[[1]],
+    isTRUE(convergence$inference_ready)
+  )
+  expect_false(identical(bundle$summary$MfrmrMaxit[[1]], 1L))
+  expect_false(isTRUE(all.equal(bundle$summary$MfrmrReltol[[1]], 0.1)))
+
+  fit_without_used_engine <- fit
+  fit_without_used_engine$summary$MMLEngineUsed <- NULL
+  fit_without_used_engine$config$estimation_control$mml_engine_used <- NULL
+  status_without_used_engine <- mfrmr:::conquest_overlap_mfrmr_fit_status(
+    fit_without_used_engine
+  )
+  expect_true(is.na(status_without_used_engine$engine))
 })
 
 test_that("build_conquest_overlap_bundle rejects intercept-only latent-regression fits", {
@@ -1124,7 +1238,7 @@ test_that("build_conquest_overlap_bundle rejects unsupported overlap contracts",
   fit_jml <- export_core_fixture$fit
   expect_error(
     build_conquest_overlap_bundle(fit_jml),
-    "supports only `MML` fits",
+    "requires an MML fit",
     fixed = TRUE
   )
 
@@ -1268,10 +1382,17 @@ test_that("build_conquest_overlap_bundle writes expected external-comparison fil
   if (dir.exists(out_dir)) unlink(out_dir, recursive = TRUE, force = TRUE)
   dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-  bundle <- build_conquest_overlap_bundle(
-    output_dir = out_dir,
-    prefix = "cq_overlap_test",
-    overwrite = TRUE
+  bundle <- NULL
+  expect_warning(
+    bundle <- build_conquest_overlap_bundle(
+      output_dir = out_dir,
+      prefix = "cq_overlap_test",
+      overwrite = TRUE,
+      quad_points = 3L,
+      maxit = 5L
+    ),
+    "contains person identifiers and sensitive person-level data",
+    fixed = TRUE
   )
 
   expect_s3_class(bundle, "mfrm_conquest_overlap_bundle")
@@ -1284,12 +1405,114 @@ test_that("build_conquest_overlap_bundle writes expected external-comparison fil
   expect_true(file.exists(file.path(out_dir, "cq_overlap_test_mfrmr_item_estimates.csv")))
   expect_true(file.exists(file.path(out_dir, "cq_overlap_test_mfrmr_case_eap.csv")))
   expect_true(file.exists(file.path(out_dir, "cq_overlap_test_conquest_output_contract.csv")))
+  expect_true(file.exists(file.path(out_dir, "cq_overlap_test_privacy_notice.csv")))
   expect_true(file.exists(file.path(out_dir, "cq_overlap_test_README.txt")))
+  expect_true("DataHandling" %in% names(bundle$written_files))
+  expect_match(
+    bundle$written_files$DataHandling[bundle$written_files$Component == "response_wide"][1],
+    "person_identifiers_and_item_responses",
+    fixed = TRUE
+  )
   readme <- paste(readLines(file.path(out_dir, "cq_overlap_test_README.txt"), warn = FALSE), collapse = "\n")
   expect_match(readme, "PopulationDesignColumns", fixed = TRUE)
   expect_match(readme, "PopulationResponseRowsOmitted", fixed = TRUE)
+  expect_match(readme, "mfrmr fit status", fixed = TRUE)
+  expect_match(readme, "MML engine used: direct", fixed = TRUE)
+  expect_match(readme, "Maximum optimizer iterations: 5", fixed = TRUE)
+  expect_match(readme, "Relative convergence tolerance: 1e-09", fixed = TRUE)
+  expect_match(readme, "Convergence status: iteration_limit", fixed = TRUE)
+  expect_match(readme, "Convergence severity: fail", fixed = TRUE)
+  expect_match(readme, "Terminal gradient sup-norm:", fixed = TRUE)
+  expect_match(readme, "Inference ready: no", fixed = TRUE)
+  expect_match(readme, "Important: The mfrmr fit is not inference-ready.", fixed = TRUE)
+  expect_false(bundle$summary$MfrmrInferenceReady[[1]])
   expect_match(readme, "Requested external ConQuest outputs", fixed = TRUE)
   expect_match(readme, "cq_overlap_test_conquest_reg_coefficients.csv", fixed = TRUE)
+  expect_match(readme, "normalize_conquest_overlap_exports()", fixed = TRUE)
+  expect_match(readme, "not a deidentified or automatically shareable export", fixed = TRUE)
+  expect_match(readme, "ConQuest case-EAP output contain person identifiers", fixed = TRUE)
+})
+
+test_that("normalize_conquest_overlap_exports reads the generated native CSV contract", {
+  bundle <- build_conquest_overlap_bundle()
+  out_dir <- file.path(tempdir(), "mfrmr-conquest-native-exports")
+  if (dir.exists(out_dir)) unlink(out_dir, recursive = TRUE, force = TRUE)
+  dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+  item <- as.data.frame(bundle$mfrmr_item_estimates, stringsAsFactors = FALSE)
+  parameter_file <- file.path(out_dir, "parameters.csv")
+  regression_file <- file.path(out_dir, "regression.csv")
+  covariance_file <- file.path(out_dir, "covariance.csv")
+  case_file <- file.path(out_dir, "cases.csv")
+  utils::write.csv(
+    data.frame(
+      P = seq_len(nrow(item) - 1L),
+      Estimate = item$CenteredEstimate[-nrow(item)],
+      Label = paste("item", tolower(item$ResponseVar[-nrow(item)])),
+      stringsAsFactors = FALSE
+    ),
+    parameter_file,
+    row.names = FALSE
+  )
+  coefficient_rows <- bundle$mfrmr_population$Parameter != "sigma2"
+  utils::write.csv(
+    data.frame(
+      Dimension = 1L,
+      Regressor = seq_len(sum(coefficient_rows)),
+      Estimate = bundle$mfrmr_population$Estimate[coefficient_rows]
+    ),
+    regression_file,
+    row.names = FALSE
+  )
+  utils::write.csv(
+    data.frame(Dim1 = 1L, Dim2 = 1L, Covariance = bundle$mfrmr_population$Estimate[!coefficient_rows]),
+    covariance_file,
+    row.names = FALSE
+  )
+  utils::write.csv(
+    data.frame(
+      PID = paste0("    ", bundle$mfrmr_case_eap$Person),
+      EAP_1 = bundle$mfrmr_case_eap$Estimate
+    ),
+    case_file,
+    row.names = FALSE
+  )
+
+  normalized <- normalize_conquest_overlap_exports(
+    bundle,
+    parameter_file,
+    regression_file,
+    covariance_file,
+    case_file,
+    conquest_version = "5.47.5",
+    conquest_edition = "demo/free",
+    run_date = as.Date("2026-07-23")
+  )
+  expect_s3_class(normalized, "mfrm_conquest_overlap_tables")
+  expect_identical(normalized$conquest_case_eap$Person, as.character(bundle$mfrmr_case_eap$Person))
+  expect_equal(
+    normalized$conquest_item_estimates$Estimate,
+    bundle$mfrmr_item_estimates$CenteredEstimate,
+    tolerance = 1e-10
+  )
+  expect_true(any(grepl("negative sum", normalized$notes, fixed = TRUE)))
+  normalized_setting <- function(key) {
+    as.character(normalized$settings$Value[normalized$settings$Setting == key][1])
+  }
+  expect_identical(normalized_setting("conquest_version"), "5.47.5")
+  expect_identical(normalized_setting("conquest_edition"), "demo/free")
+  expect_identical(normalized_setting("conquest_run_date"), "2026-07-23")
+
+  review <- review_conquest_overlap(bundle, normalized)
+  expect_identical(review$summary$AttentionItems, 0L)
+  expect_identical(review$summary$ItemRowsCompared, nrow(bundle$mfrmr_item_estimates))
+  expect_identical(review$summary$CaseRowsCompared, nrow(bundle$mfrmr_case_eap))
+  review_setting <- function(key) {
+    as.character(review$settings$Value[review$settings$Setting == key][1])
+  }
+  expect_identical(review_setting("conquest_version"), "5.47.5")
+  expect_identical(review_setting("conquest_edition"), "demo/free")
+  expect_identical(review_setting("conquest_run_date"), "2026-07-23")
 })
 
 test_that("build_conquest_overlap_bundle accepts the documented PCM overlap surface", {
@@ -1655,9 +1878,13 @@ test_that("review_conquest_overlap records non-numeric extracted estimates", {
     "ItemCenteredMaxAbsDifference",
     "CaseMaxAbsDifference",
     "PopulationMaxAbsParameter",
-    "ItemCenteredMaxAbsItem",
-    "CaseMaxAbsPerson"
+    "ItemCenteredMaxAbsItem"
   ) %in% names(s$summary)))
+  expect_false("CaseMaxAbsPerson" %in% names(s$summary))
+  expect_true(
+    "CaseMaxAbsPerson" %in%
+      names(summary(audit, include_person = TRUE)$summary)
+  )
   expect_equal(s$summary$AttentionNonNumeric[[1]], 3)
   printed <- paste(capture.output(print(s)), collapse = "\n")
   expect_match(printed, "AttentionNonNumeric", fixed = TRUE)
@@ -1968,6 +2195,8 @@ test_that("review_conquest_overlap records duplicate external rows as attention 
 
 test_that("review_conquest_overlap records missing external rows as attention items", {
   bundle <- build_conquest_overlap_bundle()
+  private_case_id <- "PRIVATE_CASE_ID_9QZ"
+  bundle$mfrmr_case_eap$Person[1] <- private_case_id
 
   missing_parameter <- bundle$mfrmr_population$Parameter[bundle$mfrmr_population$Parameter != "(Intercept)"][1]
   missing_item <- bundle$mfrmr_item_estimates$ResponseVar[1]
@@ -2029,9 +2258,23 @@ test_that("review_conquest_overlap records missing external rows as attention it
   ]
   expect_identical(as.character(attention_row$Status[1]), "review required")
   expect_identical(as.character(attention_row$Evidence[1]), "3 attention item(s)")
+  expect_false("CaseMaxAbsPerson" %in% names(s$summary))
+  expect_identical(
+    s$preview$ID[s$preview$Section == "cases"][1],
+    "<suppressed>"
+  )
+  expect_false(any(grepl(private_case_id, unlist(s), fixed = TRUE)))
   printed <- paste(capture.output(print(s)), collapse = "\n")
   expect_match(printed, "review required", fixed = TRUE)
   expect_match(printed, "missing_conquest_parameter", fixed = TRUE)
+  expect_false(grepl(private_case_id, printed, fixed = TRUE))
+
+  s_with_person <- summary(audit, include_person = TRUE)
+  expect_true("CaseMaxAbsPerson" %in% names(s_with_person$summary))
+  expect_true(any(grepl(private_case_id, unlist(s_with_person), fixed = TRUE)))
+  printed_with_person <- paste(capture.output(print(s_with_person)), collapse = "\n")
+  expect_match(printed_with_person, private_case_id, fixed = TRUE)
+  expect_identical(bundle$mfrmr_case_eap$Person[1], private_case_id)
 })
 
 test_that("review_conquest_overlap matches item IDs by response variable when requested", {
@@ -2404,7 +2647,8 @@ test_that("build_mfrm_replay_script preserves keep_original and rating range", {
   expect_match(replay$script, "keep_original = TRUE", fixed = TRUE)
   expect_match(replay$script, "rating_min = 1", fixed = TRUE)
   expect_match(replay$script, "rating_max = 5", fixed = TRUE)
-  expect_match(replay$script, "# Model: RSM | Method: JML | InternalMethod: JMLE", fixed = TRUE)
+  expect_match(replay$script, "# Model: RSM | Method: JML", fixed = TRUE)
+  expect_false(grepl("ResolvedMethod", replay$script, fixed = TRUE))
   expect_match(replay$script, "# population_active = FALSE", fixed = TRUE)
   expect_match(replay$script, "# posterior_basis = legacy_mml", fixed = TRUE)
   expect_match(replay$script, 'method = "JML"', fixed = TRUE)
@@ -2423,7 +2667,8 @@ test_that("export_mfrm_bundle writes requested tables and html output", {
       output_dir = out_dir,
       prefix = "bundle_test",
       include = c("core_tables", "checklist", "dashboard", "apa", "anchors", "manifest", "visual_summaries", "script", "html"),
-      overwrite = TRUE
+      overwrite = TRUE,
+      acknowledge_sensitive = TRUE
     )
   )
 
@@ -2441,6 +2686,35 @@ test_that("export_mfrm_bundle writes requested tables and html output", {
   expect_true(file.exists(file.path(out_dir, "bundle_test_visual_warning_map.txt")))
 })
 
+test_that("export_mfrm_bundle labels every fit-level archive as potentially identifying", {
+  out_dir <- file.path(tempdir(), "mfrmr-export-bundle-privacy")
+  if (dir.exists(out_dir)) unlink(out_dir, recursive = TRUE, force = TRUE)
+  dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+  expect_warning(
+    bundle <- export_mfrm_bundle(
+      fit = export_core_fixture$fit,
+      diagnostics = export_core_fixture$diagnostics,
+      output_dir = out_dir,
+      prefix = "bundle_privacy",
+      include = c("manifest", "html"),
+      overwrite = TRUE
+    ),
+    "not a deidentified"
+  )
+
+  expect_identical(bundle$summary$PrivacyClass[[1]], "analysis_archive")
+  expect_false(bundle$summary$Deidentified[[1]])
+  expect_false(bundle$summary$ShareableWithoutReview[[1]])
+  expect_false(bundle$summary$SensitiveDataAcknowledged[[1]])
+  expect_true("DataHandling" %in% names(bundle$written_files))
+  expect_true(all(nzchar(bundle$written_files$DataHandling)))
+  expect_false(bundle$privacy_notice$Deidentified[[1]])
+  html <- paste(readLines(file.path(out_dir, "bundle_privacy_bundle.html")), collapse = "\n")
+  expect_match(html, "Privacy and data handling", fixed = TRUE)
+  expect_match(html, "not a deidentified", fixed = TRUE)
+})
+
 test_that("export_mfrm_bundle writes optional prediction artifacts", {
   out_dir <- file.path(tempdir(), "mfrmr-export-bundle-predictions")
   if (dir.exists(out_dir)) unlink(out_dir, recursive = TRUE, force = TRUE)
@@ -2455,7 +2729,8 @@ test_that("export_mfrm_bundle writes optional prediction artifacts", {
     output_dir = out_dir,
     prefix = "bundle_pred_test",
     include = c("manifest", "predictions", "html"),
-    overwrite = TRUE
+    overwrite = TRUE,
+    acknowledge_sensitive = TRUE
   )
 
   expect_s3_class(bundle, "mfrm_export_bundle")
@@ -2514,7 +2789,8 @@ test_that("export_mfrm_bundle writes latent-regression scoring provenance artifa
     output_dir = out_dir,
     prefix = "bundle_latent_pred_test",
     include = c("manifest", "predictions", "script", "html"),
-    overwrite = TRUE
+    overwrite = TRUE,
+    acknowledge_sensitive = TRUE
   )
 
   expect_s3_class(bundle, "mfrm_export_bundle")
@@ -2601,7 +2877,8 @@ test_that("export_mfrm_bundle writes default summary-table bundles for manuscrip
     output_dir = out_dir,
     prefix = "bundle_summary_test",
     include = c("summary_tables", "html"),
-    overwrite = TRUE
+    overwrite = TRUE,
+    acknowledge_sensitive = TRUE
   )
   bundle_summary <- summary(bundle)
 
@@ -2943,7 +3220,7 @@ test_that("export_summary_appendix supports recovery-validation summaries", {
 
   expect_s3_class(appendix, "mfrm_summary_appendix_export")
   expect_true(any(appendix$written_files$Component ==
-                    "summary_validation_topline_release_decision"))
+                    "summary_validation_evidence_overview"))
   expect_true(any(appendix$written_files$Component ==
                     "summary_validation_condition_reporting_notes"))
   expect_true(any(appendix$written_files$Component ==
@@ -3161,12 +3438,13 @@ test_that("export_mfrm_bundle supports recovery-validation summary tables", {
     output_dir = out_dir,
     prefix = "bundle_recovery_validation",
     include = "summary_tables",
-    overwrite = TRUE
+    overwrite = TRUE,
+    acknowledge_sensitive = TRUE
   )
 
   expect_s3_class(bundle, "mfrm_export_bundle")
   expect_true(any(bundle$written_files$Component ==
-                    "summary_validation_topline_release_decision"))
+                    "summary_validation_evidence_overview"))
   expect_true(any(bundle$written_files$Component ==
                     "summary_validation_condition_reporting_notes"))
   expect_true(any(bundle$written_files$Component ==
@@ -3215,7 +3493,7 @@ test_that("export_summary_appendix supports section-aware appendix presets", {
 })
 
 test_that("export_summary_appendix supports future arbitrary-facet active-branch inputs", {
-  out_dir <- file.path(tempdir(), "mfrmr-summary-appendix-future-branch")
+  out_dir <- file.path(tempdir(), "mfrmr-summary-appendix-structural-design")
   if (dir.exists(out_dir)) unlink(out_dir, recursive = TRUE, force = TRUE)
   dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
@@ -3228,11 +3506,11 @@ test_that("export_summary_appendix supports future arbitrary-facet active-branch
     facet_names = c("Judge", "Task")
   )
 
-  active <- spec$planning_schema$future_branch_active_branch
+  active <- spec$planning_schema$structural_design_review
   appendix <- export_summary_appendix(
     active,
     output_dir = out_dir,
-    prefix = "appendix_future_branch",
+    prefix = "appendix_structural_design",
     include_html = FALSE,
     overwrite = TRUE
   )
@@ -3243,20 +3521,20 @@ test_that("export_summary_appendix supports future arbitrary-facet active-branch
   expect_true(is.data.frame(appendix_summary$selection_handoff_bundle_summary))
   expect_true(is.data.frame(appendix_summary$selection_handoff_role_summary))
   expect_true(is.data.frame(appendix_summary$selection_handoff_role_section_summary))
-  expect_true(any(appendix$written_files$Component == "summary_mfrm_future_branch_active_branch_future_branch_overview"))
-  expect_true(any(appendix$written_files$Component == "summary_mfrm_future_branch_active_branch_future_branch_recommendation"))
+  expect_true(any(appendix$written_files$Component == "summary_mfrm_structural_design_review_structural_design_overview"))
+  expect_true(any(appendix$written_files$Component == "summary_mfrm_structural_design_review_structural_design_recommendation"))
   expect_true(any(appendix$written_files$Component == "appendix_selection_handoff_preset_summary"))
   expect_true(any(appendix$written_files$Component == "appendix_selection_handoff_bundle_summary"))
   expect_true(any(appendix$written_files$Component == "appendix_selection_handoff_role_summary"))
   expect_true(any(appendix$written_files$Component == "appendix_selection_handoff_role_section_summary"))
   expect_true(file.exists(file.path(
     out_dir,
-    "appendix_future_branch_summary_mfrm_future_branch_active_branch_future_branch_recommendation.csv"
+    "appendix_structural_design_summary_mfrm_structural_design_review_structural_design_recommendation.csv"
   )))
 })
 
 test_that("export_summary_appendix applies appendix presets to future arbitrary-facet active-branch inputs", {
-  out_dir <- file.path(tempdir(), "mfrmr-summary-appendix-future-branch-recommended")
+  out_dir <- file.path(tempdir(), "mfrmr-summary-appendix-structural-design-recommended")
   if (dir.exists(out_dir)) unlink(out_dir, recursive = TRUE, force = TRUE)
   dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
@@ -3269,11 +3547,11 @@ test_that("export_summary_appendix applies appendix presets to future arbitrary-
     facet_names = c("Judge", "Task")
   )
 
-  active <- spec$planning_schema$future_branch_active_branch
+  active <- spec$planning_schema$structural_design_review
   appendix <- export_summary_appendix(
     active,
     output_dir = out_dir,
-    prefix = "appendix_future_branch_recommended",
+    prefix = "appendix_structural_design_recommended",
     preset = "recommended",
     include_html = FALSE,
     overwrite = TRUE
@@ -3286,13 +3564,13 @@ test_that("export_summary_appendix applies appendix presets to future arbitrary-
   expect_true(all(appendix$selection_handoff_bundle_summary$Preset == "recommended"))
   expect_true(all(appendix$selection_handoff_role_summary$Preset == "recommended"))
   expect_true(all(appendix$selection_handoff_role_section_summary$Preset == "recommended"))
-  expect_true(any(appendix$written_files$Component == "summary_mfrm_future_branch_active_branch_future_branch_overview"))
-  expect_true(any(appendix$written_files$Component == "summary_mfrm_future_branch_active_branch_future_branch_profile"))
-  expect_true(any(appendix$written_files$Component == "summary_mfrm_future_branch_active_branch_future_branch_readiness"))
-  expect_true(any(appendix$written_files$Component == "summary_mfrm_future_branch_active_branch_future_branch_recommendation"))
-  expect_false(any(appendix$written_files$Component == "summary_mfrm_future_branch_active_branch_future_branch_load_balance"))
-  expect_false(any(appendix$written_files$Component == "summary_mfrm_future_branch_active_branch_future_branch_coverage"))
-  expect_false(any(appendix$written_files$Component == "summary_mfrm_future_branch_active_branch_future_branch_guardrails"))
+  expect_true(any(appendix$written_files$Component == "summary_mfrm_structural_design_review_structural_design_overview"))
+  expect_true(any(appendix$written_files$Component == "summary_mfrm_structural_design_review_structural_design_profile"))
+  expect_true(any(appendix$written_files$Component == "summary_mfrm_structural_design_review_structural_design_readiness"))
+  expect_true(any(appendix$written_files$Component == "summary_mfrm_structural_design_review_structural_design_recommendation"))
+  expect_false(any(appendix$written_files$Component == "summary_mfrm_structural_design_review_structural_design_load_balance"))
+  expect_false(any(appendix$written_files$Component == "summary_mfrm_structural_design_review_structural_design_coverage"))
+  expect_false(any(appendix$written_files$Component == "summary_mfrm_structural_design_review_structural_design_guardrails"))
   expect_true(all(
     appendix$selection_catalog$AppendixSection[appendix$selection_catalog$Selected %in% TRUE] %in%
       c("methods", "diagnostics")
@@ -3311,7 +3589,8 @@ test_that("export_mfrm_bundle requires explicit prediction objects for predictio
       output_dir = out_dir,
       prefix = "bundle_pred_missing",
       include = c("predictions"),
-      overwrite = TRUE
+      overwrite = TRUE,
+      acknowledge_sensitive = TRUE
     ),
     "`include = 'predictions'` requires at least one of `population_prediction`, `unit_prediction`, or `plausible_values`.",
     fixed = TRUE
@@ -3331,7 +3610,8 @@ test_that("export_mfrm_bundle rejects malformed bias_results inputs early", {
       output_dir = out_dir,
       prefix = "bundle_bad_bias",
       include = c("manifest"),
-      overwrite = TRUE
+      overwrite = TRUE,
+      acknowledge_sensitive = TRUE
     ),
     "`bias_results` in export helpers must be NULL, output from estimate_bias\\(\\), an `mfrm_bias_collection`, or a list of `mfrm_bias` objects."
   )
@@ -3350,7 +3630,8 @@ test_that("export_mfrm_bundle does not change the caller working directory", {
     prefix = "bundle_zip_test",
     include = c("manifest"),
     zip_bundle = TRUE,
-    overwrite = TRUE
+    overwrite = TRUE,
+    acknowledge_sensitive = TRUE
   )
 
   expect_identical(getwd(), original_wd)
@@ -3372,7 +3653,8 @@ test_that("export_mfrm_bundle respects overwrite for zip bundles", {
       prefix = "bundle_zip_overwrite",
       include = c("manifest"),
       zip_bundle = TRUE,
-      overwrite = TRUE
+      overwrite = TRUE,
+      acknowledge_sensitive = TRUE
     )
   )
 
@@ -3384,7 +3666,8 @@ test_that("export_mfrm_bundle respects overwrite for zip bundles", {
       prefix = "bundle_zip_overwrite",
       include = c("manifest"),
       zip_bundle = TRUE,
-      overwrite = FALSE
+      overwrite = FALSE,
+      acknowledge_sensitive = TRUE
     ),
     "File already exists:",
     fixed = TRUE

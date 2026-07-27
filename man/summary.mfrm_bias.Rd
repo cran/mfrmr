@@ -13,7 +13,7 @@
 
 \item{top_n}{Number of strongest bias rows to keep.}
 
-\item{p_cut}{Significance cutoff used for counting flagged rows.}
+\item{p_cut}{Tail-area cutoff used for counting screen-positive rows.}
 
 \item{...}{Reserved for generic compatibility.}
 }
@@ -34,7 +34,7 @@ Summarize an \code{mfrm_bias} object in a user-friendly format
 This method returns a compact interaction-bias summary:
 \itemize{
 \item interaction facets/order and analyzed cell counts
-\item effect-size profile (\verb{|bias|} mean/max, significant cell count)
+\item effect-size profile (\verb{|bias|} mean/max, screen-positive cell count)
 \item fixed-effect chi-square block
 \item iteration-end convergence indicators
 \item top rows ranked by absolute t
@@ -61,12 +61,14 @@ summaries also retain the profile-likelihood review columns when present.
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_bias")
 toy <- toy[toy$Person \%in\% unique(toy$Person)[1:8], ]
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "none")
 bias <- estimate_bias(fit, diag, facet_a = "Rater", facet_b = "Criterion", max_iter = 1)
 summary(bias)
+}
 }
 \seealso{
 \code{\link[=estimate_bias]{estimate_bias()}}, \code{\link[=bias_interaction_report]{bias_interaction_report()}}

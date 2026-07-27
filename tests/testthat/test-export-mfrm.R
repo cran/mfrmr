@@ -46,11 +46,22 @@ test_that("export_mfrm writes person and facet CSVs", {
   dir.create(tmpdir)
   on.exit(unlink(tmpdir, recursive = TRUE), add = TRUE)
 
-  result <- export_mfrm(fit, output_dir = tmpdir, prefix = "test",
-                         tables = c("person", "facets"))
+  expect_warning(
+    result <- export_mfrm(fit, output_dir = tmpdir, prefix = "test",
+                          tables = c("person", "facets")),
+    "not a deidentified"
+  )
   expect_s3_class(result, "data.frame")
   expect_equal(nrow(result), 2)
   expect_true(all(file.exists(result$Path)))
+  expect_true(all(c(
+    "DataHandling", "PrivacyClass", "Deidentified",
+    "ShareableWithoutReview", "SensitiveDataAcknowledged"
+  ) %in% names(result)))
+  expect_true(all(result$PrivacyClass == "analysis_archive"))
+  expect_true(all(result$Deidentified %in% FALSE))
+  expect_true(all(result$ShareableWithoutReview %in% FALSE))
+  expect_true(all(result$SensitiveDataAcknowledged %in% FALSE))
 
   person_csv <- utils::read.csv(result$Path[result$Table == "person"])
   expect_true(nrow(person_csv) > 0)
@@ -64,7 +75,7 @@ test_that("export_mfrm writes summary CSV", {
   on.exit(unlink(tmpdir, recursive = TRUE), add = TRUE)
 
   result <- export_mfrm(fit, output_dir = tmpdir, prefix = "test",
-                         tables = "summary")
+                         tables = "summary", acknowledge_sensitive = TRUE)
   expect_equal(nrow(result), 1)
   expect_true(file.exists(result$Path[1]))
 
@@ -79,7 +90,7 @@ test_that("export_mfrm writes step CSV", {
   on.exit(unlink(tmpdir, recursive = TRUE), add = TRUE)
 
   result <- export_mfrm(fit, output_dir = tmpdir, prefix = "test",
-                         tables = "steps")
+                         tables = "steps", acknowledge_sensitive = TRUE)
   # Steps may or may not exist depending on model
   # but the function should not error
   expect_s3_class(result, "data.frame")
@@ -95,7 +106,8 @@ test_that("export_mfrm enriches facets when diagnostics provided", {
   on.exit(unlink(tmpdir, recursive = TRUE), add = TRUE)
 
   result <- export_mfrm(fit, diagnostics = diag, output_dir = tmpdir,
-                         prefix = "enriched", tables = c("facets", "measures"))
+                         prefix = "enriched", tables = c("facets", "measures"),
+                         acknowledge_sensitive = TRUE)
   expect_true(nrow(result) >= 2)
 
   facet_csv <- utils::read.csv(
@@ -114,9 +126,11 @@ test_that("export_mfrm refuses to overwrite by default", {
   dir.create(tmpdir)
   on.exit(unlink(tmpdir, recursive = TRUE), add = TRUE)
 
-  export_mfrm(fit, output_dir = tmpdir, prefix = "ow", tables = "person")
+  export_mfrm(fit, output_dir = tmpdir, prefix = "ow", tables = "person",
+              acknowledge_sensitive = TRUE)
   expect_error(
-    export_mfrm(fit, output_dir = tmpdir, prefix = "ow", tables = "person"),
+    export_mfrm(fit, output_dir = tmpdir, prefix = "ow", tables = "person",
+                acknowledge_sensitive = TRUE),
     "already exists"
   )
 })
@@ -127,9 +141,11 @@ test_that("export_mfrm overwrites when overwrite = TRUE", {
   dir.create(tmpdir)
   on.exit(unlink(tmpdir, recursive = TRUE), add = TRUE)
 
-  export_mfrm(fit, output_dir = tmpdir, prefix = "ow", tables = "person")
+  export_mfrm(fit, output_dir = tmpdir, prefix = "ow", tables = "person",
+              acknowledge_sensitive = TRUE)
   result <- export_mfrm(fit, output_dir = tmpdir, prefix = "ow",
-                          tables = "person", overwrite = TRUE)
+                          tables = "person", overwrite = TRUE,
+                          acknowledge_sensitive = TRUE)
   expect_equal(nrow(result), 1)
 })
 

@@ -37,9 +37,8 @@ per-column replacement counts for traceability logs.
 Convenience helper that replaces the standard non-\code{NA} missing-code
 sentinels used in SPSS / SAS / FACETS exports (\code{99}, \code{999}, \code{-1},
 \code{"N"}, \code{"NA"}, \code{"n/a"}, \code{"."}, \code{""}) with \code{NA} across the columns
-you select. This is the R counterpart of the preprocessing UI in
-the companion Streamlit app and is useful before calling
-\code{\link[=fit_mfrm]{fit_mfrm()}} on data exported with those conventions.
+you select. It is useful before calling \code{\link[=fit_mfrm]{fit_mfrm()}} on data exported with
+those conventions.
 }
 \examples{
 dat <- data.frame(

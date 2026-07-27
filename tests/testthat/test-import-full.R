@@ -121,6 +121,45 @@ test_that("import_tam_fit detects multi-facet fits", {
   expect_gte(length(unique(imp$facets$others$Facet)), 1L)
 })
 
+# --- eRm person-parameter schemas ---------------------------------------
+
+test_that("import_erm_fit reads the current eRm person-parameter schema", {
+  skip_if_no("eRm")
+  set.seed(47L)
+  response_matrix <- matrix(sample(0:2, 120L, replace = TRUE), nrow = 30L)
+  colnames(response_matrix) <- paste0("I", seq_len(ncol(response_matrix)))
+  rownames(response_matrix) <- paste0("Candidate", seq_len(nrow(response_matrix)))
+
+  erm_fit <- suppressMessages(suppressWarnings(eRm::PCM(response_matrix)))
+  imported <- import_erm_fit(erm_fit, model = "PCM")
+
+  expect_s3_class(imported, "mfrm_imported_fit")
+  expect_identical(nrow(imported$facets$person), nrow(response_matrix))
+  expect_identical(
+    imported$facets$person$Person,
+    rownames(eRm::person.parameter(erm_fit)$theta.table)
+  )
+  expect_true(all(is.finite(imported$facets$person$Estimate)))
+  expect_true(all(is.finite(imported$facets$person$SE)))
+})
+
+test_that("eRm person extraction rejects ambiguous or misaligned schemas", {
+  ambiguous <- list(theta.table = data.frame(theta = 1:2, thetapar = 1:2))
+  expect_error(
+    mfrmr:::.erm_extract_person_table(ambiguous),
+    "Expected exactly one person-estimate column"
+  )
+
+  misaligned <- list(
+    theta.table = data.frame(theta = c(0.1, 0.2, 0.3)),
+    se.theta = list(c(0.4, 0.5))
+  )
+  expect_error(
+    mfrmr:::.erm_extract_person_table(misaligned),
+    "3 person estimates but 2 standard errors"
+  )
+})
+
 # --- diagnostics integration -------------------------------------------
 
 test_that("synthetic diagnostics has the slots downstream helpers expect", {

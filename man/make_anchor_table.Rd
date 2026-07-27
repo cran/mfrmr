@@ -57,8 +57,11 @@ can introduce avoidable calibration error.
 }
 
 \examples{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
+toy <- load_mfrmr_data("example_operational")
+fit <- fit_mfrm(
+  toy, "Person", c("Rater", "Criterion"), "Score",
+  method = "MML", quad_points = 7, maxit = 30
+)
 anchors_tbl <- make_anchor_table(fit)
 head(anchors_tbl)
 summary(anchors_tbl$Anchor)

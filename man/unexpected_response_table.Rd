@@ -104,6 +104,7 @@ The \code{summary} data.frame contains:
 }
 
 \examples{
+\donttest{
 toy_full <- load_mfrmr_data("example_core")
 toy_people <- unique(toy_full$Person)[1:12]
 toy <- toy_full[toy_full$Person \%in\% toy_people, , drop = FALSE]
@@ -114,6 +115,7 @@ t4 <- unexpected_response_table(fit, abs_z_min = 1.5, prob_max = 0.4, top_n = 5)
 summary(t4)
 p_t4 <- plot(t4, draw = FALSE)
 p_t4$data$plot
+}
 }
 \seealso{
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=displacement_table]{displacement_table()}}, \code{\link[=fair_average_table]{fair_average_table()}},

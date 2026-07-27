@@ -16,6 +16,27 @@
 # the public helpers below.
 .mfrmr_test_cache <- new.env(parent = emptyenv())
 
+# Muffle only warnings that a test has explicitly classified as unrelated
+# setup noise. Any warning that does not match one of `patterns` continues to
+# propagate, so new package warnings cannot be hidden accidentally.
+.mfrmr_muffle_expected_warnings <- function(expr, patterns) {
+  patterns <- as.character(patterns)
+  withCallingHandlers(
+    expr,
+    warning = function(w) {
+      message <- conditionMessage(w)
+      matched <- any(vapply(
+        patterns,
+        function(pattern) grepl(pattern, message, perl = TRUE),
+        logical(1)
+      ))
+      if (matched) {
+        invokeRestart("muffleWarning")
+      }
+    }
+  )
+}
+
 .cache_key <- function(...) paste(vapply(list(...), function(x) {
   if (is.null(x)) "NULL" else paste(deparse(x), collapse = "|")
 }, character(1)), collapse = ":")

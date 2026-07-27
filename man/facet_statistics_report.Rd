@@ -65,12 +65,14 @@ The returned bundle now includes:
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 out <- facet_statistics_report(fit)
 summary(out)
 p_fs <- plot(out, draw = FALSE)
 p_fs$data$plot
+}
 }
 \seealso{
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=summary.mfrm_fit]{summary.mfrm_fit()}}, \code{\link[=plot_facets_chisq]{plot_facets_chisq()}},

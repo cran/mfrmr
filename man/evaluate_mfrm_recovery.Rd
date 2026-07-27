@@ -47,8 +47,9 @@ evaluate_mfrm_recovery(
 named vector, or one-row data frame. When \code{sim_spec = NULL}, names may use
 canonical variables (\code{n_person}, \code{n_rater}, \code{n_criterion},
 \code{raters_per_person}) or role keywords (\code{person}, \code{rater}, \code{criterion},
-\code{assignment}). For the currently exposed facet keys, the schema-only
-future branch input \code{design$facets = c(person = ..., rater = ..., criterion = ...)} is also accepted. Do not specify the same variable
+\code{assignment}). A nested named-facet form,
+\code{design$facets = c(person = ..., rater = ..., criterion = ...)}, is also
+accepted for the supported person/rater/criterion design. Do not specify the same variable
 through both \code{design} and the scalar count arguments.}
 
 \item{reps}{Number of Monte Carlo replications.}
@@ -125,7 +126,7 @@ rows when the fitted object exposes person estimates.}
 \item{include_diagnostics}{Logical. When \code{TRUE}, run \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} after
 each successful refit and retain facet-level fit/separation operating
 characteristics. These diagnostics are reported separately from recovery
-metrics and are not release-success criteria by themselves.}
+metrics and are not parameter-recovery criteria by themselves.}
 
 \item{diagnostic_fit_df_method}{Fit-ZSTD degrees-of-freedom convention used
 for optional diagnostic operating-characteristic summaries. Use \code{"both"}
@@ -189,8 +190,9 @@ used in later simulation-study guidance.
 \enumerate{
 \item Build a simulation specification with \code{\link[=build_mfrm_sim_spec]{build_mfrm_sim_spec()}} or pass scalar
 generator arguments directly.
-\item Run \code{evaluate_mfrm_recovery(...)} with a modest \code{reps} value for a smoke
-check, then increase \code{reps} for stable Monte Carlo summaries.
+\item Run \code{evaluate_mfrm_recovery(...)} with a modest \code{reps} value for an
+initial end-to-end review, then increase \code{reps} for stable Monte Carlo
+summaries.
 \item Inspect \code{summary(x)$recovery_summary} and the row-level \code{x$recovery} table.
 }
 }

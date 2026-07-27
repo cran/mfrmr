@@ -96,6 +96,7 @@ specific facet after global PCA review.
 }
 
 \examples{
+\donttest{
 toy_full <- load_mfrmr_data("example_core")
 toy_people <- unique(toy_full$Person)[1:24]
 toy <- toy_full[match(toy_full$Person, toy_people, nomatch = 0L) > 0L, , drop = FALSE]
@@ -106,17 +107,16 @@ diag <- diagnose_mfrm(fit, residual_pca = "overall")
 pca <- analyze_residual_pca(diag, mode = "overall")
 plt <- plot_residual_pca(pca, mode = "overall", plot_type = "scree", draw = FALSE)
 head(plt$data)
-\donttest{
 pca_pa <- analyze_residual_pca(diag, mode = "overall", parallel = TRUE, parallel_reps = 10)
 pa <- plot_residual_pca(pca_pa, mode = "overall", plot_type = "parallel_scree", draw = FALSE)
 head(pa$data)
-}
 plt_load <- plot_residual_pca(
   pca, mode = "overall", plot_type = "loadings", component = 1, draw = FALSE
 )
 head(plt_load$data)
 if (interactive()) {
   plot_residual_pca(pca, mode = "overall", plot_type = "scree", preset = "publication")
+}
 }
 }
 \seealso{

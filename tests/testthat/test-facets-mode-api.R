@@ -1,4 +1,4 @@
-test_that("run_mfrm_facets returns legacy-compatible workflow bundle", {
+test_that("run_mfrm_facets returns a FACETS-style workflow bundle", {
   old_opt <- options(lifecycle_verbosity = "quiet")
   on.exit(options(old_opt), add = TRUE)
 
@@ -20,14 +20,19 @@ test_that("run_mfrm_facets returns legacy-compatible workflow bundle", {
   expect_true(is.data.frame(out$run_info))
   expect_equal(out$fit$summary$Model[[1]], "RSM")
   expect_equal(out$fit$summary$Method[[1]], "JML")
-  expect_equal(out$fit$summary$MethodUsed[[1]], "JMLE")
+  expect_equal(out$fit$summary$MethodUsed[[1]], "JML")
 
   out_summary <- summary(out, top_n = 5)
   expect_s3_class(out_summary, "summary.mfrm_facets_run")
   printed <- capture.output(print(out_summary))
-  expect_true(any(grepl("Legacy-compatible Workflow Summary", printed, fixed = TRUE)))
+  expect_true(any(grepl("FACETS-style Workflow Summary", printed, fixed = TRUE)))
+  expect_true(any(grepl("Column mapping", printed, fixed = TRUE)))
+  expect_false(any(grepl("Legacy-compatible", printed, fixed = TRUE)))
 
-  p_fit <- plot(out, type = "fit", draw = FALSE)
+  p_fit <- .mfrmr_muffle_expected_warnings(
+    plot(out, type = "fit", draw = FALSE),
+    "^Review-only display:"
+  )
   expect_s3_class(p_fit, "mfrm_plot_bundle")
   p_qc <- plot(out, type = "qc", draw = FALSE)
   expect_s3_class(p_qc, "mfrm_plot_data")

@@ -61,7 +61,7 @@ An object of class \code{mfrm_dff} (with compatibility class \code{mfrm_dif}) wi
 \itemize{
 \item \code{dif_table}: data.frame of differential-functioning contrasts.
 \item \code{cell_table}: (residual method) per-cell detail table.
-\item \code{summary}: counts by screening or ETS classification.
+\item \code{summary}: counts by method-appropriate screening classification.
 \item \code{group_fits}: (refit method) per-group facet estimates.
 \item \code{gpcm_boundary}: for bounded \code{GPCM} fits, a capability-boundary table.
 \item \code{config}: list with facet, group, method, min_obs, p_adjust settings.
@@ -103,28 +103,25 @@ a screening procedure rather than an ETS-style classifier.
 \strong{Refit method} (\code{method = "refit"}): Subsets the data by group, refits
 the MFRM model within each subset, anchors all non-target facets back to
 the baseline calibration when possible, and compares the resulting
-facet-level estimates using a Welch t-statistic:
+facet-level estimates. When linking, convergence, model-based MML precision,
+and sparsity screens all pass, a conditional plug-in Welch statistic is also
+shown:
 \deqn{t = \frac{\hat{\delta}_1 - \hat{\delta}_2}
                {\sqrt{SE_1^2 + SE_2^2}}}
-This provides group-specific parameter estimates on a common scale when
-linking anchors are available, but is slower and may encounter convergence
-issues with small subsets.  ETS categories are reported only for contrasts
-whose subgroup calibrations retained enough linking anchors to support a
-common-scale interpretation and whose subgroup precision remained on the
-package's model-based MML path.
+This provides group-specific point estimates on a common scale when linking
+anchors are available. However, the plug-in standard error conditions on
+the baseline anchors and omits baseline-anchor uncertainty and cross-refit
+covariance. Refit statistics therefore remain screening evidence and set
+\code{FormalInferenceEligible}, \code{SupportsFormalInference},
+\code{PrimaryReportingEligible}, and \code{ETS_Eligible} to \code{FALSE}.
 
 When \code{facet} refers to an item-like facet (for example \code{Criterion}), this
 recovers the familiar DIF case. When \code{facet} refers to raters or
 prompts/tasks, the same machinery supports DRF/DPF-style analyses.
 
-For the refit method only, effect size is classified following the ETS
-(Educational Testing Service) DIF guidelines when subgroup calibrations are
-both linked and eligible for model-based inference:
-\itemize{
-\item \strong{A (Negligible)}: \eqn{|\Delta| <} 0.43 logits
-\item \strong{B (Moderate)}: 0.43 \eqn{\le |\Delta| <} 0.64 logits
-\item \strong{C (Large)}: \eqn{|\Delta| \ge} 0.64 logits
-}
+Refit contrasts are not assigned ETS A/B/C labels. Even when subgroup point
+estimates share a linked logit scale, a validated joint, bootstrap, or
+replicate covariance contract is required before formal refit inference.
 
 Multiple comparisons are adjusted using Holm's step-down procedure by
 default, which controls the family-wise error rate without assuming
@@ -152,9 +149,8 @@ method-appropriate classification. Includes \code{Method}, \code{N_Group1},
 \code{ReportingUse}, \code{PrimaryReportingEligible}, and \code{sparse} columns.
 \item \verb{$cell_table}: (residual method only) per-cell detail with N,
 ObsScore, ExpScore, ObsExpAvg, StdResidual.
-\item \verb{$summary}: counts by screening result (\code{method = "residual"}) or ETS
-category plus linked-screening and insufficient-linking rows
-(\code{method = "refit"}).
+\item \verb{$summary}: counts by screening result (\code{method = "residual"}) or linked-
+screening and insufficient-linking rows (\code{method = "refit"}).
 \item \verb{$group_fits}: (refit method only) list of per-group facet estimates and
 subgroup linking diagnostics.
 \item \verb{$gpcm_boundary}: for bounded \code{GPCM} fits, a capability-boundary table
@@ -167,8 +163,8 @@ marking the DFF/DIF output as caveated screening evidence.
 For bounded \code{GPCM}, DFF/DIF rows are available as slope-aware screening
 evidence over the fitted expected-score and residual scale. Keep
 residual-method contrasts and interaction cells in screening language.
-Refit contrasts require explicit subgroup linking and precision support
-before stronger subgroup-comparison language is used.
+Refit contrasts require explicit subgroup linking and precision support for
+conditional screening, but remain in screening language.
 }
 
 \section{Typical workflow}{
@@ -206,8 +202,9 @@ head(dff$dif_table[, c("Level", "Group1", "Group2", "Contrast",
 dff_refit <- analyze_dff(fit, diag, facet = "Rater", group = "Group",
                          data = toy, method = "refit")
 unique(dff_refit$dif_table$ClassificationSystem)
-# Look for: "ETS" only when subgroup calibration, linking, and precision
-#   checks all support a common-scale model-based contrast.
+# Look for: "descriptive". Linked refit contrasts remain screening-only
+#   because their plug-in uncertainty omits anchor uncertainty and
+#   cross-refit covariance.
 sc <- subset_connectivity_report(fit, diagnostics = diag)
 plot(sc, type = "design_matrix", draw = FALSE)
 if ("ScaleLinkStatus" \%in\% names(dff_refit$dif_table)) {

@@ -61,7 +61,7 @@ dominant bias direction (empty when not applicable)
 \item \code{recommended_action}: one-line recommended-action label routing
 the user to the appropriate follow-up helper
 \item \code{inference_tier}: summary label indicating that the bias rows are
-intended for screening and follow-up review in this release
+intended for screening and follow-up review
 \item \code{optimization_failures}: per-cell record of any inner-loop
 optimizer failures encountered while estimating the bias
 parameters; empty when every cell converged cleanly
@@ -200,6 +200,7 @@ rater effects using many-facet Rasch measurement: Part II.
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_bias")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "none")
@@ -218,6 +219,7 @@ s_bias$top_rows
 p_bias <- plot_bias_interaction(bias, draw = FALSE)
 p_bias$data$plot
 
+}
 }
 \seealso{
 \code{\link[=build_fixed_reports]{build_fixed_reports()}}, \code{\link[=build_apa_outputs]{build_apa_outputs()}}

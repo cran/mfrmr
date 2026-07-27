@@ -48,8 +48,8 @@ make_mml_backend_fixture <- function(model = c("RSM", "PCM")) {
 
 test_that("cpp11 backend availability and gating are stable", {
   expect_true(mfrmr:::mfrm_cpp11_backend_available())
-  expect_false(mfrmr:::mfrm_use_cpp11_backend(list(model = "RSM")))
-  expect_false(mfrmr:::mfrm_use_cpp11_backend(list(model = "PCM")))
+  expect_true(mfrmr:::mfrm_use_cpp11_backend(list(model = "RSM")))
+  expect_true(mfrmr:::mfrm_use_cpp11_backend(list(model = "PCM")))
   expect_false(mfrmr:::mfrm_use_cpp11_backend(list(model = "GPCM")))
   expect_false(mfrmr:::mfrm_use_cpp11_backend(
     list(model = "PCM"),

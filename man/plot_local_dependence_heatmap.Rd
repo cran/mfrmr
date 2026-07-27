@@ -50,6 +50,7 @@ top-N pair list, while this view shows every pair on a shared color
 scale so an analyst can scan for diagonal blocks or hotspots.
 }
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                  method = "JML", maxit = 30)
@@ -59,6 +60,7 @@ dim(p$data$matrix)
 #   acceptable regime; values >= 0.3 (Yen 1984 / Marais 2013
 #   guideline) flag pairs that may share dependence beyond the
 #   main-effects MFRM. Inspect those cells in `diag$obs`.
+}
 }
 \seealso{
 \code{\link[=plot_marginal_pairwise]{plot_marginal_pairwise()}}, \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}},

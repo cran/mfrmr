@@ -20,6 +20,23 @@ local_dif_fixtures <- function(env = parent.frame()) {
   assign("diag", diag, envir = env)
 }
 
+mark_test_inference_ready <- function(fit) {
+  fit$summary$Converged[1] <- TRUE
+  fit$summary$InferenceReady[1] <- TRUE
+  fit$summary$ConvergenceCode[1] <- 0L
+  fit$summary$ConvergenceStatus[1] <- "converged"
+  fit$summary$ConvergenceSeverity[1] <- "pass"
+  fit
+}
+
+mark_test_inference_review <- function(fit) {
+  fit$summary$Converged[1] <- FALSE
+  fit$summary$InferenceReady[1] <- FALSE
+  fit$summary$ConvergenceStatus[1] <- "optimizer_warning"
+  fit$summary$ConvergenceSeverity[1] <- "review"
+  fit
+}
+
 # ================================================================
 # DIF diagnostic module
 # ================================================================
@@ -79,7 +96,8 @@ test_that("analyze_dif refit keeps JML contrasts descriptive even when linked", 
   expect_true(is.data.frame(dif$dif_table))
   expect_true(nrow(dif$dif_table) > 0)
   expect_true(all(c("ContrastComparable", "ScaleLinkStatus", "LinkingFacets",
-                    "FormalInferenceEligible", "InferenceTier",
+                    "ConditionalRefitScreenEligible", "FormalInferenceEligible",
+                    "SupportsFormalInference", "InferenceTier",
                     "ReportingUse", "PrimaryReportingEligible",
                     "BaselineConverged", "SubgroupConverged1", "SubgroupConverged2",
                     "BaselineMethod", "BaselinePrecisionTier",
@@ -89,14 +107,17 @@ test_that("analyze_dif refit keeps JML contrasts descriptive even when linked", 
   expect_true("Converged" %in% names(dif$group_fits[[1]]))
   expect_true(all(dif$dif_table$ClassificationSystem == "descriptive"))
   expect_true(all(dif$dif_table$StatisticLabel == "linked descriptive contrast"))
-  expect_true(all(dif$dif_table$SEBasis == "not reported without model-based subgroup precision"))
+  expect_true(all(dif$dif_table$SEBasis ==
+                    "not reported without complete conditional-screen inputs"))
   expect_true(all(is.na(dif$dif_table$ETS)))
   expect_true(all(dif$dif_table$ContrastComparable))
+  expect_true(all(!dif$dif_table$ConditionalRefitScreenEligible))
   expect_true(all(!dif$dif_table$FormalInferenceEligible))
+  expect_true(all(!dif$dif_table$SupportsFormalInference))
   expect_true(all(!dif$dif_table$PrimaryReportingEligible))
   expect_true(all(dif$dif_table$InferenceTier == "exploratory"))
   expect_true(all(dif$dif_table$ScaleLinkStatus == "linked"))
-  expect_true(all(dif$dif_table$ReportingUse == "screening_only"))
+  expect_true(all(dif$dif_table$ReportingUse == "screening_only_linked_descriptive"))
   expect_equal(dif$config$method, "refit")
 })
 
@@ -118,7 +139,7 @@ test_that("analyze_dif refit surfaces subgroup diagnostics failures", {
   expect_true(all(grepl("forced subgroup diagnostics failure", group_fit_tbl$DiagnosticsDetail, fixed = TRUE)))
 })
 
-test_that("analyze_dif refit uses ETS only for linked model-based MML contrasts", {
+test_that("analyze_dif refit keeps linked model-based MML contrasts exploratory", {
   dat <- mfrmr:::sample_mfrm_data(seed = 42)
   persons <- unique(dat$Person)
   half <- ceiling(length(persons) / 2)
@@ -147,24 +168,52 @@ test_that("analyze_dif refit uses ETS only for linked model-based MML contrasts"
     method = "refit"
   )
 
-  expect_true(any(dif_mml$dif_table$ClassificationSystem == "ETS"))
-  ets_rows <- dif_mml$dif_table$ClassificationSystem == "ETS"
-  expect_true(all(dif_mml$dif_table$ContrastComparable[ets_rows]))
-  expect_true(all(dif_mml$dif_table$FormalInferenceEligible[ets_rows]))
-  expect_true(all(dif_mml$dif_table$PrimaryReportingEligible[ets_rows]))
-  expect_true(all(dif_mml$dif_table$InferenceTier[ets_rows] == "model_based"))
-  expect_true(all(dif_mml$dif_table$ReportingUse[ets_rows] == "primary_reporting"))
-  expect_true(all(stats::na.omit(dif_mml$dif_table$ETS) %in% c("A", "B", "C")))
+  expect_true(all(dif_mml$dif_table$ClassificationSystem == "descriptive"))
+  expect_true(all(is.na(dif_mml$dif_table$ETS)))
+  expect_true(all(!dif_mml$dif_table$ETS_Eligible))
+  expect_true(all(!dif_mml$dif_table$FormalInferenceEligible))
+  expect_true(all(!dif_mml$dif_table$SupportsFormalInference))
+  expect_true(all(!dif_mml$dif_table$PrimaryReportingEligible))
+
+  conditional_rows <- dif_mml$dif_table$ConditionalRefitScreenEligible
+  if (any(conditional_rows)) {
+    expect_true(all(dif_mml$dif_table$ContrastComparable[conditional_rows]))
+    expect_true(all(dif_mml$dif_table$InferenceTier[conditional_rows] == "model_based"))
+    expect_true(all(dif_mml$dif_table$ReportingUse[conditional_rows] ==
+                      "screening_only_conditional_plugin"))
+    expect_true(all(grepl(
+      "baseline-anchor uncertainty",
+      dif_mml$dif_table$SEBasis[conditional_rows],
+      fixed = TRUE
+    )))
+    expect_true(all(is.finite(dif_mml$dif_table$SE[conditional_rows])))
+  }
+
+  refit_report <- dif_report(dif_mml)
+  expect_identical(nrow(refit_report$large_dif), 0L)
+  expect_false(any(c("A", "B", "C") %in% names(refit_report$counts)))
+  expect_match(refit_report$narrative, "No ETS A/B/C labels", fixed = TRUE)
 })
 
 test_that("analyze_dif refit demotes ETS when subgroup refits lack linking facets", {
   local_dif_fixtures()
 
-  fit_one <- fit_mfrm(toy, person = "Person", facets = "Criterion",
-                      score = "Score", method = "JML", maxit = 20)
+  toy_one <- toy[
+    !duplicated(toy[c("Person", "Criterion")]),
+    ,
+    drop = FALSE
+  ]
+  fit_one <- .mfrmr_muffle_expected_warnings(
+    fit_mfrm(toy_one, person = "Person", facets = "Criterion",
+             score = "Score", method = "JML", maxit = 20),
+    "^Optimization convergence review did not produce"
+  )
   diag_one <- diagnose_mfrm(fit_one, residual_pca = "none")
-  dif_one <- analyze_dif(fit_one, diag_one, facet = "Criterion", group = "Group",
-                         data = toy, method = "refit")
+  dif_one <- .mfrmr_muffle_expected_warnings(
+    analyze_dif(fit_one, diag_one, facet = "Criterion", group = "Group",
+                data = toy_one, method = "refit"),
+    "^Optimization convergence review did not produce"
+  )
 
   expect_true(all(dif_one$dif_table$ClassificationSystem == "descriptive"))
   expect_true(all(is.na(dif_one$dif_table$ETS)))
@@ -264,7 +313,7 @@ test_that("residual method uses Welch-Satterthwaite degrees of freedom", {
   expect_equal(first_row$df, expected_df, tolerance = 1e-8)
 })
 
-test_that("refit method ETS classification is valid", {
+test_that("refit method never promotes screening contrasts to ETS", {
   dat <- mfrmr:::sample_mfrm_data(seed = 99)
   dat$Group <- ifelse(dat$Person %in% unique(dat$Person)[1:30], "A", "B")
   fit_mml <- suppressWarnings(fit_mfrm(
@@ -279,7 +328,11 @@ test_that("refit method ETS classification is valid", {
   diag_mml <- diagnose_mfrm(fit_mml, residual_pca = "none")
   dif <- analyze_dif(fit_mml, diag_mml, facet = "Criterion", group = "Group",
                      data = dat, method = "refit")
-  expect_true(all(stats::na.omit(dif$dif_table$ETS) %in% c("A", "B", "C")))
+  expect_true(all(dif$dif_table$ClassificationSystem == "descriptive"))
+  expect_true(all(is.na(dif$dif_table$ETS)))
+  expect_true(all(!dif$dif_table$ETS_Eligible))
+  expect_true(all(!dif$dif_table$FormalInferenceEligible))
+  expect_true(all(!dif$dif_table$PrimaryReportingEligible))
 })
 
 test_that("dif_interaction_table returns expected structure", {
@@ -449,8 +502,8 @@ test_that("compare_mfrm reports comparable IC quantities on a common basis", {
     quad_points = 5,
     maxit = 15
   ))
-  fit_rsm$summary$Converged[1] <- TRUE
-  fit_pcm$summary$Converged[1] <- TRUE
+  fit_rsm <- mark_test_inference_ready(fit_rsm)
+  fit_pcm <- mark_test_inference_ready(fit_pcm)
 
   comp <- compare_mfrm(RSM = fit_rsm, PCM = fit_pcm)
 
@@ -528,8 +581,8 @@ test_that("compare_mfrm evidence_ratios are reciprocal", {
     quad_points = 5,
     maxit = 15
   ))
-  fit_rsm$summary$Converged[1] <- TRUE
-  fit_pcm$summary$Converged[1] <- TRUE
+  fit_rsm <- mark_test_inference_ready(fit_rsm)
+  fit_pcm <- mark_test_inference_ready(fit_pcm)
 
   comp <- compare_mfrm(RSM = fit_rsm, PCM = fit_pcm)
 
@@ -564,8 +617,8 @@ test_that("compare_mfrm print and summary work with new fields", {
     quad_points = 5,
     maxit = 15
   ))
-  fit_rsm$summary$Converged[1] <- TRUE
-  fit_pcm$summary$Converged[1] <- TRUE
+  fit_rsm <- mark_test_inference_ready(fit_rsm)
+  fit_pcm <- mark_test_inference_ready(fit_pcm)
 
   comp <- compare_mfrm(RSM = fit_rsm, PCM = fit_pcm)
 
@@ -596,8 +649,8 @@ test_that("compare_mfrm suppresses IC ranking outside the formal MML path and re
     quad_points = 5,
     maxit = 15
   ))
-  fit_jml$summary$Converged[1] <- TRUE
-  fit_mml$summary$Converged[1] <- TRUE
+  fit_jml <- mark_test_inference_ready(fit_jml)
+  fit_mml <- mark_test_inference_ready(fit_mml)
 
   expect_warning(
     comp <- compare_mfrm(JML = fit_jml, MML = fit_mml),
@@ -619,7 +672,7 @@ test_that("compare_mfrm suppresses IC ranking outside the formal MML path and re
     step_facet = "Criterion",
     maxit = 15
   ))
-  fit_pcm$summary$Converged[1] <- TRUE
+  fit_pcm <- mark_test_inference_ready(fit_pcm)
 
   expect_warning(
     comp_no_lrt <- compare_mfrm(RSM = fit_jml, PCM = fit_pcm),
@@ -647,7 +700,7 @@ test_that("compare_mfrm suppresses IC ranking outside the formal MML path and re
     model = "RSM",
     maxit = 15
   ))
-  fit_rsm_2$summary$Converged[1] <- TRUE
+  fit_rsm_2 <- mark_test_inference_ready(fit_rsm_2)
 
   expect_warning(
     comp_same <- compare_mfrm(RSM1 = fit_jml, RSM2 = fit_rsm_2, nested = TRUE),
@@ -685,8 +738,8 @@ test_that("compare_mfrm records why boundary LRTs are not reported", {
     quad_points = 5,
     maxit = 15
   ))
-  fit_rsm$summary$Converged[1] <- TRUE
-  fit_pcm$summary$Converged[1] <- TRUE
+  fit_rsm <- mark_test_inference_ready(fit_rsm)
+  fit_pcm <- mark_test_inference_ready(fit_pcm)
 
   fit_pcm_worse <- fit_pcm
   fit_pcm_worse$summary$LogLik[1] <- fit_rsm$summary$LogLik[1] - 1
@@ -724,8 +777,8 @@ test_that("compare_mfrm suppresses IC ranking for JML-only comparisons", {
   fit2 <- fit_mfrm(toy, person = "Person", facets = c("Rater", "Criterion"),
                    score = "Score", method = "JML",
                    model = "PCM", step_facet = "Criterion")
-  fit$summary$Converged[1] <- TRUE
-  fit2$summary$Converged[1] <- TRUE
+  fit <- mark_test_inference_ready(fit)
+  fit2 <- mark_test_inference_ready(fit2)
 
   expect_warning(
     comp <- compare_mfrm(RSM = fit, PCM = fit2),
@@ -745,11 +798,12 @@ test_that("compare_mfrm suppresses IC ranking when a fit is marked unconverged",
   fit2 <- fit_mfrm(toy, person = "Person", facets = c("Rater", "Criterion"),
                    score = "Score", method = "JML",
                    model = "PCM", step_facet = "Criterion")
-  fit2$summary$Converged[1] <- FALSE
+  fit <- mark_test_inference_ready(fit)
+  fit2 <- mark_test_inference_review(fit2)
 
   expect_warning(
     comp <- compare_mfrm(RSM = fit, PCM = fit2),
-    "did not converge"
+    "optimizer or convergence review"
   )
 
   expect_false(isTRUE(comp$comparison_basis$ic_comparable))
@@ -771,7 +825,7 @@ test_that("compare_mfrm requires the same prepared response data for IC ranking"
     quad_points = 5,
     maxit = 15
   ))
-  fit_a$summary$Converged[1] <- TRUE
+  fit_a <- mark_test_inference_ready(fit_a)
 
   toy_perm <- toy_small[sample.int(nrow(toy_small)), , drop = FALSE]
   fit_perm <- suppressWarnings(fit_mfrm(
@@ -784,7 +838,7 @@ test_that("compare_mfrm requires the same prepared response data for IC ranking"
     quad_points = 5,
     maxit = 15
   ))
-  fit_perm$summary$Converged[1] <- TRUE
+  fit_perm <- mark_test_inference_ready(fit_perm)
 
   comp_same <- compare_mfrm(RSM1 = fit_a, RSM2 = fit_perm)
   expect_true(isTRUE(comp_same$comparison_basis$same_data))
@@ -802,7 +856,7 @@ test_that("compare_mfrm requires the same prepared response data for IC ranking"
     quad_points = 5,
     maxit = 15
   ))
-  fit_shuf$summary$Converged[1] <- TRUE
+  fit_shuf <- mark_test_inference_ready(fit_shuf)
 
   expect_warning(
     comp_diff <- compare_mfrm(A = fit_a, B = fit_shuf),

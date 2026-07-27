@@ -11,7 +11,7 @@ knitr::opts_chunk$set(
 ## ----setup--------------------------------------------------------------------
 # library(mfrmr)
 # 
-# toy <- load_mfrmr_data("example_core")
+# toy <- load_mfrmr_data("example_operational")
 # 
 # # The vignette uses compact quadrature so optional local execution stays fast.
 # # For final manuscript reporting, refit with the package default or a higher
@@ -60,6 +60,33 @@ knitr::opts_chunk$set(
 ## ----section-map--------------------------------------------------------------
 # apa$section_map[, c("SectionId", "Heading", "Available")]
 
+## ----publication-boundary-----------------------------------------------------
+# res <- mfrm_results(fit, include = "publication")
+# report <- mfrm_report(res, style = "apa")
+# 
+# report$first_screen
+# report$claim_readiness
+# report$report_gaps
+# head(report$template_index[, c(
+#   "Area", "Topic", "BoundaryType", "ClaimStrength", "RecommendedUse"
+# )])
+
+## ----fit-to-html-bundle, eval=FALSE-------------------------------------------
+# bundle <- export_mfrm_bundle(
+#   fit,
+#   diagnostics = diag,
+#   output_dir = "mfrmr-report-bundle",
+#   prefix = "analysis01",
+#   include = c(
+#     "core_tables", "checklist", "dashboard", "apa",
+#     "summary_tables", "manifest", "script", "html"
+#   ),
+#   overwrite = TRUE,
+#   acknowledge_sensitive = TRUE
+# )
+# 
+# bundle$written_files[bundle$written_files$Format == "html", ]
+
 ## ----apa-tables---------------------------------------------------------------
 # tbl_summary <- apa_table(fit, which = "summary")
 # tbl_reliability <- apa_table(fit, which = "reliability", diagnostics = diag)
@@ -95,4 +122,27 @@ knitr::opts_chunk$set(
 # apa_bias <- build_apa_outputs(fit_bias, diagnostics = diag_bias, bias_results = bias)
 # 
 # apa_bias$section_map[, c("SectionId", "Available", "Heading")]
+
+## ----model-choice-route, eval=FALSE-------------------------------------------
+# cmp <- compare_mfrm(RSM = fit_rsm, PCM = fit_pcm, GPCM = fit_gpcm)
+# review <- build_model_choice_review(
+#   RSM = fit_rsm,
+#   PCM = fit_pcm,
+#   GPCM = fit_gpcm,
+#   run_weighting_review = TRUE
+# )
+# model_choice_tables <- build_summary_table_bundle(
+#   review,
+#   appendix_preset = "recommended"
+# )
+# 
+# cmp[, c("Model", "LogLik", "AIC", "BIC", "ICComparable")]
+# model_choice_tables$table_index
+
+## ----latent-regression-reporting, eval=FALSE----------------------------------
+# s_pop <- summary(fit_pop)
+# s_pop$population_overview
+# s_pop$population_coefficients
+# s_pop$population_coding
+# s_pop$caveats
 

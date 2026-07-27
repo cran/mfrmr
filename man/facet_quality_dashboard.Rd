@@ -72,7 +72,7 @@ complementary criteria:
 \item \strong{Severity}: elements with \eqn{|\mathrm{Estimate}| >}
 \code{severity_warn} logits are flagged as unusually harsh or lenient.
 \item \strong{Misfit}: elements with Infit or Outfit MnSq outside the
-acceptance band are flagged. The band defaults to the package
+configured heuristic review band are flagged. The band defaults to the package
 pair returned by \code{\link[=mfrm_misfit_thresholds]{mfrm_misfit_thresholds()}} (Linacre 0.5-1.5);
 pass \code{misfit_warn = 1.5} to keep the older symmetric
 \eqn{[1/}\code{misfit_warn}\eqn{,\;}\code{misfit_warn}\eqn{]}
@@ -86,12 +86,13 @@ screen-positive interaction cells (from \code{\link[=estimate_bias]{estimate_bia
 }
 
 A \strong{flag density} score counts how many of the four criteria each
-element triggers.  Elements flagged on multiple criteria warrant
-priority review (e.g., rater retraining, data exclusion).
+element triggers. Elements flagged on multiple criteria warrant priority
+review and may motivate training or a documented data-quality review; the
+dashboard does not justify automatic row, person, or rater exclusion.
 
-Default thresholds are designed for moderate-stakes rating contexts.
-Adjust for your application: stricter thresholds for high-stakes
-certification, more lenient for formative assessment.
+Default thresholds are screening heuristics. Prespecify and justify any
+application-specific alternatives rather than treating them as universal
+validity or acceptance criteria.
 }
 \section{Output}{
 
@@ -119,12 +120,14 @@ when \code{bias_results} was supplied; \code{NULL} otherwise
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 toy <- toy[toy$Person \%in\% unique(toy$Person)[1:8], ]
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "none")
 dash <- facet_quality_dashboard(fit, diagnostics = diag)
 summary(dash)
+}
 }
 \seealso{
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=estimate_bias]{estimate_bias()}}, \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}}

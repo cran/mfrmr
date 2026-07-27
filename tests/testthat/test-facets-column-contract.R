@@ -39,14 +39,17 @@ test_that("FACETS column contract file is available and valid", {
 
 test_that("FACETS column contract is satisfied by current outputs", {
   d <- mfrmr:::sample_mfrm_data(seed = 123)
-  fit <- mfrmr::fit_mfrm(
-    data = d,
-    person = "Person",
-    facets = c("Rater", "Task", "Criterion"),
-    score = "Score",
-    method = "JML",
-    model = "RSM",
-    maxit = 20
+  fit <- .mfrmr_muffle_expected_warnings(
+    mfrmr::fit_mfrm(
+      data = d,
+      person = "Person",
+      facets = c("Rater", "Task", "Criterion"),
+      score = "Score",
+      method = "JML",
+      model = "RSM",
+      maxit = 20
+    ),
+    "^Optimization convergence review did not produce"
   )
   diag <- mfrmr::diagnose_mfrm(fit, residual_pca = "none")
   bias <- mfrmr::estimate_bias(fit, diag, facet_a = "Rater", facet_b = "Task", max_iter = 2)

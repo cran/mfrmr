@@ -28,10 +28,16 @@ test_that("plot_bubble returns mfrm_plot_data with draw=FALSE", {
   expect_true(is.data.frame(out$data$reference_lines))
 })
 
-test_that("plot_bubble table excludes Person facet", {
+test_that("plot_bubble excludes Person by default and can include it", {
   fit <- local_fit()
   out <- suppressWarnings(plot_bubble(fit, draw = FALSE))
   expect_false("Person" %in% out$data$table$Facet)
+
+  with_person <- suppressWarnings(plot_bubble(
+    fit, include_person = TRUE, top_n = 200, draw = FALSE
+  ))
+  expect_true("Person" %in% with_person$data$table$Facet)
+  expect_true(with_person$data$include_person)
 })
 
 # ---- 2. fit_stat parameter ----------------------------------------------
@@ -54,6 +60,25 @@ test_that("plot_bubble works with all bubble_size options", {
     expect_true(length(out$data$radius) > 0)
     expect_true(all(is.finite(out$data$radius)))
   }
+})
+
+test_that("SE bubbles are larger for more precise rows", {
+  diagnostic_stub <- list(measures = data.frame(
+    Facet = c("Rater", "Rater"),
+    Level = c("precise", "imprecise"),
+    Estimate = c(-0.2, 0.2),
+    SE = c(0.1, 0.4),
+    N = c(20, 20),
+    Infit = c(1, 1),
+    Outfit = c(1, 1),
+    stringsAsFactors = FALSE
+  ))
+  out <- plot_bubble(
+    diagnostic_stub, bubble_size = "SE", top_n = 2, draw = FALSE
+  )
+  precise <- match("precise", out$data$table$Level)
+  imprecise <- match("imprecise", out$data$table$Level)
+  expect_gt(out$data$radius[precise], out$data$radius[imprecise])
 })
 
 # ---- 4. facets parameter ------------------------------------------------

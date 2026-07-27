@@ -55,11 +55,13 @@ anchoring.
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                 method = "JML", maxit = 30)
 p <- plot_rater_severity_profile(fit, draw = FALSE)
 head(p$data$data)
+}
 }
 \seealso{
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=analyze_facet_equivalence]{analyze_facet_equivalence()}},

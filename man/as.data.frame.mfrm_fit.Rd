@@ -18,14 +18,15 @@
 \value{
 A data.frame with columns \code{Facet}, \code{Level},
 \code{Estimate}, and \code{Extreme}. The \code{Extreme} column
-is populated for person rows from the extreme-score flag added
-in 0.1.6 (\code{"Min"} / \code{"Max"} / \code{NA}); non-person
+is populated for person rows from the extreme-score flag
+(\code{"Min"} / \code{"Max"} / \code{NA}); non-person
 facet rows carry \code{NA} in that column by design.
 }
 \description{
 Returns all facet-level estimates (person and others) in a single
-tidy data.frame. Useful for quick interactive export:
-\code{write.csv(as.data.frame(fit), "results.csv")}.
+tidy data.frame. Person rows retain their original identifiers; review or
+transform them before writing the result outside a controlled analysis
+environment.
 }
 \details{
 This method returns four columns (\code{Facet}, \code{Level},
@@ -48,9 +49,10 @@ All non-person facets are stacked underneath in the same schema.
 }
 
 \examples{
-toy <- load_mfrmr_data("example_core")
+toy <- load_mfrmr_data("example_operational")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", model = "RSM", maxit = 30)
+                method = "MML", model = "RSM",
+                quad_points = 7, maxit = 30)
 head(as.data.frame(fit))
 }
 \seealso{

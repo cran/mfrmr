@@ -19,6 +19,19 @@ underlying method, e.g. \verb{[as_kable.apa_table()]} returns a
 \description{
 Generic for converting objects to a \code{knitr::kable}
 }
+\examples{
+tbl <- structure(
+  list(
+    table = data.frame(Term = c("Rater A", "Rater B"), Estimate = c(-0.12, 0.18)),
+    caption = "Facet estimates",
+    note = "Toy values for formatting only."
+  ),
+  class = "apa_table"
+)
+if (requireNamespace("knitr", quietly = TRUE)) {
+  invisible(as_kable(tbl))
+}
+}
 \seealso{
 \code{\link[=as_kable.apa_table]{as_kable.apa_table()}} for the \code{apa_table} method;
 \code{\link[=as_flextable]{as_flextable()}} for a \code{flextable}-targeted alternative;

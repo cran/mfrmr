@@ -10,10 +10,10 @@ knitr::opts_chunk$set(
 
 ## ----facets-mode--------------------------------------------------------------
 # library(mfrmr)
-# data("ej2021_study1", package = "mfrmr")
+# data("mfrmr_example_operational", package = "mfrmr")
 # 
 # run <- run_mfrm_facets(
-#   data = ej2021_study1,
+#   data = mfrmr_example_operational,
 #   person = "Person",
 #   facets = c("Rater", "Criterion"),
 #   score = "Score",
@@ -24,6 +24,11 @@ knitr::opts_chunk$set(
 # names(run)
 
 ## ----facets-mode-summary------------------------------------------------------
-# summary(run$fit)
+# jml_status <- summary(run$fit, profile = "fit", detail = "brief")
+# jml_status$overview[, c(
+#   "Model", "Method", "Converged", "InferenceReady",
+#   "ConvergenceSeverity"
+# )]
+# jml_status$readiness
 # head(run$fair_average)
 

@@ -43,8 +43,9 @@ simulate_mfrm_data(
 named vector, or one-row data frame. When \code{sim_spec = NULL}, names may use
 canonical variables (\code{n_person}, \code{n_rater}, \code{n_criterion},
 \code{raters_per_person}) or role keywords (\code{person}, \code{rater}, \code{criterion},
-\code{assignment}). For the currently exposed facet keys, the schema-only
-future branch input \code{design$facets = c(person = ..., rater = ..., criterion = ...)} is also accepted. Do not specify the same variable
+\code{assignment}). A nested named-facet form,
+\code{design$facets = c(person = ..., rater = ..., criterion = ...)}, is also
+accepted for the supported person/rater/criterion design. Do not specify the same variable
 through both \code{design} and the scalar count arguments.}
 
 \item{score_levels}{Number of ordered score categories.}
@@ -179,14 +180,14 @@ from \code{step_span}
 values may vary by \code{StepFacet} (currently \code{Criterion} or \code{Rater})
 }
 
-For bounded \code{GPCM}, the generator now requires an explicit slope
-contract in parallel with the threshold table. The current public branch
-keeps \code{slope_facet == step_facet}, normalizes supplied slopes to the same
-geometric-mean-one log-slope identification used by \code{\link[=fit_mfrm]{fit_mfrm()}}, and uses
-the internal \code{category_prob_gpcm()} helper for response sampling. Broader
-arbitrary-facet planning remains restricted until that slope-aware contract
-is generalized beyond the current role-based design, population-forecasting,
-diagnostic-screening, and signal-detection helpers.
+For bounded \code{GPCM}, the generator requires an explicit slope contract in
+parallel with the threshold table. The supported route keeps
+\code{slope_facet == step_facet}, normalizes supplied slopes to the same
+geometric-mean-one log-slope identification used by \code{\link[=fit_mfrm]{fit_mfrm()}}, and
+samples responses from the corresponding GPCM category probabilities.
+Independent arbitrary slope-facet planning is not supported by these
+design, population-forecasting, diagnostic-screening, or signal-detection
+helpers.
 
 Assignment handling is also explicit:
 \itemize{

@@ -154,6 +154,7 @@ rater effects using many-facet Rasch measurement: Part II.
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_bias")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "none")
@@ -170,6 +171,7 @@ head(out$table)
 #   warrant content-review of the two raters' scoring conventions on
 #   the conditioning context facet (e.g. compare their item-level
 #   marks for systematic strictness/leniency patterns).
+}
 }
 \seealso{
 \code{\link[=estimate_bias]{estimate_bias()}}, \code{\link[=bias_interaction_report]{bias_interaction_report()}}, \code{\link[=build_fixed_reports]{build_fixed_reports()}}

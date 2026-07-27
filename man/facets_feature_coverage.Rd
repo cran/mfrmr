@@ -5,7 +5,8 @@
 \title{FACETS Feature Coverage Matrix}
 \usage{
 facets_feature_coverage(
-  status = c("all", "implemented", "partial", "not_implemented", "not_targeted")
+  status = c("all", "implemented", "supported_with_caveat", "partial", "not_implemented",
+    "not_targeted")
 )
 }
 \arguments{
@@ -20,15 +21,17 @@ A data.frame with columns:
 \item \code{FACETSReference}
 \item \code{mfrmrRoute}
 \item \code{Status}
-\item \code{Scope}
-\item \code{GapOrBoundary}
-\item \code{Priority}
+\item \code{Capability}
+\item \code{Limitation}
+\item \code{Alternative}
 }
 }
 \description{
-\code{facets_feature_coverage()} summarizes how the current \code{mfrmr} release maps
+\code{facets_feature_coverage()} summarizes how \code{mfrmr} maps
 the main FACETS output-table, output-file, and graph-menu surface to package
-functions.
+functions. It is a surface-coverage guide, not a statement that estimands,
+conditioning, extreme-score handling, degrees of freedom, or numerical
+results are equivalent.
 
 Use this helper before migration work when you need a public, user-facing
 answer to three questions:
@@ -45,24 +48,36 @@ Tables 1--14, DIF/bias plots, R/Web plots, output files, and graph-menu
 curves. \code{mfrmr} intentionally prioritizes structured R tables and reusable
 plot data over exact FACETS line-printer output.
 
+The current software reference target is FACETS 64-bit 4.5.1 (July 2026).
+Bibliographic references retain the title and edition of the consulted
+manual rather than silently relabelling a 4.5.0 manual as 4.5.1. External
+numerical validation is a separate evidence contract.
+
 Status meanings:
 \itemize{
-\item \code{implemented}: a package-native route covers the substantive output.
+\item \code{implemented}: a package-native route covers the substantive output
+surface; this status alone does not claim an externally matched
+statistical contract.
+\item \code{supported_with_caveat}: a package-native route exists, but the output
+must be read with explicit identification, validation, or scope caveats.
 \item \code{partial}: the concept is covered, but not the full FACETS formatting,
 option surface, file type, or external integration.
 \item \code{not_implemented}: a FACETS feature has no direct package-native route in
-the current release.
+the documented package scope.
 \item \code{not_targeted}: the feature is tied to FACETS UI, Web/Excel handoff, or
-another external program format and is not a release goal.
+another external program format and is outside the package scope.
 }
 }
 \examples{
 facets_feature_coverage()
 facets_feature_coverage("partial")
+facets_feature_coverage("supported_with_caveat")
 facets_feature_coverage("not_implemented")
 }
 \references{
 Linacre, J. M. (2026). \emph{A user's guide to FACETS, version 4.5.0}.
+Current FACETS software release:
+\url{https://www.winsteps.com/facets.htm}.
 Output tables - files - plots - graphs:
 \url{https://www.winsteps.com/facetman64/outputtableindex.htm}.
 }

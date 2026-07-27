@@ -2,44 +2,66 @@
 % Please edit documentation in R/datasets.R
 \name{mfrmr_example_data}
 \alias{mfrmr_example_data}
+\alias{mfrmr_example_operational}
 \alias{mfrmr_example_core}
 \alias{mfrmr_example_bias}
-\title{Purpose-built example datasets for package help pages}
+\title{Synthetic many-facet rating examples}
 \format{
 A data.frame with 6 columns:
 \describe{
-\item{Study}{Example dataset label (\code{"ExampleCore"} or \code{"ExampleBias"}).}
+\item{Study}{Example dataset label (\code{"OperationalExample"},
+\code{"ExampleCore"}, or \code{"ExampleBias"}).}
 \item{Person}{Person/respondent identifier.}
 \item{Rater}{Rater identifier.}
 \item{Criterion}{Criterion facet label.}
 \item{Score}{Observed category score on a four-category scale (\code{1}--\code{4}).}
-\item{Group}{Balanced grouping variable used in DFF/DIF examples (\code{"A"} / \code{"B"}).}
+\item{Group}{Balanced grouping label (\code{"A"} / \code{"B"}). It is neutral in
+the operational and core examples; the bias example has the planted
+group structure described below.}
 }
 }
 \source{
 Synthetic documentation data generated from rating-scale Rasch facet
-designs with fixed seeds in \code{data-raw/make-example-data.R}.
+designs with fixed seeds. Generator scripts are maintained under
+\verb{data-raw/} for this release in the public source repository.
+These are synthetic examples, not empirical records.
 }
 \description{
-Compact synthetic many-facet datasets designed for documentation examples.
-Both datasets are large enough to avoid tiny-sample toy behavior while
-remaining fast in \verb{R CMD check} examples.
+Compact synthetic many-facet datasets sized to exercise the documented
+workflow. Their dimensions are not evidence of sample-size adequacy for an
+applied study.
 }
 \details{
 Available data objects:
 \itemize{
+\item \code{mfrmr_example_operational}
+\item \code{mfrmr_example_operational_design} (documented separately below)
 \item \code{mfrmr_example_core}
 \item \code{mfrmr_example_bias}
 }
 
-\code{mfrmr_example_core} is generated from a single latent trait plus rater and
-criterion main effects, making it suitable for general fitting, plotting, and
-reporting examples.
+\code{mfrmr_example_operational} is the primary applied teaching example. It has
+a connected but incomplete two-rater assignment, moderately unequal rater
+workloads, and six planned criterion-level omissions. Scores are sampled
+directly from stated RSM category probabilities. The six unobserved ratings
+are absent rows in the long data rather than \code{NA} scores. Each group contains
+24 persons, and three omissions in each group leave 141 observed rows for
+Group A and 141 for Group B. The balanced \code{Group} variable has no effect in
+the generating model; random observed differences may still occur.
 
-\code{mfrmr_example_bias} starts from the same basic design but adds:
+\code{mfrmr_example_core} is an idealized complete crossing generated from a
+single latent trait plus rater and criterion main effects. It is useful as a
+fast deterministic example, but it is not representative of routine
+incomplete operational assignment.
+
+\code{mfrmr_example_bias} instead uses a balanced partial two-rater assignment.
+Group A and B latent means are -0.1 and 0.1 logits, respectively, with a
+common SD of 0.9. It also contains:
 \itemize{
-\item a known \verb{Group x Criterion} effect (\verb{Group B} is advantaged on \code{Language})
-\item a known \verb{Rater x Criterion} interaction (\verb{R04 x Accuracy})
+\item a planted \verb{Group x Criterion} effect (\verb{Group B} is advantaged by 1.2
+logits on \code{Language})
+\item a planted \verb{Rater x Criterion} interaction (\verb{R04 x Accuracy} lowers the
+linear predictor by 1.2 logits)
 }
 
 This lets differential-functioning and bias-analysis help pages demonstrate non-null findings.
@@ -48,6 +70,7 @@ This lets differential-functioning and bias-analysis help pages demonstrate non-
 
 \tabular{lrrrrr}{
 \strong{Dataset} \tab \strong{Rows} \tab \strong{Persons} \tab \strong{Raters} \tab \strong{Criteria} \tab \strong{Groups} \cr
+example_operational \tab 282 \tab 48 \tab 6 \tab 3 \tab 2 \cr
 example_core \tab 768 \tab 48 \tab 4 \tab 4 \tab 2 \cr
 example_bias \tab 384 \tab 48 \tab 4 \tab 4 \tab 2
 }
@@ -56,19 +79,21 @@ example_bias \tab 384 \tab 48 \tab 4 \tab 4 \tab 2
 \section{Suggested usage}{
 
 \itemize{
-\item Use \code{mfrmr_example_core} for fitting, diagnostics, design-weighted precision curves,
-and generic plots/reports.
+\item Use \code{mfrmr_example_operational} for the beginner data-to-report workflow
+and for inspecting incomplete but connected assignment.
+\item Use \code{mfrmr_example_core} for fast, idealized checks and examples that
+specifically require complete crossing.
 \item Use \code{mfrmr_example_bias} for \code{\link[=analyze_dff]{analyze_dff()}}, \code{\link[=analyze_dif]{analyze_dif()}}, \code{\link[=dif_interaction_table]{dif_interaction_table()}},
 \code{\link[=plot_dif_heatmap]{plot_dif_heatmap()}}, and \code{\link[=estimate_bias]{estimate_bias()}}.
 }
 
-Both objects can be loaded either with \code{\link[=load_mfrmr_data]{load_mfrmr_data()}} or directly via
-\code{data("mfrmr_example_core", package = "mfrmr")} /
-\code{data("mfrmr_example_bias", package = "mfrmr")}.
+All three objects can be loaded either with \code{\link[=load_mfrmr_data]{load_mfrmr_data()}} or directly
+with \code{data()}, for example
+\code{data("mfrmr_example_operational", package = "mfrmr")}.
 }
 
 \examples{
-data("mfrmr_example_core", package = "mfrmr")
-table(mfrmr_example_core$Score)
-table(mfrmr_example_core$Group)
+data("mfrmr_example_operational", package = "mfrmr")
+table(mfrmr_example_operational$Score)
+table(mfrmr_example_operational$Group)
 }

@@ -83,6 +83,7 @@ test_that("NAMESPACE roxygen contract keeps expected exports and methods", {
     "mfrmr_interval_guide",
     "mfrmr_output_guide",
     "mfrm_threshold_profiles",
+    "normalize_conquest_overlap_exports",
     "normalize_conquest_overlap_files",
     "normalize_conquest_overlap_tables",
     "plot_anchor_drift",
@@ -283,7 +284,7 @@ test_that("NAMESPACE roxygen contract keeps expected exports and methods", {
     "S3method(print,summary.mfrm_design_evaluation)",
     "S3method(print,summary.mfrm_signal_detection)",
     "S3method(print,summary.mfrm_diagnostic_screening)",
-    "S3method(print,summary.mfrm_future_branch_active_branch)",
+    "S3method(print,summary.mfrm_structural_design_review)",
     "S3method(summary,mfrm_facet_dashboard)",
     "S3method(summary,mfrm_qc_pipeline)",
     "S3method(summary,mfrm_reporting_checklist)",
@@ -292,10 +293,10 @@ test_that("NAMESPACE roxygen contract keeps expected exports and methods", {
     "S3method(summary,mfrm_population_prediction)",
     "S3method(summary,mfrm_unit_prediction)",
     "S3method(summary,mfrm_plausible_values)",
-    "S3method(summary,mfrm_future_branch_active_branch)",
+    "S3method(summary,mfrm_structural_design_review)",
     "S3method(plot,mfrm_d_study)",
-    "S3method(plot,mfrm_future_branch_active_branch)",
-    # print delegates added in 0.1.6 for classes that only had summary methods.
+    "S3method(plot,mfrm_structural_design_review)",
+    # Print delegates for classes that otherwise expose summary methods only.
     "S3method(print,mfrm_apa_outputs)",
     "S3method(print,mfrm_bias)",
     "S3method(print,mfrm_bundle)",
@@ -303,14 +304,16 @@ test_that("NAMESPACE roxygen contract keeps expected exports and methods", {
     "S3method(print,mfrm_design_evaluation)",
     "S3method(print,mfrm_diagnostics)",
     "S3method(print,mfrm_facet_dashboard)",
-    "S3method(print,mfrm_future_branch_active_branch)",
+    "S3method(print,mfrmr_gpcm_capabilities)",
+    "S3method(print,mfrm_structural_design_review)",
+    "S3method(print,mfrm_sim_spec)",
     "S3method(print,mfrm_plausible_values)",
     "S3method(print,mfrm_population_prediction)",
     "S3method(print,mfrm_reporting_checklist)",
     "S3method(print,mfrm_signal_detection)",
     "S3method(print,mfrm_threshold_profiles)",
     "S3method(print,mfrm_unit_prediction)",
-    # Hierarchical-audit S3 methods added in 0.1.6.
+    # Hierarchical-audit S3 methods.
     "S3method(print,mfrm_facet_nesting)",
     "S3method(summary,mfrm_facet_nesting)",
     "S3method(print,mfrm_facet_sample_review)",
@@ -320,14 +323,13 @@ test_that("NAMESPACE roxygen contract keeps expected exports and methods", {
     "S3method(print,mfrm_hierarchical_structure)",
     "S3method(summary,mfrm_hierarchical_structure)",
     "S3method(plot,mfrm_hierarchical_structure)",
-    # 0.1.6 polish: apa_table Word/HTML adapters.
+    # apa_table Word/HTML adapters.
     "S3method(as_kable,apa_table)",
     "S3method(as_flextable,apa_table)",
-    # 0.1.6 polish second pass: summary methods for facet_icc /
-    # design_effect.
+    # Summary methods for facet_icc and design_effect.
     "S3method(summary,mfrm_facet_icc)",
     "S3method(summary,mfrm_facet_design_effect)",
-    # 0.1.6: sample-review bar and nesting heatmap plots.
+    # Sample-review bar and nesting heatmap plots.
     "S3method(plot,mfrm_facet_sample_review)",
     "S3method(plot,mfrm_facet_nesting)",
     # 0.1.6: equating chain bipartite / common-anchor plot method.
@@ -362,13 +364,20 @@ test_that("NAMESPACE roxygen contract keeps expected exports and methods", {
     "S3method(print,mfrm_resamples)",
     "S3method(print,summary.mfrm_resamples)",
     "S3method(summary,mfrm_resamples)",
-    # 0.2.1: lightweight mfrm_results export object.
+    # Lightweight mfrm_results export object.
     "S3method(print,mfrm_results_export)",
-    # 0.2.1: response-time descriptive review layer.
+    # Response-time descriptive review layer.
     "S3method(plot,mfrm_response_time_review)",
     "S3method(print,mfrm_response_time_review)",
     "S3method(print,summary.mfrm_response_time_review)",
-    "S3method(summary,mfrm_response_time_review)"
+    "S3method(summary,mfrm_response_time_review)",
+    # Optional ggplot2 conversion for draw-free plot payloads.
+    "S3method(as_ggplot,default)",
+    "S3method(as_ggplot,mfrm_design_evaluation)",
+    "S3method(as_ggplot,mfrm_design_evaluation_plot_data)",
+    "S3method(as_ggplot,mfrm_plot_data)",
+    "S3method(as_ggplot,mfrm_signal_detection)",
+    "S3method(as_ggplot,mfrm_signal_detection_plot_data)"
   )
   expect_setequal(s3, expected_s3)
 })

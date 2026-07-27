@@ -19,6 +19,19 @@ underlying method, e.g. \verb{[as_flextable.apa_table()]} returns a
 \description{
 Generic for converting objects to a \code{flextable}
 }
+\examples{
+tbl <- structure(
+  list(
+    table = data.frame(Term = c("Rater A", "Rater B"), Estimate = c(-0.12, 0.18)),
+    caption = "Facet estimates",
+    note = "Toy values for formatting only."
+  ),
+  class = "apa_table"
+)
+if (requireNamespace("flextable", quietly = TRUE)) {
+  invisible(as_flextable(tbl))
+}
+}
 \seealso{
 \code{\link[=as_flextable.apa_table]{as_flextable.apa_table()}} for the \code{apa_table} method;
 \code{\link[=as_kable]{as_kable()}} for a \code{knitr::kable}-targeted alternative;

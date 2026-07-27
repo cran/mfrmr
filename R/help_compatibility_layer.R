@@ -6,7 +6,7 @@
 #' fixed-width reports, or graph/score file style outputs.
 #'
 #' This compatibility layer currently applies mainly to diagnostics-based
-#' `RSM` / `PCM` workflows. First-release `GPCM` fits now also support
+#' `RSM` / `PCM` workflows. Bounded `GPCM` fits also support
 #' graph-only compatibility-style exports, while scorefile and
 #' diagnostics-driven compatibility outputs remain limited to `RSM` / `PCM`.
 #' Treat this layer as a presentation/contract surface, not as a claim of

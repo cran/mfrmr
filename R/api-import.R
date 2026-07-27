@@ -2,13 +2,10 @@
 # Import adapters: mirt / TAM / eRm fits to mfrmr-compatible bundles
 # ==============================================================================
 #
-# The current import path is **partial**: each helper extracts the
-# subset of measurement information that maps cleanly to the
-# `mfrm_fit` contract (item / step parameters, person scores, basic
-# fit statistics) and returns a thin object that the mfrmr plot and
-# reporting helpers can consume. Full bundle import (bias / DIF /
-# anchor review / replay) is deferred to a future release because the
-# source packages do not always expose the underlying data.
+# Importers expose the measurement information that maps reliably to the
+# `mfrm_fit` contract: item/step parameters, person scores, and basic fit
+# statistics. Bias, DIF, anchor-review, and replay components are outside this
+# adapter contract when the source package does not expose the underlying data.
 #
 # All importers refuse to claim the `mfrm_fit` class outright; they
 # return an `mfrm_imported_fit` object that downstream helpers can
@@ -60,9 +57,19 @@
 #'
 #' @section Scope:
 #' Bundles bias / DIF / anchor / replay slots are explicitly not
-#' populated; full bidirectional import / export is planned for a
-#' future release.
+#' populated. This helper provides a one-way fitted-object import for the
+#' documented core fields, not a bidirectional interchange format.
 #' @seealso [import_tam_fit()], [import_erm_fit()]
+#' @examples
+#' \donttest{
+#' if (requireNamespace("mirt", quietly = TRUE)) {
+#'   response_matrix <- matrix(sample(0:3, 60, replace = TRUE), nrow = 20)
+#'   colnames(response_matrix) <- paste0("Item", seq_len(ncol(response_matrix)))
+#'   fit <- mirt::mirt(response_matrix, 1, itemtype = "gpcm", verbose = FALSE)
+#'   imported <- import_mirt_fit(fit, model = "GPCM")
+#'   imported$summary
+#' }
+#' }
 #' @export
 import_mirt_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
                              item_facet = "Item",
@@ -301,6 +308,16 @@ import_mirt_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
 #' @return An `mfrm_imported_fit` object. Slots mirror
 #'   [import_mirt_fit()].
 #' @seealso [import_mirt_fit()], [import_erm_fit()]
+#' @examples
+#' \donttest{
+#' if (requireNamespace("TAM", quietly = TRUE)) {
+#'   response_matrix <- matrix(sample(0:3, 60, replace = TRUE), nrow = 20)
+#'   colnames(response_matrix) <- paste0("Item", seq_len(ncol(response_matrix)))
+#'   fit <- TAM::tam.mml(resp = response_matrix, irtmodel = "PCM")
+#'   imported <- import_tam_fit(fit, model = "PCM")
+#'   imported$summary
+#' }
+#' }
 #' @export
 import_tam_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
                             item_facet = "Item",
@@ -611,7 +628,11 @@ import_tam_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
 #' Import an `eRm` fit to an mfrmr-compatible bundle
 #'
 #' Extracts item / person parameters from an [eRm::PCM()] /
-#' [eRm::RM()] fit. Same caveats as [import_mirt_fit()].
+#' [eRm::RM()] fit. Current `eRm` person tables use `Person Parameter` and
+#' `Std.Error`; historical `theta` / `thetapar` estimate labels are also
+#' accepted. Unknown or internally misaligned person-table schemas stop with an
+#' explicit error rather than silently recycling rows. Same caveats as
+#' [import_mirt_fit()].
 #'
 #' @param fit An object returned by `eRm::PCM()`, `eRm::RM()`, or
 #'   `eRm::RSM()`.
@@ -620,6 +641,16 @@ import_tam_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
 #'
 #' @return An `mfrm_imported_fit` object.
 #' @seealso [import_mirt_fit()], [import_tam_fit()]
+#' @examples
+#' \donttest{
+#' if (requireNamespace("eRm", quietly = TRUE)) {
+#'   response_matrix <- matrix(sample(0:3, 60, replace = TRUE), nrow = 20)
+#'   colnames(response_matrix) <- paste0("Item", seq_len(ncol(response_matrix)))
+#'   fit <- eRm::PCM(response_matrix)
+#'   imported <- import_erm_fit(fit, model = "PCM")
+#'   imported$summary
+#' }
+#' }
 #' @export
 import_erm_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
                             item_facet = "Item") {
@@ -642,14 +673,7 @@ import_erm_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
   )
   pp <- tryCatch(eRm::person.parameter(fit), error = function(e) NULL)
   if (!is.null(pp)) {
-    theta <- as.numeric(pp$theta.table$theta)
-    person_tbl <- data.frame(
-      Person = paste0("P", seq_along(theta)),
-      Estimate = theta,
-      SE = as.numeric(pp$se.theta[[1]] %||% NA_real_),
-      Extreme = "none",
-      stringsAsFactors = FALSE
-    )
+    person_tbl <- .erm_extract_person_table(pp)
   } else {
     person_tbl <- data.frame(Person = character(0), Estimate = numeric(0),
                               SE = numeric(0), Extreme = character(0),
@@ -685,6 +709,113 @@ import_erm_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
   )
   class(out) <- c("mfrm_imported_fit", "mfrm_fit", "list")
   out
+}
+
+.erm_normalize_schema_name <- function(x) {
+  gsub("[^a-z0-9]+", "", tolower(as.character(x)))
+}
+
+.erm_extract_person_table <- function(person_parameters) {
+  theta_table <- person_parameters$theta.table %||% NULL
+  if (!is.data.frame(theta_table) || nrow(theta_table) == 0L) {
+    stop(
+      paste0(
+        "`eRm::person.parameter()` returned an unsupported person-parameter ",
+        "schema: `theta.table` must be a non-empty data frame."
+      ),
+      call. = FALSE
+    )
+  }
+
+  normalized_names <- .erm_normalize_schema_name(names(theta_table))
+  estimate_columns <- which(normalized_names %in% c(
+    "theta", "thetapar", "personparameter"
+  ))
+  if (length(estimate_columns) != 1L) {
+    available <- paste(names(theta_table), collapse = ", ")
+    if (!nzchar(available)) available <- "<none>"
+    stop(
+      paste0(
+        "`eRm::person.parameter()` returned an unsupported `theta.table` ",
+        "schema. Expected exactly one person-estimate column named `theta`, ",
+        "`thetapar`, or `Person Parameter`; available columns: ", available,
+        "."
+      ),
+      call. = FALSE
+    )
+  }
+
+  estimate_raw <- theta_table[[estimate_columns]]
+  estimates <- suppressWarnings(as.numeric(estimate_raw))
+  if (length(estimates) != nrow(theta_table)) {
+    stop(
+      "The eRm person-estimate column could not be aligned to `theta.table` rows.",
+      call. = FALSE
+    )
+  }
+
+  id_columns <- which(normalized_names %in% c("person", "personid", "id"))
+  if (length(id_columns) > 1L) {
+    stop(
+      "The eRm `theta.table` contains multiple possible person-ID columns.",
+      call. = FALSE
+    )
+  }
+  if (length(id_columns) == 1L) {
+    person_ids <- as.character(theta_table[[id_columns]])
+  } else {
+    person_ids <- rownames(theta_table)
+    default_rows <- identical(person_ids, as.character(seq_len(nrow(theta_table))))
+    if (is.null(person_ids) || length(person_ids) != nrow(theta_table) ||
+        default_rows || anyNA(person_ids) || any(!nzchar(person_ids))) {
+      estimate_names <- names(estimate_raw)
+      if (!is.null(estimate_names) && length(estimate_names) == nrow(theta_table) &&
+          !anyNA(estimate_names) && all(nzchar(estimate_names))) {
+        person_ids <- estimate_names
+      } else {
+        person_ids <- paste0("P", seq_len(nrow(theta_table)))
+      }
+    }
+  }
+
+  se_columns <- which(normalized_names %in% c(
+    "se", "setheta", "stderr", "stderror", "standarderror"
+  ))
+  if (length(se_columns) > 1L) {
+    stop(
+      "The eRm `theta.table` contains multiple possible standard-error columns.",
+      call. = FALSE
+    )
+  }
+  if (length(se_columns) == 1L) {
+    standard_errors <- suppressWarnings(as.numeric(theta_table[[se_columns]]))
+  } else {
+    standard_errors <- unlist(
+      person_parameters$se.theta %||% numeric(0),
+      use.names = TRUE
+    )
+    standard_errors <- suppressWarnings(as.numeric(standard_errors))
+  }
+  if (length(standard_errors) == 0L) {
+    standard_errors <- rep(NA_real_, length(estimates))
+  } else if (length(standard_errors) != length(estimates)) {
+    stop(
+      paste0(
+        "`eRm::person.parameter()` returned ", length(estimates),
+        " person estimates but ", length(standard_errors),
+        " standard errors; the rows cannot be aligned safely."
+      ),
+      call. = FALSE
+    )
+  }
+
+  data.frame(
+    Person = person_ids,
+    Estimate = estimates,
+    SE = standard_errors,
+    Extreme = "none",
+    stringsAsFactors = FALSE
+  )
 }
 
 # ==============================================================================
@@ -867,7 +998,7 @@ import_erm_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
 
 #' @export
 print.mfrm_imported_fit <- function(x, ...) {
-  cat("mfrmr imported fit (measurement-side slots only)\n")
+  cat("Imported measurement results (limited functionality)\n")
   cat(sprintf("  Source: %s (%s)\n",
               x$source$package %||% "unknown",
               x$source$source_object_class %||% "unknown"))
@@ -876,7 +1007,7 @@ print.mfrm_imported_fit <- function(x, ...) {
     cat(sprintf("  Model: %s | Method: %s | Persons: %s\n",
                 ov$Model, ov$Method, ov$Persons))
   }
-  cat("  Use mfrmr plot helpers for measurement-side views;\n")
-  cat("  bias / DIF / anchor / replay slots are not available.\n")
+  cat("  Use mfrmr plot helpers for available measurement views.\n")
+  cat("  Bias, DIF, anchoring, and reproducibility workflows require a native fit_mfrm() object.\n")
   invisible(x)
 }

@@ -11,7 +11,7 @@ dif_report(dif_result, ...)
 (class \code{mfrm_dff} with compatibility class \code{mfrm_dif}) or
 \code{\link[=dif_interaction_table]{dif_interaction_table()}} (class \code{mfrm_dif_interaction}).}
 
-\item{...}{Currently unused; reserved for future extensions.}
+\item{...}{Reserved for generic compatibility.}
 }
 \value{
 Object of class \code{mfrm_dif_report} with \code{narrative},
@@ -20,8 +20,8 @@ Object of class \code{mfrm_dif_report} with \code{narrative},
 \description{
 Produces APA-style narrative text interpreting the results of a differential-
 functioning analysis or interaction table. For \code{method = "refit"}, the
-report summarises the number of facet levels classified as negligible (A),
-moderate (B), and large (C). For \code{method = "residual"}, it summarises
+report summarises linked screening contrasts and whether conditional plug-in
+uncertainty was available. For \code{method = "residual"}, it summarises
 screening-positive results, lists the specific levels and their direction,
 and includes a caveat about the distinction between construct-relevant
 variation and measurement bias.
@@ -32,20 +32,19 @@ the pairwise differential-functioning contrasts in \verb{$dif_table}. When it is
 \code{mfrm_dif_interaction} object, the report uses the cell-level
 statistics and flags from \verb{$table}.
 
-For \code{method = "refit"}, ETS-style magnitude labels are used only when
-subgroup calibrations were successfully linked back to a common baseline
-scale; otherwise the report labels those contrasts as unclassified because
-the refit difference is descriptive rather than comparable on a linked
-logit scale. For \code{method = "residual"}, the report describes
-screening-positive versus screening-negative contrasts instead of applying
-ETS labels.
+Refit differences are descriptive on a linked logit scale when subgroup
+calibrations retain the required anchors. Their separate-subgroup plug-in
+standard errors condition on those anchors and omit baseline-anchor
+uncertainty and cross-refit covariance, so the report does not assign ETS
+labels or present refit rows as formal inference. The residual method also
+uses screening-positive versus screening-negative language.
 }
 \section{Interpreting output}{
 
 \itemize{
 \item \verb{$narrative}: character scalar with the full narrative text.
 \item \verb{$counts}: named integer vector of method-appropriate counts.
-\item \verb{$large_dif}: tibble of large ETS results (\code{method = "refit"}) or
+\item \verb{$large_dif}: an empty compatibility table for current refit output, or
 screening-positive contrasts/cells (\code{method = "residual"}).
 \item \verb{$gpcm_boundary}: for bounded \code{GPCM} inputs, a capability-boundary table
 marking the narrative as caveated DFF screening output.
@@ -86,14 +85,17 @@ Rasch measurement in language testing. \emph{Language Testing}, 29(4),
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_bias")
 
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                 method = "JML", model = "RSM", maxit = 30)
+  method = "JML", model = "RSM", maxit = 30
+)
 diag <- diagnose_mfrm(fit, residual_pca = "none")
 dif <- analyze_dff(fit, diag, facet = "Rater", group = "Group", data = toy)
 rpt <- dif_report(dif)
 cat(rpt$narrative)
+}
 }
 \seealso{
 \code{\link[=analyze_dff]{analyze_dff()}}, \code{\link[=analyze_dif]{analyze_dif()}}, \code{\link[=dif_interaction_table]{dif_interaction_table()}},

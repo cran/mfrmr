@@ -23,7 +23,7 @@ diagnostics are computed internally with \code{residual_pca = "none"}.}
 \item{bias_results}{Optional output from \code{\link[=estimate_bias]{estimate_bias()}}. If omitted and
 at least two facets exist, a 2-way bias run is computed internally.}
 
-\item{branch}{Contract branch. \code{"facets"} checks legacy-compatible columns.
+\item{branch}{Contract branch. \code{"facets"} checks FACETS-style contract columns.
 \code{"original"} adapts branch-sensitive contracts to the package's compact
 naming.}
 
@@ -60,15 +60,16 @@ returns:
 \item optional metric-level consistency checks
 }
 
-It is intended for output-contract QA and regression review. It does
-not establish external validity or software equivalence beyond the specific
+It is intended to show users which FACETS-style output fields have a
+package-native counterpart and which remain unavailable. It does not
+establish external validity or software equivalence beyond the specific
 schema/metric contract encoded in the contract file.
 }
 \section{Bounded GPCM boundary}{
 
-This helper remains blocked for bounded \code{GPCM} fits in 0.2.1. The FACETS
+This helper is unavailable for bounded \code{GPCM} fits because the FACETS
 output contract includes score-side rows whose measure-to-score and
-uncertainty semantics are validated for the current Rasch-family route, not
+uncertainty semantics are supported for the Rasch-family route, not
 for free-discrimination bounded \code{GPCM}. Use \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}} before
 routing a bounded \code{GPCM} fit into score-side compatibility-output helpers.
 
@@ -104,7 +105,8 @@ current contract.
 \enumerate{
 \item Run \code{facets_output_contract_review(fit, branch = "facets")}.
 \item Inspect \code{summary(contract_review)} and \code{missing_preview}.
-\item Patch upstream table builders, then rerun the output-contract review.
+\item For unresolved rows, use the documented package-native alternative or
+retain the scope limitation in the report.
 }
 }
 

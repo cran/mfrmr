@@ -69,7 +69,7 @@ test_that("strict marginal fit diagnostics are available for MML RSM, PCM, and G
     expect_true("posterior_predictive_follow_up" %in% diag$marginal_fit$guidance$Component)
     expect_identical(
       diag$marginal_fit$summary$PosteriorPredictiveFollowUp[1],
-      "planned_not_implemented"
+      "not_available"
     )
 
     overall_cells <- diag$marginal_fit$overall$cell_stats
@@ -93,12 +93,15 @@ test_that("strict marginal fit diagnostics are available for MML RSM, PCM, and G
     expect_true(nrow(diag_summary$diagnostic_basis) >= 4)
     expect_true("posterior_predictive_follow_up" %in% diag_summary$marginal_guidance$Component)
 
-    printed <- paste(capture.output(print(diag_summary)), collapse = "\n")
+    printed <- paste(
+      capture.output(print(summary(diag, detail = "full"))),
+      collapse = "\n"
+    )
     expect_match(printed, "Diagnostic basis guide", fixed = TRUE)
     expect_match(printed, "Strict marginal fit", fixed = TRUE)
     expect_match(printed, "Strict pairwise local dependence", fixed = TRUE)
     expect_match(printed, "Strict marginal guidance", fixed = TRUE)
-    expect_match(printed, "planned_not_implemented", fixed = TRUE)
+    expect_match(printed, "not_available", fixed = TRUE)
 
     rs <- mfrmr::rating_scale_table(obj$fit, diagnostics = diag)
     expect_true(all(c(

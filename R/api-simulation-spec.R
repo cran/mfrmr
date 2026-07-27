@@ -9,9 +9,9 @@
 #'   (`n_person`, `n_rater`, `n_criterion`, `raters_per_person`), current
 #'   public aliases implied by `facet_names` (for example `n_judge`,
 #'   `n_task`, `judge_per_person`), or role keywords (`person`, `rater`,
-#'   `criterion`, `assignment`). The schema-only future branch input
+#'   `criterion`, `assignment`). The nested named-facet form
 #'   `design$facets = c(person = ..., judge = ..., task = ...)` is also
-#'   accepted for the currently exposed facet keys. Do not specify the same
+#'   accepted for the supported person/rater/criterion design. Do not specify the same
 #'   variable through both `design` and the scalar count arguments.
 #' @param score_levels Number of ordered score categories.
 #' @param theta_sd Standard deviation of simulated person measures.
@@ -126,20 +126,19 @@
 #'   design contract rather than a fully arbitrary-facet planner
 #' - `planning_constraints`, an explicit record of which design variables can
 #'   currently be changed from that specification without rebuilding it
-#' - `planning_schema`, a combined schema contract bundling the role descriptor,
-#'   scope boundary, current mutability map, a `facet_manifest`, a
-#'   schema-only `future_facet_table`, and a matching
-#'   `future_design_template`, plus a nested `future_branch_schema` scaffold
-#'   for a future arbitrary-facet planning branch
-#' - the current `design$facets(...)` parser now normalizes nested facet-count
-#'   input through that bundled `future_branch_schema`, whose nested
-#'   `design_schema` is now the authoritative schema-only branch object
+#' - `planning_schema`, a combined structural contract containing the role
+#'   descriptor, supported scope, mutability map, facet manifest, and the
+#'   normalized named-facet design representation. Its `structural_design_*`
+#'   fields describe deterministic balance and connectivity reviews; they do
+#'   not imply support for arbitrary-facet simulation.
+#' - the `design$facets` parser normalizes named facet counts through the same
+#'   design representation used by the planning helpers
 #' - optional signal tables for DIF and interaction bias
 #'
 #' The current generator targets the package's standard person x rater x
 #' criterion workflow, but the public output names for those two facet roles
 #' can now be customized with `facet_names`. This naming layer improves public
-#' ergonomics; it does not yet turn the generator into a fully arbitrary-facet
+#' ergonomics; it does not provide a fully arbitrary-facet
 #' simulator. Internally, helper objects keep canonical role mappings so that
 #' planning functions can treat the first non-person facet as rater-like and
 #' the second as criterion-like. When threshold values are provided by
@@ -175,7 +174,7 @@
 #' (2023).
 #'
 #' If `population_formula` is supplied, the simulation specification carries a
-#' first-version person-level latent-regression generator. This affects only the
+#' person-level latent-regression generator. This affects only the
 #' person distribution. The current implementation keeps the non-person facets
 #' in the existing many-facet Rasch generator and resamples rows from
 #' `population_covariates` to the requested design size before computing
@@ -401,6 +400,39 @@ build_mfrm_sim_spec <- function(n_person = 50,
   )
 }
 
+#' Print an mfrmr simulation specification
+#'
+#' Shows the model, design size, assignment, and latent-distribution settings
+#' needed to understand the specification without printing its complete
+#' machine-readable planning metadata.
+#'
+#' @param x An `mfrm_sim_spec` object.
+#' @param ... Reserved for generic compatibility.
+#'
+#' @return `x`, invisibly.
+#' @rdname build_mfrm_sim_spec
+#' @method print mfrm_sim_spec
+#' @export
+print.mfrm_sim_spec <- function(x, ...) {
+  facet_names <- x$facet_names %||% c(rater = "Rater", criterion = "Criterion")
+  rater_label <- as.character(facet_names[["rater"]] %||% "Rater")
+  criterion_label <- as.character(facet_names[["criterion"]] %||% "Criterion")
+
+  cat("mfrmr simulation specification\n")
+  cat(" Model: ", as.character(x$model %||% "unknown"),
+      " | Score categories: ", as.integer(x$score_levels %||% NA_integer_), "\n", sep = "")
+  cat(" Design: ", as.integer(x$n_person %||% NA_integer_), " persons; ",
+      rater_label, " ", as.integer(x$n_rater %||% NA_integer_), "; ",
+      criterion_label, " ", as.integer(x$n_criterion %||% NA_integer_), "\n", sep = "")
+  cat(" Assignment: ", as.character(x$assignment %||% "unknown"),
+      " (", as.integer(x$raters_per_person %||% NA_integer_),
+      " ", rater_label, " levels per person)\n", sep = "")
+  cat(" Latent distribution: ",
+      as.character(x$latent_distribution %||% "unknown"), "\n", sep = "")
+  cat(" Next: simulate_mfrm_data(sim_spec = <this specification>)\n")
+  invisible(x)
+}
+
 peer_review_validate_scalar_logical <- function(x, arg_name) {
   if (!is.logical(x) || length(x) != 1L || is.na(x)) {
     stop("`", arg_name, "` must be either `TRUE` or `FALSE`.", call. = FALSE)
@@ -561,6 +593,7 @@ peer_review_build_design_skeleton <- function(n_submission,
 #' @seealso [simulate_mfrm_data()], [build_mfrm_network_review()],
 #'   [build_mfrm_sim_spec()]
 #' @examples
+#' \donttest{
 #' peer_spec <- build_peer_review_sim_spec(
 #'   n_submission = 12,
 #'   n_criterion = 3,
@@ -568,6 +601,7 @@ peer_review_build_design_skeleton <- function(n_submission,
 #'   anchor_submissions = 2
 #' )
 #' peer_spec$peer_review$overview
+#' }
 #' @export
 build_peer_review_sim_spec <- function(n_submission = 50,
                                        n_criterion = 4,
@@ -758,15 +792,14 @@ build_peer_review_sim_spec <- function(n_submission = 50,
 #' mechanism. Users should review and, if necessary, edit the returned
 #' specification before using it for design planning.
 #'
-#' First-release `GPCM` fits are now supported here for direct data generation
+#' Bounded `GPCM` fits are supported here for direct data generation
 #' and parameter-recovery checks, provided that the returned simulation
 #' specification stores both a threshold table and a parallel slope table.
 #' The same fit-derived specification can feed caveated role-based design
 #' evaluation, population forecasting, and fit-based report/export bundles.
-#' Diagnostic/signal-detection design screening, full FACETS score-side
-#' contract review, posterior predictive checks, and heavy backend extensions
-#' remain outside the bounded-`GPCM` boundary until those downstream contracts
-#' are widened explicitly.
+#' Diagnostic and signal-detection design screening is available with explicit
+#' caveats. Full FACETS score-side contract review, posterior predictive checks,
+#' and MCMC estimation are not available for bounded `GPCM`.
 #'
 #' If you want to carry person-level group labels into a fit-derived observed
 #' response skeleton, provide the original `source_data` together with
@@ -1290,7 +1323,7 @@ simulation_build_population_spec <- function(population_formula = NULL,
     person_id = "TemplatePerson",
     covariate_template = template,
     notes = c(
-      "This simulation specification stores a first-version latent-regression person generator.",
+      "This simulation specification stores a latent-regression person generator.",
       "Template person rows are resampled to the requested design size before computing theta = X beta + e."
     )
   )

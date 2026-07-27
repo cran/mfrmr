@@ -5,7 +5,7 @@
 # Internal helpers for reading anchor / group-anchor tables, normalizing
 # their structure, and generating the connectivity / overlap audit
 # bundle consumed by `fit_mfrm()`. Split out of `mfrm_core.R` for
-# 0.1.6 so the anchor-table layer lives in a single file. All
+# so the anchor-table layer lives in a single file. All
 # functions here are internal (no @export); they are called from the
 # preparation phase of `mfrm_estimate()` before the optimizer runs.
 

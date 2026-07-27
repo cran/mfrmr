@@ -45,7 +45,7 @@ families:
 \itemize{
 \item \code{synthetic_truth}: checks whether recovered facet measures align with the
 known generating values from the package's synthetic design.
-\item \code{synthetic_latent_regression}: checks whether the first-version
+\item \code{synthetic_latent_regression}: checks whether the
 latent-regression \code{MML} branch recovers known population coefficients,
 residual latent variance, criterion ordering, and posterior-shift
 direction from a synthetic overlap case.
@@ -97,7 +97,7 @@ including the latent-regression reference case.
 ConQuest-overlap bundle/normalization/review workflow; this remains a
 package-side check until actual ConQuest output tables are supplied.
 \item \code{population_policy_checks}: complete-case omission checks for population
-model benchmark fixtures.
+model reference data.
 \item \code{source_profile}: source-backed rules used by the reference checks.
 }
 }

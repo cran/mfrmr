@@ -92,7 +92,8 @@ NCME presentation.
 \donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 30)
+  method = "JML", maxit = 30
+)
 if (requireNamespace("igraph", quietly = TRUE)) {
   review <- build_mfrm_network_review(fit)
   summary(review)

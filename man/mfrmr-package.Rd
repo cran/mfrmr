@@ -12,25 +12,33 @@ many-facet ordered-response measurement models: the Rasch-family \code{RSM} /
 documented.
 }
 \details{
-Start with the following core workflow before branching into the longer
-\code{GPCM}, simulation, and planning notes:
+Start with the following core workflow before branching into diagnostics,
+bounded \code{GPCM}, simulation, and planning notes:
 \enumerate{
+\item Review long-format data and the intended score support with
+\code{\link[=describe_mfrm_data]{describe_mfrm_data()}}. When a planned assignment roster exists, pass it
+as \code{expected_design} so absent rows are not confused with unassigned cells
 \item Fit with \code{\link[=fit_mfrm]{fit_mfrm()}} using \code{method = "MML"}
-\item For \code{RSM} / \code{PCM}, run \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} with
-\code{diagnostic_mode = "both"}; for bounded \code{GPCM}, use the direct
-diagnostic route and read \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}}
-\item Build a comprehensive first screen with \code{\link[=mfrm_results]{mfrm_results()}}
-\item Read \code{summary(fit)}, \code{summary(diag)}, and \code{summary(res)} before branching
-\item Use \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}} and \code{\link[=reporting_checklist]{reporting_checklist()}} as the first visual
-and reporting screens
+\item Read \code{summary(fit, profile = "fit")}, then request the comprehensive
+FACETS-organized view with \code{summary(fit, profile = "facets")}
+\item Create the required native Wright map with
+\code{plot(fit, type = "wright", show_ci = TRUE)}; use the FACETS renderer
+only as an optional familiar presentation
+\item Continue from the summary's \code{results} component to \code{\link[=mfrm_report]{mfrm_report()}} and
+\code{\link[=export_mfrm_results]{export_mfrm_results()}}
+\item Reuse \code{review$results$diagnostics} for \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}} and
+\code{\link[=reporting_checklist]{reporting_checklist()}}; call \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} again only for residual
+PCA or other custom settings. For
+bounded \code{GPCM}, read \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}} before interpreting
+specialist helpers
 }
 
 Recommended workflow:
 \enumerate{
-\item Fit model with \code{\link[=fit_mfrm]{fit_mfrm()}}
-\item For \code{RSM} / \code{PCM}, compute diagnostics with
-\code{\link[=diagnose_mfrm]{diagnose_mfrm()}} and prefer \code{diagnostic_mode = "both"} when you want
-legacy residual continuity plus the newer strict marginal-fit screen
+\item Review the data with \code{\link[=describe_mfrm_data]{describe_mfrm_data()}} and fit with \code{\link[=fit_mfrm]{fit_mfrm()}}
+\item For \code{RSM} / \code{PCM}, create the comprehensive summary and reuse its
+diagnostics; request a separate \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} call only for custom
+settings
 \item For \code{RSM} / \code{PCM}, run residual PCA with \code{\link[=analyze_residual_pca]{analyze_residual_pca()}} if needed
 \item For \code{RSM} / \code{PCM}, or bounded \code{GPCM} with the documented screening
 caveat, estimate interactions with \code{\link[=estimate_bias]{estimate_bias()}}
@@ -67,7 +75,7 @@ Companion vignettes:
 \item \code{vignette("mfrmr-linking-and-dff", package = "mfrmr")}
 }
 
-A two-page landscape cheatsheet of the public API ships at
+A printable landscape cheatsheet of the public API ships at
 \code{system.file("cheatsheet", "mfrmr-cheatsheet.pdf", package = "mfrmr")}
 (pre-rendered) and \code{system.file("cheatsheet", "mfrmr-cheatsheet.Rmd", package = "mfrmr")} (source). Open the PDF directly for a printable
 reference card, or knit the source with \code{rmarkdown::render()} when
@@ -77,12 +85,18 @@ you want a customised version.
 
 Use this order before exploring the broader feature surface:
 \enumerate{
+\item \code{\link[=describe_mfrm_data]{describe_mfrm_data()}} for score support, column missingness, declared
+assignment coverage, and Person-facet connectivity
 \item \code{\link[=fit_mfrm]{fit_mfrm()}} with \code{method = "MML"}
-\item \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} with \code{diagnostic_mode = "both"} for \code{RSM} / \code{PCM};
-for bounded \code{GPCM}, keep diagnostics on the direct exploratory route
-\item \code{\link[=mfrm_results]{mfrm_results()}} for a FACETS-style first screen
-\item \code{summary(fit)}, \code{summary(diag)}, and \code{summary(res)}
-\item \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}} for first-pass triage
+\item \code{summary(fit, profile = "fit")}, followed by
+\code{summary(fit, profile = "facets")} for the comprehensive first screen
+\item \code{plot(fit, type = "wright", show_ci = TRUE)} for the required
+shared-logit figure
+\item \code{\link[=mfrm_report]{mfrm_report()}} and \code{\link[=export_mfrm_results]{export_mfrm_results()}} from the summary's \code{results}
+component for reporting and reproducible analysis handoff
+\item Add \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} with \code{diagnostic_mode = "both"} for deeper
+\code{RSM} / \code{PCM} diagnostics; for bounded \code{GPCM}, keep diagnostics on the
+direct exploratory route and read \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}}
 \item Choose the next branch:
 \code{\link[=reporting_checklist]{reporting_checklist()}} for reporting,
 \code{\link[=build_weighting_review]{build_weighting_review()}} for Rasch-versus-\code{GPCM} weighting review,
@@ -96,7 +110,7 @@ or caveated bounded-\code{GPCM} linking synthesis
 
 After the basic route above:
 \itemize{
-\item the package now includes a first-version latent-regression \code{MML} branch
+\item the package supports latent-regression \code{MML}
 for ordered-response \code{RSM} / \code{PCM} models with a one-dimensional
 conditional-normal population model and explicit one-row-per-person
 covariates expanded through \code{stats::model.matrix()}
@@ -104,9 +118,8 @@ covariates expanded through \code{stats::model.matrix()}
 \item bounded \code{GPCM} supports the core fit/summary/scoring/information
 path, direct Wright/pathway/CCC plots, residual-PCA follow-up, and the
 residual-based diagnostics tables/plots as exploratory tools
-\item posterior-predictive computation, \code{MCMC} engines, and Docker-based
-advanced runtimes are future extensions rather than requirements for the
-current bounded \code{GPCM} route
+\item posterior-predictive checks and \code{MCMC} estimation are not available for
+bounded \code{GPCM}; use external Bayesian software when they are required
 \item direct \code{GPCM} data generation through \code{\link[=build_mfrm_sim_spec]{build_mfrm_sim_spec()}},
 \code{\link[=extract_mfrm_sim_spec]{extract_mfrm_sim_spec()}}, and \code{\link[=simulate_mfrm_data]{simulate_mfrm_data()}} is available when
 the specification carries both thresholds and slopes
@@ -115,8 +128,8 @@ bounded \code{GPCM} with explicit caveats; \code{\link[=build_apa_outputs]{build
 \code{\link[=build_visual_summaries]{build_visual_summaries()}}, \code{\link[=run_qc_pipeline]{run_qc_pipeline()}},
 \code{\link[=build_mfrm_manifest]{build_mfrm_manifest()}}, \code{\link[=build_mfrm_replay_script]{build_mfrm_replay_script()}}, and
 \code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}} are available as caveated partial reporting/export
-surfaces; score-side FACETS compatibility and broader planning semantics
-remain validated for \code{RSM} / \code{PCM}
+surfaces; score-side FACETS compatibility remains limited, and fully
+arbitrary-facet planning is outside the documented planning scope
 \item \code{predict_mfrm_population()} remains a scenario-level forecast helper and
 should not be described as the latent-regression estimator itself
 \item the current simulation/planning layer remains role-based for two
@@ -184,8 +197,8 @@ fair-average tables, and bias screening are also available for bounded
 \code{GPCM} with documented caveats)
 \item Reporting: \code{\link[=build_apa_outputs]{build_apa_outputs()}}, \code{\link[=build_visual_summaries]{build_visual_summaries()}},
 \code{\link[=reporting_checklist]{reporting_checklist()}}, \code{\link[=apa_table]{apa_table()}} for the full \code{RSM} / \code{PCM} route;
-bounded \code{GPCM} currently stays on the checklist / direct-table / direct-
-plot / summary-appendix side instead of the narrative/QC layer
+bounded \code{GPCM} uses these as caveated partial surfaces and retains direct
+table, plot, checklist, and summary-appendix routes
 \item Weighting review: \code{\link[=compare_mfrm]{compare_mfrm()}}, \code{\link[=build_weighting_review]{build_weighting_review()}},
 \code{\link[=build_model_choice_review]{build_model_choice_review()}}, \code{\link[=compute_information]{compute_information()}}, \code{\link[=plot_information]{plot_information()}}
 \item Case review: \code{\link[=build_misfit_casebook]{build_misfit_casebook()}}, \code{\link[=plot_unexpected]{plot_unexpected()}},
@@ -195,13 +208,13 @@ plot / summary-appendix side instead of the narrative/QC layer
 \code{\link[=build_linking_review]{build_linking_review()}}, \code{\link[=plot_anchor_drift]{plot_anchor_drift()}}
 \item Dashboards: \code{\link[=facet_quality_dashboard]{facet_quality_dashboard()}}, \code{\link[=plot_facet_quality_dashboard]{plot_facet_quality_dashboard()}}
 \item Export / reproducibility: \code{\link[=build_mfrm_manifest]{build_mfrm_manifest()}}, \code{\link[=build_mfrm_replay_script]{build_mfrm_replay_script()}},
-\code{\link[=build_conquest_overlap_bundle]{build_conquest_overlap_bundle()}}, \code{\link[=normalize_conquest_overlap_files]{normalize_conquest_overlap_files()}},
+\code{\link[=build_conquest_overlap_bundle]{build_conquest_overlap_bundle()}}, \code{normalize_conquest_overlap_exports()},
+\code{\link[=normalize_conquest_overlap_files]{normalize_conquest_overlap_files()}},
 \code{\link[=normalize_conquest_overlap_tables]{normalize_conquest_overlap_tables()}},
 \code{\link[=review_conquest_overlap]{review_conquest_overlap()}},
 \code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}} for the diagnostics-compatible Rasch-family route;
-bounded \code{GPCM} remains outside the current fit-based
-manifest/replay/bundle layer but can use \code{\link[=export_summary_appendix]{export_summary_appendix()}} for
-documented direct outputs
+bounded \code{GPCM} supports caveated partial manifest, replay, and bundle
+output as well as \code{\link[=export_summary_appendix]{export_summary_appendix()}}
 \item Equivalence: \code{\link[=analyze_facet_equivalence]{analyze_facet_equivalence()}}, \code{\link[=plot_facet_equivalence]{plot_facet_equivalence()}}
 \item Data and anchors: \code{\link[=describe_mfrm_data]{describe_mfrm_data()}}, \code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}},
 \code{\link[=make_anchor_table]{make_anchor_table()}}, \code{\link[=load_mfrmr_data]{load_mfrmr_data()}}
@@ -232,7 +245,9 @@ as a short triage subset. Summary-table exports route those rows through
 as weakly identified when an intermediate category is unobserved.
 \item Optional columns such as \code{Subset}, \code{Weight}, and \code{Group} support linking,
 weighted analysis, and fairness-focused follow-up workflows.
-\item Packaged simulation data is available via \code{\link[=load_mfrmr_data]{load_mfrmr_data()}} or \code{data()}.
+\item Packaged synthetic data is available via \code{\link[=load_mfrmr_data]{load_mfrmr_data()}} or \code{data()}.
+Use \code{list_mfrmr_data(details = TRUE)} to distinguish the applied teaching,
+idealized, planted-effect, and larger sparse-design datasets.
 }
 }
 
@@ -271,11 +286,16 @@ fairness or interaction questions matter; bounded \code{GPCM} also supports
 \code{\link[=evaluate_mfrm_design]{evaluate_mfrm_design()}}, \code{\link[=mfrm_generalizability]{mfrm_generalizability()}}, \code{\link[=mfrm_d_study]{mfrm_d_study()}},
 and \code{\link[=predict_mfrm_population]{predict_mfrm_population()}}. Bounded
 \code{GPCM} also supports direct simulation via
-\code{\link[=extract_mfrm_sim_spec]{extract_mfrm_sim_spec()}} / \code{\link[=simulate_mfrm_data]{simulate_mfrm_data()}}, but not the broader
-planning helpers. Those helpers assume two non-person facet roles
+\code{\link[=extract_mfrm_sim_spec]{extract_mfrm_sim_spec()}} / \code{\link[=simulate_mfrm_data]{simulate_mfrm_data()}} and caveated role-based
+\code{\link[=evaluate_mfrm_design]{evaluate_mfrm_design()}} / \code{\link[=predict_mfrm_population]{predict_mfrm_population()}} routes. Those
+helpers assume two non-person facet roles
 even though the estimation core supports arbitrary facet counts. Treat
 \code{\link[=evaluate_mfrm_design]{evaluate_mfrm_design()}} as Monte Carlo design evaluation, and use
-\code{\link[=mfrm_d_study]{mfrm_d_study()}} for analytic G/Phi design projections.
+\code{\link[=mfrm_d_study]{mfrm_d_study()}} for analytic G/Phi design projections. Always read
+the \code{IdentificationStatus}, \code{GStatus}, and \code{PhiStatus} columns before
+reporting those projections; boundary or singular mixed-model fits are
+design-identification warnings, not high-stakes-ready reliability
+evidence.
 \code{predict_mfrm_population()} remains the scenario-level forecast helper,
 not the latent-regression estimator.
 \item For future-unit scoring, retain an \code{MML} calibration when you want the
@@ -296,7 +316,7 @@ documented caveats. Caveated APA/QC/export bundles and exploratory
 linking review plus role-based design evaluation, population
 forecasting, diagnostic-screening, and signal-detection helpers are
 available, while full score-side FACETS review, posterior-predictive
-checks, and heavy backends remain outside the bounded \code{GPCM} route. Use
+checks, and \code{MCMC} estimation are not available for bounded \code{GPCM}. Use
 \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}} as the formal boundary statement.
 }
 }
@@ -363,7 +383,7 @@ so they are handled through the ordinary ordered-score interface. This means
 \code{mfrmr} supports ordered binary and ordered polytomous data under \code{RSM} and
 \code{PCM}, plus a narrow bounded \code{GPCM} branch with one designated
 \code{slope_facet} that currently must equal \code{step_facet}. Unordered
-nominal/multinomial response models are not yet implemented.
+nominal/multinomial response models are outside the documented model scope.
 }
 
 \section{Estimation methods}{
@@ -387,15 +407,19 @@ estimates are obtained post-hoc via Expected A Posteriori (EAP):
   \frac{\sum_q \theta_q \, w_q \, L(\mathbf{X}_n \mid \theta_q)}
        {\sum_q w_q \, L(\mathbf{X}_n \mid \theta_q)}}
 
-MML avoids the incidental-parameter problem and is generally preferred
-for smaller samples.
+MML does not estimate one fixed person parameter per respondent and therefore
+avoids that JML incidental-parameter mechanism. Its structural inference is
+nevertheless conditional on the specified population distribution, response
+model, quadrature approximation, and regularity conditions; it is not an
+automatic small-sample guarantee.
 
 Note: Bock & Aitkin (1981) is the canonical citation for the
 Gauss-Hermite-quadrature MML \emph{framework}. The default mfrmr engine
 (\code{mml_engine = "direct"}) optimises this marginal log-likelihood by
 direct gradient methods (BFGS / L-BFGS-B), not by Bock & Aitkin's
 signature EM algorithm. The \code{"em"} and \code{"hybrid"} engines do follow
-the EM template but use a BFGS M-step rather than B&A's probit IRLS,
+the EM template but use the selected gradient-based M-step rather than
+B&A's probit IRLS,
 because the target is the polytomous Rasch family rather than B&A's
 2PL probit model.
 
@@ -405,9 +429,11 @@ JML estimates all person and facet parameters simultaneously as fixed
 effects by maximising the joint log-likelihood
 \eqn{\ell(\boldsymbol{\theta}, \boldsymbol{\delta} \mid \mathbf{X})}
 directly.  It does not assume a parametric person distribution, which
-can be advantageous when the population shape is strongly non-normal,
-but parameter estimates are known to be biased when the number of
-persons is small relative to the number of items (Neyman & Scott, 1948).
+can be advantageous when the population shape is strongly non-normal.
+Its incidental-parameter concern is not simply a small-person-sample issue:
+structural-parameter bias can persist as the number of persons increases
+when the number of ratings or items per person remains fixed (Neyman &
+Scott, 1948).
 The package still accepts \code{"JMLE"} as a backward-compatible alias, but
 user-facing summaries and documentation use \code{"JML"} as the public label.
 
@@ -473,9 +499,12 @@ mean-square chi-square ratio to an approximate standard normal deviate:
 \deqn{\mathrm{ZSTD} = \frac{\mathrm{MnSq}^{1/3} - (1 - 2/(9\,\mathit{df}))}
                            {\sqrt{2/(9\,\mathit{df})}}}
 
-Values near 0 indicate expected fit; \eqn{|\mathrm{ZSTD}| > 2} flags
-potential misfit at the 5\\% level, and \eqn{|\mathrm{ZSTD}| > 3} at the
-1\\% level (Wright & Linacre, 1994; see also Wilson & Hilferty, 1931).
+Values near 0 indicate expected fit. The conventional
+\eqn{|\mathrm{ZSTD}| > 2} and \eqn{|\mathrm{ZSTD}| > 3} cutoffs are heuristic
+two- and three-standard-deviation reference bands (Wright & Linacre, 1994;
+see also Wilson & Hilferty, 1931), not calibrated 5\\% and 1\\% hypothesis
+tests. Parameter estimation, sparse cells, the selected df convention, and
+repeated screening across elements all affect that interpretation.
 ZSTD is reported alongside every Infit and Outfit value. ZSTD is
 withheld (\code{NA}) when the applicable df falls below 1, where the
 Wilson-Hilferty transformation is numerically unstable; FACETS/Winsteps
@@ -496,9 +525,10 @@ standardization-side df/ZSTD conventions.
 \strong{PTMEA (Point-Measure Correlation)}
 
 Pearson correlation between observed scores and estimated person measures
-within each facet level.  Positive values indicate that scoring aligns
-with the latent trait dimension; negative values suggest reversed
-orientation or scoring errors.
+within each facet level. A positive value is directionally consistent with
+the fitted orientation, but it is not a confirmatory test of alignment.
+A negative value prompts review of orientation, response patterns, and model
+specification; it does not by itself establish a scoring error.
 
 \strong{Separation}
 
@@ -583,9 +613,11 @@ performance assessments: A many-facet Rasch analysis. \emph{Language Assessment
 Quarterly}, 2, 197--221.
 \item Muraki, E. (1992). A generalized partial credit model: Application of
 an EM algorithm. \emph{Applied Psychological Measurement}, 16(2),
-159--176. (Source for the bounded \code{GPCM} extension used in
-\code{fit_mfrm(model = "GPCM")}, \code{fair_average_table()}, and
-\code{estimate_bias()}.)
+159--176. (Source for the GPCM response-probability kernel used by the
+package's bounded \code{fit_mfrm(model = "GPCM")} route. The slope-aware
+\code{fair_average_table()} and \code{estimate_bias()} extensions are package-specific,
+caveated adaptations built from that kernel, not procedures proposed in
+Muraki 1992.)
 \item Muraki, E. (1993). Information functions of the generalized partial
 credit model. \emph{Applied Psychological Measurement}, 17(4),
 351--363. (Companion paper to Muraki 1992 that derives the GPCM
@@ -654,10 +686,13 @@ Posteriori (EAP).  Joint Maximum Likelihood (JML) estimates all person
 and facet parameters simultaneously as fixed effects; \code{"JMLE"} remains a
 backward-compatible alias.
 
-MML is generally preferred for smaller samples because it avoids the
-incidental-parameter problem of JML.  JML does not assume a normal person
-distribution and can be lighter computationally in some settings, which
-may be an advantage when the population shape is strongly non-normal.
+Estimator choice should follow the inferential target and assumptions. MML
+avoids estimating one fixed effect per person, but its structural inference
+depends on the specified population distribution and response model. JML
+does not assume a parametric person distribution and can be lighter
+computationally, but structural-parameter bias can persist as the number of
+persons increases when the number of ratings or items per person remains
+fixed. Sample size alone therefore does not determine the preferred route.
 
 See \code{\link[=fit_mfrm]{fit_mfrm()}} for usage.
 
@@ -677,26 +712,24 @@ only for the post hoc scoring layer. This is useful for practical
 fixed-scale scoring, but it should still be described as a limited
 approximation rather than as full ConQuest-style population modeling.
 
-\strong{Current ConQuest overlap}
+\strong{ConQuest overlap}
 
-The package now includes a first-version latent-regression \code{MML} branch, but
+The package supports a scoped latent-regression \code{MML} model, but
 the overlap with ConQuest should still be described conservatively. The
-documented overlap is:
-ordered-response \code{RSM} / \code{PCM}, one latent dimension, a conditional-normal
-person population model, and person covariates supplied through an explicit
-one-row-per-person table and expanded through the package-built model
-matrix. Categorical person covariates carry fitted levels and contrasts into
-scoring. This is a scoped overlap, not a claim of broad ConQuest numerical
-equivalence for arbitrary imported design matrices, multidimensional models,
-imported design specifications, or the full plausible-values workflow.
+documented comparison is binary \code{RSM} / \code{PCM}, one latent dimension,
+exactly one item facet, complete rectangular responses, and exactly one
+numeric person covariate beyond the intercept in a conditional-normal person
+population model. This is a scoped file-based comparison, not a claim of
+broad ConQuest numerical equivalence for polytomous, multidimensional,
+incomplete, or arbitrary imported designs.
 }
 
 \examples{
 mfrm_threshold_profiles()
-list_mfrmr_data()
+list_mfrmr_data(details = TRUE)
 
 \donttest{
-toy <- load_mfrmr_data("example_core")
+toy <- load_mfrmr_data("example_operational")
 fit <- fit_mfrm(
   toy,
   person = "Person",
@@ -714,6 +747,7 @@ summary(diag)
 \seealso{
 Useful links:
 \itemize{
+  \item \url{https://ryuya-dot-com.github.io/mfrmr/}
   \item \url{https://github.com/Ryuya-dot-com/mfrmr}
   \item Report bugs at \url{https://github.com/Ryuya-dot-com/mfrmr/issues}
 }

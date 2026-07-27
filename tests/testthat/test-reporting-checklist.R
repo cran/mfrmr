@@ -57,7 +57,7 @@ test_that("reporting_checklist returns a bundle with checklist coverage tables",
   )
   expect_match(
     chk$software_scope$Relationship[chk$software_scope$Software == "FACETS"][1],
-    "FACETS-style reporting and handoff surface",
+    "FACETS-style reporting and file handoff",
     fixed = TRUE
   )
   expect_match(

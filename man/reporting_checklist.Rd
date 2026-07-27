@@ -39,8 +39,8 @@ A named list with checklist tables. Class:
 Build an auto-filled MFRM reporting checklist
 }
 \details{
-This helper ports the app-level reporting checklist into a package-native
-bundle. It does not try to judge substantive reporting quality; instead, it
+This helper builds a package-native reporting checklist. It does not try to
+judge substantive reporting quality; instead, it
 checks whether the fitted object and related diagnostics contain the evidence
 typically reported in MFRM write-ups.
 
@@ -111,9 +111,12 @@ short \code{InterpretationCheck} for the main user-facing caveat.
 Review the rows with \code{Available = FALSE} or \code{DraftReady = FALSE}, then add
 the missing diagnostics, bias results, or narrative context before calling
 \code{\link[=build_apa_outputs]{build_apa_outputs()}} for draft text generation. For \code{RSM} / \code{PCM}
-reporting runs, the preferred route is an \code{MML} fit plus
+reporting runs where the MML population assumptions are defensible, the
+most complete package-native route is an \code{MML} fit plus
 \code{diagnose_mfrm(..., diagnostic_mode = "both")} so the checklist can see the
-legacy and strict marginal screens together.
+legacy and strict marginal screens together. A JML route remains available
+when its estimand and incidental-parameter limitations better match the
+analysis purpose.
 }
 
 \section{How this differs from operational review}{
@@ -146,8 +149,8 @@ available from the current analysis objects.
 }
 
 \examples{
-# Fast smoke run: a JML fit + legacy-only diagnostic produces a
-# populated checklist in well under a second.
+\donttest{
+# Minimal checklist example using a JML fit and lightweight diagnostics.
 toy <- load_mfrmr_data("example_core")
 fit_quick <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                       method = "JML", maxit = 30)
@@ -156,7 +159,6 @@ diag_quick <- diagnose_mfrm(fit_quick, residual_pca = "none",
 chk_quick <- reporting_checklist(fit_quick, diagnostics = diag_quick)
 head(chk_quick$checklist[, c("Section", "Item", "DraftReady")])
 
-\donttest{
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                 method = "MML", quad_points = 7, maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "both", diagnostic_mode = "both")

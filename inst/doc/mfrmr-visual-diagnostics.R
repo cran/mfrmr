@@ -11,16 +11,15 @@ knitr::opts_chunk$set(
 ## ----setup--------------------------------------------------------------------
 # library(mfrmr)
 # 
-# toy <- load_mfrmr_data("example_core")
+# toy <- load_mfrmr_data("example_operational")
 # 
 # fit <- fit_mfrm(
 #   toy,
 #   person = "Person",
 #   facets = c("Rater", "Criterion"),
 #   score = "Score",
-#   method = "JML",
-#   model = "RSM",
-#   maxit = 20
+#   method = "MML",
+#   model = "RSM"
 # )
 # 
 # diag <- diagnose_mfrm(fit, residual_pca = "none")
@@ -34,8 +33,30 @@ knitr::opts_chunk$set(
 ## ----wright-------------------------------------------------------------------
 # plot(fit, type = "wright", preset = "publication", show_ci = TRUE)
 
+## ----wright-facets-style------------------------------------------------------
+# plot(
+#   fit,
+#   type = "wright",
+#   renderer = "facets",
+#   category_labels = c(
+#     `1` = "Beginning", `2` = "Developing", `3` = "Secure", `4` = "Advanced"
+#   )
+# )
+
 ## ----pathway------------------------------------------------------------------
 # plot(fit, type = "pathway", preset = "publication")
+
+## ----fit-pathway--------------------------------------------------------------
+# plot(
+#   fit,
+#   type = "fit_pathway",
+#   diagnostics = diag,
+#   fit_stat = "Infit",
+#   fit_scale = "mnsq",
+#   include_person = TRUE,
+#   show_ci = TRUE,
+#   preset = "publication"
+# )
 
 ## ----unexpected---------------------------------------------------------------
 # plot_unexpected(
@@ -122,6 +143,27 @@ knitr::opts_chunk$set(
 #   plot = "facet_profile",
 #   preset = "publication"
 # )
+
+## ----custom-plot-data---------------------------------------------------------
+# plot(fit, type = "wright", preset = "monochrome")
+# 
+# wright_payload <- plot(fit, type = "wright", draw = FALSE, preset = "publication")
+# plot_data_components(wright_payload)
+# 
+# locations <- plot_data(wright_payload, component = "locations")
+# head(locations)
+# 
+# pathway_long <- plot_data(
+#   fit,
+#   type = "pathway",
+#   component = "pathway_long",
+#   preset = "publication"
+# )
+# head(pathway_long[, c("Layer", "CurveGroup", "Theta", "Value")])
+
+## ----custom-guidance----------------------------------------------------------
+# names(wright_payload$data)
+# wright_payload$data$reference_lines
 
 ## ----response-time-review-----------------------------------------------------
 # toy_rt <- toy

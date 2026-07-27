@@ -22,10 +22,12 @@ An object of class \code{summary.mfrm_facet_dashboard}.
 Summarize a facet-quality dashboard
 }
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "none")
 summary(facet_quality_dashboard(fit, diagnostics = diag))
+}
 }
 \seealso{
 \code{\link[=facet_quality_dashboard]{facet_quality_dashboard()}}, \code{\link[=plot_facet_quality_dashboard]{plot_facet_quality_dashboard()}}

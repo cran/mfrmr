@@ -195,10 +195,16 @@ test_that("plot_dif_summary sort_by = 'effect' orders by signed contrast", {
 # --- plot_apa_figure_one ----------------------------------------------------
 
 test_that("plot_apa_figure_one bundles the four panels", {
-  expect_warning(
-    p <- plot_apa_figure_one(.fit, diagnostics = .diag, draw = FALSE),
-    NA
+  warnings <- character(0)
+  p <- withCallingHandlers(
+    plot_apa_figure_one(.fit, diagnostics = .diag, draw = FALSE),
+    warning = function(w) {
+      warnings <<- c(warnings, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
   )
+  expect_length(warnings, 1L)
+  expect_match(warnings, "Review-only display", fixed = TRUE)
   expect_s3_class(p, "mfrm_plot_data")
   expect_true(all(c("wright", "severity", "threshold", "summary") %in%
                     names(p$data$data)))
@@ -208,21 +214,36 @@ test_that("plot_apa_figure_one bundles the four panels", {
   expect_true(length(p$data$data$summary) >= 1L)
   expect_true(any(grepl("N obs = 768", p$data$data$summary, fixed = TRUE)))
   expect_true(any(grepl("Persons = 48", p$data$data$summary, fixed = TRUE)))
+  expect_identical(p$data$interpretation_status, "review_only")
+  expect_true(is.data.frame(p$data$fit_readiness))
+  expect_identical(
+    p$data$data$wright$data$interpretation_status,
+    p$data$interpretation_status
+  )
+  expect_match(p$data$subtitle, "REVIEW ONLY", fixed = TRUE)
 })
 
 test_that("plot_apa_figure_one draws the 2x2 composite", {
   pdf(NULL); on.exit(dev.off(), add = TRUE)
-  # Allow warnings on composite draw (layout() may warn on null
-  # devices); we only require the call to succeed without error.
-  expect_no_error(suppressWarnings(
-    plot_apa_figure_one(.fit, diagnostics = .diag, draw = TRUE)
+  warnings <- character(0)
+  expect_no_error(withCallingHandlers(
+    plot_apa_figure_one(.fit, diagnostics = .diag, draw = TRUE),
+    warning = function(w) {
+      warnings <<- c(warnings, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
   ))
+  expect_length(warnings, 1L)
+  expect_match(warnings, "Review-only display", fixed = TRUE)
 })
 
 # --- plot(fit, type = "ccc_overlay") ---------------------------------------
 
 test_that("plot(fit, type = 'ccc_overlay') carries overlay rows", {
-  p <- plot(.fit, type = "ccc_overlay", draw = FALSE)
+  p <- .mfrmr_muffle_expected_warnings(
+    plot(.fit, type = "ccc_overlay", draw = FALSE),
+    "^Review-only display:"
+  )
   expect_identical(p$name, "category_characteristic_curves_overlay")
   expect_true("overlay" %in% names(p$data))
   expect_s3_class(p$data$overlay, "data.frame")
@@ -234,8 +255,11 @@ test_that("plot(fit, type = 'ccc_overlay') carries overlay rows", {
 # --- plot(fit, type = "wright", group = ...) -------------------------------
 
 test_that("plot(fit, type = 'wright') subgroup overlay via group_data", {
-  p <- plot(.fit, type = "wright", group = "Group",
-            group_data = .toy, draw = FALSE)
+  p <- .mfrmr_muffle_expected_warnings(
+    plot(.fit, type = "wright", group = "Group",
+         group_data = .toy, draw = FALSE),
+    "^Review-only display:"
+  )
   expect_s3_class(p, "mfrm_plot_data")
   expect_s3_class(p$data$group, "data.frame")
   expect_true(all(c("Group", "Theta", "Density") %in%
@@ -244,7 +268,10 @@ test_that("plot(fit, type = 'wright') subgroup overlay via group_data", {
 })
 
 test_that("plot(fit, type = 'wright') without group has no group payload", {
-  p <- plot(.fit, type = "wright", draw = FALSE)
+  p <- .mfrmr_muffle_expected_warnings(
+    plot(.fit, type = "wright", draw = FALSE),
+    "^Review-only display:"
+  )
   expect_null(p$data$group)
 })
 

@@ -36,7 +36,7 @@ assess_mfrm_recovery(
 from \code{assess_mfrm_recovery()}.}
 
 \item{min_reps}{Minimum replication count expected before treating the
-simulation as more than a smoke check.}
+simulation for inferential use.}
 
 \item{min_success_rate}{Minimum acceptable proportion of replications that
 generated data and produced a fitted model.}
@@ -65,7 +65,7 @@ groups or a named vector/list with names such as \code{"facet"}, \code{"step"},
 
 \item{digits}{Digits used by the print method.}
 
-\item{...}{Reserved for future extensions.}
+\item{...}{Reserved for generic compatibility.}
 
 \item{y}{Reserved for S3 generic compatibility.}
 
@@ -88,7 +88,7 @@ An object of class \code{mfrm_recovery_assessment} with:
 \code{GPCM} slope-regime interpretation and generated score-category support
 when available.
 \item \code{condition_reporting_notes}: reporter-facing generator-condition caveats
-separated from recovery metrics and release-gate decisions.
+separated from parameter-recovery conclusions.
 \item \code{diagnostic_reporting_notes}: reporter-facing fit/separation caveats
 retained as diagnostic context rather than recovery gates.
 \item \code{diagnostic_review}: optional fit/separation operating-characteristic

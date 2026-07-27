@@ -59,9 +59,9 @@ named vector, or one-row data frame. Names may use canonical variables
 (\code{n_person}, \code{n_rater}, \code{n_criterion}, \code{raters_per_person}), current
 public aliases implied by \code{sim_spec} (for example \code{n_judge}, \code{n_task},
 \code{judge_per_person}), or role keywords (\code{person}, \code{rater}, \code{criterion},
-\code{assignment}). Values may be vectors. The schema-only future branch input
+\code{assignment}). Values may be vectors. The nested named-facet form
 \code{design$facets = c(person = ..., judge = ..., task = ...)} is also
-accepted for the currently exposed facet keys. Do not specify the same
+accepted for the supported person/rater/criterion design. Do not specify the same
 variable through both \code{design} and the scalar design-grid arguments.}
 
 \item{reps}{Number of replications per design condition.}
@@ -164,7 +164,7 @@ An object of class \code{mfrm_signal_detection} with:
 \itemize{
 \item \code{design_grid}: evaluated design conditions. When \code{sim_spec} carries custom
 public facet names, matching design-variable alias columns are included
-alongside the canonical internal columns.
+alongside the standard result columns.
 \item \code{results}: replicate-level detection results, with the same
 design-variable alias columns when applicable.
 \item \code{rep_overview}: run-level status and timing, with the same design-variable
@@ -174,7 +174,7 @@ summaries and plots
 \item \code{planning_scope}: explicit record of the current planning contract
 \item \code{planning_constraints}: explicit record of which design variables remain
 mutable under the current simulation specification
-\item \code{planning_schema}: combined planner-schema contract bundling the role
+\item \code{planning_schema}: structured planning metadata bundling the role
 descriptor, scope boundary, and current mutability map
 \item \code{gpcm_boundary}: bounded-\code{GPCM} caveat row when a \code{GPCM} screening route
 is used

@@ -2,49 +2,38 @@
 % Please edit documentation in R/help_gpcm_scope.R
 \name{gpcm_score_side_contract}
 \alias{gpcm_score_side_contract}
-\title{Bounded GPCM Score-Side Export Contract}
+\title{Bounded GPCM Score-Side Availability}
 \usage{
-gpcm_score_side_contract(
-  status = c("all", "implemented_with_caveat", "required_for_full_facets_review",
-    "validated_dependency")
-)
+gpcm_score_side_contract(status = "all")
 }
 \arguments{
 \item{status}{Which rows to return: \code{"all"} (default),
-\code{"implemented_with_caveat"}, \code{"required_for_full_facets_review"}, or
-\code{"validated_dependency"}.}
+\code{"available_with_caveat"}, \code{"supporting_route"}, or \code{"unavailable"}.}
 }
 \value{
 A data.frame with columns:
 \itemize{
-\item \code{ContractArea}
-\item \code{Requirement}
-\item \code{CurrentStatus}
-\item \code{ReleaseBoundary}
-\item \code{ValidationTarget}
-\item \code{ExitCriterion}
+\item \code{Capability}
+\item \code{Status}
+\item \code{Limitation}
+\item \code{Alternative}
 }
 }
 \description{
-Minimal contract table for the caveated bounded-\code{GPCM} scorefile route and
-the still-blocked full FACETS-style score-side review route.
+Show which bounded-\code{GPCM} score-side quantities are available, the limits on
+their interpretation, and the alternative route when a quantity is not
+available.
 }
 \details{
-This helper does not enable full FACETS-style score-side review. It records
-the requirements that separate the current caveated
-\code{facets_output_file_bundle(include = "score")} route from a future
-\code{facets_output_contract_review()} route for bounded \code{GPCM}.
-
-Use it as a release-maintenance checklist. Rows marked
-\code{implemented_with_caveat} support the current package-native bounded-\code{GPCM}
-scorefile route. Rows marked \code{required_for_full_facets_review} are still
-blockers for full FACETS-style output-contract review. Rows marked
-\code{validated_dependency} are already available in the package but are not
-sufficient by themselves to justify full FACETS score-side equivalence.
+Package-native expected-score and uncertainty fields are not FACETS
+score-side equivalents. A row marked \code{available_with_caveat} can be used
+within its stated \code{Limitation}; \code{supporting_route} identifies a related
+output that can inform interpretation; and \code{unavailable} identifies a route
+that should be replaced by the listed \code{Alternative}.
 }
 \examples{
 gpcm_score_side_contract()
-gpcm_score_side_contract("implemented_with_caveat")
+gpcm_score_side_contract("unavailable")
 }
 \seealso{
 \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}}, \code{\link[=gpcm_runtime_guard_coverage]{gpcm_runtime_guard_coverage()}},

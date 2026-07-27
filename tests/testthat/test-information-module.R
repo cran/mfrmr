@@ -104,7 +104,10 @@ test_that("compute_information supports PCM fits with custom step facet names", 
 
   info <- compute_information(fit, theta_points = 11)
   task_plot <- plot_information(info, type = "iif", facet = "Task", draw = FALSE)
-  surface_plot <- plot(fit, type = "ccc_surface", draw = FALSE, theta_points = 55)
+  surface_plot <- .mfrmr_muffle_expected_warnings(
+    plot(fit, type = "ccc_surface", draw = FALSE, theta_points = 55),
+    "^Review-only display:"
+  )
 
   expect_s3_class(info, "mfrm_information")
   expect_equal(nrow(info$tif), 11)
@@ -130,7 +133,10 @@ test_that("compute_information supports bounded GPCM fits", {
 
   info <- compute_information(fit, theta_points = 11)
   criterion_plot <- plot_information(info, type = "iif", facet = "Criterion", draw = FALSE)
-  surface_plot <- plot(fit, type = "ccc_surface", draw = FALSE, theta_points = 55)
+  surface_plot <- .mfrmr_muffle_expected_warnings(
+    plot(fit, type = "ccc_surface", draw = FALSE, theta_points = 55),
+    "^Review-only display:"
+  )
   curves <- category_curves_report(fit, theta_points = 55, digits = 8)
   curve_cumulative_plot <- plot(curves, type = "cumulative", draw = FALSE)
   curve_info_plot <- plot(curves, type = "information", draw = FALSE)

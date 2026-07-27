@@ -47,8 +47,9 @@ review_mfrm_anchors(
 
 \item{missing_codes}{Optional. \code{NULL} (default) is a no-op;
 \code{TRUE} or \code{"default"} converts the FACETS / SPSS / SAS sentinel
-set to \code{NA} on the person, facets, and score columns before
-review. Supply a character vector for a custom code set.}
+set to \code{NA} on the score column before review while preserving person and
+facet identifiers. Supply a character vector to apply a custom code set
+across the person, facet, and score columns.}
 
 \item{min_common_anchors}{Minimum anchored levels per linking facet used in
 recommendations (default \code{5}).}

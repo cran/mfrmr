@@ -25,10 +25,10 @@ design-variable alias columns when applicable
 \item \code{design_descriptor}: role-based design-variable metadata
 \item \code{planning_scope}: explicit record of the current planning contract
 \item \code{planning_constraints}: explicit record of mutable/locked design variables
-\item \code{planning_schema}: combined planner-schema contract
-\item \code{future_branch_active_summary}: compact deterministic summary of the
-schema-only future arbitrary-facet planning branch embedded in the current
-planning schema
+\item \code{planning_schema}: structured planning metadata
+\item \code{structural_design_review}: deterministic structural review of the
+named-facet design grid; it reports
+design bookkeeping rather than signal-detection performance
 \item \code{gpcm_boundary}: bounded-\code{GPCM} caveat row when present
 \item \code{notes}: short interpretation notes, including the bias-side screening caveat
 }

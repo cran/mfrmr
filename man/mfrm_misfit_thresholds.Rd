@@ -18,9 +18,10 @@ A named numeric vector \code{c(lower = ..., upper = ...)} with
 }
 \description{
 Returns the lower / upper bounds that mfrmr screens treat as the
-acceptable mean-square (Infit / Outfit MnSq) band when flagging
-element-level misfit. Defaults follow Linacre's published 0.5-1.5
-acceptance band; both ends can be overridden via R options.
+heuristic mean-square (Infit / Outfit MnSq) review band when flagging
+element-level misfit. Defaults use the published 0.5-1.5 interval as a
+screening convention; both ends can be overridden via R options. The
+interval is not a universal acceptance rule or an automatic exclusion rule.
 }
 \details{
 Helpers that consume the band include
@@ -35,8 +36,8 @@ analysis script therefore changes every downstream screen at once.
 
 Two scalar R options drive the band:
 \describe{
-\item{\code{mfrmr.misfit_lower}}{Lower acceptance bound. Default \code{0.5}.}
-\item{\code{mfrmr.misfit_upper}}{Upper acceptance bound. Default \code{1.5}.}
+\item{\code{mfrmr.misfit_lower}}{Lower review bound. Default \code{0.5}.}
+\item{\code{mfrmr.misfit_upper}}{Upper review bound. Default \code{1.5}.}
 }
 
 Pass scalar arguments to override the options for a single call,

@@ -9,7 +9,7 @@ Use this page when you need continuity with older compatibility-oriented workflo
 fixed-width reports, or graph/score file style outputs.
 
 This compatibility layer currently applies mainly to diagnostics-based
-\code{RSM} / \code{PCM} workflows. First-release \code{GPCM} fits now also support
+\code{RSM} / \code{PCM} workflows. Bounded \code{GPCM} fits also support
 graph-only compatibility-style exports, while scorefile and
 diagnostics-driven compatibility outputs remain limited to \code{RSM} / \code{PCM}.
 Treat this layer as a presentation/contract surface, not as a claim of

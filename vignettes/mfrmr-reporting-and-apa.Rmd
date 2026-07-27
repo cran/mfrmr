@@ -37,7 +37,7 @@ For a plot-first route, see
 ```{r setup}
 library(mfrmr)
 
-toy <- load_mfrmr_data("example_core")
+toy <- load_mfrmr_data("example_operational")
 
 # The vignette uses compact quadrature so optional local execution stays fast.
 # For final manuscript reporting, refit with the package default or a higher
@@ -131,6 +131,55 @@ Interpretation:
 - `section_map` is the machine-readable map of what text blocks are available.
 - The same contract also feeds captions and notes, which reduces wording drift.
 
+## Publication-readiness boundary
+
+The APA route is strongest when it is used as a structured drafting and review
+workflow. It is not a one-click manuscript generator. Before moving text into a
+journal article, inspect the following objects together:
+
+```{r publication-boundary}
+res <- mfrm_results(fit, include = "publication")
+report <- mfrm_report(res, style = "apa")
+
+report$first_screen
+report$claim_readiness
+report$report_gaps
+head(report$template_index[, c(
+  "Area", "Topic", "BoundaryType", "ClaimStrength", "RecommendedUse"
+)])
+```
+
+For a high-stakes manuscript, treat `build_apa_outputs()` and
+`mfrm_report(style = "apa")` as a conservative drafting template. Stronger journal
+claims still require a defensible study design, cited measurement rationale,
+adequate precision evidence, linked or balanced design evidence where relevant,
+and substantive interpretation written in the language of the target journal.
+Do not report `DraftReady`, `ReadyForAPA`, or `ClaimStrength` as if they were
+formal acceptance decisions; use them to decide what wording is currently safe
+and which caveats must remain visible.
+
+When the target is a local HTML/CSV/replay bundle rather than an interactive
+review object, use `export_mfrm_bundle()` directly from the fitted object. The
+result is a potentially identifying analysis archive, not a deidentified
+sharing package:
+
+```{r fit-to-html-bundle, eval=FALSE}
+bundle <- export_mfrm_bundle(
+  fit,
+  diagnostics = diag,
+  output_dir = "mfrmr-report-bundle",
+  prefix = "analysis01",
+  include = c(
+    "core_tables", "checklist", "dashboard", "apa",
+    "summary_tables", "manifest", "script", "html"
+  ),
+  overwrite = TRUE,
+  acknowledge_sensitive = TRUE
+)
+
+bundle$written_files[bundle$written_files$Format == "html", ]
+```
+
 ## 4. Build tables from the same contract
 
 Use `apa_table()` when you want reproducible handoff tables without rebuilding
@@ -189,6 +238,56 @@ apa_bias <- build_apa_outputs(fit_bias, diagnostics = diag_bias, bias_results = 
 apa_bias$section_map[, c("SectionId", "Available", "Heading")]
 ```
 
+## 7. Keep model comparison as a reporting review
+
+When candidate models are fitted, separate same-data comparison from the
+scoring interpretation. `compare_mfrm()` provides the fit-statistic table;
+`build_model_choice_review()` attaches model roles, downstream route
+boundaries, and cautious wording. Convert the review to a summary-table bundle
+when the comparison needs to appear in an appendix or exported report.
+
+```{r model-choice-route, eval=FALSE}
+cmp <- compare_mfrm(RSM = fit_rsm, PCM = fit_pcm, GPCM = fit_gpcm)
+review <- build_model_choice_review(
+  RSM = fit_rsm,
+  PCM = fit_pcm,
+  GPCM = fit_gpcm,
+  run_weighting_review = TRUE
+)
+model_choice_tables <- build_summary_table_bundle(
+  review,
+  appendix_preset = "recommended"
+)
+
+cmp[, c("Model", "LogLik", "AIC", "BIC", "ICComparable")]
+model_choice_tables$table_index
+```
+
+For bounded `GPCM`, report the fit as a slope-aware sensitivity model unless
+the score interpretation explicitly justifies discrimination-based reweighting.
+Do not use AIC/BIC alone as an operational-scoring decision.
+
+## 8. Report the latent-regression population model
+
+Latent-regression fits provide reportable results through the fit summary:
+`population_overview`, `population_coefficients`, `population_coding`, and
+`caveats`. Coefficients are conditional-normal population-model parameters,
+not post-hoc regressions on EAP or MLE scores.
+
+```{r latent-regression-reporting, eval=FALSE}
+s_pop <- summary(fit_pop)
+s_pop$population_overview
+s_pop$population_coefficients
+s_pop$population_coding
+s_pop$caveats
+```
+
+Keep latent-regression claims within the documented
+one-dimensional `MML` `RSM` / `PCM` route. Report the population formula,
+coding/contrast handling, population policy, and any omitted-person or
+omitted-row counts; do not imply multidimensional latent regression,
+Wald-test inference, or posterior predictive checking from these tables alone.
+
 ## Recommended sequence
 
 For a compact manuscript-oriented route:
@@ -200,6 +299,8 @@ For a compact manuscript-oriented route:
 5. `build_apa_outputs()`
 6. `apa_table()`
 7. `build_visual_summaries()`
+8. `compare_mfrm()` -> `build_model_choice_review()` when candidate-model
+   comparisons are part of the manuscript
 
 ## Related help
 

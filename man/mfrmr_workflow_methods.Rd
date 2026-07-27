@@ -10,8 +10,13 @@ output objects support \code{summary()} and \code{plot()}.
 \section{Canonical reporting route}{
 
 For the clearest default route in \code{RSM} / \code{PCM}, use
+\code{\link[=describe_mfrm_data]{describe_mfrm_data()}} ->
 \code{\link[=fit_mfrm]{fit_mfrm()}} with \code{method = "MML"} ->
-\code{\link[=diagnose_mfrm]{diagnose_mfrm()}} with \code{diagnostic_mode = "both"} ->
+\code{summary(fit, profile = "fit")} ->
+\code{review <- summary(fit, profile = "facets")} ->
+the required native \code{plot(fit, type = "wright", show_ci = TRUE)} ->
+reuse \code{review$results$diagnostics}; call \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} again only when
+residual PCA or other custom settings are needed ->
 \code{\link[=reporting_checklist]{reporting_checklist()}} ->
 \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}} and, when flagged, \code{\link[=plot_marginal_fit]{plot_marginal_fit()}} /
 \code{\link[=plot_marginal_pairwise]{plot_marginal_pairwise()}} ->
@@ -19,15 +24,18 @@ For the clearest default route in \code{RSM} / \code{PCM}, use
 \code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}} -> \code{\link[=apa_table]{apa_table()}} or
 \code{\link[=export_summary_appendix]{export_summary_appendix()}}.
 
-Use \code{JML} only when you explicitly want a faster exploratory pass and are
-willing to defer strict marginal follow-up and formal precision language to
-a later \code{MML} run.
+Use \code{JML} only when its fixed-person-parameter estimand is methodologically
+intended, for example for a JMLE-oriented external comparison, descriptive
+or exploratory work, or a design with substantial information per person.
+Do not select it merely as a faster substitute for \code{MML}: a later \code{MML} run
+targets a different estimand rather than serving as stricter follow-up to
+the same analysis.
 }
 
 \section{Canonical operational review route}{
 
 When the main question is scale maintenance rather than manuscript reporting,
-branch after \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} into:
+branch from \code{review$results$diagnostics} into:
 \code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}} and/or \code{\link[=detect_anchor_drift]{detect_anchor_drift()}} ->
 \code{\link[=build_equating_chain]{build_equating_chain()}} when adjacent-link review is needed ->
 \code{\link[=build_linking_review]{build_linking_review()}} ->
@@ -44,7 +52,7 @@ operational \code{GPCM} linking decision or evidence that anchor drift is absent
 \section{Canonical misfit case-review route}{
 
 When the main question is which observations, facet levels, or pairwise
-structures deserve follow-up, branch after \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} into:
+structures deserve follow-up, branch from \code{review$results$diagnostics} into:
 \code{\link[=build_misfit_casebook]{build_misfit_casebook()}} ->
 inspect \code{casebook$group_view_index}, \code{casebook$group_views}, and
 \code{summary(casebook)$plot_routes} for stable person / facet / wave rollups and
@@ -94,12 +102,27 @@ exports route those rows through \code{score_category_caveats} or
 weakly identified when an intermediate category is unobserved.
 }
 
+\section{Planned assignment and structural missingness}{
+
+A long-format table alone does not reveal whether an absent Person x facet
+cell was expected or never assigned. When a score-free assignment roster is
+available, pass it as \code{expected_design} to \code{\link[=describe_mfrm_data]{describe_mfrm_data()}}. The
+summary then separates expected-but-unobserved cells from unexpected
+observations and reports observed versus declared Person-facet graph
+components. Without a roster, structural missingness is explicitly marked
+as not assessed; mfrmr does not assume a complete crossing.
+}
+
 \section{Typical workflow}{
 
 \enumerate{
-\item Fit a model with \code{\link[=fit_mfrm]{fit_mfrm()}}.
-For final reporting, prefer \code{method = "MML"} unless you explicitly want
-a fast exploratory JML pass.
+\item Review the long-format data and intended score support with
+\code{\link[=describe_mfrm_data]{describe_mfrm_data()}}.
+\item Fit a model with \code{\link[=fit_mfrm]{fit_mfrm()}}. Choose \code{MML} or \code{JML} from the prespecified
+estimand and assumptions; do not select \code{JML} merely to shorten runtime.
+\item Read \code{summary(fit, profile = "fit")}, then request
+\code{summary(fit, profile = "facets")} and draw the required native Wright
+map with \code{plot(fit, type = "wright", show_ci = TRUE)}.
 \item (Optional) Use \code{\link[=run_mfrm_facets]{run_mfrm_facets()}} or \code{\link[=mfrmRFacets]{mfrmRFacets()}} for a
 legacy-compatible one-shot workflow wrapper.
 \item For \code{RSM} / \code{PCM}, build diagnostics with \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.
@@ -133,7 +156,7 @@ specification stores both thresholds and slopes. Use
 recovery checks plus caveated role-based design evaluation, population
 forecasting, diagnostic-screening, and signal-detection helpers.
 Caveated APA/QC/export bundles are available for sensitivity reporting,
-while score-side FACETS helpers remain outside the validated \code{GPCM}
+while score-side FACETS helpers remain outside the documented \code{GPCM}
 boundary. Use
 \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}} as the formal capability map
 before branching into less common helpers.
@@ -214,7 +237,7 @@ output with explicit \code{gpcm_boundary} rows.
 \code{"Method Section"} rows -> \code{\link[=build_apa_outputs]{build_apa_outputs()}} ->
 \code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}} -> \code{\link[=apa_table]{apa_table()}} or
 \code{\link[=export_summary_appendix]{export_summary_appendix()}}.
-First-release \code{GPCM}:
+bounded \code{GPCM}:
 \code{\link[=reporting_checklist]{reporting_checklist()}} -> direct table/plot helpers ->
 \code{\link[=build_apa_outputs]{build_apa_outputs()}} / \code{\link[=build_visual_summaries]{build_visual_summaries()}} ->
 \code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}} with \code{gpcm_boundary} caveats.
@@ -234,7 +257,7 @@ background data, or \code{JML} with the documented post hoc EAP approximation).
 Here again, \code{\link[=predict_mfrm_population]{predict_mfrm_population()}} is the
 scenario-level forecast helper, whereas \code{\link[=predict_mfrm_units]{predict_mfrm_units()}} /
 \code{\link[=sample_mfrm_plausible_values]{sample_mfrm_plausible_values()}} are the scoring layer. Prediction export
-requires actual prediction objects. First-release \code{GPCM} now supports
+requires actual prediction objects. Bounded \code{GPCM} supports
 direct data generation via
 \code{\link[=build_mfrm_sim_spec]{build_mfrm_sim_spec()}}, \code{\link[=extract_mfrm_sim_spec]{extract_mfrm_sim_spec()}}, and
 \code{\link[=simulate_mfrm_data]{simulate_mfrm_data()}}, \code{\link[=evaluate_mfrm_recovery]{evaluate_mfrm_recovery()}},
@@ -243,8 +266,8 @@ population forecasting, diagnostic/signal-detection design screening,
 residual diagnostics, and direct curve/report helpers. The current
 planning layer remains role-based for two
 non-person facets even though estimation itself supports arbitrary facet
-counts; future arbitrary-facet planning fields should be treated as
-design metadata rather than finished public behavior.
+counts. Additional arbitrary-facet fields are structural design metadata,
+not Monte Carlo performance results.
 }
 }
 

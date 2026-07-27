@@ -111,22 +111,26 @@ knitr::opts_chunk$set(
 # compare_mfrm(Additive = fit_add, Interaction = fit_interaction, nested = TRUE)
 
 ## ----drift-route, eval = FALSE------------------------------------------------
-# d1 <- load_mfrmr_data("study1")
-# d2 <- load_mfrmr_data("study2")
+# declared_common_facets <- c("Criterion")
 # 
-# fit1 <- fit_mfrm(d1, "Person", c("Rater", "Criterion"), "Score",
-#                  method = "JML", maxit = 25)
-# fit2 <- fit_mfrm(d2, "Person", c("Rater", "Criterion"), "Score",
-#                  method = "JML", maxit = 25)
+# fit1 <- fit_mfrm(
+#   wave1, "Person", c("Rater", "Criterion"), "Score",
+#   method = "MML"
+# )
 # 
 # anchored <- anchor_to_baseline(
-#   d2,
+#   wave2,
 #   fit1,
 #   person = "Person",
 #   facets = c("Rater", "Criterion"),
-#   score = "Score"
+#   score = "Score",
+#   anchor_facets = declared_common_facets
 # )
 # 
+# fit2 <- fit_mfrm(
+#   wave2, "Person", c("Rater", "Criterion"), "Score",
+#   method = "MML"
+# )
 # drift <- detect_anchor_drift(list(Wave1 = fit1, Wave2 = fit2))
 # plot_anchor_drift(drift, type = "drift", preset = "publication")
 

@@ -48,7 +48,7 @@ alias columns when applicable
 \item \code{design_descriptor}: role-based design-variable metadata
 \item \code{planning_scope}: explicit record of the current planning contract
 \item \code{planning_constraints}: explicit record of mutable/locked design variables
-\item \code{planning_schema}: combined planner-schema contract
+\item \code{planning_schema}: structured planning metadata
 \item \code{caveats}: structured warning rows for situations where the
 recommendation rests on weak evidence (e.g., no design met every
 threshold; the recommended design is at the boundary of the

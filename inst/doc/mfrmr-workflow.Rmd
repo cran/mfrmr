@@ -9,6 +9,20 @@ vignette: >
 
 ```{r, include = FALSE}
 is_cran_check <- !isTRUE(as.logical(Sys.getenv("NOT_CRAN", "false")))
+vignette_artifact <- function(name) {
+  path <- system.file(
+    "extdata", "vignette-artifacts", name,
+    package = "mfrmr",
+    mustWork = TRUE
+  )
+  read.csv(
+    path,
+    stringsAsFactors = FALSE,
+    check.names = FALSE,
+    na.strings = character(),
+    colClasses = "character"
+  )
+}
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
@@ -22,6 +36,8 @@ This vignette outlines a reproducible workflow for:
 
 - loading packaged simulation data
 - fitting an MFRM with flexible facets
+- choosing a fast fit summary or an opt-in comprehensive summary
+- producing the required Wright map on the fitted shared logit scale
 - running diagnostics and residual PCA
 - generating APA and visual summary outputs
 - moving from fitted models into design simulation and fixed-calibration
@@ -30,10 +46,16 @@ This vignette outlines a reproducible workflow for:
 For a plot-first companion guide, see the separate
 `mfrmr-visual-diagnostics` vignette.
 
-For speed-sensitive work, a useful pattern is:
+For a faster preliminary run without changing the final analysis target:
 
-- start with `method = "JML"` or `quad_points = 7`
-- use `diagnose_mfrm(..., residual_pca = "none")` for the first pass
+- test code mechanics on a small deterministic subset or, for an MML workflow,
+  a temporary `quad_points = 7` grid; restore the prespecified final MML grid
+  (31 points by default) and check quadrature sensitivity before reporting
+- choose `method = "JML"` only when its person-parameter treatment is
+  methodologically appropriate, not merely as a faster substitute for MML
+- use `diagnose_mfrm(..., residual_pca = "none", diagnostic_mode = "both",
+  fit_df_method = "both")` when the diagnostics will feed a comprehensive
+  summary
 - reuse the same diagnostics object in downstream reports and plots
 
 ## MML and Diagnostic Modes
@@ -41,10 +63,13 @@ For speed-sensitive work, a useful pattern is:
 `mfrmr` treats `MML` and `JML` differently on purpose.
 
 - `MML` integrates over the person distribution with Gauss-Hermite quadrature.
-- The current `MML` branch optimizes the quadrature-based marginal
-  log-likelihood directly; it is not an EM implementation.
-- `JML` is often useful for quick exploratory passes, but `MML` remains the
-  preferred route for final estimation and fixed-calibration follow-up.
+- `mml_engine = "direct"` (the default) optimizes the quadrature-based
+  marginal log-likelihood directly. `mml_engine = "em"` and `"hybrid"` provide
+  the documented EM and EM-warm-start routes for supported RSM/PCM fits.
+- `JML` is useful for JMLE-oriented comparisons and analyses that avoid a
+  parametric person distribution. `MML` is the package default and supports
+  marginal and fixed-calibration follow-up when its response-model and
+  population-distribution assumptions are defensible.
 
 For `RSM` and `PCM`, diagnostics now expose two distinct evidence paths:
 
@@ -53,7 +78,7 @@ For `RSM` and `PCM`, diagnostics now expose two distinct evidence paths:
 - `diagnostic_mode = "both"` is the safest default when you want to inspect
   both views side by side.
 
-The strict marginal branch is still screening-oriented in the current release.
+Strict marginal diagnostics are screening-oriented.
 Use `summary(diag)$diagnostic_basis` to separate the legacy residual evidence
 from the strict marginal evidence rather than pooling them into one decision.
 
@@ -62,7 +87,7 @@ from the strict marginal evidence rather than pooling them into one decision.
 ```{r load-data}
 library(mfrmr)
 
-list_mfrmr_data()
+list_mfrmr_data(details = TRUE)[, c("Key", "PrimaryUse", "Design", "CountBasis")]
 
 data("ej2021_study1", package = "mfrmr")
 head(ej2021_study1)
@@ -71,32 +96,204 @@ study1_alt <- load_mfrmr_data("study1")
 identical(names(ej2021_study1), names(study1_alt))
 ```
 
-## Minimal Runnable Example
+## Applied Runnable Example
 
-Start with the packaged `example_core` dataset. It is intentionally compact,
-category-complete, and generated from a single latent trait plus facet main
-effects so that help-page examples stay fast without relying on undersized toy
-data. The same object is also available via
-`data("mfrmr_example_core", package = "mfrmr")`:
+Start with the packaged `example_operational` dataset. It is intentionally
+compact but uses a connected two-rater assignment, unequal rater workloads,
+and six planned omissions represented by absent long-format rows rather than
+`NA` or sentinel scores. This makes the main tutorial closer to an applied
+rating design without using empirical records. The same object is also
+available via `data("mfrmr_example_operational", package = "mfrmr")`. A
+separate score-free assignment roster lets the pre-fit review identify those
+six omissions without guessing which cells should have existed.
+`example_core` remains available as an idealized complete-crossing example for
+fast help-page checks.
 
 ```{r toy-setup}
-data("mfrmr_example_core", package = "mfrmr")
-toy <- mfrmr_example_core
+data("mfrmr_example_operational", package = "mfrmr")
+data("mfrmr_example_operational_design", package = "mfrmr")
+toy <- mfrmr_example_operational
+
+data_review_toy <- describe_mfrm_data(
+  data = toy,
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  score = "Score",
+  rating_min = 1,
+  rating_max = 4,
+  expected_design = mfrmr_example_operational_design
+)
+data_summary_toy <- summary(data_review_toy)
+data_summary_toy$structural_missingness
+data_summary_toy$design_connectivity
 
 fit_toy <- fit_mfrm(
   data = toy,
   person = "Person",
   facets = c("Rater", "Criterion"),
   score = "Score",
-  method = "JML",
-  model = "RSM",
-  maxit = 30
+  method = "MML",
+  model = "RSM"
 )
-diag_toy <- diagnose_mfrm(fit_toy, residual_pca = "none")
+diag_toy <- diagnose_mfrm(
+  fit_toy,
+  residual_pca = "none",
+  diagnostic_mode = "both",
+  fit_df_method = "both"
+)
 
-summary(fit_toy)$overview
+# Fast fit-only summary: this does not compute diagnostics.
+fit_summary_toy <- summary(fit_toy, profile = "fit", detail = "brief")
+
+# Comprehensive review, reusing diagnostics already computed above.
+facets_summary_toy <- summary(
+  fit_toy,
+  profile = "facets",
+  detail = "brief",
+  diagnostics = diag_toy
+)
+res_toy <- facets_summary_toy$results
+
+fit_summary_toy$overview
+fit_summary_toy$readiness
+fit_summary_toy$data_review
 summary(diag_toy)$overview
-names(plot(fit_toy, draw = FALSE))
+facets_summary_toy
+
+# Required first fitted-scale figure.
+plot(res_toy, type = "wright", preset = "publication", show_ci = TRUE, top_n = Inf)
+
+# Optional FACETS-style ruler. Replace these examples with the study rubric.
+rubric_labels <- c(
+  "1" = "Level 1",
+  "2" = "Level 2",
+  "3" = "Level 3",
+  "4" = "Level 4"
+)
+plot(
+  res_toy,
+  type = "wright",
+  renderer = "facets",
+  category_labels = rubric_labels,
+  show_ci = FALSE,
+  preset = "publication"
+)
+# Setting show_ci = TRUE on this FACETS-style ruler is available as a
+# deliberate hybrid: FACETS ruler grammar plus mfrmr uncertainty intervals.
+
+# Optional follow-up: Infit on x, measure on y; persons are explicit opt-in.
+plot(
+  res_toy,
+  type = "fit_pathway",
+  fit_stat = "Infit",
+  include_person = TRUE,
+  top_n_person = 12,
+  person_labels = "none",
+  facet_labels = "flagged",
+  preset = "publication"
+)
+```
+
+Optimizer code zero is only one numerical signal. `fit_mfrm()` also checks the
+terminal gradient; when the initial direct or hybrid solution stops with a
+larger gradient and `reltol <= 1e-9`, it runs a bounded sequence of
+warm-started polishing stages and retains the best non-worsening candidate
+under the recorded selection rule. Inspect
+`fit_toy$opt$optimizer_polish$Stages` when `Numerical` is not `pass`.
+
+`maxit` is only a computational ceiling. It must not be increased until a
+preferred coefficient, fit statistic, or expected conclusion appears. For a
+final analysis, prespecify the estimator and controls and start from the
+package default `maxit = 400` unless the analysis protocol states otherwise.
+If a run reaches `ConvergenceStatus = "iteration_limit"`, keep it review-only
+and repeat the same data, model, method, anchors, optimizer, tolerance, and
+quadrature rule with the next ceiling in a prespecified sequence. Interpret
+only a run with `Converged = TRUE`, `InferenceReady = TRUE`, and
+`Numerical = pass`. If two separately ready runs differ materially, investigate
+numerical stability instead of selecting the preferred result. Report the
+requested ceiling, actual evaluations, convergence reason, and terminal
+gradient.
+
+`InferenceReady` describes this numerical gate only: Data, Design, Stability,
+Diagnostics, and Reporting remain separate rows in `fit_summary_toy$readiness`.
+For example, a disconnected design remains a reporting hold even if its
+optimizer converges. Conversely,
+`ready_for_diagnostics_and_reporting_follow_up` means that fitting completed
+and diagnostic review is the next stage; it is neither an optimization failure
+nor a claim that the analysis is already manuscript-ready.
+
+`expected_design` is a declared roster, not an inferred complete crossing.
+When no roster is available, the structural-missingness status is
+`"not_declared"`; the package does not label unassigned cells as missing.
+
+The `facets` profile is FACETS-style organization, not evidence that FACETS
+was run and not a numerical-equivalence claim. Its brief print is selective
+and does not print person identifiers; full tables remain in
+`facets_summary_toy$results$tables`. For a report-oriented result set, use
+`profile = "reporting"`. To inspect availability without allowing diagnostic
+computation, use `compute = "never"`; requested dependent sections are then
+recorded as `not_computed`:
+
+```{r summary-profile-controls, eval = FALSE}
+reporting_summary_toy <- summary(
+  fit_toy,
+  profile = "reporting",
+  diagnostics = diag_toy
+)
+
+availability_only <- summary(
+  fit_toy,
+  profile = "facets",
+  compute = "never"
+)
+availability_only$section_status
+```
+
+Availability and interpretability are intentionally separate. Review
+`res_toy$readiness` and the `InterpretationStatus` columns in
+`res_toy$plot_map` before treating an available plot as a final result.
+Plots remain available during a numerical, data, design, or stability review,
+but they warn and carry `REVIEW ONLY` in the returned subtitle and drawn title
+until the readiness issue is resolved.
+
+Bias/DIF, residual PCA, and anchor-drift/linking analyses are deliberately not
+auto-run by any summary profile. They require explicit contrasts, diagnostic
+settings, or multi-fit designs.
+
+```{r toy-setup-artifacts, echo = FALSE, eval = is_cran_check}
+vignette_artifact("workflow_fit_overview.csv")
+vignette_artifact("workflow_diagnostic_overview.csv")
+vignette_artifact("workflow_plot_components.csv")
+```
+
+The same fit can then move through the recommended first reporting workflow:
+
+```{r primary-route}
+report_toy <- mfrm_report(res_toy, style = "qc")
+
+summary(res_toy)$next_actions
+summary(report_toy)$overview
+
+# This is a controlled analysis archive, not a deidentified shareable export.
+export_dir <- file.path(tempdir(), "mfrmr-workflow-export")
+export_toy <- export_mfrm_results(
+  res_toy,
+  output_dir = export_dir,
+  include = c("default", "report"),
+  overwrite = TRUE,
+  acknowledge_sensitive = TRUE
+)
+head(export_toy$written_files)
+```
+
+The acknowledgement suppresses the warning only; it does not redact person
+identifiers, person-level results, local paths, or the complete RDS object.
+Review every exported file under the study's data-handling policy before sharing.
+
+```{r primary-route-artifacts, echo = FALSE, eval = is_cran_check}
+vignette_artifact("workflow_next_actions.csv")
+vignette_artifact("workflow_report_overview.csv")
+vignette_artifact("workflow_export_files.csv")
 ```
 
 ## Diagnostics and Reporting
@@ -133,9 +330,15 @@ subset(
 )
 ```
 
+```{r diagnostics-reporting-artifacts, echo = FALSE, eval = is_cran_check}
+vignette_artifact("workflow_summary_classes.csv")
+vignette_artifact("workflow_plot_object_components.csv")
+vignette_artifact("workflow_visual_checklist.csv")
+```
+
 ## Fit and Diagnose with Full Data
 
-For a realistic analysis, use the packaged Study 1 dataset:
+For a larger sparse synthetic illustration, use the packaged Study 1 dataset:
 
 ```{r fit-full}
 fit <- fit_mfrm(
@@ -150,12 +353,42 @@ fit <- fit_mfrm(
 
 diag <- diagnose_mfrm(
   fit,
-  residual_pca = "none"
+  residual_pca = "none",
+  diagnostic_mode = "both",
+  fit_df_method = "both"
 )
 
-summary(fit)
+summary(fit, profile = "fit", detail = "brief")
 summary(diag)
+
+# Keep the final figure flow explicit: fit -> Wright map -> follow-up plots.
+s <- summary(fit, profile = "facets", diagnostics = diag)
+res <- s$results
+s
+plot(res, type = "wright", preset = "publication", show_ci = TRUE, top_n = Inf)
+
+# Optional closest FACETS-style asterisk ruler (without mfrmr CI overlays).
+plot(res, type = "wright", renderer = "facets",
+     category_labels = rubric_labels, show_ci = FALSE,
+     preset = "publication")
+
+plot(
+  res,
+  type = "fit_pathway",
+  fit_stat = "Infit",
+  include_person = TRUE,
+  top_n_person = 12,
+  person_labels = "none",
+  facet_labels = "flagged",
+  preset = "publication"
+)
 ```
+
+This full-data figure caps the displayed person layer at 12 and suppresses
+routine point labels to keep the first screen legible. The selected person IDs
+and every retained facet row remain in
+`plot(..., draw = FALSE)$data$table`; use `person_labels = "all"` or
+`facet_labels = "all"` for a point-identification figure.
 
 If you need residual-structure evidence for a final report, you can add residual
 PCA after the initial diagnostic pass. Treat this as an exploratory screen, not
@@ -322,8 +555,30 @@ distinction is:
 - `evaluate_mfrm_design()` and `predict_mfrm_population()` are
   design-level helpers that summarize expected operating characteristics under
   an explicit simulation specification.
+- `mfrm_generalizability()` and `mfrm_d_study()` summarize observed
+  univariate G-study components and analytic D-study projections. Read
+  `IdentificationStatus`, `GStatus`, and `PhiStatus` before reporting
+  projected coefficients; boundary or singular mixed-model fits are
+  design-identification warnings rather than high-stakes-ready reliability
+  evidence.
 - `predict_mfrm_units()` and `sample_mfrm_plausible_values()` score future or
   partially observed persons under a fixed `MML` calibration.
+
+```{r gd-study-reading-order, eval=FALSE}
+if (requireNamespace("lme4", quietly = TRUE)) {
+  gt <- mfrm_generalizability(fit)
+  gt$coefficients[, c("G", "Phi", "GStatus", "PhiStatus",
+                      "IdentificationStatus")]
+
+  ds <- mfrm_d_study(
+    gt,
+    data.frame(Rater = c(2, 3, 4), Criterion = 4),
+    residual_scaling = "sensitivity"
+  )
+  ds[, c("n_Rater", "n_Criterion", "ResidualScaling",
+         "G", "Phi", "GStatus", "PhiStatus", "IdentificationStatus")]
+}
+```
 
 ```{r design-prediction}
 sim_spec <- build_mfrm_sim_spec(
@@ -378,33 +633,6 @@ recovery_bundle <- build_summary_table_bundle(
 )
 recovery_bundle$table_index[, c("Table", "Rows", "Role")]
 
-# For a release-scale check, use the optional validation protocol:
-# source(system.file("validation", "recovery-validation.R", package = "mfrmr"))
-# validation <- mfrmr_run_recovery_validation(tier = "core", output_dir = "recovery-validation")
-# summary(validation)
-# validation_summary <- summary(validation)
-# validation_summary$reading_order
-# validation_summary$topline_release_decision
-# validation_summary$release_decision_table
-# validation_summary$condition_reporting_notes
-# validation_summary$condition_summary
-# validation_summary$diagnostic_reporting_notes
-# validation_summary$domain_decision_table
-# validation_bundle <- build_summary_table_bundle(validation_summary)
-# validation_bundle$tables$reading_order
-# validation_bundle$tables$topline_release_decision
-# validation_bundle$tables$condition_reporting_notes
-# validation_bundle$tables$condition_summary
-# validation_bundle$tables$diagnostic_reporting_notes
-# The top-line table is the release-recovery conclusion. It uses recovery
-# metrics, convergence, and Monte Carlo precision from core cases as the
-# primary evidence, while ExtendedSensitivityStatus reports non-core stress
-# cases separately. The condition notes and condition table keep generator
-# stress and score support separate from recovery metrics, so OverallStatus = "review" is not
-# read as a recovery-metric failure by itself. The diagnostic reporting notes
-# turn fit/separation operating characteristics into report caveats rather
-# than release gates.
-
 pred_pop <- predict_mfrm_population(
   sim_spec = sim_spec,
   reps = 2,
@@ -455,8 +683,8 @@ export_summary_appendix(
 )
 ```
 
-For a quick smoke test, `reps = 2` or another very small value is useful only to
-check that the data-generating setup and refit path run. For a study report,
+For an initial exploratory run, `reps = 2` or another very small value is useful
+only to check the data-generating setup and refit path. For a study report,
 increase `reps`, keep the ADEMP-style metadata in the exported tables, and set
 substantive RMSE/Bias thresholds so that `assess_mfrm_recovery()` can mark those
 rows as `ok`, `review`, or `concern` rather than `not_assessed`.

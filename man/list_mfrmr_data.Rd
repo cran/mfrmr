@@ -4,17 +4,25 @@
 \alias{list_mfrmr_data}
 \title{List packaged simulation datasets}
 \usage{
-list_mfrmr_data()
+list_mfrmr_data(details = FALSE)
+}
+\arguments{
+\item{details}{If \code{FALSE} (default), return the backward-compatible
+character vector of dataset keys. If \code{TRUE}, return a catalog describing
+the intended teaching role and design of every dataset.}
 }
 \value{
-Character vector of dataset keys accepted by \code{\link[=load_mfrmr_data]{load_mfrmr_data()}}.
+A character vector of dataset keys accepted by \code{\link[=load_mfrmr_data]{load_mfrmr_data()}},
+or, when \code{details = TRUE}, a data.frame with \code{Key}, \code{Rows}, \code{Persons},
+\code{Raters}, \code{Criteria}, \code{CountBasis}, \code{PrimaryUse}, \code{Design}, and
+\code{Empirical}.
 }
 \description{
 List packaged simulation datasets
 }
 \details{
 Use this helper when you want to select packaged data programmatically
-(e.g., inside scripts, loops, or shiny/streamlit wrappers).
+(e.g., inside scripts, loops, or interactive-application wrappers).
 
 Typical pattern:
 \enumerate{
@@ -24,7 +32,12 @@ Typical pattern:
 }
 \section{Interpreting output}{
 
-Returned values are canonical dataset keys accepted by \code{\link[=load_mfrmr_data]{load_mfrmr_data()}}.
+With \code{details = FALSE}, returned values are canonical dataset keys accepted
+by \code{\link[=load_mfrmr_data]{load_mfrmr_data()}}. With \code{details = TRUE}, use \code{PrimaryUse} and
+\code{Design} to distinguish the applied teaching example from idealized,
+planted-effect diagnostic, and larger sparse-design datasets. \code{CountBasis}
+states whether person/rater counts use raw labels or Study-prefixed labels.
+Every bundled dataset is synthetic rather than empirical.
 }
 
 \section{Typical workflow}{
@@ -32,14 +45,18 @@ Returned values are canonical dataset keys accepted by \code{\link[=load_mfrmr_d
 \enumerate{
 \item Capture keys in a script (\code{keys <- list_mfrmr_data()}).
 \item Select one key by index or name.
-\item Load data via \code{\link[=load_mfrmr_data]{load_mfrmr_data()}} and continue analysis.
+\item Load data via \code{\link[=load_mfrmr_data]{load_mfrmr_data()}} and continue analysis. Treat a
+\code{combined} key as a design-review object, not as a direct-fit example.
 }
 }
 
 \examples{
 keys <- list_mfrmr_data()
 keys
-d <- load_mfrmr_data(keys[1])
+list_mfrmr_data(details = TRUE)[, c(
+  "Key", "PrimaryUse", "Design", "CountBasis"
+)]
+d <- load_mfrmr_data("example_operational")
 head(d)
 }
 \seealso{

@@ -15,6 +15,13 @@
 #' This helper computes pairwise rater agreement on matched contexts
 #' and returns both a pair-level table and a one-row summary. The output is
 #' package-native and does not require knowledge of legacy report numbering.
+#' When fitted category probabilities are available, expected exact agreement
+#' for a matched context is the model-implied quantity
+#' \eqn{\sum_k P_{r1}(X=k)P_{r2}(X=k)}. It is not a marginal-frequency chance
+#' agreement statistic. Observed exact agreement uses equality of the package's
+#' observed score categories. The current function does not translate category
+#' positions across multiple independent scales, apply an agreement-based SE
+#' inflation, or establish numerical equivalence with FACETS Table 7.
 #'
 #' @section Interpreting output:
 #' - `summary`: overall agreement level, number/share of flagged pairs.
@@ -35,7 +42,9 @@
 #'   \item{Rater1, Rater2}{Rater pair identifiers.}
 #'   \item{N}{Number of matched-context observations for this pair.}
 #'   \item{Exact}{Proportion of exact score agreements.}
-#'   \item{ExpectedExact}{Expected exact agreement under chance.}
+#'   \item{ExpectedExact}{Model-implied expected exact agreement from the two
+#'     raters' fitted category-probability vectors. `NA` when those probabilities
+#'     are unavailable.}
 #'   \item{Adjacent}{Proportion of adjacent (+/- 1 category) agreements.}
 #'   \item{MeanDiff}{Signed mean score difference (Rater1 - Rater2).}
 #'   \item{MAD}{Mean absolute score difference.}
@@ -66,6 +75,7 @@
 #' @seealso [diagnose_mfrm()], [facets_chisq_table()], [plot_interrater_agreement()],
 #'   [mfrmr_visual_diagnostics]
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 #' ir <- interrater_agreement_table(fit, rater_facet = "Rater")
@@ -77,6 +87,7 @@
 #' head(ir$pairs)
 #' p_ir <- plot(ir, draw = FALSE)
 #' p_ir$data$plot
+#' }
 #' @export
 interrater_agreement_table <- function(fit,
                                        diagnostics = NULL,
@@ -234,12 +245,14 @@ interrater_agreement_table <- function(fit,
 #'
 #' @seealso [diagnose_mfrm()], [interrater_agreement_table()], [plot_facets_chisq()]
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 #' chi <- facets_chisq_table(fit)
 #' summary(chi)
 #' p_chi <- plot(chi, draw = FALSE)
 #' p_chi$data$plot
+#' }
 #' @export
 facets_chisq_table <- function(fit,
                                diagnostics = NULL,
@@ -372,6 +385,7 @@ facets_chisq_table <- function(fit,
 #' @seealso [diagnose_mfrm()], [displacement_table()], [fair_average_table()],
 #'   [mfrmr_visual_diagnostics]
 #' @examples
+#' \donttest{
 #' toy_full <- load_mfrmr_data("example_core")
 #' toy_people <- unique(toy_full$Person)[1:12]
 #' toy <- toy_full[toy_full$Person %in% toy_people, , drop = FALSE]
@@ -382,6 +396,7 @@ facets_chisq_table <- function(fit,
 #' summary(t4)
 #' p_t4 <- plot(t4, draw = FALSE)
 #' p_t4$data$plot
+#' }
 #' @export
 unexpected_response_table <- function(fit,
                                       diagnostics = NULL,
@@ -706,12 +721,14 @@ fair_average_table <- function(fit,
 #'
 #' @seealso [diagnose_mfrm()], [unexpected_response_table()], [fair_average_table()]
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 #' disp <- displacement_table(fit, anchored_only = FALSE)
 #' summary(disp)
 #' p_disp <- plot(disp, draw = FALSE)
 #' p_disp$data$plot
+#' }
 #' @export
 displacement_table <- function(fit,
                                diagnostics = NULL,
@@ -835,12 +852,14 @@ displacement_table <- function(fit,
 #' @seealso [diagnose_mfrm()], [rating_scale_table()], [describe_mfrm_data()],
 #'   [mfrmr_visual_diagnostics]
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 #' t5 <- measurable_summary_table(fit)
 #' summary(t5)
 #' p_t5 <- plot(t5, draw = FALSE)
 #' p_t5$data$plot
+#' }
 #' @export
 measurable_summary_table <- function(fit, diagnostics = NULL) {
   if (!inherits(fit, "mfrm_fit")) {
@@ -998,6 +1017,7 @@ measurable_summary_table <- function(fit, diagnostics = NULL) {
 #' @seealso [diagnose_mfrm()], [measurable_summary_table()], [plot.mfrm_fit()],
 #'   [mfrmr_visual_diagnostics]
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 #' t8 <- rating_scale_table(fit)
@@ -1006,6 +1026,7 @@ measurable_summary_table <- function(fit, diagnostics = NULL) {
 #' p_t8 <- plot(t8, draw = FALSE)
 #' p_t8$data$plot
 #'
+#' }
 #' @section References:
 #' - Andrich, D. (1978). *A rating formulation for ordered response
 #'   categories*. Psychometrika, 43(4), 561-573.
@@ -1014,7 +1035,7 @@ measurable_summary_table <- function(fit, diagnostics = NULL) {
 #'   Psychometrika, 47(2), 149-174. \doi{10.1007/BF02296272}
 #' - Linacre, J. M. (2002). What do Infit and Outfit, mean-square and
 #'   standardized mean? *Rasch Measurement Transactions, 16*(2), 878.
-#'   (Source for the 0.5-1.5 mean-square acceptance band and the
+#'   (Source for the 0.5-1.5 mean-square heuristic review interval and the
 #'   threshold-gap heuristics used in `summary(t8)$summary`.)
 #' - Wind, S. A. (2023). *Detecting rating scale malfunctioning with the
 #'   partial credit model and generalized partial credit model*.
@@ -1216,6 +1237,7 @@ rating_scale_table <- function(fit,
 #' @seealso [estimate_bias()], [unexpected_after_bias_table()], [build_fixed_reports()],
 #'   [mfrmr_visual_diagnostics]
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_bias")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 #' diag <- diagnose_mfrm(fit, residual_pca = "none")
@@ -1234,6 +1256,7 @@ rating_scale_table <- function(fit,
 #'     palette = c(count = "#2b8cbe", low = "#cb181d"),
 #'     label_angle = 45
 #'   )
+#' }
 #' }
 #' @export
 bias_count_table <- function(bias_results,
@@ -1380,8 +1403,12 @@ bias_count_table <- function(bias_results,
 #' - `table`: residual unexpected responses after bias adjustment.
 #' - `thresholds`: screening settings used in this comparison.
 #'
-#' Large reductions indicate bias terms explain part of prior unexpectedness;
-#' persistent unexpected rows indicate remaining model-data mismatch.
+#' Lower after-adjustment counts describe an in-sample change in flags; they do
+#' not show that bias has been removed or establish fairness. For bounded
+#' `GPCM`, both the bias estimate and the post-adjustment comparison use the
+#' fitted slope-aware probability kernel while holding the other fitted
+#' quantities fixed. Read the returned `gpcm_boundary` before reporting the
+#' comparison.
 #'
 #' @section Typical workflow:
 #' 1. Run [unexpected_response_table()] as baseline.
@@ -1412,10 +1439,12 @@ bias_count_table <- function(bias_results,
 #' - `summary`: one-row summary (includes baseline-vs-after counts)
 #' - `thresholds`: applied thresholds
 #' - `facets`: analyzed bias facet pair
+#' - `gpcm_boundary`: bounded-`GPCM` interpretation guidance when applicable
 #'
 #' @seealso [estimate_bias()], [unexpected_response_table()], [bias_count_table()],
 #'   [mfrmr_visual_diagnostics]
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_bias")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 #' diag <- diagnose_mfrm(fit, residual_pca = "none")
@@ -1424,6 +1453,7 @@ bias_count_table <- function(bias_results,
 #' summary(t10)
 #' p_t10 <- plot(t10, draw = FALSE)
 #' p_t10$data$plot
+#' }
 #' @export
 unexpected_after_bias_table <- function(fit,
                                         bias_results,
@@ -1436,7 +1466,6 @@ unexpected_after_bias_table <- function(fit,
   if (!inherits(fit, "mfrm_fit")) {
     stop("`fit` must be an mfrm_fit object from fit_mfrm().")
   }
-  stop_if_gpcm_out_of_scope(fit, "unexpected_after_bias_table()")
   if (is.null(bias_results) || is.null(bias_results$table) || nrow(bias_results$table) == 0) {
     stop("`bias_results` must be output from estimate_bias() with non-empty `table`.")
   }
@@ -1503,6 +1532,10 @@ unexpected_after_bias_table <- function(fit,
       interaction_facets = bias_results$interaction_facets %||% c(bias_results$facet_a, bias_results$facet_b),
       interaction_order = bias_results$interaction_order %||% 2L,
       interaction_mode = bias_results$interaction_mode %||% "pairwise"
+    ),
+    gpcm_boundary = gpcm_capability_boundary_table(
+      fit,
+      helper = "unexpected_after_bias_table()"
     )
   )
   as_mfrm_bundle(out, "mfrm_unexpected_after_bias")
@@ -1705,7 +1738,7 @@ as_mfrm_bundle <- function(x, class_name) {
 #' \describe{
 #'   \item{Engine}{Estimation engine identifier (always `"mfrmr"`).}
 #'   \item{Model}{`"RSM"` or `"PCM"`.}
-#'   \item{Method}{`"JMLE"` or `"MML"`.}
+#'   \item{Method}{`"JML"` or `"MML"`.}
 #' }
 #'
 #' The `facet_labels` data.frame contains:
@@ -1810,12 +1843,15 @@ table1_specifications <- function(fit,
     stringsAsFactors = FALSE
   )
 
+  convergence <- mfrm_convergence_state(fit)
   convergence_control <- data.frame(
     Setting = c(
       "MaxIterations",
       "RelativeTolerance",
       "QuadPoints",
-      "Converged",
+      "OptimizerCodeZero",
+      "InferenceReady",
+      "ConvergenceSeverity",
       "FunctionEvaluations",
       "OptimizerMessage"
     ),
@@ -1823,7 +1859,9 @@ table1_specifications <- function(fit,
       as.character(est_ctl$maxit %||% NA_integer_),
       as.character(est_ctl$reltol %||% NA_real_),
       as.character(est_ctl$quad_points %||% NA_integer_),
-      as.character(isTRUE(ov$Converged[1])),
+      as.character(convergence$code_converged),
+      as.character(convergence$inference_ready),
+      as.character(convergence$severity),
       as.character(fit$opt$counts[["function"]] %||% NA_integer_),
       as.character(fit$opt$message %||% "")
     ),
@@ -2287,7 +2325,6 @@ table3_iteration_report <- function(fit,
   if (!inherits(fit, "mfrm_fit")) {
     stop("`fit` must be an mfrm_fit object from fit_mfrm().")
   }
-  stop_if_gpcm_out_of_scope(fit, "estimation_iteration_report()")
   cfg <- fit$config
   prep <- fit$prep
   sizes <- build_param_sizes(cfg)
@@ -2381,8 +2418,11 @@ table3_iteration_report <- function(fit,
   subset_tbl <- calc_subsets(compute_obs_table(fit), c("Person", cfg$facet_names))$summary
   connected <- if (!is.null(subset_tbl) && nrow(subset_tbl) > 0) nrow(subset_tbl) == 1 else NA
 
+  convergence <- mfrm_convergence_state(fit)
   summary_tbl <- data.frame(
-    FinalConverged = isTRUE(fit$summary$Converged[1]),
+    FinalConverged = convergence$inference_ready,
+    OptimizerCodeZero = convergence$code_converged,
+    ConvergenceSeverity = convergence$severity,
     FinalIterations = as.integer(fit$summary$Iterations[1]),
     ReplayRows = nrow(tbl),
     ConnectedSubset = connected,
@@ -4719,6 +4759,11 @@ build_cumulative_boundary_table <- function(cumulative, categories_chr) {
 #' expected-score uncertainty and/or score-side delta-method SEs when the
 #' required MML diagnostics are available. Use `score_se_method` to choose
 #' `"both"` (default), `"native"`, `"score_side"`, or `"none"`.
+#' The score-side route transforms a logit-side standard error with the bounded
+#' GPCM expected-score derivative
+#' \eqn{dE[X]/d\eta = \alpha Var(X)}, where `ScoreSlope` is \eqn{\alpha}.
+#' `ScoreSideLogitSE` remains on the logit side; `ScoreSideSE` and its interval
+#' columns are on the expected-score scale.
 #' The scorefile also carries explicit score-side caveat columns. It is not a
 #' FACETS score-side equivalence file, does not export FACETS-equivalent
 #' score-side standard errors, and does not establish an operational
@@ -4742,12 +4787,14 @@ build_cumulative_boundary_table <- function(cumulative, categories_chr) {
 #'   [export_mfrm_bundle()], [mfrmr_reports_and_tables],
 #'   [mfrmr_compatibility_layer]
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 #' out <- facets_output_file_bundle(fit, diagnostics = diagnose_mfrm(fit, residual_pca = "none"))
 #' summary(out)
 #' p_out <- plot(out, draw = FALSE)
 #' p_out$data$plot
+#' }
 #' @export
 facets_output_file_bundle <- function(fit,
                                       diagnostics = NULL,
@@ -6121,6 +6168,7 @@ extract_loading_table <- function(pca_bundle, component = 1L, top_n = 20L) {
 #'
 #' @seealso [analyze_residual_pca()], [diagnose_mfrm()]
 #' @examples
+#' \donttest{
 #' toy_full <- load_mfrmr_data("example_core")
 #' toy_people <- unique(toy_full$Person)[1:24]
 #' toy <- toy_full[match(toy_full$Person, toy_people, nomatch = 0L) > 0L, , drop = FALSE]
@@ -6131,17 +6179,16 @@ extract_loading_table <- function(pca_bundle, component = 1L, top_n = 20L) {
 #' pca <- analyze_residual_pca(diag, mode = "overall")
 #' plt <- plot_residual_pca(pca, mode = "overall", plot_type = "scree", draw = FALSE)
 #' head(plt$data)
-#' \donttest{
 #' pca_pa <- analyze_residual_pca(diag, mode = "overall", parallel = TRUE, parallel_reps = 10)
 #' pa <- plot_residual_pca(pca_pa, mode = "overall", plot_type = "parallel_scree", draw = FALSE)
 #' head(pa$data)
-#' }
 #' plt_load <- plot_residual_pca(
 #'   pca, mode = "overall", plot_type = "loadings", component = 1, draw = FALSE
 #' )
 #' head(plt_load$data)
 #' if (interactive()) {
 #'   plot_residual_pca(pca, mode = "overall", plot_type = "scree", preset = "publication")
+#' }
 #' }
 #' @export
 plot_residual_pca <- function(x,
@@ -6521,13 +6568,14 @@ plot_residual_pca <- function(x,
 #' - `recommended_action`: one-line recommended-action label routing
 #'   the user to the appropriate follow-up helper
 #' - `inference_tier`: summary label indicating that the bias rows are
-#'   intended for screening and follow-up review in this release
+#'   intended for screening and follow-up review
 #' - `optimization_failures`: per-cell record of any inner-loop
 #'   optimizer failures encountered while estimating the bias
 #'   parameters; empty when every cell converged cleanly
 #'
 #' @seealso [build_fixed_reports()], [build_apa_outputs()]
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_bias")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 #' diag <- diagnose_mfrm(fit, residual_pca = "none")
@@ -6546,6 +6594,7 @@ plot_residual_pca <- function(x,
 #' p_bias <- plot_bias_interaction(bias, draw = FALSE)
 #' p_bias$data$plot
 #'
+#' }
 #' @section References:
 #' - Linacre, J. M. (1989). *Many-Facet Rasch Measurement*. MESA Press.
 #'   (FACETS Table 13 corresponds to the bias / interaction

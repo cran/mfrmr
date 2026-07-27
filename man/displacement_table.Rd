@@ -82,12 +82,14 @@ The \code{table} data.frame contains:
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 disp <- displacement_table(fit, anchored_only = FALSE)
 summary(disp)
 p_disp <- plot(disp, draw = FALSE)
 p_disp$data$plot
+}
 }
 \seealso{
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=unexpected_response_table]{unexpected_response_table()}}, \code{\link[=fair_average_table]{fair_average_table()}}

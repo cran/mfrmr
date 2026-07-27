@@ -1,4 +1,4 @@
-gpcm_runtime_guard_fixtures <- function() {
+gpcm_runtime_guard_inputs <- function() {
   list(
     fit = structure(
       list(
@@ -16,36 +16,37 @@ gpcm_runtime_guard_fixtures <- function() {
   )
 }
 
-gpcm_call_runtime_guard <- function(helper, fixtures) {
+gpcm_call_runtime_guard <- function(helper, inputs) {
   calls <- list(
     "build_apa_outputs()" = function() {
-      build_apa_outputs(fixtures$fit, fixtures$diagnostics)
+      build_apa_outputs(inputs$fit, inputs$diagnostics)
     },
     "build_visual_summaries()" = function() {
-      build_visual_summaries(fixtures$fit, fixtures$diagnostics)
+      build_visual_summaries(inputs$fit, inputs$diagnostics)
     },
     "run_qc_pipeline()" = function() {
-      run_qc_pipeline(fixtures$fit)
+      run_qc_pipeline(inputs$fit)
     },
     "build_mfrm_manifest()" = function() {
-      build_mfrm_manifest(fixtures$fit)
+      build_mfrm_manifest(inputs$fit)
     },
     "build_mfrm_replay_script()" = function() {
-      build_mfrm_replay_script(fixtures$fit)
+      build_mfrm_replay_script(inputs$fit)
     },
     "export_mfrm_bundle()" = function() {
       export_mfrm_bundle(
-        fixtures$fit,
+        inputs$fit,
         output_dir = tempdir(),
         include = "core_tables",
-        overwrite = TRUE
+        overwrite = TRUE,
+        acknowledge_sensitive = TRUE
       )
     },
     "facets_output_contract_review()" = function() {
-      facets_output_contract_review(fixtures$fit)
+      facets_output_contract_review(inputs$fit)
     },
     "facets_output_file_bundle(include = \"score\")" = function() {
-      facets_output_file_bundle(fixtures$fit, include = "score")
+      facets_output_file_bundle(inputs$fit, include = "score")
     },
     "evaluate_mfrm_design()" = function() {
       evaluate_mfrm_design(
@@ -73,30 +74,30 @@ gpcm_call_runtime_guard <- function(helper, fixtures) {
     },
     "predict_mfrm_population()" = function() {
       predict_mfrm_population(
-        sim_spec = fixtures$sim_spec,
+        sim_spec = inputs$sim_spec,
         reps = 1,
         seed = 1
       )
     },
     "build_linking_review()" = function() {
-      build_linking_review(drift = fixtures$drift)
+      build_linking_review(drift = inputs$drift)
     }
   )
 
   if (!helper %in% names(calls)) {
-    stop("No runtime guard fixture for helper: ", helper, call. = FALSE)
+    stop("No runtime guard input for helper: ", helper, call. = FALSE)
   }
   calls[[helper]]()
 }
 
-test_that("gpcm_capability_matrix exposes the bounded GPCM support contract", {
+test_that("gpcm_capability_matrix exposes only user-facing route guidance", {
   tbl <- gpcm_capability_matrix()
 
   expect_s3_class(tbl, "data.frame")
-  expect_true(all(c(
-    "Area", "Helpers", "Status", "PrimaryUse", "Boundary", "Evidence",
-    "RecommendedRoute", "NextValidationStep"
-  ) %in% names(tbl)))
+  expect_identical(
+    names(tbl),
+    c("Area", "Helpers", "Status", "Boundary", "RecommendedRoute")
+  )
   expect_true(all(tbl$Status %in% c(
     "supported", "supported_with_caveat", "blocked", "deferred"
   )))
@@ -137,8 +138,8 @@ test_that("gpcm_capability_matrix exposes the bounded GPCM support contract", {
     grepl("build_linking_review\\(\\)", tbl$Helpers) &
       tbl$Status == "supported_with_caveat"
   ))
+  expect_true(all(nzchar(tbl$Boundary)))
   expect_true(all(nzchar(tbl$RecommendedRoute)))
-  expect_true(all(nzchar(tbl$NextValidationStep)))
   expect_true(any(
     tbl$Area == "APA writer and fit-based export bundles" &
       tbl$Status == "supported_with_caveat" &
@@ -153,9 +154,21 @@ test_that("gpcm_capability_matrix exposes the bounded GPCM support contract", {
       tbl$Status == "blocked"
   ))
   expect_true(any(
+    grepl("unexpected_after_bias_table()", tbl$Helpers, fixed = TRUE) &
+      tbl$Area == "Residual-bias screening under bounded GPCM" &
+      tbl$Status == "supported_with_caveat",
+    na.rm = TRUE
+  ))
+  expect_true(any(
+    tbl$Helpers == "estimation_iteration_report()" &
+      tbl$Area == "Replayed optimization diagnostics under bounded GPCM" &
+      tbl$Status == "supported_with_caveat",
+    na.rm = TRUE
+  ))
+  expect_true(any(
     tbl$Area == "Diagnostic and signal-detection design screening under bounded GPCM" &
       tbl$Status == "supported_with_caveat" &
-      grepl("slope regimes", tbl$NextValidationStep, fixed = TRUE)
+      grepl("screening evidence", tbl$Boundary, fixed = TRUE)
   ))
 })
 
@@ -172,108 +185,130 @@ test_that("gpcm_capability_matrix filters by status", {
   expect_equal(nrow(supported_tbl), sum(full_tbl$Status == "supported"))
 })
 
-test_that("gpcm_score_side_contract records unblock requirements without enabling exports", {
+test_that("gpcm_capability_matrix prints a compact first screen", {
+  tbl <- gpcm_capability_matrix()
+  expect_s3_class(tbl, "mfrmr_gpcm_capabilities")
+
+  printed <- capture.output(print(tbl))
+  expect_match(paste(printed, collapse = "\n"), "workflow availability")
+  expect_match(paste(printed, collapse = "\n"), "Route preview")
+  expect_match(paste(printed, collapse = "\n"), "Filter by status")
+  expect_lt(length(printed), 40L)
+})
+
+test_that("gpcm_score_side_contract exposes user-facing availability only", {
   contract <- gpcm_score_side_contract()
-  implemented <- gpcm_score_side_contract("implemented_with_caveat")
-  required <- gpcm_score_side_contract("required_for_full_facets_review")
-  dependency <- gpcm_score_side_contract("validated_dependency")
+  available <- gpcm_score_side_contract("available_with_caveat")
+  supporting <- gpcm_score_side_contract("supporting_route")
+  unavailable <- gpcm_score_side_contract("unavailable")
+  registry <- .gpcm_score_side_contract_registry()
   matrix <- gpcm_capability_matrix()
   score_row <- matrix[matrix$Area == "Score-side scorefile export under bounded GPCM", , drop = FALSE]
   review_row <- matrix[matrix$Area == "FACETS output-contract score-side review", , drop = FALSE]
 
   expect_s3_class(contract, "data.frame")
-  expect_true(all(c(
-    "ContractArea", "Requirement", "CurrentStatus", "ReleaseBoundary",
-    "ValidationTarget", "ExitCriterion"
-  ) %in% names(contract)))
+  expect_identical(
+    names(contract),
+    c("Capability", "Status", "Limitation", "Alternative")
+  )
   expect_true(nrow(contract) >= 8L)
-  expect_true(nrow(implemented) > 0L)
-  expect_true(nrow(required) > 0L)
-  expect_true(nrow(dependency) > 0L)
-  expect_true(all(implemented$CurrentStatus == "implemented_with_caveat"))
-  expect_true(all(required$CurrentStatus == "required_for_full_facets_review"))
-  expect_true(all(dependency$CurrentStatus == "validated_dependency"))
-  expect_true(any(contract$ContractArea == "score_estimand"))
-  expect_true(any(contract$ContractArea == "score_uncertainty"))
-  expect_true(any(contract$ContractArea == "facets_score_uncertainty_contract"))
-  expect_true(any(contract$ContractArea == "export_schema"))
-  expect_true(any(contract$ContractArea == "runtime_guard"))
-  expect_true(any(contract$ContractArea == "score_uncertainty" &
-                    contract$CurrentStatus == "implemented_with_caveat"))
-  expect_true(any(contract$ContractArea == "facets_score_uncertainty_contract" &
-                    contract$CurrentStatus == "required_for_full_facets_review"))
-  expect_true(any(grepl("PCM", contract$Requirement, fixed = TRUE)))
-  expect_true(any(grepl("mfrmr_gpcm_scope_error", contract$ValidationTarget, fixed = TRUE)))
+  expect_true(nrow(available) > 0L)
+  expect_true(nrow(supporting) > 0L)
+  expect_true(nrow(unavailable) > 0L)
+  expect_true(all(available$Status == "available_with_caveat"))
+  expect_true(all(supporting$Status == "supporting_route"))
+  expect_true(all(unavailable$Status == "unavailable"))
+  expect_true(any(contract$Capability == "Package-native score estimand"))
+  expect_true(any(contract$Capability == "Native score uncertainty"))
+  expect_true(any(contract$Capability == "Full FACETS score-side review" &
+                    contract$Status == "unavailable"))
+  expect_true(all(nzchar(contract$Limitation)))
+  expect_true(all(nzchar(contract$Alternative)))
+
+  expect_identical(
+    names(registry),
+    c(
+      "CompatibilityStatus", "Capability", "PublicStatus", "Limitation",
+      "Alternative"
+    )
+  )
+
+  legacy <- gpcm_score_side_contract("implemented_with_caveat")
+  expect_true(nrow(legacy) > 0L)
+  expect_true(all(legacy$Status == "available_with_caveat"))
   expect_identical(score_row$Status[1], "supported_with_caveat")
   expect_identical(review_row$Status[1], "blocked")
   expect_true(grepl("gpcm_score_side_contract", score_row$RecommendedRoute[1], fixed = TRUE))
-  expect_true(grepl("unit-slope PCM reduction", score_row$NextValidationStep[1], fixed = TRUE))
-  expect_true(grepl("gpcm_score_side_contract", review_row$NextValidationStep[1], fixed = TRUE))
+  expect_true(grepl("full FACETS output-contract reviews", review_row$RecommendedRoute[1], fixed = TRUE))
 })
 
-test_that("blocked and deferred GPCM rows are tracked in future-scope notes", {
-  tbl <- gpcm_capability_matrix()
-  roadmap_path <- testthat::test_path("..", "..", "inst", "validation",
-                                      "gpcm-post-0.2.1-roadmap.md")
-  if (!file.exists(roadmap_path)) {
-    roadmap_path <- system.file("validation", "gpcm-post-0.2.1-roadmap.md",
-                                package = "mfrmr")
-  }
+test_that("private GPCM route data contain only runtime product fields", {
+  public <- gpcm_capability_matrix()
+  registry <- .gpcm_capability_registry()
+  guard_registry <- .gpcm_runtime_guard_registry()
 
-  expect_true(nzchar(roadmap_path))
-  expect_true(file.exists(roadmap_path))
+  expect_identical(
+    names(registry),
+    c(
+      "CapabilityID", "Area", "Helpers", "Status", "Boundary",
+      "RecommendedRoute"
+    )
+  )
+  expect_identical(
+    names(guard_registry),
+    c(
+      "CapabilityID", "Area", "Helper", "Status", "AvailabilityMode",
+      "ConditionClass", "RecommendedRoute"
+    )
+  )
 
-  roadmap <- paste(readLines(roadmap_path, warn = FALSE), collapse = "\n")
-  outstanding <- tbl[tbl$Status %in% c("blocked", "deferred"), , drop = FALSE]
+  idx <- match(public$Area, registry$Area)
+  expect_false(anyNA(idx))
+  expect_equal(public$Status, registry$Status[idx])
+  expect_equal(public$Boundary, registry$Boundary[idx])
+  expect_equal(public$RecommendedRoute, registry$RecommendedRoute[idx])
+  expect_identical(anyDuplicated(registry$CapabilityID), 0L)
+  expect_true(all(grepl("^[a-z0-9_]+$", registry$CapabilityID)))
 
-  expect_true(nrow(outstanding) > 0L)
-  for (area in outstanding$Area) {
-    expect_true(grepl(area, roadmap, fixed = TRUE),
-                info = paste("Missing GPCM roadmap area:", area))
-  }
-
-  expect_true(grepl("score-side export contract", roadmap, fixed = TRUE))
-  expect_true(grepl("gpcm_score_side_contract()", roadmap, fixed = TRUE))
-  expect_true(grepl("design operating characteristics", roadmap, fixed = TRUE))
-  expect_true(grepl("posterior predictive checks", roadmap, fixed = TRUE))
-  expect_true(grepl("slope_facet == step_facet", roadmap, fixed = TRUE))
+  outstanding <- registry[
+    registry$Status %in% c("blocked", "deferred"), , drop = FALSE
+  ]
+  expect_true("CapabilityID" %in% names(guard_registry))
+  expect_false(anyNA(match(guard_registry$CapabilityID, registry$CapabilityID)))
+  expect_setequal(guard_registry$Area, outstanding$Area)
 })
 
-test_that("GPCM runtime guard coverage aligns with the capability matrix", {
+test_that("GPCM unavailable-route table stays user-facing", {
   matrix <- gpcm_capability_matrix()
   coverage <- gpcm_runtime_guard_coverage()
   outstanding <- matrix[matrix$Status %in% c("blocked", "deferred"), , drop = FALSE]
 
   expect_s3_class(coverage, "data.frame")
-  expect_true(all(c(
-    "Area", "Helper", "Status", "GuardMode", "ExpectedConditionClass",
-    "RecommendedRoute", "NextValidationStep", "TestRoute", "Notes"
-  ) %in% names(coverage)))
+  expect_identical(
+    names(coverage),
+    c("Area", "Helper", "Status", "Boundary", "RecommendedRoute")
+  )
   expect_true(nrow(coverage) > 0L)
   expect_equal(sort(unique(coverage$Area)), sort(outstanding$Area))
   expect_true(all(coverage$Status %in% c("blocked", "deferred")))
-  expect_true(all(coverage$GuardMode %in% c("runtime_error", "roadmap_only")))
 
   idx <- match(coverage$Area, matrix$Area)
   expect_equal(coverage$Status, matrix$Status[idx])
+  expect_equal(coverage$Boundary, matrix$Boundary[idx])
   expect_equal(coverage$RecommendedRoute, matrix$RecommendedRoute[idx])
-  expect_equal(coverage$NextValidationStep, matrix$NextValidationStep[idx])
-
-  runtime_rows <- coverage[coverage$GuardMode == "runtime_error", , drop = FALSE]
-  expect_true(nrow(runtime_rows) > 0L)
-  expect_true(all(nzchar(runtime_rows$Helper)))
-  expect_true(all(runtime_rows$ExpectedConditionClass == "mfrmr_gpcm_scope_error"))
 })
 
 test_that("GPCM runtime guards return matrix-synchronized conditions", {
-  coverage <- gpcm_runtime_guard_coverage()
-  runtime_rows <- coverage[coverage$GuardMode == "runtime_error", , drop = FALSE]
-  fixtures <- gpcm_runtime_guard_fixtures()
+  coverage <- .gpcm_runtime_guard_registry()
+  runtime_rows <- coverage[
+    coverage$AvailabilityMode == "structured_error", , drop = FALSE
+  ]
+  inputs <- gpcm_runtime_guard_inputs()
 
   for (i in seq_len(nrow(runtime_rows))) {
     row <- runtime_rows[i, , drop = FALSE]
     err <- tryCatch(
-      gpcm_call_runtime_guard(row$Helper, fixtures),
+      gpcm_call_runtime_guard(row$Helper, inputs),
       mfrmr_gpcm_scope_error = function(e) e,
       error = function(e) e
     )
@@ -284,7 +319,8 @@ test_that("GPCM runtime guards return matrix-synchronized conditions", {
     expect_identical(err$area, row$Area)
     expect_identical(err$status, row$Status)
     expect_identical(err$recommended_route, row$RecommendedRoute)
-    expect_identical(err$next_validation_step, row$NextValidationStep)
+    expect_identical(err$follow_up, row$RecommendedRoute)
+    expect_identical(err$next_validation_step, err$follow_up)
   }
 })
 
@@ -304,17 +340,20 @@ test_that("GPCM scorefile export is caveated while full contract review stays bl
   expect_identical(err$status, "blocked")
   expect_identical(err$area, "FACETS output-contract score-side review")
   expect_true(nzchar(err$recommended_route))
-  expect_true(nzchar(err$next_validation_step))
+  expect_identical(err$follow_up, err$recommended_route)
+  expect_identical(err$next_validation_step, err$follow_up)
   msg <- conditionMessage(err)
   expect_match(msg, "does not support `GPCM` fits", fixed = TRUE)
-  expect_match(msg, "GPCM capability row:", fixed = TRUE)
+  expect_match(msg, "GPCM route:", fixed = TRUE)
+  expect_match(msg, "Constraint:", fixed = TRUE)
   expect_match(msg, "Recommended route:", fixed = TRUE)
-  expect_match(msg, "Next validation step:", fixed = TRUE)
+  expect_false(grepl("Next validation step:", msg, fixed = TRUE))
   expect_match(msg, "gpcm_capability_matrix()", fixed = TRUE)
   expect_match(msg, "gpcm_score_side_contract()", fixed = TRUE)
 })
 
 test_that("GPCM partial report, QC, export, and linking helpers return caveated objects", {
+  skip_on_cran()
   toy <- load_mfrmr_data("example_core")
   fit <- suppressWarnings(fit_mfrm(
     toy,
@@ -366,10 +405,23 @@ test_that("GPCM partial report, QC, export, and linking helpers return caveated 
   expect_true(any(is.finite(score$scorefile$ExpectedScoreSE)))
   expect_true(any(score$scorefile$ScoreSideSE_Status == "ok"))
   expect_true(any(is.finite(score$scorefile$ScoreSideSE)))
+  ok_score_side <- score$scorefile$ScoreSideSE_Status == "ok"
+  expected_score_side_se <-
+    abs(as.numeric(score$scorefile$ScoreSlope[ok_score_side])) *
+    as.numeric(score$scorefile$Var[ok_score_side]) *
+    as.numeric(score$scorefile$ScoreSideLogitSE[ok_score_side])
+  expect_equal(
+    as.numeric(score$scorefile$ScoreSideSE[ok_score_side]),
+    expected_score_side_se,
+    tolerance = 1e-3
+  )
   expect_true(any(grepl("Native structural delta method",
                         score$scorefile$ScoreUncertaintyMethod,
                         fixed = TRUE)))
   expect_true(any(grepl("Score-side delta method",
+                        score$scorefile$ScoreSideSE_Method,
+                        fixed = TRUE)))
+  expect_true(any(grepl("ScoreSlope x Var",
                         score$scorefile$ScoreSideSE_Method,
                         fixed = TRUE)))
   score_side_only <- facets_output_file_bundle(
@@ -449,7 +501,44 @@ test_that("GPCM partial report, QC, export, and linking helpers return caveated 
   expect_true(nrow(dff_interaction_report$gpcm_boundary) > 0)
 })
 
+test_that("GPCM score-side delta SE stays on the expected-score scale", {
+  fn <- getFromNamespace("add_gpcm_score_side_delta_se", "mfrmr")
+  scorefile <- data.frame(
+    Person = "P1",
+    Rater = "R1",
+    Criterion = "C1",
+    Observed = 3,
+    Expected = 2,
+    Residual = 1,
+    ScoreSlope = 1.25,
+    Var = 0.40,
+    stringsAsFactors = FALSE
+  )
+  res <- list(
+    config = list(model = "GPCM", facet_names = c("Rater", "Criterion")),
+    prep = list(rating_min = 1, rating_max = 4)
+  )
+  diagnostics <- list(
+    measures = data.frame(
+      Facet = c("Person", "Rater", "Criterion"),
+      Level = c("P1", "R1", "C1"),
+      ModelSE = c(0.30, 0.40, 0.50),
+      stringsAsFactors = FALSE
+    )
+  )
+
+  out <- fn(scorefile, res = res, diagnostics = diagnostics)
+  eta_se <- sqrt(0.30^2 + 0.40^2 + 0.50^2)
+  expected_score_se <- 1.25 * 0.40 * eta_se
+
+  expect_equal(out$ScoreSideLogitSE, eta_se, tolerance = 1e-12)
+  expect_equal(out$ScoreSideSE, expected_score_se, tolerance = 1e-12)
+  expect_equal(out$ScoreSideResidualSE, expected_score_se, tolerance = 1e-12)
+  expect_true(grepl("ScoreSlope x Var", out$ScoreSideSE_Method, fixed = TRUE))
+})
+
 test_that("GPCM design evaluation and population forecasts return caveated objects", {
+  skip_on_cran()
   gpcm_spec <- build_mfrm_sim_spec(
     design = list(person = 10, rater = 2, criterion = 2, assignment = 2),
     model = "GPCM",
@@ -497,6 +586,7 @@ test_that("GPCM design evaluation and population forecasts return caveated objec
 })
 
 test_that("GPCM diagnostic and signal-detection screening return caveated objects", {
+  skip_on_cran()
   gpcm_spec <- build_mfrm_sim_spec(
     design = list(person = 10, rater = 2, criterion = 2, assignment = 2),
     model = "GPCM",
@@ -624,5 +714,6 @@ test_that("GPCM scope errors can be caught by class", {
   expect_identical(err$area, "FACETS output-contract score-side review")
   expect_identical(err$status, "blocked")
   expect_match(err$recommended_route, "direct fair-average tables", fixed = TRUE)
-  expect_match(err$next_validation_step, "FACETS-compatible free-discrimination", fixed = TRUE)
+  expect_identical(err$follow_up, err$recommended_route)
+  expect_identical(err$next_validation_step, err$follow_up)
 })

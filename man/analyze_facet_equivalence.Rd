@@ -39,8 +39,7 @@ view. Default \code{0.95}.}
 
 \item{conf_level}{Deprecated alias for \code{ci_level}, retained for
 backward compatibility. Supplying a non-\code{NULL} value overrides
-\code{ci_level} and emits a one-time deprecation warning. Will be
-removed in a future release.
+\code{ci_level} and emits a one-time deprecation warning.
 Default \code{0.95}.}
 }
 \value{
@@ -179,12 +178,14 @@ The returned bundle has class \code{mfrm_facet_equivalence} and includes:
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                 method = "JML", maxit = 30)
 eq <- analyze_facet_equivalence(fit, facet = "Rater")
 eq$summary[, c("Facet", "Elements", "Decision", "MeanROPE")]
 head(eq$pairwise[, c("ElementA", "ElementB", "Equivalent")])
+}
 }
 \references{
 Kass, R. E., & Raftery, A. E. (1995). Bayes factors. \emph{Journal of the

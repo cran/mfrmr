@@ -19,7 +19,8 @@ knitr::opts_chunk$set(
 ```
 
 `mfrmr` includes a bounded implementation of the Generalized Partial Credit
-Model (GPCM; Muraki 1992). The estimator is fully functional, but several
+Model (GPCM; Muraki 1992). The bounded estimator is available under the
+documented constraints, while several
 downstream reporting helpers remain restricted because score-side semantics
 under free discrimination differ from the Rasch-family case. This vignette
 documents which helpers are available, which are not, and what to use as a
@@ -62,11 +63,10 @@ the scoring contract.
 
 `gpcm_capability_matrix()` is the canonical reference. It returns one row
 per helper family with a `Status` column drawn from `supported`,
-`supported_with_caveat`, `blocked`, and `deferred`, plus the rationale and
-the evidence trail behind each classification. The `RecommendedRoute` column
-states what to do instead when a helper is blocked or deferred, and
-`NextValidationStep` records what evidence would be needed before broadening
-that route.
+`supported_with_caveat`, `blocked`, and `deferred`. Read `Boundary` for the
+interpretive limit and `RecommendedRoute` for the route to use next. The
+default print is deliberately compact; subset by status to inspect a focused
+set of rows.
 
 ```{r capability-supported}
 library(mfrmr)
@@ -82,13 +82,13 @@ gpcm_capability_matrix("blocked")[, c("Area", "Status", "RecommendedRoute")]
 ```
 
 ```{r capability-deferred}
-gpcm_capability_matrix("deferred")[, c("Area", "Status", "NextValidationStep")]
+gpcm_capability_matrix("deferred")[, c("Area", "Status", "Boundary", "RecommendedRoute")]
 ```
 
 The matrix is intentionally conservative. A row stays in `blocked` or
-`deferred` even when some lower-level component already runs, because the
-scope statement reflects the validation evidence rather than the raw code
-path.
+`deferred` even when some individual computation is already available, because the
+scope statement includes the interpretation needed for a complete public
+workflow rather than only checking whether code executes.
 
 ## Source-grounded recovery interpretation
 
@@ -116,24 +116,13 @@ means:
    `plot(recovery_review, type = "status")`, then
    `plot(recovery_review, type = "metrics", metric = "rmse")`.
 
-For release-scale checks, the packaged `recovery-validation.R` protocol
-separates core release evidence from extended sensitivity cases. Read
-`topline_release_decision` before `condition_reporting_notes`,
-`condition_summary`, or row-level case tables, and treat
-`ExtendedSensitivityStatus` as sensitivity evidence rather than as the core
-release gate by itself.
-Fit/separation operating characteristics belong in the diagnostic summary;
-they are not part of the top-line release-recovery gate. Read
-`diagnostic_reporting_notes` first when deciding whether zero separation,
-reliability collapse, or df-sensitive ZSTD flags need explicit report
-language.
+## Supported routes and verification evidence
 
-## What works today
-
-The following routes are validated for bounded `GPCM`:
+The following bounded-`GPCM` routes are documented and verified within the
+stated constraints:
 
 - **Fitting and core summaries** via `fit_mfrm(model = "GPCM", step_facet =
-  ...)`. The validated default keeps `slope_facet == step_facet`, with the
+  ...)`. The documented default keeps `slope_facet == step_facet`, with the
   direct `MML` engine.
 - **Posterior scoring and information** via `predict_mfrm_units()`,
   `sample_mfrm_plausible_values()`, `compute_information()`, and
@@ -167,7 +156,12 @@ screens rather than as Rasch-style invariance evidence:
 - `estimate_bias()` now provides bounded-GPCM conditional screening rows with
   slope-aware information and profile-likelihood columns. Treat these rows as
   screening evidence for follow-up, not as standalone confirmatory fairness
-  tests.
+  tests. `unexpected_after_bias_table()` provides a descriptive in-sample
+  before/after flag comparison; a lower flag count does not show that bias has
+  been removed.
+- `estimation_iteration_report()` provides a slope-aware reconstructed
+  optimization trajectory. It is a diagnostic replay, not the exact optimizer
+  history or an additional convergence test.
 - `analyze_dff()`, `analyze_dif()`, `dif_interaction_table()`,
   `dif_report()`, `plot_dif_heatmap()`, and `plot_dif_summary()` provide
   bounded-GPCM DFF/DIF screening and reporting surfaces with explicit
@@ -204,8 +198,8 @@ operational score-side summaries. Specifically:
 
 - `facets_output_contract_review()` still depends on FACETS-style
   compatibility semantics that are not generalized to free discrimination.
-- posterior-predictive checks, MCMC, and heavy-backend extensions are still
-  future scope.
+- posterior-predictive checks and MCMC estimation are not available in mfrmr;
+  use external Bayesian software when those analyses are required.
 - Caveated reporting, export, linking, design-forecast, and screening helpers
   must keep their `gpcm_boundary` wording visible and must not imply
   FACETS-equivalent score-side uncertainty, operational scoring, calibrated
@@ -217,30 +211,24 @@ When a restricted helper is needed for a `GPCM` report, the practical paths
 are:
 
 - Refit with `model = "PCM"` if the discrimination-free assumption is
-  defensible for the data. The full APA / output-contract / fit-based export stack
-  becomes available, and `compare_mfrm()` quantifies the loss in fit.
+  defensible for the data and a full FACETS score-side review is required;
+  `compare_mfrm()` quantifies the loss in fit.
 - Keep the report on the `GPCM` fit itself but draft the manuscript section
   manually around the supported tables: `summary(fit)` for parameters,
   `diagnose_mfrm()` for residual fit, `facet_quality_dashboard()` for the
   per-facet quality summary, and `compute_information()` for precision
   evidence.
-- Generate the reproducibility manifest from a parallel `RSM` or `PCM`
-  baseline fit. The two fits can be reported side by side in the same
-  document, with the `GPCM` fit footnoted as the discrimination-aware
-  counterpart.
+- When a Rasch-family baseline comparison is substantively useful, optionally
+  generate a second manifest from a parallel `RSM` or `PCM` fit. The two fits
+  can be reported side by side, with the `GPCM` fit identified as the
+  discrimination-aware counterpart. This is not required to use the caveated
+  bounded-`GPCM` manifest/replay/export route.
 
-Those restricted helpers use the same capability matrix at runtime. A blocked
-or deferred bounded-`GPCM` call stops with the relevant capability row,
-recommended route, and next validation step instead of producing a partial
-score-side or unsupported backend result. The condition class is
-`mfrmr_gpcm_scope_error`, and the condition object carries `helper`, `area`,
-`status`, `recommended_route`, and `next_validation_step` fields so wrappers
-can catch and route the failure without parsing the message text. The
-release-readiness protocol checks that the blocked/deferred rows in
-`gpcm_capability_matrix()` are represented in the runtime guard coverage table
-or explicitly marked as roadmap-only. Call `gpcm_runtime_guard_coverage()` to
-inspect that table. Use `mfrmr_output_guide("gpcm")` when you want the shorter
-user-facing route map that points to both the support matrix and guard coverage.
+Restricted helpers use the capability matrix at runtime. An unsupported
+bounded-`GPCM` call stops with the relevant limitation and a supported
+alternative instead of producing a partial score-side or backend result. Use
+`gpcm_capability_matrix()` or `mfrmr_output_guide("gpcm")` before choosing a
+downstream route.
 
 ## A worked example
 
@@ -314,31 +302,17 @@ summary(review_gpcm)$diagnostic_review
 plot(review_gpcm, type = "status")
 plot(review_gpcm, type = "metrics", metric = "rmse")
 
-# For a release-scale smoke read:
-# source(system.file("validation", "recovery-validation.R", package = "mfrmr"))
-# validation <- mfrmr_run_recovery_validation(
-#   case_ids = c("gpcm_slope_profile", "gpcm_high_dispersion_sparse"),
-#   quick = TRUE,
-#   verbose = FALSE
-# )
-# validation_summary <- summary(validation)
-# validation_summary$reading_order
-# validation_summary$topline_release_decision
-# validation_summary$condition_reporting_notes
-# validation_summary$condition_summary
-# validation_summary$diagnostic_reporting_notes
-# build_summary_table_bundle(validation_summary)$tables$reading_order
-# build_summary_table_bundle(validation_summary)$tables$domain_decision_table
 ```
 
 The fit, summary, residual diagnostics, information, recovery, fair-average, and
 conditional bias-screening helpers all run under `GPCM` with the caveats listed
-above. Trying `build_apa_outputs(fit_gpcm)` raises an explicit message pointing
-back at `gpcm_capability_matrix()` rather than producing a partial output.
+above. `build_apa_outputs(fit_gpcm)` returns a caveated sensitivity-reporting
+object with a `gpcm_boundary`; full FACETS score-side review remains on the
+`RSM` / `PCM` route.
 
-## Roadmap
+## Current boundary
 
-The boundary above is a release-scope statement, not a permanent design
-choice. Score-side semantics for free-discrimination polytomous models are
-on the roadmap for a future release. Until then, the matrix returned by
-`gpcm_capability_matrix()` is the binding contract.
+Score-side semantics for free-discrimination polytomous models differ from the
+Rasch-family route. Use the current matrix returned by
+`gpcm_capability_matrix()` as the workflow contract and
+`gpcm_score_side_contract()` for score-side alternatives.

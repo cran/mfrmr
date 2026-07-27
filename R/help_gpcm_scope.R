@@ -1,84 +1,42 @@
-#' Bounded GPCM Support Matrix
+#' GPCM Workflow Availability
 #'
 #' @description
-#' Public capability map for the current `GPCM` scope in `mfrmr`.
+#' Check which bounded `GPCM` workflows can be used in `mfrmr`, the limits that
+#' apply to each workflow, and the recommended alternative when a route is not
+#' available.
 #'
-#' Use this helper when you need to answer a practical question quickly:
-#' which `GPCM` workflows are supported in this release, which are available
-#' only with explicit caveats, and which helpers remain blocked or deferred,
-#' plus the route to use instead when the requested helper is outside the
-#' current boundary.
-#'
-#' The matrix is intentionally conservative. It is a release-scope statement,
-#' not a promise that every lower-level helper can be combined with `GPCM`.
-#' If a helper is not yet covered by the current validation boundary, it is
-#' listed as `blocked` or `deferred` even when related components already
-#' exist.
+#' The table is intended for route selection before or after fitting and is
+#' limited to workflow availability, interpretive constraints, and the route
+#' to use next.
 #'
 #' @param status Which rows to return: `"all"` (default), `"supported"`,
 #'   `"supported_with_caveat"`, `"blocked"`, or `"deferred"`.
 #'
 #' @details
-#' The current release treats `GPCM` as a bounded supported scope inside the
-#' core R package:
+#' `Status` has the following user-facing meanings:
 #'
-#' - fitting and core summaries are supported,
-#' - posterior-scoring and information helpers are supported,
-#' - residual-based diagnostics and strict marginal follow-up are supported as
-#'   exploratory screens,
-#' - direct slope-aware simulation-spec generation and parameter-recovery
-#'   simulation are supported with caveats,
-#' - `fair_average_table()` is supported with an explicit slope-aware
-#'   element-conditional caveat,
-#' - `estimate_bias()` is supported as conditional screening evidence with
-#'   slope-aware information and profile-likelihood follow-up columns,
-#' - summary-table appendix export is available for supported direct outputs,
-#' - APA writer, visual summaries, QC pipelines, manifests, replay scripts,
-#'   and fit-based export bundles are available only as caveated
-#'   sensitivity-reporting surfaces with an explicit `gpcm_boundary`,
-#' - package-native scorefile export is available with score-side caveats,
-#' - role-based design evaluation and population forecasting are available as
-#'   caveated bounded-`GPCM` sensitivity evidence,
-#' - role-based diagnostic and signal-detection design screening helpers are
-#'   available as caveated bounded-`GPCM` sensitivity evidence,
-#' - full FACETS output-contract score-side review remains outside the
-#'   validated `GPCM` boundary.
+#' - `supported`: the helper is available within the stated boundary;
+#' - `supported_with_caveat`: the helper runs, but its interpretation is
+#'   restricted as described in `Boundary`;
+#' - `blocked`: the helper intentionally stops for a bounded `GPCM` fit;
+#' - `deferred`: no public `mfrmr` route is currently available.
 #'
-#' Why some helpers remain blocked:
+#' Read `Boundary` before interpreting a caveated result. For a blocked or
+#' deferred row, use `RecommendedRoute` to choose a supported analysis or a
+#' Rasch-family alternative.
 #'
-#' - full FACETS output-contract score-side review depends on Rasch-family
-#'   measure-to-score semantics plus delta-method SE machinery that are not
-#'   yet generalized to the free-discrimination `GPCM` branch;
-#' - APA writer, fit-based report/export bundles, visual summaries, and QC
-#'   pipelines stay caveated because they must not turn unsupported score-side
-#'   semantics into narrative or pass/fail outputs;
-#' - diagnostic, signal-detection, design-forecast, and linking helpers stay
-#'   caveated because their simulation/refit summaries must not become
-#'   operational screening, scoring, or arbitrary-facet planning claims.
-#'
-#' This boundary is aligned with the package's current validation evidence,
-#' including the targeted `GPCM` recovery snapshot and the public workflow
-#' checks.
-#'
-#' @return A data.frame with one row per public helper family and columns:
+#' @return A data.frame of class `mfrmr_gpcm_capabilities` with one row per
+#' workflow family and columns:
 #' - `Area`
 #' - `Helpers`
 #' - `Status`
-#' - `PrimaryUse`
 #' - `Boundary`
-#' - `Evidence`
 #' - `RecommendedRoute`
-#' - `NextValidationStep`
 #'
 #' @section Typical workflow:
 #' 1. Call `gpcm_capability_matrix()` before using `GPCM` in a new workflow.
-#' 2. Stay on rows marked `supported` or `supported_with_caveat` for the
-#'    current release.
-#' 3. For `blocked` and `deferred` rows, read `RecommendedRoute` before choosing
-#'    a substitute workflow.
-#' 4. Treat `blocked` rows as explicit non-support, not as temporary omissions.
-#' 5. Treat `deferred` rows as future-extension targets rather than part of the
-#'    current user-facing support.
+#' 2. For `supported_with_caveat`, read `Boundary` before interpreting output.
+#' 3. For `blocked` or `deferred`, follow `RecommendedRoute` instead.
 #'
 #' @seealso [fit_mfrm()], [diagnose_mfrm()], [compute_information()],
 #'   [predict_mfrm_units()], [sample_mfrm_plausible_values()],
@@ -92,8 +50,78 @@
 #' @export
 gpcm_capability_matrix <- function(status = c("all", "supported", "supported_with_caveat", "blocked", "deferred")) {
   status <- match.arg(status)
+  out <- .gpcm_capability_registry(status)
+  out <- out[, c(
+    "Area", "Helpers", "Status", "Boundary", "RecommendedRoute"
+  ), drop = FALSE]
+  out$Helpers[out$Status == "deferred"] <- NA_character_
+  rownames(out) <- NULL
+  class(out) <- c("mfrmr_gpcm_capabilities", "data.frame")
+  out
+}
+
+#' @export
+#' @method print mfrmr_gpcm_capabilities
+#' @noRd
+print.mfrmr_gpcm_capabilities <- function(x, ...) {
+  status_levels <- c(
+    "supported", "supported_with_caveat", "blocked", "deferred"
+  )
+  counts <- table(factor(x$Status, levels = status_levels))
+  status_summary <- data.frame(
+    Status = names(counts),
+    Routes = as.integer(counts),
+    stringsAsFactors = FALSE
+  )
+  status_summary <- status_summary[status_summary$Routes > 0L, , drop = FALSE]
+
+  cat("mfrmr bounded-GPCM workflow availability\n\n")
+  print.data.frame(status_summary, row.names = FALSE)
+
+  max_rows <- min(nrow(x), 8L)
+  if (max_rows > 0L) {
+    cat("\nRoute preview\n")
+    preview <- x[seq_len(max_rows), c("Area", "Status"), drop = FALSE]
+    print.data.frame(preview, row.names = FALSE)
+  }
+  if (nrow(x) > max_rows) {
+    cat("\n... ", nrow(x) - max_rows, " more route(s).\n", sep = "")
+  }
+  cat(
+    "\nFilter by status, for example ",
+    "gpcm_capability_matrix(\"supported_with_caveat\").\n",
+    "Read Boundary and RecommendedRoute before interpreting a caveated or ",
+    "unavailable route.\n",
+    sep = ""
+  )
+  invisible(x)
+}
+
+.gpcm_capability_registry <- function(status = c("all", "supported", "supported_with_caveat", "blocked", "deferred")) {
+  status <- match.arg(status)
 
   out <- data.frame(
+    CapabilityID = c(
+      "core_fit_summary",
+      "exploratory_diagnostics",
+      "fixed_calibration_scoring",
+      "curve_category_views",
+      "summary_appendix",
+      "misfit_casebook",
+      "weighting_model_choice",
+      "linking_synthesis",
+      "simulation_recovery",
+      "apa_export_bundles",
+      "fair_average",
+      "design_forecasting",
+      "diagnostic_signal_screening",
+      "dff_screening",
+      "mcmc_backends",
+      "residual_bias_screening",
+      "scorefile_export",
+      "facets_score_review",
+      "optimization_replay"
+    ),
     Area = c(
       "Core fitting and summaries",
       "Exploratory diagnostics and residual follow-up",
@@ -109,10 +137,11 @@ gpcm_capability_matrix <- function(status = c("all", "supported", "supported_wit
       "Design evaluation and population forecasting under bounded GPCM",
       "Diagnostic and signal-detection design screening under bounded GPCM",
       "Differential facet functioning screening under bounded GPCM",
-      "MCMC and heavy-backend extensions",
+      "Posterior-predictive and Bayesian workflows",
       "Residual-bias screening under bounded GPCM",
       "Score-side scorefile export under bounded GPCM",
-      "FACETS output-contract score-side review"
+      "FACETS output-contract score-side review",
+      "Replayed optimization diagnostics under bounded GPCM"
     ),
     Helpers = c(
       "fit_mfrm(model = \"GPCM\"); summary(); print()",
@@ -139,10 +168,11 @@ gpcm_capability_matrix <- function(status = c("all", "supported", "supported_wit
       "evaluate_mfrm_design(); predict_mfrm_population()",
       "evaluate_mfrm_diagnostic_screening(); evaluate_mfrm_signal_detection()",
       "analyze_dff(); analyze_dif(); dif_interaction_table(); dif_report(); plot_dif_heatmap(); plot_dif_summary()",
-      "cpp11 backend promotion; posterior predictive computation; MCMC engine; Docker-based advanced runtime",
-      "estimate_bias()",
+      NA_character_,
+      "estimate_bias(); unexpected_after_bias_table()",
       "facets_output_file_bundle(include = \"score\")",
-      "facets_output_contract_review()"
+      "facets_output_contract_review()",
+      "estimation_iteration_report()"
     ),
     Status = c(
       "supported",
@@ -162,32 +192,13 @@ gpcm_capability_matrix <- function(status = c("all", "supported", "supported_wit
       "deferred",
       "supported_with_caveat",
       "supported_with_caveat",
-      "blocked"
-    ),
-    PrimaryUse = c(
-      "Estimate bounded GPCM models and inspect convergence, steps, and slope summaries.",
-      "Screen local misfit, residual structure, and agreement patterns after fitting.",
-      "Score new units or review design-weighted precision under the fitted GPCM calibration.",
-      "Inspect targeting, category progression, and category-probability behavior under the generalized kernel.",
-      "Check which direct tables and plots are draft-ready and export their summary tables.",
-      "Combine residual, strict marginal, unexpected-response, and displacement screens into one review queue.",
-      "Review whether bounded GPCM is introducing substantively acceptable discrimination-based reweighting.",
-      "Synthesize anchor, drift, and chain evidence into one exploratory review surface.",
-      "Generate or extract slope-aware simulation specifications, sample responses, and run direct parameter-recovery checks.",
-      "Produce caveated manuscript-draft prose, fit-based report bundles, manifests, replay scripts, or full export bundles.",
-      "Compute slope-aware element-conditional fair-average score adjustments for reporting tables.",
-      "Evaluate role-based future designs or forecast one future administration with repeated bounded-GPCM simulation/refit runs.",
-      "Run diagnostic-screening or signal-detection operating-characteristic studies.",
-      "Review group-by-facet differential-functioning patterns as slope-aware screening evidence.",
-      "Move beyond the current core-package release boundary.",
-      "Screen residual two-way interaction-bias cells under bounded GPCM at the screening tier.",
-      "Export observation-level slope-aware expected score, residual, probability, and slope fields for bounded GPCM.",
-      "Run the full FACETS-style output-contract score-side review that depends on validated free-discrimination score metrics."
+      "blocked",
+      "supported_with_caveat"
     ),
     Boundary = c(
       paste(
         "Requires an explicit step facet and currently keeps",
-        "`slope_facet == step_facet`; MML direct is the validated default,",
+        "`slope_facet == step_facet`; MML direct is the documented and verified default,",
         "and EM/hybrid fall back to direct."
       ),
       paste(
@@ -271,8 +282,8 @@ gpcm_capability_matrix <- function(status = c("all", "supported", "supported_wit
         "any stronger subgroup-comparison wording is used."
       ),
       paste(
-        "Future extensions, listed for transparency. Out of scope for",
-        "the current bounded GPCM branch."
+        "mfrmr does not currently provide posterior-predictive checks or MCMC",
+        "estimation for bounded GPCM."
       ),
       paste(
         "Bias point estimates use the slope-aware GPCM kernel: the bias",
@@ -283,7 +294,10 @@ gpcm_capability_matrix <- function(status = c("all", "supported", "supported_wit
         "columns use conditional plug-in information at the bias point",
         "estimate. All quantities hold theta, steps, slopes, and other",
         "facet estimates fixed, so they support screening and follow-up",
-        "review rather than standalone fairness claims."
+        "review rather than standalone fairness claims. The post-bias",
+        "unexpected-response comparison uses the same conditional fitted",
+        "quantities and is an in-sample descriptive screen; it does not show",
+        "that bias has been removed."
       ),
       paste(
         "Supported with caveat for package-native scorefile export only.",
@@ -295,31 +309,16 @@ gpcm_capability_matrix <- function(status = c("all", "supported", "supported_wit
         "SEs or establish operational score-scale equivalence."
       ),
       paste(
-        "Not yet generalized to the full FACETS-style output-contract review.",
+        "Limited to direct scorefile export rather than the full FACETS-style output-contract review.",
         "Direct scorefile export is available with caveats, but contract-wide",
         "coverage and metric claims still require a broader free-discrimination",
         "score-side review contract."
+      ),
+      paste(
+        "This is a slope-aware diagnostic replay from a reconstructed starting",
+        "state, not the exact optimizer history stored during fitting and not",
+        "an additional convergence test."
       )
-    ),
-    Evidence = c(
-      "covered by estimation and output-stability checks",
-      "covered by diagnostic and marginal-plot checks",
-      "covered by scoring and information checks",
-      "covered by curve, plot, and information checks",
-      "covered by reporting-route and summary-appendix export checks",
-      "covered by misfit-casebook and diagnostic checks",
-      "covered by weighting-review and information checks",
-      "covered by exploratory linking-review guardrail tests",
-      "covered by slope-aware simulation and recovery checks",
-      "covered by partial-reporting and export-bundle GPCM tests",
-      "covered by reduction-to-PCM and worked-example numerical-agreement tests",
-      "covered by caveated GPCM design-evaluation and forecast tests",
-      "covered by caveated GPCM diagnostic and signal-detection screening tests",
-      "covered by caveated GPCM DFF summary, report, and plot-payload tests",
-      "future extension",
-      "covered by an end-to-end test on a fitted GPCM example",
-      "covered by GPCM scorefile export, native uncertainty, and guardrail tests",
-      "not yet validated for free-discrimination score semantics"
     ),
     RecommendedRoute = c(
       paste(
@@ -390,12 +389,13 @@ gpcm_capability_matrix <- function(status = c("all", "supported", "supported_wit
         "`plot_dif_summary()` before writing claims."
       ),
       paste(
-        "Keep this outside the current public GPCM route and track it as",
-        "future-extension scope."
+        "Use the current MML fitting and fixed-calibration scoring routes, or",
+        "use external Bayesian software when posterior sampling is required."
       ),
       paste(
-        "Use `estimate_bias()` as screening evidence and follow up with explicit",
-        "facet-pair review or external validation before fairness language."
+        "Run `estimate_bias()` first; use `unexpected_after_bias_table()` only",
+        "for a descriptive before/after flag comparison, then confirm important",
+        "patterns with substantive facet-pair review or external validation."
       ),
       paste(
         "Use `facets_output_file_bundle(include = \"score\")` for a",
@@ -405,79 +405,13 @@ gpcm_capability_matrix <- function(status = c("all", "supported", "supported_wit
       ),
       paste(
         "Use direct fair-average tables and graph-only compatibility outputs;",
-        "use `gpcm_score_side_contract()` to inspect the unblock criteria,",
-        "and keep full FACETS output-contract reviews on the `RSM` / `PCM` route."
-      )
-    ),
-    NextValidationStep = c(
-      paste(
-        "Add identification and recovery tests before broadening beyond",
-        "`slope_facet == step_facet`."
+        "use package-native scorefile export with its stated caveats, and keep",
+        "full FACETS output-contract reviews on the `RSM` / `PCM` route."
       ),
       paste(
-        "Collect free-discrimination diagnostic comparison fixtures before",
-        "promoting residual screens to confirmatory wording."
-      ),
-      paste(
-        "Validate latent-regression and population-forecast semantics separately",
-        "from fixed-calibration scoring."
-      ),
-      "Keep kernel-reduction, curve-shape, and draw-free plot-data tests current.",
-      paste(
-        "Keep direct-output and report-bundle caveats synchronized before",
-        "broadening toward operational wording."
-      ),
-      "Add larger operational case-review examples if external GPCM fixtures become available.",
-      paste(
-        "Define a model-choice decision policy before turning reweighting review",
-        "into recommendation language."
-      ),
-      paste(
-        "Validate larger multi-wave GPCM anchor/drift and equating-chain",
-        "fixtures before upgrading exploratory wording to operational linking",
-        "claims."
-      ),
-      paste(
-        "Expand multi-seed recovery coverage across slope regimes and sparse",
-        "score-category support."
-      ),
-      paste(
-        "Keep partial-section availability tests synchronized with score-side",
-        "and design-forecasting guards."
-      ),
-      "Add external or simulation-backed checks for structural fair-average SEs.",
-      paste(
-        "Expand multi-seed fixtures across slope regimes, sparse score support,",
-        "and fit-derived specifications before using this route for stronger",
-        "operational design recommendations."
-      ),
-      paste(
-        "Expand multi-seed fixtures across slope regimes, local-dependence,",
-        "step/slope-facet misspecification, sparse score support, and",
-        "fit-derived specifications before using this route for stronger",
-        "screening recommendations."
-      ),
-      paste(
-        "Add larger subgroup fixtures and simulation operating-characteristic",
-        "checks before using DFF rows as fairness, invariance, or bias claims."
-      ),
-      paste(
-        "Decide posterior-predictive, MCMC, and backend scope only after the",
-        "score-side contract is stable."
-      ),
-      paste(
-        "Add simulation operating-characteristic or external fixture evidence",
-        "before using screening rows as fairness claims."
-      ),
-      paste(
-        "Add unit-slope PCM reduction checks and slope-variation fixtures before",
-        "broadening the scorefile route from package-native delta SEs toward",
-        "FACETS-style score-side SEs."
-      ),
-      paste(
-        "Complete the `gpcm_score_side_contract()` requirements, including",
-        "a FACETS-compatible free-discrimination score metric and output",
-        "contract, before enabling full score-side contract review."
+        "Use `summary(fit, profile = \"fit\", detail = \"brief\")` for the",
+        "recorded convergence result. Use `estimation_iteration_report()` only",
+        "to inspect a reconstructed trajectory and label it as replayed."
       )
     ),
     stringsAsFactors = FALSE
@@ -491,72 +425,77 @@ gpcm_capability_matrix <- function(status = c("all", "supported", "supported_wit
   out
 }
 
-#' Bounded GPCM Score-Side Export Contract
+#' Bounded GPCM Score-Side Availability
 #'
 #' @description
-#' Minimal contract table for the caveated bounded-`GPCM` scorefile route and
-#' the still-blocked full FACETS-style score-side review route.
+#' Show which bounded-`GPCM` score-side quantities are available, the limits on
+#' their interpretation, and the alternative route when a quantity is not
+#' available.
 #'
 #' @details
-#' This helper does not enable full FACETS-style score-side review. It records
-#' the requirements that separate the current caveated
-#' `facets_output_file_bundle(include = "score")` route from a future
-#' `facets_output_contract_review()` route for bounded `GPCM`.
-#'
-#' Use it as a release-maintenance checklist. Rows marked
-#' `implemented_with_caveat` support the current package-native bounded-`GPCM`
-#' scorefile route. Rows marked `required_for_full_facets_review` are still
-#' blockers for full FACETS-style output-contract review. Rows marked
-#' `validated_dependency` are already available in the package but are not
-#' sufficient by themselves to justify full FACETS score-side equivalence.
+#' Package-native expected-score and uncertainty fields are not FACETS
+#' score-side equivalents. A row marked `available_with_caveat` can be used
+#' within its stated `Limitation`; `supporting_route` identifies a related
+#' output that can inform interpretation; and `unavailable` identifies a route
+#' that should be replaced by the listed `Alternative`.
 #'
 #' @param status Which rows to return: `"all"` (default),
-#'   `"implemented_with_caveat"`, `"required_for_full_facets_review"`, or
-#'   `"validated_dependency"`.
+#'   `"available_with_caveat"`, `"supporting_route"`, or `"unavailable"`.
 #'
 #' @return A data.frame with columns:
-#' - `ContractArea`
-#' - `Requirement`
-#' - `CurrentStatus`
-#' - `ReleaseBoundary`
-#' - `ValidationTarget`
-#' - `ExitCriterion`
+#' - `Capability`
+#' - `Status`
+#' - `Limitation`
+#' - `Alternative`
 #'
 #' @seealso [gpcm_capability_matrix()], [gpcm_runtime_guard_coverage()],
 #'   [facets_output_contract_review()], [facets_output_file_bundle()]
 #' @examples
 #' gpcm_score_side_contract()
-#' gpcm_score_side_contract("implemented_with_caveat")
+#' gpcm_score_side_contract("unavailable")
 #' @concept GPCM boundaries
 #' @concept FACETS compatibility
 #' @export
-gpcm_score_side_contract <- function(status = c("all", "implemented_with_caveat", "required_for_full_facets_review", "validated_dependency")) {
-  status <- match.arg(status)
+gpcm_score_side_contract <- function(status = "all") {
+  status <- as.character(status[1])
+  public_status <- c(
+    "all", "available_with_caveat", "supporting_route", "unavailable"
+  )
+  legacy_status <- c(
+    "implemented_with_caveat", "required_for_full_facets_review",
+    "validated_dependency"
+  )
+  if (is.na(status) || !nzchar(status) ||
+      !status %in% c(public_status, legacy_status)) {
+    stop(
+      "`status` must be one of: ",
+      paste(sprintf('"%s"', public_status), collapse = ", "),
+      ".",
+      call. = FALSE
+    )
+  }
 
-  out <- data.frame(
-    ContractArea = c(
-      "score_estimand",
-      "measure_to_score_metric",
-      "score_uncertainty",
-      "facets_score_uncertainty_contract",
-      "structural_fair_average_se",
-      "pcm_reduction",
-      "export_schema",
-      "runtime_guard",
-      "release_wording"
-    ),
-    Requirement = c(
-      "Define the bounded-GPCM score-side estimand separately from Rasch-family measure-to-score semantics.",
-      "Specify how free-discrimination slopes enter expected-score summaries, residual score-side fields, and caveat columns.",
-      "Define native observation-level expected-score uncertainty and selectable score-side delta SEs under free discrimination before exporting bounded-GPCM score files.",
-      "Define the FACETS-compatible score-side uncertainty contract before enabling full output-contract review.",
-      "Use structural fair-average SEs where available and document when Hessian-based SEs are unavailable.",
-      "Preserve unit-slope bounded-GPCM reduction tests against the PCM route before any score-side export is advertised.",
-      "Map each scorefile column to a bounded-GPCM source, caveat, or explicit unavailable status.",
-      "Keep full FACETS output-contract review blocked until all required_for_full_facets_review rows are satisfied.",
-      "Keep sensitivity-model output separate from operational scoring and FACETS equivalence claims."
-    ),
-    CurrentStatus = c(
+  registry <- .gpcm_score_side_contract_registry()
+  if (status %in% legacy_status) {
+    registry <- registry[
+      registry$CompatibilityStatus == status, , drop = FALSE
+    ]
+  } else if (!identical(status, "all")) {
+    registry <- registry[registry$PublicStatus == status, , drop = FALSE]
+  }
+  out <- registry[, c(
+    "Capability", "PublicStatus", "Limitation", "Alternative"
+  ), drop = FALSE]
+  names(out)[names(out) == "PublicStatus"] <- "Status"
+  rownames(out) <- NULL
+  out
+}
+
+.gpcm_score_side_contract_registry <- function() {
+  data.frame(
+    # These selectors preserve calls accepted before the public status names
+    # were simplified. They are not returned by gpcm_score_side_contract().
+    CompatibilityStatus = c(
       rep("implemented_with_caveat", 3L),
       "required_for_full_facets_review",
       "validated_dependency",
@@ -565,78 +504,70 @@ gpcm_score_side_contract <- function(status = c("all", "implemented_with_caveat"
       "validated_dependency",
       "implemented_with_caveat"
     ),
-    ReleaseBoundary = c(
-      "scorefile_supported_with_caveat",
-      "scorefile_supported_with_caveat",
-      "scorefile_supported_with_caveat",
-      "full_facets_review_blocked",
-      "available as fair_average_table(fair_se = TRUE), not as scorefile support",
-      "available as reduction evidence, not as scorefile support",
-      "scorefile_supported_with_caveat",
-      "active guard for full FACETS review",
-      "scorefile_supported_with_caveat"
+    Capability = c(
+      "Package-native score estimand",
+      "Slope-aware expected-score fields",
+      "Native score uncertainty",
+      "FACETS-compatible score uncertainty",
+      "Structural fair-average uncertainty",
+      "Equal-discrimination PCM reference",
+      "Package-native scorefile export",
+      "Full FACETS score-side review",
+      "Reporting interpretation"
     ),
-    ValidationTarget = c(
-      "A named estimand and interpretation note for every exported bounded-GPCM scorefile quantity.",
-      "A deterministic scorefile contract with slope handling and identification conventions.",
-      "Native delta-method expected-score SEs and score-side delta SEs where MML diagnostics are available, with explicit not_requested/unavailable status otherwise.",
-      "A FACETS-compatible free-discrimination score metric plus uncertainty policy for contract-wide review fields.",
-      "Agreement checks that structural fair-average SE columns are present only when supported by the fitted object.",
-      "Numerical agreement checks showing bounded-GPCM unit-slope score-side quantities reduce to the PCM route.",
-      "A column contract that separates available, caveated, and unavailable bounded-GPCM scorefile fields.",
-      "Structured mfrmr_gpcm_scope_error before full FACETS output-contract review work begins.",
-      "NEWS, README, help pages, and validation artifacts that prevent operational scoring overclaims."
+    PublicStatus = c(
+      rep("available_with_caveat", 3L),
+      "unavailable",
+      "supporting_route",
+      "supporting_route",
+      "available_with_caveat",
+      "unavailable",
+      "available_with_caveat"
     ),
-    ExitCriterion = c(
-      "Scorefile help pages can name the bounded-GPCM estimand without borrowing Rasch-family wording.",
-      "Tests cover slope variation, slope_facet identification, expected-score conversion, and boundary categories.",
-      "Tests cover finite native expected-score and score-side delta SEs where available, plus explicit not_requested/unavailable status where not available.",
-      "facets_output_contract_review() can report bounded-GPCM score-side uncertainty without borrowing Rasch-family SE semantics.",
-      "The fair-average SE route remains traceable and does not imply FACETS score-side equivalence.",
-      "Unit-slope bounded-GPCM fixtures match PCM score-side outputs within stated tolerance.",
-      "facets_output_contract_review() can report bounded-GPCM score rows without silently emitting unsupported fields.",
-      "gpcm_runtime_guard_coverage() and score-side helper errors remain synchronized with gpcm_capability_matrix().",
-      "Release wording states whether the route is supported, supported_with_caveat, or still blocked."
+    Limitation = c(
+      "Expected-score and residual quantities are package-native bounded-GPCM outputs, not Rasch measure-to-score or FACETS-equivalent quantities.",
+      "Expected-score fields use the fitted slope structure and therefore depend on the declared step and slope facets.",
+      "Uncertainty fields require the relevant MML diagnostics; otherwise the scorefile reports an explicit unavailable status.",
+      "No FACETS-compatible free-discrimination score-side uncertainty definition is currently available.",
+      "Structural fair-average SEs are a separate table route and do not establish FACETS score-side equivalence.",
+      "Unit-slope agreement with PCM is an interpretation reference, not evidence that every free-slope score quantity is Rasch-equivalent.",
+      "The exported scorefile is package-native and must retain its bounded-GPCM caveat fields.",
+      "The full FACETS-style score-side review is unavailable for free-discrimination bounded GPCM.",
+      "Bounded-GPCM score-side output is sensitivity evidence, not an automatic operational scoring decision."
+    ),
+    Alternative = c(
+      "Use `facets_output_file_bundle(include = \"score\")` and report the package-native estimand explicitly.",
+      "Inspect the fitted step and slope summaries before interpreting exported expected scores or residuals.",
+      "Use an MML fit when uncertainty is required, or report the explicit unavailable status without substituting another SE.",
+      "Use the package-native scorefile with caveats; use an `RSM` or `PCM` fit when a full FACETS score-side review is required.",
+      "Use `fair_average_table(fair_se = TRUE)` directly and label the result as slope-aware element-conditional.",
+      "Fit a `PCM` reference when equal-discrimination score semantics are required for comparison.",
+      "Use `facets_output_file_bundle(include = \"score\")` and retain all status and caveat columns.",
+      "Keep full `facets_output_contract_review()` work on the `RSM` or `PCM` route.",
+      "Report bounded GPCM as a slope-aware sensitivity analysis and keep operational claims separate."
     ),
     stringsAsFactors = FALSE
   )
-
-  if (!identical(status, "all")) {
-    out <- out[out$CurrentStatus == status, , drop = FALSE]
-  }
-
-  rownames(out) <- NULL
-  out
 }
 
-#' Bounded GPCM Route-Boundary Coverage
+#' Unavailable GPCM Routes and Alternatives
 #'
 #' @description
-#' Public table showing how blocked or deferred bounded-`GPCM` capability rows
-#' are handled by the current release.
+#' List bounded-`GPCM` routes that are not currently available and show the
+#' supported alternative for each route.
 #'
 #' @details
-#' `gpcm_capability_matrix()` is the user-facing support matrix. This helper
-#' records which public helpers stop with `mfrmr_gpcm_scope_error` when called
-#' on a bounded `GPCM` path and which capability rows have no public route yet
-#' and are therefore documented as future-extension scope.
-#'
-#' Package checks use this table to keep out-of-scope `GPCM` behavior aligned
-#' with the capability matrix. A row with `GuardMode = "runtime_error"` should
-#' have `ExpectedConditionClass = "mfrmr_gpcm_scope_error"`. A row with
-#' `GuardMode = "roadmap_only"` records a documented future-extension target
-#' with no public helper to call in the current release.
+#' A `blocked` row names a helper that intentionally stops instead of returning
+#' an unsupported bounded-`GPCM` result. A `deferred` row has no public helper.
+#' In either case, read `Boundary` for the reason and `RecommendedRoute` for a
+#' currently available analysis route.
 #'
 #' @return A data.frame with columns:
 #' - `Area`
 #' - `Helper`
 #' - `Status`
-#' - `GuardMode`
-#' - `ExpectedConditionClass`
+#' - `Boundary`
 #' - `RecommendedRoute`
-#' - `NextValidationStep`
-#' - `TestRoute`
-#' - `Notes`
 #'
 #' @seealso [gpcm_capability_matrix()], [mfrmr_workflow_methods],
 #'   [mfrmr-package]
@@ -644,42 +575,50 @@ gpcm_score_side_contract <- function(status = c("all", "implemented_with_caveat"
 #' gpcm_runtime_guard_coverage()
 #' @export
 gpcm_runtime_guard_coverage <- function() {
-  matrix <- gpcm_capability_matrix()
+  matrix <- .gpcm_capability_registry()
+  registry <- .gpcm_runtime_guard_registry()
+  idx <- match(registry$CapabilityID, matrix$CapabilityID)
+  out <- data.frame(
+    Area = registry$Area,
+    Helper = registry$Helper,
+    Status = matrix$Status[idx],
+    Boundary = matrix$Boundary[idx],
+    RecommendedRoute = matrix$RecommendedRoute[idx],
+    stringsAsFactors = FALSE
+  )
+  rownames(out) <- NULL
+  out
+}
+
+.gpcm_runtime_guard_registry <- function() {
+  matrix <- .gpcm_capability_registry()
   guard <- data.frame(
-    Area = c(
-      "FACETS output-contract score-side review",
-      "MCMC and heavy-backend extensions"
+    CapabilityID = c(
+      "facets_score_review",
+      "mcmc_backends"
     ),
     Helper = c(
       "facets_output_contract_review()",
       NA_character_
     ),
-    GuardMode = c(
-      "runtime_error",
-      "roadmap_only"
+    AvailabilityMode = c(
+      "structured_error",
+      "no_public_helper"
     ),
-    ExpectedConditionClass = c(
+    ConditionClass = c(
       "mfrmr_gpcm_scope_error",
       NA_character_
-    ),
-    TestRoute = c(
-      "minimal mfrm_fit",
-      "no public runtime helper in 0.2.1"
-    ),
-    Notes = c(
-      "Full FACETS score-side contract review is intentionally unavailable for bounded GPCM; see gpcm_score_side_contract().",
-      "Documented as future-extension scope until a public backend/MCMC helper is exposed."
     ),
     stringsAsFactors = FALSE
   )
 
-  idx <- match(guard$Area, matrix$Area)
+  idx <- match(guard$CapabilityID, matrix$CapabilityID)
+  guard$Area <- matrix$Area[idx]
   guard$Status <- matrix$Status[idx]
   guard$RecommendedRoute <- matrix$RecommendedRoute[idx]
-  guard$NextValidationStep <- matrix$NextValidationStep[idx]
   guard <- guard[, c(
-    "Area", "Helper", "Status", "GuardMode", "ExpectedConditionClass",
-    "RecommendedRoute", "NextValidationStep", "TestRoute", "Notes"
+    "CapabilityID", "Area", "Helper", "Status", "AvailabilityMode",
+    "ConditionClass", "RecommendedRoute"
   )]
   rownames(guard) <- NULL
   guard

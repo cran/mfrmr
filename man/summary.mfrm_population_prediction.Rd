@@ -24,11 +24,11 @@ An object of class \code{summary.mfrm_population_prediction} with:
 \item \code{design_descriptor}: role-based description of design variables
 \item \code{planning_scope}: explicit record of the current planning contract
 \item \code{planning_constraints}: explicit record of mutable/locked design variables
-\item \code{planning_schema}: combined planner-schema contract
+\item \code{planning_schema}: structured planning metadata
 \item \code{gpcm_boundary}: bounded-\code{GPCM} caveat row when present
-\item \code{future_branch_active_summary}: compact deterministic summary of the
-schema-only future arbitrary-facet planning branch embedded in the current
-planning schema
+\item \code{structural_design_review}: deterministic structural review of the
+named-facet design grid; it is not
+a forecast-uncertainty result
 \item \code{ademp}: simulation-study metadata
 \item \code{notes}: interpretation notes
 }

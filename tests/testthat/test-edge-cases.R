@@ -56,13 +56,42 @@ test_that("fit_mfrm handles observation weights correctly", {
 
 # ---- Non-convergence detection ----
 
-test_that("fit_mfrm warns about non-convergence with tiny maxit", {
+test_that("fit_mfrm reports a deterministic iteration-limit failure", {
   d <- mfrmr:::sample_mfrm_data(seed = 123)
+  fit <- NULL
   expect_warning(
-    fit_mfrm(d, "Person", c("Rater", "Task", "Criterion"), "Score",
-             method = "JML", maxit = 1),
-    "did not fully converge"
+    fit <- fit_mfrm(
+      d, "Person", c("Rater", "Task", "Criterion"), "Score",
+      method = "JML", optimizer = "BFGS", maxit = 1, reltol = 1e-12
+    ),
+    "Optimization convergence review .*status = iteration_limit"
   )
+  expect_identical(fit$opt$convergence, 1L)
+  expect_identical(
+    fit$opt$optimizer_diagnostics$ConvergenceStatus,
+    "iteration_limit"
+  )
+  expect_identical(
+    fit$opt$optimizer_diagnostics$ConvergenceReason,
+    "iteration_limit_large_gradient"
+  )
+  expect_identical(
+    fit$opt$optimizer_diagnostics$ConvergenceSeverity,
+    "fail"
+  )
+  expect_false(fit$summary$InferenceReady[[1]])
+  expect_false(fit$opt$optimizer_polish$Triggered)
+  fit_summary <- summary(fit)
+  expect_true(any(grepl(
+    "Do not interpret or select estimates from this iteration-limited fit.",
+    fit_summary$next_actions,
+    fixed = TRUE
+  )))
+  expect_true(any(grepl(
+    "prespecified `maxit` sequence",
+    fit_summary$next_actions,
+    fixed = TRUE
+  )))
 })
 
 # ---- PCM model path ----

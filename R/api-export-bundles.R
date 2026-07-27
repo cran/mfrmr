@@ -75,8 +75,8 @@ render_r_object_literal <- function(x) {
 # Build the multi-line `fit_mfrm(...)` call used in `replay.R`, from
 # the `replay_inputs` list that `fit_mfrm()` stores on `fit$config`.
 # The helper emits every argument that materially affects the fit
-# (including the ones that were silently dropped before 0.1.6:
-# `missing_codes`, `mml_engine`, `slope_facet`, `anchor_policy`,
+# (including inputs that older serialized fits may not retain:
+# `missing_codes`, `optimizer`, `mml_engine`, `slope_facet`, `anchor_policy`,
 # `min_obs_per_*`, `min_common_anchors`, `facet_shrinkage`,
 # `facet_prior_sd`, `shrink_person`, `attach_diagnostics`).
 #
@@ -104,7 +104,7 @@ build_replay_fit_mfrm_lines <- function(replay_inputs,
     ri$rating_max <- as.integer(cfg$rating_max)
   }
 
-  # If the fit predates 0.1.6 (no `replay_inputs`), fall back to the
+  # If a serialized fit has no `replay_inputs`, fall back to the
   # subset that older releases recorded. This keeps cross-version
   # bundles loadable; it does not magically recover dropped args.
   if (length(ri) == 0L) {
@@ -162,6 +162,7 @@ build_replay_fit_mfrm_lines <- function(replay_inputs,
     emit("quad_points", as.integer(ri$quad_points %||% 31L)),
     emit("maxit", as.integer(ri$maxit %||% 400L)),
     emit("reltol", as.numeric(ri$reltol %||% 1e-6)),
+    emit("optimizer", as.character(ri$optimizer %||% "auto")),
     emit("mml_engine", as.character(ri$mml_engine %||% "direct")),
     emit("facet_shrinkage", as.character(ri$facet_shrinkage %||% "none"))
   )
@@ -389,8 +390,8 @@ validate_bias_results_input <- function(bias_results,
 #'   `read.csv()` will produce in a replay session.
 #'
 #' @details
-#' This helper captures the package-native equivalent of the Streamlit app's
-#' configuration export. It summarizes analysis settings, source columns,
+#' This helper creates a compact package-native analysis record. It summarizes
+#' analysis settings, source columns,
 #' anchoring information, and which downstream outputs are currently available.
 #'
 #' @section When to use this:
@@ -399,7 +400,9 @@ validate_bias_results_input <- function(bias_results,
 #' - [export_mfrm()] writes analysis tables only.
 #' - `build_mfrm_manifest()` records settings and available outputs.
 #' - [build_mfrm_replay_script()] creates an executable R script.
-#' - [export_mfrm_bundle()] writes a shareable folder of files.
+#' - [export_mfrm_bundle()] writes a project-folder reproducibility bundle;
+#'   review every included artifact for person-level or sensitive data before
+#'   sharing it.
 #'
 #' @section Output:
 #' The returned bundle has class `mfrm_manifest` and includes:
@@ -454,6 +457,7 @@ validate_bias_results_input <- function(bias_results,
 #' @seealso [export_mfrm_bundle()], [build_mfrm_replay_script()],
 #'   [make_anchor_table()], [reporting_checklist()]
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
 #'                 method = "JML", maxit = 30)
@@ -461,6 +465,7 @@ validate_bias_results_input <- function(bias_results,
 #' manifest <- build_mfrm_manifest(fit, diagnostics = diag)
 #' manifest$summary[, c("Model", "Method", "Observations", "Facets")]
 #' manifest$available_outputs[, c("Component", "Available")]
+#' }
 #' @export
 build_mfrm_manifest <- function(fit,
                                 diagnostics = NULL,
@@ -518,6 +523,7 @@ build_mfrm_manifest <- function(fit,
     person_table_replay_scope = NULL
   )
 
+  convergence <- mfrm_convergence_state(fit)
   summary_tbl <- data.frame(
     Model = as.character(cfg$model %||% NA_character_),
     Method = as.character(cfg$method_input %||% cfg$method %||% NA_character_),
@@ -530,7 +536,9 @@ build_mfrm_manifest <- function(fit,
     HasResidualPCA = export_has_residual_pca(diagnostics),
     FitPopulationActive = isTRUE(fit_population$active),
     FitPosteriorBasis = as.character(fit_population$posterior_basis %||% "legacy_mml"),
-    Converged = isTRUE(fit$summary$Converged %||% FALSE),
+    Converged = convergence$inference_ready,
+    OptimizerCodeZero = convergence$code_converged,
+    ConvergenceSeverity = convergence$severity,
     stringsAsFactors = FALSE
   )
 
@@ -603,7 +611,9 @@ build_mfrm_manifest <- function(fit,
   estimation_control <- dashboard_settings_table(list(
     maxit = as.integer(est_ctl$maxit %||% NA_integer_),
     reltol = as.numeric(est_ctl$reltol %||% NA_real_),
-    quad_points = as.integer(est_ctl$quad_points %||% NA_integer_)
+    quad_points = as.integer(est_ctl$quad_points %||% NA_integer_),
+    optimizer_requested = as.character(est_ctl$optimizer_requested %||% NA_character_),
+    optimizer_used = as.character(est_ctl$optimizer_used %||% NA_character_)
   ))
 
   anchor_summary <- as.data.frame(cfg$anchor_summary %||% data.frame(), stringsAsFactors = FALSE)
@@ -653,7 +663,7 @@ build_mfrm_manifest <- function(fit,
     input_mode = ctx$input_mode
   ))
 
-  # Hierarchical structure review (0.1.6). Lightweight descriptive
+  # Lightweight hierarchical-structure review
   # summary so manifests document the observed nesting / sample-adequacy
   # state even when the full review table is not stored alongside the fit.
   hierarchical_review <- tryCatch({
@@ -666,7 +676,7 @@ build_mfrm_manifest <- function(fit,
       FacetSampleSizeFlag = flag,
       FacetMinLevelN = min_n,
       FacetSparseCount = sparse_n,
-      # Extreme-person counts (added in 0.1.6). These were computed
+      # Extreme-person counts are computed
       # in fit$summary but not surfaced in any bundle; manifest consumers
       # need them to review JML extreme-score behaviour.
       ExtremeHighN = ext_hi,
@@ -713,7 +723,7 @@ build_mfrm_manifest <- function(fit,
     stringsAsFactors = FALSE
   ))
 
-  # Reproducibility additions (0.1.6 polish). These tables are always
+  # Reproducibility tables are always
   # populated (never NULL) so downstream writers can rely on the column
   # contract, but individual fields may be NA when the underlying
   # helper is unavailable (e.g. `digest` in Suggests but not installed).
@@ -741,7 +751,7 @@ build_mfrm_manifest <- function(fit,
 
   session_info_tbl <- build_mfrm_session_info_table()
 
-  # Empirical-Bayes shrinkage trail (0.1.6). Records the mode and per-facet
+  # Empirical-Bayes shrinkage trail records the mode and per-facet
   # tau^2 / mean shrinkage values so reproducibility bundles mirror
   # what `build_apa_outputs()` puts in the Methods narrative. When no
   # shrinkage is applied, return a single-row sentinel so downstream
@@ -796,7 +806,7 @@ build_mfrm_manifest <- function(fit,
       extra_areas = c(
         "Score-side scorefile export under bounded GPCM",
         "FACETS output-contract score-side review",
-        "Design planning and forecasting"
+        "Design evaluation and population forecasting under bounded GPCM"
       )
     ),
     settings = settings
@@ -804,7 +814,7 @@ build_mfrm_manifest <- function(fit,
   as_mfrm_bundle(out, "mfrm_manifest")
 }
 
-# ---- internal helpers for manifest reproducibility (0.1.6 polish) --------
+# ---- helpers for manifest reproducibility --------------------------------
 
 #' @keywords internal
 #' @noRd
@@ -948,10 +958,9 @@ build_mfrm_session_info_table <- function() {
 #' @param bundle_prefix Prefix used by the generated bundle exporter call.
 #'
 #' @details
-#' This helper mirrors the Streamlit app's reproducible-download idea, but uses
-#' `mfrmr`'s installed API rather than embedding a separate estimation engine.
-#' The generated script assumes the user has the package installed and provides
-#' a data file at `data_file`.
+#' This helper builds a reproducible script from `mfrmr`'s installed API. The
+#' generated script assumes the user has the package installed and provides a
+#' data file at `data_file`.
 #'
 #' Anchor and group-anchor constraints are embedded directly from the fitted
 #' object's stored configuration, so the script can replay anchored analyses
@@ -1008,12 +1017,14 @@ build_mfrm_session_info_table <- function() {
 #' @return A named list with class `mfrm_replay_script`.
 #' @seealso [build_mfrm_manifest()], [export_mfrm_bundle()], [run_mfrm_facets()]
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
 #'                 method = "JML", maxit = 30)
 #' replay <- build_mfrm_replay_script(fit, data_file = "your_data.csv")
 #' replay$summary[, c("ScriptMode", "ResidualPCA", "BiasPairs")]
 #' cat(substr(replay$script, 1, 120))
+#' }
 #' @export
 build_mfrm_replay_script <- function(fit,
                                      diagnostics = NULL,
@@ -1133,7 +1144,7 @@ build_mfrm_replay_script <- function(fit,
     paste0("# Model: ", as.character(cfg$model %||% NA_character_),
            " | Method: ", as.character(cfg$method_input %||% cfg$method %||% NA_character_),
            if (!identical(cfg$method_input %||% NULL, cfg$method %||% NULL)) {
-             paste0(" | InternalMethod: ", as.character(cfg$method %||% NA_character_))
+             paste0(" | ResolvedMethod: ", as.character(cfg$method %||% NA_character_))
            } else {
              ""
            }),
@@ -1211,6 +1222,7 @@ build_mfrm_replay_script <- function(fit,
       paste0("  quad_points = ", render_r_object_literal(as.integer(est_ctl$quad_points %||% 15L)), ","),
       paste0("  maxit = ", render_r_object_literal(as.integer(est_ctl$maxit %||% 400L)), ","),
       paste0("  reltol = ", render_r_object_literal(as.numeric(est_ctl$reltol %||% 1e-6)), ","),
+      paste0("  optimizer = ", render_r_object_literal(as.character(est_ctl$optimizer_requested %||% "auto")), ","),
       paste0("  top_n_interactions = ", render_r_object_literal(as.integer(top_n_interactions))),
       ")",
       "fit <- run$fit",
@@ -1527,7 +1539,7 @@ build_mfrm_replay_script <- function(fit,
       extra_areas = c(
         "Score-side scorefile export under bounded GPCM",
         "FACETS output-contract score-side review",
-        "Design planning and forecasting"
+        "Design evaluation and population forecasting under bounded GPCM"
       )
     ),
     anchors = anchor_df,
@@ -1540,7 +1552,7 @@ resolve_conquest_overlap_input <- function(fit = NULL,
                                            case = c("synthetic_latent_regression"),
                                            quad_points = 7L,
                                            maxit = 40L,
-                                           reltol = 1e-6) {
+                                           reltol = 1e-9) {
   if (!is.null(fit)) {
     if (inherits(fit, "mfrm_facets_run")) {
       fit <- fit$fit
@@ -1563,14 +1575,70 @@ resolve_conquest_overlap_input <- function(fit = NULL,
     model = "RSM",
     quad_points = as.integer(quad_points[1] %||% 7L),
     maxit = as.integer(maxit[1] %||% 40L),
-    reltol = as.numeric(reltol[1] %||% 1e-6)
+    reltol = as.numeric(reltol[1] %||% 1e-9)
   )
 
   list(
     fit = fit_obj$fit,
-    source = "internal_case",
+    source = "bundled_synthetic_example",
     case = case,
     truth = fit_obj$truth %||% NULL
+  )
+}
+
+conquest_overlap_mfrmr_fit_status <- function(fit) {
+  cfg <- fit$config %||% list()
+  est_ctl <- cfg$estimation_control %||% list()
+  replay <- cfg$replay_inputs %||% list()
+  fit_summary <- as.data.frame(fit$summary %||% data.frame(), stringsAsFactors = FALSE)
+  convergence <- mfrm_convergence_state(fit)
+
+  first_summary_value <- function(name, default = NULL) {
+    if (nrow(fit_summary) > 0L && name %in% names(fit_summary)) {
+      fit_summary[[name]][1]
+    } else {
+      default
+    }
+  }
+  first_finite <- function(...) {
+    values <- suppressWarnings(as.numeric(unlist(list(...), use.names = FALSE)))
+    values <- values[is.finite(values)]
+    if (length(values) == 0L) NA_real_ else values[1]
+  }
+  first_text <- function(...) {
+    values <- as.character(unlist(list(...), use.names = FALSE))
+    values <- trimws(values[!is.na(values) & nzchar(trimws(values))])
+    if (length(values) == 0L) NA_character_ else values[1]
+  }
+
+  maxit <- first_finite(est_ctl$maxit, replay$maxit)
+  reltol <- first_finite(est_ctl$reltol, replay$reltol)
+  engine <- first_text(
+    first_summary_value("MMLEngineUsed"),
+    est_ctl$mml_engine_used
+  )
+  terminal_gradient <- first_finite(
+    first_summary_value("TerminalGradientSupNorm")
+  )
+  inference_ready <- isTRUE(convergence$inference_ready)
+
+  list(
+    maxit = if (is.finite(maxit)) as.integer(maxit) else NA_integer_,
+    reltol = reltol,
+    engine = engine,
+    convergence_status = as.character(convergence$status),
+    convergence_severity = as.character(convergence$severity),
+    terminal_gradient_sup_norm = terminal_gradient,
+    inference_ready = inference_ready,
+    note = if (inference_ready) {
+      character(0)
+    } else {
+      paste(
+        "The mfrmr fit is not inference-ready.",
+        "Resolve the reported convergence issue and refit before using its",
+        "estimates for inferential comparison with ConQuest."
+      )
+    }
   )
 }
 
@@ -1583,7 +1651,10 @@ validate_conquest_overlap_fit <- function(fit) {
   facet_names <- as.character(cfg$facet_names %||% character(0))
 
   if (!identical(method, "MML")) {
-    stop("ConQuest overlap bundle currently supports only `MML` fits.", call. = FALSE)
+    stop(
+      "This ConQuest comparison bundle requires an MML fit. Refit with `method = \"MML\"`; use ordinary mfrmr tables for analyses outside this comparison scope.",
+      call. = FALSE
+    )
   }
   if (!(model %in% c("RSM", "PCM"))) {
     stop(
@@ -1599,7 +1670,7 @@ validate_conquest_overlap_fit <- function(fit) {
   }
   if (length(facet_names) != 1L) {
     stop(
-      "ConQuest overlap bundle is currently restricted to exact-overlap item-only fits with exactly one non-person facet.",
+      "The documented ConQuest comparison scope requires an item-only fit with exactly one non-person facet.",
       call. = FALSE
     )
   }
@@ -1640,7 +1711,7 @@ validate_conquest_overlap_fit <- function(fit) {
         length(fit$population$contrasts %||% list()) > 0L) {
       stop(
         "ConQuest overlap bundle currently requires one raw numeric person covariate column. ",
-        "Categorical/model-matrix-expanded covariates are stored for mfrmr scoring, but are not yet supported by this exact-overlap ConQuest export.",
+        "Categorical/model-matrix-expanded covariates are stored for mfrmr scoring but are outside this documented ConQuest comparison scope.",
         call. = FALSE
       )
     }
@@ -1735,14 +1806,19 @@ conquest_overlap_response_spec <- function(response_vars) {
 build_conquest_overlap_command_template <- function(data_file,
                                                     response_vars,
                                                     covariate,
-                                                    prefix = "conquest_overlap") {
+                                                    prefix = "conquest_overlap",
+                                                    quad_points = 31L) {
   response_spec <- conquest_overlap_response_spec(response_vars)
+  quad_points <- suppressWarnings(as.integer(quad_points[1]))
+  if (!is.finite(quad_points) || quad_points < 1L) {
+    stop("`quad_points` must be a positive integer for the ConQuest command.", call. = FALSE)
+  }
   c(
     "/*",
     "Generated by mfrmr::build_conquest_overlap_bundle()",
-    "Scope: ordered-response RSM/PCM, presently operationalized as binary item-only latent regression with one numeric person covariate.",
-    "Official-manual alignment: block comments, CSV PID/keeps widths, and machine-readable export/show CSV outputs are requested.",
-    "Combine exported reg_coefficients and covariance outputs into the population table before review normalization.",
+    "Scope: ordered-response RSM/PCM, operationalized here as binary item-only latent-regression MML with one numeric person covariate.",
+    "The command requests machine-readable parameter, regression, covariance, and case-EAP CSV outputs.",
+    "Pass the four CSV exports to mfrmr::normalize_conquest_overlap_exports().",
     "Confirm local ConQuest syntax/options before treating this as an external benchmark run.",
     "*/",
     paste0(
@@ -1755,15 +1831,15 @@ build_conquest_overlap_command_template <- function(data_file,
       ", keepswidth=32",
       ";"
     ),
-    "score (0,1);",
     paste0("regression ", as.character(covariate[1]), ";"),
     "model item;",
-    "estimate;",
+    paste0("estimate ! method=quadrature, nodes=", quad_points, ", fit=no, stderr=quick;"),
     paste0("export parameters ! filetype=csv >> ", as.character(prefix[1]), "_conquest_parameters.csv;"),
     paste0("export reg_coefficients ! filetype=csv >> ", as.character(prefix[1]), "_conquest_reg_coefficients.csv;"),
     paste0("export covariance ! filetype=csv >> ", as.character(prefix[1]), "_conquest_covariance.csv;"),
     paste0("show cases ! estimates=eap, filetype=csv, regressors=yes >> ", as.character(prefix[1]), "_conquest_cases_eap.csv;"),
-    paste0("show parameters ! tables=1:4, estimates=eap >> ", as.character(prefix[1]), "_conquest_parameters_review.txt;")
+    paste0("show parameters ! tables=1:2:3:4, estimates=eap >> ", as.character(prefix[1]), "_conquest_parameters_review.txt;"),
+    "quit;"
   )
 }
 
@@ -1782,14 +1858,21 @@ build_conquest_overlap_output_contract <- function(prefix = "conquest_overlap") 
       "export reg_coefficients ! filetype=csv",
       "export covariance ! filetype=csv",
       "show cases ! estimates=eap, filetype=csv, regressors=yes",
-      "show parameters ! tables=1:4, estimates=eap"
+      "show parameters ! tables=1:2:3:4, estimates=eap"
     ),
     ReviewHandoff = c(
-      "Use as the extracted item-estimate table after confirming item labels/parameter rows.",
-      "Combine into the normalized population table as regression-coefficient rows.",
-      "Combine into the normalized population table as the residual variance/covariance row.",
-      "Use as the normalized case-level EAP table after selecting the EAP column.",
+      "Pass to normalize_conquest_overlap_exports() as the item-parameter file.",
+      "Pass to normalize_conquest_overlap_exports() as the regression file.",
+      "Pass to normalize_conquest_overlap_exports() as the covariance file.",
+      "Pass to normalize_conquest_overlap_exports() as the case-EAP file.",
       "Human-readable review only; do not treat this text file as a parsed review table."
+    ),
+    DataHandling = c(
+      "Review item labels and analysis metadata before sharing.",
+      "Review covariate labels and analysis metadata before sharing.",
+      "Review covariance results and analysis metadata before sharing.",
+      "Contains person identifiers and person-level EAP estimates; restricted handling is required.",
+      "Review parameter labels and analysis metadata before sharing."
     ),
     RequiredForReview = c(TRUE, TRUE, TRUE, TRUE, FALSE),
     stringsAsFactors = FALSE
@@ -1800,15 +1883,49 @@ build_conquest_overlap_readme <- function(summary_tbl,
                                           comparison_targets,
                                           output_contract,
                                           command_file,
-                                          data_file) {
+                                          data_file,
+                                          mfrmr_fit_status) {
+  display_value <- function(x, scientific = FALSE) {
+    if (length(x) == 0L || is.na(x[1])) return("not recorded")
+    if (isTRUE(scientific)) {
+      x <- suppressWarnings(as.numeric(x[1]))
+      if (!is.finite(x)) return("not recorded")
+      return(format(x, scientific = TRUE, digits = 6, trim = TRUE))
+    }
+    as.character(x[1])
+  }
+  status_lines <- c(
+    paste0("- MML engine used: ", display_value(mfrmr_fit_status$engine)),
+    paste0("- Maximum optimizer iterations: ", display_value(mfrmr_fit_status$maxit)),
+    paste0("- Relative convergence tolerance: ", display_value(mfrmr_fit_status$reltol, scientific = TRUE)),
+    paste0("- Convergence status: ", display_value(mfrmr_fit_status$convergence_status)),
+    paste0("- Convergence severity: ", display_value(mfrmr_fit_status$convergence_severity)),
+    paste0("- Terminal gradient sup-norm: ", display_value(mfrmr_fit_status$terminal_gradient_sup_norm, scientific = TRUE)),
+    paste0("- Inference ready: ", if (isTRUE(mfrmr_fit_status$inference_ready)) "yes" else "no")
+  )
+  status_note <- as.character(mfrmr_fit_status$note %||% character(0))
+
   c(
     "mfrmr ConQuest overlap bundle",
     "",
     "Purpose:",
-    "This bundle packages one exact-overlap comparison case for ConQuest and mfrmr.",
+    "This bundle packages one case within the documented comparison scope for ConQuest and mfrmr.",
     "The supported scope is intentionally narrow: ordered-response RSM/PCM,",
     "currently operationalized as binary item-only latent regression,",
     "unidimensional MML, and one numeric person covariate.",
+    "",
+    "mfrmr fit status:",
+    status_lines,
+    if (length(status_note) > 0L) c("", paste0("Important: ", status_note)) else character(0),
+    "",
+    "Privacy and data handling:",
+    "This is a controlled analysis bundle, not a deidentified or automatically shareable export.",
+    "The long and wide response files contain person identifiers and item responses.",
+    "The person-data file contains person identifiers and the person covariate.",
+    "The mfrmr case-EAP file and ConQuest case-EAP output contain person identifiers and person-level estimates.",
+    "Use an approved restricted location and review, pseudonymize, or redact every file as required before sharing.",
+    "Setting an identifier to a study code is not, by itself, a guarantee of deidentification.",
+    "See *_privacy_notice.csv for the artifact-level handling inventory.",
     "",
     "Key files:",
     paste0("- Wide CSV for ConQuest template: ", as.character(data_file[1])),
@@ -1826,8 +1943,14 @@ build_conquest_overlap_readme <- function(summary_tbl,
       "- ",
       output_contract$ExternalFile,
       ": ",
-      output_contract$ReviewHandoff
+      output_contract$ReviewHandoff,
+      " Data handling: ",
+      output_contract$DataHandling
     ),
+    "",
+    "After the ConQuest run (once the mfrmr fit is inference-ready):",
+    "Use normalize_conquest_overlap_exports() with the four generated CSV files,",
+    "then pass the returned object to review_conquest_overlap().",
     "",
     "Comparison rules:",
     paste0(
@@ -1846,6 +1969,50 @@ build_conquest_overlap_readme <- function(summary_tbl,
   )
 }
 
+conquest_overlap_privacy_notice <- function(prefix) {
+  prefix <- as.character(prefix[1] %||% "conquest_overlap")
+  data.frame(
+    Artifact = c(
+      paste0(prefix, "_long.csv"),
+      paste0(prefix, "_wide.csv"),
+      paste0(prefix, "_person_data.csv"),
+      paste0(prefix, "_mfrmr_case_eap.csv"),
+      paste0(prefix, "_conquest_cases_eap.csv"),
+      "in_memory_bundle"
+    ),
+    Contains = c(
+      "Person identifiers, item labels, and item responses",
+      "Person identifiers, person covariate, and item responses",
+      "Person identifiers and person covariate",
+      "Person identifiers, person-level EAP estimates, uncertainty, and covariate",
+      "Person identifiers and ConQuest person-level EAP estimates",
+      "All bundle tables listed above, including person-level data"
+    ),
+    PrivacyClass = "potentially_identifying_analysis_data",
+    Deidentified = FALSE,
+    RequiredHandling = paste0(
+      "Keep in an approved restricted location; apply the study's required ",
+      "pseudonymization or redaction and review before sharing."
+    ),
+    stringsAsFactors = FALSE
+  )
+}
+
+conquest_overlap_component_sensitivity <- function(component) {
+  component <- as.character(component[1] %||% "")
+  if (component %in% c("response_long", "response_wide")) {
+    return("contains_person_identifiers_and_item_responses")
+  }
+  if (identical(component, "person_data")) {
+    return("contains_person_identifiers_and_covariates")
+  }
+  if (identical(component, "mfrmr_case_eap")) {
+    return("contains_person_identifiers_and_person_estimates")
+  }
+  if (identical(component, "privacy_notice")) return("data_handling_metadata")
+  "review_before_sharing"
+}
+
 #' Build a scoped ConQuest-overlap bundle
 #'
 #' @param fit Optional output from [fit_mfrm()] or [run_mfrm_facets()]. When
@@ -1859,8 +2026,12 @@ build_conquest_overlap_readme <- function(summary_tbl,
 #' @param overwrite If `FALSE`, refuse to overwrite existing files.
 #' @param quad_points Quadrature points used when `fit = NULL` and the
 #'   overlap case is fit on the fly.
-#' @param maxit Maximum optimizer iterations used when `fit = NULL`.
+#' @param maxit Maximum optimizer iterations used when `fit = NULL`. The
+#'   fitted object's actual value is recorded in the returned summary and
+#'   settings.
 #' @param reltol Relative convergence tolerance used when `fit = NULL`.
+#'   Default `1e-9`. The fitted object's actual value is recorded in the
+#'   returned summary and settings.
 #'
 #' @details
 #' This helper prepares a narrow ConQuest comparison bundle for an `RSM` / `PCM`
@@ -1878,20 +2049,35 @@ build_conquest_overlap_readme <- function(summary_tbl,
 #' The returned bundle standardizes the responses to `{0, 1}`, pivots them to a
 #' one-row-per-person wide CSV, stores the corresponding person covariates, and
 #' records the `mfrmr` estimates that should be compared externally.
+#' It also records the actual `mfrmr` optimizer controls, MML engine, terminal
+#' gradient, convergence status and severity, and inference-readiness decision.
+#' A fit that is not inference-ready remains available for convergence review,
+#' but its estimates should not be used for inferential comparison with
+#' ConQuest until the convergence issue is resolved and the model is refit.
 #'
 #' The `conquest_command` component is a conservative starting template, not a
 #' guaranteed version-invariant automation. The `conquest_output_contract`
 #' component records which requested external output should feed each
 #' normalized review table.
-#' Use [normalize_conquest_overlap_files()] or
-#' [normalize_conquest_overlap_tables()] and then [review_conquest_overlap()] only
-#' after the matching ConQuest run has been executed externally and the relevant
-#' output tables have been extracted. The bundle and command template alone are
-#' not external validation evidence.
+#' Use `normalize_conquest_overlap_exports()` for the four CSV files requested
+#' by the generated command. [normalize_conquest_overlap_files()] and
+#' [normalize_conquest_overlap_tables()] remain available for already-extracted
+#' custom tables. Then use [review_conquest_overlap()] only after the matching
+#' ConQuest run has been executed externally. The bundle and command template
+#' alone are not external validation evidence.
+#'
+#' This is a controlled analysis bundle, not a deidentified or automatically
+#' shareable export. Response files contain person identifiers and responses;
+#' the person-data file contains identifiers and covariates; and case-EAP files
+#' contain identifiers and person-level estimates. When files are written, the
+#' helper emits a warning and writes an artifact-level privacy notice. Apply the
+#' study's data-handling policy before sharing or moving any bundle file.
 #'
 #' @section Comparison targets:
-#' - regression slope: compare directly;
-#' - residual variance `sigma2`: compare directly;
+#' - regression slope: compare after confirming identical covariate coding and
+#'   population-model parameterization;
+#' - residual variance `sigma2`: compare after confirming the same latent-scale
+#'   and variance parameterization;
 #' - item estimates: compare after centering because the Rasch location origin
 #'   remains constraint-dependent;
 #' - case EAP estimates: compare as posterior summaries under the fitted
@@ -1899,8 +2085,8 @@ build_conquest_overlap_readme <- function(summary_tbl,
 #'
 #' @section Output:
 #' The returned object has class `mfrm_conquest_overlap_bundle` and includes:
-#' - `summary`: one-row scope summary with posterior-basis and
-#'   population-model review fields
+#' - `summary`: one-row scope summary with posterior-basis, population-model,
+#'   optimizer-control, and convergence-review fields
 #' - `comparison_targets`: comparison rules for the exported tables
 #' - `conquest_output_contract`: requested ConQuest outputs and review handoff
 #' - `response_long`: long-format binary response data used by the bundle
@@ -1912,18 +2098,21 @@ build_conquest_overlap_readme <- function(summary_tbl,
 #' - `mfrmr_case_eap`: posterior EAP summaries for the fitted persons
 #' - `conquest_command`: conservative ConQuest command template
 #' - `written_files`: file inventory when `output_dir` is supplied
-#' - `settings`: bundle settings
+#' - `privacy_notice`: artifact-level sensitive-data inventory
+#' - `settings`: bundle settings, including the actual `mfrmr` fit controls
+#'   and convergence state
 #' - `notes`: interpretation notes
 #'
 #' @return A named list with class `mfrm_conquest_overlap_bundle`.
-#' @seealso [normalize_conquest_overlap_files()],
-#'   [normalize_conquest_overlap_tables()], [review_conquest_overlap()],
+#' @seealso [normalize_conquest_overlap_files()], [normalize_conquest_overlap_tables()],
+#'   [review_conquest_overlap()],
 #'   [reference_case_benchmark()], [build_mfrm_replay_script()],
 #'   [export_mfrm_bundle()]
 #' @examples
 #' \donttest{
 #' bundle <- build_conquest_overlap_bundle(quad_points = 3, maxit = 30)
 #' bundle$summary[, c("Case", "Facet", "Covariate", "Persons", "Items")]
+#' summary(bundle)$mfrmr_fit_status
 #' summary(bundle)$conquest_command_scope
 #' summary(bundle)$conquest_output_contract
 #' cat(substr(bundle$conquest_command, 1, 120))
@@ -1936,7 +2125,7 @@ build_conquest_overlap_bundle <- function(fit = NULL,
                                           overwrite = FALSE,
                                           quad_points = 7L,
                                           maxit = 40L,
-                                          reltol = 1e-6) {
+                                          reltol = 1e-9) {
   resolved <- resolve_conquest_overlap_input(
     fit = fit,
     case = case,
@@ -1954,6 +2143,14 @@ build_conquest_overlap_bundle <- function(fit = NULL,
 
   fit <- prepared$fit
   pop <- fit$population
+  mfrmr_fit_status <- conquest_overlap_mfrmr_fit_status(fit)
+  conquest_quad_points <- suppressWarnings(as.integer(
+    fit$config$quad_points %||% quad_points %||% 31L
+  ))
+  if (length(conquest_quad_points) != 1L ||
+      !is.finite(conquest_quad_points) || conquest_quad_points < 1L) {
+    stop("The fitted quadrature-point count is unavailable for the ConQuest comparison.", call. = FALSE)
+  }
   population_formula <- pop$formula %||% fit$config$population_formula %||% NULL
   population_formula_label <- if (is.null(population_formula)) {
     NA_character_
@@ -1973,8 +2170,11 @@ build_conquest_overlap_bundle <- function(fit = NULL,
     Parameter = c(names(pop$coefficients %||% numeric(0)), "sigma2"),
     Estimate = c(as.numeric(pop$coefficients %||% numeric(0)), as.numeric(pop$sigma2)),
     ComparisonRule = c(
-      rep("Direct comparison for numeric regression coefficients.", length(pop$coefficients %||% numeric(0))),
-      "Direct comparison for residual latent variance."
+      rep(
+        "Compare only after confirming identical covariate coding and population-model parameterization.",
+        length(pop$coefficients %||% numeric(0))
+      ),
+      "Compare only after confirming the same latent-scale and variance parameterization."
     ),
     stringsAsFactors = FALSE
   )
@@ -2013,15 +2213,16 @@ build_conquest_overlap_bundle <- function(fit = NULL,
       "mfrmr_case_eap"
     ),
     ComparisonRule = c(
-      "Compare directly.",
+      "Compare on the reported scale only after confirming identical covariate coding and population-model parameterization.",
       "Compare only if the external calibration uses the same item-centering/location convention.",
-      "Compare directly.",
+      "Compare only after confirming the same latent-scale and variance parameterization.",
       "Compare after centering the item estimates.",
       "Compare as posterior EAP summaries under the fitted population model."
     ),
     stringsAsFactors = FALSE
   )
   output_contract <- build_conquest_overlap_output_contract(prefix = prefix)
+  privacy_notice <- conquest_overlap_privacy_notice(prefix = prefix)
 
   wide_file <- paste0(prefix, "_wide.csv")
   command_file <- paste0(prefix, ".cqc")
@@ -2030,7 +2231,8 @@ build_conquest_overlap_bundle <- function(fit = NULL,
       data_file = wide_file,
       response_vars = wide_parts$item_map$ResponseVar,
       covariate = prepared$covariate,
-      prefix = prefix
+      prefix = prefix,
+      quad_points = conquest_quad_points
     ),
     collapse = "\n"
   )
@@ -2039,19 +2241,78 @@ build_conquest_overlap_bundle <- function(fit = NULL,
     Component = character(0),
     Format = character(0),
     Path = character(0),
+    DataHandling = character(0),
     stringsAsFactors = FALSE
   )
   add_written <- function(component, format, path) {
     written_files <<- rbind(
       written_files,
-      data.frame(Component = component, Format = format, Path = path, stringsAsFactors = FALSE)
+      data.frame(
+        Component = component,
+        Format = format,
+        Path = path,
+        DataHandling = conquest_overlap_component_sensitivity(component),
+        stringsAsFactors = FALSE
+      )
     )
   }
+
+  make_summary_table <- function(files_written) {
+    data.frame(
+      Case = resolved$case,
+      InputSource = resolved$source,
+      Facet = prepared$facet_name,
+      Covariate = prepared$covariate,
+      Persons = length(prepared$person_levels),
+      Items = length(prepared$item_levels),
+      RowsLong = nrow(prepared$long),
+      Method = as.character(fit$config$method_input %||% fit$config$method %||% NA_character_),
+      Model = as.character(fit$config$model %||% NA_character_),
+      PosteriorBasis = as.character(fit$config$posterior_basis %||% pop$posterior_basis %||% "population_model"),
+      PopulationFormula = population_formula_label,
+      PopulationDesignColumns = paste(population_design_columns, collapse = ", "),
+      PopulationCoefficientCount = as.integer(length(population_coefficients)),
+      PopulationResidualVariance = suppressWarnings(as.numeric(pop$sigma2 %||% NA_real_)),
+      PopulationIncludedPersons = as.integer(length(pop$included_persons %||% character(0))),
+      PopulationOmittedPersons = as.integer(length(pop$omitted_persons %||% character(0))),
+      PopulationResponseRowsRetained = suppressWarnings(as.integer(pop$response_rows_retained %||% NA_integer_)),
+      PopulationResponseRowsOmitted = suppressWarnings(as.integer(pop$response_rows_omitted %||% NA_integer_)),
+      MfrmrQuadraturePoints = conquest_quad_points,
+      ConQuestQuadratureNodes = conquest_quad_points,
+      MfrmrMaxit = mfrmr_fit_status$maxit,
+      MfrmrReltol = mfrmr_fit_status$reltol,
+      MfrmrMMLEngineUsed = mfrmr_fit_status$engine,
+      MfrmrConvergenceStatus = mfrmr_fit_status$convergence_status,
+      MfrmrConvergenceSeverity = mfrmr_fit_status$convergence_severity,
+      MfrmrTerminalGradientSupNorm = mfrmr_fit_status$terminal_gradient_sup_norm,
+      MfrmrInferenceReady = mfrmr_fit_status$inference_ready,
+      PrivacyClass = "potentially_identifying_analysis_data",
+      Deidentified = FALSE,
+      ShareableWithoutReview = FALSE,
+      FilesWritten = as.integer(files_written),
+      stringsAsFactors = FALSE
+    )
+  }
+
+  notes <- c(
+    "This bundle is intentionally restricted to the documented binary item-only latent-regression comparison case.",
+    "Use the ConQuest command text as a conservative template, not as a claim of guaranteed version-invariant automation.",
+    "Item estimates should be centered before external comparison.",
+    "This bundle contains person identifiers, responses, covariates, and case-EAP results; it is not deidentified or automatically shareable.",
+    mfrmr_fit_status$note
+  )
 
   if (!is.null(output_dir)) {
     output_dir <- normalizePath(as.character(output_dir[1]), winslash = "/", mustWork = FALSE)
     dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
     overwrite <- isTRUE(overwrite)
+    warning(
+      "The ConQuest overlap bundle contains person identifiers and sensitive ",
+      "person-level data in response, covariate, and case-EAP files. It is not ",
+      "deidentified or automatically shareable; keep it in an approved ",
+      "restricted location and review every file before sharing.",
+      call. = FALSE
+    )
 
     write_csv <- function(df, file, component) {
       path <- file.path(output_dir, file)
@@ -2079,61 +2340,23 @@ build_conquest_overlap_bundle <- function(fit = NULL,
     write_csv(case_eap, paste0(prefix, "_mfrmr_case_eap.csv"), "mfrmr_case_eap")
     write_csv(comparison_targets, paste0(prefix, "_comparison_targets.csv"), "comparison_targets")
     write_csv(output_contract, paste0(prefix, "_conquest_output_contract.csv"), "conquest_output_contract")
+    write_csv(privacy_notice, paste0(prefix, "_privacy_notice.csv"), "privacy_notice")
     write_text(command_text, command_file, "conquest_command")
     write_text(
       build_conquest_overlap_readme(
-        summary_tbl = data.frame(
-          Case = resolved$case,
-          Facet = prepared$facet_name,
-          Covariate = prepared$covariate,
-          Persons = length(prepared$person_levels),
-          Items = length(prepared$item_levels),
-          PosteriorBasis = as.character(fit$config$posterior_basis %||% pop$posterior_basis %||% "population_model"),
-          PopulationFormula = population_formula_label,
-          PopulationDesignColumns = paste(population_design_columns, collapse = ", "),
-          PopulationResidualVariance = suppressWarnings(as.numeric(pop$sigma2 %||% NA_real_)),
-          PopulationOmittedPersons = as.integer(length(pop$omitted_persons %||% character(0))),
-          PopulationResponseRowsOmitted = suppressWarnings(as.integer(pop$response_rows_omitted %||% NA_integer_)),
-          stringsAsFactors = FALSE
-        ),
+        summary_tbl = make_summary_table(nrow(written_files) + 1L),
         comparison_targets = comparison_targets,
         output_contract = output_contract,
         command_file = command_file,
-        data_file = wide_file
+        data_file = wide_file,
+        mfrmr_fit_status = mfrmr_fit_status
       ),
       paste0(prefix, "_README.txt"),
       "readme"
     )
   }
 
-  summary_tbl <- data.frame(
-    Case = resolved$case,
-    InputSource = resolved$source,
-    Facet = prepared$facet_name,
-    Covariate = prepared$covariate,
-    Persons = length(prepared$person_levels),
-    Items = length(prepared$item_levels),
-    RowsLong = nrow(prepared$long),
-    Method = as.character(fit$config$method_input %||% fit$config$method %||% NA_character_),
-    Model = as.character(fit$config$model %||% NA_character_),
-    PosteriorBasis = as.character(fit$config$posterior_basis %||% pop$posterior_basis %||% "population_model"),
-    PopulationFormula = population_formula_label,
-    PopulationDesignColumns = paste(population_design_columns, collapse = ", "),
-    PopulationCoefficientCount = as.integer(length(population_coefficients)),
-    PopulationResidualVariance = suppressWarnings(as.numeric(pop$sigma2 %||% NA_real_)),
-    PopulationIncludedPersons = as.integer(length(pop$included_persons %||% character(0))),
-    PopulationOmittedPersons = as.integer(length(pop$omitted_persons %||% character(0))),
-    PopulationResponseRowsRetained = suppressWarnings(as.integer(pop$response_rows_retained %||% NA_integer_)),
-    PopulationResponseRowsOmitted = suppressWarnings(as.integer(pop$response_rows_omitted %||% NA_integer_)),
-    FilesWritten = nrow(written_files),
-    stringsAsFactors = FALSE
-  )
-
-  notes <- c(
-    "This bundle is intentionally restricted to a binary item-only latent-regression overlap case.",
-    "Use the ConQuest command text as a conservative template, not as a claim of guaranteed version-invariant automation.",
-    "Item estimates should be centered before external comparison."
-  )
+  summary_tbl <- make_summary_table(nrow(written_files))
 
   settings <- dashboard_settings_table(list(
     case = resolved$case,
@@ -2142,6 +2365,18 @@ build_conquest_overlap_bundle <- function(fit = NULL,
     covariate = prepared$covariate,
     output_dir = if (!is.null(output_dir)) output_dir else NA_character_,
     prefix = as.character(prefix[1]),
+    mfrmr_quad_points = conquest_quad_points,
+    conquest_quadrature_nodes = conquest_quad_points,
+    mfrmr_maxit = mfrmr_fit_status$maxit,
+    mfrmr_reltol = mfrmr_fit_status$reltol,
+    mfrmr_mml_engine_used = mfrmr_fit_status$engine,
+    mfrmr_convergence_status = mfrmr_fit_status$convergence_status,
+    mfrmr_convergence_severity = mfrmr_fit_status$convergence_severity,
+    mfrmr_terminal_gradient_sup_norm = mfrmr_fit_status$terminal_gradient_sup_norm,
+    mfrmr_inference_ready = mfrmr_fit_status$inference_ready,
+    privacy_class = "potentially_identifying_analysis_data",
+    deidentified = FALSE,
+    shareable_without_review = FALSE,
     overwrite = isTRUE(overwrite)
   ))
 
@@ -2158,6 +2393,7 @@ build_conquest_overlap_bundle <- function(fit = NULL,
     mfrmr_case_eap = case_eap,
     conquest_command = command_text,
     written_files = written_files,
+    privacy_notice = privacy_notice,
     settings = settings,
     notes = notes
   )
@@ -2244,7 +2480,7 @@ normalize_conquest_overlap_table_component <- function(df,
                                                        keep_extra_columns = TRUE) {
   estimate_numeric <- suppressWarnings(as.numeric(df[[estimate_col]]))
   out <- data.frame(
-    Identifier = as.character(df[[id_col]]),
+    Identifier = trimws(as.character(df[[id_col]])),
     Estimate = estimate_numeric,
     EstimateNonNumeric = flag_conquest_overlap_non_numeric(df[[estimate_col]], estimate_numeric),
     stringsAsFactors = FALSE
@@ -2335,11 +2571,16 @@ coerce_conquest_overlap_tables_for_audit <- function(conquest_population,
         call. = FALSE
       )
     }
+    source_settings <- as.data.frame(
+      conquest_population$settings %||% data.frame(),
+      stringsAsFactors = FALSE
+    )
     return(list(
       conquest_population = as.data.frame(conquest_population$conquest_population, stringsAsFactors = FALSE),
       conquest_item_estimates = as.data.frame(conquest_population$conquest_item_estimates, stringsAsFactors = FALSE),
       conquest_case_eap = as.data.frame(conquest_population$conquest_case_eap, stringsAsFactors = FALSE),
-      standardized = TRUE
+      standardized = TRUE,
+      source_settings = source_settings
     ))
   }
 
@@ -2354,7 +2595,8 @@ coerce_conquest_overlap_tables_for_audit <- function(conquest_population,
     conquest_population = conquest_population,
     conquest_item_estimates = conquest_item_estimates,
     conquest_case_eap = conquest_case_eap,
-    standardized = FALSE
+    standardized = FALSE,
+    source_settings = data.frame()
   )
 }
 
@@ -2591,6 +2833,233 @@ normalize_conquest_overlap_tables <- function(conquest_population,
   as_mfrm_bundle(out, "mfrm_conquest_overlap_tables")
 }
 
+#' Normalize the CSV exports generated by the ConQuest overlap template
+#'
+#' @param bundle Output from [build_conquest_overlap_bundle()].
+#' @param parameter_file Path to the ConQuest `export parameters` CSV.
+#' @param regression_file Path to the ConQuest `export reg_coefficients` CSV.
+#' @param covariance_file Path to the ConQuest `export covariance` CSV.
+#' @param case_file Path to the ConQuest `show cases` EAP CSV.
+#' @param delimiter Delimiter used by all four files. The default, `"auto"`,
+#'   detects comma-, tab-, or semicolon-delimited files.
+#' @param conquest_version Optional ConQuest version recorded for provenance.
+#' @param conquest_edition Optional edition label, such as `"demo/free"`,
+#'   recorded for provenance.
+#' @param run_date Optional external-run date coercible to `Date`. Supply the
+#'   date of the ConQuest run, not the normalization date.
+#'
+#' @details
+#' This helper is intentionally limited to the native CSV files requested by
+#' the command template from [build_conquest_overlap_bundle()]. It maps the
+#' exported regression rows to the bundle's intercept and covariate, maps the
+#' unidimensional covariance row to `sigma2`, trims padded person identifiers,
+#' and reconstructs the final item location under ConQuest's default
+#' sum-to-zero item constraint. It does not parse arbitrary ConQuest reports.
+#'
+#' After normalization, pass the returned object directly to
+#' [review_conquest_overlap()].
+#'
+#' @return An object of class `mfrm_conquest_overlap_tables` with normalized
+#'   population, item, and case-EAP tables.
+#' @seealso [normalize_conquest_overlap_files()],
+#'   [normalize_conquest_overlap_tables()], [review_conquest_overlap()]
+#' @examples
+#' \dontrun{
+#' bundle <- build_conquest_overlap_bundle(output_dir = "conquest-overlap")
+#' # Run bundle$conquest_command in ConQuest, then:
+#' cq <- normalize_conquest_overlap_exports(
+#'   bundle,
+#'   "conquest-overlap/conquest_overlap_conquest_parameters.csv",
+#'   "conquest-overlap/conquest_overlap_conquest_reg_coefficients.csv",
+#'   "conquest-overlap/conquest_overlap_conquest_covariance.csv",
+#'   "conquest-overlap/conquest_overlap_conquest_cases_eap.csv"
+#' )
+#' review_conquest_overlap(bundle, cq)
+#' }
+#' @export
+normalize_conquest_overlap_exports <- function(bundle,
+                                                parameter_file,
+                                                regression_file,
+                                                covariance_file,
+                                                case_file,
+                                                delimiter = c(
+                                                  "auto", "comma", "tab",
+                                                  "semicolon", ",", "\t", ";"
+                                                ),
+                                                conquest_version = NULL,
+                                                conquest_edition = NULL,
+                                                run_date = NULL) {
+  bundle <- validate_conquest_overlap_bundle_object(bundle)
+  delimiter <- match.arg(delimiter)
+  provenance_label <- function(x, arg) {
+    if (is.null(x)) return(NA_character_)
+    value <- trimws(as.character(x[1]))
+    if (is.na(value) || !nzchar(value)) {
+      stop("`", arg, "` must be a non-empty value when supplied.", call. = FALSE)
+    }
+    value
+  }
+  conquest_version <- provenance_label(conquest_version, "conquest_version")
+  conquest_edition <- provenance_label(conquest_edition, "conquest_edition")
+  conquest_run_date <- NA_character_
+  if (!is.null(run_date)) {
+    parsed_date <- tryCatch(as.Date(run_date[1]), error = function(e) NA)
+    if (length(parsed_date) != 1L || is.na(parsed_date)) {
+      stop("`run_date` must be coercible to a calendar Date.", call. = FALSE)
+    }
+    conquest_run_date <- as.character(parsed_date)
+  }
+  parameters <- read_conquest_overlap_file(
+    parameter_file, "parameter_file", delimiter = delimiter
+  )
+  regression <- read_conquest_overlap_file(
+    regression_file, "regression_file", delimiter = delimiter
+  )
+  covariance <- read_conquest_overlap_file(
+    covariance_file, "covariance_file", delimiter = delimiter
+  )
+  cases <- read_conquest_overlap_file(
+    case_file, "case_file", delimiter = delimiter
+  )
+
+  resolve_export_column <- function(df, candidates, role) {
+    keys <- normalize_conquest_overlap_column_key(names(df))
+    wanted <- normalize_conquest_overlap_column_key(candidates)
+    hits <- which(keys %in% wanted)
+    if (length(hits) != 1L) {
+      stop(
+        "`", role, "` must contain exactly one of: ",
+        paste(candidates, collapse = ", "), ".",
+        call. = FALSE
+      )
+    }
+    names(df)[hits]
+  }
+
+  parameter_index_col <- resolve_export_column(
+    parameters, c("P", "Parameter"), "parameter_file"
+  )
+  parameter_estimate_col <- resolve_export_column(
+    parameters, c("Estimate", "Est"), "parameter_file"
+  )
+  parameter_index <- suppressWarnings(as.integer(parameters[[parameter_index_col]]))
+  parameter_estimate <- suppressWarnings(as.numeric(parameters[[parameter_estimate_col]]))
+  n_items <- nrow(as.data.frame(bundle$item_map, stringsAsFactors = FALSE))
+  if (
+    n_items < 2L || anyNA(parameter_index) || anyDuplicated(parameter_index) ||
+      any(parameter_index < 1L | parameter_index > n_items) ||
+      any(!is.finite(parameter_estimate))
+  ) {
+    stop(
+      "`parameter_file` does not match the generated item-only ConQuest export contract.",
+      call. = FALSE
+    )
+  }
+  item_estimate <- rep(NA_real_, n_items)
+  item_estimate[parameter_index] <- parameter_estimate
+  missing_item <- which(!is.finite(item_estimate))
+  reconstructed_last_item <- FALSE
+  if (length(missing_item) == 1L && identical(missing_item, n_items)) {
+    item_estimate[n_items] <- -sum(item_estimate[-n_items])
+    reconstructed_last_item <- TRUE
+  } else if (length(missing_item) > 0L) {
+    stop(
+      "`parameter_file` must contain every free item location; only the final ",
+      "sum-constrained item may be omitted.",
+      call. = FALSE
+    )
+  }
+  item_map <- as.data.frame(bundle$item_map, stringsAsFactors = FALSE)
+  item_tbl <- data.frame(
+    ItemID = as.character(item_map$ResponseVar),
+    Estimate = item_estimate,
+    OriginalLevel = as.character(item_map$OriginalLevel),
+    stringsAsFactors = FALSE
+  )
+
+  regression_index_col <- resolve_export_column(
+    regression, c("Regressor", "Coefficient"), "regression_file"
+  )
+  regression_estimate_col <- resolve_export_column(
+    regression, c("Estimate", "Est"), "regression_file"
+  )
+  regression_index <- suppressWarnings(as.numeric(regression[[regression_index_col]]))
+  regression_estimate <- suppressWarnings(as.numeric(regression[[regression_estimate_col]]))
+  regression_order <- order(regression_index)
+  regression_estimate <- regression_estimate[regression_order]
+  expected_population <- as.character(bundle$mfrmr_population$Parameter)
+  expected_coefficients <- expected_population[expected_population != "sigma2"]
+  if (
+    length(regression_estimate) != length(expected_coefficients) ||
+      any(!is.finite(regression_estimate))
+  ) {
+    stop(
+      "`regression_file` does not contain the expected intercept and covariate rows.",
+      call. = FALSE
+    )
+  }
+
+  covariance_estimate_col <- resolve_export_column(
+    covariance, c("Covariance", "Estimate", "Est"), "covariance_file"
+  )
+  covariance_estimate <- suppressWarnings(as.numeric(covariance[[covariance_estimate_col]]))
+  if (length(covariance_estimate) != 1L || !is.finite(covariance_estimate)) {
+    stop(
+      "`covariance_file` must contain one finite unidimensional covariance estimate.",
+      call. = FALSE
+    )
+  }
+  population_tbl <- data.frame(
+    Parameter = c(expected_coefficients, "sigma2"),
+    Estimate = c(regression_estimate, covariance_estimate),
+    stringsAsFactors = FALSE
+  )
+
+  case_id_col <- resolve_export_column(cases, c("PID", "Person"), "case_file")
+  case_estimate_col <- resolve_export_column(
+    cases, c("EAP_1", "EAP", "Estimate"), "case_file"
+  )
+  case_tbl <- data.frame(
+    Person = trimws(as.character(cases[[case_id_col]])),
+    Estimate = suppressWarnings(as.numeric(cases[[case_estimate_col]])),
+    stringsAsFactors = FALSE
+  )
+
+  out <- normalize_conquest_overlap_tables(
+    conquest_population = population_tbl,
+    conquest_item_estimates = item_tbl,
+    conquest_case_eap = case_tbl,
+    conquest_population_term = "Parameter",
+    conquest_population_estimate = "Estimate",
+    conquest_item_id = "ItemID",
+    conquest_item_estimate = "Estimate",
+    conquest_case_person = "Person",
+    conquest_case_estimate = "Estimate",
+    keep_extra_columns = TRUE
+  )
+  out$settings <- rbind(
+    out$settings,
+    dashboard_settings_table(list(
+      source = "generated_conquest_csv_exports",
+      reconstructed_last_item = reconstructed_last_item,
+      conquest_version = conquest_version,
+      conquest_edition = conquest_edition,
+      conquest_run_date = conquest_run_date
+    ))
+  )
+  out$notes <- unique(c(
+    "Native CSV exports from the generated ConQuest command were normalized without parsing report text.",
+    if (reconstructed_last_item) {
+      "The final item location was reconstructed as the negative sum of the exported free item locations under the default sum-to-zero constraint."
+    } else {
+      "All item locations were present in the parameter export."
+    },
+    "Person identifiers were trimmed to remove fixed-width padding.",
+    out$notes
+  ))
+  out
+}
+
 #' Normalize extracted ConQuest overlap files to the `mfrmr` review contract
 #'
 #' @param population_file Path to an extracted ConQuest population-parameter
@@ -2632,7 +3101,8 @@ normalize_conquest_overlap_tables <- function(conquest_population,
 #'
 #' The recommended workflow is:
 #'
-#' 1. export an exact-overlap bundle with [build_conquest_overlap_bundle()];
+#' 1. export a bundle for the documented comparison scope with
+#'    [build_conquest_overlap_bundle()];
 #' 2. extract the relevant ConQuest tables to CSV/TSV/TXT files;
 #' 3. call `normalize_conquest_overlap_files()` on those files;
 #' 4. pass the result to [review_conquest_overlap()].
@@ -2749,17 +3219,19 @@ normalize_conquest_overlap_files <- function(population_file,
   normalized
 }
 
-#' Review an exact-overlap ConQuest comparison against an `mfrmr` overlap bundle
+#' Review a ConQuest comparison within the documented `mfrmr` overlap scope
 #'
 #' @param bundle Output from [build_conquest_overlap_bundle()].
 #' @param conquest_population Normalized ConQuest population-parameter table as a
-#'   data.frame, or output from [normalize_conquest_overlap_tables()].
+#'   data.frame, or output from `normalize_conquest_overlap_exports()`,
+#'   [normalize_conquest_overlap_files()], or
+#'   [normalize_conquest_overlap_tables()].
 #' @param conquest_item_estimates Normalized ConQuest item-estimate table as a
 #'   data.frame. Leave `NULL` when `conquest_population` is an object from
-#'   [normalize_conquest_overlap_tables()].
+#'   one of the ConQuest normalization helpers.
 #' @param conquest_case_eap Normalized ConQuest case-level EAP table as a
 #'   data.frame. Leave `NULL` when `conquest_population` is an object from
-#'   [normalize_conquest_overlap_tables()].
+#'   one of the ConQuest normalization helpers.
 #' @param conquest_population_term Column in `conquest_population` that stores
 #'   parameter names. `"auto"` tries conservative aliases such as `Parameter`
 #'   and `Term`.
@@ -2789,7 +3261,10 @@ normalize_conquest_overlap_files <- function(population_file,
 #' intentionally conservative:
 #'
 #' - it does **not** parse raw ConQuest text output automatically;
-#' - it expects already normalized data frames or output from
+#' - its primary route expects output from
+#'   `normalize_conquest_overlap_exports()`, which reads the four native CSV
+#'   files requested by the generated command; custom extracted tables may use
+#'   [normalize_conquest_overlap_files()] or
 #'   [normalize_conquest_overlap_tables()];
 #' - and it reports numerical differences and missing elements without claiming
 #'   that any fixed tolerance implies software equivalence.
@@ -2801,9 +3276,11 @@ normalize_conquest_overlap_files <- function(population_file,
 #'
 #' The intended workflow is:
 #'
-#' 1. export an exact-overlap bundle with [build_conquest_overlap_bundle()];
+#' 1. export a bundle for the documented comparison scope with
+#'    [build_conquest_overlap_bundle()];
 #' 2. run the narrow matching case in ConQuest;
-#' 3. normalize the resulting ConQuest outputs into data frames;
+#' 3. normalize the four requested CSV files with
+#'    `normalize_conquest_overlap_exports()`;
 #' 4. pass those tables here to inspect direct differences, centered item
 #'    agreement, and case-level EAP agreement.
 #'
@@ -2832,37 +3309,21 @@ normalize_conquest_overlap_files <- function(population_file,
 #'   `CaseMaxAbsPerson` columns identify the row where each maximum absolute
 #'   difference occurs.
 #' - Missing or non-numeric rows in `attention_items` indicate that the external
-#'   tables do not yet align cleanly with the exported overlap bundle.
+#'   tables do not align cleanly with the exported overlap bundle.
 #'
 #' @return A named list with class `mfrm_conquest_overlap_review`.
 #' @seealso [build_conquest_overlap_bundle()],
 #'   [normalize_conquest_overlap_files()], [normalize_conquest_overlap_tables()],
 #'   [reference_case_benchmark()]
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' bundle <- build_conquest_overlap_bundle()
-#' raw_pop <- data.frame(
-#'   Term = bundle$mfrmr_population$Parameter,
-#'   Est = bundle$mfrmr_population$Estimate
-#' )
-#' raw_item <- data.frame(
-#'   Item = bundle$mfrmr_item_estimates$ResponseVar,
-#'   Est = bundle$mfrmr_item_estimates$Estimate
-#' )
-#' raw_case <- data.frame(
-#'   PID = bundle$mfrmr_case_eap$Person,
-#'   EAP = bundle$mfrmr_case_eap$Estimate
-#' )
-#' normalized <- normalize_conquest_overlap_tables(
-#'   conquest_population = raw_pop,
-#'   conquest_item_estimates = raw_item,
-#'   conquest_case_eap = raw_case,
-#'   conquest_population_term = "Term",
-#'   conquest_population_estimate = "Est",
-#'   conquest_item_id = "Item",
-#'   conquest_item_estimate = "Est",
-#'   conquest_case_person = "PID",
-#'   conquest_case_estimate = "EAP"
+#' normalized <- normalize_conquest_overlap_exports(
+#'   bundle,
+#'   parameter_file = "conquest_overlap_conquest_parameters.csv",
+#'   regression_file = "conquest_overlap_conquest_reg_coefficients.csv",
+#'   covariance_file = "conquest_overlap_conquest_covariance.csv",
+#'   case_file = "conquest_overlap_conquest_cases_eap.csv"
 #' )
 #' review <- review_conquest_overlap(bundle, normalized)
 #' summary(review)$summary
@@ -2919,7 +3380,7 @@ review_conquest_overlap <- function(bundle,
   pop_raw_estimate <- conquest_population[[pop_est_col]]
   pop_numeric_estimate <- suppressWarnings(as.numeric(pop_raw_estimate))
   cq_pop <- data.frame(
-    Parameter = as.character(conquest_population[[pop_term_col]]),
+    Parameter = trimws(as.character(conquest_population[[pop_term_col]])),
     ConQuestEstimate = pop_numeric_estimate,
     ConQuestEstimateNonNumeric = resolve_conquest_overlap_non_numeric_flag(
       conquest_population,
@@ -2992,7 +3453,7 @@ review_conquest_overlap <- function(bundle,
   item_raw_estimate <- conquest_item_estimates[[item_est_col]]
   item_numeric_estimate <- suppressWarnings(as.numeric(item_raw_estimate))
   cq_item <- data.frame(
-    MatchID = as.character(conquest_item_estimates[[item_id_col]]),
+    MatchID = trimws(as.character(conquest_item_estimates[[item_id_col]])),
     ConQuestEstimate = item_numeric_estimate,
     ConQuestEstimateNonNumeric = resolve_conquest_overlap_non_numeric_flag(
       conquest_item_estimates,
@@ -3059,7 +3520,7 @@ review_conquest_overlap <- function(bundle,
   case_raw_estimate <- conquest_case_eap[[case_est_col]]
   case_numeric_estimate <- suppressWarnings(as.numeric(case_raw_estimate))
   cq_case <- data.frame(
-    Person = as.character(conquest_case_eap[[case_person_col]]),
+    Person = trimws(as.character(conquest_case_eap[[case_person_col]])),
     ConQuestEstimate = case_numeric_estimate,
     ConQuestEstimateNonNumeric = resolve_conquest_overlap_non_numeric_flag(
       conquest_case_eap,
@@ -3160,9 +3621,17 @@ review_conquest_overlap <- function(bundle,
     conquest_case_person = case_person_col,
     conquest_case_estimate = case_est_col
   ))
+  source_settings <- as.data.frame(inputs$source_settings %||% data.frame(), stringsAsFactors = FALSE)
+  if (nrow(source_settings) > 0L && all(c("Setting", "Value") %in% names(source_settings))) {
+    keep_provenance <- source_settings$Setting %in% c(
+      "source", "reconstructed_last_item", "conquest_version",
+      "conquest_edition", "conquest_run_date"
+    )
+    settings <- rbind(settings, source_settings[keep_provenance, , drop = FALSE])
+  }
 
   notes <- c(
-    "This review compares normalized ConQuest tables against the exact-overlap mfrmr bundle.",
+    "This review compares normalized ConQuest tables against the mfrmr bundle within the documented comparison scope.",
     "No raw ConQuest text parsing is assumed here; normalize external tables before review.",
     "Population slopes and sigma2 are intended for direct comparison, whereas item estimates are compared after centering.",
     "Non-numeric external estimate cells are treated as attention items rather than silently as ordinary missing rows."
@@ -3181,7 +3650,7 @@ review_conquest_overlap <- function(bundle,
   as_mfrm_bundle(out, "mfrm_conquest_overlap_review")
 }
 
-#' Export manuscript appendix tables from validated summary surfaces
+#' Export manuscript appendix tables from documented summary surfaces
 #'
 #' @param x A supported `summary()` source, a prebuilt
 #'   [build_summary_table_bundle()] result, or a named list of such objects.
@@ -3207,7 +3676,7 @@ review_conquest_overlap <- function(bundle,
 #'   be normalized through [build_summary_table_bundle()].
 #'
 #' @details
-#' This helper is the narrow public bridge from validated `summary()` surfaces
+#' This helper is the narrow public bridge from documented `summary()` surfaces
 #' to manuscript appendix artifacts. It accepts the same reporting objects that
 #' [build_summary_table_bundle()] supports, exports their table bundles as CSV,
 #' and optionally assembles a lightweight HTML appendix page.
@@ -3220,8 +3689,8 @@ review_conquest_overlap <- function(bundle,
 #'
 #' Precision-review summaries keep `fit_separation_basis` in the exported
 #' precision-review role so fit, ZSTD, separation/reliability/strata, and
-#' package QC thresholds can be reported without turning them into release or
-#' recovery success gates.
+#' package review thresholds can be reported without turning them into
+#' universal recovery criteria.
 #' Fit-measure and FACETS fit-review summaries keep df/ZSTD sensitivity and
 #' optional external FACETS matching tables in the same precision-review lane.
 #'
@@ -3231,9 +3700,9 @@ review_conquest_overlap <- function(bundle,
 #' replication status, adequacy checklist, thresholds, and next actions in
 #' separate appendix-ready tables.
 #'
-#' Recovery-validation summaries from the packaged validation protocol can be
-#' exported by passing `summary(validation)`, including top-line release
-#' decisions, condition notes, diagnostic notes, and domain decisions.
+#' A compatible precomputed recovery-evidence summary can also be exported,
+#' including its case assessments, condition
+#' notes, diagnostic notes, and domain assessments.
 #'
 #' Unlike [export_mfrm_bundle()], this helper does not require a fitted model.
 #' It is intended for the stage where compact reporting summaries already exist
@@ -3700,7 +4169,7 @@ export_summary_appendix <- function(x,
   as_mfrm_bundle(out, "mfrm_summary_appendix_export")
 }
 
-#' Export an analysis bundle for sharing or archiving
+#' Export a fit-level analysis archive
 #'
 #' @param fit Output from [fit_mfrm()] or [run_mfrm_facets()].
 #' @param diagnostics Optional output from [diagnose_mfrm()]. When `NULL`,
@@ -3718,8 +4187,9 @@ export_summary_appendix <- function(x,
 #'   `build_summary_table_bundle()`, or a named list of such objects. When
 #'   `NULL` and `"summary_tables"` is requested in `include`, a default set is
 #'   built from `fit`, `diagnostics`, [reporting_checklist()], and
-#'   [build_apa_outputs()]. Recovery-validation summaries can be supplied here
-#'   to co-locate release-review appendix tables with a fit-based export bundle.
+#'   [build_apa_outputs()]. Compatible precomputed recovery-evidence summaries
+#'   can be supplied here to co-locate their appendix tables with a fit-based
+#'   export bundle.
 #' @param output_dir Directory where files will be written.
 #' @param prefix File-name prefix.
 #' @param include Components to export. Supported values are
@@ -3730,6 +4200,10 @@ export_summary_appendix <- function(x,
 #' @param include_person_anchors If `TRUE`, include person measures in the
 #'   exported anchor table.
 #' @param overwrite If `FALSE`, refuse to overwrite existing files.
+#' @param acknowledge_sensitive Logical; set to `TRUE` only after acknowledging
+#'   that the archive can contain direct person identifiers, person-level
+#'   estimates, original labels, replay data, and local paths. This suppresses
+#'   the privacy warning; it does not deidentify any file.
 #' @param zip_bundle If `TRUE`, attempt to zip the written files into a single
 #'   archive using [utils::zip()]. This is best-effort and may depend on the
 #'   local R installation.
@@ -3744,9 +4218,20 @@ export_summary_appendix <- function(x,
 #'   `your_data.csv` placeholder path.
 #'
 #' @details
-#' This function is the package-native counterpart to the app's download bundle.
-#' It reuses existing `mfrmr` helpers instead of reimplementing estimation or
-#' diagnostics.
+#' This function is the one-call fit-level archive and HTML route. It reuses
+#' existing `mfrmr` helpers instead of reimplementing estimation or diagnostics.
+#' When `diagnostics = NULL`,
+#' the exporter computes the diagnostics it needs, then writes the requested
+#' CSV/text/replay artifacts and a lightweight HTML page from the fitted object.
+#' Use [mfrm_results()] and [mfrm_report()] first when you want to inspect a
+#' results object before writing files; use `export_mfrm_bundle()` when the
+#' goal is a project-folder bundle from `fit`.
+#'
+#' Every bundle is an analysis archive, not a deidentified or automatically
+#' shareable package. Core tables, anchors, predictions, replay sidecars,
+#' scripts, and HTML can contain identifying or study-sensitive information.
+#' Review and transform every file under the applicable data-handling policy
+#' before sharing it.
 #'
 #' @section Choosing exports:
 #' The `include` argument lets you assemble a bundle for different audiences:
@@ -3754,10 +4239,10 @@ export_summary_appendix <- function(x,
 #' - `"manifest"` for a compact analysis record.
 #' - `"script"` for reproducibility and reruns. For latent-regression fits,
 #'   this also writes the fit-level replay person-data sidecar when available.
-#' - `"html"` for a light, shareable summary page. When replay sidecars are
-#'   present, the HTML shows an artifact index for them rather than embedding
-#'   the raw person-level replay table.
-#' - `"summary_tables"` for manuscript-facing CSV exports of validated
+#' - `"html"` for a lightweight summary page. This is not a deidentification
+#'   guarantee. When replay sidecars are present, the HTML shows an artifact
+#'   index for them rather than embedding the raw person-level replay table.
+#' - `"summary_tables"` for manuscript-facing CSV exports of documented
 #'   `summary()` surfaces and their compact indexes.
 #' - `"visual_summaries"` when you want warning maps or residual PCA summaries
 #'   to travel with the bundle.
@@ -3793,7 +4278,7 @@ export_summary_appendix <- function(x,
 #' prediction objects. [predict_mfrm_population()] remains the scenario-level
 #' forecast helper, whereas [predict_mfrm_units()] and
 #' [sample_mfrm_plausible_values()] are the scoring layer.
-#' To keep exports and replay scripts practical, large future-planning schemas
+#' To keep exports and replay scripts practical, large structural-design schemas
 #' from scenario-level population predictions are not flattened into
 #' `*_population_prediction_settings.csv` or ADeMP CSVs; the compact simulation
 #' specification files carry the replay-relevant settings instead.
@@ -3819,9 +4304,12 @@ export_summary_appendix <- function(x,
 #' 4. Inspect `bundle$written_files` or open the generated HTML file.
 #'
 #' @return A named list with class `mfrm_export_bundle`.
-#' @seealso [build_mfrm_manifest()], [build_mfrm_replay_script()],
-#'   [export_mfrm()], [reporting_checklist()], [export_summary_appendix()]
+#' @seealso [fit_mfrm()], [mfrm_results()], [mfrm_report()],
+#'   [export_mfrm_results()], [build_mfrm_manifest()],
+#'   [build_mfrm_replay_script()], [export_mfrm()],
+#'   [reporting_checklist()], [export_summary_appendix()]
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
 #'                 method = "JML", maxit = 30)
@@ -3832,10 +4320,12 @@ export_summary_appendix <- function(x,
 #'   output_dir = tempdir(),
 #'   prefix = "mfrmr_bundle_example",
 #'   include = c("core_tables", "manifest", "script", "html"),
-#'   overwrite = TRUE
+#'   overwrite = TRUE,
+#'   acknowledge_sensitive = TRUE
 #' )
 #' bundle$summary[, c("FilesWritten", "HtmlWritten", "ScriptWritten")]
 #' head(bundle$written_files)
+#' }
 #' @export
 export_mfrm_bundle <- function(fit,
                                diagnostics = NULL,
@@ -3850,6 +4340,7 @@ export_mfrm_bundle <- function(fit,
                                facet = NULL,
                                include_person_anchors = FALSE,
                                overwrite = FALSE,
+                               acknowledge_sensitive = FALSE,
                                zip_bundle = FALSE,
                                zip_name = NULL,
                                data = NULL) {
@@ -3867,6 +4358,7 @@ export_mfrm_bundle <- function(fit,
   if (!nzchar(prefix)) prefix <- "mfrmr_bundle"
   output_dir <- as.character(output_dir[1])
   overwrite <- isTRUE(overwrite)
+  acknowledge_sensitive <- isTRUE(acknowledge_sensitive)
   zip_bundle <- isTRUE(zip_bundle)
 
   if (!dir.exists(output_dir)) {
@@ -3874,6 +4366,28 @@ export_mfrm_bundle <- function(fit,
   }
   if (!dir.exists(output_dir)) {
     stop("Could not create output directory: ", output_dir, call. = FALSE)
+  }
+
+  privacy_notice <- data.frame(
+    PrivacyClass = "analysis_archive",
+    Deidentified = FALSE,
+    ShareableWithoutReview = FALSE,
+    Notice = paste0(
+      "This fit-level bundle is an analysis archive, not a deidentified or ",
+      "automatically shareable package. It can contain direct person identifiers, ",
+      "person-level estimates, original labels, replay data, and local paths. ",
+      "Review and transform every file under the applicable data-handling policy ",
+      "before sharing it."
+    ),
+    stringsAsFactors = FALSE
+  )
+  if (!acknowledge_sensitive) {
+    warning(
+      privacy_notice$Notice[1],
+      " Set `acknowledge_sensitive = TRUE` only to acknowledge this risk; ",
+      "that setting does not deidentify the export.",
+      call. = FALSE
+    )
   }
 
   ctx <- resolve_mfrm_export_context(
@@ -3917,10 +4431,13 @@ export_mfrm_bundle <- function(fit,
     Component = character(0),
     Format = character(0),
     Path = character(0),
+    DataHandling = character(0),
     stringsAsFactors = FALSE
   )
   html_tables <- list()
-  html_text <- list()
+  html_text <- list(
+    `Privacy and data handling` = privacy_notice$Notice[1]
+  )
   visual <- NULL
   replay <- NULL
   checklist_obj <- NULL
@@ -3934,6 +4451,7 @@ export_mfrm_bundle <- function(fit,
         Component = as.character(component),
         Format = as.character(format),
         Path = normalizePath(path, winslash = "/", mustWork = FALSE),
+        DataHandling = mfrm_results_export_component_sensitivity(component),
         stringsAsFactors = FALSE
       )
     )
@@ -4145,7 +4663,8 @@ export_mfrm_bundle <- function(fit,
       diagnostics = diagnostics,
       output_dir = output_dir,
       prefix = prefix,
-      overwrite = overwrite
+      overwrite = overwrite,
+      acknowledge_sensitive = TRUE
     )
     add_core <- list(
       person = as.data.frame(fit$facets$person, stringsAsFactors = FALSE),
@@ -4265,7 +4784,13 @@ export_mfrm_bundle <- function(fit,
       html_tables = html_tables,
       html_text = html_text
     )
-    written_files <- rbind(written_files, emitted$written_files)
+    emitted_written <- emitted$written_files
+    emitted_written$DataHandling <- vapply(
+      emitted_written$Component,
+      mfrm_results_export_component_sensitivity,
+      character(1)
+    )
+    written_files <- rbind(written_files, emitted_written)
     html_tables <- emitted$html_tables
     html_text <- emitted$html_text
   }
@@ -4582,6 +5107,10 @@ export_mfrm_bundle <- function(fit,
     ScriptWritten = sum(written_files$Format == "r"),
     HtmlWritten = sum(written_files$Format == "html"),
     ZipWritten = sum(written_files$Format == "zip"),
+    PrivacyClass = privacy_notice$PrivacyClass[1],
+    Deidentified = privacy_notice$Deidentified[1],
+    ShareableWithoutReview = privacy_notice$ShareableWithoutReview[1],
+    SensitiveDataAcknowledged = acknowledge_sensitive,
     stringsAsFactors = FALSE
   )
 
@@ -4591,6 +5120,10 @@ export_mfrm_bundle <- function(fit,
     output_dir = normalizePath(output_dir, winslash = "/", mustWork = FALSE),
     prefix = prefix,
     overwrite = overwrite,
+    privacy_class = privacy_notice$PrivacyClass[1],
+    deidentified = privacy_notice$Deidentified[1],
+    shareable_without_review = privacy_notice$ShareableWithoutReview[1],
+    acknowledge_sensitive = acknowledge_sensitive,
     zip_bundle = zip_bundle,
     zip_written = zip_written
   ))
@@ -4609,13 +5142,14 @@ export_mfrm_bundle <- function(fit,
     manifest = manifest,
     visual_summaries = visual,
     replay_script = replay,
+    privacy_notice = privacy_notice,
     gpcm_boundary = gpcm_capability_boundary_table(
       fit,
       helper = "export_mfrm_bundle()",
       extra_areas = c(
         "Score-side scorefile export under bounded GPCM",
         "FACETS output-contract score-side review",
-        "Design planning and forecasting"
+        "Design evaluation and population forecasting under bounded GPCM"
       )
     ),
     settings = settings,
@@ -4716,7 +5250,7 @@ export_normalize_summary_table_inputs <- function(summary_tables,
     "mfrm_recovery_simulation",
     "mfrm_recovery_assessment",
     "mfrm_population_prediction",
-    "mfrm_future_branch_active_branch",
+    "mfrm_structural_design_review",
     "mfrm_facets_run",
     "mfrm_bias",
     "mfrm_anchor_review",
@@ -4740,7 +5274,7 @@ export_normalize_summary_table_inputs <- function(summary_tables,
     "summary.mfrm_recovery_assessment",
     "summary.mfrmr_recovery_validation",
     "summary.mfrm_population_prediction",
-    "summary.mfrm_future_branch_active_branch",
+    "summary.mfrm_structural_design_review",
     "summary.mfrm_facets_run",
     "summary.mfrm_bias",
     "summary.mfrm_anchor_review",

@@ -192,15 +192,21 @@ test_that("plot.mfrm_fit(type = 'shrinkage') returns a plot bundle", {
              method = "JML", maxit = 15,
              facet_shrinkage = "empirical_bayes")
   ))
-  out <- plot(fit, type = "shrinkage", draw = FALSE)
+  out <- .mfrmr_muffle_expected_warnings(
+    plot(fit, type = "shrinkage", draw = FALSE),
+    "^Review-only display:"
+  )
   expect_s3_class(out, "mfrm_plot_data")
   expect_true(is.data.frame(out$data$data))
   expect_true(all(c("Facet", "Level", "Estimate", "ShrunkEstimate",
                     "ShrinkageFactor") %in% names(out$data$data)))
   expect_identical(out$data$mode, "empirical_bayes")
 
-  out_ci <- plot(fit, type = "shrinkage", show_ci = TRUE, ci_level = 0.90,
-                 draw = FALSE)
+  out_ci <- .mfrmr_muffle_expected_warnings(
+    plot(fit, type = "shrinkage", show_ci = TRUE, ci_level = 0.90,
+         draw = FALSE),
+    "^Review-only display:"
+  )
   expect_s3_class(out_ci, "mfrm_plot_data")
   expect_true(isTRUE(out_ci$data$show_ci))
   expect_equal(out_ci$data$ci_level, 0.90)
@@ -218,7 +224,10 @@ test_that("plot.mfrm_fit(type = 'shrinkage') gracefully renders with no shrinkag
   ))
   # Without shrinkage, draw = FALSE should still return a structure
   # with an empty data frame and mode == "none".
-  out <- plot(fit, type = "shrinkage", draw = FALSE)
+  out <- .mfrmr_muffle_expected_warnings(
+    plot(fit, type = "shrinkage", draw = FALSE),
+    "^Review-only display:"
+  )
   expect_s3_class(out, "mfrm_plot_data")
   expect_equal(nrow(out$data$data), 0L)
   expect_identical(out$data$mode, "none")

@@ -8,7 +8,7 @@ Package-native guide to moving from fitted model objects to
 manuscript-draft text, tables, notes, and revision checklists in \code{mfrmr}.
 
 This guide currently applies fully to diagnostics-based \code{RSM} / \code{PCM}
-workflows. First-release \code{GPCM} fits now support \code{\link[=reporting_checklist]{reporting_checklist()}},
+workflows. Bounded \code{GPCM} fits support \code{\link[=reporting_checklist]{reporting_checklist()}},
 \code{\link[=precision_review_report]{precision_review_report()}}, direct curve/graph and residual table helpers,
 and caveated APA/QC/export bundles. Use \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}} when you
 need the formal boundary for the current \code{GPCM} reporting path.
@@ -25,7 +25,7 @@ treated as automatic operational-scoring evidence.
 \section{Start with the reporting question}{
 
 \itemize{
-\item "Which parts of this run are draft-complete, and with what caveats?"
+\item "Which parts of this run are ready to draft, and with what caveats?"
 Use \code{\link[=reporting_checklist]{reporting_checklist()}}.
 \item "How should I phrase the model, fit, and precision sections?"
 For \code{RSM} / \code{PCM}, use \code{\link[=build_apa_outputs]{build_apa_outputs()}}.
@@ -37,6 +37,10 @@ Use \code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}}, \co
 Use \code{\link[=precision_review_report]{precision_review_report()}} and \code{summary(diagnose_mfrm(...))}.
 \item "Which caveats need to appear in the write-up?"
 Use \code{\link[=reporting_checklist]{reporting_checklist()}} first, then \code{\link[=build_apa_outputs]{build_apa_outputs()}}.
+\item "How should I report candidate-model comparisons?"
+Use \code{\link[=compare_mfrm]{compare_mfrm()}} for the same-data comparison table, then
+\code{\link[=build_model_choice_review]{build_model_choice_review()}} and \code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}} for
+cautious model-role, route-boundary, and wording tables.
 \item "How should I start figure captions or visual-results wording?"
 Use \code{\link[=visual_reporting_template]{visual_reporting_template()}} for conservative caption and results
 sentence starters, then verify availability with
@@ -64,7 +68,68 @@ sensitivity-reporting output and keep its \code{gpcm_boundary} visible.
 \code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}}, review the bundle with \code{summary()} /
 \code{plot()}, then convert specific components to handoff tables with
 \code{\link[=apa_table]{apa_table()}} or export them directly with \code{\link[=export_summary_appendix]{export_summary_appendix()}}.
+\item When candidate models are compared, keep the comparison as a reporting
+review: \code{\link[=compare_mfrm]{compare_mfrm()}} -> \code{\link[=build_model_choice_review]{build_model_choice_review()}} ->
+\code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}}. Treat bounded \code{GPCM} as a slope-aware
+sensitivity route unless the study design explicitly justifies
+discrimination-based operational scoring.
 }
+}
+
+\section{Model-comparison reporting route}{
+
+Use \code{\link[=compare_mfrm]{compare_mfrm()}} to build the candidate-model table and inspect
+\code{ICComparable}, \code{ComparisonBasis}, and any nesting warnings before reading
+information criteria. Then use \code{\link[=build_model_choice_review]{build_model_choice_review()}} to attach the
+comparison to explicit model roles, downstream-route boundaries, wording
+templates, and optional \code{\link[=build_weighting_review]{build_weighting_review()}} output. Convert that
+review with \code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}} when a manuscript appendix,
+coauthor handoff, or HTML export needs stable table names.
+
+A conservative bounded-\code{GPCM} reporting sequence is:
+\code{\link[=fit_mfrm]{fit_mfrm()}} for the equal-weighting \code{RSM} / \code{PCM} reference,
+\code{\link[=fit_mfrm]{fit_mfrm()}} for the bounded \code{GPCM} sensitivity fit,
+\code{\link[=compare_mfrm]{compare_mfrm()}}, \code{\link[=build_model_choice_review]{build_model_choice_review()}},
+\code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}}, then \code{\link[=export_summary_appendix]{export_summary_appendix()}} or
+\code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}}. Do not use \code{AIC}, \code{BIC}, or log-likelihood alone as
+an automatic operational-scoring decision.
+}
+
+\section{Latent-regression reporting route}{
+
+Active latent-regression fits expose their reporting surface through
+\code{summary(fit)$population_overview},
+\code{summary(fit)$population_coefficients},
+\code{summary(fit)$population_coding}, and fit-level \code{caveats}. Report those
+coefficients as conditional-normal population-model parameters, not as a
+post-hoc regression on EAP or MLE scores. Also report the
+\code{population_formula}, coding/contrast information, \code{population_policy}, and
+omitted-person or omitted-row counts when complete-case handling was used.
+
+Prediction-side helpers \code{\link[=predict_mfrm_units]{predict_mfrm_units()}} and
+\code{\link[=sample_mfrm_plausible_values]{sample_mfrm_plausible_values()}} can carry the fitted population model into
+future-unit scoring and plausible-value draws. The supported route is
+one-dimensional \code{MML} for \code{RSM} / \code{PCM}; avoid stronger
+claims about multidimensional latent regression, Wald tests, posterior
+predictive checking, or full external-engine equivalence unless those checks
+were performed outside this helper family.
+}
+
+\section{Publication-readiness boundary}{
+
+\code{mfrmr} can provide a defensible measurement-output trail for a manuscript:
+fitted model summaries, diagnostic tables, precision review, report
+templates, APA table metadata, figure-routing guidance, and reproducible
+exports. It does not decide whether a specific journal claim is warranted.
+For high-stakes or selective journals, use the package outputs together
+with the study design, measurement rationale, primary citations, sensitivity
+checks, and substantive argument for the target field.
+
+Treat \code{DraftReady}, \code{ReadyForAPA}, \code{ClaimStrength}, and report-template rows
+as drafting and caveat-routing aids. They are not formal acceptance rules,
+proof of validity, or a substitute for peer-review judgment. Before copying
+text, inspect \code{mfrm_report(res, style = "apa")$first_screen},
+\verb{$claim_readiness}, \verb{$report_gaps}, and \verb{$template_index}.
 }
 
 \section{Which helper answers which task}{
@@ -83,7 +148,7 @@ captions, and a section map from the current fit and diagnostics.}
 into named \code{data.frame} tables plus an index for manuscript or appendix
 handoff, and now also supports bundle-level \code{summary()} / \code{plot()} for
 role coverage and numeric QC.}
-\item{\code{\link[=export_summary_appendix]{export_summary_appendix()}}}{Writes those validated summary-table
+\item{\code{\link[=export_summary_appendix]{export_summary_appendix()}}}{Writes those documented summary-table
 bundles to CSV and optional HTML appendix artifacts without requiring a
 full fit-based export bundle.}
 \item{\code{\link[=apa_table]{apa_table()}}}{Produces reproducible base-R tables with APA-oriented
@@ -126,6 +191,21 @@ review outside this route.
 }
 }
 
+\section{Fit-to-HTML reporting bundle}{
+
+When the user already has a fitted object and wants a local report folder in
+one call, use \code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}} directly:
+\code{export_mfrm_bundle(fit, include = c("core_tables", "checklist", "dashboard", "apa", "summary_tables", "manifest", "script", "html"))}.
+This route computes missing diagnostics, writes CSV/text/replay artifacts,
+and creates a lightweight HTML summary without requiring a prior
+\code{\link[=mfrm_results]{mfrm_results()}} object. Use \code{\link[=mfrm_results]{mfrm_results()}} and \code{\link[=mfrm_report]{mfrm_report()}} first when
+the goal is interactive triage or report-readiness review; use
+\code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}} when the goal is a file bundle for a project folder,
+coauthor handoff, or supplementary-methods archive. The bundle is not
+deidentified; review every file under the study's data-handling policy before
+any handoff.
+}
+
 \section{Typical workflow}{
 
 \itemize{
@@ -150,6 +230,10 @@ rows before writing claims.
 \code{\link[=reporting_checklist]{reporting_checklist()}} -> direct residual/category/information helpers ->
 caveated \code{\link[=build_apa_outputs]{build_apa_outputs()}}, \code{\link[=build_visual_summaries]{build_visual_summaries()}},
 \code{\link[=run_qc_pipeline]{run_qc_pipeline()}}, or \code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}} as needed.
+\item Model-comparison route:
+\code{\link[=compare_mfrm]{compare_mfrm()}} -> \code{\link[=build_model_choice_review]{build_model_choice_review()}} ->
+\code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}} -> \code{\link[=export_summary_appendix]{export_summary_appendix()}} or
+\code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}}(include = c("summary_tables", "html")).
 }
 }
 
@@ -197,6 +281,17 @@ bundle <- build_summary_table_bundle(checklist)
 bundle$table_index
 apa_from_bundle <- apa_table(bundle, which = "section_summary")
 apa_from_bundle$caption
+
+report_bundle <- export_mfrm_bundle(
+  fit,
+  diagnostics = diag,
+  output_dir = tempdir(),
+  prefix = "mfrmr_report_bundle",
+  include = c("core_tables", "checklist", "apa", "summary_tables", "html"),
+  overwrite = TRUE,
+  acknowledge_sensitive = TRUE
+)
+report_bundle$summary[, c("FilesWritten", "HtmlWritten")]
 }
 
 }

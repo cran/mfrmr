@@ -108,7 +108,7 @@ outputs into named \code{data.frame} tables with a compact index for appendix
 or manuscript handoff, including recovery simulation and recovery
 assessment outputs. It also supports bundle-level \code{summary()} / \code{plot()}
 for QC before export.}
-\item{\code{\link[=export_summary_appendix]{export_summary_appendix()}}}{Exports those validated summary-table
+\item{\code{\link[=export_summary_appendix]{export_summary_appendix()}}}{Exports those documented summary-table
 bundles as CSV and optional HTML appendix artifacts without requiring the
 broader fit-based export bundle. This is the preferred export route for
 recovery simulation evidence.}
@@ -122,7 +122,8 @@ table without rebuilding the analysis object path.}
 
 \itemize{
 \item Use bundle summaries first, then drill down into component tables.
-\item Treat \code{\link[=precision_review_report]{precision_review_report()}} as the gatekeeper for formal inference.
+\item Use \code{\link[=precision_review_report]{precision_review_report()}} to determine whether formal inference is
+supported for the fitted result.
 \item Treat category and bias outputs as complementary layers rather than
 substitutes for overall fit review.
 \item Treat zero-count score categories as scale-functioning caveats. Boundary

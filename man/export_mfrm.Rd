@@ -10,7 +10,8 @@ export_mfrm(
   output_dir = ".",
   prefix = "mfrm",
   tables = c("person", "facets", "summary", "steps", "measures"),
-  overwrite = FALSE
+  overwrite = FALSE,
+  acknowledge_sensitive = FALSE
 )
 }
 \arguments{
@@ -30,10 +31,16 @@ writes the full measures table.}
 
 \item{overwrite}{If \code{FALSE} (default), refuse to overwrite existing
 files.}
+
+\item{acknowledge_sensitive}{Logical; set to \code{TRUE} only after
+acknowledging that these tables can contain direct person identifiers,
+person-level estimates, and original facet labels. This suppresses the
+privacy warning; it does not deidentify any file.}
 }
 \value{
-Invisibly, a data.frame listing written files with columns
-\code{Table} and \code{Path}.
+Invisibly, a data.frame listing written files, their paths, and
+explicit privacy/data-handling metadata. \code{Deidentified} and
+\code{ShareableWithoutReview} are always \code{FALSE}.
 }
 \description{
 Writes tidy CSV files suitable for import into spreadsheet software or
@@ -56,7 +63,9 @@ diagnostics).}
 
 The returned data.frame tells you exactly which files were written and where.
 This is convenient for scripted pipelines where the output directory is created
-on the fly.
+on the fly. The files are analysis tables, not a deidentified sharing
+package; review each file under the applicable data-handling policy before
+sharing it.
 }
 
 \section{Typical workflow}{
@@ -69,6 +78,7 @@ on the fly.
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                 method = "JML", model = "RSM", maxit = 30)
@@ -78,9 +88,11 @@ out <- export_mfrm(
   diagnostics = diag,
   output_dir = tempdir(),
   prefix = "mfrmr_example",
-  overwrite = TRUE
+  overwrite = TRUE,
+  acknowledge_sensitive = TRUE
 )
 out$Table
+}
 }
 \seealso{
 \code{\link{fit_mfrm}}, \code{\link{diagnose_mfrm}},

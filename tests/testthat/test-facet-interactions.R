@@ -80,7 +80,7 @@ test_that("facet_interactions validates the current modeling boundary", {
       score = "Score",
       method = "JML",
       model = model,
-      step_facet = "Criterion",
+      step_facet = if (identical(model, "RSM")) NULL else "Criterion",
       facet_interactions = facet_interactions,
       min_obs_per_interaction = 0,
       maxit = 5

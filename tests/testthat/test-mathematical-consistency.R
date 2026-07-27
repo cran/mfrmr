@@ -85,14 +85,16 @@ expect_curve_moment_identities <- function(fit, theta_points = 13) {
 
 expect_plot_curves_match_report <- function(fit, theta_points = 13) {
   curves <- category_curves_report(fit, theta_points = theta_points, digits = 12)
-  ccc <- plot(fit, type = "ccc", draw = FALSE, theta_points = theta_points)
-  pathway <- plot(
-    fit,
-    type = "pathway",
-    draw = FALSE,
-    theta_points = theta_points,
-    include_fit_measures = FALSE
-  )
+  .mfrmr_muffle_expected_warnings({
+    ccc <- plot(fit, type = "ccc", draw = FALSE, theta_points = theta_points)
+    pathway <- plot(
+      fit,
+      type = "pathway",
+      draw = FALSE,
+      theta_points = theta_points,
+      include_fit_measures = FALSE
+    )
+  }, "^Review-only display:")
 
   ccc_joined <- merge(
     as.data.frame(ccc$data$probabilities, stringsAsFactors = FALSE),

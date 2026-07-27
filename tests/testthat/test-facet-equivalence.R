@@ -1,12 +1,15 @@
 test_that("analyze_facet_equivalence returns the expected bundle structure", {
   toy <- load_mfrmr_data("example_core")
-  fit <- fit_mfrm(
-    toy,
-    person = "Person",
-    facets = c("Rater", "Criterion"),
-    score = "Score",
-    method = "JML",
-    maxit = 25
+  fit <- .mfrmr_muffle_expected_warnings(
+    fit_mfrm(
+      toy,
+      person = "Person",
+      facets = c("Rater", "Criterion"),
+      score = "Score",
+      method = "JML",
+      maxit = 25
+    ),
+    "^Optimization convergence review did not produce"
   )
 
   eq <- analyze_facet_equivalence(fit, facet = "Rater")
@@ -29,13 +32,16 @@ test_that("analyze_facet_equivalence returns the expected bundle structure", {
 
 test_that("plot_facet_equivalence prepares forest and rope views without drawing", {
   toy <- load_mfrmr_data("example_core")
-  fit <- fit_mfrm(
-    toy,
-    person = "Person",
-    facets = c("Rater", "Criterion"),
-    score = "Score",
-    method = "JML",
-    maxit = 25
+  fit <- .mfrmr_muffle_expected_warnings(
+    fit_mfrm(
+      toy,
+      person = "Person",
+      facets = c("Rater", "Criterion"),
+      score = "Score",
+      method = "JML",
+      maxit = 25
+    ),
+    "^Optimization convergence review did not produce"
   )
   eq <- analyze_facet_equivalence(fit, facet = "Rater")
 

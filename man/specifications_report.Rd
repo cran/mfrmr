@@ -56,8 +56,11 @@ Build a specification summary report (preferred alias)
 }
 
 \examples{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
+toy <- load_mfrmr_data("example_operational")
+fit <- fit_mfrm(
+  toy, "Person", c("Rater", "Criterion"), "Score",
+  method = "MML", quad_points = 7, maxit = 30
+)
 out <- specifications_report(fit, title = "Toy run")
 summary(out)
 p_spec <- plot(out, draw = FALSE)

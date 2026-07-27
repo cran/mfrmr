@@ -22,7 +22,7 @@ methods appendix must make clear that \code{mfrmr} is not a FACETS numerical
 clone.
 }
 \details{
-The guide separates four ideas that are easy to conflate:
+The guide separates five ideas that are easy to conflate:
 \itemize{
 \item estimation authority: fitted values come from \code{mfrmr} unless external
 FACETS output is explicitly supplied;
@@ -30,6 +30,10 @@ FACETS output is explicitly supplied;
 handoff, and report-organization surfaces;
 \item external comparison: FACETS comparisons require a supplied external table
 and should separate MnSq differences from df/ZSTD convention differences;
+\item current model boundary: one response-model family and one observed score
+scale are used per fit; mixed families, multiple independent scales,
+general threshold anchoring, and fixed-calibration scoring are not part of
+the current public estimator;
 \item extension surface: native R tables, plot data, GPCM diagnostics,
 network views, and G/D-study helpers are package extensions, not promises
 of FACETS menu-level reproduction.

@@ -38,16 +38,15 @@ public plotting family shown here.
 ```{r setup}
 library(mfrmr)
 
-toy <- load_mfrmr_data("example_core")
+toy <- load_mfrmr_data("example_operational")
 
 fit <- fit_mfrm(
   toy,
   person = "Person",
   facets = c("Rater", "Criterion"),
   score = "Score",
-  method = "JML",
-  model = "RSM",
-  maxit = 20
+  method = "MML",
+  model = "RSM"
 )
 
 diag <- diagnose_mfrm(fit, residual_pca = "none")
@@ -72,7 +71,35 @@ Interpretation:
 
 - Compare person density on the left to facet and step locations on the right.
 - Large gaps suggest weaker targeting in that logit region.
-- Wide overlap in confidence whiskers means neighboring levels are not cleanly separated.
+- Wide overlap in marginal confidence whiskers suggests imprecision; estimate
+  the relevant pairwise contrast directly before claiming that two levels are
+  separated or indistinguishable.
+
+The native view above remains the recommended analytic figure because it keeps
+facet uncertainty and fitted step locations visible. For a closer FACETS-facing handoff, switch the
+renderer and leave `show_ci` at its default `FALSE`. The fitted coordinates do
+not change.
+
+```{r wright-facets-style}
+plot(
+  fit,
+  type = "wright",
+  renderer = "facets",
+  category_labels = c(
+    `1` = "Beginning", `2` = "Developing", `3` = "Secure", `4` = "Advanced"
+  )
+)
+```
+
+This renderer uses one common logit ruler, a `*` person-frequency column,
+signed facet headers, every facet level, and short labeled score-transition
+lines. It is FACETS-style visual correspondence, not a claim that `mfrmr` and FACETS
+produce numerically identical estimates. A numerical comparison requires output
+from a documented FACETS version and aligned estimator, identification, score,
+and orientation settings. Set `show_ci = TRUE` only when
+you deliberately want a hybrid FACETS-style ruler with the mfrmr uncertainty
+extension. Use `draw = FALSE` and inspect the `facets_style` tables when
+rebuilding the display with ggplot2 or another graphics system.
 
 Next, use the pathway map when you want to see how expected scores progress
 across theta.
@@ -86,6 +113,29 @@ Interpretation:
 - Steeper rises indicate stronger score progression.
 - Dominant-category strips show where each category is most likely to govern the score.
 - Flat or compressed regions suggest weaker category separation.
+
+The expected-score pathway is not a fit pathway. To review measure against
+Infit, place Infit on the horizontal axis and include person rows explicitly:
+
+```{r fit-pathway}
+plot(
+  fit,
+  type = "fit_pathway",
+  diagnostics = diag,
+  fit_stat = "Infit",
+  fit_scale = "mnsq",
+  include_person = TRUE,
+  show_ci = TRUE,
+  preset = "publication"
+)
+```
+
+Interpretation:
+
+- The vertical axis remains the fitted measure in logits.
+- The horizontal axis is Infit MnSq; the 1.0 line is the model-expectation reference.
+- Vertical whiskers show measure uncertainty; person and non-person rows have distinct uncertainty bases, recorded in the draw-free payload metadata.
+- Treat displaced or flagged rows as review prompts, not automatic exclusions.
 
 ## 2. Local response and level issues
 
@@ -238,9 +288,48 @@ Interpretation:
 - Facet profiles are useful for seeing whether a small number of levels drives most flagged interaction cells.
 - Treat these plots as screening evidence; confirm with the corresponding tables and narrative reports.
 
-## 5. Secondary visual layer
+## 5. Custom figures without losing the evidence boundary
 
-The package ships a second-wave visual layer for teaching and
+The built-in plots are intended as safe defaults. Use
+`preset = "monochrome"` when a journal, accessibility review, or print workflow
+needs grayscale output. For journal figures, teaching material, dashboards, or
+lab-specific styles, use `draw = FALSE` and the plot-data accessors instead of
+editing screenshots.
+
+```{r custom-plot-data}
+plot(fit, type = "wright", preset = "monochrome")
+
+wright_payload <- plot(fit, type = "wright", draw = FALSE, preset = "publication")
+plot_data_components(wright_payload)
+
+locations <- plot_data(wright_payload, component = "locations")
+head(locations)
+
+pathway_long <- plot_data(
+  fit,
+  type = "pathway",
+  component = "pathway_long",
+  preset = "publication"
+)
+head(pathway_long[, c("Layer", "CurveGroup", "Theta", "Value")])
+```
+
+When you build a custom figure, keep the helper's guidance tables with the
+plot data:
+
+```{r custom-guidance}
+names(wright_payload$data)
+wright_payload$data$reference_lines
+```
+
+Those metadata are the guardrails for captions and interpretation. They let
+you change colors, labels, panels, or rendering technology while preserving the
+same measurement scale, reference lines, caveats, and reporting role used by
+the package-native plot.
+
+## 6. Secondary visual layer
+
+The package ships a complementary visual layer for teaching and
 diagnostic follow-up. These helpers are not default reporting figures;
 use them after the main screens above.
 

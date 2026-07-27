@@ -35,8 +35,9 @@ residual, with columns \code{Source}, \code{Variance}, and
 \code{ProportionVariance}.}
 \item{\code{coefficients}}{One-row data frame with \code{G}
 (generalizability coefficient, relative decision) and
-\code{Phi} (dependability coefficient, absolute decision), using the
-single-observation-per-cell convention.}
+\code{Phi} (dependability coefficient, absolute decision), coefficient
+status labels, and the identification status of the fitted
+random-effects model.}
 \item{\code{design}}{Description of the crossed-random model.}
 }
 }
@@ -59,8 +60,10 @@ persons): \code{G = sigma2(p) / (sigma2(p) + sigma2(Residual))}.
 classification): \verb{Phi = sigma2(p) / (sigma2(p) + sigma2(facet main effects) + sigma2(Residual))}, before D-study scaling.
 \item Use \code{\link[=mfrm_d_study]{mfrm_d_study()}} to project \code{G} / \code{Phi} under planned numbers of
 raters, items, criteria, or other random measurement facets.
-\item Reporting bands follow Brennan (2001): G / Phi >= 0.8 for
-high-stakes decisions, >= 0.7 for routine reporting.
+\item Values of 0.70 and 0.80 are displayed as familiar planning references,
+not as universal decision rules. Required dependability depends on the
+decision, consequences, population, and evidence beyond a single
+coefficient.
 }
 }
 
@@ -80,6 +83,8 @@ simplified variance-component decomposition.
 Because person-by-facet interaction terms are not estimated separately,
 D-study projections remain practical planning evidence rather than a
 replacement for a fully specified G-theory design.
+Boundary or singular \code{lme4} fits are retained as diagnostic evidence but are
+not treated as decision-ready G/D-study evidence.
 }
 
 \section{References}{
@@ -105,9 +110,15 @@ if (requireNamespace("lme4", quietly = TRUE)) {
   #   variance shares mean those conditions add measurement error
   #   relative to person spread.
   gt$coefficients
-  # Look for: G >= 0.7 for routine reporting, >= 0.8 for high-stakes.
-  #   G < Phi means absolute decisions are noisier than relative
+  # Compare G and Phi with study-specific requirements; 0.70 and 0.80
+  #   are reference guides only. G < Phi means absolute decisions are noisier than relative
   #   decisions; review whether facet main effects need anchoring.
+  # Always check IdentificationStatus before using the bands:
+  gt$coefficients[, c("G", "Phi", "GStatus", "PhiStatus",
+                      "IdentificationStatus")]
+  gt$design$identification_note
+  # If IdentificationStatus is not "identified", treat G/Phi as
+  # design-review evidence rather than decision-ready reliability.
 }
 }
 }

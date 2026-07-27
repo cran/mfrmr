@@ -99,6 +99,7 @@ non-trivial heterogeneity beyond measurement error.
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 p <- plot_facets_chisq(fit, draw = FALSE)
@@ -112,6 +113,7 @@ if (interactive()) {
     palette = c(fixed_ok = "#2b8cbe", fixed_flag = "#cb181d"),
     label_angle = 45
   )
+}
 }
 }
 \seealso{

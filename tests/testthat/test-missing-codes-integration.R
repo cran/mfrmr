@@ -48,11 +48,43 @@ test_that("prep$missing_recoding stores per-column replacement counts", {
   ))
   audit <- fit$prep$missing_recoding
   expect_s3_class(audit, "data.frame")
-  expect_true(all(c("Column", "Replaced") %in% names(audit)))
+  expect_true(all(c("Column", "Replaced", "Scope") %in% names(audit)))
   expect_setequal(audit$Column, c("Person", "Rater", "Task", "Score"))
   expect_true(is.numeric(audit$Replaced) || is.integer(audit$Replaced))
   # 99 is a valid sentinel; expect at least one Score replacement.
   expect_gt(audit$Replaced[audit$Column == "Score"], 0L)
+  expect_identical(
+    audit$Scope[audit$Column == "Score"],
+    "default_score_only"
+  )
+})
+
+test_that("default missing codes preserve legitimate person and facet IDs", {
+  d <- make_dirty_data(seed = 22L)
+  d$Person[d$Person == "P1"] <- "N"
+  d$Rater[d$Rater == "R1"] <- "N"
+
+  prep <- suppressWarnings(mfrmr:::prepare_mfrm_data(
+    d,
+    person_col = "Person",
+    facet_cols = c("Rater", "Task"),
+    score_col = "Score",
+    missing_codes = TRUE
+  ))
+
+  expect_true("N" %in% prep$data$Person)
+  expect_true("N" %in% prep$data$Rater)
+  expect_equal(
+    prep$missing_recoding$Replaced[
+      prep$missing_recoding$Column %in% c("Person", "Rater", "Task")
+    ],
+    rep(0L, 3L)
+  )
+  expect_true(all(
+    prep$missing_recoding$Scope[
+      prep$missing_recoding$Column %in% c("Person", "Rater", "Task")
+    ] == "identifier_preserved_by_default"
+  ))
 })
 
 test_that("missing_codes accepts custom character vectors", {
@@ -79,6 +111,36 @@ test_that("missing_codes = NULL is a strict no-op", {
              method = "JML", maxit = 15)
   ))
   expect_null(fit$prep$missing_recoding)
+})
+
+test_that("unhandled FACETS sentinels are warned once and remain auditable", {
+  d <- make_dirty_data(seed = 31L)
+  warnings <- character(0)
+  fit <- withCallingHandlers(
+    suppressMessages(
+      fit_mfrm(
+        d, "Person", c("Rater", "Task"), "Score",
+        method = "JML", maxit = 15, missing_codes = NULL
+      )
+    ),
+    warning = function(w) {
+      warnings <<- c(warnings, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
+
+  score_warnings <- warnings[grepl("non-consecutive", warnings, fixed = TRUE)]
+  expect_length(score_warnings, 1L)
+  expect_match(score_warnings, "commonly used as missing-value codes", fixed = TRUE)
+
+  notes <- as.data.frame(fit$prep$preparation_notes, stringsAsFactors = FALSE)
+  expect_true(any(notes$Condition == "score_categories_recoded"))
+  expect_match(
+    notes$Message[notes$Condition == "score_categories_recoded"][1],
+    "missing-value codes",
+    fixed = TRUE
+  )
+  expect_true(any(fit$prep$score_map$OriginalScore == 99L))
 })
 
 test_that("build_mfrm_manifest exposes missing_recoding from the fit", {
@@ -112,6 +174,52 @@ test_that("describe_mfrm_data respects missing_codes", {
   raw_max <- as.integer(desc_raw$score_support$rating_max)
   clean_max <- as.integer(desc_clean$score_support$rating_max)
   expect_gt(raw_max, clean_max)
+  expect_s3_class(desc_clean$missing_recoding, "data.frame")
+  expect_gt(
+    desc_clean$missing_recoding$Replaced[
+      desc_clean$missing_recoding$Column == "Score"
+    ],
+    0L
+  )
+})
+
+test_that("data description does not silently call an item facet a rater", {
+  d <- expand.grid(
+    Person = paste0("P", seq_len(12)),
+    Item = paste0("I", seq_len(4)),
+    stringsAsFactors = FALSE
+  )
+  d$Score <- rep(c(0L, 1L), length.out = nrow(d))
+
+  auto <- suppressWarnings(
+    describe_mfrm_data(d, "Person", "Item", "Score")
+  )
+  expect_false(auto$agreement$settings$included)
+  expect_identical(auto$agreement$settings$status, "not_computed")
+  expect_equal(nrow(auto$agreement$summary), 0L)
+  expect_identical(
+    summary(auto)$reporting_map$CoveredHere[
+      summary(auto)$reporting_map$Area == "Rater-facet agreement"
+    ],
+    "no"
+  )
+
+  explicit <- suppressWarnings(
+    describe_mfrm_data(
+      d, "Person", "Item", "Score",
+      rater_facet = "Item"
+    )
+  )
+  expect_true(explicit$agreement$settings$included)
+  expect_identical(explicit$agreement$settings$status, "computed")
+  expect_identical(explicit$agreement$settings$rater_facet, "Item")
+  explicit_summary <- summary(explicit)
+  expect_identical(explicit_summary$agreement_settings$rater_facet, "Item")
+  expect_match(
+    paste(capture.output(print(explicit_summary)), collapse = "\n"),
+    "Observed agreement by Item",
+    fixed = TRUE
+  )
 })
 
 test_that("review_mfrm_anchors respects missing_codes", {

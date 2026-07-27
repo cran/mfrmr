@@ -4,7 +4,7 @@
 #
 # Pure-math helpers for the Rasch-family polytomous likelihoods used by
 # the JML and MML estimators in `mfrm_core.R`. Split out of `mfrm_core.R`
-# for 0.1.6 so the per-observation likelihood kernels and the cumulative
+# so the per-observation likelihood kernels and the cumulative
 # response-probability helpers live in a single file. The functions are
 # internal (no @export); they are called by the JML/MML likelihood
 # builders and by the information / fit-statistic helpers.
@@ -80,7 +80,7 @@ loglik_pcm <- function(eta, score_k, step_cum_mat, criterion_idx, weight = NULL,
 
 # GPCM log-likelihood: same adjacent-category structure as PCM but with a
 # positive discrimination attached to each designated slope-facet level.
-# Under the first-release target:
+# For the bounded GPCM parameterization:
 #   log(P_k / P_{k-1}) = a_c * (eta - tau_{c,k})
 # so category k has kernel exp(a_c * (k * eta - tau_{c,k}^{cum})).
 loglik_gpcm <- function(eta, score_k, step_cum_mat, criterion_idx, slopes,
@@ -133,8 +133,7 @@ loglik_gpcm <- function(eta, score_k, step_cum_mat, criterion_idx, slopes,
 # Returns an n x K matrix where K = number of categories.
 # Each row sums to 1; probabilities are computed in log-domain for stability.
 # category_prob_rsm / category_prob_pcm / category_prob_gpcm are
-# defined in R/core-category-probabilities.R (split out of this file
-# in 0.1.6 for clarity).
+# defined in R/core-category-probabilities.R.
 
 # Compute P(X >= s) matrix for s = 1,...,K-1 from category probabilities.
 # Input: probs (n x K matrix of category probabilities, columns for k=0,...,K-1)
@@ -155,7 +154,7 @@ compute_P_geq_r <- function(probs) {
 }
 
 compute_P_geq <- function(probs) {
-  if (isTRUE(getOption("mfrmr.use_cpp11_backend", FALSE)) &&
+  if (isTRUE(getOption("mfrmr.use_cpp11_backend", TRUE)) &&
       mfrm_cpp11_backend_available() &&
       is.matrix(probs) &&
       is.numeric(probs)) {

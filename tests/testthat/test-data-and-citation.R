@@ -10,7 +10,11 @@ test_that("packaged data aliases and loaders are available", {
 })
 
 test_that("citation metadata is available", {
-  cit <- utils::citation("mfrmr")
+  # `test_local()` loads the source tree without installing it, so base R may
+  # warn that no installed package was found even though pkgload exposes the
+  # package metadata and inst/CITATION correctly. Installed-package checks do
+  # not take this branch.
+  cit <- suppressWarnings(utils::citation("mfrmr"))
   expect_true(length(cit) >= 1)
 
   cit_file <- system.file("CITATION", package = "mfrmr")

@@ -4,7 +4,7 @@
 \alias{summary.mfrm_person_fit_indices}
 \title{Summarize person-fit indices}
 \usage{
-\method{summary}{mfrm_person_fit_indices}(object, digits = 3, top_n = 10, ...)
+\method{summary}{mfrm_person_fit_indices}(object, digits = 3, top_n = 10, include_person = FALSE, ...)
 }
 \arguments{
 \item{object}{Output from \code{\link[=compute_person_fit_indices]{compute_person_fit_indices()}}.}
@@ -12,6 +12,10 @@
 \item{digits}{Number of digits used when printing numeric columns.}
 
 \item{top_n}{Number of review rows retained in \code{top_review}.}
+
+\item{include_person}{If \code{TRUE}, print person identifiers in the review
+preview. The default retains the rows in the returned object but suppresses
+identifiers from console output.}
 
 \item{...}{Unused.}
 }

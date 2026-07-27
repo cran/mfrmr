@@ -1,8 +1,8 @@
 ---
-title: "Migrating from Facets to mfrmr"
+title: "Migrating from FACETS to mfrmr"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Migrating from Facets to mfrmr}
+  %\VignetteIndexEntry{Migrating from FACETS to mfrmr}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -18,13 +18,18 @@ knitr::opts_chunk$set(
 )
 ```
 
-This vignette walks Facets users through the equivalent `mfrmr` workflow:
+This vignette walks FACETS users through the closest `mfrmr` workflow:
 preparing data, fitting an `RSM`/`PCM` many-facet Rasch-family model with
-Facets-compatible defaults, generating the diagnostic and reporting tables that
-the canonical Facets output stack provides, and reviewing the output-contract
+FACETS-oriented settings, generating related diagnostic and reporting tables,
+and reviewing the output-contract
 boundary between the two systems. Bounded `GPCM` can be fit in `mfrmr`, but its slope-aware
-score semantics are intentionally outside the score-side Facets output-contract
+score semantics are intentionally outside the score-side FACETS output-contract
 route.
+
+The software reference target for this migration boundary is FACETS 64-bit
+4.5.1 (July 2026). A cited manual may retain its published 4.5.0 edition;
+software version and documentation edition are recorded separately. The
+coverage described here is not an external numerical-parity result.
 
 ## Mental model
 
@@ -39,30 +44,36 @@ facets_feature_coverage()
 facets_feature_coverage("not_implemented")
 ```
 
-| Concept | Facets (Linacre 2026) | mfrmr |
+This matrix describes the availability of package-native output surfaces.
+`implemented` does not by itself mean that the two programs use the same
+estimand, conditioning, extreme-score rule, degrees of freedom, or numerical
+contract.
+
+| Concept | FACETS (Linacre 2026) | mfrmr |
 |---|---|---|
 | Input | Specification file plus data file | `data.frame` in long format |
-| Estimation | JMLE by default | `JML` (legacy default) or `MML` (recommended for new analyses) |
+| Estimation | JMLE by default | `MML` by default; `JML` is the closest estimation route for a JMLE-oriented comparison |
 | Fit-statistic basis | Residuals at JMLE estimates | Residuals at EAP person measures under `MML` (shrunken toward the mean); refit with `method = "JML"` for a JMLE-style residual basis |
-| Models | Rating-scale, partial-credit, polytomous step models | `RSM`, `PCM`, bounded `GPCM` |
+| Models | Multiple model statements, rating scales, partial credit, and other response families can coexist | One response-model family per fit: `RSM`, `PCM`, or bounded `GPCM` |
 | Output | Tables 0-30 plus graphic files | Returned R objects with `summary()` and `plot()` methods |
-| Anchoring | `D=`, `A=` fields in the specification | `anchors` and `group_anchors` arguments to `fit_mfrm()` |
+| Anchoring | Element/group anchors, rating-scale calibration, and reusable starting values | Element and group anchors; no general threshold/scale anchors or fixed-calibration starting-value bundle |
+| Repeated cells | Multiple observations may be represented within a design cell | Exact Person-by-facet duplicates are retained but force Data review; distinguish legitimate repeats with an event/occasion facet |
 | Bias / interaction | Table 14 | `estimate_bias()` and `bias_interaction_report()` |
 | Wright map / variable map | Graphic variable-map output | `plot(fit, type = "wright")` and `plot_wright_unified()` |
 | Fair average | Table 7 fair-M average | `fair_average_table()` |
-| Reproducibility | Specification file is the manifest | `build_mfrm_manifest()` plus `build_mfrm_replay_script()` |
+| Reproducibility | Specification, input data, FACETS version, and recorded run environment/settings | `build_mfrm_manifest()` plus `build_mfrm_replay_script()` |
 
 ## A one-shot legacy-compatible call
 
-If the goal is to reproduce a Facets-style script with minimal R-side
+If the goal is to translate a FACETS-style script with minimal R-side
 plumbing, use `run_mfrm_facets()` (alias `mfrmRFacets()`):
 
 ```{r facets-mode}
 library(mfrmr)
-data("ej2021_study1", package = "mfrmr")
+data("mfrmr_example_operational", package = "mfrmr")
 
 run <- run_mfrm_facets(
-  data = ej2021_study1,
+  data = mfrmr_example_operational,
   person = "Person",
   facets = c("Rater", "Criterion"),
   score = "Score",
@@ -78,19 +89,29 @@ a step-by-step pipeline produces, plus the iteration log, fair-average
 table, and rating-scale table:
 
 ```{r facets-mode-summary}
-summary(run$fit)
+jml_status <- summary(run$fit, profile = "fit", detail = "brief")
+jml_status$overview[, c(
+  "Model", "Method", "Converged", "InferenceReady",
+  "ConvergenceSeverity"
+)]
+jml_status$readiness
 head(run$fair_average)
 ```
 
-For new analysis scripts, prefer `fit_mfrm(method = "MML")` directly. MML
-integrates over the person distribution under an N(0, 1) prior and exposes
-per-person posterior SEs that JML cannot produce.
+`method = "JML"` is shown here for a JMLE-oriented migration comparison.
+Do not infer readiness from `Converged` alone: require `InferenceReady = TRUE`
+for the numerical gate and review the terminal-gradient guidance when severity
+is `"review"` or `"fail"`. Numerical readiness does not override a Data,
+Design, or Stability hold; use the readiness table before interpreting or
+reporting the fit. For new analysis scripts, prefer `fit_mfrm(method = "MML")`
+directly. MML integrates over the person distribution under an N(0, 1) prior
+and exposes per-person posterior SEs that JML cannot produce.
 
 ## Translating the specification file
 
-The mapping below covers the most common Facets specification keywords.
+The mapping below covers the most common FACETS specification keywords.
 
-### Facets and labels
+### FACETS and labels
 
 ```
 Facets = 3
@@ -129,7 +150,7 @@ name).
 
 ### Anchoring
 
-A Facets `D = 2, A =` block:
+A FACETS `D = 2, A =` block:
 
 ```
 D = 2
@@ -154,8 +175,8 @@ fit runs, surfacing connectivity, overlap, and minimum-sample issues.
 
 ### Bias and interaction
 
-Facets Table 14 bias output between Rater and Criterion has a direct
-equivalent:
+For FACETS Table 14 bias output between Rater and Criterion, the closest mfrmr
+screening route is:
 
 ```r
 diag <- diagnose_mfrm(fit)
@@ -169,20 +190,54 @@ summary(bias)
 ### Wright map / variable map
 
 For a shared-logit visual display of persons, facet levels, and step
-thresholds, use the Wright map route:
+thresholds, first create the FACETS-organized summary and retain its result
+object:
 
 ```r
-plot(fit, type = "wright", preset = "publication", show_ci = TRUE)
+review <- summary(fit, profile = "facets", detail = "brief")
+res <- review$results
+
+# Primary final-scale figure: all locations and available facet uncertainty.
+plot(res, type = "wright", renderer = "native", show_ci = TRUE,
+     top_n = Inf, preset = "publication")
 ```
 
 `plot_wright_unified()` is the corresponding explicit helper when the Wright
-map is the main figure rather than one panel in a larger visual workflow.
+map is the main figure. For readers who expect the FACETS Table 6-style
+asterisk ruler and horizontal, rubric-labelled category transitions, define
+one label for every retained original score:
+
+```r
+rubric_labels <- setNames(
+  your_rubric_labels,
+  fit$prep$score_map$OriginalScore
+)
+plot(res, type = "wright", renderer = "facets", show_ci = FALSE,
+     category_labels = rubric_labels, preset = "publication")
+```
+
+`show_ci = FALSE` is the closest FACETS-style visual grammar. Setting
+`show_ci = TRUE` deliberately creates a hybrid display: the ruler is
+FACETS-style, but the intervals are mfrmr uncertainty estimates. Neither
+renderer implies that FACETS performed the estimation or that the two
+programs are numerically equivalent.
+
+For the Bond-and-Fox-style follow-up requested by many FACETS users, put
+Infit on the horizontal axis and the measure on the vertical axis. Person
+rows remain opt-in:
+
+```r
+plot(res, type = "fit_pathway", fit_stat = "Infit",
+     include_person = TRUE, top_n_person = 12,
+     person_labels = "none", facet_labels = "flagged")
+```
+
 Use `draw = FALSE` or `plot_data(fit, type = "wright")` when you need the
 underlying coordinates for a custom `ggplot2`, base-R, or Quarto graphic.
 
 ### Fit df and ZSTD review
 
-Facets users often compare Infit/Outfit MnSq together with ZStd columns.
+FACETS users often compare Infit/Outfit MnSq together with ZStd columns.
 In `mfrmr`, treat MnSq as the primary fit statistic and use the df/ZSTD
 columns to explain how the same MnSq values were standardized. The direct
 review path is:
@@ -205,7 +260,7 @@ FACETS comparison use the same language.
 
 ### Group anchoring and DFF
 
-Facets `D = ..., G =` group-anchor blocks for differential facet
+FACETS `D = ..., G =` group-anchor blocks for differential facet
 functioning translate to the `group_anchors` argument and the
 `analyze_dff()` follow-up:
 
@@ -281,9 +336,9 @@ standardization. `external_table_quality` is the first place to look if the
 FACETS export only contains ZStd and T.Count columns, or if duplicate
 `Facet` x `Level` rows were supplied.
 
-## Producing Facets-style output files
+## Producing FACETS-style output files
 
-For traceability or downstream tools that expect Facets output files,
+For traceability or downstream tools that expect FACETS output files,
 `facets_output_file_bundle()` writes a parallel set of fixed-width or CSV
 exports:
 
@@ -299,12 +354,12 @@ files <- facets_output_file_bundle(
 For RSM and PCM the score-side helpers are available. Under bounded `GPCM`
 the score-side bundle is intentionally restricted; see
 `?gpcm_capability_matrix` and the `mfrmr-gpcm-scope` vignette for the
-binding contract.
+documented limitation.
 
 ## Recommended next steps
 
-After a Facets-equivalent fit is in hand, the canonical mfrmr reporting
-route extends the analysis with:
+After a FACETS-oriented package-native fit is in hand, the recommended mfrmr
+reporting workflow extends the analysis with:
 
 - `review_mfrm_anchors()` before anchored fitting, and
   `detect_anchor_drift()` / `plot_anchor_drift()` when common elements define
@@ -323,10 +378,10 @@ route extends the analysis with:
 - `reporting_checklist()` for a manuscript-readiness summary.
 - `build_apa_outputs()` for Method and Results paragraphs and APA tables.
 - `build_mfrm_manifest()` and `build_mfrm_replay_script()` for the
-  reproducibility bundle that Facets specifications cannot produce
+  reproducibility bundle alongside the FACETS-style handoff
   out of the box.
 
 The `mfrmr-workflow` vignette covers the full sequence end to end; the
-`mfrmr-reporting-and-apa` vignette focuses on the manuscript surface; the
+`mfrmr-reporting-and-apa` vignette focuses on manuscript preparation; the
 `mfrmr-linking-and-dff` vignette covers anchoring, drift, and DFF in
 detail.

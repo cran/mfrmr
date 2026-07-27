@@ -127,6 +127,7 @@ For a plot-selection guide and a longer walkthrough, see
 }
 
 \examples{
+\donttest{
 toy_full <- load_mfrmr_data("example_core")
 toy_people <- unique(toy_full$Person)[1:12]
 toy <- toy_full[toy_full$Person \%in\% toy_people, , drop = FALSE]
@@ -136,6 +137,7 @@ fit <- suppressWarnings(
 p <- plot_fair_average(fit, metric = "AdjustedAverage", draw = FALSE)
 if (interactive()) {
   plot_fair_average(fit, metric = "AdjustedAverage", plot_type = "difference")
+}
 }
 }
 \seealso{

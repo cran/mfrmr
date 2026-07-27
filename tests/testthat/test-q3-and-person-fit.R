@@ -37,6 +37,32 @@ test_that("q3_statistic rejects unknown facet", {
   )
 })
 
+test_that("q3_statistic validates its screening controls", {
+  expect_error(
+    q3_statistic(.fit, diagnostics = .diag, min_pairs = 2),
+    "single integer of at least 3"
+  )
+  expect_error(
+    q3_statistic(.fit, diagnostics = .diag, min_pairs = c(5, 6)),
+    "single integer of at least 3"
+  )
+  expect_error(
+    q3_statistic(.fit, diagnostics = .diag, yen_threshold = c(0.2, 0.3)),
+    "finite positive numeric scalars"
+  )
+})
+
+test_that("q3_statistic prints the implemented Q3-style screening contract", {
+  q3 <- q3_statistic(.fit, diagnostics = .diag)
+  output <- capture.output(print(q3))
+
+  expect_true(any(grepl("standardized/aggregated-residual Q3-style", output,
+                        fixed = TRUE)))
+  expect_true(any(grepl("uncalibrated heuristics", output, fixed = TRUE)))
+  expect_false(any(grepl("Yen Q3 local-dependence statistic", output,
+                         fixed = TRUE)))
+})
+
 # --- compute_person_fit_indices ------------------------------------------
 
 test_that("compute_person_fit_indices returns one row per person", {
@@ -223,7 +249,88 @@ test_that("mfrm_generalizability returns variance components and G/Phi", {
   expect_s3_class(gt, "mfrm_generalizability")
   expect_true(all(c("Source", "Variance", "ProportionVariance")
                   %in% names(gt$variance_components)))
-  expect_true(all(c("G", "Phi") %in% names(gt$coefficients)))
+  expect_true(all(c("G", "Phi", "GStatus", "PhiStatus", "IdentificationStatus")
+                  %in% names(gt$coefficients)))
+  expect_true(all(c(
+    "identification_status", "identification_note", "boundary_fit",
+    "singular_fit", "lmer_messages"
+  ) %in% names(gt$design)))
+})
+
+test_that("mfrm_generalizability records singular boundary fits", {
+  if (!requireNamespace("lme4", quietly = TRUE)) {
+    skip("lme4 (Suggests) not installed.")
+  }
+  singular_data <- expand.grid(
+    Person = paste0("p", seq_len(6)),
+    Rater = paste0("r", seq_len(2)),
+    Criterion = paste0("c", seq_len(2)),
+    KEEP.OUT.ATTRS = FALSE,
+    stringsAsFactors = FALSE
+  )
+  singular_data$Score <- as.numeric(factor(singular_data$Person))
+  singular_fit <- structure(
+    list(
+      config = list(facet_names = c("Person", "Rater", "Criterion")),
+      prep = list(data = singular_data)
+    ),
+    class = "mfrm_fit"
+  )
+
+  gt <- mfrm_generalizability(singular_fit)
+
+  expect_true(isTRUE(gt$design$boundary_fit))
+  expect_true(isTRUE(gt$design$singular_fit))
+  expect_identical(gt$design$identification_status, "boundary_or_singular_fit")
+  expect_identical(gt$coefficients$GStatus, "identification_warning")
+  expect_identical(gt$coefficients$PhiStatus, "identification_warning")
+  expect_true(any(grepl(
+    "boundary|singular",
+    c(gt$design$lmer_warnings, gt$design$lmer_messages),
+    ignore.case = TRUE
+  )))
+})
+
+test_that("mfrm_d_study downgrades coefficients when G-study identification is caveated", {
+  gt <- structure(
+    list(
+      variance_components = data.frame(
+        Source = c("Person", "Rater", "Criterion", "Residual"),
+        Variance = c(1, 0, 0, 0),
+        ProportionVariance = c(1, 0, 0, 0),
+        stringsAsFactors = FALSE
+      ),
+      coefficients = data.frame(
+        G = 1,
+        Phi = 1,
+        GStatus = "identification_warning",
+        PhiStatus = "identification_warning",
+        IdentificationStatus = "boundary_or_singular_fit",
+        stringsAsFactors = FALSE
+      ),
+      design = list(
+        object_facet = "Person",
+        random_facets = c("Rater", "Criterion"),
+        observed_levels = c(Person = 6L, Rater = 2L, Criterion = 2L),
+        identification_status = "boundary_or_singular_fit",
+        identification_note = "Boundary fit used as identification warning.",
+        boundary_fit = TRUE
+      )
+    ),
+    class = c("mfrm_generalizability", "list")
+  )
+
+  ds <- mfrm_d_study(
+    gt,
+    data.frame(Rater = c(2, 3), Criterion = c(2, 3))
+  )
+
+  expect_true(all(ds$GStatus == "identification_warning"))
+  expect_true(all(ds$PhiStatus == "identification_warning"))
+  expect_false(any(ds$GStatus == "at_or_above_0.80_reference"))
+  expect_false(any(ds$PhiStatus == "at_or_above_0.80_reference"))
+  expect_identical(unique(ds$IdentificationStatus), "boundary_or_singular_fit")
+  expect_true(all(ds$BoundaryFit))
 })
 
 test_that("mfrm_d_study projects G and Phi across planned counts", {
@@ -240,7 +347,8 @@ test_that("mfrm_d_study projects G and Phi across planned counts", {
   expect_s3_class(ds, "mfrm_d_study")
   expect_true(all(c(
     "Scenario", "n_Rater", "n_Criterion", "ResidualScaling",
-    "ResidualDivisor", "G", "Phi", "GStatus", "PhiStatus"
+    "ResidualDivisor", "G", "Phi", "GStatus", "PhiStatus",
+    "IdentificationStatus", "BoundaryFit", "IdentificationNote"
   ) %in% names(ds)))
   expect_equal(nrow(ds), 6L)
   expect_true(all(c("highest_order", "single_condition", "none") %in% ds$ResidualScaling))

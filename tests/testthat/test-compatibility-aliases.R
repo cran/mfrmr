@@ -66,3 +66,32 @@ test_that("compatibility_alias_table supports surface filters", {
   expect_true(all(plot_metric_aliases$Surface == "plot_metric"))
   expect_true(all(c("FairM", "FairZ") %in% plot_metric_aliases$Alias))
 })
+
+test_that("JMLE input resolves immediately to canonical JML state", {
+  dat <- load_mfrmr_data("example_core")
+
+  fit_jml <- suppressWarnings(fit_mfrm(
+    dat,
+    person = "Person",
+    facets = c("Rater", "Criterion"),
+    score = "Score",
+    method = "JML",
+    maxit = 30
+  ))
+  fit_alias <- suppressWarnings(fit_mfrm(
+    dat,
+    person = "Person",
+    facets = c("Rater", "Criterion"),
+    score = "Score",
+    method = "JMLE",
+    maxit = 30
+  ))
+
+  expect_identical(fit_alias$summary$Method[[1]], "JML")
+  expect_identical(fit_alias$summary$MethodUsed[[1]], "JML")
+  expect_identical(fit_alias$config$method, "JML")
+  expect_identical(fit_alias$config$method_input, "JML")
+  expect_identical(fit_alias$config$replay_inputs$method, "JML")
+  expect_equal(fit_alias$opt$par, fit_jml$opt$par)
+  expect_equal(fit_alias$summary$LogLik, fit_jml$summary$LogLik)
+})

@@ -178,6 +178,20 @@ build_mfrm_resampling_spec <- function(data,
 #' @return An object of class `mfrm_resamples` with `samples`, `manifest`,
 #'   `stratum_manifest`, and `preserve_manifest`.
 #' @seealso [build_mfrm_resampling_spec()]
+#' @examples
+#' toy <- simulate_mfrm_data(n_person = 12, n_rater = 3, n_criterion = 2,
+#'                           raters_per_person = 2, seed = 11)
+#' region_map <- setNames(rep(c("A", "B", "C"),
+#'                            length.out = length(unique(toy$Person))),
+#'                        unique(toy$Person))
+#' toy$Region <- unname(region_map[toy$Person])
+#' spec <- build_mfrm_resampling_spec(
+#'   toy, person = "Person", facets = c("Rater", "Criterion"),
+#'   score = "Score", strata = "Region", reps = 2,
+#'   sample_fraction = 0.5, seed = 99
+#' )
+#' draws <- draw_mfrm_resamples(spec, keep_data = FALSE)
+#' summary(draws)$overview
 #' @export
 draw_mfrm_resamples <- function(spec, keep_data = TRUE) {
   if (!inherits(spec, "mfrm_resampling_spec")) {

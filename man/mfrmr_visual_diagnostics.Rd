@@ -33,7 +33,7 @@ strict invariance.
 transformation. Under \code{GPCM} the fair-average panel of
 \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}} therefore renders with an explicit
 "unavailable" status, and the broader compatibility-export helpers
-stay outside the validated \code{GPCM} boundary.
+stay outside the documented \code{GPCM} boundary.
 }
 
 Use \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}} for the formal per-helper boundary
@@ -102,8 +102,7 @@ Use \code{\link[=plot_shrinkage_funnel]{plot_shrinkage_funnel()}} on a fit augme
 Use \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}} for \code{RSM} / \code{PCM}. The bounded \code{GPCM}
 branch can also call \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}}, but its fair-average
 panel reports an explicit unavailability indicator because that
-panel's score-metric semantics have not yet been generalized
-beyond the Rasch-family branch.
+panel's score-metric semantics are limited to the Rasch-family branch.
 \item "Which figures are already supported by my current run?"
 Use \code{\link[=reporting_checklist]{reporting_checklist()}} and review the \code{"Visual Displays"} rows before
 choosing the next plot.
@@ -140,14 +139,34 @@ of immediate graphics.
 3D-ready category-probability data; \code{mfrmr} intentionally does not add a
 package-native plotly/rgl renderer for this route.
 \item Use \code{preset = "publication"} when you want the package's cleaner
-manuscript-oriented styling.
+manuscript-oriented styling, or \code{preset = "monochrome"} when journals,
+accessibility requirements, or print workflows require grayscale output.
 }
 }
 
-\section{Visual coverage for this release}{
+\section{Customizing figures}{
 
-This release treats the plotting layer as sufficient when the current run
-supports all of the following follow-up roles through public helpers:
+The package's plotting defaults are intended to be safe starting points,
+not a closed graphics system. Use \code{preset = "publication"} for clean
+manuscript defaults, or \code{preset = "monochrome"} for grayscale output that
+relies more on line type, point shape, and reference lines than on color.
+Use \code{plot(..., draw = FALSE)} when you want the reusable \code{mfrm_plot_data}
+object instead of immediate base graphics. Then call
+\code{\link[=plot_data_components]{plot_data_components()}} to see available components and \code{\link[=plot_data]{plot_data()}} to
+extract the long tables used by the plot.
+
+Custom renderers should keep the returned metadata close to the figure:
+\code{reference_lines}, \code{legend}, \code{guidance}, \code{category_support},
+\code{interpretation_guide}, and any reporting-template rows are part of the
+interpretation contract. They let users change colors, labels, panels,
+or rendering technology without losing the measurement scale, caveats, and
+caption boundary attached to the package-native plot.
+}
+
+\section{Visual coverage}{
+
+The plotting layer supports the following public follow-up roles when the
+fitted object contains the required data:
 \itemize{
 \item First-pass triage:
 \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}} or the \code{"Visual Displays"} rows from
@@ -325,9 +344,9 @@ agreement concerns scoring consistency, whereas variability concerns
 whether facet elements are statistically distinguishable.
 \item Residual PCA and bias plots should be interpreted as follow-up layers
 after the main fit screen, not as first-pass diagnostics.
-\item DFF residual-method plots are screening visuals. ETS A/B/C labels
-should be claimed only for rows whose refit output reports
-\code{ClassificationSystem == "ETS"}.
+\item DFF residual- and refit-method plots are screening visuals. Current refit
+rows do not receive ETS A/B/C labels because their plug-in uncertainty
+omits baseline-anchor uncertainty and cross-refit covariance.
 }
 }
 

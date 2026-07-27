@@ -57,9 +57,8 @@ standardized residuals, and screening statistics for each
 facet-level x group-value cell.
 }
 \details{
-This function uses the fitted model's observation-level residuals
-(from the internal \code{compute_obs_table()} function) rather than
-re-estimating the model. For each facet-level x group-value cell,
+This function uses observation-level residuals computed from the fitted
+model rather than re-estimating it. For each facet-level x group-value cell,
 it computes:
 \itemize{
 \item N: number of observations in the cell
@@ -119,6 +118,7 @@ not as a standalone fairness, invariance, or operational subgroup decision.
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_bias")
 
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
@@ -128,6 +128,7 @@ int <- dif_interaction_table(fit, diag, facet = "Rater",
                              group = "Group", data = toy, min_obs = 2)
 int$summary
 head(int$table[, c("Level", "GroupValue", "ObsExpAvg", "flag_bias")])
+}
 }
 \seealso{
 \code{\link[=analyze_dff]{analyze_dff()}}, \code{\link[=analyze_dif]{analyze_dif()}}, \code{\link[=plot_dif_heatmap]{plot_dif_heatmap()}}, \code{\link[=dif_report]{dif_report()}},

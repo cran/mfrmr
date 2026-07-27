@@ -44,9 +44,9 @@ decisions.
 }
 
 \examples{
-toy <- load_mfrmr_data("example_core")
+toy <- load_mfrmr_data("example_operational")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 30)
+                method = "MML", quad_points = 7, maxit = 30)
 p <- plot_threshold_ladder(fit, draw = FALSE)
 head(p$data$data)
 }

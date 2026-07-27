@@ -2,6 +2,7 @@
 % Please edit documentation in R/api-simulation-spec.R
 \name{build_mfrm_sim_spec}
 \alias{build_mfrm_sim_spec}
+\alias{print.mfrm_sim_spec}
 \title{Build an explicit simulation specification for MFRM design studies}
 \usage{
 build_mfrm_sim_spec(
@@ -38,6 +39,8 @@ build_mfrm_sim_spec(
   population_sigma2 = NULL,
   population_covariates = NULL
 )
+
+\method{print}{mfrm_sim_spec}(x, ...)
 }
 \arguments{
 \item{n_person}{Number of persons/respondents to generate.}
@@ -53,9 +56,9 @@ named vector, or one-row data frame. Names may use canonical variables
 (\code{n_person}, \code{n_rater}, \code{n_criterion}, \code{raters_per_person}), current
 public aliases implied by \code{facet_names} (for example \code{n_judge},
 \code{n_task}, \code{judge_per_person}), or role keywords (\code{person}, \code{rater},
-\code{criterion}, \code{assignment}). The schema-only future branch input
+\code{criterion}, \code{assignment}). The nested named-facet form
 \code{design$facets = c(person = ..., judge = ..., task = ...)} is also
-accepted for the currently exposed facet keys. Do not specify the same
+accepted for the supported person/rater/criterion design. Do not specify the same
 variable through both \code{design} and the scalar count arguments.}
 
 \item{score_levels}{Number of ordered score categories.}
@@ -166,12 +169,20 @@ per template person and the background variables referenced by
 variables are expanded through the same \code{stats::model.matrix()} contract
 used by latent-regression fitting. During simulation, template rows are
 resampled to the requested \code{n_person}.}
+
+\item{x}{An \code{mfrm_sim_spec} object.}
+
+\item{...}{Reserved for generic compatibility.}
 }
 \value{
 An object of class \code{mfrm_sim_spec}.
+
+\code{x}, invisibly.
 }
 \description{
-Build an explicit simulation specification for MFRM design studies
+Shows the model, design size, assignment, and latent-distribution settings
+needed to understand the specification without printing its complete
+machine-readable planning metadata.
 }
 \details{
 \code{build_mfrm_sim_spec()} creates an explicit, portable simulation
@@ -204,21 +215,20 @@ helpers target the role-based person x rater-like x criterion-like
 design contract rather than a fully arbitrary-facet planner
 \item \code{planning_constraints}, an explicit record of which design variables can
 currently be changed from that specification without rebuilding it
-\item \code{planning_schema}, a combined schema contract bundling the role descriptor,
-scope boundary, current mutability map, a \code{facet_manifest}, a
-schema-only \code{future_facet_table}, and a matching
-\code{future_design_template}, plus a nested \code{future_branch_schema} scaffold
-for a future arbitrary-facet planning branch
-\item the current \code{design$facets(...)} parser now normalizes nested facet-count
-input through that bundled \code{future_branch_schema}, whose nested
-\code{design_schema} is now the authoritative schema-only branch object
+\item \code{planning_schema}, a combined structural contract containing the role
+descriptor, supported scope, mutability map, facet manifest, and the
+normalized named-facet design representation. Its \verb{structural_design_*}
+fields describe deterministic balance and connectivity reviews; they do
+not imply support for arbitrary-facet simulation.
+\item the \code{design$facets} parser normalizes named facet counts through the same
+design representation used by the planning helpers
 \item optional signal tables for DIF and interaction bias
 }
 
 The current generator targets the package's standard person x rater x
 criterion workflow, but the public output names for those two facet roles
 can now be customized with \code{facet_names}. This naming layer improves public
-ergonomics; it does not yet turn the generator into a fully arbitrary-facet
+ergonomics; it does not provide a fully arbitrary-facet
 simulator. Internally, helper objects keep canonical role mappings so that
 planning functions can treat the first non-person facet as rater-like and
 the second as criterion-like. When threshold values are provided by
@@ -254,7 +264,7 @@ doi:10.1177/0013164417703733), and DeMars, Shapovalov, and Hathcoat
 (2023).
 
 If \code{population_formula} is supplied, the simulation specification carries a
-first-version person-level latent-regression generator. This affects only the
+person-level latent-regression generator. This affects only the
 person distribution. The current implementation keeps the non-person facets
 in the existing many-facet Rasch generator and resamples rows from
 \code{population_covariates} to the requested design size before computing

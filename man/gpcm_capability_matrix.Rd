@@ -2,7 +2,7 @@
 % Please edit documentation in R/help_gpcm_scope.R
 \name{gpcm_capability_matrix}
 \alias{gpcm_capability_matrix}
-\title{Bounded GPCM Support Matrix}
+\title{GPCM Workflow Availability}
 \usage{
 gpcm_capability_matrix(
   status = c("all", "supported", "supported_with_caveat", "blocked", "deferred")
@@ -13,88 +13,45 @@ gpcm_capability_matrix(
 \code{"supported_with_caveat"}, \code{"blocked"}, or \code{"deferred"}.}
 }
 \value{
-A data.frame with one row per public helper family and columns:
+A data.frame of class \code{mfrmr_gpcm_capabilities} with one row per
+workflow family and columns:
 \itemize{
 \item \code{Area}
 \item \code{Helpers}
 \item \code{Status}
-\item \code{PrimaryUse}
 \item \code{Boundary}
-\item \code{Evidence}
 \item \code{RecommendedRoute}
-\item \code{NextValidationStep}
 }
 }
 \description{
-Public capability map for the current \code{GPCM} scope in \code{mfrmr}.
+Check which bounded \code{GPCM} workflows can be used in \code{mfrmr}, the limits that
+apply to each workflow, and the recommended alternative when a route is not
+available.
 
-Use this helper when you need to answer a practical question quickly:
-which \code{GPCM} workflows are supported in this release, which are available
-only with explicit caveats, and which helpers remain blocked or deferred,
-plus the route to use instead when the requested helper is outside the
-current boundary.
-
-The matrix is intentionally conservative. It is a release-scope statement,
-not a promise that every lower-level helper can be combined with \code{GPCM}.
-If a helper is not yet covered by the current validation boundary, it is
-listed as \code{blocked} or \code{deferred} even when related components already
-exist.
+The table is intended for route selection before or after fitting and is
+limited to workflow availability, interpretive constraints, and the route
+to use next.
 }
 \details{
-The current release treats \code{GPCM} as a bounded supported scope inside the
-core R package:
+\code{Status} has the following user-facing meanings:
 \itemize{
-\item fitting and core summaries are supported,
-\item posterior-scoring and information helpers are supported,
-\item residual-based diagnostics and strict marginal follow-up are supported as
-exploratory screens,
-\item direct slope-aware simulation-spec generation and parameter-recovery
-simulation are supported with caveats,
-\item \code{fair_average_table()} is supported with an explicit slope-aware
-element-conditional caveat,
-\item \code{estimate_bias()} is supported as conditional screening evidence with
-slope-aware information and profile-likelihood follow-up columns,
-\item summary-table appendix export is available for supported direct outputs,
-\item APA writer, visual summaries, QC pipelines, manifests, replay scripts,
-and fit-based export bundles are available only as caveated
-sensitivity-reporting surfaces with an explicit \code{gpcm_boundary},
-\item package-native scorefile export is available with score-side caveats,
-\item role-based design evaluation and population forecasting are available as
-caveated bounded-\code{GPCM} sensitivity evidence,
-\item role-based diagnostic and signal-detection design screening helpers are
-available as caveated bounded-\code{GPCM} sensitivity evidence,
-\item full FACETS output-contract score-side review remains outside the
-validated \code{GPCM} boundary.
+\item \code{supported}: the helper is available within the stated boundary;
+\item \code{supported_with_caveat}: the helper runs, but its interpretation is
+restricted as described in \code{Boundary};
+\item \code{blocked}: the helper intentionally stops for a bounded \code{GPCM} fit;
+\item \code{deferred}: no public \code{mfrmr} route is currently available.
 }
 
-Why some helpers remain blocked:
-\itemize{
-\item full FACETS output-contract score-side review depends on Rasch-family
-measure-to-score semantics plus delta-method SE machinery that are not
-yet generalized to the free-discrimination \code{GPCM} branch;
-\item APA writer, fit-based report/export bundles, visual summaries, and QC
-pipelines stay caveated because they must not turn unsupported score-side
-semantics into narrative or pass/fail outputs;
-\item diagnostic, signal-detection, design-forecast, and linking helpers stay
-caveated because their simulation/refit summaries must not become
-operational screening, scoring, or arbitrary-facet planning claims.
-}
-
-This boundary is aligned with the package's current validation evidence,
-including the targeted \code{GPCM} recovery snapshot and the public workflow
-checks.
+Read \code{Boundary} before interpreting a caveated result. For a blocked or
+deferred row, use \code{RecommendedRoute} to choose a supported analysis or a
+Rasch-family alternative.
 }
 \section{Typical workflow}{
 
 \enumerate{
 \item Call \code{gpcm_capability_matrix()} before using \code{GPCM} in a new workflow.
-\item Stay on rows marked \code{supported} or \code{supported_with_caveat} for the
-current release.
-\item For \code{blocked} and \code{deferred} rows, read \code{RecommendedRoute} before choosing
-a substitute workflow.
-\item Treat \code{blocked} rows as explicit non-support, not as temporary omissions.
-\item Treat \code{deferred} rows as future-extension targets rather than part of the
-current user-facing support.
+\item For \code{supported_with_caveat}, read \code{Boundary} before interpreting output.
+\item For \code{blocked} or \code{deferred}, follow \code{RecommendedRoute} instead.
 }
 }
 

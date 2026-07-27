@@ -333,7 +333,10 @@ test_that("explicit rating range preserves unused boundary categories", {
   rs <- rating_scale_table(fit, drop_unused = FALSE)
   rs_drop <- rating_scale_table(fit, drop_unused = TRUE)
   fit_summary <- summary(fit)
-  surface <- plot(fit, type = "ccc_surface", draw = FALSE, theta_points = 55)
+  surface <- .mfrmr_muffle_expected_warnings(
+    plot(fit, type = "ccc_surface", draw = FALSE, theta_points = 55),
+    "^Review-only display:"
+  )
 
   expect_equal(prep$rating_min, 1L)
   expect_equal(prep$rating_max, 5L)
@@ -423,7 +426,10 @@ test_that("explicit rating range still collapses internal gaps unless original c
   cs_keep <- category_structure_report(fit_keep)
   rs_keep_summary <- summary(rs_keep)
   cs_keep_summary <- summary(cs_keep)
-  surface_keep <- plot(fit_keep, type = "ccc_surface", draw = FALSE, theta_points = 55)
+  surface_keep <- .mfrmr_muffle_expected_warnings(
+    plot(fit_keep, type = "ccc_surface", draw = FALSE, theta_points = 55),
+    "^Review-only display:"
+  )
   expect_equal(fit_keep_summary$settings_overview$UnusedScoreCategories[1], "2, 4")
   expect_equal(fit_keep_summary$settings_overview$UnusedScoreCategoryType[1], "internal")
   expect_match(paste(fit_keep_summary$key_warnings, collapse = " "), "Unused intermediate score")
@@ -603,7 +609,7 @@ test_that("invalid anchor (non-existent level) with warn policy triggers warning
   expect_warning(
     fit_mfrm(d, "Person",
       c("Rater", "Task", "Criterion"), "Score",
-      method = "JML", maxit = 60,
+      method = "JML", maxit = 100,
       anchors = anchor_tbl,
       anchor_policy = "warn"),
     regex = "Anchor review"

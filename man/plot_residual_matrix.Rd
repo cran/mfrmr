@@ -43,15 +43,18 @@ the residual structure directly: large positive cells show
 under-prediction, negative cells over-prediction.
 }
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                  method = "JML", maxit = 30)
 p <- plot_residual_matrix(fit, top_n_persons = 12, draw = FALSE)
 dim(p$data$matrix)
-# Look for: cell values within ~|2| are routine; |residual| > 2 is
-#   misfit at the 5\% level and |residual| > 3 at the 1\% level
-#   (Wright & Linacre 1994). Persons with multiple high-magnitude
-#   cells across the same facet level point at scoring drift.
+# Look for: |residual| > 2 or > 3 crosses conventional two- or
+#   three-standard-deviation review bands; these are heuristic screens,
+#   not calibrated 5\% or 1\% tests (Wright & Linacre 1994). Repeated
+#   high-magnitude cells at one facet level warrant pattern review but
+#   do not by themselves establish scoring drift.
+}
 }
 \seealso{
 \code{\link[=plot_guttman_scalogram]{plot_guttman_scalogram()}}, \code{\link[=plot_unexpected]{plot_unexpected()}},

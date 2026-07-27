@@ -4,7 +4,14 @@
 \alias{summary.mfrm_diagnostics}
 \title{Summarize an \code{mfrm_diagnostics} object in a user-friendly format}
 \usage{
-\method{summary}{mfrm_diagnostics}(object, digits = 3, top_n = 10, ...)
+\method{summary}{mfrm_diagnostics}(
+  object,
+  digits = 3,
+  top_n = 10,
+  detail = c("brief", "full"),
+  include_person = FALSE,
+  ...
+)
 }
 \arguments{
 \item{object}{Output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.}
@@ -12,6 +19,13 @@
 \item{digits}{Number of digits for printed numeric values.}
 
 \item{top_n}{Number of highest-absolute-Z fit rows to keep.}
+
+\item{detail}{Console detail: \code{"brief"} (default) prints the first-screen
+review; \code{"full"} prints the additional structured tables.}
+
+\item{include_person}{If \code{TRUE}, person-level identifiers may be printed in
+fit-review tables. The default keeps identifiers out of console output;
+person-level rows remain available in the returned object.}
 
 \item{...}{Reserved for generic compatibility.}
 }
@@ -94,6 +108,7 @@ before comparing legacy and strict outputs.
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 toy <- toy[toy$Person \%in\% unique(toy$Person)[1:4], ]
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
@@ -104,13 +119,12 @@ s$key_warnings
 #   element + Infit / Outfit values; "Unexpected responses flagged"
 #   counts how many cell-level surprises the screen returned.
 s$top_fit
-# Look for: rows with |InfitZSTD| or |OutfitZSTD| > 2 are misfitting
-#   at the 5\% level; > 3 is misfitting at the 1\% level. Investigate
-#   in order of the AbsZ column.
+# Large absolute standardized values identify rows for follow-up; they do
+# not create a universal accept/reject rule.
 s$facets_chisq
-# Look for: FixedProb < 0.05 in each non-Person facet means the
-#   facet contributes meaningful spread; FixedProb >= 0.05 means
-#   that facet is statistically indistinguishable.
+# Read the fixed-effect chi-square as a heterogeneity screen in the context
+# of the design and intended score use.
+}
 }
 \seealso{
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=summary.mfrm_fit]{summary.mfrm_fit()}}

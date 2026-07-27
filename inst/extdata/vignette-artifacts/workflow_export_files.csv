@@ -1,0 +1,7 @@
+"Component","Format","Path","Note","DataHandling"
+"summary_overview","csv","mfrmr_results_summary_overview.csv","","review_before_sharing"
+"summary_status","csv","mfrmr_results_summary_status.csv","","review_before_sharing"
+"summary_component_index","csv","mfrmr_results_summary_component_index.csv","","review_before_sharing"
+"summary_table_index","csv","mfrmr_results_summary_table_index.csv","","review_before_sharing"
+"summary_plot_map","csv","mfrmr_results_summary_plot_map.csv","","review_before_sharing"
+"summary_triage","csv","mfrmr_results_summary_triage.csv","","review_before_sharing"

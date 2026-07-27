@@ -83,12 +83,15 @@ engine-vs-FACETS-style ZSTD conventions visible, including the
 small-df/capping boundary used for FACETS-style ZSTD review. They summarize
 the stored \code{fit_measures} component from \code{mfrm_results()}; \code{mfrm_report()}
 itself does not recompute diagnostics. The \code{fit_reporting_templates} table
-turns those counts into cautious APA/QC/validation/reviewer wording
-scaffolds while keeping MnSq, ZSTD standardization, df sensitivity, and
+turns those counts into cautious reporting language while keeping MnSq,
+ZSTD standardization, df sensitivity, and
 separation/reliability in separate sentences. All reporting-template tables
 share \code{EvidenceTable}, \code{EvidenceRoute}, \code{BoundaryType}, \code{ClaimStrength}, and
 \code{RecommendedUse} columns so each template can be traced back to its evidence
-and claim boundary. \code{template_index} stacks those columns across all
+and claim boundary. The default \code{RecommendedUse} is
+\code{"report_with_context"}; more restrictive rows request evidence, identify a
+methods or appendix caveat, or require targeted follow-up. \code{template_index}
+stacks those columns across all
 template areas so report authors can review unsupported or caveated wording
 before opening the full template text. The \code{precision_reporting_templates}
 table does the same for separation, reliability, and strata using the

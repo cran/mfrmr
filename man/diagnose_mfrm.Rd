@@ -134,13 +134,14 @@ to on-target misfitting patterns.  Expected value = 1.0.
 off-target outliers.  Expected value = 1.0.
 \item \strong{ZSTD}: Wilson-Hilferty cube-root transformation of MnSq to an
 approximate standard normal deviate.
-\item \strong{PTMEA}: point-measure correlation (item-rest correlation in MFRM
-context); positive values confirm alignment with the latent trait.
+\item \strong{PTMEA}: within-element point-measure correlation between observed
+scores and fitted person measures. A positive value is directionally
+consistent with the fitted orientation; it is not a confirmatory test.
 }
 
 The MnSq values and the ZSTD values should be read separately. \code{mfrmr} keeps
 the package-native engine df convention by default because it is the basis
-used by the R/Python/Julia validation engines. FACETS reports closely related
+used by the fitted observation-level diagnostics. FACETS reports closely related
 MnSq values but standardizes them with a Wright-Masters fourth-moment df
 approximation (\code{df = 2 / q^2}) and caps reported ZSTD values. Use
 \code{fit_df_method = "both"} to review these two standardization conventions
@@ -158,12 +159,14 @@ standardization difference. Refit with \code{method = "JML"} when an
 external FACETS fit comparison requires a JMLE-style residual basis
 (see \code{\link[=facets_fit_review]{facets_fit_review()}}).
 
-\strong{Misfit flagging guidelines (Bond & Fox, 2015):}
+\strong{Heuristic misfit-screening guidelines (Bond & Fox, 2015):}
 \itemize{
 \item MnSq < 0.5: overfit (too predictable; may inflate reliability)
 \item MnSq 0.5--1.5: productive for measurement
 \item MnSq > 1.5: underfit (noise degrades measurement)
-\item \eqn{|\mathrm{ZSTD}| > 2}: statistically significant misfit (5\\%)
+\item \eqn{|\mathrm{ZSTD}| > 2}: conventional approximate-normal review flag;
+not a calibrated 5\\% hypothesis test, especially after parameter estimation
+and repeated screening across elements
 }
 
 When Infit and Outfit disagree, Infit is generally more informative
@@ -213,8 +216,8 @@ quantities as exploratory approximations.
 \item \code{fit}: element-level misfit scan (\code{Infit}, \code{Outfit}, \code{ZSTD}).
 \item \code{unexpected}, \code{fair_average}, \code{displacement}: targeted QC bundles.
 For bounded \code{GPCM}, \code{fair_average} is retained with an unavailable
-status because that compatibility calculation has not yet been
-validated for the generalized model.
+status because that compatibility calculation is outside the documented
+generalized-model contract.
 \item \code{approximation_notes}: method notes for SE/CI/reliability summaries.
 }
 }
@@ -259,7 +262,7 @@ formulas summarized in \code{s_diag$reliability} follow this
 convention.)
 \item Wright, B. D., & Linacre, J. M. (1994). Reasonable mean-square
 fit values. \emph{Rasch Measurement Transactions, 8}(3), 370.
-(Source for the 0.5-1.5 Infit / Outfit acceptance band that
+(Source for the 0.5-1.5 Infit / Outfit heuristic review interval that
 \code{s_diag$key_warnings} and \code{misfit_thresholds} apply.)
 \item Linacre, J. M. (1989). \emph{Many-Facet Rasch Measurement}. MESA
 Press. (FACETS Tables 6 + 7 correspond to the per-facet
@@ -278,31 +281,35 @@ programs}. Winsteps.com. (WHEXACT / FACETS standardized fit df notes.)
 }
 
 \examples{
-# Fast smoke run: legacy-only diagnostic mode is enough to confirm
-# the bundle has the expected slots. ~1 s on example_core.
-toy <- load_mfrmr_data("example_core")
-fit_quick <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                      method = "JML", maxit = 30)
-diag_quick <- diagnose_mfrm(fit_quick, diagnostic_mode = "legacy",
-                             residual_pca = "none")
+\donttest{
+# Minimal diagnostic example without residual PCA.
+toy <- load_mfrmr_data("example_operational")
+fit_quick <- fit_mfrm(
+  toy, "Person", c("Rater", "Criterion"), "Score",
+  method = "MML", model = "RSM", quad_points = 7, maxit = 30
+)
+diag_quick <- diagnose_mfrm(fit_quick, diagnostic_mode = "both",
+                            residual_pca = "none")
 summary(diag_quick)$overview[, c("Observations", "Facets", "Categories")]
 
-\donttest{
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
+fit <- fit_mfrm(
+  toy, "Person", c("Rater", "Criterion"), "Score",
+  method = "MML", model = "RSM", quad_points = 7, maxit = 30
+)
 diag <- diagnose_mfrm(fit, diagnostic_mode = "both", residual_pca = "none")
 s_diag <- summary(diag)
 s_diag$overview[, c("Observations", "Facets", "Categories")]
 s_diag$diagnostic_basis[, c("DiagnosticPath", "Status", "Basis")]
 s_diag$key_warnings
-# Look for: "No immediate warnings ..." in `key_warnings` is the
-#   "all clear" signal. Lines starting with "MnSq misfit:" name the
-#   element + Infit / Outfit values that fell outside the
-#   0.5-1.5 acceptance band; review those first.
+# Look for: lines starting with "MnSq misfit:" name the element +
+#   Infit / Outfit values outside the configured heuristic review band.
+#   Review those signals in context; an empty warning list is not an
+#   automatic all-clear decision.
 s_diag$facets_chisq
-# Look for: `FixedProb` < 0.05 means that facet's elements differ
-#   reliably under the fixed-effect "all elements equal" null. A
-#   facet with a non-significant chi-square contributes little
-#   spread to the test scale.
+# Look for: `FixedProb` < 0.05 is evidence against the fixed-effect
+#   "all elements equal" null under the reported chi-square approximation.
+#   Interpret the magnitude and precision as well; a non-significant result
+#   does not demonstrate homogeneous elements or negligible facet spread.
 s_diag$interrater
 # Look for: ExactAgreement >= ExpectedExactAgreement and
 #   AgreementMinusExpected >= 0 indicate raters agree at least as
@@ -319,8 +326,8 @@ head(pca$overall_table)
 # Reporting route:
 prec <- precision_review_report(fit, diagnostics = diag)
 summary(prec)
-}
 
+}
 }
 \seealso{
 \code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=analyze_residual_pca]{analyze_residual_pca()}}, \code{\link[=build_visual_summaries]{build_visual_summaries()}},

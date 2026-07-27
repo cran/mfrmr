@@ -25,8 +25,8 @@ estimation_iteration_report(
 block.}
 }
 \value{
-A named list with iteration-report components. Class:
-\code{mfrm_iteration_report}.
+A named list with iteration-report components and, for bounded
+\code{GPCM}, a \code{gpcm_boundary} table. Class: \code{mfrm_iteration_report}.
 }
 \description{
 Build an estimation-iteration report (preferred alias)
@@ -44,6 +44,13 @@ Build an estimation-iteration report (preferred alias)
 \item \code{summary}: final status and stopping diagnostics.
 \item optional \code{PROX} row: pseudo-initial reference point when enabled.
 }
+
+For bounded \code{GPCM}, this helper replays slope-aware optimization steps from
+a reconstructed starting state. It is not the exact optimizer history from
+the fitted object and is not an additional convergence test. Use
+\code{summary(fit, profile = "fit", detail = "brief")} for the recorded
+convergence result, and read the returned \code{gpcm_boundary} before reporting
+the replay.
 }
 
 \section{Typical workflow}{
@@ -56,8 +63,11 @@ Build an estimation-iteration report (preferred alias)
 }
 
 \examples{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
+toy <- load_mfrmr_data("example_operational")
+fit <- fit_mfrm(
+  toy, "Person", c("Rater", "Criterion"), "Score",
+  method = "MML", quad_points = 7, maxit = 30
+)
 out <- estimation_iteration_report(fit, max_iter = 5)
 summary(out)
 p_iter <- plot(out, draw = FALSE)

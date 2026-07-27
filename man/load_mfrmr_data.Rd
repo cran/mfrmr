@@ -5,12 +5,14 @@
 \title{Load a packaged simulation dataset}
 \usage{
 load_mfrmr_data(
-  name = c("example_core", "example_bias", "study1", "study2", "combined",
-    "study1_itercal", "study2_itercal", "combined_itercal")
+  name = c("example_core", "example_bias", "example_operational", "study1", "study2",
+    "combined", "study1_itercal", "study2_itercal", "combined_itercal")
 )
 }
 \arguments{
-\item{name}{Dataset key. One of values from \code{\link[=list_mfrmr_data]{list_mfrmr_data()}}.}
+\item{name}{Dataset key. One of the values from \code{\link[=list_mfrmr_data]{list_mfrmr_data()}}. If
+omitted, the backward-compatible default is \code{"example_core"}; new code
+should pass a key explicitly.}
 }
 \value{
 A data.frame in long format.
@@ -22,9 +24,9 @@ Load a packaged simulation dataset
 \code{load_mfrmr_data("<key>")} is the canonical loader for the packaged
 datasets and the entry point used across the package help and
 vignettes. The equivalent base-R alternative
-\code{data("mfrmr_<key>", package = "mfrmr")} remains available for users
+\code{data("<object-name>", package = "mfrmr")} remains available for users
 who prefer the full \code{data()} spelling; both paths return identical
-long-format data frames and are supported long-term.
+long-format data frames.
 
 All returned datasets include the core long-format columns
 \code{Study}, \code{Person}, \code{Rater}, \code{Criterion}, and \code{Score}.
@@ -33,8 +35,12 @@ auxiliary variables like \code{Group} for DIF/bias demonstrations.
 }
 \section{Interpreting output}{
 
-The return value is a plain long-format \code{data.frame}, ready for direct use
-in \code{\link[=fit_mfrm]{fit_mfrm()}} without additional reshaping.
+The return value is a plain long-format \code{data.frame}. The example and
+study-specific keys are ready for \code{\link[=fit_mfrm]{fit_mfrm()}} after checking role and score
+mappings. The \code{combined} keys are design-review objects: overlapping IDs or
+simple Study-based prefixes do not establish a common measurement scale, so
+an explicit identity, anchor, or linking design is required before a joint
+fit is interpretable.
 }
 
 \section{Typical workflow}{
@@ -47,19 +53,12 @@ in \code{\link[=fit_mfrm]{fit_mfrm()}} without additional reshaping.
 }
 
 \examples{
-data("mfrmr_example_core", package = "mfrmr")
-head(mfrmr_example_core)
+data("mfrmr_example_operational", package = "mfrmr")
+head(mfrmr_example_operational)
 
-d <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(
-  data = d,
-  person = "Person",
-  facets = c("Rater", "Criterion"),
-  score = "Score",
-  method = "JML",
-  maxit = 30
-)
-summary(fit)
+d <- load_mfrmr_data("example_operational")
+table(d$Rater)
+table(d$Criterion, d$Score)
 }
 \seealso{
 \code{\link[=list_mfrmr_data]{list_mfrmr_data()}}, \link{ej2021_data}

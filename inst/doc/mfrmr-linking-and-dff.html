@@ -504,26 +504,37 @@ claims.</li>
 </div>
 <div id="multi-wave-anchor-review" class="section level2">
 <h2>7. Multi-wave anchor review</h2>
-<p>When you work across administrations, the route usually moves from
-anchor export to anchored fitting and then to drift review.</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>d1 <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;study1&quot;</span>)</span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>d2 <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;study2&quot;</span>)</span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a></span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>fit1 <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(d1, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>                 <span class="at">method =</span> <span class="st">&quot;JML&quot;</span>, <span class="at">maxit =</span> <span class="dv">25</span>)</span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>fit2 <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(d2, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>                 <span class="at">method =</span> <span class="st">&quot;JML&quot;</span>, <span class="at">maxit =</span> <span class="dv">25</span>)</span>
-<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a></span>
-<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a>anchored <span class="ot">&lt;-</span> <span class="fu">anchor_to_baseline</span>(</span>
-<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a>  d2,</span>
-<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a>  fit1,</span>
-<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
-<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
-<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span></span>
+<p>When you work across administrations, the route usually moves from a
+declared common-anchor design to anchored fitting and then to drift
+review. The block below is schematic: <code>wave1</code> and
+<code>wave2</code> must be administrations for which the listed facet
+levels have documented cross-wave identity and unchanged meaning.</p>
+<p>Do <strong>not</strong> substitute <code>ej2021_study1</code> and
+<code>ej2021_study2</code> here. They are independent legacy synthetic
+studies; reused raw labels do not identify common persons, raters, or
+anchors and do not link their scales.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>declared_common_facets <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;Criterion&quot;</span>)</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a></span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>fit1 <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>  wave1, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span></span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>)</span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a></span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>anchored <span class="ot">&lt;-</span> <span class="fu">anchor_to_baseline</span>(</span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a>  wave2,</span>
+<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a>  fit1,</span>
+<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a>  <span class="at">anchor_facets =</span> declared_common_facets</span>
 <span id="cb8-15"><a href="#cb8-15" tabindex="-1"></a>)</span>
 <span id="cb8-16"><a href="#cb8-16" tabindex="-1"></a></span>
-<span id="cb8-17"><a href="#cb8-17" tabindex="-1"></a>drift <span class="ot">&lt;-</span> <span class="fu">detect_anchor_drift</span>(<span class="fu">list</span>(<span class="at">Wave1 =</span> fit1, <span class="at">Wave2 =</span> fit2))</span>
-<span id="cb8-18"><a href="#cb8-18" tabindex="-1"></a><span class="fu">plot_anchor_drift</span>(drift, <span class="at">type =</span> <span class="st">&quot;drift&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
+<span id="cb8-17"><a href="#cb8-17" tabindex="-1"></a>fit2 <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb8-18"><a href="#cb8-18" tabindex="-1"></a>  wave2, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb8-19"><a href="#cb8-19" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span></span>
+<span id="cb8-20"><a href="#cb8-20" tabindex="-1"></a>)</span>
+<span id="cb8-21"><a href="#cb8-21" tabindex="-1"></a>drift <span class="ot">&lt;-</span> <span class="fu">detect_anchor_drift</span>(<span class="fu">list</span>(<span class="at">Wave1 =</span> fit1, <span class="at">Wave2 =</span> fit2))</span>
+<span id="cb8-22"><a href="#cb8-22" tabindex="-1"></a><span class="fu">plot_anchor_drift</span>(drift, <span class="at">type =</span> <span class="st">&quot;drift&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
 </div>
 <div id="recommended-sequence" class="section level2">
 <h2>Recommended sequence</h2>

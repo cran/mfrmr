@@ -48,8 +48,8 @@ A named list with class \code{mfrm_manifest}.
 Build a reproducibility manifest for an MFRM analysis
 }
 \details{
-This helper captures the package-native equivalent of the Streamlit app's
-configuration export. It summarizes analysis settings, source columns,
+This helper creates a compact package-native analysis record. It summarizes
+analysis settings, source columns,
 anchoring information, and which downstream outputs are currently available.
 }
 \section{When to use this}{
@@ -60,7 +60,9 @@ of how an analysis was run. Compared with related helpers:
 \item \code{\link[=export_mfrm]{export_mfrm()}} writes analysis tables only.
 \item \code{build_mfrm_manifest()} records settings and available outputs.
 \item \code{\link[=build_mfrm_replay_script]{build_mfrm_replay_script()}} creates an executable R script.
-\item \code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}} writes a shareable folder of files.
+\item \code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}} writes a project-folder reproducibility bundle;
+review every included artifact for person-level or sensitive data before
+sharing it.
 }
 }
 
@@ -124,6 +126,7 @@ routing design forecasting through its separate caveated capability row.
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                 method = "JML", maxit = 30)
@@ -131,6 +134,7 @@ diag <- diagnose_mfrm(fit, residual_pca = "none")
 manifest <- build_mfrm_manifest(fit, diagnostics = diag)
 manifest$summary[, c("Model", "Method", "Observations", "Facets")]
 manifest$available_outputs[, c("Component", "Available")]
+}
 }
 \seealso{
 \code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}}, \code{\link[=build_mfrm_replay_script]{build_mfrm_replay_script()}},

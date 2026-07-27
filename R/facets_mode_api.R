@@ -1,4 +1,4 @@
-# Legacy-compatible workflow wrappers (defaults to public-spec: RSM + JML/JMLE path)
+# Legacy-compatible workflow wrappers (defaults to public-spec: RSM + JML path)
 
 normalize_facets_mode_data <- function(data) {
   if (!is.data.frame(data)) {
@@ -94,7 +94,11 @@ infer_facets_mode_mapping <- function(dat, person = NULL, facets = NULL, score =
 #' @param positive_facets Optional facets with positive orientation.
 #' @param quad_points Quadrature points for MML; passed to [fit_mfrm()].
 #' @param maxit Maximum optimizer iterations.
-#' @param reltol Optimization tolerance.
+#' @param reltol Relative optimizer tolerance passed to [fit_mfrm()]. The
+#'   default is `1e-9`.
+#' @param optimizer Direct optimizer passed to [fit_mfrm()]. `"auto"` selects
+#'   L-BFGS-B for MML and JML fits with at least 200 free parameters, and BFGS
+#'   for smaller JML fits.
 #' @param mml_engine MML optimization engine passed to [fit_mfrm()]. Applies
 #'   only when `method = "MML"`.
 #' @param top_n_interactions Number of rows for interaction diagnostics.
@@ -115,8 +119,8 @@ infer_facets_mode_mapping <- function(dat, person = NULL, facets = NULL, score =
 #'   prefer `fit_mfrm(..., method = "MML")` -- MML is the package-wide
 #'   recommended route because person parameters are integrated out
 #'   under an N(0, 1) prior and per-person posterior SEs are available.
-#' - `method = "JMLE"`: explicit JMLE label; internally equivalent to
-#'   JML route.
+#' - `method = "JMLE"`: backward-compatible input alias for the JML route;
+#'   fitted objects and generated outputs use the canonical `"JML"` label.
 #' - `method = "MML"`: marginal maximum likelihood route using
 #'   `quad_points`. Use `mml_engine = "em"` or `"hybrid"` only for
 #'   `RSM` / `PCM` fits when you want the staged MML alternatives.
@@ -207,11 +211,13 @@ run_mfrm_facets <- function(data,
                             positive_facets = NULL,
                             quad_points = 15,
                             maxit = 400,
-                            reltol = 1e-6,
+                            reltol = 1e-9,
+                            optimizer = c("auto", "BFGS", "L-BFGS-B"),
                             mml_engine = c("direct", "em", "hybrid"),
                             top_n_interactions = 20L) {
   model <- toupper(match.arg(model))
   method <- toupper(match.arg(method))
+  optimizer <- match.arg(optimizer)
   mml_engine <- tolower(match.arg(mml_engine))
 
   dat <- normalize_facets_mode_data(data)
@@ -244,6 +250,7 @@ run_mfrm_facets <- function(data,
     quad_points = as.integer(quad_points),
     maxit = as.integer(maxit),
     reltol = as.numeric(reltol),
+    optimizer = optimizer,
     mml_engine = mml_engine
   )
 
@@ -257,7 +264,7 @@ run_mfrm_facets <- function(data,
       "person", "score", "facets", "weight",
       "model", "method_input", "method_used", "step_facet", "noncenter_facet",
       "dummy_facets", "positive_facets", "keep_original", "quad_points",
-      "maxit", "reltol", "mml_engine", "top_n_interactions"
+      "maxit", "reltol", "optimizer", "mml_engine", "top_n_interactions"
     ),
     value = c(
       mapping$person,
@@ -275,6 +282,7 @@ run_mfrm_facets <- function(data,
       as.character(as.integer(quad_points)),
       as.character(as.integer(maxit)),
       as.character(as.numeric(reltol)),
+      optimizer,
       mml_engine,
       as.character(as.integer(top_n_interactions))
     ),
@@ -315,7 +323,7 @@ mfrmRFacets <- function(data,
                         positive_facets = NULL,
                         quad_points = 15,
                         maxit = 400,
-                        reltol = 1e-6,
+                        reltol = 1e-9,
                         mml_engine = c("direct", "em", "hybrid"),
                         top_n_interactions = 20L) {
   run_mfrm_facets(

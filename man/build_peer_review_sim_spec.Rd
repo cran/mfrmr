@@ -109,6 +109,7 @@ NCME presentation.
 }
 
 \examples{
+\donttest{
 peer_spec <- build_peer_review_sim_spec(
   n_submission = 12,
   n_criterion = 3,
@@ -116,6 +117,7 @@ peer_spec <- build_peer_review_sim_spec(
   anchor_submissions = 2
 )
 peer_spec$peer_review$overview
+}
 }
 \seealso{
 \code{\link[=simulate_mfrm_data]{simulate_mfrm_data()}}, \code{\link[=build_mfrm_network_review]{build_mfrm_network_review()}},

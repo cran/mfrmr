@@ -84,7 +84,7 @@ test_that("fit_mfrm surfaces malformed anchor schemas instead of silently droppi
         anchor_policy = "warn"
       ),
       warning = function(w) {
-        if (grepl("Optimizer did not fully converge", conditionMessage(w), fixed = TRUE)) {
+        if (grepl("Optimization convergence review did not produce", conditionMessage(w), fixed = TRUE)) {
           invokeRestart("muffleWarning")
         }
       }

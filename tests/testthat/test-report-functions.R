@@ -1128,11 +1128,21 @@ test_that("plot_residual_pca produces plot bundles", {
 # ---- plot.mfrm_fit specific types ----
 
 test_that("plot.mfrm_fit supports all named types", {
-  p_wright <- plot(.fit, type = "wright", draw = FALSE)
+  expect_warning(
+    p_wright <- plot(.fit, type = "wright", draw = FALSE),
+    "Review-only display",
+    fixed = TRUE
+  )
   expect_s3_class(p_wright, "mfrm_plot_data")
   expect_true(all(c("person_hist", "person_stats", "label_points", "group_summary", "y_range") %in% names(p_wright$data)))
 
-  p_pathway <- plot(.fit, type = "pathway", diagnostics = .diag, draw = FALSE)
+  expect_warning(
+    p_pathway <- plot(
+      .fit, type = "pathway", diagnostics = .diag, draw = FALSE
+    ),
+    "Review-only display",
+    fixed = TRUE
+  )
   expect_s3_class(p_pathway, "mfrm_plot_data")
   expect_true(all(c(
     "steps", "endpoint_labels", "dominance_regions",
@@ -1153,18 +1163,39 @@ test_that("plot.mfrm_fit supports all named types", {
   ) %in% names(p_pathway$data$curve_fit_status)))
   expect_true(isTRUE(p_pathway$data$fit_measure_status$Available[1]))
 
-  p_ccc <- plot(.fit, type = "ccc", draw = FALSE)
+  expect_warning(
+    p_ccc <- plot(.fit, type = "ccc", draw = FALSE),
+    "Review-only display",
+    fixed = TRUE
+  )
   expect_s3_class(p_ccc, "mfrm_plot_data")
 
-  p_person <- plot(.fit, type = "person", draw = FALSE)
+  expect_warning(
+    p_person <- plot(.fit, type = "person", draw = FALSE),
+    "Review-only display",
+    fixed = TRUE
+  )
   expect_s3_class(p_person, "mfrm_plot_data")
 
-  p_step <- plot(.fit, type = "step", draw = FALSE)
+  expect_warning(
+    p_step <- plot(.fit, type = "step", draw = FALSE),
+    "Review-only display",
+    fixed = TRUE
+  )
   expect_s3_class(p_step, "mfrm_plot_data")
 })
 
 test_that("plot_wright_unified returns enhanced Wright-map payload", {
-  p_wright_unified <- plot_wright_unified(.fit, draw = FALSE, preset = "publication", show_thresholds = FALSE)
+  expect_warning(
+    p_wright_unified <- plot_wright_unified(
+      .fit,
+      draw = FALSE,
+      preset = "publication",
+      show_thresholds = FALSE
+    ),
+    "Review-only display",
+    fixed = TRUE
+  )
   expect_true(all(c("persons", "facets", "person_hist", "person_stats", "group_summary", "y_lim") %in%
     names(p_wright_unified)))
   expect_null(p_wright_unified$thresholds)

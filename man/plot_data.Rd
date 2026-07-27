@@ -50,6 +50,14 @@ head(pathway_long[, c("Layer", "CurveGroup", "Theta", "Value")])
 pathway_fit <- plot_data(fit, type = "pathway", component = "fit_measures")
 head(pathway_fit[, c("Facet", "Level", "Infit", "Outfit", "FitStatus")])
 
+# Re-render one component with your own styling while keeping the
+# package-generated data and interpretation metadata.
+expected <- pathway_long[pathway_long$Layer == "expected_score", , drop = FALSE]
+plot(expected$Theta, expected$Value, type = "l",
+     xlab = "Theta", ylab = "Expected score",
+     main = "Custom expected-score pathway")
+abline(v = 0, lty = 2, col = "grey60")
+
 info <- compute_information(fit, theta_points = 51)
 sem_long <- plot_data(
   plot_information(info, type = "sem", draw = FALSE),

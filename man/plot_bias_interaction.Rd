@@ -131,6 +131,7 @@ themselves establish formal inferential evidence.
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_bias")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 p <- plot_bias_interaction(
@@ -141,6 +142,7 @@ p <- plot_bias_interaction(
   preset = "publication",
   draw = FALSE
 )
+}
 }
 \seealso{
 \code{\link[=bias_interaction_report]{bias_interaction_report()}}, \code{\link[=estimate_bias]{estimate_bias()}}, \code{\link[=plot_displacement]{plot_displacement()}}

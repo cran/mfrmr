@@ -115,8 +115,11 @@ rules.
 }
 \examples{
 \donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
+toy <- load_mfrmr_data("example_operational")
+fit <- fit_mfrm(
+  toy, "Person", c("Rater", "Criterion"), "Score",
+  method = "MML", quad_points = 7, maxit = 30
+)
 fm <- fit_measures_table(fit, facet = "Rater")
 fm$facets_table
 fm$underfit

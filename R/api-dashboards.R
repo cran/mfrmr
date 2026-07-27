@@ -31,7 +31,7 @@
 #' - **Severity**: elements with \eqn{|\mathrm{Estimate}| >}
 #'   `severity_warn` logits are flagged as unusually harsh or lenient.
 #' - **Misfit**: elements with Infit or Outfit MnSq outside the
-#'   acceptance band are flagged. The band defaults to the package
+#'   configured heuristic review band are flagged. The band defaults to the package
 #'   pair returned by [mfrm_misfit_thresholds()] (Linacre 0.5-1.5);
 #'   pass `misfit_warn = 1.5` to keep the older symmetric
 #'   \eqn{[1/}\code{misfit_warn}\eqn{,\;}\code{misfit_warn}\eqn{]}
@@ -44,12 +44,13 @@
 #'   screen-positive interaction cells (from [estimate_bias()]) are flagged.
 #'
 #' A **flag density** score counts how many of the four criteria each
-#' element triggers.  Elements flagged on multiple criteria warrant
-#' priority review (e.g., rater retraining, data exclusion).
+#' element triggers. Elements flagged on multiple criteria warrant priority
+#' review and may motivate training or a documented data-quality review; the
+#' dashboard does not justify automatic row, person, or rater exclusion.
 #'
-#' Default thresholds are designed for moderate-stakes rating contexts.
-#' Adjust for your application: stricter thresholds for high-stakes
-#' certification, more lenient for formative assessment.
+#' Default thresholds are screening heuristics. Prespecify and justify any
+#' application-specific alternatives rather than treating them as universal
+#' validity or acceptance criteria.
 #'
 #' @return An object of class `mfrm_facet_dashboard` (also inheriting from
 #'   `mfrm_bundle` and `list`). The object summarizes one target facet:
@@ -84,12 +85,14 @@
 #'
 #' @seealso [diagnose_mfrm()], [estimate_bias()], [plot_qc_dashboard()]
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' toy <- toy[toy$Person %in% unique(toy$Person)[1:8], ]
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 #' diag <- diagnose_mfrm(fit, residual_pca = "none")
 #' dash <- facet_quality_dashboard(fit, diagnostics = diag)
 #' summary(dash)
+#' }
 #' @export
 facet_quality_dashboard <- function(fit,
                                     diagnostics = NULL,
@@ -572,10 +575,12 @@ dashboard_draw_plot <- function(tbl,
 #' @return An object of class `summary.mfrm_facet_dashboard`.
 #' @seealso [facet_quality_dashboard()], [plot_facet_quality_dashboard()]
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 #' diag <- diagnose_mfrm(fit, residual_pca = "none")
 #' summary(facet_quality_dashboard(fit, diagnostics = diag))
+#' }
 #' @export
 summary.mfrm_facet_dashboard <- function(object, digits = 3, top_n = 10, ...) {
   if (!is.list(object) || is.null(object$detail)) {
@@ -669,11 +674,13 @@ print.summary.mfrm_facet_dashboard <- function(x, ...) {
 #' @return A plotting-data object of class `mfrm_plot_data`.
 #' @seealso [facet_quality_dashboard()], [summary.mfrm_facet_dashboard()]
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 #' diag <- diagnose_mfrm(fit, residual_pca = "none")
 #' p <- plot_facet_quality_dashboard(fit, diagnostics = diag, draw = FALSE)
 #' p$data$plot
+#' }
 #' @export
 plot_facet_quality_dashboard <- function(x,
                                          diagnostics = NULL,

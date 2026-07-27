@@ -2,7 +2,7 @@
 % Please edit documentation in R/api-simulation.R
 \name{summary.mfrm_diagnostic_screening}
 \alias{summary.mfrm_diagnostic_screening}
-\title{Summarize a diagnostic-screening validation study}
+\title{Summarize a diagnostic-screening simulation study}
 \usage{
 \method{summary}{mfrm_diagnostic_screening}(object, digits = 3, ...)
 }
@@ -37,7 +37,7 @@ and runtime views
 \description{
 Summarizes output from \code{\link[=evaluate_mfrm_diagnostic_screening]{evaluate_mfrm_diagnostic_screening()}} for reporting,
 appendix export, and draw-free visualization handoff. The summary keeps
-simulation operating characteristics separate from validation gates: fit,
+simulation operating characteristics separate from inferential conclusions: fit,
 marginal, pairwise, and report-review signals are screening readouts rather
 than pass/fail evidence.
 }

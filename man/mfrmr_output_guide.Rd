@@ -5,14 +5,16 @@
 \title{Choose an mfrmr output helper by user goal}
 \usage{
 mfrmr_output_guide(
-  scope = c("all", "public", "entry", "viewer", "binary", "tables", "reports", "reviews",
-    "bundles", "exports", "compatibility", "gpcm", "simulation", "linking", "network",
-    "response_time", "facets", "conquest", "r")
+  scope = c("all", "public", "beginner", "psychometric", "entry", "viewer", "binary",
+    "tables", "reports", "reviews", "bundles", "exports", "compatibility", "gpcm",
+    "simulation", "linking", "network", "response_time", "facets", "conquest", "r")
 )
 }
 \arguments{
 \item{scope}{Which rows to return. \code{"all"} returns the full guide.
-\code{"public"} returns the small top-level public surface for most users.
+\code{"public"} returns the canonical six-step route for most users;
+\code{"beginner"} returns the same compact route rather than combining every
+beginner-labelled specialist row.
 \code{"entry"} returns the recommended first-screen routes. \code{"viewer"} returns
 local-viewer routes built around \code{mfrm_results(include = ...)}. \code{"binary"}
 returns the two-category person-item Rasch route and checks. Other values
@@ -60,16 +62,22 @@ Naming convention used by the guide:
 }
 \section{First-screen route}{
 
-Use \code{mfrmr_output_guide("public")} when you want the shortest top-level API
-map. Use \code{mfrmr_output_guide("entry")} when you specifically want
-first-screen creation routes. The entry guide points new scripts to
-\code{\link[=fit_mfrm]{fit_mfrm()}} -> \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} -> \code{\link[=mfrm_results]{mfrm_results()}}, existing fits to
-\code{\link[=mfrm_results]{mfrm_results()}}, and exploratory console
-work to \code{\link[=mfrm_results_interactive]{mfrm_results_interactive()}}. After creating \code{res}, use
-\code{summary(res)$next_actions} to choose the next purpose-specific helper.
+Use \code{mfrmr_output_guide("public")} or
+\code{mfrmr_output_guide("beginner")} for the shortest top-level API map:
+an explicit \code{\link[=describe_mfrm_data]{describe_mfrm_data()}} check and \code{\link[=fit_mfrm]{fit_mfrm()}} MML fit, the lightweight fit summary, the
+comprehensive FACETS-organized summary, the required native Wright map
+with SE/CI, optional FACETS-style Wright and person-inclusive Infit views,
+and finally report/export. Use \code{mfrmr_output_guide("entry")} when you
+specifically need alternative first-screen creation routes, including
+existing result objects, the optional viewer, or interactive console work.
+After creating \code{res}, use \code{summary(res)$next_actions} to choose a
+purpose-specific specialist helper.
 Use \code{mfrmr_output_guide("viewer")} when the next step is the optional local
 Shiny reader; it shows which \code{include} preset to use before calling
 \code{\link[=launch_mfrmr_viewer]{launch_mfrmr_viewer()}}.
+Use \code{mfrmr_output_guide("psychometric")} for the technical table,
+review, and reporting routes whose interpretation boundaries should be
+checked before manuscript use.
 }
 
 \section{How to use this guide}{
@@ -98,6 +106,8 @@ mfrmr_output_guide("facets")[, c("Question", "MainFunction")]
 mfrmr_output_guide("binary")[, c("Question", "MainFunction")]
 mfrmr_output_guide("viewer")[, c("Question", "MainFunction")]
 mfrmr_output_guide("response_time")[, c("Question", "MainFunction")]
+mfrmr_output_guide("beginner")[, c("Question", "MainFunction")]
+mfrmr_output_guide("psychometric")[, c("Question", "DecisionBoundary")]
 }
 \concept{GPCM boundaries}
 \concept{reporting workflow}

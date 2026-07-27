@@ -55,8 +55,8 @@ CIs. Deprecated alias: \code{icc_ci_boot_seed}.}
 adds a connectivity component summary using a bipartite graph over
 person x facet levels.}
 
-\item{icc_ci_method, icc_ci_level, icc_ci_boot_reps, icc_ci_boot_seed}{Deprecated spellings of the \verb{ci_*} arguments above, retained for
-one release. Supplying a non-\code{NULL} value routes through
+\item{icc_ci_method, icc_ci_level, icc_ci_boot_reps, icc_ci_boot_seed}{Deprecated compatibility spellings of the \verb{ci_*} arguments above.
+Supplying a non-\code{NULL} value routes through
 \code{\link[lifecycle:deprecate_warn]{lifecycle::deprecate_warn()}} and overrides the canonical
 \verb{ci_*} argument.}
 }

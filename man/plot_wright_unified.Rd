@@ -10,29 +10,45 @@ plot_wright_unified(
   bins = 20L,
   show_thresholds = TRUE,
   top_n = 30L,
-  show_ci = FALSE,
+  show_ci = NULL,
   ci_level = 0.95,
   draw = TRUE,
   preset = c("standard", "publication", "compact", "monochrome"),
   palette = NULL,
   label_angle = 45,
+  renderer = NULL,
+  wright_style = c("native", "facets_style"),
+  category_labels = NULL,
+  rows_per_logit = 2L,
+  wright_range = NULL,
+  extreme_placement = c("ends", "estimate"),
+  persons_per_star = NULL,
   ...
 )
 }
 \arguments{
 \item{fit}{Output from \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
-\item{diagnostics}{Optional output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.}
+\item{diagnostics}{Optional output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}. When supplied,
+the map uses matching standard errors and precision metadata while keeping
+coordinates from \code{fit}.}
 
 \item{bins}{Integer number of bins for the person histogram. Default \code{20}.}
 
 \item{show_thresholds}{Logical; if \code{TRUE}, display threshold/step
 positions on the map. Default \code{TRUE}.}
 
-\item{top_n}{Maximum number of facet/step points retained for labeling.}
+\item{top_n}{Maximum number of facet/step locations retained by the native
+renderer for a compact display. Step transitions are always retained and
+omitted facet locations are reported in \code{retention}; use \code{Inf} for the
+complete final map. Native text labels remain collision-aware even when
+all coordinates are retained. The FACETS-style payload retains and labels
+every fitted location, grouping coincident labels when needed.}
 
-\item{show_ci}{Logical; if \code{TRUE}, draw approximate confidence intervals when
-standard errors are available.}
+\item{show_ci}{Logical or \code{NULL}. \code{NULL} (the default) draws available
+uncertainty intervals for the native renderer and omits them from the
+FACETS-style renderer. Explicit \code{TRUE} with \code{renderer = "facets"} creates
+a hybrid FACETS-style ruler with mfrmr uncertainty intervals.}
 
 \item{ci_level}{Confidence level used when \code{show_ci = TRUE}.}
 
@@ -46,11 +62,37 @@ drawer.}
 
 \item{label_angle}{Rotation angle for group labels on the facet panel.}
 
+\item{renderer}{Canonical Wright-map renderer selector: \code{"native"}
+(default) or \code{"facets"} for the FACETS Table 6-style visual layout.}
+
+\item{wright_style}{Wright-map renderer: \code{"native"} preserves the histogram,
+point, range, and facet-SE display; \code{"facets_style"} adds a FACETS Table
+6-style text ruler. The latter is a visual layout, not a claim of numerical
+equivalence with FACETS, and is equivalent to \code{renderer = "facets"}.}
+
+\item{category_labels}{Optional score-rubric labels for
+\code{wright_style = "facets_style"}. Supply a named character vector keyed by
+every retained original score, an unnamed vector with one label per
+retained category, or a data frame with \code{Score} and \code{Label} columns.}
+
+\item{rows_per_logit}{Number of rows per logit on the FACETS-style ruler.}
+
+\item{wright_range}{Optional finite increasing length-2 logit range.}
+
+\item{extreme_placement}{Place extreme-score persons at ruler \code{"ends"} or at
+their fitted \code{"estimate"} in the FACETS-style renderer.}
+
+\item{persons_per_star}{Number of persons represented by one \code{*}; \code{NULL}
+selects a compact value automatically.}
+
 \item{...}{Additional graphical parameters.}
 }
 \value{
-Invisibly, a list with \code{persons}, \code{facets}, and \code{thresholds}
-data used for the plot.
+Invisibly, a list with \code{persons}, \code{facets}, \code{thresholds}, and the
+underlying Wright-map tables used for the plot. Native output includes a
+\code{retention} table and \code{retention_note} documenting compact-display
+omissions. All renderers include fit-readiness and interpretation-status
+metadata.
 }
 \description{
 Produces a shared-logit variable map showing person ability distribution
@@ -72,6 +114,32 @@ relative to the same latent scale.
 
 The logit scale on the y-axis is shared, allowing direct visual
 comparison of all facets and persons.
+
+If the fit records boundary-separated facet levels and \code{wright_range} is
+\code{NULL}, both renderers derive the display range from supported locations and
+place separated levels at ruler ends. The returned tables retain exact
+\code{OriginalEstimate} and \code{CI_Lower} / \code{CI_Upper} values alongside display and
+clipping metadata; endpoint triangles and footers disclose the adjustment.
+
+With \code{renderer = "facets"} (or \code{wright_style = "facets_style"}), the
+draw-free result additionally
+contains tidy ruler rows, person star frequencies, signed facet headers,
+all facet levels, step lines, original-score transitions, mean half-score
+boundaries, category labels, and display settings under \code{facets_style}.
+The payload keeps both the nearest line-printer \code{RulerValue} and the exact
+step/midpoint \code{DrawValue}; the current renderer draws threshold lines at the
+exact value and prints fitted logits in step labels.
+These tables support custom ggplot2/plotly rendering without parsing the
+base plot.
+Use \code{show_ci = FALSE} for the closest FACETS-style presentation. A
+FACETS-style ruler drawn with \code{show_ci = TRUE} is intentionally labelled as
+a hybrid because its uncertainty intervals are supplied by \code{mfrmr}.
+
+The returned list separates plotting availability from interpretation. It
+includes \code{fit_readiness}, \code{interpretation_status}, and
+\code{interpretation_note}. If numerical, data, connectivity, or stability
+review is unresolved, the map is returned for diagnosis but the call warns
+and prefixes the returned subtitle and drawn title with \verb{REVIEW ONLY}.
 }
 \section{Interpreting output}{
 
@@ -117,6 +185,15 @@ fit <- fit_mfrm(toy_small, "Person", c("Rater", "Criterion"), "Score",
                  method = "JML", model = "RSM", maxit = 30)
 map_data <- plot_wright_unified(fit, draw = FALSE)
 names(map_data)
+facets_map <- plot_wright_unified(
+  fit,
+  renderer = "facets",
+  category_labels = c(
+    `1` = "Beginning", `2` = "Developing", `3` = "Secure", `4` = "Advanced"
+  ),
+  draw = FALSE
+)
+facets_map$facets_style$settings
 }
 \seealso{
 \code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=plot.mfrm_fit]{plot.mfrm_fit()}}, \link{mfrmr_visual_diagnostics}

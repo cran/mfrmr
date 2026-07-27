@@ -62,8 +62,8 @@ a series of administrations or forms.}
 \item{\code{\link[=build_linking_review]{build_linking_review()}}}{Synthesizes anchor review, drift, and
 screened-chain evidence into one operational review surface.}
 \item{\code{\link[=analyze_dff]{analyze_dff()}}}{Screens differential facet functioning with residual
-or refit methods, using screening-only language unless linking and
-precision support stronger interpretation.}
+or refit methods. Linked refit point contrasts remain screening-only
+because their uncertainty is conditional on baseline anchors.}
 }
 }
 
@@ -75,8 +75,8 @@ precision support stronger interpretation.}
 \item Always name the facet, facet level, and group pair involved in a DFF
 contrast. A generic "DIF exists" statement is not interpretable in a
 many-facet design.
-\item Residual-method DFF classifications are screening labels. ETS A/B/C
-labels require refit output whose \code{ClassificationSystem} is \code{"ETS"}.
+\item Residual and refit DFF classifications are screening labels in 0.2.2;
+current refit output does not assign ETS A/B/C labels.
 \item Treat drift flags as prompts for review, not automatic evidence that an
 anchor must be removed.
 \item Treat \code{LinkSupportAdequate = FALSE} as a weak-link warning: at least one

@@ -45,8 +45,9 @@ specification.}
 named vector, or one-row data frame. Names may use canonical variables
 (\code{n_person}, \code{n_rater}, \code{n_criterion}, \code{raters_per_person}), current
 public aliases (for example \code{n_judge}, \code{n_task}, \code{judge_per_person}), or
-role keywords (\code{person}, \code{rater}, \code{criterion}, \code{assignment}). The
-schema-only future branch input \code{design$facets = c(person = ..., judge = ..., task = ...)} is also accepted for the currently exposed facet keys.
+role keywords (\code{person}, \code{rater}, \code{criterion}, \code{assignment}). The nested
+named-facet form \code{design$facets = c(person = ..., judge = ..., task = ...)}
+is also accepted for the supported person/rater/criterion design.
 Do not specify the same variable through both \code{design} and the scalar
 count arguments.}
 
@@ -81,12 +82,11 @@ specification
 \code{n_person}/\code{n_rater}/\code{n_criterion}/\code{raters_per_person}
 \item \code{design_descriptor}: role-based description of design variables carried
 from the underlying planning object
-\item \code{planning_scope}: explicit record of the current planning contract,
-including a \code{facet_manifest} and future-planner scaffold marker
+\item \code{planning_scope}: explicit record of the supported planning contract,
+including a \code{facet_manifest}
 \item \code{planning_constraints}: explicit record of mutable/locked design variables
-\item \code{planning_schema}: combined planner-schema contract carrying the role
-table, current boundary, mutability map, facet manifest, and a
-schema-only future facet-count table
+\item \code{planning_schema}: structured planning metadata carrying the role
+table, supported boundary, mutability map, and facet manifest
 \item \code{gpcm_boundary}: bounded-\code{GPCM} caveat row when a \code{GPCM} forecast route is
 used
 \item \code{settings}: forecasting settings

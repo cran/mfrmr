@@ -68,8 +68,11 @@ Rater\eqn{\times}Task, and Criterion\eqn{\times}Task.
 The \code{summary} table aggregates results across pairs:
 \itemize{
 \item \code{Rows}: number of interaction cells estimated
-\item \code{Significant}: count of cells with \eqn{|t| \ge 2}
+\item \code{ScreenPositive}: count of cells with \eqn{|t| \ge 2}
+\item \code{Significant}: backward-compatible alias for \code{ScreenPositive}
 \item \code{MeanAbsBias}: average absolute bias magnitude (logits)
+\item \code{FormalInferenceEligible} / \code{PrimaryReportingEligible}: always \code{FALSE};
+these conditional plug-in interaction statistics are screening evidence
 }
 
 Per-pair failures (e.g., insufficient data for a sparse pair) are
@@ -94,7 +97,7 @@ The returned object is a bundle-like list with class
 \item Fit with \code{\link[=fit_mfrm]{fit_mfrm()}} and diagnose with \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}. For
 \code{RSM} / \code{PCM} reporting runs, prefer \code{method = "MML"} plus
 \code{diagnostic_mode = "both"} in the diagnostics call.
-\item Run \code{estimate_all_bias()} to compute app-style multi-pair interactions.
+\item Run \code{estimate_all_bias()} to compute the requested multi-pair interactions.
 \item Pass the resulting \code{by_pair} list into \code{\link[=reporting_checklist]{reporting_checklist()}} or
 \code{\link[=facet_quality_dashboard]{facet_quality_dashboard()}}.
 }
@@ -107,7 +110,7 @@ fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                 method = "MML", quad_points = 7, maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "none", diagnostic_mode = "both")
 bias_all <- estimate_all_bias(fit, diagnostics = diag)
-bias_all$summary[, c("Interaction", "Rows", "Significant")]
+bias_all$summary[, c("Interaction", "Rows", "ScreenPositive")]
 }
 }
 \seealso{

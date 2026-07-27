@@ -15,8 +15,8 @@
 #'   returned bundle.
 #'
 #' @details
-#' This helper ports the app-level reporting checklist into a package-native
-#' bundle. It does not try to judge substantive reporting quality; instead, it
+#' This helper builds a package-native reporting checklist. It does not try to
+#' judge substantive reporting quality; instead, it
 #' checks whether the fitted object and related diagnostics contain the evidence
 #' typically reported in MFRM write-ups.
 #'
@@ -74,9 +74,12 @@
 #' Review the rows with `Available = FALSE` or `DraftReady = FALSE`, then add
 #' the missing diagnostics, bias results, or narrative context before calling
 #' [build_apa_outputs()] for draft text generation. For `RSM` / `PCM`
-#' reporting runs, the preferred route is an `MML` fit plus
+#' reporting runs where the MML population assumptions are defensible, the
+#' most complete package-native route is an `MML` fit plus
 #' `diagnose_mfrm(..., diagnostic_mode = "both")` so the checklist can see the
-#' legacy and strict marginal screens together.
+#' legacy and strict marginal screens together. A JML route remains available
+#' when its estimand and incidental-parameter limitations better match the
+#' analysis purpose.
 #'
 #' @section How this differs from operational review:
 #' `reporting_checklist()` is the manuscript/reporting branch of the package.
@@ -105,8 +108,8 @@
 #'   [specifications_report()], [data_quality_report()],
 #'   [build_misfit_casebook()], [build_linking_review()]
 #' @examples
-#' # Fast smoke run: a JML fit + legacy-only diagnostic produces a
-#' # populated checklist in well under a second.
+#' \donttest{
+#' # Minimal checklist example using a JML fit and lightweight diagnostics.
 #' toy <- load_mfrmr_data("example_core")
 #' fit_quick <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
 #'                       method = "JML", maxit = 30)
@@ -115,7 +118,6 @@
 #' chk_quick <- reporting_checklist(fit_quick, diagnostics = diag_quick)
 #' head(chk_quick$checklist[, c("Section", "Item", "DraftReady")])
 #'
-#' \donttest{
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
 #'                 method = "MML", quad_points = 7, maxit = 30)
 #' diag <- diagnose_mfrm(fit, residual_pca = "both", diagnostic_mode = "both")
@@ -168,13 +170,14 @@ reporting_checklist <- function(fit,
   bias_error_tbl <- attr(bias_tbls, "errors", exact = TRUE)
   n_bias_errors <- if (is.data.frame(bias_error_tbl)) nrow(bias_error_tbl) else 0L
 
-  converged <- isTRUE(fit$summary$Converged %||% FALSE)
+  convergence <- mfrm_convergence_state(fit)
+  converged <- convergence$inference_ready
   summary_msg <- if (is.data.frame(fit$summary) && "Message" %in% names(fit$summary)) {
     as.character(fit$summary$Message[1] %||% "")
   } else {
     ""
   }
-  conv_msg <- as.character(fit$opt$message %||% summary_msg %||% "")
+  conv_msg <- as.character(convergence$detail %||% fit$opt$message %||% summary_msg %||% "")
   n_bias_pairs <- length(bias_tbls)
   has_bias_sig <- FALSE
   bias_stat_parse_issue <- FALSE
@@ -212,7 +215,27 @@ reporting_checklist <- function(fit,
   has_pca <- !is.null(pca_obj) && length(pca_obj) > 0
   has_counts <- has_resid && "Observed" %in% names(obs_df)
   has_person_measure <- has_resid && "PersonMeasure" %in% names(obs_df)
-  has_subsets <- !is.null(diagnostics$subsets)
+  subset_summary_df <- as.data.frame(
+    diagnostics$subsets$summary %||% data.frame(),
+    stringsAsFactors = FALSE
+  )
+  has_subsets <- !is.null(diagnostics$subsets) && nrow(subset_summary_df) > 0L
+  subset_count <- if (has_subsets) nrow(subset_summary_df) else NA_integer_
+  common_scale_linked <- identical(subset_count, 1L)
+  connectivity_detail <- if (!has_subsets) {
+    "No subset/connectivity output"
+  } else if (common_scale_linked) {
+    paste(
+      "One connected subset; the observed design satisfies the graph-connectivity",
+      "requirement. Review other identification and design assumptions separately."
+    )
+  } else {
+    paste0(
+      subset_count,
+      " disconnected subsets; connectivity was assessed, but cross-subset ",
+      "comparisons require a reviewed linking design before reporting."
+    )
+  }
   marginal_fit_bundle <- diagnostics$marginal_fit %||% list()
   strict_marginal_available <- isTRUE(marginal_fit_bundle$available)
   strict_pairwise_available <- isTRUE(marginal_fit_bundle$pairwise$available)
@@ -341,7 +364,7 @@ reporting_checklist <- function(fit,
         severity = "required",
         ready_for_apa = population_active && identical(population_posterior_basis, "population_model"),
         missing_action = "Fit with `method = \"MML\"`, `population_formula`, and one-row-per-person `person_data` before reporting latent regression.",
-        available_action = "Describe the fit as a first-version conditional-normal latent-regression MML model, not as a post hoc regression on EAP/MLE scores."
+        available_action = "Describe the fit as a conditional-normal latent-regression MML model, not as a post hoc regression on EAP/MLE scores."
       ),
       add_item(
         "Population Model",
@@ -462,19 +485,30 @@ reporting_checklist <- function(fit,
         "Method Section",
         "Convergence",
         converged,
-        detail = if (nzchar(conv_msg)) conv_msg else if (converged) "Converged" else "Convergence status unavailable",
+        detail = if (nzchar(conv_msg)) {
+          conv_msg
+        } else if (converged) {
+          "Optimizer diagnostics support inference-ready status."
+        } else {
+          "Optimizer diagnostics require review before inference."
+        },
         source_component = "fit$summary + fit$opt",
         missing_action = "Resolve convergence before reporting model results."
       ),
       add_item(
         "Method Section",
         "Connectivity assessed",
-        !is.null(diagnostics$subsets),
-        detail = if (!is.null(diagnostics$subsets)) "Connectivity/subset output available" else "No subset output",
+        has_subsets,
+        detail = connectivity_detail,
         source_component = "diagnostics$subsets",
-        severity = "recommended",
+        severity = "required",
+        ready_for_apa = common_scale_linked,
         missing_action = "Run the subset/connectivity diagnostics and summarize whether the design is connected.",
-        available_action = "Document the connectivity result before making common-scale or linking claims."
+        available_action = if (common_scale_linked) {
+          "Document the single connected subset before making common-scale claims."
+        } else {
+          "Do not make cross-subset or common-scale claims until the design or an external linking justification has been reviewed."
+        }
       ),
       add_item(
         "Method Section",
@@ -872,7 +906,10 @@ reporting_checklist <- function(fit,
         "Connectivity / design-matrix visual",
         has_subsets,
         detail = if (has_subsets) {
-          "subset_connectivity_report() and plot(..., type = \"design_matrix\") can use the current subset bundle"
+          paste0(
+            "subset_connectivity_report() and plot(..., type = \"design_matrix\") ",
+            "can use the current subset bundle; ", connectivity_detail
+          )
         } else {
           "No subset/connectivity bundle available"
         },
@@ -1044,15 +1081,15 @@ external_software_scope_table <- function(fit) {
   data.frame(
     Software = c("mfrmr native", "FACETS", "ConQuest", "SPSS"),
     Relationship = c(
-      "primary estimation/reporting surface",
-      "FACETS-style reporting and handoff surface",
+      "primary estimation and reporting workflow",
+      "FACETS-style reporting and file handoff",
       "scoped external-table comparison for latent-regression overlap",
-      "downstream table/report handoff only"
+      "table/report handoff only"
     ),
     CurrentSupport = c(
       "active",
       "active compatibility layer",
-      if (conquest_candidate) "candidate fit; additional exact-overlap restrictions apply" else "not active for this fit",
+      if (conquest_candidate) "candidate fit; additional documented comparison restrictions apply" else "not active for this fit",
       "CSV/data.frame outputs only"
     ),
     PrimaryHelpers = c(

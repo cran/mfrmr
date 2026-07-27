@@ -2,14 +2,16 @@
 % Please edit documentation in R/api-results.R
 \name{export_mfrm_results}
 \alias{export_mfrm_results}
-\title{Export a lightweight mfrm_results archive}
+\title{Export an mfrm_results analysis archive}
 \usage{
 export_mfrm_results(
   x,
   output_dir = ".",
   prefix = "mfrmr_results",
   include = "default",
+  preset = NULL,
   overwrite = FALSE,
+  acknowledge_sensitive = FALSE,
   zip_bundle = FALSE,
   zip_name = NULL,
   plot_width = 1200,
@@ -30,7 +32,16 @@ underscores.}
 \code{"report"} to write \code{\link[=mfrm_report]{mfrm_report()}} tables plus Markdown and HTML; add
 \code{"plots"} to write available plot routes as PNG files, or use \code{"all"}.}
 
+\item{preset}{Optional reader-facing analysis-archive preset. \code{"starter"} adds the
+report and plot routes to the default files and writes \code{index.html} with
+the required Wright map embedded at the start of the reading flow.}
+
 \item{overwrite}{Logical; if \code{FALSE}, existing files stop the export.}
+
+\item{acknowledge_sensitive}{Logical; set to \code{TRUE} only after acknowledging
+that every preset can contain direct person identifiers, person-level
+results, original labels, local paths, and a complete result object. This
+suppresses the privacy warning; it does not deidentify any file.}
 
 \item{zip_bundle}{Logical; if \code{TRUE}, create a best-effort zip archive of
 the written files.}
@@ -47,9 +58,9 @@ An \code{mfrm_results_export} object with \code{summary}, \code{written_files},
 }
 \description{
 \code{export_mfrm_results()} writes the contents of an existing \code{\link[=mfrm_results]{mfrm_results()}}
-object to a small shareable folder. It is a results-download helper for the
+object to a compact analysis folder. It is a results-download helper for the
 comprehensive first-screen workflow, not a new estimation, diagnostics, or
-validation step.
+validation step. The folder is not deidentified or automatically shareable.
 }
 \details{
 The helper writes:
@@ -62,13 +73,27 @@ evidence-summary, and reporting-template CSVs plus Markdown and HTML;
 \item a lightweight HTML report equivalent to \code{mfrm_results(x, output = "html")}
 for the already-created object;
 \item an \code{.rds} copy of the \code{mfrm_results} object;
-\item a replay \code{.R} scaffold from \code{x$input$reproducible_code};
+\item a replay \code{.R} script from \code{x$input$reproducible_code};
 \item a written-files manifest and compact export summary.
 }
+
+All presets, including \code{"starter"}, are analysis archives. In particular,
+the default \code{.rds} file retains the complete result object, and CSV, HTML,
+plot, and replay artifacts can retain direct identifiers or other sensitive
+study information. The manifest labels each file for review, but the helper
+does not pseudonymize, redact, or certify an export for sharing. Apply the
+study's data-governance process before moving the files outside the approved
+analysis environment.
 
 Plot export is intentionally optional because some plot routes can be
 comparatively slow or require richer graphics devices. Plot failures are
 recorded in the returned \code{plot_errors} table rather than stopping the export.
+The \code{"starter"} preset is the recommended reader-oriented analysis archive
+because it always
+requests the Wright map in addition to the result summary, report, replay
+script, and manifest. Its Infit pathway includes a bounded selection of
+person rows so person fit can be reviewed without replacing the required
+Wright-map first screen.
 }
 \examples{
 \donttest{
@@ -82,6 +107,7 @@ exported <- export_mfrm_results(
   res,
   output_dir = tempdir(),
   prefix = "mfrmr_results_example",
+  preset = "starter",
   overwrite = TRUE
 )
 exported$summary[, c("FilesWritten", "CsvWritten", "HtmlWritten")]

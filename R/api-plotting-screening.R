@@ -46,6 +46,7 @@
 #'   [diagnose_mfrm()] for the underlying diagnostics bundle.
 #'
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
 #'                 method = "JML", maxit = 30)
@@ -56,6 +57,7 @@
 #' #   rows are sorted by person ability. Cells circled by the
 #' #   unexpected-response overlay break the staircase and warrant
 #' #   case-level review with `unexpected_response_table()`.
+#' }
 #' @export
 plot_guttman_scalogram <- function(fit,
                                    diagnostics = NULL,
@@ -221,6 +223,7 @@ plot_guttman_scalogram <- function(fit,
 #'   `Person`, `Theoretical`, `Sample` columns.
 #'
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
 #'                 method = "JML", maxit = 30)
@@ -231,6 +234,7 @@ plot_guttman_scalogram <- function(fit,
 #' #   the standard normal expectation; pair with `plot_unexpected()`
 #' #   for case-level follow-up. This is an exploratory screen; do
 #' #   not treat tail behaviour as a definitive normality test.
+#' }
 #' @export
 plot_residual_qq <- function(fit,
                              diagnostics = NULL,
@@ -502,6 +506,7 @@ plot_rater_trajectory <- function(fits,
 #'   reads from.
 #'
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
 #'                 method = "JML", maxit = 30)
@@ -516,6 +521,7 @@ plot_rater_trajectory <- function(fits,
 #' #   `[-1, 1]`; positive cells = pairs agree on relative ordering,
 #' #   negative cells = pairs systematically rank persons in opposite
 #' #   directions and are the highest-priority review cases.
+#' }
 #' @export
 plot_rater_agreement_heatmap <- function(fit,
                                          diagnostics = NULL,

@@ -32,6 +32,7 @@ so deviations from the reference line diagnose distributional
 misfit that mean-square summaries may miss.
 }
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                 method = "JML", maxit = 30)
@@ -42,4 +43,5 @@ head(p$data$data)
 #   the standard normal expectation; pair with `plot_unexpected()`
 #   for case-level follow-up. This is an exploratory screen; do
 #   not treat tail behaviour as a definitive normality test.
+}
 }

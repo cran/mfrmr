@@ -44,13 +44,13 @@ labeled \code{large_zstd_shift} when the |ZSTD| flag status is unchanged.
 Default \code{0.5}.}
 
 \item{df_ratio_tolerance}{Relative df-difference tolerance used to classify
-the internal engine-vs-FACETS-style df difference; for example, \code{0.05}
+the within-mfrmr engine-vs-FACETS-style df difference; for example, \code{0.05}
 means a 5 percent df difference.}
 }
 \value{
 An \code{mfrm_facets_fit_review} bundle with:
 \itemize{
-\item \code{summary}: one-row overview of internal and external comparison counts
+\item \code{summary}: one-row overview of within-mfrmr and external comparison counts
 \item \code{standardization}: the fit-standardization guide from diagnostics
 \item \code{df_sensitivity}: engine-vs-FACETS-style df/ZSTD comparison using
 the same row-level status taxonomy as \code{fit_measures_table()$df_sensitivity}
@@ -84,7 +84,7 @@ The review is row-matched by \code{Facet} and \code{Level}. It treats MnSq, ZSTD
 differences separately because FACETS documentation makes the df convention
 and Wilson-Hilferty/WHEXACT handling central to ZSTD interpretation.
 
-Two upstream boundaries also apply. For \code{method = "MML"} fits, residuals
+Two prior limitations also apply. For \code{method = "MML"} fits, residuals
 are evaluated at shrunken EAP person measures while FACETS uses JMLE
 estimates, so MnSq itself can differ before standardization; refit with
 \code{method = "JML"} for a JMLE-style residual basis. And mfrmr withholds
@@ -94,11 +94,14 @@ sparse cell; such NA-vs-finite pairs are availability differences, not
 fit differences. Both notes are repeated in the returned \code{guidance} table.
 }
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 30)
+  method = "JML", maxit = 30
+)
 review <- facets_fit_review(fit)
 summary(review)
+}
 }
 \seealso{
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=facets_output_contract_review]{facets_output_contract_review()}},

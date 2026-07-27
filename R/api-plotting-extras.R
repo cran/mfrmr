@@ -1,5 +1,5 @@
 # ==============================================================================
-# Additional visualization helpers (added in 0.1.6)
+# Additional visualization helpers
 # ==============================================================================
 #
 # Each function in this file follows the established mfrmr plot conventions:
@@ -42,9 +42,9 @@
 #'   [plot.mfrm_fit()] (`type = "ccc"`).
 #'
 #' @examples
-#' toy <- load_mfrmr_data("example_core")
+#' toy <- load_mfrmr_data("example_operational")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-#'                 method = "JML", maxit = 30)
+#'                 method = "MML", quad_points = 7, maxit = 30)
 #' p <- plot_threshold_ladder(fit, draw = FALSE)
 #' head(p$data$data)
 #' @export
@@ -189,11 +189,13 @@ plot_threshold_ladder <- function(fit,
 #'   [build_misfit_casebook()].
 #'
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
 #'                 method = "JML", maxit = 30)
 #' p <- plot_person_fit(fit, draw = FALSE)
 #' head(p$data$data)
+#' }
 #' @export
 plot_person_fit <- function(fit,
                             diagnostics = NULL,
@@ -299,7 +301,7 @@ plot_person_fit <- function(fit,
   plot_title <- "Person fit"
   plot_subtitle <- if (identical(fit_index, "meansquare")) {
     sprintf(
-      "Infit and Outfit per person (acceptance band [%g, %g], Linacre 2002)",
+      "Infit and Outfit per person (heuristic review band [%g, %g], Linacre 2002)",
       lower, upper
     )
   } else {
@@ -530,11 +532,13 @@ plot_person_fit <- function(fit,
 #' @concept rater severity
 #'
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
 #'                 method = "JML", maxit = 30)
 #' p <- plot_rater_severity_profile(fit, draw = FALSE)
 #' head(p$data$data)
+#' }
 #' @export
 plot_rater_severity_profile <- function(fit,
                                         diagnostics = NULL,
@@ -652,9 +656,8 @@ plot_rater_severity_profile <- function(fit,
 #' Compact effect-size summary for a [analyze_dff()] / [analyze_dif()]
 #' result. Shows each contrast's signed effect size as a horizontal bar
 #' with a vertical reference at zero, coloured by the method-appropriate
-#' classification. ETS-style A / B / C colours are used only when they
-#' are actually available; residual-method screening labels otherwise use
-#' the neutral colour.
+#' classification. Current residual and refit screening labels use the
+#' neutral colour; refit output does not receive ETS A/B/C labels.
 #'
 #' @param x Output from [analyze_dff()] or [analyze_dif()].
 #' @param top_n Maximum rows shown (default `30`).
@@ -666,8 +669,8 @@ plot_rater_severity_profile <- function(fit,
 #'   intervals drawn from `Effect +/- z * SE` when finite standard errors are
 #'   available. Use `NULL` (default) to omit intervals.
 #' @param effect_thresholds Optional numeric vector of absolute effect-size
-#'   guide lines to draw at `+/- threshold`. These are display aids; only use
-#'   ETS-like values when the source rows support ETS interpretation.
+#'   guide lines to draw at `+/- threshold`. These are display aids, not ETS
+#'   classification boundaries.
 #' @param effect_axis_label Optional x-axis label override. When `NULL`, the
 #'   label is chosen from the DFF method.
 #'
@@ -680,9 +683,8 @@ plot_rater_severity_profile <- function(fit,
 #' observed-minus-expected average screening contrast between groups. For
 #' `method = "refit"`, this is the subgroup parameter difference on the
 #' fitted logit scale when linking support allows a comparable contrast.
-#' The ETS classification (A negligible, B moderate, C large) drives bar
-#' colour only when `ClassificationSystem == "ETS"`; otherwise the bar
-#' uses the preset's neutral.
+#' Current DFF/DIF classifications are screening-only, so bars use the
+#' preset's neutral colour.
 #'
 #' @seealso [analyze_dff()], [analyze_dif()], [plot_dif_heatmap()].
 #'
@@ -691,6 +693,7 @@ plot_rater_severity_profile <- function(fit,
 #' @concept DFF DIF
 #'
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_bias")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
 #'                 method = "JML", maxit = 30)
@@ -700,6 +703,7 @@ plot_rater_severity_profile <- function(fit,
 #' unique(dff$dif_table$ClassificationSystem)
 #' p <- plot_dif_summary(dff, draw = FALSE)
 #' head(p$data$data)
+#' }
 #' @export
 plot_dif_summary <- function(x,
                              top_n = 30L,
@@ -890,10 +894,10 @@ plot_dif_summary <- function(x,
 }
 
 
-#' Manuscript-ready four-panel composite (Wright + severity + threshold + summary)
+#' Manuscript-oriented four-panel draft (Wright + severity + threshold + summary)
 #'
-#' Builds a 2x2 publication composite for an `mfrm_fit`, suitable for a
-#' "Figure 1" in the Rasch-family `RSM`/`PCM` manuscript route. Panels: (1)
+#' Builds a 2x2 draft composite for an `mfrm_fit`, suitable for reviewing a
+#' possible "Figure 1" in the Rasch-family `RSM`/`PCM` manuscript route. Panels: (1)
 #' Wright map, (2)
 #' rater severity profile with CI whiskers, (3) threshold ladder, (4)
 #' a one-line reliability / separation summary block. Each panel reuses
@@ -911,13 +915,18 @@ plot_dif_summary <- function(x,
 #'
 #' @return Invisibly, an `mfrm_plot_data` object whose `data` slot
 #'   bundles the four panel data objects under `wright`, `severity`,
-#'   `threshold`, and `summary`.
+#'   `threshold`, and `summary`. Fit readiness is retained in
+#'   `data$fit_readiness`, `data$interpretation_status`, and
+#'   `data$interpretation_note`.
 #'
 #' @section Interpreting output:
-#' Designed for a single-figure Methods or Results overview. The
+#' Designed as a single-figure Methods or Results draft. The
 #' summary panel prints the model class, sample size, log-likelihood,
 #' AIC/BIC, and the largest non-Person facet's separation /
-#' reliability if available.
+#' reliability if available. A fit that has not passed its numerical, data,
+#' design, and stability gates produces one warning and a visible
+#' `"REVIEW ONLY"` label. Resolve that review before treating the composite as
+#' report-ready evidence.
 #'
 #' @seealso [plot.mfrm_fit()] (`type = "wright"`),
 #'   [plot_rater_severity_profile()], [plot_threshold_ladder()],
@@ -928,11 +937,13 @@ plot_dif_summary <- function(x,
 #' @concept visual diagnostics
 #'
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
 #'                 method = "JML", maxit = 30)
 #' p <- plot_apa_figure_one(fit, draw = FALSE)
 #' names(p$data)
+#' }
 #' @export
 plot_apa_figure_one <- function(fit,
                                 diagnostics = NULL,
@@ -944,17 +955,30 @@ plot_apa_figure_one <- function(fit,
     stop("`fit` must be an mfrm_fit object from fit_mfrm().", call. = FALSE)
   }
   style <- resolve_plot_preset(preset)
+  readiness <- .mfrm_fit_plot_readiness(fit)
+  muffle_nested_readiness <- function(expr) {
+    withCallingHandlers(
+      expr,
+      warning = function(w) {
+        if (identical(conditionMessage(w), readiness$detail)) {
+          invokeRestart("muffleWarning")
+        }
+      }
+    )
+  }
   if (is.null(diagnostics)) {
     diagnostics <- suppressMessages(suppressWarnings(
       diagnose_mfrm(fit, residual_pca = "none")
     ))
   }
-  wright <- plot(fit, type = "wright", draw = FALSE)
+  wright <- muffle_nested_readiness(
+    plot(fit, type = "wright", preset = preset, draw = FALSE)
+  )
   severity <- plot_rater_severity_profile(
     fit, diagnostics = diagnostics, facet = rater_facet,
-    ci_level = ci_level, draw = FALSE
+    ci_level = ci_level, preset = preset, draw = FALSE
   )
-  threshold <- plot_threshold_ladder(fit, draw = FALSE)
+  threshold <- plot_threshold_ladder(fit, preset = preset, draw = FALSE)
   summary_lines <- character(0)
   s <- fit$summary
   first_summary_value <- function(tbl, candidates, fallback = NA) {
@@ -1023,7 +1047,9 @@ plot_apa_figure_one <- function(fit,
     old_par <- graphics::par(no.readonly = TRUE)
     on.exit(graphics::par(old_par), add = TRUE)
     graphics::layout(matrix(c(1, 2, 3, 4), nrow = 2L, byrow = TRUE))
-    plot(fit, type = "wright", preset = preset, draw = TRUE)
+    muffle_nested_readiness(
+      plot(fit, type = "wright", preset = preset, draw = TRUE)
+    )
     plot_rater_severity_profile(fit, diagnostics = diagnostics,
                                 facet = rater_facet,
                                 ci_level = ci_level,
@@ -1031,7 +1057,14 @@ plot_apa_figure_one <- function(fit,
     plot_threshold_ladder(fit, preset = preset, draw = TRUE)
     apply_plot_preset(style)
     graphics::plot.new()
-    graphics::title(main = "Fit summary", line = 1)
+    graphics::title(
+      main = if (isTRUE(readiness$ready)) {
+        "Fit summary"
+      } else {
+        "REVIEW ONLY - Fit summary"
+      },
+      line = 1
+    )
     graphics::text(
       x = 0, y = seq(1, 0, length.out = length(summary_lines) + 2L)[-c(1, length(summary_lines) + 2L)],
       labels = summary_lines, adj = 0, cex = 0.9
@@ -1048,9 +1081,13 @@ plot_apa_figure_one <- function(fit,
         summary = summary_lines
       ),
       title = "APA Figure 1: Wright + severity + threshold + summary",
-      subtitle = "2x2 publication composite",
+      subtitle = "2x2 manuscript-oriented draft composite",
       preset = style$name
     )
   )
+  out <- .mfrm_attach_plot_readiness(out, readiness)
+  if (!isTRUE(readiness$ready)) {
+    warning(readiness$detail, call. = FALSE)
+  }
   invisible(out)
 }

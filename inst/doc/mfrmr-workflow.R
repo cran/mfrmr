@@ -1,5 +1,19 @@
 ## ----include = FALSE----------------------------------------------------------
 is_cran_check <- !isTRUE(as.logical(Sys.getenv("NOT_CRAN", "false")))
+vignette_artifact <- function(name) {
+  path <- system.file(
+    "extdata", "vignette-artifacts", name,
+    package = "mfrmr",
+    mustWork = TRUE
+  )
+  read.csv(
+    path,
+    stringsAsFactors = FALSE,
+    check.names = FALSE,
+    na.strings = character(),
+    colClasses = "character"
+  )
+}
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
@@ -11,7 +25,7 @@ knitr::opts_chunk$set(
 ## ----load-data----------------------------------------------------------------
 # library(mfrmr)
 # 
-# list_mfrmr_data()
+# list_mfrmr_data(details = TRUE)[, c("Key", "PrimaryUse", "Design", "CountBasis")]
 # 
 # data("ej2021_study1", package = "mfrmr")
 # head(ej2021_study1)
@@ -20,23 +34,129 @@ knitr::opts_chunk$set(
 # identical(names(ej2021_study1), names(study1_alt))
 
 ## ----toy-setup----------------------------------------------------------------
-# data("mfrmr_example_core", package = "mfrmr")
-# toy <- mfrmr_example_core
+# data("mfrmr_example_operational", package = "mfrmr")
+# data("mfrmr_example_operational_design", package = "mfrmr")
+# toy <- mfrmr_example_operational
+# 
+# data_review_toy <- describe_mfrm_data(
+#   data = toy,
+#   person = "Person",
+#   facets = c("Rater", "Criterion"),
+#   score = "Score",
+#   rating_min = 1,
+#   rating_max = 4,
+#   expected_design = mfrmr_example_operational_design
+# )
+# data_summary_toy <- summary(data_review_toy)
+# data_summary_toy$structural_missingness
+# data_summary_toy$design_connectivity
 # 
 # fit_toy <- fit_mfrm(
 #   data = toy,
 #   person = "Person",
 #   facets = c("Rater", "Criterion"),
 #   score = "Score",
-#   method = "JML",
-#   model = "RSM",
-#   maxit = 30
+#   method = "MML",
+#   model = "RSM"
 # )
-# diag_toy <- diagnose_mfrm(fit_toy, residual_pca = "none")
+# diag_toy <- diagnose_mfrm(
+#   fit_toy,
+#   residual_pca = "none",
+#   diagnostic_mode = "both",
+#   fit_df_method = "both"
+# )
 # 
-# summary(fit_toy)$overview
+# # Fast fit-only summary: this does not compute diagnostics.
+# fit_summary_toy <- summary(fit_toy, profile = "fit", detail = "brief")
+# 
+# # Comprehensive review, reusing diagnostics already computed above.
+# facets_summary_toy <- summary(
+#   fit_toy,
+#   profile = "facets",
+#   detail = "brief",
+#   diagnostics = diag_toy
+# )
+# res_toy <- facets_summary_toy$results
+# 
+# fit_summary_toy$overview
+# fit_summary_toy$readiness
+# fit_summary_toy$data_review
 # summary(diag_toy)$overview
-# names(plot(fit_toy, draw = FALSE))
+# facets_summary_toy
+# 
+# # Required first fitted-scale figure.
+# plot(res_toy, type = "wright", preset = "publication", show_ci = TRUE, top_n = Inf)
+# 
+# # Optional FACETS-style ruler. Replace these examples with the study rubric.
+# rubric_labels <- c(
+#   "1" = "Level 1",
+#   "2" = "Level 2",
+#   "3" = "Level 3",
+#   "4" = "Level 4"
+# )
+# plot(
+#   res_toy,
+#   type = "wright",
+#   renderer = "facets",
+#   category_labels = rubric_labels,
+#   show_ci = FALSE,
+#   preset = "publication"
+# )
+# # Setting show_ci = TRUE on this FACETS-style ruler is available as a
+# # deliberate hybrid: FACETS ruler grammar plus mfrmr uncertainty intervals.
+# 
+# # Optional follow-up: Infit on x, measure on y; persons are explicit opt-in.
+# plot(
+#   res_toy,
+#   type = "fit_pathway",
+#   fit_stat = "Infit",
+#   include_person = TRUE,
+#   top_n_person = 12,
+#   person_labels = "none",
+#   facet_labels = "flagged",
+#   preset = "publication"
+# )
+
+## ----summary-profile-controls, eval = FALSE-----------------------------------
+# reporting_summary_toy <- summary(
+#   fit_toy,
+#   profile = "reporting",
+#   diagnostics = diag_toy
+# )
+# 
+# availability_only <- summary(
+#   fit_toy,
+#   profile = "facets",
+#   compute = "never"
+# )
+# availability_only$section_status
+
+## ----toy-setup-artifacts, echo = FALSE, eval = is_cran_check------------------
+vignette_artifact("workflow_fit_overview.csv")
+vignette_artifact("workflow_diagnostic_overview.csv")
+vignette_artifact("workflow_plot_components.csv")
+
+## ----primary-route------------------------------------------------------------
+# report_toy <- mfrm_report(res_toy, style = "qc")
+# 
+# summary(res_toy)$next_actions
+# summary(report_toy)$overview
+# 
+# # This is a controlled analysis archive, not a deidentified shareable export.
+# export_dir <- file.path(tempdir(), "mfrmr-workflow-export")
+# export_toy <- export_mfrm_results(
+#   res_toy,
+#   output_dir = export_dir,
+#   include = c("default", "report"),
+#   overwrite = TRUE,
+#   acknowledge_sensitive = TRUE
+# )
+# head(export_toy$written_files)
+
+## ----primary-route-artifacts, echo = FALSE, eval = is_cran_check--------------
+vignette_artifact("workflow_next_actions.csv")
+vignette_artifact("workflow_report_overview.csv")
+vignette_artifact("workflow_export_files.csv")
 
 ## ----diagnostics-reporting----------------------------------------------------
 # t4_toy <- unexpected_response_table(
@@ -69,6 +189,11 @@ knitr::opts_chunk$set(
 #   c("Item", "DraftReady", "NextAction")
 # )
 
+## ----diagnostics-reporting-artifacts, echo = FALSE, eval = is_cran_check------
+vignette_artifact("workflow_summary_classes.csv")
+vignette_artifact("workflow_plot_object_components.csv")
+vignette_artifact("workflow_visual_checklist.csv")
+
 ## ----fit-full-----------------------------------------------------------------
 # fit <- fit_mfrm(
 #   data = ej2021_study1,
@@ -82,11 +207,35 @@ knitr::opts_chunk$set(
 # 
 # diag <- diagnose_mfrm(
 #   fit,
-#   residual_pca = "none"
+#   residual_pca = "none",
+#   diagnostic_mode = "both",
+#   fit_df_method = "both"
 # )
 # 
-# summary(fit)
+# summary(fit, profile = "fit", detail = "brief")
 # summary(diag)
+# 
+# # Keep the final figure flow explicit: fit -> Wright map -> follow-up plots.
+# s <- summary(fit, profile = "facets", diagnostics = diag)
+# res <- s$results
+# s
+# plot(res, type = "wright", preset = "publication", show_ci = TRUE, top_n = Inf)
+# 
+# # Optional closest FACETS-style asterisk ruler (without mfrmr CI overlays).
+# plot(res, type = "wright", renderer = "facets",
+#      category_labels = rubric_labels, show_ci = FALSE,
+#      preset = "publication")
+# 
+# plot(
+#   res,
+#   type = "fit_pathway",
+#   fit_stat = "Infit",
+#   include_person = TRUE,
+#   top_n_person = 12,
+#   person_labels = "none",
+#   facet_labels = "flagged",
+#   preset = "publication"
+# )
 
 ## ----fit-full-pca-------------------------------------------------------------
 # diag_pca <- diagnose_mfrm(
@@ -208,6 +357,21 @@ knitr::opts_chunk$set(
 # bias_rep <- bias_interaction_report(bias, top_n = 20)
 # plot_bias_interaction(bias_rep, plot = "scatter")
 
+## ----gd-study-reading-order, eval=FALSE---------------------------------------
+# if (requireNamespace("lme4", quietly = TRUE)) {
+#   gt <- mfrm_generalizability(fit)
+#   gt$coefficients[, c("G", "Phi", "GStatus", "PhiStatus",
+#                       "IdentificationStatus")]
+# 
+#   ds <- mfrm_d_study(
+#     gt,
+#     data.frame(Rater = c(2, 3, 4), Criterion = 4),
+#     residual_scaling = "sensitivity"
+#   )
+#   ds[, c("n_Rater", "n_Criterion", "ResidualScaling",
+#          "G", "Phi", "GStatus", "PhiStatus", "IdentificationStatus")]
+# }
+
 ## ----design-prediction--------------------------------------------------------
 # sim_spec <- build_mfrm_sim_spec(
 #   n_person = 30,
@@ -260,33 +424,6 @@ knitr::opts_chunk$set(
 #   appendix_preset = "recommended"
 # )
 # recovery_bundle$table_index[, c("Table", "Rows", "Role")]
-# 
-# # For a release-scale check, use the optional validation protocol:
-# # source(system.file("validation", "recovery-validation.R", package = "mfrmr"))
-# # validation <- mfrmr_run_recovery_validation(tier = "core", output_dir = "recovery-validation")
-# # summary(validation)
-# # validation_summary <- summary(validation)
-# # validation_summary$reading_order
-# # validation_summary$topline_release_decision
-# # validation_summary$release_decision_table
-# # validation_summary$condition_reporting_notes
-# # validation_summary$condition_summary
-# # validation_summary$diagnostic_reporting_notes
-# # validation_summary$domain_decision_table
-# # validation_bundle <- build_summary_table_bundle(validation_summary)
-# # validation_bundle$tables$reading_order
-# # validation_bundle$tables$topline_release_decision
-# # validation_bundle$tables$condition_reporting_notes
-# # validation_bundle$tables$condition_summary
-# # validation_bundle$tables$diagnostic_reporting_notes
-# # The top-line table is the release-recovery conclusion. It uses recovery
-# # metrics, convergence, and Monte Carlo precision from core cases as the
-# # primary evidence, while ExtendedSensitivityStatus reports non-core stress
-# # cases separately. The condition notes and condition table keep generator
-# # stress and score support separate from recovery metrics, so OverallStatus = "review" is not
-# # read as a recovery-metric failure by itself. The diagnostic reporting notes
-# # turn fit/separation operating characteristics into report caveats rather
-# # than release gates.
 # 
 # pred_pop <- predict_mfrm_population(
 #   sim_spec = sim_spec,

@@ -32,8 +32,8 @@ intervals drawn from \verb{Effect +/- z * SE} when finite standard errors are
 available. Use \code{NULL} (default) to omit intervals.}
 
 \item{effect_thresholds}{Optional numeric vector of absolute effect-size
-guide lines to draw at \verb{+/- threshold}. These are display aids; only use
-ETS-like values when the source rows support ETS interpretation.}
+guide lines to draw at \verb{+/- threshold}. These are display aids, not ETS
+classification boundaries.}
 
 \item{effect_axis_label}{Optional x-axis label override. When \code{NULL}, the
 label is chosen from the DFF method.}
@@ -46,9 +46,8 @@ columns \code{Pair}, \code{Effect}, \code{SE}, \code{Classification}, \code{Colo
 Compact effect-size summary for a \code{\link[=analyze_dff]{analyze_dff()}} / \code{\link[=analyze_dif]{analyze_dif()}}
 result. Shows each contrast's signed effect size as a horizontal bar
 with a vertical reference at zero, coloured by the method-appropriate
-classification. ETS-style A / B / C colours are used only when they
-are actually available; residual-method screening labels otherwise use
-the neutral colour.
+classification. Current residual and refit screening labels use the
+neutral colour; refit output does not receive ETS A/B/C labels.
 }
 \section{Interpreting output}{
 
@@ -57,12 +56,12 @@ contrast's native scale. For \code{method = "residual"}, this is the
 observed-minus-expected average screening contrast between groups. For
 \code{method = "refit"}, this is the subgroup parameter difference on the
 fitted logit scale when linking support allows a comparable contrast.
-The ETS classification (A negligible, B moderate, C large) drives bar
-colour only when \code{ClassificationSystem == "ETS"}; otherwise the bar
-uses the preset's neutral.
+Current DFF/DIF classifications are screening-only, so bars use the
+preset's neutral colour.
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_bias")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                 method = "JML", maxit = 30)
@@ -72,6 +71,7 @@ dff <- analyze_dff(fit, diagnostics = diag,
 unique(dff$dif_table$ClassificationSystem)
 p <- plot_dif_summary(dff, draw = FALSE)
 head(p$data$data)
+}
 }
 \seealso{
 \code{\link[=analyze_dff]{analyze_dff()}}, \code{\link[=analyze_dif]{analyze_dif()}}, \code{\link[=plot_dif_heatmap]{plot_dif_heatmap()}}.

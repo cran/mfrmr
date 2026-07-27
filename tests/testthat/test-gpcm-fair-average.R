@@ -182,6 +182,27 @@ test_that("estimate_bias() no longer hard-stops on GPCM fits", {
   expect_identical(bias$method, "GPCM-slope-aware")
   expect_true(!is.null(bias$caveat))
   expect_true(grepl("slope-aware GPCM kernel", bias$caveat, fixed = TRUE))
+
+  post_bias <- unexpected_after_bias_table(
+    fit,
+    bias_results = bias,
+    diagnostics = dx,
+    top_n = 20
+  )
+  expect_s3_class(post_bias, "mfrm_unexpected_after_bias")
+  expect_equal(nrow(post_bias$summary), 1L)
+  expect_true(all(is.finite(unlist(post_bias$summary[c(
+    "BaselineUnexpectedN", "AfterBiasUnexpectedN", "ReducedBy"
+  )], use.names = FALSE))))
+  expect_true(nrow(post_bias$gpcm_boundary) == 1L)
+  expect_identical(
+    post_bias$gpcm_boundary$Area[1],
+    "Residual-bias screening under bounded GPCM"
+  )
+  expect_identical(
+    post_bias$gpcm_boundary$Status[1],
+    "supported_with_caveat"
+  )
   # Bias point estimates must be finite, well-bounded, and accompanied
   # by the screening-tier inference columns.
   expect_true(all(is.finite(bias$table$`Bias Size`)))

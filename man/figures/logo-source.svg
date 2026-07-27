@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 866 1000">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#24244a"/><stop offset="100%" stop-color="#12122a"/>
+    </linearGradient>
+    <clipPath id="hx"><path d="M433 8 L858 253 V747 L433 992 L8 747 V253 Z"/></clipPath>
+  </defs>
+  <path d="M433 8 L858 253 V747 L433 992 L8 747 V253 Z" fill="url(#bg)"/>
+  <g clip-path="url(#hx)">
+    <g stroke="#ffffff" stroke-opacity="0.12" stroke-width="4" stroke-dasharray="2 14" stroke-linecap="round">
+      <line x1="30" y1="349" x2="836" y2="349"/><line x1="30" y1="449" x2="836" y2="449"/>
+      <line x1="30" y1="549" x2="836" y2="549"/>
+    </g>
+    <g text-anchor="middle" font-family="TeX Gyre Termes" font-style="italic" font-weight="700" font-size="42" fill="#b3b8fa">
+      <text x="198" y="224">&#952;</text><text x="356" y="224">&#948;</text>
+      <text x="514" y="224">&#946;</text><text x="672" y="224">&#964;</text>
+    </g>
+    <line x1="198" y1="248" x2="198" y2="650" stroke="#ffffff" stroke-opacity="0.35" stroke-width="6" stroke-linecap="round"/>
+    <rect x="183" y="252" width="12" height="46" rx="6" fill="#dde131"/>
+    <rect x="163" y="302" width="32" height="46" rx="6" fill="#a2d648"/>
+    <rect x="145" y="352" width="50" height="46" rx="6" fill="#66cb5f"/>
+    <rect x="123" y="402" width="72" height="46" rx="6" fill="#4ab76f"/>
+    <rect x="127" y="452" width="68" height="46" rx="6" fill="#34a27f"/>
+    <rect x="149" y="502" width="46" height="46" rx="6" fill="#248f8e"/>
+    <rect x="167" y="552" width="28" height="46" rx="6" fill="#37839b"/>
+    <rect x="183" y="602" width="12" height="46" rx="6" fill="#4977a8"/>
+    <g stroke="#ffffff" stroke-opacity="0.35" stroke-width="7" stroke-linecap="round">
+      <line x1="356" y1="248" x2="356" y2="650"/><line x1="514" y1="248" x2="514" y2="650"/>
+    </g>
+    <circle cx="356" cy="276" r="12" fill="#dce132"/>
+    <circle cx="356" cy="376" r="21" fill="#65ca5f"/>
+    <circle cx="356" cy="474" r="14" fill="#34a37f"/>
+    <circle cx="356" cy="588" r="17" fill="#3b809e"/>
+    <circle cx="514" cy="322" r="19" fill="#a5d647"/>
+    <circle cx="514" cy="528" r="15" fill="#258e8f"/>
+    <circle cx="514" cy="636" r="12" fill="#4d74aa"/>
+    <circle cx="514" cy="430" r="12" fill="none" stroke="#48b571" stroke-width="5"/>
+    <rect x="655" y="248" width="34" height="97" rx="9" fill="#fde725"/>
+    <rect x="655" y="353" width="34" height="92" rx="9" fill="#5ec962"/>
+    <rect x="655" y="453" width="34" height="92" rx="9" fill="#21918c"/>
+    <rect x="655" y="553" width="34" height="97" rx="9" fill="#5271ae"/>
+    <g stroke="#ffffff" stroke-opacity="0.45" stroke-width="3">
+      <line x1="647" y1="349" x2="697" y2="349"/><line x1="647" y1="449" x2="697" y2="449"/>
+      <line x1="647" y1="549" x2="697" y2="549"/>
+    </g>
+  </g>
+  <path d="M433 8 L858 253 V747 L433 992 L8 747 V253 Z" fill="none" stroke="#8b90cf" stroke-width="16" stroke-linejoin="round"/>
+  <text x="433" y="826" text-anchor="middle" font-family="IBM Plex Serif" font-weight="700" font-size="152" fill="#ffffff" style="letter-spacing:2px">mfrmr</text>
+</svg>

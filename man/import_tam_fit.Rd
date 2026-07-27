@@ -38,6 +38,17 @@ non-person facet is mapped onto a row of \code{fit$facets$others}
 so downstream MFRM helpers (e.g. \code{plot_qc_dashboard()}) work
 on the imported object.
 }
+\examples{
+\donttest{
+if (requireNamespace("TAM", quietly = TRUE)) {
+  response_matrix <- matrix(sample(0:3, 60, replace = TRUE), nrow = 20)
+  colnames(response_matrix) <- paste0("Item", seq_len(ncol(response_matrix)))
+  fit <- TAM::tam.mml(resp = response_matrix, irtmodel = "PCM")
+  imported <- import_tam_fit(fit, model = "PCM")
+  imported$summary
+}
+}
+}
 \seealso{
 \code{\link[=import_mirt_fit]{import_mirt_fit()}}, \code{\link[=import_erm_fit]{import_erm_fit()}}
 }

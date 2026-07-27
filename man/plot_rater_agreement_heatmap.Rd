@@ -43,6 +43,7 @@ The plot is a compact alternative to \code{\link[=plot_interrater_agreement]{plo
 bar chart when the rater count exceeds ~6 pairs.
 }
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                 method = "JML", maxit = 30)
@@ -57,6 +58,7 @@ dim(p$data$matrix)
 #   `[-1, 1]`; positive cells = pairs agree on relative ordering,
 #   negative cells = pairs systematically rank persons in opposite
 #   directions and are the highest-priority review cases.
+}
 }
 \seealso{
 \code{\link[=interrater_agreement_table]{interrater_agreement_table()}} for the underlying numeric

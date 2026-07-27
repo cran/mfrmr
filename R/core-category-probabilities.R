@@ -3,7 +3,7 @@
 # ==============================================================================
 #
 # Pure-math helpers for the Rasch-family polytomous response models.
-# Split out of `mfrm_core.R` for 0.1.6 so the category probability
+# Split out of `mfrm_core.R` so the category probability
 # kernels live in a single, browseable file. The functions are
 # internal (no @export) and are called directly by the MML / JML
 # likelihood builders, the information helpers, and the pathway /
@@ -104,4 +104,73 @@ category_prob_gpcm <- function(eta, step_cum_mat, criterion_idx, slopes,
   row_max <- row_max_fast(log_num)
   log_denom <- row_max + log(rowSums(exp(log_num - row_max)))
   exp(log_num - matrix(log_denom, nrow = n, ncol = k_cat))
+}
+
+# Joint probability / observed-log-probability kernel used by the optimizer.
+# Keeping both quantities in one bundle lets the objective and analytical
+# gradient share the same normalization work at an identical parameter vector.
+# The observed log probabilities are retained directly rather than recovered
+# with log(probs), which preserves log-domain stability for extreme logits.
+mfrm_jml_probability_bundle <- function(eta,
+                                          score_k,
+                                          model,
+                                          step_cum,
+                                          criterion_idx = NULL,
+                                          slopes = NULL,
+                                          slope_idx = criterion_idx) {
+  n <- length(eta)
+  k_cat <- if (identical(model, "RSM")) length(step_cum) else ncol(step_cum)
+  if (n == 0L) {
+    return(list(
+      probs = matrix(0, nrow = 0L, ncol = k_cat),
+      log_prob_obs = numeric(0),
+      linear_part = NULL
+    ))
+  }
+  if (any(!is.finite(score_k) | score_k < 0L | score_k >= k_cat)) {
+    stop("`score_k` has values outside [0, ", k_cat - 1L,
+         "]. This usually indicates `Score` fell outside `rating_min:rating_max`.",
+         call. = FALSE)
+  }
+
+  k_vals <- 0:(k_cat - 1L)
+  linear_part <- if (identical(model, "RSM")) {
+    outer(eta, k_vals) -
+      matrix(step_cum, nrow = n, ncol = k_cat, byrow = TRUE)
+  } else {
+    if (length(criterion_idx) != n ||
+        any(!is.finite(criterion_idx)) || any(criterion_idx < 1L) ||
+        any(criterion_idx > nrow(step_cum))) {
+      stop("`criterion_idx` must index a valid step row for every observation.",
+           call. = FALSE)
+    }
+    outer(eta, k_vals) - step_cum[as.integer(criterion_idx), , drop = FALSE]
+  }
+
+  log_num <- linear_part
+  if (identical(model, "GPCM")) {
+    if (length(slope_idx) != n ||
+        any(!is.finite(slope_idx)) || any(slope_idx < 1L) ||
+        any(slope_idx > length(slopes))) {
+      stop("`slope_idx` must index a valid slope for every observation.",
+           call. = FALSE)
+    }
+    slope_obs <- as.numeric(slopes[as.integer(slope_idx)])
+    if (any(!is.finite(slope_obs)) || any(slope_obs <= 0)) {
+      stop("Observed GPCM slopes must be finite and strictly positive.",
+           call. = FALSE)
+    }
+    log_num <- linear_part * slope_obs
+  }
+
+  # Reuse the normalized log-kernel object rather than retaining separate
+  # shifted, denominator-expanded, and log-probability matrices.
+  log_prob <- log_num - row_max_fast(log_num)
+  log_prob <- log_prob - log(rowSums(exp(log_prob)))
+
+  list(
+    probs = exp(log_prob),
+    log_prob_obs = log_prob[cbind(seq_len(n), score_k + 1L)],
+    linear_part = if (identical(model, "GPCM")) linear_part else NULL
+  )
 }

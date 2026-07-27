@@ -31,12 +31,34 @@ test_that("estimate_all_bias batches all modeled facet pairs", {
   expect_s3_class(bias_all, "mfrm_bias_collection")
   expect_true(is.data.frame(bias_all$summary))
   expect_true(is.list(bias_all$by_pair))
-  expect_true(all(c("Interaction", "Rows", "Significant", "Kept") %in% names(bias_all$summary)))
+  expect_true(all(c(
+    "Interaction", "Rows", "ScreenPositive", "Significant",
+    "FormalInferenceEligible", "PrimaryReportingEligible", "Kept"
+  ) %in% names(bias_all$summary)))
+  expect_identical(bias_all$summary$ScreenPositive, bias_all$summary$Significant)
+  expect_true(all(!bias_all$summary$FormalInferenceEligible))
+  expect_true(all(!bias_all$summary$PrimaryReportingEligible))
+  expect_true(all(bias_all$summary$ReportingUse == "screening_only"))
   expect_identical(
     sort(bias_all$summary$Interaction),
     sort(c("Rater x Task", "Rater x Criterion", "Task x Criterion"))
   )
   expect_true(length(bias_all$by_pair) >= 1)
+
+  one_summary <- summary(bias_all$by_pair[[1]])$overview
+  expect_true(all(c(
+    "ScreenPositive", "BonferroniScreenPositive", "HolmScreenPositive",
+    "Significant", "BonferroniSignificant", "HolmSignificant",
+    "FormalInferenceEligible", "PrimaryReportingEligible"
+  ) %in% names(one_summary)))
+  expect_identical(one_summary$ScreenPositive, one_summary$Significant)
+  expect_identical(
+    one_summary$BonferroniScreenPositive,
+    one_summary$BonferroniSignificant
+  )
+  expect_identical(one_summary$HolmScreenPositive, one_summary$HolmSignificant)
+  expect_false(one_summary$FormalInferenceEligible)
+  expect_false(one_summary$PrimaryReportingEligible)
 })
 
 test_that("estimate_all_bias accepts explicit pair specifications", {

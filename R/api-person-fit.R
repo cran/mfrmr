@@ -117,6 +117,7 @@
 #'
 #' @seealso [diagnose_mfrm()]
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
 #'                 method = "JML", maxit = 30)
@@ -130,6 +131,7 @@
 #' #   a 1% flag. lz_star is populated for JML/fixed-effect person
 #' #   estimates and left NA for MML/EAP estimates. Use ReportIndex /
 #' #   ReviewStatus for a compact report-ready reading.
+#' }
 #' @export
 compute_person_fit_indices <- function(diagnostics, fit = NULL) {
   if (is.null(diagnostics) || !is.list(diagnostics) ||
@@ -349,6 +351,9 @@ person_fit_validate_table <- function(object) {
 #' @param object Output from [compute_person_fit_indices()].
 #' @param digits Number of digits used when printing numeric columns.
 #' @param top_n Number of review rows retained in `top_review`.
+#' @param include_person If `TRUE`, print person identifiers in the review
+#'   preview. The default retains the rows in the returned object but suppresses
+#'   identifiers from console output.
 #' @param ... Unused.
 #'
 #' @return An object of class `summary.mfrm_person_fit_indices` with:
@@ -362,7 +367,11 @@ person_fit_validate_table <- function(object) {
 #' - `reporting_map`
 #' - `notes`
 #' @export
-summary.mfrm_person_fit_indices <- function(object, digits = 3, top_n = 10, ...) {
+summary.mfrm_person_fit_indices <- function(object,
+                                            digits = 3,
+                                            top_n = 10,
+                                            include_person = FALSE,
+                                            ...) {
   tbl <- person_fit_validate_table(object)
   digits <- max(0L, as.integer(digits))
   top_n <- max(1L, as.integer(top_n))
@@ -466,7 +475,8 @@ summary.mfrm_person_fit_indices <- function(object, digits = 3, top_n = 10, ...)
     thresholds = thresholds,
     reporting_map = reporting_map,
     notes = notes,
-    digits = digits
+    digits = digits,
+    include_person = isTRUE(include_person)
   )
   class(out) <- "summary.mfrm_person_fit_indices"
   out
@@ -491,8 +501,15 @@ print.summary.mfrm_person_fit_indices <- function(x, ...) {
           row.names = FALSE)
   }
   if (!is.null(x$top_review) && nrow(x$top_review) > 0L) {
-    cat("\nTop review rows\n")
-    print(as.data.frame(x$top_review), row.names = FALSE)
+    if (isTRUE(x$include_person)) {
+      cat("\nTop review rows\n")
+      print(as.data.frame(x$top_review), row.names = FALSE)
+    } else {
+      cat(sprintf(
+        "\nPerson-level review rows: %d; identifiers suppressed. Use `include_person = TRUE` only under appropriate privacy controls.\n",
+        nrow(x$top_review)
+      ))
+    }
   }
   print_bullet_section("Notes", x$notes)
   invisible(x)

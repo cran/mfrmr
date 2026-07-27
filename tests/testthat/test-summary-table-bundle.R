@@ -162,9 +162,13 @@ expect_summary_bundle_roles_registered <- function(...) {
   expect_equal(nrow(registry), length(unique(registry$Role)))
   expect_equal(nrow(registry), length(unique(registry$PreferredAppendixOrder)))
   roles <- unique(unlist(lapply(bundles, function(bundle) {
-    if (!inherits(bundle, "mfrm_summary_table_bundle")) return(character(0))
+    if (!inherits(bundle, "mfrm_summary_table_bundle")) {
+      return(character(0))
+    }
     idx <- as.data.frame(bundle$table_index, stringsAsFactors = FALSE)
-    if (!"Role" %in% names(idx)) return(character(0))
+    if (!"Role" %in% names(idx)) {
+      return(character(0))
+    }
     as.character(idx$Role)
   }), use.names = FALSE))
   roles <- roles[nzchar(roles)]
@@ -453,7 +457,7 @@ test_that("summary table bundle role registry covers every supported spec role",
       overview = df,
       forecast = df
     ),
-    summary.mfrm_future_branch_active_branch = list(
+    summary.mfrm_structural_design_review = list(
       overview = df,
       profile_summary = df,
       load_balance_summary = df,
@@ -569,6 +573,20 @@ test_that("summary table bundle role registry covers every supported spec role",
       notes = character(),
       settings = list()
     ),
+    summary.mfrm_model_choice_review = list(
+      overview = df,
+      key_warnings = character(),
+      next_actions = character(),
+      comparison_table = df,
+      model_roles = df,
+      downstream_routes = df,
+      report_templates = df,
+      route_map = df,
+      weighting_review_status = df,
+      support_status = df,
+      notes = character(),
+      settings = list()
+    ),
     summary.mfrm_weighting_review = list(
       overview = df,
       status = df,
@@ -653,21 +671,21 @@ test_that("build_summary_table_bundle converts supported reporting summaries int
   expect_true(is.data.frame(fit_bundle_summary$reporting_map))
   expect_true("AnyNumericTable" %in% names(fit_bundle_summary$overview))
   expect_true(all(c("RecommendedAppendixTables", "CompactAppendixTables") %in%
-                    names(fit_bundle_summary$overview)))
+    names(fit_bundle_summary$overview)))
   expect_true(all(c("Table", "ExportReady", "ApaTableReady", "RecommendedBridge") %in%
-                    names(fit_bundle_summary$table_catalog)))
+    names(fit_bundle_summary$table_catalog)))
   expect_true(all(c("AppendixSection", "RecommendedAppendix", "CompactAppendix", "PreferredAppendixOrder", "AppendixRationale") %in%
-                    names(fit_bundle_summary$table_catalog)))
+    names(fit_bundle_summary$table_catalog)))
   expect_identical(
     as.character(fit_bundle_summary$appendix_presets$Preset),
     c("all", "recommended", "compact", "methods", "results", "diagnostics", "reporting")
   )
   expect_true(all(c("Role", "Tables", "RecommendedTables", "CompactTables") %in%
-                    names(fit_bundle_summary$appendix_role_summary)))
+    names(fit_bundle_summary$appendix_role_summary)))
   expect_true(all(c("AppendixSection", "Tables", "RolesCovered") %in%
-                    names(fit_bundle_summary$appendix_section_summary)))
+    names(fit_bundle_summary$appendix_section_summary)))
   expect_true(all(c("Area", "CoveredHere", "CompanionOutput") %in%
-                    names(fit_bundle_summary$reporting_map)))
+    names(fit_bundle_summary$reporting_map)))
 
   diag_bundle <- build_summary_table_bundle(diag, which = c("overview", "flags"))
   expect_identical(names(diag_bundle$tables), c("overview", "flags"))
@@ -689,7 +707,7 @@ test_that("build_summary_table_bundle converts supported reporting summaries int
   expect_identical(precision_summary_bundle$source_class, "summary.mfrm_precision_review")
   expect_identical(precision_summary_bundle$summary_class, "summary.mfrm_precision_review")
   expect_true(all(c("profile", "checks", "fit_separation_basis") %in%
-                    names(precision_bundle$tables)))
+    names(precision_bundle$tables)))
   expect_identical(
     as.character(precision_bundle$table_index$Role[
       precision_bundle$table_index$Table == "fit_separation_basis"
@@ -706,7 +724,7 @@ test_that("build_summary_table_bundle converts supported reporting summaries int
   expect_identical(fm_bundle$source_class, "mfrm_fit_measures")
   expect_identical(fm_bundle$summary_class, "summary.mfrm_fit_measures")
   expect_true(all(c("summary", "table", "status_summary", "df_sensitivity") %in%
-                    names(fm_bundle$tables)))
+    names(fm_bundle$tables)))
   expect_identical(
     as.character(fm_bundle$table_index$Role[
       fm_bundle$table_index$Table == "df_sensitivity"
@@ -723,7 +741,7 @@ test_that("build_summary_table_bundle converts supported reporting summaries int
   expect_identical(facets_review_bundle$source_class, "summary.mfrm_facets_fit_review")
   expect_identical(facets_review_bundle$summary_class, "summary.mfrm_facets_fit_review")
   expect_true(all(c("summary", "df_sensitivity", "guidance") %in%
-                    names(facets_review_bundle$tables)))
+    names(facets_review_bundle$tables)))
   expect_identical(
     as.character(facets_review_bundle$table_index$Role[
       facets_review_bundle$table_index$Table == "df_sensitivity"
@@ -739,7 +757,7 @@ test_that("build_summary_table_bundle converts supported reporting summaries int
   expect_identical(pf_bundle$source_class, "mfrm_person_fit_indices")
   expect_identical(pf_bundle$summary_class, "summary.mfrm_person_fit_indices")
   expect_true(all(c("overview", "status_summary", "top_review", "thresholds") %in%
-                    names(pf_bundle$tables)))
+    names(pf_bundle$tables)))
   expect_true(any(as.character(pf_bundle$table_index$Role) == "extreme_fit_rows"))
 
   ds_bundle <- build_summary_table_bundle(summary(ds))
@@ -748,15 +766,14 @@ test_that("build_summary_table_bundle converts supported reporting summaries int
 
   chk_bundle <- build_summary_table_bundle(chk)
   expect_true(all(c("overview", "section_summary", "facets_positioning", "action_items") %in%
-                    names(chk_bundle$tables)))
+    names(chk_bundle$tables)))
   expect_identical(
     as.character(chk_bundle$table_index$Role[chk_bundle$table_index$Table == "facets_positioning"]),
     "facets_relationship_wording"
   )
   chk_bundle_summary <- summary(chk_bundle)
   chk_facets_row <- chk_bundle_summary$table_catalog[
-    chk_bundle_summary$table_catalog$Table == "facets_positioning",
-    ,
+    chk_bundle_summary$table_catalog$Table == "facets_positioning", ,
     drop = FALSE
   ]
   expect_identical(as.character(chk_facets_row$AppendixSection[1]), "methods")
@@ -1059,7 +1076,7 @@ test_that("build_summary_table_bundle validates front-door inputs before bundle 
   )
 })
 
-test_that("build_summary_table_bundle supports planning and forecast summaries with future-branch tables", {
+test_that("build_summary_table_bundle supports planning and forecast summaries with structural-design tables", {
   spec <- build_mfrm_sim_spec(
     n_person = 10,
     n_rater = 3,
@@ -1094,19 +1111,23 @@ test_that("build_summary_table_bundle supports planning and forecast summaries w
 
   design_bundle <- build_summary_table_bundle(sim_eval)
   expect_identical(design_bundle$source_class, "mfrm_design_evaluation")
-  expect_true(all(c("overview", "design_summary", "future_branch_overview",
-                    "future_branch_recommendation") %in% names(design_bundle$tables)))
+  expect_true(all(c(
+    "overview", "design_summary", "structural_design_overview",
+    "structural_design_recommendation"
+  ) %in% names(design_bundle$tables)))
 
   signal_bundle <- build_summary_table_bundle(summary(sig_eval))
   expect_identical(signal_bundle$source_class, "summary.mfrm_signal_detection")
-  expect_true(all(c("overview", "detection_summary", "future_branch_readiness") %in%
-                    names(signal_bundle$tables)))
+  expect_true(all(c("overview", "detection_summary", "structural_design_readiness") %in%
+    names(signal_bundle$tables)))
 
   pred_bundle <- build_summary_table_bundle(pred)
   expect_identical(pred_bundle$source_class, "mfrm_population_prediction")
-  expect_true(all(c("design", "forecast", "future_branch_profile",
-                    "future_branch_load_balance", "future_branch_coverage") %in%
-                    names(pred_bundle$tables)))
+  expect_true(all(c(
+    "design", "forecast", "structural_design_profile",
+    "structural_design_load_balance", "structural_design_coverage"
+  ) %in%
+    names(pred_bundle$tables)))
   expect_summary_bundle_roles_registered(design_bundle, signal_bundle, pred_bundle)
 })
 
@@ -1130,7 +1151,7 @@ test_that("build_summary_table_bundle supports diagnostic-screening summaries", 
   expect_true(any(diag_bundle$tables$figure_recipes$FigureID == "overview_rates"))
   expect_true(any(grepl("plot_data", diag_bundle$tables$figure_recipes$PlotDataCall, fixed = TRUE)))
   expect_true(any(grepl("build_summary_table_bundle", diag_bundle$tables$next_actions$Route, fixed = TRUE)))
-  expect_true(any(grepl("release gates", diag_bundle$tables$reporting_notes$ReportingBoundary, fixed = TRUE)))
+  expect_true(any(grepl("standalone validation criteria", diag_bundle$tables$reporting_notes$ReportingBoundary, fixed = TRUE)))
   expect_true(any(diag_bundle$tables$plot_overview_rate$Signal == "Strict combined any-flag rate"))
   expect_true("diagnostic_screening_plot_data" %in% diag_bundle$table_index$Role)
 
@@ -1189,7 +1210,7 @@ test_that("build_summary_table_bundle supports recovery simulation and assessmen
         Reliability = 0.82,
         MeanInfit = 1.00,
         MeanOutfit = 1.02,
-        ValidationUse = "diagnostic_only_not_release_gate"
+        ValidationUse = "diagnostic_context_only"
       ),
       diagnostic_oc_summary = tibble::tibble(
         Facet = "Rater",
@@ -1198,7 +1219,7 @@ test_that("build_summary_table_bundle supports recovery simulation and assessmen
         MeanReliability = 0.82,
         MeanInfit = 1.00,
         MeanOutfit = 1.02,
-        ValidationUse = "diagnostic_only_not_release_gate"
+        ValidationUse = "diagnostic_context_only"
       ),
       settings = list(reps = 1L, fit_method = "MML", model = "RSM"),
       notes = "Use more replications before treating this as a final recovery study.",
@@ -1219,9 +1240,11 @@ test_that("build_summary_table_bundle supports recovery simulation and assessmen
 
   recovery_bundle <- build_summary_table_bundle(rec)
   expect_identical(recovery_bundle$source_class, "mfrm_recovery_simulation")
-  expect_true(all(c("overview", "recovery_summary", "rep_overview",
-                    "diagnostic_oc", "diagnostic_oc_summary", "ademp",
-                    "settings", "notes") %in% names(recovery_bundle$tables)))
+  expect_true(all(c(
+    "overview", "recovery_summary", "rep_overview",
+    "diagnostic_oc", "diagnostic_oc_summary", "ademp",
+    "settings", "notes"
+  ) %in% names(recovery_bundle$tables)))
   expect_true("recovery_performance" %in% recovery_bundle$table_index$Role)
 
   recovery_compact <- build_summary_table_bundle(rec, appendix_preset = "compact")
@@ -1275,7 +1298,7 @@ test_that("build_summary_table_bundle supports recovery simulation and assessmen
         Evidence = "model=GPCM; slope_regime=moderate",
         ReportingImplication = "The slope-regime label describes generator context.",
         NextAction = "Report the generator condition.",
-        ValidationUse = "generator_condition_not_release_gate"
+        ValidationUse = "generator_condition_context"
       ),
       diagnostic_reporting_notes = tibble::tibble(
         Facet = "Rater",
@@ -1284,7 +1307,7 @@ test_that("build_summary_table_bundle supports recovery simulation and assessmen
         Evidence = "replications=1; mean_separation=2.10; mean_reliability=0.82",
         ReportingImplication = "Fit/separation diagnostics are available for context.",
         NextAction = "Keep this row separate from recovery gates.",
-        ValidationUse = "diagnostic_only_not_release_gate"
+        ValidationUse = "diagnostic_context_only"
       ),
       diagnostic_review = tibble::tibble(
         Facet = "Rater",
@@ -1295,7 +1318,7 @@ test_that("build_summary_table_bundle supports recovery simulation and assessmen
         MeanOutfit = 1.02,
         DiagnosticAvailability = "available",
         Status = "not_assessed",
-        ValidationUse = "diagnostic_only_not_release_gate",
+        ValidationUse = "diagnostic_context_only",
         Interpretation = "Diagnostic context only.",
         NextAction = "Keep separate from recovery gates."
       ),
@@ -1339,19 +1362,24 @@ test_that("build_summary_table_bundle supports recovery simulation and assessmen
 
   assessment_bundle <- build_summary_table_bundle(assessment)
   expect_identical(assessment_bundle$source_class, "mfrm_recovery_assessment")
-  expect_true(all(c("overview", "checklist", "condition_reporting_notes",
-                    "condition_review", "diagnostic_reporting_notes",
-                    "diagnostic_review", "metric_review", "uncertainty_review",
-                    "reading_order", "next_actions",
-                    "thresholds", "notes") %in% names(assessment_bundle$tables)))
+  expect_true(all(c(
+    "overview", "checklist", "condition_reporting_notes",
+    "condition_review", "diagnostic_reporting_notes",
+    "diagnostic_review", "metric_review", "uncertainty_review",
+    "reading_order", "next_actions",
+    "thresholds", "notes"
+  ) %in% names(assessment_bundle$tables)))
 
   assessment_diag <- build_summary_table_bundle(summary(assessment),
-                                                appendix_preset = "diagnostics")
-  expect_true(all(c("overview", "reading_order", "checklist",
-                    "condition_reporting_notes", "condition_review",
-                    "diagnostic_reporting_notes", "diagnostic_review",
-                    "metric_review", "uncertainty_review") %in%
-                    names(assessment_diag$tables)))
+    appendix_preset = "diagnostics"
+  )
+  expect_true(all(c(
+    "overview", "reading_order", "checklist",
+    "condition_reporting_notes", "condition_review",
+    "diagnostic_reporting_notes", "diagnostic_review",
+    "metric_review", "uncertainty_review"
+  ) %in%
+    names(assessment_diag$tables)))
   validation_summary <- list(
     topline_release_decision = tibble::tibble(
       Cases = 1L,
@@ -1393,7 +1421,7 @@ test_that("build_summary_table_bundle supports recovery simulation and assessmen
       Evidence = "max_zero_score_levels=1",
       ReportingImplication = "Report sparse generated score support as condition stress.",
       NextAction = "Inspect category-level recovery before generalizing.",
-      ValidationUse = "generator_condition_not_release_gate"
+      ValidationUse = "generator_condition_context"
     ),
     diagnostic_oc_summary = tibble::tibble(
       CaseID = "gpcm_high_dispersion_sparse",
@@ -1402,7 +1430,7 @@ test_that("build_summary_table_bundle supports recovery simulation and assessmen
       MeanReliability = 0,
       DiagnosticAvailability = "available",
       Status = "not_assessed",
-      ValidationUse = "diagnostic_only_not_release_gate"
+      ValidationUse = "diagnostic_context_only"
     ),
     diagnostic_reporting_notes = tibble::tibble(
       CaseID = "gpcm_high_dispersion_sparse",
@@ -1412,7 +1440,7 @@ test_that("build_summary_table_bundle supports recovery simulation and assessmen
       Evidence = "mean_separation=0; mean_reliability=0",
       ReportingImplication = "Report zero separation as diagnostic context, not release failure.",
       NextAction = "Inspect the generated condition before using reliability language.",
-      ValidationUse = "diagnostic_only_not_release_gate"
+      ValidationUse = "diagnostic_context_only"
     ),
     domain_decision_table = tibble::tibble(
       CaseID = "gpcm_high_dispersion_sparse",
@@ -1423,12 +1451,14 @@ test_that("build_summary_table_bundle supports recovery simulation and assessmen
   class(validation_summary) <- "summary.mfrmr_recovery_validation"
   validation_bundle <- build_summary_table_bundle(validation_summary)
   expect_identical(validation_bundle$source_class, "summary.mfrmr_recovery_validation")
-  expect_true(all(c("topline_release_decision", "reading_order", "release_decision_table",
-                    "case_summary", "condition_summary", "condition_reporting_notes",
-                    "diagnostic_reporting_notes",
-                    "diagnostic_oc_summary",
-                    "domain_decision_table") %in%
-                    names(validation_bundle$tables)))
+  expect_true(all(c(
+    "evidence_overview", "reading_order", "case_evidence_assessment",
+    "case_summary", "condition_summary", "condition_reporting_notes",
+    "diagnostic_reporting_notes",
+    "diagnostic_oc_summary",
+    "domain_decision_table"
+  ) %in%
+    names(validation_bundle$tables)))
   expect_identical(
     as.character(validation_bundle$table_index$Role[
       validation_bundle$table_index$Table == "condition_reporting_notes"
@@ -1448,14 +1478,17 @@ test_that("build_summary_table_bundle supports recovery simulation and assessmen
     "recovery_validation_diagnostic_oc_summary"
   )
   validation_diag <- build_summary_table_bundle(validation_summary,
-                                                appendix_preset = "diagnostics")
+    appendix_preset = "diagnostics"
+  )
   expect_true("condition_reporting_notes" %in% names(validation_diag$tables))
   expect_true("diagnostic_reporting_notes" %in% names(validation_diag$tables))
   expect_true("diagnostic_oc_summary" %in% names(validation_diag$tables))
   validation_recommended <- build_summary_table_bundle(validation_summary,
-                                                       appendix_preset = "recommended")
+    appendix_preset = "recommended"
+  )
   validation_compact <- build_summary_table_bundle(validation_summary,
-                                                   appendix_preset = "compact")
+    appendix_preset = "compact"
+  )
   expect_true("diagnostic_reporting_notes" %in% names(validation_recommended$tables))
   expect_true("diagnostic_reporting_notes" %in% names(validation_compact$tables))
   expect_true("condition_reporting_notes" %in% names(validation_recommended$tables))
@@ -1465,23 +1498,28 @@ test_that("build_summary_table_bundle supports recovery simulation and assessmen
   expect_identical(validation_recommended$appendix_preset, "recommended")
   expect_identical(validation_compact$appendix_preset, "compact")
   expect_true("recovery_validation_reading_order" %in%
-                validation_bundle$table_index$Role)
+    validation_bundle$table_index$Role)
   expect_true("recovery_validation_condition_summary" %in%
-                validation_bundle$table_index$Role)
+    validation_bundle$table_index$Role)
   validation_diag <- build_summary_table_bundle(validation_summary,
-                                                appendix_preset = "diagnostics")
-  expect_true(all(c("case_summary", "condition_summary", "condition_reporting_notes",
-                    "diagnostic_reporting_notes",
-                    "diagnostic_oc_summary",
-                    "domain_decision_table") %in%
-                    names(validation_diag$tables)))
+    appendix_preset = "diagnostics"
+  )
+  expect_true(all(c(
+    "case_summary", "condition_summary", "condition_reporting_notes",
+    "diagnostic_reporting_notes",
+    "diagnostic_oc_summary",
+    "domain_decision_table"
+  ) %in%
+    names(validation_diag$tables)))
   expect_false("reading_order" %in% names(validation_diag$tables))
-  expect_false("topline_release_decision" %in% names(validation_diag$tables))
-  expect_summary_bundle_roles_registered(recovery_bundle, recovery_compact,
-                                         assessment_bundle, assessment_diag,
-                                         validation_bundle, validation_diag,
-                                         validation_recommended,
-                                         validation_compact)
+  expect_false("evidence_overview" %in% names(validation_diag$tables))
+  expect_summary_bundle_roles_registered(
+    recovery_bundle, recovery_compact,
+    assessment_bundle, assessment_diag,
+    validation_bundle, validation_diag,
+    validation_recommended,
+    validation_compact
+  )
 })
 
 test_that("build_summary_table_bundle supports future arbitrary-facet active-branch inputs", {
@@ -1494,54 +1532,54 @@ test_that("build_summary_table_bundle supports future arbitrary-facet active-bra
     facet_names = c("Judge", "Task")
   )
 
-  active <- spec$planning_schema$future_branch_active_branch
+  active <- spec$planning_schema$structural_design_review
   active_bundle <- build_summary_table_bundle(active)
   expect_s3_class(active_bundle, "mfrm_summary_table_bundle")
-  expect_identical(active_bundle$source_class, "mfrm_future_branch_active_branch")
-  expect_identical(active_bundle$summary_class, "summary.mfrm_future_branch_active_branch")
+  expect_identical(active_bundle$source_class, "mfrm_structural_design_review")
+  expect_identical(active_bundle$summary_class, "summary.mfrm_structural_design_review")
   expect_true(all(c(
-    "future_branch_overview",
-    "future_branch_profile",
-    "future_branch_load_balance",
-    "future_branch_coverage",
-    "future_branch_guardrails",
-    "future_branch_readiness",
-    "future_branch_recommendation",
-    "future_branch_appendix_presets",
-    "future_branch_appendix_roles",
-    "future_branch_appendix_sections",
-    "future_branch_selection_table_presets",
-    "future_branch_selection_handoff_tables",
-    "future_branch_selection_handoff_presets",
-    "future_branch_selection_handoff",
-    "future_branch_selection_handoff_bundles",
-    "future_branch_selection_handoff_roles",
-    "future_branch_selection_handoff_role_sections",
-    "future_branch_selection_tables",
-    "future_branch_selection_summary",
-    "future_branch_selection_roles",
-    "future_branch_selection_sections",
-    "future_branch_selection_catalog",
-    "future_branch_reporting_map"
+    "structural_design_overview",
+    "structural_design_profile",
+    "structural_design_load_balance",
+    "structural_design_coverage",
+    "structural_design_guardrails",
+    "structural_design_readiness",
+    "structural_design_recommendation",
+    "structural_design_appendix_presets",
+    "structural_design_appendix_roles",
+    "structural_design_appendix_sections",
+    "structural_design_selection_table_presets",
+    "structural_design_selection_handoff_tables",
+    "structural_design_selection_handoff_presets",
+    "structural_design_selection_handoff",
+    "structural_design_selection_handoff_bundles",
+    "structural_design_selection_handoff_roles",
+    "structural_design_selection_handoff_role_sections",
+    "structural_design_selection_tables",
+    "structural_design_selection_summary",
+    "structural_design_selection_roles",
+    "structural_design_selection_sections",
+    "structural_design_selection_catalog",
+    "structural_design_reporting_map"
   ) %in% names(active_bundle$tables)))
 
   summary_bundle <- build_summary_table_bundle(summary(active))
-  expect_identical(summary_bundle$source_class, "summary.mfrm_future_branch_active_branch")
-  expect_identical(summary_bundle$summary_class, "summary.mfrm_future_branch_active_branch")
+  expect_identical(summary_bundle$source_class, "summary.mfrm_structural_design_review")
+  expect_identical(summary_bundle$summary_class, "summary.mfrm_structural_design_review")
   expect_true(all(c(
-    "future_branch_overview",
-    "future_branch_profile",
-    "future_branch_selection_table_presets",
-    "future_branch_selection_handoff_tables",
-    "future_branch_selection_handoff_presets",
-    "future_branch_selection_handoff",
-    "future_branch_selection_handoff_bundles",
-    "future_branch_selection_handoff_roles",
-    "future_branch_selection_handoff_role_sections",
-    "future_branch_selection_tables",
-    "future_branch_recommendation",
-    "future_branch_selection_summary",
-    "future_branch_reporting_map"
+    "structural_design_overview",
+    "structural_design_profile",
+    "structural_design_selection_table_presets",
+    "structural_design_selection_handoff_tables",
+    "structural_design_selection_handoff_presets",
+    "structural_design_selection_handoff",
+    "structural_design_selection_handoff_bundles",
+    "structural_design_selection_handoff_roles",
+    "structural_design_selection_handoff_role_sections",
+    "structural_design_selection_tables",
+    "structural_design_recommendation",
+    "structural_design_selection_summary",
+    "structural_design_reporting_map"
   ) %in% names(summary_bundle$tables)))
 
   active_bundle_summary <- summary(active_bundle)
@@ -1556,23 +1594,23 @@ test_that("build_summary_table_bundle supports future arbitrary-facet active-bra
   expect_true(is.data.frame(active_bundle_summary$selection_role_summary))
   expect_true(is.data.frame(active_bundle_summary$selection_section_summary))
   expect_true(all(c("Preset", "SectionsCovered", "PlotReadyTables", "PlotReadyFraction", "NumericFraction") %in%
-                    names(active_bundle_summary$selection_handoff_preset_summary)))
+    names(active_bundle_summary$selection_handoff_preset_summary)))
   expect_true(all(c("Preset", "AppendixSection", "PlotReadyTables", "PlotReadyFraction", "NumericFraction") %in%
-                    names(active_bundle_summary$selection_handoff_summary)))
+    names(active_bundle_summary$selection_handoff_summary)))
   expect_true(all(c("Preset", "AppendixSection", "Bundle", "PlotReadyTables", "PlotReadyFraction", "NumericFraction") %in%
-                    names(active_bundle_summary$selection_handoff_bundle_summary)))
+    names(active_bundle_summary$selection_handoff_bundle_summary)))
   expect_true(all(c("Preset", "Role", "PlotReadyTables", "PlotReadyFraction", "NumericFraction") %in%
-                    names(active_bundle_summary$selection_handoff_role_summary)))
+    names(active_bundle_summary$selection_handoff_role_summary)))
   expect_true(all(c("Preset", "AppendixSection", "Role", "PlotReadyTables", "PlotReadyFraction", "NumericFraction") %in%
-                    names(active_bundle_summary$selection_handoff_role_section_summary)))
+    names(active_bundle_summary$selection_handoff_role_section_summary)))
   expect_true(all(c("Preset", "AppendixSection", "Role", "Bundle", "Table", "Rows", "NumericColumns", "PlotReady", "ExportReady", "ApaTableReady") %in%
-                    names(active_bundle_summary$selection_handoff_table_summary)))
+    names(active_bundle_summary$selection_handoff_table_summary)))
   expect_true(all(c("Preset", "Bundle", "TablesAvailable", "SelectionFraction", "PlotReadyFraction", "NumericFraction") %in%
-                    names(active_bundle_summary$selection_summary)))
+    names(active_bundle_summary$selection_summary)))
   expect_true(all(c("Preset", "Role", "PlotReadyFraction", "NumericFraction") %in%
-                    names(active_bundle_summary$selection_role_summary)))
+    names(active_bundle_summary$selection_role_summary)))
   expect_true(all(c("Preset", "AppendixSection", "PlotReadyFraction", "NumericFraction") %in%
-                    names(active_bundle_summary$selection_section_summary)))
+    names(active_bundle_summary$selection_section_summary)))
   expect_summary_bundle_roles_registered(active_bundle, summary_bundle)
 })
 
@@ -1586,7 +1624,7 @@ test_that("future arbitrary-facet active-branch bundles support appendix presets
     facet_names = c("Judge", "Task")
   )
 
-  active <- spec$planning_schema$future_branch_active_branch
+  active <- spec$planning_schema$structural_design_review
   full_bundle <- build_summary_table_bundle(active)
   rec_bundle <- build_summary_table_bundle(active, appendix_preset = "recommended")
   compact_bundle <- build_summary_table_bundle(active, appendix_preset = "compact")
@@ -1594,27 +1632,27 @@ test_that("future arbitrary-facet active-branch bundles support appendix presets
   diagnostics_bundle <- build_summary_table_bundle(active, appendix_preset = "diagnostics")
 
   expect_true(all(c(
-    "future_branch_overview",
-    "future_branch_profile",
-    "future_branch_readiness",
-    "future_branch_recommendation"
+    "structural_design_overview",
+    "structural_design_profile",
+    "structural_design_readiness",
+    "structural_design_recommendation"
   ) %in% names(rec_bundle$tables)))
-  expect_false("future_branch_selection_table_presets" %in% names(rec_bundle$tables))
-  expect_false("future_branch_selection_handoff" %in% names(rec_bundle$tables))
-  expect_false("future_branch_selection_summary" %in% names(rec_bundle$tables))
-  expect_false("future_branch_load_balance" %in% names(rec_bundle$tables))
-  expect_false("future_branch_coverage" %in% names(rec_bundle$tables))
-  expect_false("future_branch_guardrails" %in% names(rec_bundle$tables))
+  expect_false("structural_design_selection_table_presets" %in% names(rec_bundle$tables))
+  expect_false("structural_design_selection_handoff" %in% names(rec_bundle$tables))
+  expect_false("structural_design_selection_summary" %in% names(rec_bundle$tables))
+  expect_false("structural_design_load_balance" %in% names(rec_bundle$tables))
+  expect_false("structural_design_coverage" %in% names(rec_bundle$tables))
+  expect_false("structural_design_guardrails" %in% names(rec_bundle$tables))
 
   expect_true(all(c(
-    "future_branch_overview",
-    "future_branch_readiness",
-    "future_branch_recommendation"
+    "structural_design_overview",
+    "structural_design_readiness",
+    "structural_design_recommendation"
   ) %in% names(compact_bundle$tables)))
-  expect_false("future_branch_selection_table_presets" %in% names(compact_bundle$tables))
-  expect_false("future_branch_selection_handoff" %in% names(compact_bundle$tables))
-  expect_false("future_branch_appendix_presets" %in% names(compact_bundle$tables))
-  expect_false("future_branch_profile" %in% names(compact_bundle$tables))
+  expect_false("structural_design_selection_table_presets" %in% names(compact_bundle$tables))
+  expect_false("structural_design_selection_handoff" %in% names(compact_bundle$tables))
+  expect_false("structural_design_appendix_presets" %in% names(compact_bundle$tables))
+  expect_false("structural_design_profile" %in% names(compact_bundle$tables))
 
   expect_true(all(methods_bundle$table_index$AppendixSection %in% "methods"))
   expect_true(all(diagnostics_bundle$table_index$AppendixSection %in% "diagnostics"))
@@ -1729,10 +1767,10 @@ test_that("apa_table consumes future arbitrary-facet active-branch summaries dir
     facet_names = c("Judge", "Task")
   )
 
-  active <- spec$planning_schema$future_branch_active_branch
-  tbl <- apa_table(summary(active), which = "future_branch_readiness")
+  active <- spec$planning_schema$structural_design_review
+  tbl <- apa_table(summary(active), which = "structural_design_readiness")
   expect_s3_class(tbl, "apa_table")
-  expect_identical(tbl$which, "future_branch_readiness")
+  expect_identical(tbl$which, "structural_design_readiness")
   expect_true(nrow(tbl$table) > 0L)
   expect_true(nzchar(tbl$caption))
 })
@@ -1780,7 +1818,7 @@ test_that("plot methods consume summary table bundles directly", {
   expect_identical(first_numeric_plot$data$source_table, "facet_overview")
 })
 
-test_that("future-branch summary table bundles expose selection plot surfaces", {
+test_that("structural-design summary table bundles expose selection plot surfaces", {
   spec <- build_mfrm_sim_spec(
     n_person = 12,
     n_rater = 3,
@@ -1790,7 +1828,7 @@ test_that("future-branch summary table bundles expose selection plot surfaces", 
     facet_names = c("Judge", "Task")
   )
 
-  active_bundle <- build_summary_table_bundle(spec$planning_schema$future_branch_active_branch)
+  active_bundle <- build_summary_table_bundle(spec$planning_schema$structural_design_review)
 
   handoff_preset_plot <- plot(active_bundle, type = "selection_handoff_presets", appendix_preset = "all", draw = FALSE)
   expect_s3_class(handoff_preset_plot, "mfrm_plot_data")

@@ -365,9 +365,10 @@ format_reporting_marginal_pair_label <- function(pair_row) {
 #' MnSq misfit threshold pair used across mfrmr screening helpers
 #'
 #' Returns the lower / upper bounds that mfrmr screens treat as the
-#' acceptable mean-square (Infit / Outfit MnSq) band when flagging
-#' element-level misfit. Defaults follow Linacre's published 0.5-1.5
-#' acceptance band; both ends can be overridden via R options.
+#' heuristic mean-square (Infit / Outfit MnSq) review band when flagging
+#' element-level misfit. Defaults use the published 0.5-1.5 interval as a
+#' screening convention; both ends can be overridden via R options. The
+#' interval is not a universal acceptance rule or an automatic exclusion rule.
 #'
 #' Helpers that consume the band include
 #' [summary.mfrm_diagnostics()] (`misfit_flagged` block and
@@ -380,8 +381,8 @@ format_reporting_marginal_pair_label <- function(pair_row) {
 #' @section Configuration:
 #' Two scalar R options drive the band:
 #' \describe{
-#'   \item{`mfrmr.misfit_lower`}{Lower acceptance bound. Default `0.5`.}
-#'   \item{`mfrmr.misfit_upper`}{Upper acceptance bound. Default `1.5`.}
+#'   \item{`mfrmr.misfit_lower`}{Lower review bound. Default `0.5`.}
+#'   \item{`mfrmr.misfit_upper`}{Upper review bound. Default `1.5`.}
 #' }
 #'
 #' Pass scalar arguments to override the options for a single call,
@@ -426,7 +427,8 @@ mfrm_misfit_thresholds <- function(lower = NULL, upper = NULL) {
 #   - n_obs_min, n_person_min: Linacre (1994), sample size guidelines for stable estimates.
 #   - low_cat_min: Linacre (2002), minimum 10 observations per category for stable thresholds.
 #   - misfit_ratio_warn: Bond & Fox (2015), MnSq 0.5-1.5 acceptable range; >10% flagged.
-#   - zstd thresholds: |ZSTD| > 2 at 5% significance; >3 at 1% (Wright & Linacre, 1994).
+#   - zstd thresholds: |ZSTD| > 2 and >3 are heuristic normal-reference bands,
+#     not calibrated 5% and 1% tests (Wright & Linacre, 1994).
 #   - pca_first_eigen_warn: Linacre-style residual-PCA heuristic band; use only as exploratory screening, not direct proof of multidimensionality.
 #   - pca_first_prop_warn: Smith (2002), unexplained variance > 5-10% merits investigation.
 #   - pca_reference_bands: Raiche (2005) EV >= 1.4 critical minimum for parallel analysis.
@@ -663,7 +665,9 @@ summarize_convergence_metrics <- function(summary_row) {
     return("Optimization summary was not available.")
   }
 
-  converged <- if ("Converged" %in% names(summary_row)) isTRUE(summary_row$Converged[1]) else NA
+  convergence <- mfrm_convergence_state(summary_row)
+  converged <- convergence$code_converged
+  inference_ready <- convergence$inference_ready
   iter <- if ("Iterations" %in% names(summary_row)) to_float(summary_row$Iterations[1]) else NA_real_
   fn_eval <- if ("FunctionEvaluations" %in% names(summary_row)) to_float(summary_row$FunctionEvaluations[1]) else iter
   gr_eval <- if ("GradientEvaluations" %in% names(summary_row)) to_float(summary_row$GradientEvaluations[1]) else NA_real_
@@ -675,12 +679,14 @@ summarize_convergence_metrics <- function(summary_row) {
   grad_sup <- if ("TerminalGradientSupNorm" %in% names(summary_row)) to_float(summary_row$TerminalGradientSupNorm[1]) else NA_real_
   grad_tol <- if ("GradientReviewTolerance" %in% names(summary_row)) to_float(summary_row$GradientReviewTolerance[1]) else NA_real_
 
-  conv_txt <- if (identical(status, "reviewable_warning")) {
+  conv_txt <- if (isTRUE(inference_ready)) {
+    "met the package convergence checks"
+  } else if (isTRUE(converged) && identical(status, "converged_gradient_review")) {
+    "returned code 0, but the terminal gradient requires review"
+  } else if (identical(status, "reviewable_warning")) {
     "ended with a reviewable optimizer warning"
-  } else if (isTRUE(converged)) {
-    "converged"
   } else if (identical(converged, FALSE)) {
-    "did not converge"
+    "did not meet the package convergence checks"
   } else {
     "had unknown convergence status"
   }
@@ -1483,7 +1489,7 @@ build_apa_reporting_contract <- function(res, diagnostics, bias_results = NULL, 
     method_sentences <- c(method_sentences, shrinkage_sentence)
   }
 
-  # Extreme-score person warning (added in 0.1.6). Under JMLE the
+  # Extreme-score person warning. Under JMLE the
   # theta for such persons diverges; under MML the EAP is finite but
   # the information is small. Flag either tail in the Methods section
   # so reviewers understand why those persons may have been dropped or

@@ -37,6 +37,55 @@ test_that("reference_case_benchmark returns package-native benchmark bundle", {
   expect_true(all(bench$fit_runs$PrecisionTier %in% c("model_based", "hybrid", "exploratory")))
 })
 
+test_that("reference case status treats code-zero optimizer review as Warn", {
+  fit_runs <- tibble::tibble(
+    Case = "review_case",
+    Converged = FALSE,
+    OptimizerCodeZero = TRUE,
+    ConvergenceSeverity = "review"
+  )
+  design_checks <- tibble::tibble(
+    Case = "review_case",
+    Status = "Pass"
+  )
+  recovery_checks <- tibble::tibble(
+    Case = "review_case",
+    Status = "Pass",
+    Correlation = 0.99
+  )
+  empty_checks <- tibble::tibble()
+
+  review <- mfrmr:::summarize_reference_benchmark_case(
+    case_id = "review_case",
+    case_type = "truth_recovery",
+    fit_runs = fit_runs,
+    design_checks = design_checks,
+    recovery_checks = recovery_checks,
+    pair_checks = empty_checks,
+    bias_checks = empty_checks,
+    linking_checks = empty_checks,
+    conquest_overlap_checks = empty_checks,
+    population_policy_checks = empty_checks
+  )
+  expect_identical(as.character(review$Status[1]), "Warn")
+
+  fit_runs$OptimizerCodeZero <- FALSE
+  fit_runs$ConvergenceSeverity <- "fail"
+  failed <- mfrmr:::summarize_reference_benchmark_case(
+    case_id = "review_case",
+    case_type = "truth_recovery",
+    fit_runs = fit_runs,
+    design_checks = design_checks,
+    recovery_checks = recovery_checks,
+    pair_checks = empty_checks,
+    bias_checks = empty_checks,
+    linking_checks = empty_checks,
+    conquest_overlap_checks = empty_checks,
+    population_policy_checks = empty_checks
+  )
+  expect_identical(as.character(failed$Status[1]), "Fail")
+})
+
 test_that("reference_case_benchmark includes latent-regression omission contract case", {
   bench <- suppressWarnings(reference_case_benchmark(
     cases = "synthetic_latent_regression_omit",
@@ -74,7 +123,14 @@ test_that("reference_case_benchmark includes latent-regression omission contract
     drop = FALSE
   ]
   expect_equal(nrow(row), 1)
-  expect_identical(as.character(row$Status[1]), "Pass")
+  if (isTRUE(run$Converged[1])) {
+    expect_identical(as.character(row$Status[1]), "Pass")
+  } else {
+    expect_true(isTRUE(run$OptimizerCodeZero[1]))
+    expect_identical(as.character(run$ConvergenceSeverity[1]), "review")
+    expect_false(isTRUE(run$SupportsFormalInference[1]))
+    expect_identical(as.character(row$Status[1]), "Warn")
+  }
   expect_identical(row$PopulationPolicyChecks[1], nrow(bench$population_policy_checks))
   expect_match(row$KeySignal[1], "Population response rows omitted = 6", fixed = TRUE)
 })
@@ -106,7 +162,19 @@ test_that("reference_case_benchmark includes ConQuest-overlap package-side check
     drop = FALSE
   ]
   expect_equal(nrow(row), 1)
-  expect_identical(as.character(row$Status[1]), "Pass")
+  run <- bench$fit_runs[
+    bench$fit_runs$Case == "synthetic_conquest_overlap_dry_run",
+    ,
+    drop = FALSE
+  ]
+  if (isTRUE(run$Converged[1])) {
+    expect_identical(as.character(row$Status[1]), "Pass")
+  } else {
+    expect_true(isTRUE(run$OptimizerCodeZero[1]))
+    expect_identical(as.character(run$ConvergenceSeverity[1]), "review")
+    expect_false(isTRUE(run$SupportsFormalInference[1]))
+    expect_identical(as.character(row$Status[1]), "Warn")
+  }
   expect_identical(row$ConQuestOverlapChecks[1], nrow(bench$conquest_overlap_checks))
   expect_match(row$KeySignal[1], "package-side attention items = 0", fixed = TRUE)
 })
@@ -162,10 +230,10 @@ test_that("reference_case_benchmark summary surfaces specialized contract checks
     ,
     drop = FALSE
   ]
-  expect_identical(as.character(external_row$Status[1]), "not performed")
+  expect_identical(as.character(external_row$Status[1]), "not assessed")
   expect_match(
     external_row$Interpretation[1],
-    "Actual external ConQuest output tables are required",
+    "not a substitute for reviewing external ConQuest output",
     fixed = TRUE
   )
   expect_true(nrow(s$conquest_overlap_checks) > 0)
@@ -178,7 +246,7 @@ test_that("reference_case_benchmark summary surfaces specialized contract checks
   expect_match(printed, "ConQuest-overlap checks", fixed = TRUE)
   expect_match(printed, "Population-policy checks", fixed = TRUE)
   expect_match(printed, "actual external ConQuest output is still required", fixed = TRUE)
-  expect_match(printed, "external validation.\n - Bias checks", fixed = TRUE)
+  expect_match(printed, "Bias checks review package identities", fixed = TRUE)
 })
 
 test_that("reference_case_benchmark includes latent-regression benchmark case", {
@@ -193,7 +261,13 @@ test_that("reference_case_benchmark includes latent-regression benchmark case", 
   expect_true("synthetic_latent_regression" %in% bench$case_summary$Case)
   expect_true(any(grepl("Population:", bench$recovery_checks$Facet, fixed = TRUE)))
   expect_true(any(bench$recovery_checks$Facet == "Population:posterior_shift"))
-  expect_true(all(bench$fit_runs$SupportsFormalInference))
+  expect_identical(
+    as.logical(bench$fit_runs$SupportsFormalInference),
+    as.logical(bench$fit_runs$Converged)
+  )
+  expect_false(any(
+    bench$fit_runs$SupportsFormalInference[!bench$fit_runs$Converged]
+  ))
   expect_true(all(bench$fit_runs$PopulationModelActive))
   expect_identical(as.character(bench$fit_runs$PosteriorBasis[1]), "population_model")
   expect_match(bench$fit_runs$PopulationFormula[1], "X", fixed = TRUE)
@@ -218,7 +292,13 @@ test_that("reference_case_benchmark recovers synthetic truth under MML", {
   expect_true(all(bench$recovery_checks$Status %in% c("Pass", "Warn", "Fail")))
   expect_true(min(bench$recovery_checks$Correlation, na.rm = TRUE) > 0.95)
   expect_true(max(bench$recovery_checks$MeanAbsoluteDeviation, na.rm = TRUE) < 0.30)
-  expect_true(all(bench$fit_runs$SupportsFormalInference))
+  expect_identical(
+    as.logical(bench$fit_runs$SupportsFormalInference),
+    as.logical(bench$fit_runs$Converged)
+  )
+  expect_false(any(
+    bench$fit_runs$SupportsFormalInference[!bench$fit_runs$Converged]
+  ))
   expect_true(all(!bench$fit_runs$PopulationModelActive))
   expect_identical(as.character(bench$fit_runs$PosteriorBasis[1]), "legacy_mml")
   expect_identical(bench$fit_runs$PopulationOmittedPersons[1], 0L)
@@ -282,7 +362,7 @@ test_that("reference_case_benchmark enforces the GPCM benchmark contract", {
   )
   expect_error(
     reference_case_benchmark(cases = "synthetic_gpcm", method = "JML", model = "GPCM"),
-    "validated only for `method = \"MML\"`",
+    "supports only `method = \"MML\"`",
     fixed = TRUE
   )
 })

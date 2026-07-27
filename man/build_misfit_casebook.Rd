@@ -44,8 +44,8 @@ outputs. It does not invent a new misfit statistic. Instead, it organizes
 existing evidence families into one case-level review surface:
 \itemize{
 \item element-level Infit / Outfit MnSq misfit from \code{diagnostics$fit}
-(rows whose Infit or Outfit MnSq falls outside the 0.5-1.5 Linacre
-acceptance band)
+(rows whose Infit or Outfit MnSq falls outside the configured Linacre
+heuristic review band, 0.5-1.5 by default)
 \item strict marginal cell screens from \code{diagnostics$marginal_fit$top_cells}
 \item strict pairwise screens from \code{diagnostics$marginal_fit$pairwise$top_pairs}
 \item unexpected responses from \code{\link[=unexpected_response_table]{unexpected_response_table()}}

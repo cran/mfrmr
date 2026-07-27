@@ -103,6 +103,7 @@ The bundle is optimized for downstream \code{summary()} and
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_bias")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "none")
@@ -111,6 +112,7 @@ out <- bias_interaction_report(bias, top_n = 10)
 summary(out)
 p_bi <- plot(out, draw = FALSE)
 p_bi$data$plot
+}
 }
 \seealso{
 \code{\link[=estimate_bias]{estimate_bias()}}, \code{\link[=build_fixed_reports]{build_fixed_reports()}}, \code{\link[=plot_bias_interaction]{plot_bias_interaction()}}

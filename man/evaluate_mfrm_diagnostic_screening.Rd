@@ -51,8 +51,8 @@ public aliases implied by \code{sim_spec}, or role keywords
 
 \item{reps}{Number of replications per design condition and scenario.}
 
-\item{scenarios}{Screening scenarios to evaluate. The current first release
-supports \code{"well_specified"}, \code{"local_dependence"}, and
+\item{scenarios}{Screening scenarios to evaluate. Supported values are
+\code{"well_specified"}, \code{"local_dependence"}, and
 \code{"latent_misspecification"}, plus
 \code{"step_structure_misspecification"}.}
 
@@ -89,7 +89,7 @@ simulation calls when \code{sim_spec = NULL}.}
 
 \item{maxit}{Maximum iterations passed to \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
-\item{quad_points}{Quadrature points for the internal \code{MML} fit.}
+\item{quad_points}{Quadrature points for the underlying \code{MML} fit.}
 
 \item{residual_pca}{Residual PCA mode passed to \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.}
 
@@ -126,7 +126,7 @@ well-specified baseline when the baseline scenario was evaluated
 \item \code{design_descriptor}: role-based design-variable metadata
 \item \code{planning_scope}: explicit record of the current planning contract
 \item \code{planning_constraints}: explicit record of mutable/locked design variables
-\item \code{planning_schema}: combined planner-schema contract
+\item \code{planning_schema}: structured planning metadata
 \item \code{gpcm_boundary}: bounded-\code{GPCM} caveat row when present
 \item \code{settings}: simulation and fitting settings
 \item \code{ademp}: simulation-study metadata
@@ -137,8 +137,8 @@ well-specified baseline when the baseline scenario was evaluated
 Evaluate legacy and strict marginal diagnostic screening under controlled misfit scenarios
 }
 \details{
-This helper performs a compact Monte Carlo validation study for the package's
-current diagnostic architecture.
+This helper performs a compact Monte Carlo evaluation of the package's
+diagnostic architecture under user-specified simulation conditions.
 
 For each design condition and scenario, the function:
 \enumerate{
@@ -168,7 +168,7 @@ non-person facet. For bounded \code{GPCM}, the generator and fit each keep
 step/slope facet mismatch.
 
 This function is intentionally screening-oriented. The strict marginal branch
-remains exploratory in the current release, so the returned summaries should
+remains exploratory, so the returned summaries should
 be used to compare relative sensitivity across scenarios rather than to claim
 calibrated inferential power. Bounded-\code{GPCM} rows add explicit
 \code{gpcm_boundary} caveats and should be read as slope-aware operating

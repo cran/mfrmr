@@ -48,7 +48,7 @@ comprehensive results object, not a new estimation interface.
 The viewer assumes that fitting, diagnostics, and section selection have
 already happened through \code{\link[=mfrm_results]{mfrm_results()}}. This keeps GUI exploration
 separate from reproducible analysis setup: the Replay tab displays the
-\code{mfrm_results()} scaffold stored in the result object.
+\code{mfrm_results()} replay script stored in the result object.
 
 The app includes tabs for overview/triage, QC evidence, APA-style report
 text when \code{include = "publication"} or \code{"apa"} was used, available bias
@@ -62,6 +62,7 @@ still requires an explicit facet-pair decision outside the viewer.
 \code{install.packages("shiny")}.
 }
 \examples{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(
   toy,
@@ -76,6 +77,7 @@ res <- mfrm_results(fit, include = c("fit", "diagnostics", "tables"))
 if (interactive() && requireNamespace("shiny", quietly = TRUE)) {
   launch_mfrmr_viewer(res)
 }
+\dontshow{\}) # examplesIf}
 }
 \seealso{
 \code{\link[=mfrm_results]{mfrm_results()}}, \code{\link[=mfrm_results_interactive]{mfrm_results_interactive()}}

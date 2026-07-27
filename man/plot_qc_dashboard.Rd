@@ -120,7 +120,8 @@ Treat this dashboard as a screening layer; follow up with dedicated helpers
 }
 
 \examples{
-# Fast smoke run: build the plot data only (no graphics device).
+\donttest{
+# Build the plotting data without opening a graphics device.
 toy <- load_mfrmr_data("example_core")
 toy_small <- toy[toy$Person \%in\% unique(toy$Person)[1:3], ]
 fit_quick <- suppressWarnings(
@@ -130,7 +131,6 @@ fit_quick <- suppressWarnings(
 qc_quick <- plot_qc_dashboard(fit_quick, draw = FALSE)
 names(qc_quick$data)
 
-\donttest{
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 qc <- plot_qc_dashboard(fit, draw = FALSE)
 qc$data$panels$Status

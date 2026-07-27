@@ -43,6 +43,13 @@ test_that("build_mfrm_sim_spec returns reusable simulation metadata", {
   expect_equal(spec$model, "PCM")
   expect_true(is.data.frame(spec$threshold_table))
   expect_equal(length(unique(spec$threshold_table$StepFacet)), 4)
+
+  printed <- capture.output(print(spec))
+  expect_match(printed[1], "mfrmr simulation specification", fixed = TRUE)
+  expect_true(any(grepl("Model: PCM", printed, fixed = TRUE)))
+  expect_true(any(grepl("Next: simulate_mfrm_data", printed, fixed = TRUE)))
+  expect_false(any(grepl("future.branch|schema.only|review|review layer", printed, ignore.case = TRUE)))
+  expect_lte(max(nchar(printed, type = "width")), 80L)
 })
 
 test_that("build_mfrm_sim_spec accepts compact step-facet threshold shortcuts", {
@@ -102,9 +109,9 @@ test_that("build_mfrm_sim_spec accepts custom public facet names", {
   expect_identical(spec$planning_scope$role_labels, c("Judge", "Task"))
   expect_false(spec$planning_scope$supports_arbitrary_facet_planning)
   expect_true(spec$planning_scope$supports_arbitrary_facet_estimation)
-  expect_identical(spec$planning_scope$future_planner_contract, "arbitrary_facet_planning_scaffold")
-  expect_identical(spec$planning_scope$future_planner_stage, "schema_only")
-  expect_identical(spec$planning_scope$future_branch_input_contract, "design$facets(named counts)")
+  expect_identical(spec$planning_scope$structural_review_contract, "named_facet_structural_review")
+  expect_identical(spec$planning_scope$structural_review_stage, "deterministic_review")
+  expect_identical(spec$planning_scope$structural_design_input_contract, "design$facets(named counts)")
   expect_true(is.data.frame(spec$planning_scope$facet_manifest))
   expect_identical(spec$planning_scope$facet_manifest$facet, c("Person", "Judge", "Task"))
   expect_identical(spec$planning_scope$facet_manifest$planning_count_alias, c("n_person", "n_judge", "n_task"))
@@ -114,88 +121,88 @@ test_that("build_mfrm_sim_spec accepts custom public facet names", {
   expect_identical(spec$planning_constraints$locked_design_variables, character(0))
   expect_true(is.list(spec$planning_schema))
   expect_identical(spec$planning_schema$planner_contract, "role_based_two_non_person_facets")
-  expect_identical(spec$planning_schema$future_planner_contract, "arbitrary_facet_planning_scaffold")
-  expect_identical(spec$planning_schema$future_branch_input_contract, "design$facets(named counts)")
+  expect_identical(spec$planning_schema$structural_review_contract, "named_facet_structural_review")
+  expect_identical(spec$planning_schema$structural_design_input_contract, "design$facets(named counts)")
   expect_true(is.data.frame(spec$planning_schema$facet_manifest))
   expect_identical(spec$planning_schema$facet_manifest$facet, c("Person", "Judge", "Task"))
-  expect_true(is.data.frame(spec$planning_schema$future_facet_table))
-  expect_identical(spec$planning_schema$future_facet_table$future_facet_key, c("person", "judge", "task"))
-  expect_identical(spec$planning_schema$future_facet_table$current_planning_count_alias, c("n_person", "n_judge", "n_task"))
-  expect_identical(spec$planning_schema$future_facet_table$future_axis_class, c("person_count", "facet_level_count", "facet_level_count"))
-  expect_true(is.list(spec$planning_schema$future_design_template))
-  expect_identical(spec$planning_schema$future_design_template$facets, list(person = 16L, judge = 3L, task = 2L))
-  expect_identical(spec$planning_schema$future_design_template$assignment, 2L)
-  expect_true(is.list(spec$planning_schema$future_branch_schema))
-  expect_identical(spec$planning_schema$future_branch_schema$planner_contract, "arbitrary_facet_planning_scaffold")
-  expect_identical(spec$planning_schema$future_branch_schema$planner_stage, "schema_only")
-  expect_identical(spec$planning_schema$future_branch_schema$input_contract, "design$facets(named counts)")
-  expect_true(is.data.frame(spec$planning_schema$future_branch_schema$facet_table))
-  expect_identical(spec$planning_schema$future_branch_schema$facet_table$future_facet_key, c("person", "judge", "task"))
-  expect_true(is.list(spec$planning_schema$future_branch_schema$design_template))
-  expect_identical(spec$planning_schema$future_branch_schema$design_template$facets, list(person = 16L, judge = 3L, task = 2L))
-  expect_identical(spec$planning_schema$future_branch_schema$design_template$assignment, 2L)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$assignment_axis))
-  expect_identical(spec$planning_schema$future_branch_schema$assignment_axis$current_planning_count_alias, "judge_per_person")
-  expect_identical(spec$planning_schema$future_branch_schema$assignment_axis$future_input_key, "assignment")
-  expect_true(is.list(spec$planning_schema$future_branch_schema$design_schema))
-  expect_identical(spec$planning_schema$future_branch_schema$design_schema$schema_contract, "arbitrary_facet_design_schema")
-  expect_identical(spec$planning_schema$future_branch_schema$design_schema$schema_stage, "schema_only")
-  expect_true(is.data.frame(spec$planning_schema$future_branch_schema$design_schema$facet_axes))
-  expect_identical(spec$planning_schema$future_branch_schema$design_schema$facet_axes$input_key, c("person", "judge", "task"))
-  expect_identical(spec$planning_schema$future_branch_schema$design_schema$assignment_axis$current_planning_count_alias, "judge_per_person")
-  expect_identical(spec$planning_schema$future_branch_schema$design_schema$default_design$facets, list(person = 16L, judge = 3L, task = 2L))
-  expect_true(is.list(spec$planning_schema$future_branch_schema$design_schema$grid_semantics))
+  expect_true(is.data.frame(spec$planning_schema$structural_facet_table))
+  expect_identical(spec$planning_schema$structural_facet_table$structural_facet_key, c("person", "judge", "task"))
+  expect_identical(spec$planning_schema$structural_facet_table$current_planning_count_alias, c("n_person", "n_judge", "n_task"))
+  expect_identical(spec$planning_schema$structural_facet_table$design_axis_class, c("person_count", "facet_level_count", "facet_level_count"))
+  expect_true(is.list(spec$planning_schema$structural_design_template))
+  expect_identical(spec$planning_schema$structural_design_template$facets, list(person = 16L, judge = 3L, task = 2L))
+  expect_identical(spec$planning_schema$structural_design_template$assignment, 2L)
+  expect_true(is.list(spec$planning_schema$structural_design_schema))
+  expect_identical(spec$planning_schema$structural_design_schema$planner_contract, "named_facet_structural_review")
+  expect_identical(spec$planning_schema$structural_design_schema$planner_stage, "deterministic_review")
+  expect_identical(spec$planning_schema$structural_design_schema$input_contract, "design$facets(named counts)")
+  expect_true(is.data.frame(spec$planning_schema$structural_design_schema$facet_table))
+  expect_identical(spec$planning_schema$structural_design_schema$facet_table$structural_facet_key, c("person", "judge", "task"))
+  expect_true(is.list(spec$planning_schema$structural_design_schema$design_template))
+  expect_identical(spec$planning_schema$structural_design_schema$design_template$facets, list(person = 16L, judge = 3L, task = 2L))
+  expect_identical(spec$planning_schema$structural_design_schema$design_template$assignment, 2L)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$assignment_axis))
+  expect_identical(spec$planning_schema$structural_design_schema$assignment_axis$current_planning_count_alias, "judge_per_person")
+  expect_identical(spec$planning_schema$structural_design_schema$assignment_axis$design_input_key, "assignment")
+  expect_true(is.list(spec$planning_schema$structural_design_schema$design_schema))
+  expect_identical(spec$planning_schema$structural_design_schema$design_schema$schema_contract, "arbitrary_facet_design_schema")
+  expect_identical(spec$planning_schema$structural_design_schema$design_schema$schema_stage, "deterministic_review")
+  expect_true(is.data.frame(spec$planning_schema$structural_design_schema$design_schema$facet_axes))
+  expect_identical(spec$planning_schema$structural_design_schema$design_schema$facet_axes$input_key, c("person", "judge", "task"))
+  expect_identical(spec$planning_schema$structural_design_schema$design_schema$assignment_axis$current_planning_count_alias, "judge_per_person")
+  expect_identical(spec$planning_schema$structural_design_schema$design_schema$default_design$facets, list(person = 16L, judge = 3L, task = 2L))
+  expect_true(is.list(spec$planning_schema$structural_design_schema$design_schema$grid_semantics))
   expect_identical(
-    spec$planning_schema$future_branch_schema$design_schema$grid_semantics$canonical_columns,
+    spec$planning_schema$structural_design_schema$design_schema$grid_semantics$canonical_columns,
     c("design_id", "n_person", "n_rater", "n_criterion", "raters_per_person")
   )
-  expect_true(is.list(spec$planning_schema$future_branch_schema$preview))
-  expect_true(spec$planning_schema$future_branch_schema$preview$preview_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$grid_contract))
-  expect_true(is.list(spec$planning_schema$future_branch_schema$grid_bundle))
-  expect_true(is.list(spec$planning_schema$future_branch_schema$grid_context))
+  expect_true(is.list(spec$planning_schema$structural_design_schema$preview))
+  expect_true(spec$planning_schema$structural_design_schema$preview$preview_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$grid_contract))
+  expect_true(is.list(spec$planning_schema$structural_design_schema$grid_bundle))
+  expect_true(is.list(spec$planning_schema$structural_design_schema$grid_context))
   expect_identical(
-    spec$planning_schema$future_branch_schema$grid_contract$contract,
+    spec$planning_schema$structural_design_schema$grid_contract$contract,
     "arbitrary_facet_design_grid_contract"
   )
-  expect_true(spec$planning_schema$future_branch_schema$grid_contract$preview_available)
+  expect_true(spec$planning_schema$structural_design_schema$grid_contract$preview_available)
   expect_identical(
-    spec$planning_schema$future_branch_schema$grid_bundle$bundle_contract,
+    spec$planning_schema$structural_design_schema$grid_bundle$bundle_contract,
     "arbitrary_facet_design_grid_bundle"
   )
-  expect_true(spec$planning_schema$future_branch_schema$grid_bundle$grid_available)
-  expect_true(spec$planning_schema$future_branch_schema$grid_context$grid_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$grid_semantics))
-  expect_true(is.list(spec$planning_schema$future_branch_preview))
-  expect_true(spec$planning_schema$future_branch_preview$preview_available)
-  expect_true(is.list(spec$planning_schema$future_branch_preview$grid_semantics))
-  expect_true(is.list(spec$planning_schema$future_branch_grid_semantics))
-  expect_true(is.list(spec$planning_schema$future_branch_grid_contract))
-  expect_true(is.list(spec$planning_schema$future_branch_grid_bundle))
-  expect_true(is.list(spec$planning_schema$future_branch_grid_context))
+  expect_true(spec$planning_schema$structural_design_schema$grid_bundle$grid_available)
+  expect_true(spec$planning_schema$structural_design_schema$grid_context$grid_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$grid_semantics))
+  expect_true(is.list(spec$planning_schema$structural_design_preview))
+  expect_true(spec$planning_schema$structural_design_preview$preview_available)
+  expect_true(is.list(spec$planning_schema$structural_design_preview$grid_semantics))
+  expect_true(is.list(spec$planning_schema$structural_design_grid_semantics))
+  expect_true(is.list(spec$planning_schema$structural_design_grid_contract))
+  expect_true(is.list(spec$planning_schema$structural_design_grid_bundle))
+  expect_true(is.list(spec$planning_schema$structural_design_grid_context))
   expect_identical(
-    spec$planning_schema$future_branch_grid_contract$planner_contract,
-    "arbitrary_facet_planning_scaffold"
+    spec$planning_schema$structural_design_grid_contract$planner_contract,
+    "named_facet_structural_review"
   )
   expect_identical(
-    spec$planning_schema$future_branch_grid_bundle$planner_contract,
-    "arbitrary_facet_planning_scaffold"
+    spec$planning_schema$structural_design_grid_bundle$planner_contract,
+    "named_facet_structural_review"
   )
   expect_identical(
-    spec$planning_schema$future_branch_grid_semantics$branch_columns,
+    spec$planning_schema$structural_design_grid_semantics$branch_columns,
     c("design_id", "person", "judge", "task", "assignment")
   )
   expect_identical(
-    spec$planning_schema$future_branch_grid_context$context_contract,
+    spec$planning_schema$structural_design_grid_context$context_contract,
     "arbitrary_facet_design_grid_context"
   )
-  expect_true(spec$planning_schema$future_branch_grid_context$grid_available)
+  expect_true(spec$planning_schema$structural_design_grid_context$grid_available)
   expect_identical(
-    names(spec$planning_schema$future_branch_preview$canonical),
+    names(spec$planning_schema$structural_design_preview$canonical),
     c("design_id", "n_person", "n_rater", "n_criterion", "raters_per_person")
   )
   expect_identical(
-    spec$planning_schema$future_branch_preview$canonical[1, c("n_person", "n_rater", "n_criterion", "raters_per_person")],
+    spec$planning_schema$structural_design_preview$canonical[1, c("n_person", "n_rater", "n_criterion", "raters_per_person")],
     tibble::tibble(n_person = 16L, n_rater = 3L, n_criterion = 2L, raters_per_person = 2L)
   )
   expect_true(is.data.frame(spec$planning_schema$role_table))
@@ -230,7 +237,7 @@ test_that("build_mfrm_sim_spec accepts role-based and alias-based design input",
   )
 })
 
-test_that("design$facets accepts schema-only future facet-count keys", {
+test_that("design$facets accepts deterministic future facet-count keys", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
@@ -241,15 +248,15 @@ test_that("design$facets accepts schema-only future facet-count keys", {
   expect_equal(spec$n_rater, 3)
   expect_equal(spec$n_criterion, 2)
   expect_equal(spec$raters_per_person, 2)
-  expect_identical(spec$planning_scope$future_branch_input_contract, "design$facets(named counts)")
-  expect_identical(spec$planning_schema$future_facet_table$future_facet_key, c("person", "judge", "task"))
-  expect_identical(spec$planning_schema$future_design_template$facets, list(person = 14L, judge = 3L, task = 2L))
-  expect_identical(spec$planning_schema$future_design_template$assignment, 2L)
-  expect_identical(spec$planning_schema$future_branch_schema$design_template$facets, list(person = 14L, judge = 3L, task = 2L))
-  expect_identical(spec$planning_schema$future_branch_schema$assignment_axis$current_planning_count_alias, "judge_per_person")
-  expect_identical(spec$planning_schema$future_branch_schema$design_schema$default_design$facets, list(person = 14L, judge = 3L, task = 2L))
-  expect_true(spec$planning_schema$future_branch_preview$preview_available)
-  expect_true(all(spec$planning_schema$future_branch_preview$canonical$n_person == 14L))
+  expect_identical(spec$planning_scope$structural_design_input_contract, "design$facets(named counts)")
+  expect_identical(spec$planning_schema$structural_facet_table$structural_facet_key, c("person", "judge", "task"))
+  expect_identical(spec$planning_schema$structural_design_template$facets, list(person = 14L, judge = 3L, task = 2L))
+  expect_identical(spec$planning_schema$structural_design_template$assignment, 2L)
+  expect_identical(spec$planning_schema$structural_design_schema$design_template$facets, list(person = 14L, judge = 3L, task = 2L))
+  expect_identical(spec$planning_schema$structural_design_schema$assignment_axis$current_planning_count_alias, "judge_per_person")
+  expect_identical(spec$planning_schema$structural_design_schema$design_schema$default_design$facets, list(person = 14L, judge = 3L, task = 2L))
+  expect_true(spec$planning_schema$structural_design_preview$preview_available)
+  expect_true(all(spec$planning_schema$structural_design_preview$canonical$n_person == 14L))
 
   pred <- suppressWarnings(
     predict_mfrm_population(
@@ -289,17 +296,17 @@ test_that("design$facets accepts schema-only future facet-count keys", {
   )
 })
 
-test_that("future_branch_schema normalizes nested facet-count design stubs", {
+test_that("structural_design_schema normalizes nested facet-count design stubs", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  parse_branch <- getFromNamespace("simulation_parse_future_branch_design", "mfrmr")
-  coerce_branch <- getFromNamespace("simulation_coerce_future_branch_design_schema", "mfrmr")
+  parse_branch <- getFromNamespace("simulation_parse_structural_design", "mfrmr")
+  coerce_branch <- getFromNamespace("simulation_coerce_structural_design_schema", "mfrmr")
 
-  schema <- coerce_branch(spec$planning_schema$future_branch_schema)
+  schema <- coerce_branch(spec$planning_schema$structural_design_schema)
   expect_identical(schema$schema_contract, "arbitrary_facet_design_schema")
   expect_true(is.data.frame(schema$facet_axes))
   expect_identical(schema$facet_axes$input_key, c("person", "judge", "task"))
@@ -310,7 +317,7 @@ test_that("future_branch_schema normalizes nested facet-count design stubs", {
 
   parsed <- parse_branch(
     design = list(facets = c(person = 15, judge = 4, task = 2), assignment = 3),
-    future_branch_schema = spec$planning_schema$future_branch_schema
+    structural_design_schema = spec$planning_schema$structural_design_schema
   )
   expect_identical(
     parsed,
@@ -319,31 +326,31 @@ test_that("future_branch_schema normalizes nested facet-count design stubs", {
 
   parsed_assignment_only <- parse_branch(
     design = list(assignment = 2),
-    future_branch_schema = spec$planning_schema$future_branch_schema
+    structural_design_schema = spec$planning_schema$structural_design_schema
   )
   expect_identical(parsed_assignment_only, list(raters_per_person = 2))
 
   expect_error(
     parse_branch(
       design = list(facets = c(panel = 3)),
-      future_branch_schema = spec$planning_schema$future_branch_schema
+      structural_design_schema = spec$planning_schema$structural_design_schema
     ),
     "must use names such as person, judge, task",
     fixed = TRUE
   )
 })
 
-test_that("future branch design schema builds schema-only grids", {
+test_that("structural design review design schema builds deterministic grids", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  build_future_grid <- getFromNamespace("simulation_build_future_branch_design_grid", "mfrmr")
+  build_future_grid <- getFromNamespace("simulation_build_structural_design_grid", "mfrmr")
 
   grid <- build_future_grid(
-    design_schema = spec$planning_schema$future_branch_schema,
+    design_schema = spec$planning_schema$structural_design_schema,
     design = list(
       facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
       assignment = c(1, 2)
@@ -353,11 +360,11 @@ test_that("future branch design schema builds schema-only grids", {
 
   expect_true(is.data.frame(grid$canonical))
   expect_true(is.data.frame(grid$public))
-  expect_true(is.data.frame(grid$branch))
+  expect_true(is.data.frame(grid$design))
   expect_true(is.list(grid$design_schema))
   expect_true(is.list(grid$grid_semantics))
   expect_identical(names(grid$canonical), c("design_id", "n_person", "n_rater", "n_criterion", "raters_per_person"))
-  expect_identical(names(grid$branch), c("design_id", "person", "judge", "task", "assignment"))
+  expect_identical(names(grid$design), c("design_id", "person", "judge", "task", "assignment"))
   expect_identical(grid$grid_semantics$public_columns, c("design_id", "n_person", "n_judge", "n_task", "judge_per_person"))
   expect_true(all(c("n_judge", "n_task", "judge_per_person") %in% names(grid$public)))
   expect_equal(sort(unique(grid$canonical$n_person)), c(12, 14))
@@ -367,23 +374,23 @@ test_that("future branch design schema builds schema-only grids", {
 
   expect_error(
     build_future_grid(
-      design_schema = spec$planning_schema$future_branch_schema,
+      design_schema = spec$planning_schema$structural_design_schema,
       design = list(facets = list(person = 10, judge = 2, task = 2), assignment = 3)
     ),
-    "No valid future-branch design rows remain",
+    "No valid structural-design rows remain",
     fixed = TRUE
   )
 })
 
-test_that("future branch grid contract can be coerced and rebuilt independently", {
+test_that("structural design review grid contract can be coerced and rebuilt independently", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  coerce_grid_contract <- getFromNamespace("simulation_coerce_future_branch_grid_contract", "mfrmr")
-  build_from_contract <- getFromNamespace("simulation_build_future_branch_design_grid_from_contract", "mfrmr")
+  coerce_grid_contract <- getFromNamespace("simulation_coerce_structural_design_grid_contract", "mfrmr")
+  build_from_contract <- getFromNamespace("simulation_build_structural_design_grid_from_contract", "mfrmr")
 
   contract <- coerce_grid_contract(spec$planning_schema)
   expect_identical(contract$contract, "arbitrary_facet_design_grid_contract")
@@ -391,10 +398,10 @@ test_that("future branch grid contract can be coerced and rebuilt independently"
   expect_true(is.list(contract$design_schema))
   expect_true(is.list(contract$grid_semantics))
 
-  rebuilt_default <- build_from_contract(spec$planning_schema$future_branch_grid_contract)
+  rebuilt_default <- build_from_contract(spec$planning_schema$structural_design_grid_contract)
   expect_identical(
     rebuilt_default$canonical,
-    spec$planning_schema$future_branch_grid_contract$canonical
+    spec$planning_schema$structural_design_grid_contract$canonical
   )
   expect_identical(
     rebuilt_default$grid_semantics$branch_columns,
@@ -402,7 +409,7 @@ test_that("future branch grid contract can be coerced and rebuilt independently"
   )
 
   rebuilt_custom <- build_from_contract(
-    spec$planning_schema$future_branch_grid_contract,
+    spec$planning_schema$structural_design_grid_contract,
     design = list(facets = list(person = c(12, 14), judge = 3, task = 2), assignment = c(1, 2))
   )
   expect_true(is.data.frame(rebuilt_custom$canonical))
@@ -411,15 +418,15 @@ test_that("future branch grid contract can be coerced and rebuilt independently"
   expect_true(is.list(rebuilt_custom$grid_contract))
 })
 
-test_that("future branch grid bundle bundles live branch grids through one object", {
+test_that("structural design review grid bundle bundles live design grids through one object", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  build_bundle <- getFromNamespace("simulation_future_branch_grid_bundle", "mfrmr")
-  coerce_bundle <- getFromNamespace("simulation_coerce_future_branch_grid_bundle", "mfrmr")
+  build_bundle <- getFromNamespace("simulation_structural_design_grid_bundle", "mfrmr")
+  coerce_bundle <- getFromNamespace("simulation_coerce_structural_design_grid_bundle", "mfrmr")
 
   bundle <- build_bundle(spec$planning_schema)
   expect_identical(bundle$bundle_contract, "arbitrary_facet_design_grid_bundle")
@@ -428,7 +435,7 @@ test_that("future branch grid bundle bundles live branch grids through one objec
   expect_true(is.list(bundle$grid_contract))
   expect_identical(
     bundle$canonical,
-    spec$planning_schema$future_branch_grid_contract$canonical
+    spec$planning_schema$structural_design_grid_contract$canonical
   )
 
   coerced <- coerce_bundle(spec$planning_schema)
@@ -443,22 +450,22 @@ test_that("future branch grid bundle bundles live branch grids through one objec
   expect_equal(sort(unique(custom_bundle$canonical$raters_per_person)), c(1, 2))
 })
 
-test_that("future branch grid bundle can be materialized and viewed from live objects", {
+test_that("structural design review grid bundle can be materialized and viewed from live objects", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  materialize_bundle <- getFromNamespace("simulation_materialize_future_branch_grid_bundle", "mfrmr")
-  grid_view <- getFromNamespace("simulation_future_branch_grid_view", "mfrmr")
+  materialize_bundle <- getFromNamespace("simulation_materialize_structural_design_grid_bundle", "mfrmr")
+  grid_view <- getFromNamespace("simulation_structural_design_grid_view", "mfrmr")
 
   from_spec <- materialize_bundle(spec)
   expect_identical(from_spec$bundle_contract, "arbitrary_facet_design_grid_bundle")
   expect_true(from_spec$grid_available)
   expect_identical(
-    from_spec$branch,
-    spec$planning_schema$future_branch_grid_bundle$branch
+    from_spec$design,
+    spec$planning_schema$structural_design_grid_bundle$design
   )
 
   from_schema <- materialize_bundle(
@@ -469,7 +476,7 @@ test_that("future branch grid bundle can be materialized and viewed from live ob
   expect_equal(sort(unique(from_schema$canonical$n_person)), c(12, 14))
 
   expect_identical(
-    names(grid_view(spec$planning_schema, view = "branch")),
+    names(grid_view(spec$planning_schema, view = "design")),
     c("design_id", "person", "judge", "task", "assignment")
   )
   expect_true(all(
@@ -479,14 +486,14 @@ test_that("future branch grid bundle can be materialized and viewed from live ob
   ))
 })
 
-test_that("future branch grid context summarizes varying and fixed axes", {
+test_that("structural design review grid context summarizes varying and fixed axes", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  grid_context <- getFromNamespace("simulation_future_branch_grid_context", "mfrmr")
+  grid_context <- getFromNamespace("simulation_structural_design_grid_context", "mfrmr")
 
   context_default <- grid_context(spec$planning_schema)
   expect_identical(context_default$context_contract, "arbitrary_facet_design_grid_context")
@@ -509,21 +516,21 @@ test_that("future branch grid context summarizes varying and fixed axes", {
   )
   expect_true(is.list(context_custom$grid_bundle))
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   context_unavailable <- grid_context(branch)
   expect_false(context_unavailable$grid_available)
   expect_true(all(is.na(context_unavailable$axis_table$n_values)))
 })
 
-test_that("future branch summary and baseline recommendation use schema-only grid context", {
+test_that("structural design review summary and baseline recommendation use deterministic grid context", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  grid_summary <- getFromNamespace("simulation_future_branch_grid_summary", "mfrmr")
-  grid_recommendation <- getFromNamespace("simulation_future_branch_grid_recommendation", "mfrmr")
+  grid_summary <- getFromNamespace("simulation_structural_design_grid_summary", "mfrmr")
+  grid_recommendation <- getFromNamespace("simulation_structural_design_grid_recommendation", "mfrmr")
 
   summary_default <- grid_summary(spec$planning_schema)
   expect_identical(summary_default$summary_contract, "arbitrary_facet_design_grid_summary")
@@ -557,7 +564,7 @@ test_that("future branch summary and baseline recommendation use schema-only gri
   expect_identical(rec$recommended_canonical$raters_per_person[[1]], 1L)
   expect_identical(rec$recommended_branch$assignment[[1]], 1L)
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   summary_unavailable <- grid_summary(branch)
   expect_false(summary_unavailable$grid_available)
   expect_identical(summary_unavailable$n_designs, 0L)
@@ -566,15 +573,15 @@ test_that("future branch summary and baseline recommendation use schema-only gri
   expect_false(rec_unavailable$recommendation_available)
 })
 
-test_that("future branch table and plot payload expose schema-only branch views", {
+test_that("structural design review table and plot payload expose deterministic design views", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  grid_table <- getFromNamespace("simulation_future_branch_grid_table", "mfrmr")
-  grid_plot <- getFromNamespace("simulation_future_branch_grid_plot_payload", "mfrmr")
+  grid_table <- getFromNamespace("simulation_structural_design_grid_table", "mfrmr")
+  grid_plot <- getFromNamespace("simulation_structural_design_grid_plot_payload", "mfrmr")
 
   table_obj <- grid_table(
     spec$planning_schema,
@@ -594,10 +601,10 @@ test_that("future branch table and plot payload expose schema-only branch views"
     x_var = "assignment",
     group_var = "task",
     prefer = c("assignment", "task", "person"),
-    view = "branch"
+    view = "design"
   )
   expect_s3_class(plot_obj, "mfrm_plot_data")
-  expect_identical(plot_obj$name, "future_branch_grid_schema")
+  expect_identical(plot_obj$name, "structural_design_grid_schema")
   expect_true(isTRUE(plot_obj$data$plot_available))
   expect_identical(plot_obj$data$x_var, "raters_per_person")
   expect_identical(plot_obj$data$group_var, "n_criterion")
@@ -606,21 +613,21 @@ test_that("future branch table and plot payload expose schema-only branch views"
   expect_true(all(c("design_id", "x_value", "group_value", "recommended") %in% names(plot_obj$data$data)))
   expect_identical(sum(plot_obj$data$data$recommended), 1L)
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   unavailable_plot <- grid_plot(branch)
   expect_s3_class(unavailable_plot, "mfrm_plot_data")
   expect_false(unavailable_plot$data$plot_available)
   expect_equal(nrow(unavailable_plot$data$data), 0)
 })
 
-test_that("future branch report bundle combines schema-only consumers", {
+test_that("structural design review report bundle combines deterministic consumers", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  grid_report <- getFromNamespace("simulation_future_branch_report_bundle", "mfrmr")
+  grid_report <- getFromNamespace("simulation_structural_design_report_bundle", "mfrmr")
 
   report <- grid_report(
     spec$planning_schema,
@@ -633,32 +640,32 @@ test_that("future branch report bundle combines schema-only consumers", {
   expect_true(report$report_available)
   expect_identical(report$recommended_design_id, "F01")
   expect_true(is.data.frame(report$overview_table))
-  expect_true(all(c("canonical", "public", "branch") %in% names(report$tables)))
-  expect_true(all(c("canonical", "public", "branch") %in% names(report$plots)))
+  expect_true(all(c("canonical", "public", "design") %in% names(report$tables)))
+  expect_true(all(c("canonical", "public", "design") %in% names(report$plots)))
   expect_identical(report$tables$public$recommended_design_id, "F01")
-  expect_s3_class(report$plots$branch, "mfrm_plot_data")
-  expect_true(report$plots$branch$data$plot_available)
-  expect_identical(report$plots$branch$data$recommended_design_id, "F01")
-  expect_true(is.list(spec$planning_schema$future_branch_report_bundle))
-  expect_true(spec$planning_schema$future_branch_report_bundle$report_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$report_bundle))
-  expect_true(spec$planning_schema$future_branch_schema$report_bundle$report_available)
+  expect_s3_class(report$plots$design, "mfrm_plot_data")
+  expect_true(report$plots$design$data$plot_available)
+  expect_identical(report$plots$design$data$recommended_design_id, "F01")
+  expect_true(is.list(spec$planning_schema$structural_design_report_bundle))
+  expect_true(spec$planning_schema$structural_design_report_bundle$report_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$report_bundle))
+  expect_true(spec$planning_schema$structural_design_schema$report_bundle$report_available)
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   report_unavailable <- grid_report(branch)
   expect_false(report_unavailable$report_available)
   expect_identical(nrow(report_unavailable$tables$public$table), 0L)
   expect_false(report_unavailable$plots$public$data$plot_available)
 })
 
-test_that("future branch report summary exposes a compact component index", {
+test_that("structural design review report summary exposes a compact component index", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  report_summary <- getFromNamespace("simulation_future_branch_report_summary", "mfrmr")
+  report_summary <- getFromNamespace("simulation_structural_design_report_summary", "mfrmr")
 
   summary_obj <- report_summary(
     spec$planning_schema,
@@ -671,31 +678,31 @@ test_that("future branch report summary exposes a compact component index", {
   expect_true(summary_obj$report_available)
   expect_identical(summary_obj$n_designs, 8L)
   expect_identical(summary_obj$recommended_design_id, "F01")
-  expect_equal(summary_obj$available_table_views, c("canonical", "public", "branch"))
-  expect_equal(summary_obj$available_plot_views, c("canonical", "public", "branch"))
+  expect_equal(summary_obj$available_table_views, c("canonical", "public", "design"))
+  expect_equal(summary_obj$available_plot_views, c("canonical", "public", "design"))
   expect_true(is.data.frame(summary_obj$component_index))
   expect_identical(nrow(summary_obj$component_index), 8L)
   expect_true(all(c("component_type", "view", "available", "n_rows", "x_var", "group_var", "recommended_design_id") %in% names(summary_obj$component_index)))
-  expect_true(is.list(spec$planning_schema$future_branch_report_summary))
-  expect_true(spec$planning_schema$future_branch_report_summary$report_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$report_summary))
-  expect_true(spec$planning_schema$future_branch_schema$report_summary$report_available)
+  expect_true(is.list(spec$planning_schema$structural_design_report_summary))
+  expect_true(spec$planning_schema$structural_design_report_summary$report_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$report_summary))
+  expect_true(spec$planning_schema$structural_design_schema$report_summary$report_available)
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   summary_unavailable <- report_summary(branch)
   expect_false(summary_unavailable$report_available)
   expect_identical(summary_unavailable$n_designs, 0L)
   expect_true(is.data.frame(summary_unavailable$component_index))
 })
 
-test_that("future branch report overview exposes compact metrics and axis state", {
+test_that("structural design review report overview exposes compact metrics and axis state", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  report_overview <- getFromNamespace("simulation_future_branch_report_overview_table", "mfrmr")
+  report_overview <- getFromNamespace("simulation_structural_design_report_overview_table", "mfrmr")
 
   overview_obj <- report_overview(
     spec$planning_schema,
@@ -718,12 +725,12 @@ test_that("future branch report overview exposes compact metrics and axis state"
     "axis_class", "facet", "axis_state", "n_values", "value_summary", "fixed_value"
   ) %in% names(overview_obj$axis_overview_table)))
   expect_true(all(c("varying", "fixed") %in% overview_obj$axis_overview_table$axis_state))
-  expect_true(is.list(spec$planning_schema$future_branch_report_overview_table))
-  expect_true(spec$planning_schema$future_branch_report_overview_table$report_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$report_overview_table))
-  expect_true(spec$planning_schema$future_branch_schema$report_overview_table$report_available)
+  expect_true(is.list(spec$planning_schema$structural_design_report_overview_table))
+  expect_true(spec$planning_schema$structural_design_report_overview_table$report_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$report_overview_table))
+  expect_true(spec$planning_schema$structural_design_schema$report_overview_table$report_available)
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   overview_unavailable <- report_overview(branch)
   expect_false(overview_unavailable$report_available)
   expect_identical(overview_unavailable$metrics_table$n_designs[[1]], 0L)
@@ -731,14 +738,14 @@ test_that("future branch report overview exposes compact metrics and axis state"
   expect_true(is.data.frame(overview_unavailable$component_index))
 })
 
-test_that("future branch report overview view exposes selected component tables", {
+test_that("structural design review report overview view exposes selected component tables", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  overview_view <- getFromNamespace("simulation_future_branch_report_overview_view", "mfrmr")
+  overview_view <- getFromNamespace("simulation_structural_design_report_overview_view", "mfrmr")
   design_override <- list(
     facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
     assignment = c(1, 2)
@@ -766,20 +773,20 @@ test_that("future branch report overview view exposes selected component tables"
   expect_identical(components_view$component_label, "component index")
   expect_true(all(c("component_type", "available") %in% names(components_view$table)))
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   unavailable_view <- overview_view(branch, component = "axes")
   expect_false(unavailable_view$report_available)
   expect_true(all(unavailable_view$table$axis_state == "unavailable"))
 })
 
-test_that("future branch report catalog enumerates overview surfaces", {
+test_that("structural design review report catalog enumerates overview surfaces", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  report_catalog <- getFromNamespace("simulation_future_branch_report_catalog", "mfrmr")
+  report_catalog <- getFromNamespace("simulation_structural_design_report_catalog", "mfrmr")
   design_override <- list(
     facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
     assignment = c(1, 2)
@@ -800,25 +807,25 @@ test_that("future branch report catalog enumerates overview surfaces", {
   expect_true(all(catalog$surface_index$available))
   expect_true(is.list(catalog$views))
   expect_true(all(c("metrics", "axes", "components") %in% names(catalog$views)))
-  expect_true(is.list(spec$planning_schema$future_branch_report_catalog))
-  expect_true(spec$planning_schema$future_branch_report_catalog$report_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$report_catalog))
-  expect_true(spec$planning_schema$future_branch_schema$report_catalog$report_available)
+  expect_true(is.list(spec$planning_schema$structural_design_report_catalog))
+  expect_true(spec$planning_schema$structural_design_report_catalog$report_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$report_catalog))
+  expect_true(spec$planning_schema$structural_design_schema$report_catalog$report_available)
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   unavailable_catalog <- report_catalog(branch)
   expect_false(unavailable_catalog$report_available)
   expect_true(all(!unavailable_catalog$surface_index$available))
 })
 
-test_that("future branch report digest exposes headline branch-side report state", {
+test_that("structural design review report digest exposes headline design-review report state", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  report_digest <- getFromNamespace("simulation_future_branch_report_digest", "mfrmr")
+  report_digest <- getFromNamespace("simulation_structural_design_report_digest", "mfrmr")
   design_override <- list(
     facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
     assignment = c(1, 2)
@@ -840,12 +847,12 @@ test_that("future branch report digest exposes headline branch-side report state
   expect_equal(digest$available_surfaces, c("metrics", "axes", "components"))
   expect_equal(sort(digest$varying_axes), sort(c("n_person", "n_criterion", "raters_per_person")))
   expect_equal(digest$fixed_axes, "n_rater")
-  expect_true(is.list(spec$planning_schema$future_branch_report_digest))
-  expect_true(spec$planning_schema$future_branch_report_digest$report_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$report_digest))
-  expect_true(spec$planning_schema$future_branch_schema$report_digest$report_available)
+  expect_true(is.list(spec$planning_schema$structural_design_report_digest))
+  expect_true(spec$planning_schema$structural_design_report_digest$report_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$report_digest))
+  expect_true(spec$planning_schema$structural_design_schema$report_digest$report_available)
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   unavailable_digest <- report_digest(branch)
   expect_false(unavailable_digest$report_available)
   expect_identical(unavailable_digest$digest_table$n_designs[[1]], 0L)
@@ -853,14 +860,14 @@ test_that("future branch report digest exposes headline branch-side report state
   expect_length(unavailable_digest$available_surfaces, 0L)
 })
 
-test_that("future branch report surface exposes selected compact report layers", {
+test_that("structural design review report surface exposes selected compact report layers", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  report_surface <- getFromNamespace("simulation_future_branch_report_surface", "mfrmr")
+  report_surface <- getFromNamespace("simulation_structural_design_report_surface", "mfrmr")
   design_override <- list(
     facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
     assignment = c(1, 2)
@@ -888,20 +895,20 @@ test_that("future branch report surface exposes selected compact report layers",
   expect_identical(axes_surface$surface_label, "axis overview")
   expect_true(all(c("axis_state", "canonical_design_variable") %in% names(axes_surface$table)))
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   unavailable_surface <- report_surface(branch, surface = "digest")
   expect_false(unavailable_surface$report_available)
   expect_identical(unavailable_surface$table$n_designs[[1]], 0L)
 })
 
-test_that("future branch report surface registry enumerates compact report surfaces", {
+test_that("structural design review report surface registry enumerates compact report surfaces", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  report_registry <- getFromNamespace("simulation_future_branch_report_surface_registry", "mfrmr")
+  report_registry <- getFromNamespace("simulation_structural_design_report_surface_registry", "mfrmr")
   design_override <- list(
     facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
     assignment = c(1, 2)
@@ -922,25 +929,25 @@ test_that("future branch report surface registry enumerates compact report surfa
   expect_true(all(registry$surface_index$available))
   expect_true(is.list(registry$surfaces))
   expect_true(all(c("digest", "catalog", "metrics", "axes", "components") %in% names(registry$surfaces)))
-  expect_true(is.list(spec$planning_schema$future_branch_report_surface_registry))
-  expect_true(spec$planning_schema$future_branch_report_surface_registry$report_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$report_surface_registry))
-  expect_true(spec$planning_schema$future_branch_schema$report_surface_registry$report_available)
+  expect_true(is.list(spec$planning_schema$structural_design_report_surface_registry))
+  expect_true(spec$planning_schema$structural_design_report_surface_registry$report_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$report_surface_registry))
+  expect_true(spec$planning_schema$structural_design_schema$report_surface_registry$report_available)
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   unavailable_registry <- report_registry(branch)
   expect_false(unavailable_registry$report_available)
   expect_true(all(!unavailable_registry$surface_index$available))
 })
 
-test_that("future branch report panel combines one selected surface with headline metadata", {
+test_that("structural design review report panel combines one selected surface with headline metadata", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  report_panel <- getFromNamespace("simulation_future_branch_report_panel", "mfrmr")
+  report_panel <- getFromNamespace("simulation_structural_design_report_panel", "mfrmr")
   design_override <- list(
     facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
     assignment = c(1, 2)
@@ -965,25 +972,25 @@ test_that("future branch report panel combines one selected surface with headlin
   expect_identical(axes_panel$surface_label, "axis overview")
   expect_true(all(c("axis_state", "canonical_design_variable") %in% names(axes_panel$selected_table)))
 
-  expect_true(is.list(spec$planning_schema$future_branch_report_panel))
-  expect_true(spec$planning_schema$future_branch_report_panel$report_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$report_panel))
-  expect_true(spec$planning_schema$future_branch_schema$report_panel$report_available)
+  expect_true(is.list(spec$planning_schema$structural_design_report_panel))
+  expect_true(spec$planning_schema$structural_design_report_panel$report_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$report_panel))
+  expect_true(spec$planning_schema$structural_design_schema$report_panel$report_available)
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   unavailable_panel <- report_panel(branch)
   expect_false(unavailable_panel$report_available)
   expect_identical(unavailable_panel$selected_table$n_designs[[1]], 0L)
 })
 
-test_that("future branch report operation combines digest, registry, and selected surface", {
+test_that("structural design review report operation combines digest, registry, and selected surface", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  report_operation <- getFromNamespace("simulation_future_branch_report_operation", "mfrmr")
+  report_operation <- getFromNamespace("simulation_structural_design_report_operation", "mfrmr")
   design_override <- list(
     facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
     assignment = c(1, 2)
@@ -1007,31 +1014,31 @@ test_that("future branch report operation combines digest, registry, and selecte
   expect_true(all(c("axis_state", "canonical_design_variable") %in% names(operation$axis_overview_table)))
   expect_true(all(c("component_type", "available") %in% names(operation$component_index)))
   expect_true(all(c("axis_state", "canonical_design_variable") %in% names(operation$selected_table)))
-  expect_true(is.list(spec$planning_schema$future_branch_report_operation))
-  expect_true(spec$planning_schema$future_branch_report_operation$report_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$report_operation))
-  expect_true(spec$planning_schema$future_branch_schema$report_operation$report_available)
+  expect_true(is.list(spec$planning_schema$structural_design_report_operation))
+  expect_true(spec$planning_schema$structural_design_report_operation$report_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$report_operation))
+  expect_true(spec$planning_schema$structural_design_schema$report_operation$report_available)
   expect_true(all(c("digest_table", "surface_index", "metrics_table") %in% names(
-    spec$planning_schema$future_branch_schema$report_operation
+    spec$planning_schema$structural_design_schema$report_operation
   )))
-  expect_false("report_panel" %in% names(spec$planning_schema$future_branch_schema$report_operation))
-  expect_false("report_surface_registry" %in% names(spec$planning_schema$future_branch_schema$report_operation))
+  expect_false("report_panel" %in% names(spec$planning_schema$structural_design_schema$report_operation))
+  expect_false("report_surface_registry" %in% names(spec$planning_schema$structural_design_schema$report_operation))
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   unavailable_operation <- report_operation(branch)
   expect_false(unavailable_operation$report_available)
   expect_identical(unavailable_operation$digest_table$n_designs[[1]], 0L)
   expect_true(all(c("surface", "available", "n_rows") %in% names(unavailable_operation$surface_index)))
 })
 
-test_that("future branch report snapshot exposes compact headline tables without nested operation state", {
+test_that("structural design review report snapshot exposes compact headline tables without nested operation state", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  report_snapshot <- getFromNamespace("simulation_future_branch_report_snapshot", "mfrmr")
+  report_snapshot <- getFromNamespace("simulation_structural_design_report_snapshot", "mfrmr")
   design_override <- list(
     facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
     assignment = c(1, 2)
@@ -1058,26 +1065,26 @@ test_that("future branch report snapshot exposes compact headline tables without
   expect_true(all(c("axis_state", "canonical_design_variable") %in% names(snapshot$selected_table)))
   expect_false("report_panel" %in% names(snapshot))
   expect_false("report_surface_registry" %in% names(snapshot))
-  expect_true(is.list(spec$planning_schema$future_branch_report_snapshot))
-  expect_true(spec$planning_schema$future_branch_report_snapshot$report_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$report_snapshot))
-  expect_true(spec$planning_schema$future_branch_schema$report_snapshot$report_available)
+  expect_true(is.list(spec$planning_schema$structural_design_report_snapshot))
+  expect_true(spec$planning_schema$structural_design_report_snapshot$report_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$report_snapshot))
+  expect_true(spec$planning_schema$structural_design_schema$report_snapshot$report_available)
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   unavailable_snapshot <- report_snapshot(branch)
   expect_false(unavailable_snapshot$report_available)
   expect_identical(unavailable_snapshot$n_designs, 0L)
   expect_length(unavailable_snapshot$available_surfaces, 0L)
 })
 
-test_that("future branch report brief exposes one selected surface without snapshot payload", {
+test_that("structural design review report brief exposes one selected surface without snapshot payload", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  report_brief <- getFromNamespace("simulation_future_branch_report_brief", "mfrmr")
+  report_brief <- getFromNamespace("simulation_structural_design_report_brief", "mfrmr")
   design_override <- list(
     facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
     assignment = c(1, 2)
@@ -1111,27 +1118,27 @@ test_that("future branch report brief exposes one selected surface without snaps
   expect_false("digest_table" %in% names(brief))
   expect_false("metrics_table" %in% names(brief))
   expect_false("axis_overview_table" %in% names(brief))
-  expect_true(is.list(spec$planning_schema$future_branch_report_brief))
-  expect_true(spec$planning_schema$future_branch_report_brief$report_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$report_brief))
-  expect_true(spec$planning_schema$future_branch_schema$report_brief$report_available)
+  expect_true(is.list(spec$planning_schema$structural_design_report_brief))
+  expect_true(spec$planning_schema$structural_design_report_brief$report_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$report_brief))
+  expect_true(spec$planning_schema$structural_design_schema$report_brief$report_available)
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   unavailable_brief <- report_brief(branch)
   expect_false(unavailable_brief$report_available)
   expect_identical(unavailable_brief$headline_table$n_designs[[1]], 0L)
   expect_identical(unavailable_brief$headline_table$available_surfaces[[1]], "")
 })
 
-test_that("future branch report consumer dispatches across brief snapshot and operation modes", {
+test_that("structural design review report consumer dispatches across brief snapshot and operation modes", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  report_consume <- getFromNamespace("simulation_future_branch_report_consume", "mfrmr")
-  mode_registry <- getFromNamespace("simulation_future_branch_report_mode_registry", "mfrmr")
+  report_consume <- getFromNamespace("simulation_structural_design_report_consume", "mfrmr")
+  mode_registry <- getFromNamespace("simulation_structural_design_report_mode_registry", "mfrmr")
   design_override <- list(
     facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
     assignment = c(1, 2)
@@ -1173,88 +1180,88 @@ test_that("future branch report consumer dispatches across brief snapshot and op
   expect_true(is.list(operation_consumer$payload))
   expect_identical(operation_consumer$payload$operation_contract, "arbitrary_facet_design_report_operation")
 
-  expect_true(is.data.frame(spec$planning_schema$future_branch_report_mode_registry))
-  expect_true(is.list(spec$planning_schema$future_branch_report_consumer))
+  expect_true(is.data.frame(spec$planning_schema$structural_design_report_mode_registry))
+  expect_true(is.list(spec$planning_schema$structural_design_report_consumer))
   expect_identical(
-    spec$planning_schema$future_branch_report_consumer$payload_contract,
+    spec$planning_schema$structural_design_report_consumer$payload_contract,
     "arbitrary_facet_design_report_brief"
   )
-  expect_true(is.data.frame(spec$planning_schema$future_branch_schema$report_mode_registry))
-  expect_true(is.list(spec$planning_schema$future_branch_schema$report_consumer))
+  expect_true(is.data.frame(spec$planning_schema$structural_design_schema$report_mode_registry))
+  expect_true(is.list(spec$planning_schema$structural_design_schema$report_consumer))
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   unavailable_consumer <- report_consume(branch, mode = "brief")
   expect_false(unavailable_consumer$report_available)
   expect_identical(unavailable_consumer$n_designs, 0L)
 })
 
-test_that("future branch pilot bundles one grid view with one report consumer", {
+test_that("structural design review bundles one grid view with one report consumer", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  future_pilot <- getFromNamespace("simulation_future_branch_pilot", "mfrmr")
+  compact_review_builder <- getFromNamespace("simulation_structural_design_compact_review", "mfrmr")
   design_override <- list(
     facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
     assignment = c(1, 2)
   )
 
-  pilot <- future_pilot(
+  review <- compact_review_builder(
     spec$planning_schema,
     design = design_override,
     prefer = c("assignment", "task", "person"),
-    view = "branch",
+    view = "design",
     mode = "brief",
     surface = "axes",
     x_var = "assignment",
     group_var = "task"
   )
-  expect_identical(pilot$pilot_contract, "arbitrary_facet_planning_pilot")
-  expect_identical(pilot$pilot_stage, "pilot_active")
-  expect_true(pilot$pilot_available)
-  expect_identical(pilot$view, "branch")
-  expect_identical(pilot$mode, "brief")
-  expect_identical(pilot$surface, "axes")
-  expect_identical(pilot$recommended_design_id, "F01")
-  expect_identical(pilot$n_designs, 8L)
-  expect_true(is.data.frame(pilot$grid_table))
-  expect_true("recommended" %in% names(pilot$grid_table))
-  expect_s3_class(pilot$plot_payload, "mfrm_plot_data")
-  expect_true(is.list(pilot$report_consumer))
+  expect_identical(review$compact_review_contract, "named_facet_compact_review")
+  expect_identical(review$review_stage, "review_ready")
+  expect_true(review$review_available)
+  expect_identical(review$view, "design")
+  expect_identical(review$mode, "brief")
+  expect_identical(review$surface, "axes")
+  expect_identical(review$recommended_design_id, "F01")
+  expect_identical(review$n_designs, 8L)
+  expect_true(is.data.frame(review$grid_table))
+  expect_true("recommended" %in% names(review$grid_table))
+  expect_s3_class(review$plot_payload, "mfrm_plot_data")
+  expect_true(is.list(review$report_consumer))
   expect_identical(
-    pilot$report_consumer$payload_contract,
+    review$report_consumer$payload_contract,
     "arbitrary_facet_design_report_brief"
   )
-  expect_true(is.list(spec$planning_schema$future_branch_pilot))
-  expect_true(spec$planning_schema$future_branch_pilot$pilot_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$pilot))
-  expect_true(spec$planning_schema$future_branch_schema$pilot$pilot_available)
+  expect_true(is.list(spec$planning_schema$structural_design_compact_review))
+  expect_true(spec$planning_schema$structural_design_compact_review$review_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$review))
+  expect_true(spec$planning_schema$structural_design_schema$review$review_available)
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
-  unavailable_pilot <- future_pilot(branch)
-  expect_false(unavailable_pilot$pilot_available)
-  expect_identical(unavailable_pilot$pilot_stage, "schema_only")
-  expect_identical(unavailable_pilot$n_designs, 0L)
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  unavailable_review <- compact_review_builder(branch)
+  expect_false(unavailable_review$review_available)
+  expect_identical(unavailable_review$review_stage, "deterministic_review")
+  expect_identical(unavailable_review$n_designs, 0L)
 })
 
-test_that("future branch pilot summary table and plot expose compact active consumers", {
+test_that("structural design review summary table and plot expose compact active consumers", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  pilot_summary <- getFromNamespace("simulation_future_branch_pilot_summary", "mfrmr")
-  pilot_table <- getFromNamespace("simulation_future_branch_pilot_table", "mfrmr")
-  pilot_plot <- getFromNamespace("simulation_future_branch_pilot_plot", "mfrmr")
+  compact_review_summary <- getFromNamespace("simulation_structural_design_compact_review_summary", "mfrmr")
+  compact_review_table <- getFromNamespace("simulation_structural_design_compact_review_table", "mfrmr")
+  compact_review_plot <- getFromNamespace("simulation_structural_design_compact_review_plot", "mfrmr")
   design_override <- list(
     facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
     assignment = c(1, 2)
   )
 
-  summary_obj <- pilot_summary(
+  summary_obj <- compact_review_summary(
     spec$planning_schema,
     design = design_override,
     prefer = c("assignment", "task", "person"),
@@ -1264,78 +1271,78 @@ test_that("future branch pilot summary table and plot expose compact active cons
     x_var = "assignment",
     group_var = "task"
   )
-  expect_identical(summary_obj$pilot_summary_contract, "arbitrary_facet_planning_pilot_summary")
-  expect_true(summary_obj$pilot_available)
+  expect_identical(summary_obj$compact_review_summary_contract, "arbitrary_facet_planning_compact_review_summary")
+  expect_true(summary_obj$review_available)
   expect_true(is.data.frame(summary_obj$headline_table))
   expect_identical(summary_obj$headline_table$n_designs[[1]], 8L)
   expect_identical(summary_obj$headline_table$recommended_design_id[[1]], "F01")
   expect_identical(summary_obj$headline_table$report_payload_contract[[1]], "arbitrary_facet_design_report_snapshot")
 
-  grid_table_obj <- pilot_table(
+  grid_table_obj <- compact_review_table(
     spec$planning_schema,
     component = "grid",
     design = design_override,
-    view = "branch",
+    view = "design",
     mode = "brief",
     surface = "axes"
   )
-  expect_identical(grid_table_obj$pilot_table_contract, "arbitrary_facet_planning_pilot_table")
-  expect_true(grid_table_obj$pilot_available)
+  expect_identical(grid_table_obj$compact_review_table_contract, "arbitrary_facet_planning_compact_review_table")
+  expect_true(grid_table_obj$review_available)
   expect_true(all(c("design_id", "recommended") %in% names(grid_table_obj$table)))
 
-  report_table_obj <- pilot_table(
+  report_table_obj <- compact_review_table(
     spec$planning_schema,
     component = "report",
     design = design_override,
-    view = "branch",
+    view = "design",
     mode = "brief",
     surface = "axes"
   )
   expect_true(all(c("axis_state", "canonical_design_variable") %in% names(report_table_obj$table)))
 
-  plot_obj <- pilot_plot(
+  plot_obj <- compact_review_plot(
     spec$planning_schema,
     design = design_override,
-    view = "branch",
+    view = "design",
     mode = "brief",
     surface = "axes",
     x_var = "assignment",
     group_var = "task"
   )
-  expect_identical(plot_obj$pilot_plot_contract, "arbitrary_facet_planning_pilot_plot")
-  expect_true(plot_obj$pilot_available)
+  expect_identical(plot_obj$compact_review_plot_contract, "arbitrary_facet_planning_compact_review_plot")
+  expect_true(plot_obj$review_available)
   expect_s3_class(plot_obj$plot, "mfrm_plot_data")
 
-  expect_true(is.list(spec$planning_schema$future_branch_pilot_summary))
-  expect_true(is.list(spec$planning_schema$future_branch_pilot_table))
-  expect_true(is.list(spec$planning_schema$future_branch_pilot_plot))
-  expect_true(is.list(spec$planning_schema$future_branch_schema$pilot_summary))
-  expect_true(is.list(spec$planning_schema$future_branch_schema$pilot_table))
-  expect_true(is.list(spec$planning_schema$future_branch_schema$pilot_plot))
-  expect_false("pilot" %in% names(spec$planning_schema$future_branch_schema$pilot_summary))
-  expect_false("pilot" %in% names(spec$planning_schema$future_branch_schema$pilot_table))
-  expect_false("pilot" %in% names(spec$planning_schema$future_branch_schema$pilot_plot))
+  expect_true(is.list(spec$planning_schema$structural_design_compact_review_summary))
+  expect_true(is.list(spec$planning_schema$structural_design_compact_review_table))
+  expect_true(is.list(spec$planning_schema$structural_design_compact_review_plot))
+  expect_true(is.list(spec$planning_schema$structural_design_schema$compact_review_summary))
+  expect_true(is.list(spec$planning_schema$structural_design_schema$compact_review_table))
+  expect_true(is.list(spec$planning_schema$structural_design_schema$compact_review_plot))
+  expect_false("review" %in% names(spec$planning_schema$structural_design_schema$compact_review_summary))
+  expect_false("review" %in% names(spec$planning_schema$structural_design_schema$compact_review_table))
+  expect_false("review" %in% names(spec$planning_schema$structural_design_schema$compact_review_plot))
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
-  unavailable_summary <- pilot_summary(branch)
-  expect_false(unavailable_summary$pilot_available)
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  unavailable_summary <- compact_review_summary(branch)
+  expect_false(unavailable_summary$review_available)
   expect_identical(unavailable_summary$headline_table$n_designs[[1]], 0L)
 })
 
-test_that("future branch active branch bundles pilot summary table and plot", {
+test_that("structural design review design review bundles review summary table and plot", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  active_branch <- getFromNamespace("simulation_future_branch_active_branch", "mfrmr")
+  design_review <- getFromNamespace("simulation_structural_design_review", "mfrmr")
   design_override <- list(
     facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
     assignment = c(1, 2)
   )
 
-  branch_obj <- active_branch(
+  review_obj <- design_review(
     spec$planning_schema,
     design = design_override,
     prefer = c("assignment", "task", "person"),
@@ -1346,50 +1353,50 @@ test_that("future branch active branch bundles pilot summary table and plot", {
     x_var = "assignment",
     group_var = "task"
   )
-  expect_identical(branch_obj$branch_contract, "arbitrary_facet_planning_active_branch")
-  expect_identical(branch_obj$branch_stage, "pilot_active")
-  expect_true(branch_obj$branch_available)
-  expect_identical(branch_obj$recommended_design_id, "F01")
-  expect_identical(branch_obj$n_designs, 8L)
-  expect_true(is.list(branch_obj$summary))
-  expect_true(is.list(branch_obj$table))
-  expect_true(is.list(branch_obj$plot))
+  expect_identical(review_obj$review_contract, "arbitrary_facet_planning_design_review")
+  expect_identical(review_obj$review_stage, "review_ready")
+  expect_true(review_obj$review_available)
+  expect_identical(review_obj$recommended_design_id, "F01")
+  expect_identical(review_obj$n_designs, 8L)
+  expect_true(is.list(review_obj$summary))
+  expect_true(is.list(review_obj$table))
+  expect_true(is.list(review_obj$plot))
   expect_identical(
-    branch_obj$summary$pilot_summary_contract,
-    "arbitrary_facet_planning_pilot_summary"
+    review_obj$summary$compact_review_summary_contract,
+    "arbitrary_facet_planning_compact_review_summary"
   )
   expect_identical(
-    branch_obj$table$pilot_table_contract,
-    "arbitrary_facet_planning_pilot_table"
+    review_obj$table$compact_review_table_contract,
+    "arbitrary_facet_planning_compact_review_table"
   )
   expect_identical(
-    branch_obj$plot$pilot_plot_contract,
-    "arbitrary_facet_planning_pilot_plot"
+    review_obj$plot$compact_review_plot_contract,
+    "arbitrary_facet_planning_compact_review_plot"
   )
-  expect_true(is.list(spec$planning_schema$future_branch_active_branch))
-  expect_true(spec$planning_schema$future_branch_active_branch$branch_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$active_branch))
-  expect_true(spec$planning_schema$future_branch_schema$active_branch$branch_available)
-  expect_true(is.data.frame(spec$planning_schema$future_branch_schema$active_branch$canonical_grid))
-  expect_false("pilot" %in% names(spec$planning_schema$future_branch_schema$active_branch$summary))
-  expect_false("pilot" %in% names(spec$planning_schema$future_branch_schema$active_branch$table))
-  expect_false("pilot" %in% names(spec$planning_schema$future_branch_schema$active_branch$plot))
+  expect_true(is.list(spec$planning_schema$structural_design_review))
+  expect_true(spec$planning_schema$structural_design_review$review_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$design_review))
+  expect_true(spec$planning_schema$structural_design_schema$design_review$review_available)
+  expect_true(is.data.frame(spec$planning_schema$structural_design_schema$design_review$canonical_grid))
+  expect_false("review" %in% names(spec$planning_schema$structural_design_schema$design_review$summary))
+  expect_false("review" %in% names(spec$planning_schema$structural_design_schema$design_review$table))
+  expect_false("review" %in% names(spec$planning_schema$structural_design_schema$design_review$plot))
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
-  unavailable_branch_obj <- active_branch(branch)
-  expect_false(unavailable_branch_obj$branch_available)
-  expect_identical(unavailable_branch_obj$branch_stage, "schema_only")
-  expect_identical(unavailable_branch_obj$n_designs, 0L)
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  unavailable_review_obj <- design_review(branch)
+  expect_false(unavailable_review_obj$review_available)
+  expect_identical(unavailable_review_obj$review_stage, "deterministic_review")
+  expect_identical(unavailable_review_obj$n_designs, 0L)
 })
 
-test_that("future branch active profile exposes deterministic design bookkeeping metrics", {
+test_that("structural design review active profile exposes deterministic design bookkeeping metrics", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  active_profile <- getFromNamespace("simulation_future_branch_active_branch_profile", "mfrmr")
+  active_profile <- getFromNamespace("simulation_structural_design_review_profile", "mfrmr")
   design_override <- list(
     facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
     assignment = c(1, 2)
@@ -1406,8 +1413,8 @@ test_that("future branch active profile exposes deterministic design bookkeeping
     x_var = "assignment",
     group_var = "task"
   )
-  expect_identical(profile$profile_contract, "arbitrary_facet_planning_active_branch_profile")
-  expect_true(profile$branch_available)
+  expect_identical(profile$profile_contract, "arbitrary_facet_planning_design_review_profile")
+  expect_true(profile$review_available)
   expect_true(is.data.frame(profile$profile_table))
   expect_true(is.data.frame(profile$metric_registry))
   expect_true(is.data.frame(profile$profile_summary_table))
@@ -1451,31 +1458,31 @@ test_that("future branch active profile exposes deterministic design bookkeeping
   ]
   expect_identical(nrow(summary_row), 1L)
   expect_equal(summary_row$recommended_value[[1]], 8)
-  expect_true(is.list(spec$planning_schema$future_branch_active_branch_profile))
-  expect_true(spec$planning_schema$future_branch_active_branch_profile$branch_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$active_branch_profile))
-  expect_true(spec$planning_schema$future_branch_schema$active_branch_profile$branch_available)
+  expect_true(is.list(spec$planning_schema$structural_design_review_profile))
+  expect_true(spec$planning_schema$structural_design_review_profile$review_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$design_review_profile))
+  expect_true(spec$planning_schema$structural_design_schema$design_review_profile$review_available)
   expect_true(all(c("metric_registry", "profile_summary_table", "profile_table") %in% names(
-    spec$planning_schema$future_branch_schema$active_branch_profile
+    spec$planning_schema$structural_design_schema$design_review_profile
   )))
-  expect_false("active_branch" %in% names(spec$planning_schema$future_branch_schema$active_branch_profile))
+  expect_false("design_review" %in% names(spec$planning_schema$structural_design_schema$design_review_profile))
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   unavailable_profile <- active_profile(branch)
-  expect_false(unavailable_profile$branch_available)
+  expect_false(unavailable_profile$review_available)
   expect_true(is.data.frame(unavailable_profile$metric_registry))
   expect_true(is.data.frame(unavailable_profile$profile_summary_table))
   expect_identical(nrow(unavailable_profile$profile_table), 0L)
 })
 
-test_that("future branch active overview combines branch headline and metric summaries", {
+test_that("structural design review active overview combines branch headline and metric summaries", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  active_overview <- getFromNamespace("simulation_future_branch_active_branch_overview", "mfrmr")
+  active_overview <- getFromNamespace("simulation_structural_design_review_overview", "mfrmr")
   design_override <- list(
     facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
     assignment = c(1, 2)
@@ -1492,8 +1499,8 @@ test_that("future branch active overview combines branch headline and metric sum
     x_var = "assignment",
     group_var = "task"
   )
-  expect_identical(overview$overview_contract, "arbitrary_facet_planning_active_branch_overview")
-  expect_true(overview$branch_available)
+  expect_identical(overview$overview_contract, "arbitrary_facet_planning_design_review_overview")
+  expect_true(overview$review_available)
   expect_true(is.data.frame(overview$headline_table))
   expect_true(is.data.frame(overview$metric_registry))
   expect_true(is.data.frame(overview$metric_summary_table))
@@ -1502,26 +1509,26 @@ test_that("future branch active overview combines branch headline and metric sum
   expect_identical(overview$headline_table$n_metrics[[1]], 5L)
   expect_true(all(c("metric", "basis_class", "formula", "interpretation") %in% names(overview$metric_registry)))
   expect_true(all(c("metric", "min", "max", "mean", "recommended_value") %in% names(overview$metric_summary_table)))
-  expect_true(is.list(spec$planning_schema$future_branch_active_branch_overview))
-  expect_true(spec$planning_schema$future_branch_active_branch_overview$branch_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$active_branch_overview))
-  expect_true(spec$planning_schema$future_branch_schema$active_branch_overview$branch_available)
+  expect_true(is.list(spec$planning_schema$structural_design_review_overview))
+  expect_true(spec$planning_schema$structural_design_review_overview$review_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$design_review_overview))
+  expect_true(spec$planning_schema$structural_design_schema$design_review_overview$review_available)
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   unavailable_overview <- active_overview(branch)
-  expect_false(unavailable_overview$branch_available)
+  expect_false(unavailable_overview$review_available)
   expect_identical(unavailable_overview$headline_table$n_designs[[1]], 0L)
   expect_identical(nrow(unavailable_overview$metric_summary_table), 0L)
 })
 
-test_that("future branch active load-balance diagnostics separate expectations from integer balance", {
+test_that("structural design review active load-balance diagnostics separate expectations from integer balance", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  active_load_balance <- getFromNamespace("simulation_future_branch_active_branch_load_balance", "mfrmr")
+  active_load_balance <- getFromNamespace("simulation_structural_design_review_load_balance", "mfrmr")
   design_override <- list(
     facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
     assignment = c(1, 2)
@@ -1538,8 +1545,8 @@ test_that("future branch active load-balance diagnostics separate expectations f
     x_var = "assignment",
     group_var = "task"
   )
-  expect_identical(diagnostics$diagnostics_contract, "arbitrary_facet_planning_active_branch_load_balance")
-  expect_true(diagnostics$branch_available)
+  expect_identical(diagnostics$diagnostics_contract, "arbitrary_facet_planning_design_review_load_balance")
+  expect_true(diagnostics$review_available)
   expect_true(is.data.frame(diagnostics$metric_registry))
   expect_true(is.data.frame(diagnostics$diagnostic_summary_table))
   expect_true(is.data.frame(diagnostics$diagnostic_table))
@@ -1588,26 +1595,26 @@ test_that("future branch active load-balance diagnostics separate expectations f
   ]
   expect_identical(nrow(summary_row), 1L)
   expect_equal(summary_row$recommended_value[[1]], 4)
-  expect_true(is.list(spec$planning_schema$future_branch_active_branch_load_balance))
-  expect_true(spec$planning_schema$future_branch_active_branch_load_balance$branch_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$active_branch_load_balance))
-  expect_true(spec$planning_schema$future_branch_schema$active_branch_load_balance$branch_available)
+  expect_true(is.list(spec$planning_schema$structural_design_review_load_balance))
+  expect_true(spec$planning_schema$structural_design_review_load_balance$review_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$design_review_load_balance))
+  expect_true(spec$planning_schema$structural_design_schema$design_review_load_balance$review_available)
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   unavailable_diagnostics <- active_load_balance(branch)
-  expect_false(unavailable_diagnostics$branch_available)
+  expect_false(unavailable_diagnostics$review_available)
   expect_true(is.data.frame(unavailable_diagnostics$metric_registry))
   expect_identical(nrow(unavailable_diagnostics$diagnostic_table), 0L)
 })
 
-test_that("future branch active load-balance overview summarizes divisibility patterns", {
+test_that("structural design review active load-balance overview summarizes divisibility patterns", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  load_balance_overview <- getFromNamespace("simulation_future_branch_active_branch_load_balance_overview", "mfrmr")
+  load_balance_overview <- getFromNamespace("simulation_structural_design_review_load_balance_overview", "mfrmr")
   design_override <- list(
     facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
     assignment = c(1, 2)
@@ -1626,9 +1633,9 @@ test_that("future branch active load-balance overview summarizes divisibility pa
   )
   expect_identical(
     overview$overview_contract,
-    "arbitrary_facet_planning_active_branch_load_balance_overview"
+    "arbitrary_facet_planning_design_review_load_balance_overview"
   )
-  expect_true(overview$branch_available)
+  expect_true(overview$review_available)
   expect_true(is.data.frame(overview$headline_table))
   expect_true(is.data.frame(overview$metric_registry))
   expect_true(is.data.frame(overview$diagnostic_summary_table))
@@ -1637,26 +1644,26 @@ test_that("future branch active load-balance overview summarizes divisibility pa
   expect_identical(overview$headline_table$recommended_design_id[[1]], "F01")
   expect_identical(overview$headline_table$n_perfect_integer_balance[[1]], 4L)
   expect_identical(overview$headline_table$n_nondivisible_designs[[1]], 4L)
-  expect_true(is.list(spec$planning_schema$future_branch_active_branch_load_balance_overview))
-  expect_true(spec$planning_schema$future_branch_active_branch_load_balance_overview$branch_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$active_branch_load_balance_overview))
-  expect_true(spec$planning_schema$future_branch_schema$active_branch_load_balance_overview$branch_available)
+  expect_true(is.list(spec$planning_schema$structural_design_review_load_balance_overview))
+  expect_true(spec$planning_schema$structural_design_review_load_balance_overview$review_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$design_review_load_balance_overview))
+  expect_true(spec$planning_schema$structural_design_schema$design_review_load_balance_overview$review_available)
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   unavailable_overview <- load_balance_overview(branch)
-  expect_false(unavailable_overview$branch_available)
+  expect_false(unavailable_overview$review_available)
   expect_identical(unavailable_overview$headline_table$n_designs[[1]], 0L)
   expect_identical(nrow(unavailable_overview$diagnostic_summary_table), 0L)
 })
 
-test_that("future branch active coverage diagnostics summarize scored-cell overlap structure", {
+test_that("structural design review active coverage diagnostics summarize scored-cell overlap structure", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  active_coverage <- getFromNamespace("simulation_future_branch_active_branch_coverage", "mfrmr")
+  active_coverage <- getFromNamespace("simulation_structural_design_review_coverage", "mfrmr")
   design_override <- list(
     facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
     assignment = c(1, 2)
@@ -1673,8 +1680,8 @@ test_that("future branch active coverage diagnostics summarize scored-cell overl
     x_var = "assignment",
     group_var = "task"
   )
-  expect_identical(diagnostics$diagnostics_contract, "arbitrary_facet_planning_active_branch_coverage")
-  expect_true(diagnostics$branch_available)
+  expect_identical(diagnostics$diagnostics_contract, "arbitrary_facet_planning_design_review_coverage")
+  expect_true(diagnostics$review_available)
   expect_true(is.data.frame(diagnostics$metric_registry))
   expect_true(is.data.frame(diagnostics$diagnostic_summary_table))
   expect_true(is.data.frame(diagnostics$diagnostic_table))
@@ -1722,26 +1729,26 @@ test_that("future branch active coverage diagnostics summarize scored-cell overl
   ]
   expect_identical(nrow(summary_row), 1L)
   expect_equal(summary_row$recommended_value[[1]], 24)
-  expect_true(is.list(spec$planning_schema$future_branch_active_branch_coverage))
-  expect_true(spec$planning_schema$future_branch_active_branch_coverage$branch_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$active_branch_coverage))
-  expect_true(spec$planning_schema$future_branch_schema$active_branch_coverage$branch_available)
+  expect_true(is.list(spec$planning_schema$structural_design_review_coverage))
+  expect_true(spec$planning_schema$structural_design_review_coverage$review_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$design_review_coverage))
+  expect_true(spec$planning_schema$structural_design_schema$design_review_coverage$review_available)
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   unavailable_diagnostics <- active_coverage(branch)
-  expect_false(unavailable_diagnostics$branch_available)
+  expect_false(unavailable_diagnostics$review_available)
   expect_true(is.data.frame(unavailable_diagnostics$metric_registry))
   expect_identical(nrow(unavailable_diagnostics$diagnostic_table), 0L)
 })
 
-test_that("future branch active coverage overview summarizes overlap patterns", {
+test_that("structural design review active coverage overview summarizes overlap patterns", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  coverage_overview <- getFromNamespace("simulation_future_branch_active_branch_coverage_overview", "mfrmr")
+  coverage_overview <- getFromNamespace("simulation_structural_design_review_coverage_overview", "mfrmr")
   design_override <- list(
     facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
     assignment = c(1, 2)
@@ -1760,9 +1767,9 @@ test_that("future branch active coverage overview summarizes overlap patterns", 
   )
   expect_identical(
     overview$overview_contract,
-    "arbitrary_facet_planning_active_branch_coverage_overview"
+    "arbitrary_facet_planning_design_review_coverage_overview"
   )
-  expect_true(overview$branch_available)
+  expect_true(overview$review_available)
   expect_true(is.data.frame(overview$headline_table))
   expect_true(is.data.frame(overview$metric_registry))
   expect_true(is.data.frame(overview$diagnostic_summary_table))
@@ -1773,26 +1780,26 @@ test_that("future branch active coverage overview summarizes overlap patterns", 
   expect_identical(overview$headline_table$n_single_rater_designs[[1]], 4L)
   expect_identical(overview$headline_table$n_pair_connected_designs[[1]], 4L)
   expect_identical(overview$headline_table$n_zero_pair_overlap_designs[[1]], 4L)
-  expect_true(is.list(spec$planning_schema$future_branch_active_branch_coverage_overview))
-  expect_true(spec$planning_schema$future_branch_active_branch_coverage_overview$branch_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$active_branch_coverage_overview))
-  expect_true(spec$planning_schema$future_branch_schema$active_branch_coverage_overview$branch_available)
+  expect_true(is.list(spec$planning_schema$structural_design_review_coverage_overview))
+  expect_true(spec$planning_schema$structural_design_review_coverage_overview$review_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$design_review_coverage_overview))
+  expect_true(spec$planning_schema$structural_design_schema$design_review_coverage_overview$review_available)
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   unavailable_overview <- coverage_overview(branch)
-  expect_false(unavailable_overview$branch_available)
+  expect_false(unavailable_overview$review_available)
   expect_identical(unavailable_overview$headline_table$n_designs[[1]], 0L)
   expect_identical(nrow(unavailable_overview$diagnostic_summary_table), 0L)
 })
 
-test_that("future branch active guardrails classify exact design regimes", {
+test_that("structural design review active guardrails classify exact design regimes", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  active_guardrails <- getFromNamespace("simulation_future_branch_active_branch_guardrails", "mfrmr")
+  active_guardrails <- getFromNamespace("simulation_structural_design_review_guardrails", "mfrmr")
   design_override <- list(
     facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
     assignment = c(1, 2)
@@ -1809,8 +1816,8 @@ test_that("future branch active guardrails classify exact design regimes", {
     x_var = "assignment",
     group_var = "task"
   )
-  expect_identical(guardrails$guardrail_contract, "arbitrary_facet_planning_active_branch_guardrails")
-  expect_true(guardrails$branch_available)
+  expect_identical(guardrails$guardrail_contract, "arbitrary_facet_planning_design_review_guardrails")
+  expect_true(guardrails$review_available)
   expect_true(is.data.frame(guardrails$guardrail_registry))
   expect_true(is.data.frame(guardrails$guardrail_summary_table))
   expect_true(is.data.frame(guardrails$guardrail_table))
@@ -1839,26 +1846,26 @@ test_that("future branch active guardrails classify exact design regimes", {
   expect_identical(nrow(summary_row), 1L)
   expect_identical(summary_row$recommended_level[[1]], "single_rater")
   expect_true(grepl("partial_overlap", summary_row$observed_levels[[1]], fixed = TRUE))
-  expect_true(is.list(spec$planning_schema$future_branch_active_branch_guardrails))
-  expect_true(spec$planning_schema$future_branch_active_branch_guardrails$branch_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$active_branch_guardrails))
-  expect_true(spec$planning_schema$future_branch_schema$active_branch_guardrails$branch_available)
+  expect_true(is.list(spec$planning_schema$structural_design_review_guardrails))
+  expect_true(spec$planning_schema$structural_design_review_guardrails$review_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$design_review_guardrails))
+  expect_true(spec$planning_schema$structural_design_schema$design_review_guardrails$review_available)
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   unavailable_guardrails <- active_guardrails(branch)
-  expect_false(unavailable_guardrails$branch_available)
+  expect_false(unavailable_guardrails$review_available)
   expect_true(is.data.frame(unavailable_guardrails$guardrail_registry))
   expect_identical(nrow(unavailable_guardrails$guardrail_table), 0L)
 })
 
-test_that("future branch active guardrail overview summarizes regime counts", {
+test_that("structural design review active guardrail overview summarizes regime counts", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  guardrail_overview <- getFromNamespace("simulation_future_branch_active_branch_guardrail_overview", "mfrmr")
+  guardrail_overview <- getFromNamespace("simulation_structural_design_review_guardrail_overview", "mfrmr")
   design_override <- list(
     facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
     assignment = c(1, 2)
@@ -1877,9 +1884,9 @@ test_that("future branch active guardrail overview summarizes regime counts", {
   )
   expect_identical(
     overview$overview_contract,
-    "arbitrary_facet_planning_active_branch_guardrail_overview"
+    "arbitrary_facet_planning_design_review_guardrail_overview"
   )
-  expect_true(overview$branch_available)
+  expect_true(overview$review_available)
   expect_true(is.data.frame(overview$headline_table))
   expect_true(is.data.frame(overview$guardrail_registry))
   expect_true(is.data.frame(overview$guardrail_summary_table))
@@ -1890,26 +1897,26 @@ test_that("future branch active guardrail overview summarizes regime counts", {
   expect_identical(overview$headline_table$n_partial_overlap_designs[[1]], 4L)
   expect_identical(overview$headline_table$n_fully_crossed_designs[[1]], 0L)
   expect_identical(overview$headline_table$n_integer_balanced_designs[[1]], 4L)
-  expect_true(is.list(spec$planning_schema$future_branch_active_branch_guardrail_overview))
-  expect_true(spec$planning_schema$future_branch_active_branch_guardrail_overview$branch_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$active_branch_guardrail_overview))
-  expect_true(spec$planning_schema$future_branch_schema$active_branch_guardrail_overview$branch_available)
+  expect_true(is.list(spec$planning_schema$structural_design_review_guardrail_overview))
+  expect_true(spec$planning_schema$structural_design_review_guardrail_overview$review_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$design_review_guardrail_overview))
+  expect_true(spec$planning_schema$structural_design_schema$design_review_guardrail_overview$review_available)
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   unavailable_overview <- guardrail_overview(branch)
-  expect_false(unavailable_overview$branch_available)
+  expect_false(unavailable_overview$review_available)
   expect_identical(unavailable_overview$headline_table$n_designs[[1]], 0L)
   expect_identical(nrow(unavailable_overview$guardrail_summary_table), 0L)
 })
 
-test_that("future branch active readiness summarizes exact overlap preconditions", {
+test_that("structural design review active readiness summarizes exact overlap preconditions", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  active_readiness <- getFromNamespace("simulation_future_branch_active_branch_readiness", "mfrmr")
+  active_readiness <- getFromNamespace("simulation_structural_design_review_readiness", "mfrmr")
   design_override <- list(
     facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
     assignment = c(1, 2)
@@ -1926,8 +1933,8 @@ test_that("future branch active readiness summarizes exact overlap preconditions
     x_var = "assignment",
     group_var = "task"
   )
-  expect_identical(readiness$readiness_contract, "arbitrary_facet_planning_active_branch_readiness")
-  expect_true(readiness$branch_available)
+  expect_identical(readiness$readiness_contract, "arbitrary_facet_planning_design_review_readiness")
+  expect_true(readiness$review_available)
   expect_true(is.data.frame(readiness$indicator_registry))
   expect_true(is.data.frame(readiness$readiness_summary_table))
   expect_true(is.data.frame(readiness$readiness_table))
@@ -1957,26 +1964,26 @@ test_that("future branch active readiness summarizes exact overlap preconditions
   ]
   expect_identical(nrow(summary_row), 1L)
   expect_equal(summary_row$recommended_value[[1]], 1)
-  expect_true(is.list(spec$planning_schema$future_branch_active_branch_readiness))
-  expect_true(spec$planning_schema$future_branch_active_branch_readiness$branch_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$active_branch_readiness))
-  expect_true(spec$planning_schema$future_branch_schema$active_branch_readiness$branch_available)
+  expect_true(is.list(spec$planning_schema$structural_design_review_readiness))
+  expect_true(spec$planning_schema$structural_design_review_readiness$review_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$design_review_readiness))
+  expect_true(spec$planning_schema$structural_design_schema$design_review_readiness$review_available)
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   unavailable_readiness <- active_readiness(branch)
-  expect_false(unavailable_readiness$branch_available)
+  expect_false(unavailable_readiness$review_available)
   expect_true(is.data.frame(unavailable_readiness$indicator_registry))
   expect_identical(nrow(unavailable_readiness$readiness_table), 0L)
 })
 
-test_that("future branch active readiness overview summarizes exact structural tiers", {
+test_that("structural design review active readiness overview summarizes exact structural tiers", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  readiness_overview <- getFromNamespace("simulation_future_branch_active_branch_readiness_overview", "mfrmr")
+  readiness_overview <- getFromNamespace("simulation_structural_design_review_readiness_overview", "mfrmr")
   design_override <- list(
     facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
     assignment = c(1, 2)
@@ -1995,9 +2002,9 @@ test_that("future branch active readiness overview summarizes exact structural t
   )
   expect_identical(
     overview$overview_contract,
-    "arbitrary_facet_planning_active_branch_readiness_overview"
+    "arbitrary_facet_planning_design_review_readiness_overview"
   )
-  expect_true(overview$branch_available)
+  expect_true(overview$review_available)
   expect_true(is.data.frame(overview$headline_table))
   expect_true(is.data.frame(overview$indicator_registry))
   expect_true(is.data.frame(overview$readiness_summary_table))
@@ -2008,26 +2015,26 @@ test_that("future branch active readiness overview summarizes exact structural t
   expect_identical(overview$headline_table$n_partial_overlap_balanced_tiers[[1]], 2L)
   expect_identical(overview$headline_table$n_partial_overlap_unbalanced_tiers[[1]], 2L)
   expect_identical(overview$headline_table$n_full_overlap_tiers[[1]], 0L)
-  expect_true(is.list(spec$planning_schema$future_branch_active_branch_readiness_overview))
-  expect_true(spec$planning_schema$future_branch_active_branch_readiness_overview$branch_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$active_branch_readiness_overview))
-  expect_true(spec$planning_schema$future_branch_schema$active_branch_readiness_overview$branch_available)
+  expect_true(is.list(spec$planning_schema$structural_design_review_readiness_overview))
+  expect_true(spec$planning_schema$structural_design_review_readiness_overview$review_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$design_review_readiness_overview))
+  expect_true(spec$planning_schema$structural_design_schema$design_review_readiness_overview$review_available)
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   unavailable_overview <- readiness_overview(branch)
-  expect_false(unavailable_overview$branch_available)
+  expect_false(unavailable_overview$review_available)
   expect_identical(unavailable_overview$headline_table$n_designs[[1]], 0L)
   expect_identical(nrow(unavailable_overview$readiness_summary_table), 0L)
 })
 
-test_that("future branch active recommendation ranks designs by exact structural tier then counts", {
+test_that("structural design review active recommendation ranks designs by exact structural tier then counts", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  active_recommendation <- getFromNamespace("simulation_future_branch_active_branch_recommendation", "mfrmr")
+  active_recommendation <- getFromNamespace("simulation_structural_design_review_recommendation", "mfrmr")
   design_override <- list(
     facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
     assignment = c(1, 2)
@@ -2046,7 +2053,7 @@ test_that("future branch active recommendation ranks designs by exact structural
   )
   expect_identical(
     recommendation$recommendation_contract,
-    "arbitrary_facet_planning_active_branch_recommendation"
+    "arbitrary_facet_planning_design_review_recommendation"
   )
   expect_true(recommendation$recommendation_available)
   expect_identical(recommendation$recommended_design_id, "F05")
@@ -2059,28 +2066,28 @@ test_that("future branch active recommendation ranks designs by exact structural
   expect_true(row_f05$recommended[[1]])
   expect_identical(row_f05$structural_priority[[1]], 3L)
   expect_equal(row_f05$total_observations[[1]], 48)
-  expect_true(is.list(spec$planning_schema$future_branch_active_branch_recommendation))
-  expect_true(spec$planning_schema$future_branch_active_branch_recommendation$recommendation_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$active_branch_recommendation))
-  expect_true(spec$planning_schema$future_branch_schema$active_branch_recommendation$recommendation_available)
-  expect_true("recommendation_table" %in% names(spec$planning_schema$future_branch_schema$active_branch_recommendation))
-  expect_false("active_branch_readiness" %in% names(spec$planning_schema$future_branch_schema$active_branch_recommendation))
-  expect_false("active_branch_profile" %in% names(spec$planning_schema$future_branch_schema$active_branch_recommendation))
+  expect_true(is.list(spec$planning_schema$structural_design_review_recommendation))
+  expect_true(spec$planning_schema$structural_design_review_recommendation$recommendation_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$design_review_recommendation))
+  expect_true(spec$planning_schema$structural_design_schema$design_review_recommendation$recommendation_available)
+  expect_true("recommendation_table" %in% names(spec$planning_schema$structural_design_schema$design_review_recommendation))
+  expect_false("design_review_readiness" %in% names(spec$planning_schema$structural_design_schema$design_review_recommendation))
+  expect_false("design_review_profile" %in% names(spec$planning_schema$structural_design_schema$design_review_recommendation))
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   unavailable_recommendation <- active_recommendation(branch)
   expect_false(unavailable_recommendation$recommendation_available)
   expect_identical(nrow(unavailable_recommendation$recommendation_table), 0L)
 })
 
-test_that("future branch active recommendation overview summarizes conservative selection", {
+test_that("structural design review active recommendation overview summarizes conservative selection", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  recommendation_overview <- getFromNamespace("simulation_future_branch_active_branch_recommendation_overview", "mfrmr")
+  recommendation_overview <- getFromNamespace("simulation_structural_design_review_recommendation_overview", "mfrmr")
   design_override <- list(
     facets = list(person = c(12, 14), judge = 3, task = c(2, 4)),
     assignment = c(1, 2)
@@ -2099,7 +2106,7 @@ test_that("future branch active recommendation overview summarizes conservative 
   )
   expect_identical(
     overview$overview_contract,
-    "arbitrary_facet_planning_active_branch_recommendation_overview"
+    "arbitrary_facet_planning_design_review_recommendation_overview"
   )
   expect_true(overview$recommendation_available)
   expect_true(is.data.frame(overview$headline_table))
@@ -2108,30 +2115,30 @@ test_that("future branch active recommendation overview summarizes conservative 
   expect_identical(overview$headline_table$recommended_design_id[[1]], "F05")
   expect_identical(overview$headline_table$recommended_tier[[1]], "partial_overlap_balanced")
   expect_identical(overview$headline_table$n_top_tier_candidates[[1]], 2L)
-  expect_true(is.list(spec$planning_schema$future_branch_active_branch_recommendation_overview))
-  expect_true(spec$planning_schema$future_branch_active_branch_recommendation_overview$recommendation_available)
-  expect_true(is.list(spec$planning_schema$future_branch_schema$active_branch_recommendation_overview))
-  expect_true(spec$planning_schema$future_branch_schema$active_branch_recommendation_overview$recommendation_available)
+  expect_true(is.list(spec$planning_schema$structural_design_review_recommendation_overview))
+  expect_true(spec$planning_schema$structural_design_review_recommendation_overview$recommendation_available)
+  expect_true(is.list(spec$planning_schema$structural_design_schema$design_review_recommendation_overview))
+  expect_true(spec$planning_schema$structural_design_schema$design_review_recommendation_overview$recommendation_available)
 
-  branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")(facet_names = c("Judge", "Task"))
+  branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
   unavailable_overview <- recommendation_overview(branch)
   expect_false(unavailable_overview$recommendation_available)
   expect_identical(nrow(unavailable_overview$recommendation_table), 0L)
 })
 
-test_that("future branch grid can be materialized from live planning objects", {
+test_that("structural design review grid can be materialized from live planning objects", {
   spec <- build_mfrm_sim_spec(
     facet_names = c("Judge", "Task"),
     design = list(facets = c(person = 14, judge = 3, task = 2), assignment = 2),
     assignment = "rotating"
   )
 
-  materialize_branch_grid <- getFromNamespace("simulation_materialize_future_branch_grid", "mfrmr")
+  materialize_branch_grid <- getFromNamespace("simulation_materialize_structural_design_grid", "mfrmr")
 
   from_spec <- materialize_branch_grid(spec)
   expect_identical(
     from_spec$canonical,
-    spec$planning_schema$future_branch_grid_contract$canonical
+    spec$planning_schema$structural_design_grid_contract$canonical
   )
 
   from_schema <- materialize_branch_grid(
@@ -2147,13 +2154,13 @@ test_that("future branch grid can be materialized from live planning objects", {
   wrapped <- list(settings = list(planning_schema = spec$planning_schema))
   from_wrapped <- materialize_branch_grid(wrapped)
   expect_identical(
-    from_wrapped$branch,
-    spec$planning_schema$future_branch_grid_contract$branch
+    from_wrapped$design,
+    spec$planning_schema$structural_design_grid_contract$design
   )
 })
 
-test_that("future branch preview reports unavailable defaults for facet-name-only schemas", {
-  build_branch <- getFromNamespace("simulation_future_branch_schema", "mfrmr")
+test_that("structural design review preview reports unavailable defaults for facet-name-only schemas", {
+  build_branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")
 
   branch <- build_branch(facet_names = c("Judge", "Task"))
   expect_true(is.list(branch$preview))
@@ -3162,7 +3169,7 @@ test_that("manual specs preserve custom facet names across planning helpers", {
   expect_identical(sim_eval$planning_scope$role_labels, c("Judge", "Task"))
   expect_false(sim_eval$planning_scope$supports_arbitrary_facet_planning)
   expect_true(sim_eval$planning_scope$supports_arbitrary_facet_estimation)
-  expect_true(grepl("arbitrary facet counts", sim_eval$planning_scope$note, fixed = TRUE))
+  expect_true(grepl("limited to this role-based design", sim_eval$planning_scope$note, fixed = TRUE))
   expect_true(is.list(sim_eval$planning_constraints))
   expect_identical(sim_eval$planning_constraints$mutable_design_variables, c("n_person", "n_rater", "n_criterion", "raters_per_person"))
   expect_true(is.list(sim_eval$planning_schema))
@@ -3170,15 +3177,15 @@ test_that("manual specs preserve custom facet names across planning helpers", {
   expect_identical(sim_eval$planning_schema$role_table$alias, c("n_person", "n_judge", "n_task", "judge_per_person"))
   expect_true(is.data.frame(sim_eval$planning_schema$facet_manifest))
   expect_identical(sim_eval$planning_schema$facet_manifest$facet, c("Person", "Judge", "Task"))
-  expect_true(is.data.frame(sim_eval$planning_schema$future_facet_table))
-  expect_identical(sim_eval$planning_schema$future_facet_table$future_facet_key, c("person", "judge", "task"))
-  expect_true(is.list(sim_eval$planning_schema$future_branch_schema))
-  expect_identical(sim_eval$planning_schema$future_branch_schema$input_contract, "design$facets(named counts)")
-  expect_identical(sim_eval$planning_schema$future_branch_schema$design_template$assignment, 2L)
-  expect_true(is.list(sim_eval$planning_schema$future_branch_preview))
-  expect_true(sim_eval$planning_schema$future_branch_preview$preview_available)
-  expect_true(is.list(sim_eval$planning_schema$future_branch_grid_semantics))
-  expect_true(is.list(sim_eval$planning_schema$future_branch_grid_contract))
+  expect_true(is.data.frame(sim_eval$planning_schema$structural_facet_table))
+  expect_identical(sim_eval$planning_schema$structural_facet_table$structural_facet_key, c("person", "judge", "task"))
+  expect_true(is.list(sim_eval$planning_schema$structural_design_schema))
+  expect_identical(sim_eval$planning_schema$structural_design_schema$input_contract, "design$facets(named counts)")
+  expect_identical(sim_eval$planning_schema$structural_design_schema$design_template$assignment, 2L)
+  expect_true(is.list(sim_eval$planning_schema$structural_design_preview))
+  expect_true(sim_eval$planning_schema$structural_design_preview$preview_available)
+  expect_true(is.list(sim_eval$planning_schema$structural_design_grid_semantics))
+  expect_true(is.list(sim_eval$planning_schema$structural_design_grid_contract))
 
   s_custom <- summary(sim_eval)
   expect_equal(s_custom$facet_names[["rater"]], "Judge")
@@ -3188,14 +3195,14 @@ test_that("manual specs preserve custom facet names across planning helpers", {
   expect_identical(s_custom$design_descriptor$canonical, c("n_person", "n_rater", "n_criterion", "raters_per_person"))
   expect_true(is.list(s_custom$planning_scope))
   expect_identical(s_custom$planning_scope$role_labels, c("Judge", "Task"))
-  expect_true(any(grepl("arbitrary facet counts", s_custom$notes, fixed = TRUE)))
+  expect_true(any(grepl("limited to this role-based design", s_custom$notes, fixed = TRUE)))
   expect_true(is.list(s_custom$planning_constraints))
   expect_true(any(grepl("All current design variables remain mutable", s_custom$notes, fixed = TRUE)))
   expect_true(is.list(s_custom$planning_schema))
   expect_true(is.data.frame(s_custom$planning_schema$role_table))
-  expect_true(is.list(s_custom$planning_schema$future_branch_preview))
-  expect_true(is.list(s_custom$planning_schema$future_branch_grid_semantics))
-  expect_true(is.list(s_custom$planning_schema$future_branch_grid_contract))
+  expect_true(is.list(s_custom$planning_schema$structural_design_preview))
+  expect_true(is.list(s_custom$planning_schema$structural_design_grid_semantics))
+  expect_true(is.list(s_custom$planning_schema$structural_design_grid_contract))
 
   p_custom <- plot(
     sim_eval,
@@ -3248,11 +3255,11 @@ test_that("manual specs preserve custom facet names across planning helpers", {
   expect_true(is.list(pred$planning_constraints))
   expect_true(is.list(pred$planning_schema))
   expect_true(is.data.frame(pred$planning_schema$facet_manifest))
-  expect_identical(pred$planning_schema$future_planner_contract, "arbitrary_facet_planning_scaffold")
-  expect_true(is.data.frame(pred$planning_schema$future_facet_table))
-  expect_identical(pred$planning_schema$future_facet_table$future_facet_key, c("person", "judge", "task"))
-  expect_true(is.list(pred$planning_schema$future_branch_schema))
-  expect_identical(pred$planning_schema$future_branch_schema$planner_stage, "schema_only")
+  expect_identical(pred$planning_schema$structural_review_contract, "named_facet_structural_review")
+  expect_true(is.data.frame(pred$planning_schema$structural_facet_table))
+  expect_identical(pred$planning_schema$structural_facet_table$structural_facet_key, c("person", "judge", "task"))
+  expect_true(is.list(pred$planning_schema$structural_design_schema))
+  expect_identical(pred$planning_schema$structural_design_schema$planner_stage, "deterministic_review")
 
   sig_eval <- suppressWarnings(
     evaluate_mfrm_signal_detection(
@@ -3278,16 +3285,16 @@ test_that("manual specs preserve custom facet names across planning helpers", {
   expect_true(is.list(sig_eval$planning_scope))
   expect_true(is.list(s_sig$planning_scope))
   expect_identical(sig_eval$planning_scope$role_labels, c("Judge", "Task"))
-  expect_true(any(grepl("arbitrary facet counts", s_sig$notes, fixed = TRUE)))
+  expect_true(any(grepl("limited to this role-based design", s_sig$notes, fixed = TRUE)))
   expect_true(is.list(sig_eval$planning_constraints))
   expect_true(is.list(s_sig$planning_constraints))
   expect_true(is.list(sig_eval$planning_schema))
   expect_true(is.list(s_sig$planning_schema))
   expect_true(is.data.frame(sig_eval$planning_schema$facet_manifest))
   expect_identical(sig_eval$planning_schema$facet_manifest$facet, c("Person", "Judge", "Task"))
-  expect_true(is.data.frame(sig_eval$planning_schema$future_facet_table))
-  expect_identical(sig_eval$planning_schema$future_facet_table$future_facet_key, c("person", "judge", "task"))
-  expect_true(is.list(sig_eval$planning_schema$future_branch_schema))
+  expect_true(is.data.frame(sig_eval$planning_schema$structural_facet_table))
+  expect_identical(sig_eval$planning_schema$structural_facet_table$structural_facet_key, c("person", "judge", "task"))
+  expect_true(is.list(sig_eval$planning_schema$structural_design_schema))
   p_sig <- plot(sig_eval, signal = "dif", metric = "power", x_var = "rater", group_var = "criterion", draw = FALSE)
   expect_equal(p_sig$x_var, "n_rater")
   expect_equal(p_sig$x_label, "n_judge")
@@ -3528,13 +3535,13 @@ test_that("evaluate_mfrm_design returns usable summary and plot data", {
   expect_true(all(c("RecoveryComparableRate", "RecoveryBasis") %in% names(s$design_summary)))
   expect_true(is.list(s$ademp))
   expect_true(all(c("aims", "data_generating_mechanism", "estimands", "methods", "performance_measures") %in% names(s$ademp)))
-  expect_s3_class(s$future_branch_active_summary, "summary.mfrm_future_branch_active_branch")
-  expect_true(is.data.frame(s$future_branch_active_summary$overview))
-  expect_true(is.data.frame(s$future_branch_active_summary$readiness_summary))
-  expect_true(is.data.frame(s$future_branch_active_summary$recommendation_table))
+  expect_s3_class(s$structural_design_review, "summary.mfrm_structural_design_review")
+  expect_true(is.data.frame(s$structural_design_review$overview))
+  expect_true(is.data.frame(s$structural_design_review$readiness_summary))
+  expect_true(is.data.frame(s$structural_design_review$recommendation_table))
   printed <- capture.output(print(summary(sim_eval)))
   expect_true(any(grepl("mfrmr Design Evaluation Summary", printed, fixed = TRUE)))
-  expect_true(any(grepl("Future arbitrary-facet planning scaffold", printed, fixed = TRUE)))
+  expect_true(any(grepl("Structural design review", printed, fixed = TRUE)))
 
   p <- plot(sim_eval, facet = "Rater", metric = "separation", x_var = "n_person", draw = FALSE)
   expect_true(is.list(p))
@@ -3805,12 +3812,12 @@ test_that("evaluate_mfrm_signal_detection returns usable detection summaries", {
                     "MeanTargetContrast", "MeanTargetBias") %in%
                     names(s_sig$detection_summary)))
   expect_true(is.list(s_sig$ademp))
-  expect_s3_class(s_sig$future_branch_active_summary, "summary.mfrm_future_branch_active_branch")
-  expect_true(is.data.frame(s_sig$future_branch_active_summary$overview))
-  expect_true(is.data.frame(s_sig$future_branch_active_summary$recommendation_table))
+  expect_s3_class(s_sig$structural_design_review, "summary.mfrm_structural_design_review")
+  expect_true(is.data.frame(s_sig$structural_design_review$overview))
+  expect_true(is.data.frame(s_sig$structural_design_review$recommendation_table))
   printed_sig <- capture.output(print(summary(sig_eval)))
   expect_true(any(grepl("mfrmr Signal Detection Summary", printed_sig, fixed = TRUE)))
-  expect_true(any(grepl("Future arbitrary-facet planning scaffold", printed_sig, fixed = TRUE)))
+  expect_true(any(grepl("Structural design review", printed_sig, fixed = TRUE)))
 
   p_sig <- plot(sig_eval, signal = "dif", metric = "power", x_var = "n_person", draw = FALSE)
   expect_true(is.list(p_sig))
@@ -3911,17 +3918,17 @@ test_that("predict_mfrm_population returns scenario-level forecast from sim_spec
   expect_true(is.data.frame(s_pred$design_descriptor))
   expect_true(is.list(s_pred$planning_scope))
   expect_identical(s_pred$planning_scope$role_labels, c("Judge", "Task"))
-  expect_true(any(grepl("arbitrary facet counts", s_pred$notes, fixed = TRUE)))
+  expect_true(any(grepl("limited to this role-based design", s_pred$notes, fixed = TRUE)))
   expect_true(is.list(s_pred$planning_constraints))
   expect_true(is.list(s_pred$planning_schema))
-  expect_s3_class(s_pred$future_branch_active_summary, "summary.mfrm_future_branch_active_branch")
-  expect_true(is.data.frame(s_pred$future_branch_active_summary$overview))
-  expect_true(is.data.frame(s_pred$future_branch_active_summary$recommendation_table))
+  expect_s3_class(s_pred$structural_design_review, "summary.mfrm_structural_design_review")
+  expect_true(is.data.frame(s_pred$structural_design_review$overview))
+  expect_true(is.data.frame(s_pred$structural_design_review$recommendation_table))
   expect_true(any(grepl("All current design variables remain mutable", s_pred$notes, fixed = TRUE)))
   expect_true(all(c("Facet", "MeanSeparation", "McseSeparation") %in% names(s_pred$forecast)))
   printed_pred <- capture.output(print(summary(pred)))
   expect_true(any(grepl("mfrmr Population Prediction Summary", printed_pred, fixed = TRUE)))
-  expect_true(any(grepl("Future arbitrary-facet planning scaffold", printed_pred, fixed = TRUE)))
+  expect_true(any(grepl("Structural design review", printed_pred, fixed = TRUE)))
 })
 
 test_that("predict_mfrm_population can derive its specification from a fitted model", {
@@ -4013,7 +4020,7 @@ test_that("predict_mfrm_population requires exactly one source", {
   )
 })
 
-test_that("future arbitrary-facet active branch exposes summary and plot contracts", {
+test_that("named-facet structural design review exposes summary and plot contracts", {
   spec <- build_mfrm_sim_spec(
     n_person = 12,
     n_rater = 3,
@@ -4023,11 +4030,11 @@ test_that("future arbitrary-facet active branch exposes summary and plot contrac
     facet_names = c("Judge", "Task")
   )
 
-  active <- spec$planning_schema$future_branch_active_branch
-  expect_s3_class(active, "mfrm_future_branch_active_branch")
+  active <- spec$planning_schema$structural_design_review
+  expect_s3_class(active, "mfrm_structural_design_review")
 
   s_active <- summary(active)
-  expect_s3_class(s_active, "summary.mfrm_future_branch_active_branch")
+  expect_s3_class(s_active, "summary.mfrm_structural_design_review")
   expect_true(is.data.frame(s_active$overview))
   expect_true(is.data.frame(s_active$table_index))
   expect_true(is.data.frame(s_active$profile_summary))
@@ -4062,18 +4069,18 @@ test_that("future arbitrary-facet active branch exposes summary and plot contrac
   expect_true("recommended_design_id" %in% names(s_active$overview))
   expect_true(all(c("RecommendedAppendixTables", "CompactAppendixTables", "NumericTables", "AnyNumericTable") %in% names(s_active$overview)))
   expect_true(all(c(
-    "future_branch_overview",
-    "future_branch_profile",
-    "future_branch_selection_table_presets",
-    "future_branch_selection_handoff_tables",
-    "future_branch_selection_handoff_presets",
-    "future_branch_selection_handoff",
-    "future_branch_selection_handoff_bundles",
-    "future_branch_selection_handoff_roles",
-    "future_branch_selection_handoff_role_sections",
-    "future_branch_selection_tables",
-    "future_branch_selection_summary",
-    "future_branch_reporting_map"
+    "structural_design_overview",
+    "structural_design_profile",
+    "structural_design_selection_table_presets",
+    "structural_design_selection_handoff_tables",
+    "structural_design_selection_handoff_presets",
+    "structural_design_selection_handoff",
+    "structural_design_selection_handoff_bundles",
+    "structural_design_selection_handoff_roles",
+    "structural_design_selection_handoff_role_sections",
+    "structural_design_selection_tables",
+    "structural_design_selection_summary",
+    "structural_design_reporting_map"
   ) %in% s_active$table_index$Table))
   expect_true(any(grepl("selection_tables", s_active$plot_index$DefaultPlotTypes, fixed = TRUE)))
   expect_true(any(grepl("selection_handoff_presets", s_active$plot_index$DefaultPlotTypes, fixed = TRUE)))
@@ -4099,11 +4106,11 @@ test_that("future arbitrary-facet active branch exposes summary and plot contrac
   expect_true(all(is.na(s_active$selection_summary$SelectionFraction) | (s_active$selection_summary$SelectionFraction >= 0 & s_active$selection_summary$SelectionFraction <= 1)))
   expect_true(all(is.na(s_active$selection_handoff_summary$PlotReadyFraction) | (s_active$selection_handoff_summary$PlotReadyFraction >= 0 & s_active$selection_handoff_summary$PlotReadyFraction <= 1)))
   printed_active <- capture.output(print(s_active))
-  expect_true(any(grepl("mfrmr Future Arbitrary-Facet Planning Summary", printed_active, fixed = TRUE)))
+  expect_true(any(grepl("mfrmr Structural Design Review", printed_active, fixed = TRUE)))
 
   p_profile <- plot(active, type = "profile_metrics", draw = FALSE)
   expect_s3_class(p_profile, "mfrm_plot_data")
-  expect_identical(p_profile$name, "future_branch_active_branch")
+  expect_identical(p_profile$name, "structural_design_review")
   expect_identical(p_profile$data$plot, "profile_metrics")
 
   p_tiers <- plot(active, type = "readiness_tiers", draw = FALSE)
@@ -4127,19 +4134,19 @@ test_that("future arbitrary-facet active branch exposes summary and plot contrac
 
   p_sel_tables <- plot(active, type = "selection_tables", appendix_preset = "recommended", draw = FALSE)
   expect_s3_class(p_sel_tables, "mfrm_plot_data")
-  expect_identical(p_sel_tables$name, "future_branch_active_branch")
+  expect_identical(p_sel_tables$name, "structural_design_review")
   expect_identical(p_sel_tables$data$plot, "selection_tables")
   expect_identical(p_sel_tables$data$appendix_preset, "recommended")
 
   p_sel_handoff_presets <- plot(active, type = "selection_handoff_presets", appendix_preset = "all", draw = FALSE)
   expect_s3_class(p_sel_handoff_presets, "mfrm_plot_data")
-  expect_identical(p_sel_handoff_presets$name, "future_branch_active_branch")
+  expect_identical(p_sel_handoff_presets$name, "structural_design_review")
   expect_identical(p_sel_handoff_presets$data$plot, "selection_handoff_presets")
   expect_identical(p_sel_handoff_presets$data$appendix_preset, "all")
 
   p_sel_handoff <- plot(active, type = "selection_handoff", appendix_preset = "recommended", draw = FALSE)
   expect_s3_class(p_sel_handoff, "mfrm_plot_data")
-  expect_identical(p_sel_handoff$name, "future_branch_active_branch")
+  expect_identical(p_sel_handoff$name, "structural_design_review")
   expect_identical(p_sel_handoff$data$plot, "selection_handoff")
   expect_identical(p_sel_handoff$data$appendix_preset, "recommended")
 
@@ -4151,31 +4158,31 @@ test_that("future arbitrary-facet active branch exposes summary and plot contrac
 
   p_sel_handoff_bundles <- plot(active, type = "selection_handoff_bundles", appendix_preset = "recommended", draw = FALSE)
   expect_s3_class(p_sel_handoff_bundles, "mfrm_plot_data")
-  expect_identical(p_sel_handoff_bundles$name, "future_branch_active_branch")
+  expect_identical(p_sel_handoff_bundles$name, "structural_design_review")
   expect_identical(p_sel_handoff_bundles$data$plot, "selection_handoff_bundles")
   expect_identical(p_sel_handoff_bundles$data$appendix_preset, "recommended")
 
   p_sel_handoff_roles <- plot(active, type = "selection_handoff_roles", appendix_preset = "recommended", draw = FALSE)
   expect_s3_class(p_sel_handoff_roles, "mfrm_plot_data")
-  expect_identical(p_sel_handoff_roles$name, "future_branch_active_branch")
+  expect_identical(p_sel_handoff_roles$name, "structural_design_review")
   expect_identical(p_sel_handoff_roles$data$plot, "selection_handoff_roles")
   expect_identical(p_sel_handoff_roles$data$appendix_preset, "recommended")
 
   p_sel_handoff_role_sections <- plot(active, type = "selection_handoff_role_sections", appendix_preset = "recommended", draw = FALSE)
   expect_s3_class(p_sel_handoff_role_sections, "mfrm_plot_data")
-  expect_identical(p_sel_handoff_role_sections$name, "future_branch_active_branch")
+  expect_identical(p_sel_handoff_role_sections$name, "structural_design_review")
   expect_identical(p_sel_handoff_role_sections$data$plot, "selection_handoff_role_sections")
   expect_identical(p_sel_handoff_role_sections$data$appendix_preset, "recommended")
 
   p_sel_roles <- plot(active, type = "selection_roles", appendix_preset = "recommended", draw = FALSE)
   expect_s3_class(p_sel_roles, "mfrm_plot_data")
-  expect_identical(p_sel_roles$name, "future_branch_active_branch")
+  expect_identical(p_sel_roles$name, "structural_design_review")
   expect_identical(p_sel_roles$data$plot, "selection_roles")
   expect_identical(p_sel_roles$data$appendix_preset, "recommended")
 
   p_sel_sections <- plot(active, type = "selection_sections", appendix_preset = "compact", draw = FALSE)
   expect_s3_class(p_sel_sections, "mfrm_plot_data")
-  expect_identical(p_sel_sections$name, "future_branch_active_branch")
+  expect_identical(p_sel_sections$name, "structural_design_review")
   expect_identical(p_sel_sections$data$plot, "selection_sections")
   expect_identical(p_sel_sections$data$appendix_preset, "compact")
 

@@ -303,7 +303,48 @@ direct engine regardless of that option</li>
 <li>person summaries are reported post-hoc from the integrated
 posterior</li>
 </ul>
-<p>This is the implemented MML-engine scope for this release.</p>
+<p>This is the implemented MML-engine scope.</p>
+</div>
+<div id="numerical-readiness-and-bounded-polishing" class="section level2">
+<h2>Numerical readiness and bounded polishing</h2>
+<p>An optimizer return code of zero does not by itself establish a
+stationary solution. <code>mfrmr</code> applies a common
+terminal-gradient review to direct, hybrid, and EM fits. For direct and
+hybrid fitting, a code-zero solution with a larger terminal gradient
+triggers a bounded sequence of warm-started polishing stages when the
+requested setting is at least as strict as the public default
+(<code>reltol &lt;= 1e-9</code>). The package retains the best
+non-worsening candidate under the recorded selection rule and records
+every attempt in <code>fit$opt$optimizer_polish$Stages</code>, including
+the method, portable tolerance setting, objective, terminal gradient,
+parameter change, and evaluation counts. For L-BFGS-B, the stage table
+also records the actual <code>factr</code> and <code>pgtol</code>
+controls; <code>EffectiveReltol</code> is not itself a native L-BFGS-B
+argument. EM retains its relative log-likelihood stopping result but
+must also pass the same terminal-gradient gate; use the direct engine
+for bounded gradient polishing when an EM fit remains under numerical
+review.</p>
+<p>Read <code>summary(fit)$readiness</code> as separate gates.
+<code>InferenceReady</code> and the Numerical row describe numerical
+optimization, not the design, stability, diagnostic, or reporting
+decision. A small gradient cannot repair a disconnected measurement
+graph or a boundary-separated facet level.</p>
+<div id="choosing-the-iteration-ceiling" class="section level3">
+<h3>Choosing the iteration ceiling</h3>
+<p><code>maxit</code> limits computation; it does not define
+convergence. Use the default <code>maxit = 400</code> as the initial
+analysis ceiling unless a prespecified protocol uses another value. A
+fit that stops at <code>ConvergenceStatus = &quot;iteration_limit&quot;</code> is
+review-only regardless of whether its estimates look plausible. Keep the
+data, model, method, anchors, optimizer, tolerance, and quadrature rule
+fixed, then use the next ceiling from a prespecified sequence. Accept a
+result only after <code>Converged</code>, <code>InferenceReady</code>,
+and the Numerical readiness row all pass. Do not select a run because
+its coefficients, fit statistics, significance, or agreement with an
+expected result are more favorable. Material differences between
+separately ready runs are evidence of numerical instability, not a
+choice among equally acceptable answers.</p>
+</div>
 </div>
 <div id="strict-marginal-diagnostic-target" class="section level2">
 <h2>Strict Marginal Diagnostic Target</h2>
@@ -374,14 +415,13 @@ and recommend prioritizing fit procedures by intended use rather than
 treating one index as universally decisive.</p></li>
 <li><p>Posterior predictive follow-up. Sinharay et al. (2006) treat
 posterior predictive checking as a separate model-checking family built
-around replicated datasets and discrepancy measures. That is the
-intended follow-up role of the package’s
-<code>posterior_predictive_follow_up</code> path, which is reserved for
-a future release.</p></li>
+around replicated datasets and discrepancy measures. mfrmr does not
+implement posterior-predictive checks; use a model-specific external
+workflow when this corroborating analysis is required.</p></li>
 <li><p>Many-facet reporting context. Linacre’s FACETS framework and
 applied MFRM studies such as Eckes (2005) remain the primary references
 for severity/leniency, mean-square fit, separation, and inter-rater
-agreement. The current strict marginal branch is designed to sit
+agreement. mfrmr’s strict marginal diagnostics are designed to sit
 alongside that many-facet toolkit, not to replace it.</p></li>
 </ol>
 </div>
@@ -419,7 +459,7 @@ The documented follow-up is
 <code>strict_pairwise_local_dependence</code>, which surfaces evidence
 of dependence at the pair level. See Haberman and Sinharay (2013) for a
 generalized-residual framework that models such dependence explicitly;
-that path is not yet included in the current release scope.</p>
+that path is not included in the documented diagnostic scope.</p>
 <p>For many-facet reporting, one additional boundary matters.
 Facet-level separation/reliability and inter-rater agreement answer
 different questions. High rater separation reliability can coexist with
@@ -429,9 +469,9 @@ why <code>mfrmr</code> reports <code>diagnostics$reliability</code> and
 <code>diagnostics$interrater</code> as separate objects.</p>
 </div>
 </div>
-<div id="validation-scope-in-the-current-release" class="section level2">
-<h2>Validation Scope In The Current Release</h2>
-<p>The current simulation-based validation covers:</p>
+<div id="documented-simulation-check-scope" class="section level2">
+<h2>Documented simulation-check scope</h2>
+<p>The package’s documented simulation checks cover:</p>
 <ul>
 <li>well-specified baselines</li>
 <li>local dependence misspecification</li>
@@ -457,24 +497,20 @@ scorefile export, QC pass/fail pipelines, linking synthesis, role-based
 design forecasting, and diagnostic/signal-detection design screening are
 available only as caveated bounded-<code>GPCM</code> surfaces with
 explicit boundary output. Full FACETS-style score-side contract review,
-posterior predictive checks, and heavy backends remain out of scope for
-<code>GPCM</code> in this release. See
-<code>gpcm_capability_matrix()</code> for the full per-helper support
-contract.</p>
+posterior predictive checks, and MCMC estimation are not available for
+bounded <code>GPCM</code>. See <code>gpcm_capability_matrix()</code> for
+the status and recommended alternative for each helper group.</p>
 </div>
-<div id="why-gpcm-is-the-current-upper-scope" class="section level2">
-<h2>Why GPCM Is The Current Upper Scope</h2>
+<div id="why-bounded-gpcm-is-the-current-limit" class="section level2">
+<h2>Why bounded GPCM is the current limit</h2>
 <p><code>GPCM</code> is the current upper supported scope for three
 reasons.</p>
 <ol style="list-style-type: decimal">
-<li>The shared <code>MML</code> kernel and the response-probability core
-already generalize to the bounded <code>GPCM</code> branch without
-changing the main package architecture.</li>
-<li>The package has direct checks for that bounded route.</li>
-<li>The helpers that still depend on Rasch-family score semantics are
-blocked explicitly, and role-based planning helpers carry explicit
-caveats, so formal support does not require pretending that every
-downstream helper has full coverage.</li>
+<li>The bounded slope model uses the documented <code>MML</code>
+probability framework under the stated restriction.</li>
+<li>Direct verification checks are available for that model.</li>
+<li>Score-side and reporting helpers that rely on Rasch-family semantics
+remain unavailable or carry explicit caveats.</li>
 </ol>
 <p>This is a narrower but more defensible claim than saying the whole
 package is uniformly generalized to free-discrimination many-facet
@@ -498,14 +534,14 @@ therefore treats <code>RSM</code> / <code>PCM</code> as the
 equal-weighting reference models and bounded <code>GPCM</code> as a
 supported alternative for users who explicitly want to inspect or allow
 discrimination-based reweighting.</p>
-<p>This is also why full FACETS output-contract score-side review
-remains out of scope for bounded <code>GPCM</code> in this release: its
-published form is a Rasch-family score transformation, and the
-slope-aware analogue that would replace it in a free-discrimination
-context requires careful score-side uncertainty handling. Package-native
-scorefile export, manuscript-draft APA text, and fit-based report/export
-bundles are available only as caveated sensitivity-reporting surfaces,
-not as FACETS-equivalent or operational score transformations.
+<p>This is also why full FACETS output-contract score-side review is not
+provided for bounded <code>GPCM</code>: its published form is a
+Rasch-family score transformation, and the slope-aware analogue that
+would replace it in a free-discrimination context requires careful
+score-side uncertainty handling. Package-native scorefile export,
+manuscript-draft APA text, and fit-based report/export bundles are
+available only as caveated sensitivity-reporting surfaces, not as
+FACETS-equivalent or operational score transformations.
 <code>fair_average_table()</code> and <code>estimate_bias()</code>
 themselves are now available under bounded <code>GPCM</code> via the
 slope-aware element-conditional kernel. For fair averages,
@@ -542,17 +578,17 @@ boundary: <code>RSM</code>/<code>PCM</code> support the full
 manuscript/reporting route, while bounded <code>GPCM</code> supports the
 documented direct and caveated routes.</p>
 </div>
-<div id="future-extensions" class="section level2">
-<h2>Future extensions</h2>
-<p>Posterior-predictive checking, <code>MCMC</code> engines, and heavier
-runtime infrastructure remain future extensions. They are not required
-for the current quadrature-based <code>MML</code> route or for the
-bounded <code>GPCM</code> support described here.</p>
+<div id="analyses-not-provided-by-mfrmr" class="section level2">
+<h2>Analyses not provided by mfrmr</h2>
+<p>Posterior-predictive checks and <code>MCMC</code> estimation are not
+provided by mfrmr. Use external Bayesian software when those analyses
+are required. They are not needed for the quadrature-based
+<code>MML</code> route or for the bounded <code>GPCM</code> workflows
+described here.</p>
 </div>
 <div id="recommended-expert-reading-of-package-output" class="section level2">
 <h2>Recommended Expert Reading Of Package Output</h2>
-<p>For the current release, the most defensible interpretation sequence
-is:</p>
+<p>A defensible interpretation sequence is:</p>
 <ol style="list-style-type: decimal">
 <li>Read <code>summary(fit)</code> for estimation status and precision
 basis.</li>

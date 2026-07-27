@@ -14,28 +14,53 @@
   title = NULL,
   palette = NULL,
   label_angle = 45,
-  show_ci = FALSE,
+  show_ci = NULL,
   ci_level = 0.95,
   group = NULL,
   diagnostics = NULL,
   include_fit_measures = TRUE,
+  fit_stat = c("Infit", "Outfit"),
+  fit_scale = c("mnsq", "zstd"),
+  zstd_method = c("engine", "facets"),
+  include_person = FALSE,
+  person_subset = NULL,
+  top_n_person = 30,
+  person_labels = c("flagged", "all", "none"),
+  facet_labels = c("all", "flagged", "none"),
+  panel = c("combined", "facet"),
+  fit_range = c(0.5, 1.5),
+  zstd_cut = 2,
   draw = TRUE,
   preset = c("standard", "publication", "compact", "monochrome"),
+  renderer = NULL,
+  wright_style = c("native", "facets_style"),
+  category_labels = NULL,
+  rows_per_logit = 2L,
+  wright_range = NULL,
+  extreme_placement = c("ends", "estimate"),
+  persons_per_star = NULL,
   ...
 )
 }
 \arguments{
 \item{x}{An \code{mfrm_fit} object from \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
-\item{type}{Plot type. Use \code{NULL}, \code{"bundle"}, or \code{"all"} for the
-three-part fit bundle; otherwise choose one of \code{"facet"}, \code{"person"},
-\code{"step"}, \code{"wright"}, \code{"pathway"}, \code{"ccc"}, \code{"ccc_surface"}, or
-\code{"category_surface"}.}
+\item{type}{Plot type. Omit \code{type} (or use \code{NULL} / \code{"wright"}) for the
+primary native Wright map. Use \code{"bundle"}, \code{"all"}, or \code{"default"} for
+the three-part fit bundle; otherwise choose one of \code{"facet"}, \code{"person"},
+\code{"step"}, \code{"wright"}, \code{"pathway"}, \code{"fit_pathway"}, \code{"ccc"},
+\code{"ccc_surface"}, or \code{"category_surface"}. \code{"pathway"} is the
+theta-to-expected-score display; \code{"fit_pathway"} is the
+fit-statistic-to-measure display.}
 
 \item{facet}{Optional facet name for \code{type = "facet"}.}
 
-\item{top_n}{Maximum number of facet/step locations retained for
-compact displays.}
+\item{top_n}{Maximum number of facet/step locations retained by the native
+Wright map for compact displays. Step transitions are always retained;
+any omitted facet locations are counted in the returned \code{retention} table
+and disclosed in the plot subtitle/note. Use \code{Inf} for a complete
+all-level final map. The FACETS-style payload always retains every fitted
+facet and step location.}
 
 \item{theta_range}{Numeric length-2 range for pathway, CCC, and
 category-surface plot data.}
@@ -49,8 +74,12 @@ category-surface plot data.}
 
 \item{label_angle}{Rotation angle for x-axis labels where applicable.}
 
-\item{show_ci}{If \code{TRUE}, add approximate confidence intervals when
-available.}
+\item{show_ci}{Whether to add approximate confidence intervals when
+available. \code{NULL} selects the display-specific default: \code{TRUE} for the
+primary native Wright map and \code{type = "fit_pathway"}, and \code{FALSE} for the
+FACETS-style ruler and other plot types. With \code{renderer = "facets"},
+explicitly setting \code{show_ci = TRUE} creates a hybrid display: FACETS-style
+ruler grammar with mfrmr uncertainty intervals.}
 
 \item{ci_level}{Confidence level used when \code{show_ci = TRUE}.}
 
@@ -59,28 +88,96 @@ per-group person-density curves (DIF / DFF screening view).
 Either a column name (looked up first in \code{group_data} when
 supplied through \code{...}, then in \code{fit$prep$data}) or a vector
 aligned with \code{fit$facets$person}. Ignored for other \code{type}
-values. To pass the source data alongside, use
+values and for \code{wright_style = "facets_style"}, whose person column is a
+single FACETS-style star frequency. To pass the source data alongside, use
 \verb{plot(fit, type = "wright", group = "MyCol", group_data = <df>)}.}
 
 \item{diagnostics}{Optional output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}. When supplied,
-pathway plot data reuse it for \code{fit_measures}, \code{fit_status}, and
+Wright-map standard errors and precision metadata reuse matching rows from
+\code{diagnostics$measures} without replacing fitted coordinates,
+while pathway plot data reuse \code{fit_measures}, \code{fit_status}, and
 \code{curve_fit_status} instead of recomputing diagnostics.}
 
 \item{include_fit_measures}{If \code{TRUE} (default), pathway plot data include
 tidy fit-measure and fit-status tables for custom R graphics. Set to
 \code{FALSE} when only the curve coordinates are needed.}
 
+\item{fit_stat}{For \code{type = "fit_pathway"}, the horizontal fit statistic:
+\code{"Infit"} (default) or \code{"Outfit"}.}
+
+\item{fit_scale}{For \code{type = "fit_pathway"}, use mean squares (\code{"mnsq"})
+or standardized fit (\code{"zstd"}) on the horizontal axis.}
+
+\item{zstd_method}{For a ZSTD fit pathway, use the package engine degrees
+of freedom (\code{"engine"}, default) or the FACETS/Wright-Masters companion
+calculation (\code{"facets"}). The latter is a comparison aid, not a claim of
+complete FACETS output equivalence.}
+
+\item{include_person}{If \code{TRUE}, include person rows in a fit pathway.}
+
+\item{person_subset}{Optional character vector of person IDs retained in a
+fit pathway before ranking.}
+
+\item{top_n_person}{Maximum person rows retained in a fit pathway, ranked
+by distance from expected fit. Use \code{Inf} for all selected persons.}
+
+\item{person_labels}{Person-label policy for a fit pathway: \code{"flagged"}
+(default), \code{"all"}, or \code{"none"}.}
+
+\item{facet_labels}{Facet-level label policy for a fit pathway: \code{"all"}
+(default), \code{"flagged"}, or \code{"none"}. This changes drawn labels only;
+all retained facet rows remain in the draw-free table.}
+
+\item{panel}{Fit-pathway layout: \code{"combined"} (distinguish persons by
+shape) or \code{"facet"} (one base-graphics panel per facet).}
+
+\item{fit_range}{Mean-square review lines for a fit pathway.}
+
+\item{zstd_cut}{Absolute ZSTD review line for a fit pathway.}
+
 \item{draw}{If \code{TRUE}, draw the plot with base graphics.}
 
 \item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, \code{"compact"},
 or \code{"monochrome"}).}
+
+\item{renderer}{Wright-map renderer. Use \code{"native"} (default) or
+\code{"facets"} for the FACETS Table 6-style visual layout. This is the
+canonical selector for new code. The native map is the primary display
+and includes available facet uncertainty by default. The closest
+FACETS-style visual uses \code{show_ci = FALSE}.}
+
+\item{wright_style}{Wright-map renderer. \code{"native"} preserves the package's
+histogram, point, range, and facet-SE display. \code{"facets_style"} adds a
+FACETS Table 6-style text ruler with person-frequency stars, signed facet
+headers, and labeled score-transition lines. It is a visual-layout option,
+not a claim of numerical equivalence with FACETS. This explicit style name
+is equivalent to \code{renderer = "facets"}. Adding \code{show_ci = TRUE} to that
+style is an mfrmr/FACETS hybrid rather than the closest FACETS-style view.}
+
+\item{category_labels}{Optional score rubric labels used by
+\code{wright_style = "facets_style"}. Supply a named character vector keyed by
+original score, an unnamed vector with one label per retained category, or
+a data frame with \code{Score} and \code{Label} columns.}
+
+\item{rows_per_logit}{Number of FACETS-style ruler rows per logit.}
+
+\item{wright_range}{Optional finite increasing length-2 logit range for the
+FACETS-style ruler. \code{NULL} derives a range that contains the fitted data.}
+
+\item{extreme_placement}{In the FACETS-style renderer, place extreme-score
+persons at the ruler \code{"ends"} or retain their fitted \code{"estimate"}.}
+
+\item{persons_per_star}{Number of persons represented by one \code{*} in the
+FACETS-style frequency column. \code{NULL} chooses a compact value automatically.}
 
 \item{...}{Additional arguments ignored for S3 compatibility.}
 }
 \value{
 Invisibly, an \code{mfrm_plot_data} object (default and for any
 single \code{type}), or an \code{mfrm_plot_bundle} when
-\code{type = "bundle"} / \code{"all"} / \code{"default"}.
+\code{type = "bundle"} / \code{"all"} / \code{"default"}. Each returned fit plot
+includes domain-specific readiness and an interpretation status in its
+data payload.
 }
 \description{
 Plot fitted MFRM results with base R
@@ -92,9 +189,28 @@ an \code{mfrm_plot_data} object (the most useful single figure for a
 first inspection). Pass \code{type = "bundle"} (or \code{"all"} / \code{"default"})
 to obtain the legacy three-plot \code{mfrm_plot_bundle} containing a
 Wright map, pathway map, and category characteristic curves. The
-returned object always carries machine-readable metadata through
+compact native default records any omitted facet locations in
+\code{data$retention} and annotates the subtitle and drawn figure; use
+\code{top_n = Inf} to retain every fitted location in the final Wright map.
+Native text labels remain collision-aware, so a retained point may be
+unlabeled; its exact level and estimate remain available in the returned
+plot data. When the fit records boundary-separated facet levels and no
+display range was supplied, the native and FACETS-style maps use the same
+robust automatic range and place those levels at ruler ends. Exact fitted
+values and intervals remain in \code{OriginalEstimate}, \code{CI_Lower}, and
+\code{CI_Upper}; \code{DisplayEstimate}, \code{DisplayCI_Lower}, \code{DisplayCI_Upper}, and the
+clipping-status columns describe only the rendered coordinates. Endpoint
+triangles and the plot footer disclose any omitted or clipped interval.
+The returned object always carries machine-readable metadata through
 the \code{mfrm_plot_data} contract, even when the plot is drawn
 immediately.
+
+Every fit-derived payload also carries \code{data$fit_readiness},
+\code{data$interpretation_status}, and \code{data$interpretation_note}. Availability
+and interpretability are separate: when a numerical, data, design, or
+stability gate requires review, the coordinates remain available for
+diagnosis, but the call warns and marks the returned subtitle and drawn
+title \verb{REVIEW ONLY}.
 
 \code{type = "wright"} shows persons, facet levels, and step thresholds on
 a shared logit scale. Estimates are plotted as fitted, so the sign
@@ -103,11 +219,30 @@ ability, and higher non-person facet values indicate greater
 severity/difficulty under the default negative facet orientation.
 Facets listed in \code{fit_mfrm(positive_facets = ...)} are reversed
 (higher values raise expected scores); state the active orientation in
-figure captions when reporting. \code{type = "pathway"} shows expected score
+figure captions when reporting.
+
+Set \code{renderer = "facets"} (equivalently,
+\code{wright_style = "facets_style"}) for a line-printer-inspired common
+ruler. That mode retains every facet location in its data and shows actual
+(original, when scores were internally recoded) adjacent score transitions.
+Its \code{facets_style} payload contains tidy ruler, person-frequency, facet,
+step, mean-half-score, header, category-label, and settings tables for custom
+graphics. \code{RulerValue} records the nearest discrete ruler row for
+line-printer reconstruction, whereas step and midpoint lines are drawn at
+their exact fitted \code{DrawValue} and step labels print that logit value. The
+styling emulates the semantics of FACETS Table 6; estimates
+and standard errors remain those produced by \code{mfrmr}. Use
+\code{show_ci = FALSE} for the closest FACETS-style rendering. If
+\code{show_ci = TRUE} is requested, interpret the result as a hybrid that adds
+mfrmr uncertainty intervals to FACETS-style ruler grammar.
+
+\code{type = "pathway"} shows expected score
 traces and dominant-category regions across theta. This expected-score
-display is distinct from the Bond-and-Fox-style measure-versus-fit
-"pathway" bubble chart used around FACETS/Winsteps output; for that
-display, use \code{\link[=plot_bubble]{plot_bubble()}}. Its draw-free plot data also
+display is distinct from the Bond-and-Fox-style fit-versus-measure
+pathway: use \code{type = "fit_pathway"} for Infit/Outfit on the horizontal
+axis and measure logits on the vertical axis. Its draw-free plot data
+include person-selection settings, CI columns, and explicit SE-source
+metadata. The expected-score pathway draw-free data also
 includes \code{pathway_long}, \code{pathway_annotations}, \code{fit_measures},
 \code{fit_status}, and \code{curve_fit_status}, so R users can rebuild the pathway
 map in ggplot2, plotly, or a report pipeline while keeping the same
@@ -127,7 +262,8 @@ compact location-specific displays.
 \enumerate{
 \item Fit a model with \code{\link[=fit_mfrm]{fit_mfrm()}}.
 \item Use \code{plot(fit)} to inspect the Wright map at a glance.
-\item Switch to \code{type = "pathway"}, \code{"ccc"}, or \code{"shrinkage"} for the
+\item Switch to \code{type = "pathway"}, \code{"fit_pathway"}, \code{"ccc"}, or
+\code{"shrinkage"} for the
 relevant follow-up figure, or \code{type = "bundle"} for the
 three-plot overview when preparing a FACETS-style summary.
 }
@@ -141,24 +277,27 @@ For a plot-selection guide and extended examples, see
 }
 
 \examples{
-toy <- load_mfrmr_data("example_core")
+toy <- load_mfrmr_data("example_operational")
+# Seven quadrature points keep this executable example short. For a final
+# analysis, restore the default or a prespecified grid and review sensitivity.
 fit <- fit_mfrm(
   toy,
   "Person",
   c("Rater", "Criterion"),
   "Score",
-  method = "JML",
+  method = "MML",
   model = "RSM",
+  quad_points = 7,
   maxit = 30
 )
 wright <- plot(fit, draw = FALSE)
-wright$data$plot
+head(wright$data$locations)
 # Look for: persons clustered against the facet / step rows on the
 #   shared logit axis. Large gaps between the person density and
 #   the step / facet rails indicate weak targeting; ceiling /
 #   floor stripes mean the test is too easy / hard.
 bundle <- plot(fit, type = "bundle", draw = FALSE)
-bundle$wright_map$data$plot
+bundle$wright_map$data$group_summary
 # Look for: pathway curves rising in the expected order with
 #   visible dominant-category bands; CCC curves peaking sequentially
 #   without one category being completely overlapped by neighbours.

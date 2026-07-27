@@ -83,6 +83,7 @@ functioning contrasts with \code{\link[=analyze_dff]{analyze_dff()}}.
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_bias")
 
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
@@ -99,6 +100,7 @@ dim(heat$data$matrix)
 #   hypothesis test. With `metric = "contrast"` the layout switches
 #   to Level x GroupPair and reads as the pairwise differential-
 #   functioning contrast (use `analyze_dff()`).
+}
 }
 \seealso{
 \code{\link[=dif_interaction_table]{dif_interaction_table()}}, \code{\link[=analyze_dff]{analyze_dff()}}, \code{\link[=analyze_dif]{analyze_dif()}}, \code{\link[=dif_report]{dif_report()}}

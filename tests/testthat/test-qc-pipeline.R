@@ -1,7 +1,14 @@
-test_that("run_qc_pipeline returns correct class and structure", {
+make_qc_study1_fit <- function() {
   toy <- load_mfrmr_data("study1")
-  fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                  method = "JML", maxit = 25)
+  .mfrmr_muffle_expected_warnings(
+    fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
+             method = "JML", maxit = 25),
+    "^Optimization convergence review did not produce"
+  )
+}
+
+test_that("run_qc_pipeline returns correct class and structure", {
+  fit <- make_qc_study1_fit()
   qc <- run_qc_pipeline(fit)
 
   expect_s3_class(qc, "mfrm_qc_pipeline")
@@ -11,9 +18,7 @@ test_that("run_qc_pipeline returns correct class and structure", {
 })
 
 test_that("verdicts table has 10 rows with valid verdict values", {
-  toy <- load_mfrmr_data("study1")
-  fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                  method = "JML", maxit = 25)
+  fit <- make_qc_study1_fit()
   qc <- run_qc_pipeline(fit)
 
 
@@ -28,27 +33,21 @@ test_that("verdicts table has 10 rows with valid verdict values", {
 })
 
 test_that("overall verdict is one of Pass/Warn/Fail", {
-  toy <- load_mfrmr_data("study1")
-  fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                  method = "JML", maxit = 25)
+  fit <- make_qc_study1_fit()
   qc <- run_qc_pipeline(fit)
 
   expect_true(qc$overall %in% c("Pass", "Warn", "Fail"))
 })
 
 test_that("recommendations is a character vector", {
-  toy <- load_mfrmr_data("study1")
-  fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                  method = "JML", maxit = 25)
+  fit <- make_qc_study1_fit()
   qc <- run_qc_pipeline(fit)
 
   expect_type(qc$recommendations, "character")
 })
 
 test_that("print.mfrm_qc_pipeline produces output", {
-  toy <- load_mfrmr_data("study1")
-  fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                  method = "JML", maxit = 25)
+  fit <- make_qc_study1_fit()
   qc <- run_qc_pipeline(fit)
 
   out <- capture.output(print(qc))
@@ -58,9 +57,7 @@ test_that("print.mfrm_qc_pipeline produces output", {
 })
 
 test_that("summary.mfrm_qc_pipeline produces correct output", {
-  toy <- load_mfrmr_data("study1")
-  fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                  method = "JML", maxit = 25)
+  fit <- make_qc_study1_fit()
   qc <- run_qc_pipeline(fit)
 
   s <- summary(qc)
@@ -77,9 +74,7 @@ test_that("summary.mfrm_qc_pipeline produces correct output", {
 })
 
 test_that("plot_qc_pipeline with draw=FALSE returns data", {
-  toy <- load_mfrmr_data("study1")
-  fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                  method = "JML", maxit = 25)
+  fit <- make_qc_study1_fit()
   qc <- run_qc_pipeline(fit)
 
   vt <- plot_qc_pipeline(qc, draw = FALSE)
@@ -88,9 +83,7 @@ test_that("plot_qc_pipeline with draw=FALSE returns data", {
 })
 
 test_that("threshold_profile strict and lenient work", {
-  toy <- load_mfrmr_data("study1")
-  fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                  method = "JML", maxit = 25)
+  fit <- make_qc_study1_fit()
 
   qc_strict  <- run_qc_pipeline(fit, threshold_profile = "strict")
   qc_lenient <- run_qc_pipeline(fit, threshold_profile = "lenient")
@@ -108,18 +101,14 @@ test_that("threshold_profile strict and lenient work", {
 })
 
 test_that("thresholds override works", {
-  toy <- load_mfrmr_data("study1")
-  fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                  method = "JML", maxit = 25)
+  fit <- make_qc_study1_fit()
 
   qc <- run_qc_pipeline(fit, thresholds = list(reliability_pass = 0.99))
   expect_equal(qc$config$thresholds$reliability_pass, 0.99)
 })
 
 test_that("run_qc_pipeline works with pre-computed diagnostics", {
-  toy <- load_mfrmr_data("study1")
-  fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                  method = "JML", maxit = 25)
+  fit <- make_qc_study1_fit()
   diag <- diagnose_mfrm(fit)
   qc <- run_qc_pipeline(fit, diagnostics = diag)
 
@@ -150,9 +139,7 @@ test_that("run_qc_pipeline records screening-tier bias metadata when bias result
 })
 
 test_that("run_qc_pipeline does not convert category-count failures into pass verdicts", {
-  toy <- load_mfrmr_data("study1")
-  fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                  method = "JML", maxit = 25)
+  fit <- make_qc_study1_fit()
   diag <- diagnose_mfrm(fit, residual_pca = "none")
   diag$obs <- structure(list(), class = "bogus_obs")
 

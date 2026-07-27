@@ -58,19 +58,28 @@ test_that("attach_diagnostics records the attached columns in config", {
 
 test_that("attach_diagnostics rejects non-logical inputs", {
   expect_error(
-    fit_mfrm(.toy, "Person", c("Rater", "Criterion"), "Score",
-             method = "JML", maxit = 5, attach_diagnostics = "yes"),
+    .mfrmr_muffle_expected_warnings(
+      fit_mfrm(.toy, "Person", c("Rater", "Criterion"), "Score",
+               method = "JML", maxit = 5, attach_diagnostics = "yes"),
+      "^Optimization convergence review did not produce"
+    ),
     "attach_diagnostics"
   )
   expect_error(
-    fit_mfrm(.toy, "Person", c("Rater", "Criterion"), "Score",
-             method = "JML", maxit = 5, attach_diagnostics = NA),
+    .mfrmr_muffle_expected_warnings(
+      fit_mfrm(.toy, "Person", c("Rater", "Criterion"), "Score",
+               method = "JML", maxit = 5, attach_diagnostics = NA),
+      "^Optimization convergence review did not produce"
+    ),
     "attach_diagnostics"
   )
   expect_error(
-    fit_mfrm(.toy, "Person", c("Rater", "Criterion"), "Score",
-             method = "JML", maxit = 5,
-             attach_diagnostics = c(TRUE, FALSE)),
+    .mfrmr_muffle_expected_warnings(
+      fit_mfrm(.toy, "Person", c("Rater", "Criterion"), "Score",
+               method = "JML", maxit = 5,
+               attach_diagnostics = c(TRUE, FALSE)),
+      "^Optimization convergence review did not produce"
+    ),
     "attach_diagnostics"
   )
 })

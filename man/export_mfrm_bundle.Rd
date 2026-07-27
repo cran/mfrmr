@@ -2,7 +2,7 @@
 % Please edit documentation in R/api-export-bundles.R
 \name{export_mfrm_bundle}
 \alias{export_mfrm_bundle}
-\title{Export an analysis bundle for sharing or archiving}
+\title{Export a fit-level analysis archive}
 \usage{
 export_mfrm_bundle(
   fit,
@@ -19,6 +19,7 @@ export_mfrm_bundle(
   facet = NULL,
   include_person_anchors = FALSE,
   overwrite = FALSE,
+  acknowledge_sensitive = FALSE,
   zip_bundle = FALSE,
   zip_name = NULL,
   data = NULL
@@ -47,8 +48,9 @@ bias bundles.}
 \code{build_summary_table_bundle()}, or a named list of such objects. When
 \code{NULL} and \code{"summary_tables"} is requested in \code{include}, a default set is
 built from \code{fit}, \code{diagnostics}, \code{\link[=reporting_checklist]{reporting_checklist()}}, and
-\code{\link[=build_apa_outputs]{build_apa_outputs()}}. Recovery-validation summaries can be supplied here
-to co-locate release-review appendix tables with a fit-based export bundle.}
+\code{\link[=build_apa_outputs]{build_apa_outputs()}}. Compatible precomputed recovery-evidence summaries
+can be supplied here to co-locate their appendix tables with a fit-based
+export bundle.}
 
 \item{output_dir}{Directory where files will be written.}
 
@@ -65,6 +67,11 @@ to co-locate release-review appendix tables with a fit-based export bundle.}
 exported anchor table.}
 
 \item{overwrite}{If \code{FALSE}, refuse to overwrite existing files.}
+
+\item{acknowledge_sensitive}{Logical; set to \code{TRUE} only after acknowledging
+that the archive can contain direct person identifiers, person-level
+estimates, original labels, replay data, and local paths. This suppresses
+the privacy warning; it does not deidentify any file.}
 
 \item{zip_bundle}{If \code{TRUE}, attempt to zip the written files into a single
 archive using \code{\link[utils:zip]{utils::zip()}}. This is best-effort and may depend on the
@@ -85,12 +92,23 @@ script will load. Default \code{NULL} falls back to the legacy
 A named list with class \code{mfrm_export_bundle}.
 }
 \description{
-Export an analysis bundle for sharing or archiving
+Export a fit-level analysis archive
 }
 \details{
-This function is the package-native counterpart to the app's download bundle.
-It reuses existing \code{mfrmr} helpers instead of reimplementing estimation or
-diagnostics.
+This function is the one-call fit-level archive and HTML route. It reuses
+existing \code{mfrmr} helpers instead of reimplementing estimation or diagnostics.
+When \code{diagnostics = NULL},
+the exporter computes the diagnostics it needs, then writes the requested
+CSV/text/replay artifacts and a lightweight HTML page from the fitted object.
+Use \code{\link[=mfrm_results]{mfrm_results()}} and \code{\link[=mfrm_report]{mfrm_report()}} first when you want to inspect a
+results object before writing files; use \code{export_mfrm_bundle()} when the
+goal is a project-folder bundle from \code{fit}.
+
+Every bundle is an analysis archive, not a deidentified or automatically
+shareable package. Core tables, anchors, predictions, replay sidecars,
+scripts, and HTML can contain identifying or study-sensitive information.
+Review and transform every file under the applicable data-handling policy
+before sharing it.
 }
 \section{Choosing exports}{
 
@@ -100,10 +118,10 @@ The \code{include} argument lets you assemble a bundle for different audiences:
 \item \code{"manifest"} for a compact analysis record.
 \item \code{"script"} for reproducibility and reruns. For latent-regression fits,
 this also writes the fit-level replay person-data sidecar when available.
-\item \code{"html"} for a light, shareable summary page. When replay sidecars are
-present, the HTML shows an artifact index for them rather than embedding
-the raw person-level replay table.
-\item \code{"summary_tables"} for manuscript-facing CSV exports of validated
+\item \code{"html"} for a lightweight summary page. This is not a deidentification
+guarantee. When replay sidecars are present, the HTML shows an artifact
+index for them rather than embedding the raw person-level replay table.
+\item \code{"summary_tables"} for manuscript-facing CSV exports of documented
 \code{summary()} surfaces and their compact indexes.
 \item \code{"visual_summaries"} when you want warning maps or residual PCA summaries
 to travel with the bundle.
@@ -146,7 +164,7 @@ population-model scoring basis when you explicitly supply the corresponding
 prediction objects. \code{\link[=predict_mfrm_population]{predict_mfrm_population()}} remains the scenario-level
 forecast helper, whereas \code{\link[=predict_mfrm_units]{predict_mfrm_units()}} and
 \code{\link[=sample_mfrm_plausible_values]{sample_mfrm_plausible_values()}} are the scoring layer.
-To keep exports and replay scripts practical, large future-planning schemas
+To keep exports and replay scripts practical, large structural-design schemas
 from scenario-level population predictions are not flattened into
 \verb{*_population_prediction_settings.csv} or ADeMP CSVs; the compact simulation
 specification files carry the replay-relevant settings instead.
@@ -179,6 +197,7 @@ replay script, and HTML summary.
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                 method = "JML", maxit = 30)
@@ -189,12 +208,16 @@ bundle <- export_mfrm_bundle(
   output_dir = tempdir(),
   prefix = "mfrmr_bundle_example",
   include = c("core_tables", "manifest", "script", "html"),
-  overwrite = TRUE
+  overwrite = TRUE,
+  acknowledge_sensitive = TRUE
 )
 bundle$summary[, c("FilesWritten", "HtmlWritten", "ScriptWritten")]
 head(bundle$written_files)
 }
+}
 \seealso{
-\code{\link[=build_mfrm_manifest]{build_mfrm_manifest()}}, \code{\link[=build_mfrm_replay_script]{build_mfrm_replay_script()}},
-\code{\link[=export_mfrm]{export_mfrm()}}, \code{\link[=reporting_checklist]{reporting_checklist()}}, \code{\link[=export_summary_appendix]{export_summary_appendix()}}
+\code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=mfrm_results]{mfrm_results()}}, \code{\link[=mfrm_report]{mfrm_report()}},
+\code{\link[=export_mfrm_results]{export_mfrm_results()}}, \code{\link[=build_mfrm_manifest]{build_mfrm_manifest()}},
+\code{\link[=build_mfrm_replay_script]{build_mfrm_replay_script()}}, \code{\link[=export_mfrm]{export_mfrm()}},
+\code{\link[=reporting_checklist]{reporting_checklist()}}, \code{\link[=export_summary_appendix]{export_summary_appendix()}}
 }

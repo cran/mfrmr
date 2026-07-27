@@ -5,7 +5,7 @@
 #' manuscript-draft text, tables, notes, and revision checklists in `mfrmr`.
 #'
 #' This guide currently applies fully to diagnostics-based `RSM` / `PCM`
-#' workflows. First-release `GPCM` fits now support [reporting_checklist()],
+#' workflows. Bounded `GPCM` fits support [reporting_checklist()],
 #' [precision_review_report()], direct curve/graph and residual table helpers,
 #' and caveated APA/QC/export bundles. Use [gpcm_capability_matrix()] when you
 #' need the formal boundary for the current `GPCM` reporting path.
@@ -20,7 +20,7 @@
 #' treated as automatic operational-scoring evidence.
 #'
 #' @section Start with the reporting question:
-#' - "Which parts of this run are draft-complete, and with what caveats?"
+#' - "Which parts of this run are ready to draft, and with what caveats?"
 #'   Use [reporting_checklist()].
 #' - "How should I phrase the model, fit, and precision sections?"
 #'   For `RSM` / `PCM`, use [build_apa_outputs()].
@@ -32,6 +32,10 @@
 #'   Use [precision_review_report()] and `summary(diagnose_mfrm(...))`.
 #' - "Which caveats need to appear in the write-up?"
 #'   Use [reporting_checklist()] first, then [build_apa_outputs()].
+#' - "How should I report candidate-model comparisons?"
+#'   Use [compare_mfrm()] for the same-data comparison table, then
+#'   [build_model_choice_review()] and [build_summary_table_bundle()] for
+#'   cautious model-role, route-boundary, and wording tables.
 #' - "How should I start figure captions or visual-results wording?"
 #'   Use [visual_reporting_template()] for conservative caption and results
 #'   sentence starters, then verify availability with
@@ -55,6 +59,61 @@
 #'    [build_summary_table_bundle()], review the bundle with `summary()` /
 #'    `plot()`, then convert specific components to handoff tables with
 #'    [apa_table()] or export them directly with [export_summary_appendix()].
+#' 8. When candidate models are compared, keep the comparison as a reporting
+#'    review: [compare_mfrm()] -> [build_model_choice_review()] ->
+#'    [build_summary_table_bundle()]. Treat bounded `GPCM` as a slope-aware
+#'    sensitivity route unless the study design explicitly justifies
+#'    discrimination-based operational scoring.
+#'
+#' @section Model-comparison reporting route:
+#' Use [compare_mfrm()] to build the candidate-model table and inspect
+#' `ICComparable`, `ComparisonBasis`, and any nesting warnings before reading
+#' information criteria. Then use [build_model_choice_review()] to attach the
+#' comparison to explicit model roles, downstream-route boundaries, wording
+#' templates, and optional [build_weighting_review()] output. Convert that
+#' review with [build_summary_table_bundle()] when a manuscript appendix,
+#' coauthor handoff, or HTML export needs stable table names.
+#'
+#' A conservative bounded-`GPCM` reporting sequence is:
+#' [fit_mfrm()] for the equal-weighting `RSM` / `PCM` reference,
+#' [fit_mfrm()] for the bounded `GPCM` sensitivity fit,
+#' [compare_mfrm()], [build_model_choice_review()],
+#' [build_summary_table_bundle()], then [export_summary_appendix()] or
+#' [export_mfrm_bundle()]. Do not use `AIC`, `BIC`, or log-likelihood alone as
+#' an automatic operational-scoring decision.
+#'
+#' @section Latent-regression reporting route:
+#' Active latent-regression fits expose their reporting surface through
+#' `summary(fit)$population_overview`,
+#' `summary(fit)$population_coefficients`,
+#' `summary(fit)$population_coding`, and fit-level `caveats`. Report those
+#' coefficients as conditional-normal population-model parameters, not as a
+#' post-hoc regression on EAP or MLE scores. Also report the
+#' `population_formula`, coding/contrast information, `population_policy`, and
+#' omitted-person or omitted-row counts when complete-case handling was used.
+#'
+#' Prediction-side helpers [predict_mfrm_units()] and
+#' [sample_mfrm_plausible_values()] can carry the fitted population model into
+#' future-unit scoring and plausible-value draws. The supported route is
+#' one-dimensional `MML` for `RSM` / `PCM`; avoid stronger
+#' claims about multidimensional latent regression, Wald tests, posterior
+#' predictive checking, or full external-engine equivalence unless those checks
+#' were performed outside this helper family.
+#'
+#' @section Publication-readiness boundary:
+#' `mfrmr` can provide a defensible measurement-output trail for a manuscript:
+#' fitted model summaries, diagnostic tables, precision review, report
+#' templates, APA table metadata, figure-routing guidance, and reproducible
+#' exports. It does not decide whether a specific journal claim is warranted.
+#' For high-stakes or selective journals, use the package outputs together
+#' with the study design, measurement rationale, primary citations, sensitivity
+#' checks, and substantive argument for the target field.
+#'
+#' Treat `DraftReady`, `ReadyForAPA`, `ClaimStrength`, and report-template rows
+#' as drafting and caveat-routing aids. They are not formal acceptance rules,
+#' proof of validity, or a substitute for peer-review judgment. Before copying
+#' text, inspect `mfrm_report(res, style = "apa")$first_screen`,
+#' `$claim_readiness`, `$report_gaps`, and `$template_index`.
 #'
 #' @section Which helper answers which task:
 #' \describe{
@@ -71,7 +130,7 @@
 #'   into named `data.frame` tables plus an index for manuscript or appendix
 #'   handoff, and now also supports bundle-level `summary()` / `plot()` for
 #'   role coverage and numeric QC.}
-#'   \item{[export_summary_appendix()]}{Writes those validated summary-table
+#'   \item{[export_summary_appendix()]}{Writes those documented summary-table
 #'   bundles to CSV and optional HTML appendix artifacts without requiring a
 #'   full fit-based export bundle.}
 #'   \item{[apa_table()]}{Produces reproducible base-R tables with APA-oriented
@@ -109,6 +168,20 @@
 #'   sensitivity-reporting surfaces and keep full FACETS-style score-side
 #'   review outside this route.
 #'
+#' @section Fit-to-HTML reporting bundle:
+#' When the user already has a fitted object and wants a local report folder in
+#' one call, use [export_mfrm_bundle()] directly:
+#' `export_mfrm_bundle(fit, include = c("core_tables", "checklist",
+#' "dashboard", "apa", "summary_tables", "manifest", "script", "html"))`.
+#' This route computes missing diagnostics, writes CSV/text/replay artifacts,
+#' and creates a lightweight HTML summary without requiring a prior
+#' [mfrm_results()] object. Use [mfrm_results()] and [mfrm_report()] first when
+#' the goal is interactive triage or report-readiness review; use
+#' [export_mfrm_bundle()] when the goal is a file bundle for a project folder,
+#' coauthor handoff, or supplementary-methods archive. The bundle is not
+#' deidentified; review every file under the study's data-handling policy before
+#' any handoff.
+#'
 #' @section Typical workflow:
 #' - Manuscript-first route:
 #'   [fit_mfrm()] -> [diagnose_mfrm()] -> [reporting_checklist()] ->
@@ -131,6 +204,10 @@
 #'   [reporting_checklist()] -> direct residual/category/information helpers ->
 #'   caveated [build_apa_outputs()], [build_visual_summaries()],
 #'   [run_qc_pipeline()], or [export_mfrm_bundle()] as needed.
+#' - Model-comparison route:
+#'   [compare_mfrm()] -> [build_model_choice_review()] ->
+#'   [build_summary_table_bundle()] -> [export_summary_appendix()] or
+#'   [export_mfrm_bundle()](include = c("summary_tables", "html")).
 #'
 #' @section Companion guides:
 #' - For report/table selection, see [mfrmr_reports_and_tables].
@@ -172,6 +249,17 @@
 #' bundle$table_index
 #' apa_from_bundle <- apa_table(bundle, which = "section_summary")
 #' apa_from_bundle$caption
+#'
+#' report_bundle <- export_mfrm_bundle(
+#'   fit,
+#'   diagnostics = diag,
+#'   output_dir = tempdir(),
+#'   prefix = "mfrmr_report_bundle",
+#'   include = c("core_tables", "checklist", "apa", "summary_tables", "html"),
+#'   overwrite = TRUE,
+#'   acknowledge_sensitive = TRUE
+#' )
+#' report_bundle$summary[, c("FilesWritten", "HtmlWritten")]
 #' }
 #'
 #' @name mfrmr_reporting_and_apa

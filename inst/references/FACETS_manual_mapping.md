@@ -39,8 +39,15 @@ explicitly supplied for comparison.
 - Table 7-style facet/person measures and fit summary: `diagnose_mfrm()` + `summary.mfrm_fit()`
 - Table 7 reliability + facet chi-square style summaries: `diagnose_mfrm()$reliability`, `diagnose_mfrm()$facets_chisq`, `facets_chisq_table()`, `plot_facets_chisq()`
 - Table 7 agreement style summaries: `diagnose_mfrm()$interrater`, `interrater_agreement_table()`, `rater_network_analysis()`, `rater_halo_network_analysis()`, `plot_interrater_agreement()`
-- Wright/variable-map visual display: `plot(fit, type = "wright")`,
-  `plot_wright_unified()`, and `plot_data(type = "wright")`
+- Table 6-style Wright/variable-map visual display:
+  `plot_wright_unified(fit, renderer = "facets")` provides the shared
+  logit ruler, person-frequency asterisks, signed facet columns, and labeled
+  score-transition lines; `renderer = "native"` retains the package-native
+  facet SE/CI display. Both routes expose editable draw-free data.
+- Fit-oriented pathway display:
+  `plot(fit, type = "fit_pathway", fit_stat = "Infit", include_person = TRUE, top_n_person = 12)`
+  places Infit/Outfit on the x-axis and measure logits on the y-axis without
+  changing the existing expected-score `type = "pathway"` contract.
 - Table 8.1-style rating scale bundle: `rating_scale_table()`
 - Table 8-style bar-chart and curves exporters: `category_structure_report()`,
   `category_curves_report()`, including cumulative probability, total
@@ -69,72 +76,85 @@ explicitly supplied for comparison.
 - Anchor workflow: `review_mfrm_anchors()`, `make_anchor_table()`
 - Data packaging/loading helpers: `list_mfrmr_data()`, `load_mfrmr_data()`
 - FACETS feature coverage boundary: `facets_feature_coverage()`
-- Automated FACETS output-contract reviews (columns + core metrics):
-  `facets_output_contract_review()`, `tests/testthat/test-facets-column-contract.R`,
-  `tests/testthat/test-facets-metric-contract.R`,
-  `inst/references/facets_column_contract.csv`
+- FACETS output-contract review:
+  `facets_output_contract_review()` checks the documented package columns and
+  metrics. A numerical comparison still requires output from a separately run,
+  documented FACETS version under aligned settings.
 
-## Partial (Implemented Concept, Not Exact FACETS Output)
-- Design policy:
-  - structured tables and visualization APIs are primary deliverables
-  - fixed-width / line-printer text is optional and secondary (traceability/log use)
-  - exact FACETS line-printer emulation is intentionally out of scope
-  - FACETS-style routes are transition and reporting aids, not claims that
-    FACETS produced or numerically determined the estimates
-  - legacy numbered `table*` names are internal and not exported
-- Table 1/2/3 reports:
-  - current: `specifications_report()`, `data_quality_report()`, `estimation_iteration_report()` with structured output and optional fixed-width text
-  - gap: FACETS fixed-width text layout and exact optimizer-internal iteration path are not yet 1:1
-- Table 5 measurable data summary:
-  - current: `measurable_summary_table()` and `describe_mfrm_data()` (including observed inter-rater agreement bundle)
-  - gap: FACETS column-by-column textual layout matching is not exact
-- Table 8.1 rating-scale report:
-  - current: `rating_scale_table()` plus CCC/pathway visualization (`plot.mfrm_fit`, QC category panel)
-  - gap: FACETS text layout and all legacy columns/order are not yet 1:1
-- Table 8 bar-chart / probability-curves exporters:
-  - current: `category_structure_report()` and `category_curves_report()` including Graphfile-style wide output, total information curves, category-specific information contributions, and optional fixed-width text mirrors
-  - gap: exact FACETS line-printer artwork/fixed-column matching is intentionally not targeted
-- Table 6.2 graphical facet-statistics report:
-  - current: `facet_statistics_report()` with fixed-width `M/S/Q/X` rulers
-  - gap: FACETS native table layout and printer-graph formatting are not yet 1:1
-- Output-file emulation (`GRAPH=` / `SCORE=`):
-  - current: `facets_output_file_bundle()` with graph coordinates, observation-level modeled score export, optional fixed-width mirrors, and optional file writing
-  - gap: FACETS command-level options and fixed-column file-writing compatibility are not yet 1:1
-- Standalone residual/subset handoff:
-  - current: `write_mfrm_residual_file()` exports observation-level residual rows; `write_mfrm_subset_file()` exports connected-subset summary and node-membership tables
-  - gap: these are package-native CSV/TSV review files, not exact FACETS fixed-field command files
-- Table 14 pairwise contrast report:
-  - current: available for 2-way bias runs via `build_fixed_reports()`
-  - gap: FACETS native layout and options are broader; higher-order runs intentionally omit pairwise section
+## Capabilities, Limitations, and Alternatives
 
-## Not Yet Implemented or Not Targeted from Output Index Scope
+### Wright and variable maps
 
-The public helper `facets_feature_coverage()` is the canonical coverage
-boundary for the current release. Main FACETS surfaces that are not fully
-implemented include:
+- Capability: `plot_wright_unified(renderer = "facets")` provides the shared
+  ruler, person-frequency asterisks, signed facet columns, and labelled score
+  transitions. The native renderer adds SE/CI information.
+- Limitation: visual correspondence does not establish pixel identity or
+  numerical equivalence across software versions.
+- Alternative: retain the native uncertainty-aware map for analysis. When
+  numerical comparison is required, supply aligned external FACETS output to
+  `facets_fit_review()`.
 
-- FACETS binomial-trial and Poisson-specific dichotomous reports.
-- Exact FACETS line-printer report emulation across the full output stack.
-- Arbitrary FACETS R/Web/Excel menu plots.
-- Exact FACETS/gtheory user-interface reproduction; package-native
-  `mfrm_generalizability()` / `mfrm_d_study()` cover observed G-study and
-  D-study planning evidence.
-- Exact FACETS-style network-graph menu output; package-native
-  `subset_connectivity_report()` / `mfrm_network_analysis()` /
-  `rater_network_analysis()` / `rater_halo_network_analysis()` /
-  `plot(..., type = "network")` provide the R graph route, reusable node/edge
-  tables, design-network vulnerability diagnostics, rater
-  agreement/disagreement/severity-direction networks, and rater-by-criterion
-  halo-network screening.
-- Winsteps control/data-file export.
-- Exact fixed-field FACETS residual-file and subset command-file syntax.
-- Exact FACETS graph-window rendering of cumulative probability curves; the
-  package-native curve data and base-R plot route are implemented.
-- Arbitrary FACETS command-file parsing.
+### Specification, data, iteration, and measurement tables
 
-Most high-priority measurement outputs used in ordinary MFRM reporting are
-covered by structured R routes; remaining gaps are mostly external-program,
-menu-output, or exact-format compatibility surfaces.
+- Capability: `specifications_report()`, `data_quality_report()`,
+  `estimation_iteration_report()`, `measurable_summary_table()`, and
+  `fit_measures_table()` provide structured R tables.
+- Limitation: column order, fixed-width layout, and the complete FACETS
+  iteration trace are not reproduced.
+- Alternative: use the structured tables for analysis and export; use FACETS
+  externally when its exact report layout is required.
+
+### Rating-scale tables and curves
+
+- Capability: `rating_scale_table()`, `category_structure_report()`, and
+  `category_curves_report()` provide category, threshold, expected-score, and
+  information-curve data.
+- Limitation: FACETS printer artwork, graph-window behavior, and every legacy
+  column option are not reproduced.
+- Alternative: use package plot data for custom R graphics, or use FACETS
+  externally for its program-specific display.
+
+### Graph, score, residual, and subset handoff
+
+- Capability: `facets_output_file_bundle()`,
+  `write_mfrm_residual_file()`, and `write_mfrm_subset_file()` provide
+  documented CSV/TSV or fixed-width handoff routes.
+- Limitation: these are package-native contracts rather than complete FACETS
+  command-file or fixed-field compatibility.
+- Alternative: use the package files for reproducible R workflows; use FACETS
+  externally when a downstream system requires its exact syntax.
+
+### Bias and pairwise contrasts
+
+- Capability: two-way bias runs provide structured pairwise output through
+  `bias_pairwise_report()` and `build_fixed_reports()`.
+- Limitation: FACETS layout and options are broader, and higher-order runs omit
+  the pairwise section.
+- Alternative: report the available structured contrasts and their screening
+  boundary; redesign the contrast or use FACETS externally if a missing
+  FACETS-specific report is required.
+
+## Unsupported or External-Only FACETS Surfaces
+
+The public `facets_feature_coverage()` table is the canonical capability
+reference. Its `Capability`, `Limitation`, and `Alternative` columns describe
+the appropriate route for each surface. External-only areas include:
+
+- FACETS binomial-trial and Poisson-specific reports; use the package's
+  two-category ordered-score route only when that model is appropriate.
+- Complete FACETS line-printer report emulation; use structured package tables
+  or run FACETS for the exact report.
+- Arbitrary FACETS R/Web/Excel menu plots; use `plot_data()` with an R graphics
+  system or run FACETS for those menu outputs.
+- The FACETS/gtheory interface; use `mfrm_generalizability()` and
+  `mfrm_d_study()` for the documented univariate package route.
+- FACETS network-menu output; use `subset_connectivity_report()`,
+  `mfrm_network_analysis()`, `rater_network_analysis()`, or
+  `rater_halo_network_analysis()` for reusable R node and edge tables.
+- Winsteps control/data-file export; use Winsteps externally when that format
+  is required.
+- Arbitrary FACETS command-file and raw-report parsing; provide supported
+  delimited or fixed-field fit extracts to `read_facets_fit_table()` instead.
 
 ## Anchoring Rules Encoded
 - Direct anchors (`Facet`, `Level`, `Anchor`) are fixed.
@@ -145,9 +165,3 @@ menu-output, or exact-format compatibility surfaces.
   - common anchors per linking facet: `>= 5`
   - observations per element: `>= 30`
   - observations per score category: `>= 10`
-
-## Pre-release Status (Current)
-- Core estimation and diagnostics: available in the current branch
-- New inter-rater and facet-chi-square APIs: implemented and tested
-- Remaining work for closer FACETS-format compatibility is mostly
-  report-format completeness, not model-estimation correctness

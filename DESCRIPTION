@@ -1,7 +1,8 @@
 Package: mfrmr
 Type: Package
 Title: Estimation and Diagnostics for Many-Facet Measurement Models
-Version: 0.2.1
+Version: 0.2.2
+Date: 2026-07-26
 Authors@R: 
     person(given = "Ryuya", family = "Komuro", role = c("aut", "cre", "cph"),
            email = "ryuya.komuro.c4@tohoku.ac.jp",
@@ -18,7 +19,8 @@ Description: Native R implementation of many-facet ordered-response
     <doi:10.1007/BF02296272>, and 'Muraki' (1992)
     <doi:10.1177/014662169201600206> for the underlying ordered-response
     models.
-URL: https://github.com/Ryuya-dot-com/mfrmr
+URL: https://ryuya-dot-com.github.io/mfrmr/,
+        https://github.com/Ryuya-dot-com/mfrmr
 BugReports: https://github.com/Ryuya-dot-com/mfrmr/issues
 License: MIT + file LICENSE
 Language: en
@@ -29,16 +31,16 @@ Imports: cli, dplyr, grDevices, graphics, tidyr, tibble, purrr,
         stringr, psych, lifecycle, rlang, methods, stats, utils
 LinkingTo: cpp11
 Suggests: testthat (>= 3.0.0), covr, knitr, rmarkdown, igraph, lme4,
-        digest, kableExtra, flextable, future.apply, shiny, mirt, TAM,
-        eRm
+        digest, kableExtra, flextable, future.apply, shiny, ggplot2 (>=
+        3.4.0), mirt, TAM, eRm
 VignetteBuilder: knitr
 Config/testthat/edition: 3
 Config/Needs/website: pkgdown
 Config/roxygen2/version: 8.0.0
 NeedsCompilation: yes
-Packaged: 2026-06-12 08:28:26 UTC; ryuyakomuro
+Packaged: 2026-07-26 18:29:19 UTC; tohokusla
 Author: Ryuya Komuro [aut, cre, cph] (ORCID:
     <https://orcid.org/0000-0001-9205-0926>)
 Maintainer: Ryuya Komuro <ryuya.komuro.c4@tohoku.ac.jp>
 Repository: CRAN
-Date/Publication: 2026-06-12 17:00:13 UTC
+Date/Publication: 2026-07-27 06:20:02 UTC

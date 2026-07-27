@@ -53,7 +53,7 @@ test_that("evaluate_mfrm_diagnostic_screening separates well-specified and local
       expect_true(any(diag_summary$next_actions$Area == "Appendix and plot-data handoff"))
       expect_true(any(diag_summary$figure_recipes$SummaryTable == "plot_overview_rate"))
       expect_true(any(grepl("export_summary_appendix", diag_summary$next_actions$Route, fixed = TRUE)))
-      expect_true(any(grepl("release gates", diag_summary$reporting_notes$ReportingBoundary, fixed = TRUE)))
+      expect_true(any(grepl("standalone validation criteria", diag_summary$reporting_notes$ReportingBoundary, fixed = TRUE)))
       expect_true(any(diag_summary$plot_overview_rate$Signal == "Strict combined any-flag rate"))
       expect_true(any(grepl("operating-characteristic", diag_summary$notes, fixed = TRUE)))
 

@@ -36,7 +36,7 @@ test_that("core fit/diagnostics workflow runs", {
     "TerminalGradientSupNorm"
   ) %in% names(fit_summary$overview)))
   printed_summary <- capture.output(summary(fit))
-  expect_true(any(grepl("Many-Facet Rasch Model Summary", printed_summary, fixed = TRUE)))
+  expect_true(any(grepl("Many-Facet Measurement Model Summary", printed_summary, fixed = TRUE)))
   expect_true(any(grepl("Key warnings", printed_summary, fixed = TRUE)))
   expect_true(any(grepl("Next actions", printed_summary, fixed = TRUE)))
   expect_true(any(grepl("Status:", printed_summary, fixed = TRUE)))
@@ -44,10 +44,12 @@ test_that("core fit/diagnostics workflow runs", {
   expect_true(any(grepl("Facet overview", printed_summary, fixed = TRUE)))
   # Default plot(fit) now returns the Wright map alone; the 3-plot
   # bundle remains available via `type = "bundle"`.
-  p_fit_default <- plot(fit, draw = FALSE)
+  .mfrmr_muffle_expected_warnings({
+    p_fit_default <- plot(fit, draw = FALSE)
+    p_fit_bundle <- plot(fit, type = "bundle", draw = FALSE)
+  }, "^Review-only display:")
   expect_s3_class(p_fit_default, "mfrm_plot_data")
   expect_identical(p_fit_default$name, "wright_map")
-  p_fit_bundle <- plot(fit, type = "bundle", draw = FALSE)
   expect_s3_class(p_fit_bundle, "mfrm_plot_bundle")
   expect_true(all(c("wright_map", "pathway_map", "category_characteristic_curves") %in% names(p_fit_bundle)))
   expect_s3_class(p_fit_bundle$wright_map, "mfrm_plot_data")
@@ -56,11 +58,13 @@ test_that("core fit/diagnostics workflow runs", {
   printed_bundle <- capture.output(print(p_fit_bundle))
   expect_true(any(grepl("mfrm plot bundle", printed_bundle, fixed = TRUE)))
 
-  p_fit_wright <- plot(fit, type = "wright", draw = FALSE)
-  p_fit_pathway <- plot(fit, type = "pathway", draw = FALSE)
-  p_fit_ccc <- plot(fit, type = "ccc", draw = FALSE)
-  p_fit_person <- plot(fit, type = "person", draw = FALSE)
-  p_fit_step <- plot(fit, type = "step", draw = FALSE)
+  .mfrmr_muffle_expected_warnings({
+    p_fit_wright <- plot(fit, type = "wright", draw = FALSE)
+    p_fit_pathway <- plot(fit, type = "pathway", draw = FALSE)
+    p_fit_ccc <- plot(fit, type = "ccc", draw = FALSE)
+    p_fit_person <- plot(fit, type = "person", draw = FALSE)
+    p_fit_step <- plot(fit, type = "step", draw = FALSE)
+  }, "^Review-only display:")
   expect_s3_class(p_fit_wright, "mfrm_plot_data")
   expect_s3_class(p_fit_pathway, "mfrm_plot_data")
   expect_s3_class(p_fit_ccc, "mfrm_plot_data")
@@ -72,7 +76,10 @@ test_that("core fit/diagnostics workflow runs", {
   expect_s3_class(p_fit_pathway$data$pathway_long, "data.frame")
   expect_s3_class(p_fit_pathway$data$fit_measures, "data.frame")
 
-  p_fit_pub <- plot(fit, type = "wright", draw = FALSE, preset = "publication")
+  p_fit_pub <- .mfrmr_muffle_expected_warnings(
+    plot(fit, type = "wright", draw = FALSE, preset = "publication"),
+    "^Review-only display:"
+  )
   expect_identical(as.character(p_fit_pub$data$preset), "publication")
 
   diag <- mfrmr::diagnose_mfrm(fit, residual_pca = "both", pca_max_factors = 4)
@@ -113,13 +120,16 @@ test_that("core fit/diagnostics workflow runs", {
   expect_s3_class(diag_summary, "summary.mfrm_diagnostics")
   expect_true(all(c("overview", "status", "key_warnings", "next_actions", "overall_fit", "reliability", "top_fit", "flags") %in% names(diag_summary)))
   printed_diag <- capture.output(summary(diag))
-  expect_true(any(grepl("Many-Facet Rasch Diagnostics Summary", printed_diag, fixed = TRUE)))
+  expect_true(any(grepl("Many-Facet Measurement Diagnostics Summary", printed_diag, fixed = TRUE)))
   expect_true(any(grepl("Key warnings", printed_diag, fixed = TRUE)))
   expect_true(any(grepl("Next actions", printed_diag, fixed = TRUE)))
-  expect_true(any(grepl("Precision basis", printed_diag, fixed = TRUE)))
   expect_true(any(grepl("Precision tier", printed_diag, fixed = TRUE)))
-  expect_true(any(grepl("SE/ModelSE, CI, and reliability conventions", printed_diag, fixed = TRUE)))
-  expect_true(any(grepl("Use `diagnostics$reliability` for facet-level separation/reliability", printed_diag, fixed = TRUE)))
+  expect_true(any(grepl("Additional tables remain in the structured summary", printed_diag, fixed = TRUE)))
+
+  printed_diag_full <- capture.output(summary(diag, detail = "full"))
+  expect_true(any(grepl("Precision basis", printed_diag_full, fixed = TRUE)))
+  expect_true(any(grepl("SE/ModelSE, CI, and reliability conventions", printed_diag_full, fixed = TRUE)))
+  expect_true(any(grepl("Use `diagnostics$reliability` for facet-level separation/reliability", printed_diag_full, fixed = TRUE)))
 
   t4 <- mfrmr::unexpected_response_table(fit, diagnostics = diag, abs_z_min = 1.5, prob_max = 0.4, top_n = 15)
   expect_s3_class(t4, "mfrm_unexpected")
@@ -348,7 +358,7 @@ test_that("core fit/diagnostics workflow runs", {
   expect_s3_class(bias_summary, "summary.mfrm_bias")
   expect_true(all(c("overview", "chi_sq", "final_iteration", "top_rows") %in% names(bias_summary)))
   printed_bias <- capture.output(summary(bias))
-  expect_true(any(grepl("Many-Facet Rasch Bias Summary", printed_bias, fixed = TRUE)))
+  expect_true(any(grepl("Many-Facet Measurement Bias Summary", printed_bias, fixed = TRUE)))
 
   t13 <- mfrmr::bias_interaction_report(bias, top_n = 20)
   expect_s3_class(t13, "mfrm_bias_interaction")
@@ -564,7 +574,7 @@ test_that("core fit/diagnostics workflow runs", {
   expect_match(apa$table_figure_captions, "Residual PCA Scree", fixed = TRUE)
   expect_match(apa$report_text, "Heuristic reference bands", fixed = TRUE)
   expect_match(apa$report_text, "Optimization", fixed = TRUE)
-  expect_match(apa$report_text, "Terminal gradient sup-norm", fixed = TRUE)
+  expect_match(apa$report_text, "Terminal gradient\\s+sup-norm")
   expect_match(apa$report_text, "Constraint settings:", fixed = TRUE)
   expect_match(apa$report_text, "Step/threshold summary:", fixed = TRUE)
   # Wrap-insensitive: the wrapped report text may hard-break inside the
@@ -760,17 +770,19 @@ test_that("descriptive and anchor-review helpers run", {
     "Anchor review detected"
   )
 
-  fit <- mfrmr::fit_mfrm(
-    data = toy,
-    person = "Person",
-    facets = c("Rater", "Criterion"),
-    score = "Score",
-    anchors = anchors,
-    group_anchors = group_anchors,
-    method = "JML",
-    maxit = 15,
-    min_common_anchors = 4,
-    anchor_policy = "silent"
+  fit <- expect_silent(
+    mfrmr::fit_mfrm(
+      data = toy,
+      person = "Person",
+      facets = c("Rater", "Criterion"),
+      score = "Score",
+      anchors = anchors,
+      group_anchors = group_anchors,
+      method = "JML",
+      maxit = 15,
+      min_common_anchors = 4,
+      anchor_policy = "silent"
+    )
   )
   expect_s3_class(fit, "mfrm_fit")
   expect_true("anchor_review" %in% names(fit$config))

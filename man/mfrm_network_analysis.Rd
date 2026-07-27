@@ -79,7 +79,8 @@ Muller, K. (2026). \emph{igraph: Network Analysis and Visualization}.
 \donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 30)
+  method = "JML", maxit = 30
+)
 if (requireNamespace("igraph", quietly = TRUE)) {
   net <- mfrm_network_analysis(fit)
   net$summary

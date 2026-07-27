@@ -4,7 +4,7 @@
 \alias{summary.mfrm_bundle}
 \title{Summarize report/table bundles in a user-friendly format}
 \usage{
-\method{summary}{mfrm_bundle}(object, digits = 3, top_n = 10, ...)
+\method{summary}{mfrm_bundle}(object, digits = 3, top_n = 10, include_person = FALSE, ...)
 }
 \arguments{
 \item{object}{Any report bundle produced by \code{mfrmr} table/report helpers.}
@@ -12,6 +12,12 @@
 \item{digits}{Number of digits for printed numeric values.}
 
 \item{top_n}{Number of preview rows shown from the main table component.}
+
+\item{include_person}{If \code{TRUE}, person-level identifiers may appear in
+supported summary and preview tables. The default suppresses identifier
+columns, person-facet level labels, and ConQuest case labels from the
+returned summary object and its console output. This does not alter the
+source bundle.}
 
 \item{...}{Reserved for generic compatibility.}
 }
@@ -59,12 +65,15 @@ Additional class-aware summaries are provided for:
 \item \code{summary}: one-row aggregate block when supplied by the bundle.
 \item \code{preview}: first \code{top_n} rows from the main table-like component.
 \item \code{settings}: resolved option values if available.
-\item \code{validation_scope}: internal-versus-external validation scope when
+\item \code{validation_scope}: package-generated versus independently supplied
+evidence scope when
 summarizing \code{mfrm_reference_benchmark}.
 \item \code{conquest_command_scope}: ConQuest command-template scope when summarizing
 \code{mfrm_conquest_overlap_bundle}.
 \item \code{conquest_output_contract}: requested ConQuest outputs and review handoff
 when summarizing \code{mfrm_conquest_overlap_bundle}.
+\item \code{mfrmr_fit_status}: actual optimizer controls, MML engine, convergence
+evidence, and inference-readiness state for an \code{mfrm_conquest_overlap_bundle}.
 \item \code{normalization_scope}: extracted-table normalization scope when summarizing
 \code{mfrm_conquest_overlap_tables}.
 \item \code{review_scope}: supplied-table review scope when summarizing

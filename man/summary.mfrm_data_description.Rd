@@ -23,7 +23,17 @@ An object of class \code{summary.mfrm_data_description}.
 \item \code{score_distribution}: compact score-usage table, including zero-count
 categories retained by the prepared score support
 \item \code{facet_overview}: facet-level coverage summary
-\item \code{agreement}: inter-rater agreement summary when available
+\item \code{structural_missingness}: declared assignment coverage summary; status is
+\code{"not_declared"} when no assignment roster was supplied
+\item \code{structural_level_coverage}: expected versus observed level counts
+\item \code{design_connectivity}: Person-facet component counts for observed and
+declared-expected designs
+\item \code{design_components}: component sizes and facet-level labels; person labels
+are suppressed unless explicitly requested in \code{\link[=describe_mfrm_data]{describe_mfrm_data()}}
+\item \code{linkage_summary}: sparse-support and shared-person counts by facet
+\item \code{duplicate_cell_summary}: aggregate duplicate-cell counts
+\item \code{agreement}: selected-facet agreement summary when available
+\item \code{agreement_settings}: selected scorer facet, matching context, and status
 \item \code{row_retention}: row counts before and after preparation filters
 \item \code{preparation_notes}: structured preparation notes retained from
 \code{\link[=describe_mfrm_data]{describe_mfrm_data()}}
@@ -51,7 +61,8 @@ Recommended read order:
 related score-support caveats; intermediate unused categories should be
 treated as threshold-functioning warnings before model fitting.
 \item \code{facet_overview}: coverage per facet (minimum/maximum weighted counts).
-\item \code{agreement}: observed-score inter-rater agreement (when available).
+\item \code{agreement}: observed-score agreement for the selected scorer facet (when
+available).
 }
 
 Very low \code{MinWeightedN} in \code{facet_overview} is a practical warning for

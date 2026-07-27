@@ -184,6 +184,57 @@ test_that("GPCM probabilities and log-likelihood reduce exactly to PCM", {
   expect_equal(ll_gpcm, ll_pcm, tolerance = 1e-12)
 })
 
+test_that("joint JML probability bundles reproduce standalone kernels", {
+  eta <- c(-1.2, -0.4, 0.2, 0.9, 1.4)
+  score_k <- c(0L, 1L, 2L, 3L, 1L)
+  step_rsm <- c(0, -0.3, 0.2, 0.8)
+  rsm <- mfrmr:::mfrm_jml_probability_bundle(
+    eta, score_k, "RSM", step_rsm
+  )
+  expect_equal(rsm$probs, mfrmr:::category_prob_rsm(eta, step_rsm),
+               tolerance = 1e-14)
+  expect_equal(sum(rsm$log_prob_obs),
+               mfrmr:::loglik_rsm(eta, score_k, step_rsm),
+               tolerance = 1e-14)
+
+  step_pcm <- matrix(c(
+    0, -0.3, 0.2, 0.5,
+    0, -0.1, 0.4, 0.8
+  ), nrow = 2, byrow = TRUE)
+  criterion <- c(1L, 2L, 1L, 2L, 1L)
+  pcm <- mfrmr:::mfrm_jml_probability_bundle(
+    eta, score_k, "PCM", step_pcm, criterion_idx = criterion
+  )
+  expect_equal(
+    pcm$probs,
+    mfrmr:::category_prob_pcm(eta, step_pcm, criterion),
+    tolerance = 1e-14
+  )
+  expect_equal(
+    sum(pcm$log_prob_obs),
+    mfrmr:::loglik_pcm(eta, score_k, step_pcm, criterion),
+    tolerance = 1e-14
+  )
+
+  slopes <- c(0.8, 1.25)
+  gpcm <- mfrmr:::mfrm_jml_probability_bundle(
+    eta, score_k, "GPCM", step_pcm,
+    criterion_idx = criterion,
+    slopes = slopes,
+    slope_idx = criterion
+  )
+  expect_equal(
+    gpcm$probs,
+    mfrmr:::category_prob_gpcm(eta, step_pcm, criterion, slopes),
+    tolerance = 1e-14
+  )
+  expect_equal(
+    sum(gpcm$log_prob_obs),
+    mfrmr:::loglik_gpcm(eta, score_k, step_pcm, criterion, slopes),
+    tolerance = 1e-14
+  )
+})
+
 test_that("RSM probabilities and log-likelihood reduce to common-threshold PCM", {
   step_cum <- c(0, -0.3, 0.2, 0.5)
   step_cum_mat <- matrix(rep(step_cum, times = 3L), nrow = 3L, byrow = TRUE)
@@ -317,14 +368,22 @@ test_that("non-unit GPCM response bundle departs from PCM diagnostics", {
 test_that("JML and MML facet estimates are highly correlated", {
   d <- mfrmr:::sample_mfrm_data(seed = 42)
 
+  # Use the documented analysis ceiling for this deterministic comparison and
+  # require both numerical gates before comparing any estimates.
   fit_jml <- suppressWarnings(fit_mfrm(
     d, "Person", c("Rater", "Task", "Criterion"), "Score",
-    method = "JML", model = "RSM", maxit = 50, quad_points = 7
+    method = "JML", model = "RSM", maxit = 400, quad_points = 7
   ))
   fit_mml <- suppressWarnings(fit_mfrm(
     d, "Person", c("Rater", "Task", "Criterion"), "Score",
-    method = "MML", model = "RSM", maxit = 50, quad_points = 7
+    method = "MML", model = "RSM", maxit = 400, quad_points = 7
   ))
+
+  for (fit in list(fit_jml, fit_mml)) {
+    expect_true(isTRUE(fit$summary$Converged[1]))
+    expect_true(isTRUE(fit$summary$InferenceReady[1]))
+    expect_identical(as.character(fit$summary$ConvergenceSeverity[1]), "pass")
+  }
 
   for (facet in c("Rater", "Task", "Criterion")) {
     est_jml <- fit_jml$facets$others |>
@@ -336,8 +395,13 @@ test_that("JML and MML facet estimates are highly correlated", {
       dplyr::arrange(Level) |>
       dplyr::pull(Estimate)
     r <- cor(est_jml, est_mml)
+    centered_mae <- mean(abs(
+      (est_jml - mean(est_jml)) - (est_mml - mean(est_mml))
+    ))
     expect_gt(r, 0.9,
               label = paste("JML-MML correlation for", facet))
+    expect_lt(centered_mae, 0.2,
+              label = paste("JML-MML centered MAE for", facet))
   }
   expect_true(is.finite(fit_jml$summary$LogLik))
   expect_true(is.finite(fit_mml$summary$LogLik))
@@ -504,7 +568,7 @@ test_that("GPCM core fits return positive discrimination tables", {
   }
 })
 
-test_that("GPCM config scaffold records slope identification metadata", {
+test_that("GPCM configuration records slope identification metadata", {
   d <- mfrmr:::sample_mfrm_data(seed = 42)
   prep <- mfrmr:::prepare_mfrm_data(
     d,
@@ -549,7 +613,7 @@ test_that("GPCM config scaffold records slope identification metadata", {
   expect_identical(idx$step_idx, idx$slope_idx)
 })
 
-test_that("GPCM slope scaffold expands positive slopes with geometric mean one", {
+test_that("GPCM slope parameterization has geometric mean one", {
   d <- mfrmr:::sample_mfrm_data(seed = 42)
   prep <- mfrmr:::prepare_mfrm_data(
     d,
@@ -637,6 +701,18 @@ test_that("latent-regression scaffolding requires person_data and MML", {
       person_data = person_tbl
     ),
     "requires `method = 'MML'`"
+  )
+
+  expect_error(
+    fit_mfrm(
+      d, "Person", c("Rater", "Task", "Criterion"), "Score",
+      method = "MML",
+      population_formula = ~ Grade,
+      person_data = person_tbl,
+      noncenter_facet = "Rater"
+    ),
+    "requires `noncenter_facet = \"Person\"`",
+    fixed = TRUE
   )
 })
 
@@ -893,6 +969,22 @@ test_that("optimizer diagnostics distinguish converged, reviewable, and hard war
   expect_equal(converged$FunctionEvaluations, 18L)
   expect_equal(converged$GradientEvaluations, 17L)
 
+  gradient_review <- mfrmr:::build_optimizer_diagnostics(
+    opt = list(
+      convergence = 0L,
+      counts = stats::setNames(c(18L, 17L), c("function", "gradient")),
+      message = NULL
+    ),
+    gradient = c(5e-2, -2e-2),
+    reltol = 1e-6,
+    maxit = 50L,
+    optimizer_method = "BFGS"
+  )
+  expect_identical(gradient_review$ConvergenceStatus, "converged_gradient_review")
+  expect_identical(gradient_review$ConvergenceReason, "code_zero_large_gradient")
+  expect_identical(gradient_review$ConvergenceSeverity, "review")
+  expect_true(isTRUE(gradient_review$ReviewableWarning))
+
   reviewable <- mfrmr:::build_optimizer_diagnostics(
     opt = list(convergence = 1L, counts = stats::setNames(c(50L, 49L), c("function", "gradient")), message = "iteration limit"),
     gradient = c(5e-6, -2e-6),
@@ -929,6 +1021,45 @@ test_that("optimizer diagnostics distinguish converged, reviewable, and hard war
   expect_identical(em_converged$ConvergenceStatus, "converged")
   expect_identical(em_converged$ConvergenceReason, "relative_loglik_tolerance_met")
   expect_false(isTRUE(em_converged$ReviewableWarning))
+})
+
+test_that("optimizer selection supports automatic and explicit limited memory", {
+  small <- mfrmr:::resolve_mfrm_optimizer("auto", 50L)
+  large <- mfrmr:::resolve_mfrm_optimizer("auto", 500L)
+  mml <- mfrmr:::resolve_mfrm_optimizer(
+    "auto", 20L, prefer_limited_memory = TRUE
+  )
+  explicit <- mfrmr:::resolve_mfrm_optimizer("BFGS", 500L)
+
+  expect_identical(small$Used, "BFGS")
+  expect_identical(large$Used, "L-BFGS-B")
+  expect_identical(mml$Used, "L-BFGS-B")
+  expect_identical(explicit$Used, "BFGS")
+  expect_error(
+    mfrmr:::normalize_mfrm_optimizer("not-an-optimizer"),
+    "must be one of"
+  )
+})
+
+test_that("MML auto optimizer records shared probability workspace use", {
+  toy <- load_mfrmr_data("example_core")
+  fit <- suppressWarnings(suppressMessages(
+    fit_mfrm(
+      toy,
+      "Person", c("Rater", "Criterion"), "Score",
+      method = "MML",
+      quad_points = 5,
+      maxit = 10,
+      optimizer = "auto"
+    )
+  ))
+
+  expect_identical(fit$summary$OptimizerMethod[1], "L-BFGS-B")
+  expect_identical(fit$config$estimation_control$optimizer_requested, "auto")
+  expect_identical(fit$config$estimation_control$optimizer_used, "L-BFGS-B")
+  expect_gt(fit$opt$evaluation_cache$SharedEvaluations, 0L)
+  expect_gt(fit$opt$evaluation_cache$GradientBuilds, 0L)
+  expect_gte(fit$opt$evaluation_cache$GradientCacheHits, 1L)
 })
 
 test_that("MML engine planner falls back only for unsupported combinations", {
@@ -980,7 +1111,14 @@ test_that("EM and hybrid MML engines are wired for RSM/PCM", {
   expect_identical(fit_em$summary$MMLEngineRequested[1], "em")
   expect_identical(fit_em$summary$MMLEngineUsed[1], "em")
   expect_identical(fit_em$summary$OptimizerMethod[1], "EM")
-  expect_identical(fit_em$summary$ConvergenceBasis[1], "relative_loglik")
+  expect_identical(
+    fit_em$summary$ConvergenceBasis[1],
+    "relative_loglik_and_gradient"
+  )
+  expect_identical(
+    fit_em$summary$InferenceReady[1],
+    identical(fit_em$summary$ConvergenceSeverity[1], "pass")
+  )
   expect_true(is.finite(fit_em$summary$EMIterations[1]))
   expect_gte(fit_em$summary$EMIterations[1], 1)
 
@@ -998,7 +1136,7 @@ test_that("EM and hybrid MML engines are wired for RSM/PCM", {
   )
   expect_identical(fit_hybrid$summary$MMLEngineRequested[1], "hybrid")
   expect_identical(fit_hybrid$summary$MMLEngineUsed[1], "hybrid")
-  expect_identical(fit_hybrid$summary$OptimizerMethod[1], "BFGS")
+  expect_identical(fit_hybrid$summary$OptimizerMethod[1], "L-BFGS-B")
   expect_true(is.finite(fit_hybrid$summary$EMIterations[1]))
   expect_gte(fit_hybrid$summary$EMIterations[1], 1)
 })
@@ -1226,6 +1364,23 @@ test_that("log-likelihood does not deteriorate with more iterations (MML)", {
     method = "MML", model = "RSM", maxit = 100, quad_points = 7
   ))
   expect_gte(fit_long$summary$LogLik, fit_short$summary$LogLik - 0.1)
+})
+
+test_that("portable optimizer settings map to the recorded native controls", {
+  bfgs <- mfrmr:::build_mfrm_optim_control("BFGS", 25, 1e-9)
+  expect_identical(bfgs$maxit, 25L)
+  expect_equal(bfgs$reltol, 1e-9)
+  expect_false(any(c("factr", "pgtol") %in% names(bfgs)))
+
+  limited <- mfrmr:::build_mfrm_optim_control("L-BFGS-B", 25, 1e-9)
+  expect_identical(limited$maxit, 25L)
+  expect_identical(limited$lmm, 20L)
+  expect_equal(limited$factr, 1e-9 / .Machine$double.eps)
+  expect_equal(limited$pgtol, sqrt(.Machine$double.eps))
+
+  tighter <- mfrmr:::build_mfrm_optim_control("L-BFGS-B", 25, 1e-13)
+  expect_lt(tighter$factr, limited$factr)
+  expect_equal(tighter$pgtol, limited$pgtol)
 })
 
 # ---- Additional: logsumexp stability ------------------------------------

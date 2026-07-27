@@ -2,7 +2,7 @@
 % Please edit documentation in R/api-export-bundles.R
 \name{review_conquest_overlap}
 \alias{review_conquest_overlap}
-\title{Review an exact-overlap ConQuest comparison against an \code{mfrmr} overlap bundle}
+\title{Review a ConQuest comparison within the documented \code{mfrmr} overlap scope}
 \usage{
 review_conquest_overlap(
   bundle,
@@ -22,15 +22,17 @@ review_conquest_overlap(
 \item{bundle}{Output from \code{\link[=build_conquest_overlap_bundle]{build_conquest_overlap_bundle()}}.}
 
 \item{conquest_population}{Normalized ConQuest population-parameter table as a
-data.frame, or output from \code{\link[=normalize_conquest_overlap_tables]{normalize_conquest_overlap_tables()}}.}
+data.frame, or output from \code{normalize_conquest_overlap_exports()},
+\code{\link[=normalize_conquest_overlap_files]{normalize_conquest_overlap_files()}}, or
+\code{\link[=normalize_conquest_overlap_tables]{normalize_conquest_overlap_tables()}}.}
 
 \item{conquest_item_estimates}{Normalized ConQuest item-estimate table as a
 data.frame. Leave \code{NULL} when \code{conquest_population} is an object from
-\code{\link[=normalize_conquest_overlap_tables]{normalize_conquest_overlap_tables()}}.}
+one of the ConQuest normalization helpers.}
 
 \item{conquest_case_eap}{Normalized ConQuest case-level EAP table as a
 data.frame. Leave \code{NULL} when \code{conquest_population} is an object from
-\code{\link[=normalize_conquest_overlap_tables]{normalize_conquest_overlap_tables()}}.}
+one of the ConQuest normalization helpers.}
 
 \item{conquest_population_term}{Column in \code{conquest_population} that stores
 parameter names. \code{"auto"} tries conservative aliases such as \code{Parameter}
@@ -65,7 +67,7 @@ EAP estimates. \code{"auto"} tries conservative aliases such as \code{Estimate},
 A named list with class \code{mfrm_conquest_overlap_review}.
 }
 \description{
-Review an exact-overlap ConQuest comparison against an \code{mfrmr} overlap bundle
+Review a ConQuest comparison within the documented \code{mfrmr} overlap scope
 }
 \details{
 This helper compares normalized ConQuest output tables against the exact-
@@ -73,7 +75,10 @@ overlap bundle produced by \code{\link[=build_conquest_overlap_bundle]{build_con
 intentionally conservative:
 \itemize{
 \item it does \strong{not} parse raw ConQuest text output automatically;
-\item it expects already normalized data frames or output from
+\item its primary route expects output from
+\code{normalize_conquest_overlap_exports()}, which reads the four native CSV
+files requested by the generated command; custom extracted tables may use
+\code{\link[=normalize_conquest_overlap_files]{normalize_conquest_overlap_files()}} or
 \code{\link[=normalize_conquest_overlap_tables]{normalize_conquest_overlap_tables()}};
 \item and it reports numerical differences and missing elements without claiming
 that any fixed tolerance implies software equivalence.
@@ -86,9 +91,11 @@ and review contract without executing ConQuest.
 
 The intended workflow is:
 \enumerate{
-\item export an exact-overlap bundle with \code{\link[=build_conquest_overlap_bundle]{build_conquest_overlap_bundle()}};
+\item export a bundle for the documented comparison scope with
+\code{\link[=build_conquest_overlap_bundle]{build_conquest_overlap_bundle()}};
 \item run the narrow matching case in ConQuest;
-\item normalize the resulting ConQuest outputs into data frames;
+\item normalize the four requested CSV files with
+\code{normalize_conquest_overlap_exports()};
 \item pass those tables here to inspect direct differences, centered item
 agreement, and case-level EAP agreement.
 }
@@ -124,35 +131,19 @@ compared population, centered item, and case rows. The
 \code{CaseMaxAbsPerson} columns identify the row where each maximum absolute
 difference occurs.
 \item Missing or non-numeric rows in \code{attention_items} indicate that the external
-tables do not yet align cleanly with the exported overlap bundle.
+tables do not align cleanly with the exported overlap bundle.
 }
 }
 
 \examples{
-\donttest{
+\dontrun{
 bundle <- build_conquest_overlap_bundle()
-raw_pop <- data.frame(
-  Term = bundle$mfrmr_population$Parameter,
-  Est = bundle$mfrmr_population$Estimate
-)
-raw_item <- data.frame(
-  Item = bundle$mfrmr_item_estimates$ResponseVar,
-  Est = bundle$mfrmr_item_estimates$Estimate
-)
-raw_case <- data.frame(
-  PID = bundle$mfrmr_case_eap$Person,
-  EAP = bundle$mfrmr_case_eap$Estimate
-)
-normalized <- normalize_conquest_overlap_tables(
-  conquest_population = raw_pop,
-  conquest_item_estimates = raw_item,
-  conquest_case_eap = raw_case,
-  conquest_population_term = "Term",
-  conquest_population_estimate = "Est",
-  conquest_item_id = "Item",
-  conquest_item_estimate = "Est",
-  conquest_case_person = "PID",
-  conquest_case_estimate = "EAP"
+normalized <- normalize_conquest_overlap_exports(
+  bundle,
+  parameter_file = "conquest_overlap_conquest_parameters.csv",
+  regression_file = "conquest_overlap_conquest_reg_coefficients.csv",
+  covariance_file = "conquest_overlap_conquest_covariance.csv",
+  case_file = "conquest_overlap_conquest_cases_eap.csv"
 )
 review <- review_conquest_overlap(bundle, normalized)
 summary(review)$summary

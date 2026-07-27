@@ -120,6 +120,7 @@ For a plot-selection guide and a longer walkthrough, see
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 p <- plot_unexpected(fit, abs_z_min = 1.5, prob_max = 0.4, top_n = 10, draw = FALSE)
@@ -135,6 +136,7 @@ if (interactive()) {
     palette = c(higher = "#d95f02", lower = "#1b9e77", bar = "#2b8cbe"),
     label_angle = 45
   )
+}
 }
 }
 \seealso{

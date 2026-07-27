@@ -4,14 +4,17 @@ safe_num <- function(x) suppressWarnings(as.numeric(x))
 
 test_that("FACETS-style metric contracts hold for key summary tables", {
   d <- mfrmr:::sample_mfrm_data(seed = 123)
-  fit <- mfrmr::fit_mfrm(
-    data = d,
-    person = "Person",
-    facets = c("Rater", "Task", "Criterion"),
-    score = "Score",
-    method = "JML",
-    model = "RSM",
-    maxit = 20
+  fit <- .mfrmr_muffle_expected_warnings(
+    mfrmr::fit_mfrm(
+      data = d,
+      person = "Person",
+      facets = c("Rater", "Task", "Criterion"),
+      score = "Score",
+      method = "JML",
+      model = "RSM",
+      maxit = 20
+    ),
+    "^Optimization convergence review did not produce"
   )
   diag <- mfrmr::diagnose_mfrm(fit, residual_pca = "none")
   bias <- mfrmr::estimate_bias(fit, diag, facet_a = "Rater", facet_b = "Task", max_iter = 2)
@@ -56,14 +59,17 @@ test_that("FACETS-style metric contracts hold for key summary tables", {
 
 test_that("FACETS-style range contracts hold for agreement, fit, displacement, and rating scale", {
   d <- mfrmr:::sample_mfrm_data(seed = 123)
-  fit <- mfrmr::fit_mfrm(
-    data = d,
-    person = "Person",
-    facets = c("Rater", "Task", "Criterion"),
-    score = "Score",
-    method = "JML",
-    model = "RSM",
-    maxit = 20
+  fit <- .mfrmr_muffle_expected_warnings(
+    mfrmr::fit_mfrm(
+      data = d,
+      person = "Person",
+      facets = c("Rater", "Task", "Criterion"),
+      score = "Score",
+      method = "JML",
+      model = "RSM",
+      maxit = 20
+    ),
+    "^Optimization convergence review did not produce"
   )
   diag <- mfrmr::diagnose_mfrm(fit, residual_pca = "none")
 

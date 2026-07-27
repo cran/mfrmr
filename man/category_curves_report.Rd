@@ -116,6 +116,7 @@ ggplot2, plotly, or another R graphics system.
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 out <- category_curves_report(fit, theta_points = 101)
@@ -129,6 +130,7 @@ p_info <- plot(out, type = "category_information", draw = FALSE)
 head(p_info$data$category_information)
 curve_long <- plot_data(out, component = "plot_long")
 head(curve_long[, c("PlotType", "Theta", "Series", "Value")])
+}
 }
 \seealso{
 \code{\link[=category_structure_report]{category_structure_report()}}, \code{\link[=rating_scale_table]{rating_scale_table()}}, \code{\link[=plot.mfrm_fit]{plot.mfrm_fit()}},

@@ -151,9 +151,12 @@ test_that("anchor with non-existent level produces warning", {
     stringsAsFactors = FALSE
   )
   expect_warning(
-    fit_mfrm(d, "Person",
-      c("Rater", "Task", "Criterion"), "Score",
-      anchors = anchors, method = "JML", maxit = 30),
+    .mfrmr_muffle_expected_warnings(
+      fit_mfrm(d, "Person",
+        c("Rater", "Task", "Criterion"), "Score",
+        anchors = anchors, method = "JML", maxit = 30),
+      "^Optimization convergence review did not produce"
+    ),
     "anchor|Anchor"
   )
 })

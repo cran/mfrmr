@@ -140,8 +140,11 @@ test_that("plot_bias_interaction CI omitted when show_ci = FALSE", {
 # --- plot(fit, type = "wright", show_ci = TRUE) ---------------------------
 
 test_that("plot(fit, type = 'wright', show_ci = TRUE) builds SE table", {
-  p <- plot(.fit, type = "wright", show_ci = TRUE, ci_level = 0.95,
-            draw = FALSE)
+  p <- .mfrmr_muffle_expected_warnings(
+    plot(.fit, type = "wright", show_ci = TRUE, ci_level = 0.95,
+         draw = FALSE),
+    "^Review-only display:"
+  )
   # Wright map overlays SE via build_wright_map_data; the returned
   # payload surfaces `CI_Lower` / `CI_Upper` on the locations table.
   expect_s3_class(p, "mfrm_plot_data")

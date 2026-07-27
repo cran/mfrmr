@@ -27,7 +27,7 @@ Interactively choose data-frame columns before calling \code{mfrm_results()}
 This helper is deliberately opt-in and stops in non-interactive sessions.
 It asks the user to choose the person, score, optional weight, and facet
 columns, prints reproducible code for the selected roles, then fits the
-default legacy-compatible \code{RSM}/\code{JML} route before calling
+documented \code{RSM}/\code{MML} starting route before calling
 \code{\link[=mfrm_results]{mfrm_results()}}. Use explicit \code{\link[=fit_mfrm]{fit_mfrm()}} calls in scripts, Quarto
 documents, tests, and reproducible analyses.
 }

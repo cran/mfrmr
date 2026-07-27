@@ -38,9 +38,11 @@ The printed text is the same content stored in
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "none")
 apa <- build_apa_outputs(fit, diag)
 apa$report_text
+}
 }

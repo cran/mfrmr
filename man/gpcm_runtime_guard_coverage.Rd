@@ -2,7 +2,7 @@
 % Please edit documentation in R/help_gpcm_scope.R
 \name{gpcm_runtime_guard_coverage}
 \alias{gpcm_runtime_guard_coverage}
-\title{Bounded GPCM Route-Boundary Coverage}
+\title{Unavailable GPCM Routes and Alternatives}
 \usage{
 gpcm_runtime_guard_coverage()
 }
@@ -12,29 +12,19 @@ A data.frame with columns:
 \item \code{Area}
 \item \code{Helper}
 \item \code{Status}
-\item \code{GuardMode}
-\item \code{ExpectedConditionClass}
+\item \code{Boundary}
 \item \code{RecommendedRoute}
-\item \code{NextValidationStep}
-\item \code{TestRoute}
-\item \code{Notes}
 }
 }
 \description{
-Public table showing how blocked or deferred bounded-\code{GPCM} capability rows
-are handled by the current release.
+List bounded-\code{GPCM} routes that are not currently available and show the
+supported alternative for each route.
 }
 \details{
-\code{gpcm_capability_matrix()} is the user-facing support matrix. This helper
-records which public helpers stop with \code{mfrmr_gpcm_scope_error} when called
-on a bounded \code{GPCM} path and which capability rows have no public route yet
-and are therefore documented as future-extension scope.
-
-Package checks use this table to keep out-of-scope \code{GPCM} behavior aligned
-with the capability matrix. A row with \code{GuardMode = "runtime_error"} should
-have \code{ExpectedConditionClass = "mfrmr_gpcm_scope_error"}. A row with
-\code{GuardMode = "roadmap_only"} records a documented future-extension target
-with no public helper to call in the current release.
+A \code{blocked} row names a helper that intentionally stops instead of returning
+an unsupported bounded-\code{GPCM} result. A \code{deferred} row has no public helper.
+In either case, read \code{Boundary} for the reason and \code{RecommendedRoute} for a
+currently available analysis route.
 }
 \examples{
 gpcm_runtime_guard_coverage()

@@ -2,7 +2,7 @@
 % Please edit documentation in R/api-export-bundles.R
 \name{export_summary_appendix}
 \alias{export_summary_appendix}
-\title{Export manuscript appendix tables from validated summary surfaces}
+\title{Export manuscript appendix tables from documented summary surfaces}
 \usage{
 export_summary_appendix(
   x,
@@ -75,10 +75,10 @@ A named list of class \code{mfrm_summary_appendix_export} with:
 }
 }
 \description{
-Export manuscript appendix tables from validated summary surfaces
+Export manuscript appendix tables from documented summary surfaces
 }
 \details{
-This helper is the narrow public bridge from validated \code{summary()} surfaces
+This helper is the narrow public bridge from documented \code{summary()} surfaces
 to manuscript appendix artifacts. It accepts the same reporting objects that
 \code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}} supports, exports their table bundles as CSV,
 and optionally assembles a lightweight HTML appendix page.
@@ -91,8 +91,8 @@ the source summary contains caveat rows.
 
 Precision-review summaries keep \code{fit_separation_basis} in the exported
 precision-review role so fit, ZSTD, separation/reliability/strata, and
-package QC thresholds can be reported without turning them into release or
-recovery success gates.
+package review thresholds can be reported without turning them into
+universal recovery criteria.
 Fit-measure and FACETS fit-review summaries keep df/ZSTD sensitivity and
 optional external FACETS matching tables in the same precision-review lane.
 
@@ -102,9 +102,9 @@ exported bundle keeps the ADEMP-style simulation basis, recovery metrics,
 replication status, adequacy checklist, thresholds, and next actions in
 separate appendix-ready tables.
 
-Recovery-validation summaries from the packaged validation protocol can be
-exported by passing \code{summary(validation)}, including top-line release
-decisions, condition notes, diagnostic notes, and domain decisions.
+A compatible precomputed recovery-evidence summary can also be exported,
+including its case assessments, condition
+notes, diagnostic notes, and domain assessments.
 
 Unlike \code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}}, this helper does not require a fitted model.
 It is intended for the stage where compact reporting summaries already exist

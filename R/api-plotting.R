@@ -310,6 +310,14 @@ plot_component_note <- function(name, role) {
 #' pathway_fit <- plot_data(fit, type = "pathway", component = "fit_measures")
 #' head(pathway_fit[, c("Facet", "Level", "Infit", "Outfit", "FitStatus")])
 #'
+#' # Re-render one component with your own styling while keeping the
+#' # package-generated data and interpretation metadata.
+#' expected <- pathway_long[pathway_long$Layer == "expected_score", , drop = FALSE]
+#' plot(expected$Theta, expected$Value, type = "l",
+#'      xlab = "Theta", ylab = "Expected score",
+#'      main = "Custom expected-score pathway")
+#' abline(v = 0, lty = 2, col = "grey60")
+#'
 #' info <- compute_information(fit, theta_points = 51)
 #' sem_long <- plot_data(
 #'   plot_information(info, type = "sem", draw = FALSE),
@@ -1441,6 +1449,7 @@ plot_marginal_pairwise <- function(x,
 #' @seealso [unexpected_response_table()], [plot_fair_average()], [plot_displacement()],
 #'   [plot_qc_dashboard()], [mfrmr_visual_diagnostics]
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 #' p <- plot_unexpected(fit, abs_z_min = 1.5, prob_max = 0.4, top_n = 10, draw = FALSE)
@@ -1456,6 +1465,7 @@ plot_marginal_pairwise <- function(x,
 #'     palette = c(higher = "#d95f02", lower = "#1b9e77", bar = "#2b8cbe"),
 #'     label_angle = 45
 #'   )
+#' }
 #' }
 #' @export
 plot_unexpected <- function(x,
@@ -1685,6 +1695,7 @@ plot_unexpected <- function(x,
 #' @concept visual diagnostics
 #' @concept fair averages
 #' @examples
+#' \donttest{
 #' toy_full <- load_mfrmr_data("example_core")
 #' toy_people <- unique(toy_full$Person)[1:12]
 #' toy <- toy_full[toy_full$Person %in% toy_people, , drop = FALSE]
@@ -1694,6 +1705,7 @@ plot_unexpected <- function(x,
 #' p <- plot_fair_average(fit, metric = "AdjustedAverage", draw = FALSE)
 #' if (interactive()) {
 #'   plot_fair_average(fit, metric = "AdjustedAverage", plot_type = "difference")
+#' }
 #' }
 #' @export
 plot_fair_average <- function(x,
@@ -2073,6 +2085,7 @@ plot_fair_average <- function(x,
 #' @concept visual diagnostics
 #' @concept displacement
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 #' p <- plot_displacement(fit, anchored_only = FALSE, draw = FALSE)
@@ -2083,6 +2096,7 @@ plot_fair_average <- function(x,
 #'     plot_type = "lollipop",
 #'     preset = "publication"
 #'   )
+#' }
 #' }
 #' @export
 plot_displacement <- function(x,
@@ -2545,6 +2559,7 @@ plot_interrater_agreement <- function(x,
 #' @return A plotting-data object of class `mfrm_plot_data`.
 #' @seealso [facets_chisq_table()], [plot_interrater_agreement()], [plot_qc_dashboard()]
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 #' p <- plot_facets_chisq(fit, draw = FALSE)
@@ -2558,6 +2573,7 @@ plot_interrater_agreement <- function(x,
 #'     palette = c(fixed_ok = "#2b8cbe", fixed_flag = "#cb181d"),
 #'     label_angle = 45
 #'   )
+#' }
 #' }
 #' @export
 plot_facets_chisq <- function(x,
@@ -2772,7 +2788,8 @@ plot_facets_chisq <- function(x,
 #' @return A plotting-data object of class `mfrm_plot_data`.
 #' @seealso [plot_unexpected()], [plot_fair_average()], [plot_displacement()], [plot_interrater_agreement()], [plot_facets_chisq()], [build_visual_summaries()]
 #' @examples
-#' # Fast smoke run: build the plot data only (no graphics device).
+#' \donttest{
+#' # Build the plotting data without opening a graphics device.
 #' toy <- load_mfrmr_data("example_core")
 #' toy_small <- toy[toy$Person %in% unique(toy$Person)[1:3], ]
 #' fit_quick <- suppressWarnings(
@@ -2782,7 +2799,6 @@ plot_facets_chisq <- function(x,
 #' qc_quick <- plot_qc_dashboard(fit_quick, draw = FALSE)
 #' names(qc_quick$data)
 #'
-#' \donttest{
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 #' qc <- plot_qc_dashboard(fit, draw = FALSE)
 #' qc$data$panels$Status
@@ -3185,7 +3201,10 @@ resolve_bubble_measures <- function(x, diagnostics = NULL) {
 #'   default for \code{view = "infit_outfit"}), or \code{"equal"}
 #'   (uniform size).
 #' @param facets Character vector of facets to include. \code{NULL} (default)
-#'   includes all non-person facets.
+#'   includes every row allowed by \code{include_person}.
+#' @param include_person If \code{TRUE}, person measures may be included in
+#'   the chart (and in \code{facets} filtering). The default is \code{FALSE}
+#'   because person rows commonly overwhelm facet-level patterns.
 #' @param fit_range Numeric length-2 vector defining the heuristic fit-review band
 #'   shown as a shaded region (default \code{c(0.5, 1.5)}).
 #' @param top_n Maximum number of elements to plot (default 60).
@@ -3240,9 +3259,11 @@ resolve_bubble_measures <- function(x, diagnostics = NULL) {
 #' @seealso \code{\link{diagnose_mfrm}}, \code{\link{plot_unexpected}},
 #'   \code{\link{plot_fair_average}}
 #' @examples
-#' toy <- load_mfrmr_data("example_core")
+#' \donttest{
+#' toy <- load_mfrmr_data("example_operational")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-#'                 method = "JML", model = "RSM", maxit = 30)
+#'                 method = "MML", model = "RSM",
+#'                 quad_points = 7, maxit = 30)
 #' diag <- diagnose_mfrm(fit, residual_pca = "none")
 #' p <- plot_bubble(fit, diagnostics = diag, draw = FALSE)
 #' head(p$data$table[, c("Facet", "Level", "Estimate", "Infit", "Outfit")])
@@ -3260,6 +3281,7 @@ resolve_bubble_measures <- function(x, diagnostics = NULL) {
 #' #   lower-left have both < 0.5 (consistent overfit). Bubble size in
 #' #   this view defaults to N (observation count) so the visual
 #' #   weighting matches how seriously the misfit should be taken.
+#' }
 #' @export
 plot_bubble <- function(x,
                         diagnostics = NULL,
@@ -3267,6 +3289,7 @@ plot_bubble <- function(x,
                         view = c("measure", "infit_outfit"),
                         bubble_size = NULL,
                         facets = NULL,
+                        include_person = FALSE,
                         fit_range = c(0.5, 1.5),
                         top_n = 60,
                         main = NULL,
@@ -3279,11 +3302,16 @@ plot_bubble <- function(x,
     bubble_size <- if (identical(view, "infit_outfit")) "N" else "SE"
   }
   bubble_size <- match.arg(bubble_size, c("SE", "N", "equal"))
+  if (!is.logical(include_person) || length(include_person) != 1L || is.na(include_person)) {
+    stop("`include_person` must be TRUE or FALSE.", call. = FALSE)
+  }
   top_n <- max(1L, as.integer(top_n))
   style <- resolve_plot_preset(preset)
 
   measures <- resolve_bubble_measures(x, diagnostics)
-  measures <- measures[measures$Facet != "Person", , drop = FALSE]
+  if (!isTRUE(include_person)) {
+    measures <- measures[measures$Facet != "Person", , drop = FALSE]
+  }
   if (!is.null(facets)) {
     measures <- measures[measures$Facet %in% as.character(facets), , drop = FALSE]
   }
@@ -3320,8 +3348,11 @@ plot_bubble <- function(x,
   radius <- switch(bubble_size,
     SE = {
       se_vals <- if ("SE" %in% names(measures)) measures$SE else rep(0.1, nrow(measures))
-      se_vals[!is.finite(se_vals)] <- stats::median(se_vals[is.finite(se_vals)], na.rm = TRUE)
-      se_vals / max(se_vals, na.rm = TRUE) * 0.15
+      valid_se <- is.finite(se_vals) & se_vals > 0
+      fallback_se <- if (any(valid_se)) stats::median(se_vals[valid_se]) else 0.1
+      se_vals[!valid_se] <- fallback_se
+      precision <- 1 / pmax(se_vals, sqrt(.Machine$double.eps))
+      precision / max(precision, na.rm = TRUE) * 0.15
     },
     N = {
       n_vals <- if ("N" %in% names(measures)) measures$N else rep(1, nrow(measures))
@@ -3436,6 +3467,7 @@ plot_bubble <- function(x,
       view = view,
       fit_stat = fit_stat,
       bubble_size = bubble_size,
+      include_person = isTRUE(include_person),
       fit_range = fit_range,
       table = measures,
       radius = radius,
@@ -3472,6 +3504,10 @@ plot_bubble <- function(x,
 #'   \code{"measures"}. Default exports all available tables.
 #' @param overwrite If \code{FALSE} (default), refuse to overwrite existing
 #'   files.
+#' @param acknowledge_sensitive Logical; set to \code{TRUE} only after
+#'   acknowledging that these tables can contain direct person identifiers,
+#'   person-level estimates, and original facet labels. This suppresses the
+#'   privacy warning; it does not deidentify any file.
 #'
 #' @section Exported files:
 #' \describe{
@@ -3487,7 +3523,9 @@ plot_bubble <- function(x,
 #' @section Interpreting output:
 #' The returned data.frame tells you exactly which files were written and where.
 #' This is convenient for scripted pipelines where the output directory is created
-#' on the fly.
+#' on the fly. The files are analysis tables, not a deidentified sharing
+#' package; review each file under the applicable data-handling policy before
+#' sharing it.
 #'
 #' @section Typical workflow:
 #' \enumerate{
@@ -3496,11 +3534,13 @@ plot_bubble <- function(x,
 #' \item Call \code{export_mfrm(...)} and inspect the returned \code{Path} column.
 #' }
 #'
-#' @return Invisibly, a data.frame listing written files with columns
-#'   \code{Table} and \code{Path}.
+#' @return Invisibly, a data.frame listing written files, their paths, and
+#'   explicit privacy/data-handling metadata. `Deidentified` and
+#'   `ShareableWithoutReview` are always `FALSE`.
 #' @seealso \code{\link{fit_mfrm}}, \code{\link{diagnose_mfrm}},
 #'   \code{\link{as.data.frame.mfrm_fit}}
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
 #'                 method = "JML", model = "RSM", maxit = 30)
@@ -3510,16 +3550,19 @@ plot_bubble <- function(x,
 #'   diagnostics = diag,
 #'   output_dir = tempdir(),
 #'   prefix = "mfrmr_example",
-#'   overwrite = TRUE
+#'   overwrite = TRUE,
+#'   acknowledge_sensitive = TRUE
 #' )
 #' out$Table
+#' }
 #' @export
 export_mfrm <- function(fit,
                         diagnostics = NULL,
                         output_dir = ".",
                         prefix = "mfrm",
                         tables = c("person", "facets", "summary", "steps", "measures"),
-                        overwrite = FALSE) {
+                        overwrite = FALSE,
+                        acknowledge_sensitive = FALSE) {
   if (!inherits(fit, "mfrm_fit")) {
     stop("`fit` must be an mfrm_fit object from fit_mfrm().")
   }
@@ -3533,6 +3576,7 @@ export_mfrm <- function(fit,
   prefix <- as.character(prefix[1])
   if (!nzchar(prefix)) prefix <- "mfrm"
   overwrite <- isTRUE(overwrite)
+  acknowledge_sensitive <- isTRUE(acknowledge_sensitive)
   output_dir <- as.character(output_dir[1])
 
   if (!dir.exists(output_dir)) {
@@ -3542,8 +3586,31 @@ export_mfrm <- function(fit,
     stop("Could not create output directory: ", output_dir)
   }
 
-  written <- data.frame(Table = character(0), Path = character(0),
-                        stringsAsFactors = FALSE)
+  privacy_notice <- paste0(
+    "These CSV files are analysis tables, not a deidentified or automatically ",
+    "shareable package. They can contain direct person identifiers, person-level ",
+    "estimates, and original facet labels. Review and transform every file under ",
+    "the applicable data-handling policy before sharing it."
+  )
+  if (!acknowledge_sensitive) {
+    warning(
+      privacy_notice,
+      " Set `acknowledge_sensitive = TRUE` only to acknowledge this risk; ",
+      "that setting does not deidentify the export.",
+      call. = FALSE
+    )
+  }
+
+  written <- data.frame(
+    Table = character(0),
+    Path = character(0),
+    DataHandling = character(0),
+    PrivacyClass = character(0),
+    Deidentified = logical(0),
+    ShareableWithoutReview = logical(0),
+    SensitiveDataAcknowledged = logical(0),
+    stringsAsFactors = FALSE
+  )
 
   write_one <- function(df, filename, table_name) {
     path <- file.path(output_dir, filename)
@@ -3551,8 +3618,23 @@ export_mfrm <- function(fit,
       stop("File already exists: ", path, ". Set overwrite = TRUE to replace.")
     }
     utils::write.csv(df, file = path, row.names = FALSE, na = "")
-    written <<- rbind(written, data.frame(Table = table_name, Path = path,
-                                          stringsAsFactors = FALSE))
+    data_handling <- if (table_name %in% c("person", "measures")) {
+      "may_contain_person_level_data"
+    } else if (identical(table_name, "facets")) {
+      "may_contain_original_facet_labels"
+    } else {
+      "review_before_sharing"
+    }
+    written <<- rbind(written, data.frame(
+      Table = table_name,
+      Path = normalizePath(path, winslash = "/", mustWork = FALSE),
+      DataHandling = data_handling,
+      PrivacyClass = "analysis_archive",
+      Deidentified = FALSE,
+      ShareableWithoutReview = FALSE,
+      SensitiveDataAcknowledged = acknowledge_sensitive,
+      stringsAsFactors = FALSE
+    ))
   }
 
   if ("person" %in% tables) {
@@ -3600,8 +3682,9 @@ export_mfrm <- function(fit,
 #' Convert mfrm_fit to a tidy data.frame
 #'
 #' Returns all facet-level estimates (person and others) in a single
-#' tidy data.frame. Useful for quick interactive export:
-#' \code{write.csv(as.data.frame(fit), "results.csv")}.
+#' tidy data.frame. Person rows retain their original identifiers; review or
+#' transform them before writing the result outside a controlled analysis
+#' environment.
 #'
 #' @param x An \code{mfrm_fit} object from \code{\link{fit_mfrm}}.
 #' @param row.names Ignored (included for S3 generic compatibility).
@@ -3626,18 +3709,19 @@ export_mfrm <- function(fit,
 #'
 #' @return A data.frame with columns \code{Facet}, \code{Level},
 #'   \code{Estimate}, and \code{Extreme}. The \code{Extreme} column
-#'   is populated for person rows from the extreme-score flag added
-#'   in 0.1.6 (\code{"Min"} / \code{"Max"} / \code{NA}); non-person
+#'   is populated for person rows from the extreme-score flag
+#'   (\code{"Min"} / \code{"Max"} / \code{NA}); non-person
 #'   facet rows carry \code{NA} in that column by design.
 #' @seealso \code{\link{fit_mfrm}}, \code{\link{export_mfrm}}
 #' @examples
-#' toy <- load_mfrmr_data("example_core")
+#' toy <- load_mfrmr_data("example_operational")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-#'                 method = "JML", model = "RSM", maxit = 30)
+#'                 method = "MML", model = "RSM",
+#'                 quad_points = 7, maxit = 30)
 #' head(as.data.frame(fit))
 #' @export
 as.data.frame.mfrm_fit <- function(x, row.names = NULL, optional = FALSE, ...) {
-  # Carry forward the Extreme flag added in 0.1.6 (via build_person_table)
+  # Carry forward the Extreme flag from build_person_table().
   # so downstream ggplot / CSV export paths see per-person extreme status.
   person_extreme <- if ("Extreme" %in% names(x$facets$person)) {
     as.character(x$facets$person$Extreme)
@@ -3682,9 +3766,26 @@ print.mfrm_fit <- function(x, ...) {
     cat(sprintf("  LogLik: %s | AIC: %s | BIC: %s\n",
                 ov$LogLik %||% NA, ov$AIC %||% NA, ov$BIC %||% NA))
     if ("Converged" %in% names(ov) && "ConvergenceStatus" %in% names(ov)) {
-      cat(sprintf("  Converged: %s | Status: %s\n",
-                  ifelse(isTRUE(ov$Converged), "Yes", "No"),
-                  ov$ConvergenceStatus %||% NA_character_))
+      convergence <- mfrm_convergence_state(x)
+      status_label <- switch(
+        convergence$status,
+        converged = "No further numerical review indicated",
+        converged_gradient_review = "Terminal gradient needs review",
+        reviewable_warning = "Optimizer warning needs review",
+        iteration_limit = "Iteration limit reached",
+        optimizer_warning = "Optimizer warning",
+        unknown = "Status unavailable",
+        convergence$status
+      )
+      cat(sprintf(
+        "  Optimizer returned code 0: %s | Convergence review: %s\n",
+        ifelse(convergence$code_converged, "Yes", "No"),
+        status_label
+      ))
+      cat(sprintf(
+        "  Formal inference: %s\n",
+        ifelse(convergence$inference_ready, "Ready", "Not ready")
+      ))
     }
     if (isTRUE(x$config$attached_diagnostics)) {
       attached_cols <- as.character(x$config$attached_diagnostics_cols %||% character(0))

@@ -1,5 +1,5 @@
 # ==============================================================================
-# Yen-style Q3 local-dependence statistic
+# mfrmr standardized/aggregated-residual Q3-style screen
 # ==============================================================================
 #
 # `q3_statistic()` computes a Q3-style index of local response dependence
@@ -10,11 +10,10 @@
 # stores; this is a deliberate departure from Yen's original definition
 # and is documented in the help page.
 #
-# Threshold attribution (community convention vs primary source):
-# - The |Q3| > 0.20 cutoff is attributed in much of the IRT literature to
-#   Yen (1984), but Yen herself did not propose it. The 0.20 cutoff comes
-#   from Chen, W.-H., & Thissen, D. (1997), "Local dependence indexes for
-#   item pairs using item response theory," JEBS, 22(3), 265-289 (p. 284).
+# Threshold attribution (descriptive convention vs primary source):
+# - Yen (1984) did not propose a fixed 0.20 cutoff. The package's legacy rule
+#   applies strict `|Q3-style| > threshold`; it is an uncalibrated screening
+#   heuristic for this standardized/aggregated-residual index.
 # - The |Q3| > 0.30 "strict" cutoff is a community convention summarized
 #   in Marais (2013, p. 121) as "often considered" - not Marais's own
 #   proposal. Marais's actual recommendation is to interpret Q3 *relative*
@@ -32,28 +31,27 @@
 # data.frame with thresholds and interpretation labels for use in
 # manuscript tables.
 
-#' Yen-style Q3 local-dependence statistic between facet levels
+#' mfrmr standardized/aggregated-residual Q3-style screen
 #'
-#' Computes a Q3-style index inspired by Yen (1984) -- the Pearson
-#' correlation of **standardized** residuals between every pair of
-#' levels of a chosen facet -- from a `diagnose_mfrm()` bundle. Under
-#' the conditional-independence assumption of the MFRM, |Q3| should be
-#' small for every pair; large absolute values flag pairs of facet
-#' elements (e.g. two raters or two items) whose residuals co-move
-#' more than the main-effects model expects.
+#' Computes mfrmr's Q3-style screening index: the Pearson correlation of
+#' **standardized residuals**, after mean-aggregation to one residual per
+#' Person-by-level cell, between every pair of levels of a chosen facet.
+#' Large absolute values identify pairs whose residuals show stronger positive
+#' co-movement or negative counter-movement than the main-effects model
+#' expects. This is not the raw-residual Yen (1984) Q3 statistic.
 #'
-#' @section Statistic definition (departures from Yen 1984):
-#' This implementation differs from Yen's (1984) original definition
-#' in two respects that together affect threshold interpretation.
+#' @section Statistic definition and distinction from Yen (1984):
+#' The name **Q3-style** is deliberate. This implementation differs from
+#' Yen's (1984) original Q3 definition in two respects that together affect
+#' threshold interpretation.
 #'
 #' **(1) Standardized vs raw residuals.** Yen (1984, eqs. 7-8, p. 127)
 #' defines `Q3 = cor(d_i, d_j)` where `d_{ik} = u_{ik} - P_hat_{ik}` is
 #' the **raw** residual. mfrmr uses **standardized** residuals
 #' `Z = (u - P_hat) / sqrt(Var(u))` because that is what
-#' `diagnose_mfrm()` stores. Standardization down-weights high-variance
-#' observations and changes the sampling distribution of the resulting
-#' correlation; the published critical values (Chen & Thissen, 1997;
-#' Christensen et al., 2017) were derived for raw-residual Q3.
+#' `diagnose_mfrm()` stores. Because model-based residual scale factors can
+#' vary across observations, the resulting pair correlations and their null
+#' distribution differ from raw-residual Q3.
 #'
 #' **(2) Mean-aggregation.** When the facet being paired (e.g. `Rater`)
 #' has multiple residual rows per (Person, Level) cell because of
@@ -62,29 +60,29 @@
 #' **mean-aggregated to one value per (Person, Level) cell**, and the
 #' Pearson correlation is taken over those mean-aggregated residuals.
 #' Yen's original formulation takes the correlation directly over
-#' per-(Person, Item) residuals, without aggregation. Mean-aggregation
-#' reduces noise but also shrinks the effective sample size and can pull
-#' correlations toward the cell mean.
+#' per-(Person, Item) residuals, without aggregation. Aggregation changes the
+#' analysis unit to persons. Each correlation is based on persons observed at
+#' both levels, so its magnitude and null distribution are not directly
+#' comparable with raw-row Q3.
 #'
 #' For both reasons, treat the values returned here as a **screening
 #' summary** rather than a direct substitute for the published Q3
-#' thresholds. For a formal local-dependence test under raw-residual Q3,
-#' use a parametric bootstrap as recommended by Christensen et al.
-#' (2017).
+#' thresholds. A formal raw-residual Q3 procedure would require a separately
+#' implemented and validated design-specific bootstrap; mfrmr 0.2.2 does not
+#' provide that procedure.
 #'
 #' @param fit An `mfrm_fit` from [fit_mfrm()].
 #' @param diagnostics Optional [diagnose_mfrm()] output. Computed
 #'   on demand when omitted.
 #' @param facet Facet whose levels are paired (default `"Rater"`).
-#' @param min_pairs Minimum number of shared response opportunities
-#'   required to retain a pair. Pairs below the threshold drop out
+#' @param min_pairs Minimum number of persons with finite aggregated residuals
+#'   at both levels required to retain a pair; a single integer of at least
+#'   three. Pairs below the threshold drop out
 #'   of the table (mirrors [plot_local_dependence_heatmap()]).
-#' @param yen_threshold Community-convention flag threshold (default
-#'   `0.20`). Often attributed to Yen (1984), but the 0.20 cutoff is
-#'   actually from Chen & Thissen (1997, p. 284); Yen herself did not
-#'   propose a fixed cutoff. The cutoff was derived for raw-residual Q3
-#'   under the 3PL - applying it to standardized-residual Q3 under MFRM
-#'   is approximate.
+#' @param yen_threshold Legacy-named argument retained for compatibility. It
+#'   applies the strict absolute heuristic `|Q3-style| > threshold` (default
+#'   `0.20`). Yen (1984) did not propose this as a general cutoff, and it is not
+#'   calibrated for mfrmr's standardized/aggregated-residual index.
 #' @param marais_threshold Stricter community-convention threshold
 #'   (default `0.30`). Marais (2013, p. 121) reports this as a value
 #'   "often considered" in the literature, not as her own
@@ -105,10 +103,14 @@
 #'   \item{`pairs`}{A data frame with one row per facet-level pair
 #'     and columns `Level1`, `Level2`, `Q3`, `N`, `AbsQ3`,
 #'     `YenFlag`, `MaraisFlag`, `RelativeFlag`, and a textual
-#'     `Interpretation` summarising which thresholds were exceeded.}
+#'     `Interpretation` summarising which thresholds were exceeded. `N` is the
+#'     number of persons with finite aggregated residuals at both levels.
+#'     `YenFlag` is a compatibility name and does not imply that Yen (1984)
+#'     proposed the fixed default.}
 #'   \item{`summary`}{One-row tibble with `MeanQ3`, `MaxAbsQ3`,
 #'     and the three flagged-pair counts.}
-#'   \item{`thresholds`}{The thresholds used, for reproducibility.}
+#'   \item{`thresholds`}{The thresholds used, for reproducibility. The `yen`
+#'     name is retained for compatibility.}
 #'   \item{`facet`}{The facet whose levels were paired.}
 #' }
 #'
@@ -119,8 +121,8 @@
 #'   \doi{10.1177/014662168400800201}
 #' - Chen, W.-H., & Thissen, D. (1997). Local dependence indexes for
 #'   item pairs using item response theory. *Journal of Educational
-#'   and Behavioral Statistics, 22*(3), 265-289. (Origin of the
-#'   commonly cited `|Q3| > 0.20` cutoff.)
+#'   and Behavioral Statistics, 22*(3), 265-289.
+#'   \doi{10.3102/10769986022003265}
 #' - Marais, I. (2013). Local dependence. In K. B. Christensen,
 #'   S. Kreiner, & M. Mesbah (Eds.), *Rasch models in health*
 #'   (pp. 111-130). London: ISTE / Wiley.
@@ -129,21 +131,23 @@
 #'   Rasch model using residual correlations.
 #'   *Applied Psychological Measurement, 41*(3), 178-194.
 #'   \doi{10.1177/0146621616677520}
+#' - Nason, K., & DeMars, C. (2025). Another look at Yen's Q3: Is .2 an
+#'   appropriate cut-off? *Journal of Educational Measurement, 62*(2),
+#'   345-359. \doi{10.1111/jedm.12432}
 #'
 #' @seealso [plot_local_dependence_heatmap()], [diagnose_mfrm()]
 #' @examples
+#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
 #'                 method = "JML", maxit = 30)
 #' q3 <- q3_statistic(fit)
 #' q3$summary
-#' # Look for: MaxAbsQ3 < 0.20 (Chen & Thissen 1997 community cutoff) is
-#' #   the comfortable regime; values above 0.30 are commonly considered
-#' #   strict-flag worthy (Marais, 2013, summarising literature). For a
-#' #   formal test, use a parametric bootstrap (Christensen et al., 2017).
-#' #   The summary's flag counts give a quick triage; inspect `q3$pairs`
-#' #   for the offending level pairs and follow up with content review.
+#' # Look for: use MaxAbsQ3 and the pair table to rank follow-up. The default
+#' #   0.20/0.30 absolute rules are uncalibrated heuristics for this Q3-style
+#' #   index, not standalone local-independence tests.
 #' head(q3$pairs)
+#' }
 #' @export
 q3_statistic <- function(fit,
                          diagnostics = NULL,
@@ -161,15 +165,23 @@ q3_statistic <- function(fit,
     stop("`facet` must be one of: ", paste(facet_names, collapse = ", "), ".",
          call. = FALSE)
   }
-  yen_threshold <- as.numeric(yen_threshold[1])
-  marais_threshold <- as.numeric(marais_threshold[1])
-  relative_offset <- as.numeric(relative_offset[1])
-  if (!is.finite(yen_threshold) || yen_threshold <= 0 ||
-      !is.finite(marais_threshold) || marais_threshold <= 0 ||
-      !is.finite(relative_offset) || relative_offset <= 0) {
-    stop("`yen_threshold`, `marais_threshold`, and `relative_offset` ",
-         "must be finite positive numbers.", call. = FALSE)
+  if (!is.numeric(min_pairs) || length(min_pairs) != 1L ||
+      !is.finite(min_pairs) || min_pairs < 3 || min_pairs != floor(min_pairs)) {
+    stop("`min_pairs` must be a single integer of at least 3.", call. = FALSE)
   }
+  min_pairs <- as.integer(min_pairs)
+  valid_positive_scalar <- function(x) {
+    is.numeric(x) && length(x) == 1L && is.finite(x) && x > 0
+  }
+  if (!valid_positive_scalar(yen_threshold) ||
+      !valid_positive_scalar(marais_threshold) ||
+      !valid_positive_scalar(relative_offset)) {
+    stop("`yen_threshold`, `marais_threshold`, and `relative_offset` ",
+         "must be finite positive numeric scalars.", call. = FALSE)
+  }
+  yen_threshold <- as.numeric(yen_threshold)
+  marais_threshold <- as.numeric(marais_threshold)
+  relative_offset <- as.numeric(relative_offset)
   if (is.null(diagnostics)) {
     diagnostics <- suppressMessages(
       diagnose_mfrm(fit, residual_pca = "none", diagnostic_mode = "legacy")
@@ -183,7 +195,7 @@ q3_statistic <- function(fit,
     fit = fit,
     diagnostics = diagnostics,
     facet = facet,
-    min_pairs = as.integer(min_pairs),
+    min_pairs = min_pairs,
     draw = FALSE
   )
 
@@ -225,11 +237,24 @@ q3_statistic <- function(fit,
 
   pairs_df$Interpretation <- vapply(seq_len(nrow(pairs_df)), function(i) {
     flags <- character(0)
-    if (isTRUE(pairs_df$MaraisFlag[i])) flags <- c(flags, "strict (>0.30)")
-    if (isTRUE(pairs_df$YenFlag[i]) && !isTRUE(pairs_df$MaraisFlag[i])) {
-      flags <- c(flags, "screening (>0.20)")
+    if (isTRUE(pairs_df$MaraisFlag[i])) {
+      flags <- c(flags, sprintf(
+        "stricter heuristic (|Q3-style| > %.2f)",
+        marais_threshold
+      ))
     }
-    if (isTRUE(pairs_df$RelativeFlag[i])) flags <- c(flags, "relative-to-mean")
+    if (isTRUE(pairs_df$YenFlag[i]) && !isTRUE(pairs_df$MaraisFlag[i])) {
+      flags <- c(flags, sprintf(
+        "fixed absolute rule (|Q3-style| > %.2f)",
+        yen_threshold
+      ))
+    }
+    if (isTRUE(pairs_df$RelativeFlag[i])) {
+      flags <- c(flags, sprintf(
+        "relative-to-mean (offset > %.2f)",
+        relative_offset
+      ))
+    }
     if (length(flags) == 0L) "OK" else paste(flags, collapse = ", ")
   }, character(1))
 
@@ -260,16 +285,24 @@ q3_statistic <- function(fit,
 
 #' @export
 print.mfrm_q3 <- function(x, ...) {
-  cat("Yen Q3 local-dependence statistic\n")
+  cat("mfrmr standardized/aggregated-residual Q3-style screen\n")
   cat(sprintf("  Facet: %s\n", x$facet))
-  cat(sprintf("  Mean Q3: %.3f | Max |Q3|: %.3f\n",
+  cat(sprintf("  Mean Q3-style correlation: %.3f | Max absolute: %.3f\n",
               x$summary$MeanQ3, x$summary$MaxAbsQ3))
-  cat(sprintf("  Flagged pairs: Yen %d / Marais %d / Relative %d (of %d)\n",
+  cat(sprintf(paste0(
+    "  Flagged pairs: fixed absolute rule %d / stricter absolute rule %d / ",
+    "relative-to-mean rule %d (of %d)\n"
+  ),
               x$summary$YenFlagged, x$summary$MaraisFlagged,
               x$summary$RelativeFlagged, nrow(x$pairs)))
-  cat(sprintf("  Thresholds: Yen %.2f | Marais %.2f | Relative offset %.2f\n",
+  cat(sprintf(paste0(
+    "  Heuristic thresholds: absolute %.2f / stricter %.2f / ",
+    "relative offset %.2f\n"
+  ),
               as.numeric(x$thresholds["yen"]),
               as.numeric(x$thresholds["marais"]),
               as.numeric(x$thresholds["relative_offset"])))
+  cat("  Fixed absolute rules are uncalibrated heuristics for this index.\n")
+  cat("  Interpretation: screening evidence, not a standalone local-independence test.\n")
   invisible(x)
 }

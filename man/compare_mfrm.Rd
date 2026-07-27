@@ -28,7 +28,8 @@ An object of class \code{mfrm_comparison} (named list) with:
 \itemize{
 \item \code{table}: data.frame of model-level statistics (LogLik, AIC, BIC,
 Delta_AIC, AkaikeWeight, Delta_BIC, BICWeight, npar, nobs, WeightedN,
-ICSampleSize, ICSampleSizeBasis, Model, Method, Converged, ICComparable).
+ICSampleSize, ICSampleSizeBasis, Model, Method, Converged,
+InferenceReady, ConvergenceSeverity, ICComparable).
 \item \code{lrt}: data.frame with likelihood-ratio test result (only when two models
 are supplied and \code{nested = TRUE}). Contains \code{ChiSq}, \code{df}, \code{p_value}.
 \item \code{evidence_ratios}: data.frame of pairwise Akaike-weight ratios (Model1,

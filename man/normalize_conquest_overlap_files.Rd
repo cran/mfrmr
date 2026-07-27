@@ -78,7 +78,8 @@ parse raw ConQuest report text.
 
 The recommended workflow is:
 \enumerate{
-\item export an exact-overlap bundle with \code{\link[=build_conquest_overlap_bundle]{build_conquest_overlap_bundle()}};
+\item export a bundle for the documented comparison scope with
+\code{\link[=build_conquest_overlap_bundle]{build_conquest_overlap_bundle()}};
 \item extract the relevant ConQuest tables to CSV/TSV/TXT files;
 \item call \code{normalize_conquest_overlap_files()} on those files;
 \item pass the result to \code{\link[=review_conquest_overlap]{review_conquest_overlap()}}.

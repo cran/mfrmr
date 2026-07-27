@@ -44,7 +44,7 @@ uses \code{EstimateAligned} / \code{ErrorAligned}; \code{"unaligned"} uses \code
 \item{draw}{If \code{TRUE}, draw with base graphics. If \code{FALSE}, return an
 \code{mfrm_plot_data} object with reusable plot tables and metadata.}
 
-\item{...}{Reserved for future extensions.}
+\item{...}{Reserved for generic compatibility.}
 }
 \value{
 An \code{mfrm_plot_data} object. When \code{draw = TRUE}, the object is returned

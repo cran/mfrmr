@@ -34,6 +34,33 @@ test_that("mfrm_results builds a comprehensive object from a fitted model", {
   expect_true(nrow(sx$next_actions) > 0)
   expect_true(any(sx$next_actions$Area %in% "Triage") || any(sx$triage$Severity %in% "ok"))
   expect_true(any(grepl("mfrm_results", sx$reproducible_code$Code)))
+  expect_true(any(sx$plot_map$Type == "wright" & sx$plot_map$RequiredArtifact))
+  expect_true(any(sx$plot_map$Type == "fit_pathway" & sx$plot_map$Available))
+  expect_true(any(sx$plot_map$Type == "fit_pathway" &
+                    grepl("include_person = FALSE", sx$plot_map$Route, fixed = TRUE)))
+  expect_true(any(sx$plot_map$Type == "fit_pathway" &
+                    grepl("top_n_person = 0", sx$plot_map$Route, fixed = TRUE)))
+  expect_true(any(sx$plot_map$Type == "fit_pathway" &
+                    grepl("person_labels = 'none'", sx$plot_map$Route, fixed = TRUE)))
+  expect_true(any(sx$plot_map$Type == "fit_pathway" &
+                    grepl("facet_labels = 'flagged'", sx$plot_map$Route, fixed = TRUE)))
+  expect_true(any(sx$next_actions$Area == "Wright map"))
+
+  primary_plot <- plot(res, draw = FALSE)
+  expect_s3_class(primary_plot, "mfrm_plot_data")
+  expect_identical(primary_plot$name, "wright_map")
+  expect_identical(primary_plot$data$renderer, "native")
+  expect_true(primary_plot$data$show_ci)
+  expect_identical(primary_plot$data$uncertainty_display, "native_mfrmr_ci")
+  fit_bundle <- plot(res, type = "fit", draw = FALSE)
+  expect_s3_class(fit_bundle, "mfrm_plot_bundle")
+
+  brief <- summary(res, view = "brief")
+  expect_identical(brief$view, "brief")
+  brief_print <- capture.output(print(brief))
+  expect_true(any(grepl("Wright map", brief_print, fixed = TRUE)))
+  expect_false(any(grepl("Section status", brief_print, fixed = TRUE)))
+  expect_error(summary(res, view = "unknown"), "arg")
 
   bundle <- build_summary_table_bundle(res)
   expect_s3_class(bundle, "mfrm_summary_table_bundle")
@@ -43,6 +70,12 @@ test_that("mfrm_results builds a comprehensive object from a fitted model", {
 
   plt <- plot(res, type = "tables", draw = FALSE)
   expect_s3_class(plt, "mfrm_plot_data")
+  fit_pathway <- plot(
+    res, type = "fit_pathway", fit_stat = "Infit",
+    include_person = TRUE, top_n_person = 2, draw = FALSE
+  )
+  expect_s3_class(fit_pathway, "mfrm_plot_data")
+  expect_identical(fit_pathway$name, "fit_pathway")
 
   report <- mfrm_report(res, style = "qc")
   expect_s3_class(report, "mfrm_report")
@@ -65,6 +98,12 @@ test_that("mfrm_results builds a comprehensive object from a fitted model", {
   expect_true(any(report_summary$immediate_actions$Status %in% c("review", "caveat", "unavailable")))
   expect_true(any(report_summary$optional_sections$Status == "request_if_needed"))
   expect_true(any(report_summary$routes$Route == "report$first_screen"))
+  reader_summary <- summary(report, view = "reader")
+  expect_identical(reader_summary$view, "reader")
+  reader_print <- capture.output(print(reader_summary))
+  expect_true(any(grepl("Claim readiness", reader_print, fixed = TRUE)))
+  expect_false(any(grepl("Boundary index", reader_print, fixed = TRUE)))
+  expect_error(summary(report, view = "unknown"), "arg")
   report_summary_bundle <- build_summary_table_bundle(report)
   expect_s3_class(report_summary_bundle, "mfrm_summary_table_bundle")
   expect_identical(report_summary_bundle$summary_class, "summary.mfrm_report")
@@ -292,7 +331,7 @@ test_that("launch_mfrmr_viewer is a viewer over mfrm_results", {
   }
 })
 
-test_that("export_mfrm_results writes lightweight result downloads", {
+test_that("export_mfrm_results writes privacy-labelled analysis archives", {
   toy <- load_mfrmr_data("example_core")
   toy_small <- toy[toy$Person %in% unique(toy$Person)[1:6], , drop = FALSE]
   fit <- suppressWarnings(
@@ -309,12 +348,29 @@ test_that("export_mfrm_results writes lightweight result downloads", {
     mfrm_results(fit, include = c("fit", "diagnostics", "tables"))
   )
 
+  warning_dir <- file.path(tempdir(), paste0("mfrmr_results_export_warning_", sample.int(1e6, 1)))
+  warned_export <- NULL
+  expect_warning(
+    warned_export <- export_mfrm_results(
+      res,
+      output_dir = warning_dir,
+      prefix = "privacy",
+      include = "manifest",
+      overwrite = TRUE
+    ),
+    "analysis archive",
+    fixed = TRUE
+  )
+  expect_false(warned_export$summary$Deidentified[[1]])
+  expect_false(warned_export$summary$ShareableWithoutReview[[1]])
+
   out_dir <- file.path(tempdir(), paste0("mfrmr_results_export_", sample.int(1e6, 1)))
   exported <- export_mfrm_results(
     res,
     output_dir = out_dir,
     prefix = "results export",
-    overwrite = TRUE
+    overwrite = TRUE,
+    acknowledge_sensitive = TRUE
   )
 
   expect_s3_class(exported, "mfrm_results_export")
@@ -328,17 +384,41 @@ test_that("export_mfrm_results writes lightweight result downloads", {
   expect_true(any(exported$written_files$Component == "written_files"))
   expect_true(any(grepl("_table_", basename(exported$written_files$Path), fixed = TRUE)))
   expect_true(exported$summary$CsvWritten[1] >= 3L)
+  expect_identical(exported$summary$PrivacyClass[[1]], "analysis_archive")
+  expect_false(exported$summary$Deidentified[[1]])
+  expect_false(exported$summary$ShareableWithoutReview[[1]])
+  expect_true(exported$summary$SensitiveDataAcknowledged[[1]])
+  expect_true(is.data.frame(exported$privacy_notice))
 
   manifest_path <- exported$written_files$Path[exported$written_files$Component == "written_files"][1]
   manifest <- utils::read.csv(manifest_path, stringsAsFactors = FALSE)
-  expect_true(all(c("Component", "Format", "Path", "Note") %in% names(manifest)))
+  expect_true(all(c("Component", "Format", "Path", "Note", "DataHandling") %in% names(manifest)))
   expect_true(any(manifest$Component == "results_rds"))
+  expect_match(
+    manifest$DataHandling[manifest$Component == "results_rds"][1],
+    "complete_result_object",
+    fixed = TRUE
+  )
+
+  export_summary_path <- exported$written_files$Path[
+    exported$written_files$Component == "export_summary"
+  ][1]
+  export_summary <- utils::read.csv(export_summary_path, stringsAsFactors = FALSE)
+  expect_identical(export_summary$PrivacyClass[[1]], "analysis_archive")
+  expect_false(export_summary$Deidentified[[1]])
+  expect_false(export_summary$ShareableWithoutReview[[1]])
+  expect_true(export_summary$SensitiveDataAcknowledged[[1]])
 
   rds_path <- exported$written_files$Path[exported$written_files$Component == "results_rds"][1]
   expect_s3_class(readRDS(rds_path), "mfrm_results")
 
   expect_error(
-    export_mfrm_results(res, output_dir = out_dir, prefix = "results export"),
+    export_mfrm_results(
+      res,
+      output_dir = out_dir,
+      prefix = "results export",
+      acknowledge_sensitive = TRUE
+    ),
     "File already exists"
   )
 
@@ -348,9 +428,49 @@ test_that("export_mfrm_results writes lightweight result downloads", {
     output_dir = plot_dir,
     prefix = "plots",
     include = c("summary", "plots", "manifest"),
-    overwrite = TRUE
+    overwrite = TRUE,
+    acknowledge_sensitive = TRUE
   )
   expect_true(any(plot_export$written_files$Format == "png") || nrow(plot_export$plot_errors) > 0L)
+  if (any(plot_export$written_files$Component == "plot_wright")) {
+    expect_match(
+      plot_export$written_files$Note[plot_export$written_files$Component == "plot_wright"][1],
+      "Complete native Wright map",
+      fixed = TRUE
+    )
+  }
+
+  starter_dir <- file.path(tempdir(), paste0("mfrmr_results_export_starter_", sample.int(1e6, 1)))
+  starter_export <- export_mfrm_results(
+    res,
+    output_dir = starter_dir,
+    prefix = "starter",
+    preset = "starter",
+    overwrite = TRUE,
+    acknowledge_sensitive = TRUE
+  )
+  expect_identical(starter_export$preset, "starter")
+  expect_true(all(c("report", "plots") %in% starter_export$include))
+  expect_true(any(starter_export$written_files$Component == "starter_index"))
+  expect_true(any(starter_export$written_files$Component == "plot_wright"))
+  expect_match(
+    starter_export$written_files$Note[starter_export$written_files$Component == "plot_wright"][1],
+    "all fitted facet and step locations",
+    fixed = TRUE
+  )
+  expect_true(any(
+    starter_export$written_files$Component == "plot_fit_pathway" &
+      grepl("person rows included", starter_export$written_files$Note, fixed = TRUE)
+  ))
+  index_path <- starter_export$written_files$Path[
+    starter_export$written_files$Component == "starter_index"
+  ][1]
+  index_html <- paste(readLines(index_path, warn = FALSE), collapse = "\n")
+  expect_match(index_html, "required first figure", fixed = TRUE)
+  expect_match(index_html, "starter_plot_wright.png", fixed = TRUE)
+  expect_match(index_html, "starter_plot_fit_pathway.png", fixed = TRUE)
+  expect_match(index_html, "selected person rows", fixed = TRUE)
+  expect_match(index_html, "not a deidentified or automatically shareable export", fixed = TRUE)
 
   report_dir <- file.path(tempdir(), paste0("mfrmr_results_export_report_", sample.int(1e6, 1)))
   report_export <- export_mfrm_results(
@@ -358,7 +478,8 @@ test_that("export_mfrm_results writes lightweight result downloads", {
     output_dir = report_dir,
     prefix = "report",
     include = c("report", "manifest"),
-    overwrite = TRUE
+    overwrite = TRUE,
+    acknowledge_sensitive = TRUE
   )
   expect_s3_class(report_export, "mfrm_results_export")
   expect_true(any(report_export$written_files$Component == "report_first_screen"))
@@ -398,14 +519,21 @@ test_that("export_mfrm_results writes lightweight result downloads", {
 test_that("mfrm_results output modes and standard data-frame route work", {
   toy <- load_mfrmr_data("example_core")
   toy_small <- toy[toy$Person %in% unique(toy$Person)[1:6], , drop = FALSE]
+  measurement_data <- toy_small[, c("Person", "Rater", "Criterion", "Score")]
 
   summary_out <- suppressWarnings(
-    mfrm_results(toy_small, include = c("fit", "diagnostics"), output = "summary")
+    mfrm_results(measurement_data, include = c("fit", "diagnostics"), output = "summary")
   )
   expect_s3_class(summary_out, "summary.mfrm_results")
   expect_identical(summary_out$overview$InputMode[1], "data.frame")
   expect_true(nrow(summary_out$mapping) > 0)
   expect_true(any(grepl("fit_mfrm", summary_out$reproducible_code$Code)))
+  expect_true(any(grepl('method = "MML"', summary_out$reproducible_code$Code, fixed = TRUE)))
+
+  expect_error(
+    mfrm_results(toy_small, include = "fit", compute = "never"),
+    "ambiguous roles"
+  )
 
   fit <- suppressWarnings(
     fit_mfrm(
@@ -535,7 +663,8 @@ test_that("mfrm_results can attach explicit response-time review", {
     output_dir = out_dir,
     prefix = "rt",
     include = c("summary", "tables", "manifest"),
-    overwrite = TRUE
+    overwrite = TRUE,
+    acknowledge_sensitive = TRUE
   )
   expect_true(any(grepl("response_time_review", exported$written_files$Component,
                         fixed = TRUE)))
@@ -583,10 +712,13 @@ test_that("mfrm_results data-frame route treats ResponseTime as metadata", {
   toy <- load_mfrmr_data("example_core")
   toy_small <- toy[toy$Person %in% unique(toy$Person)[1:5], , drop = FALSE]
   toy_small$ResponseTime <- 10 + seq_len(nrow(toy_small)) %% 4
+  measurement_data <- toy_small[, c(
+    "Person", "Rater", "Criterion", "Score", "ResponseTime"
+  )]
 
   sx <- suppressWarnings(
     mfrm_results(
-      toy_small,
+      measurement_data,
       include = c("fit", "response_time"),
       output = "summary"
     )

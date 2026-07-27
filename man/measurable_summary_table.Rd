@@ -89,12 +89,14 @@ and low-count flag.}
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 t5 <- measurable_summary_table(fit)
 summary(t5)
 p_t5 <- plot(t5, draw = FALSE)
 p_t5$data$plot
+}
 }
 \seealso{
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=rating_scale_table]{rating_scale_table()}}, \code{\link[=describe_mfrm_data]{describe_mfrm_data()}},

@@ -6,8 +6,13 @@
 #'
 #' @section Canonical reporting route:
 #' For the clearest default route in `RSM` / `PCM`, use
+#' [describe_mfrm_data()] ->
 #' [fit_mfrm()] with `method = "MML"` ->
-#' [diagnose_mfrm()] with `diagnostic_mode = "both"` ->
+#' `summary(fit, profile = "fit")` ->
+#' `review <- summary(fit, profile = "facets")` ->
+#' the required native `plot(fit, type = "wright", show_ci = TRUE)` ->
+#' reuse `review$results$diagnostics`; call [diagnose_mfrm()] again only when
+#' residual PCA or other custom settings are needed ->
 #' [reporting_checklist()] ->
 #' [plot_qc_dashboard()] and, when flagged, [plot_marginal_fit()] /
 #' [plot_marginal_pairwise()] ->
@@ -15,13 +20,16 @@
 #' [build_summary_table_bundle()] -> [apa_table()] or
 #' [export_summary_appendix()].
 #'
-#' Use `JML` only when you explicitly want a faster exploratory pass and are
-#' willing to defer strict marginal follow-up and formal precision language to
-#' a later `MML` run.
+#' Use `JML` only when its fixed-person-parameter estimand is methodologically
+#' intended, for example for a JMLE-oriented external comparison, descriptive
+#' or exploratory work, or a design with substantial information per person.
+#' Do not select it merely as a faster substitute for `MML`: a later `MML` run
+#' targets a different estimand rather than serving as stricter follow-up to
+#' the same analysis.
 #'
 #' @section Canonical operational review route:
 #' When the main question is scale maintenance rather than manuscript reporting,
-#' branch after [diagnose_mfrm()] into:
+#' branch from `review$results$diagnostics` into:
 #' [review_mfrm_anchors()] and/or [detect_anchor_drift()] ->
 #' [build_equating_chain()] when adjacent-link review is needed ->
 #' [build_linking_review()] ->
@@ -36,7 +44,7 @@
 #'
 #' @section Canonical misfit case-review route:
 #' When the main question is which observations, facet levels, or pairwise
-#' structures deserve follow-up, branch after [diagnose_mfrm()] into:
+#' structures deserve follow-up, branch from `review$results$diagnostics` into:
 #' [build_misfit_casebook()] ->
 #' inspect `casebook$group_view_index`, `casebook$group_views`, and
 #' `summary(casebook)$plot_routes` for stable person / facet / wave rollups and
@@ -79,13 +87,26 @@
 #' `analysis_caveats`. Adjacent threshold estimates should still be treated as
 #' weakly identified when an intermediate category is unobserved.
 #'
+#' @section Planned assignment and structural missingness:
+#' A long-format table alone does not reveal whether an absent Person x facet
+#' cell was expected or never assigned. When a score-free assignment roster is
+#' available, pass it as `expected_design` to [describe_mfrm_data()]. The
+#' summary then separates expected-but-unobserved cells from unexpected
+#' observations and reports observed versus declared Person-facet graph
+#' components. Without a roster, structural missingness is explicitly marked
+#' as not assessed; mfrmr does not assume a complete crossing.
+#'
 #' @section Typical workflow:
-#' 1. Fit a model with [fit_mfrm()].
-#'    For final reporting, prefer `method = "MML"` unless you explicitly want
-#'    a fast exploratory JML pass.
-#' 2. (Optional) Use [run_mfrm_facets()] or [mfrmRFacets()] for a
+#' 1. Review the long-format data and intended score support with
+#'    [describe_mfrm_data()].
+#' 2. Fit a model with [fit_mfrm()]. Choose `MML` or `JML` from the prespecified
+#'    estimand and assumptions; do not select `JML` merely to shorten runtime.
+#' 3. Read `summary(fit, profile = "fit")`, then request
+#'    `summary(fit, profile = "facets")` and draw the required native Wright
+#'    map with `plot(fit, type = "wright", show_ci = TRUE)`.
+#' 4. (Optional) Use [run_mfrm_facets()] or [mfrmRFacets()] for a
 #'    legacy-compatible one-shot workflow wrapper.
-#' 3. For `RSM` / `PCM`, build diagnostics with [diagnose_mfrm()].
+#' 5. For `RSM` / `PCM`, build diagnostics with [diagnose_mfrm()].
 #'    For final reporting, prefer `diagnostic_mode = "both"` so the legacy
 #'    residual path and the strict marginal screen remain visible side by side.
 #'    For bounded `GPCM`, diagnostics are now available through
@@ -116,20 +137,20 @@
 #'    recovery checks plus caveated role-based design evaluation, population
 #'    forecasting, diagnostic-screening, and signal-detection helpers.
 #'    Caveated APA/QC/export bundles are available for sensitivity reporting,
-#'    while score-side FACETS helpers remain outside the validated `GPCM`
+#'    while score-side FACETS helpers remain outside the documented `GPCM`
 #'    boundary. Use
 #'    [gpcm_capability_matrix()] as the formal capability map
 #'    before branching into less common helpers.
-#' 4. (Optional, `RSM` / `PCM`; bounded `GPCM` with caveat) Estimate
+#' 6. (Optional, `RSM` / `PCM`; bounded `GPCM` with caveat) Estimate
 #'    interaction bias with [estimate_bias()].
-#' 5. Choose a downstream branch:
+#' 7. Choose a downstream branch:
 #'    [reporting_checklist()] for direct report preparation, or
 #'    [build_weighting_review()] for Rasch-versus-bounded-`GPCM`
 #'    weighting review, or [build_misfit_casebook()] / [build_linking_review()]
 #'    for operational case review. For bounded `GPCM`, use
 #'    [build_linking_review()] only as an exploratory index over direct
 #'    anchor/drift/chain evidence.
-#' 6. Generate reporting bundles:
+#' 8. Generate reporting bundles:
 #'    [build_summary_table_bundle()], [apa_table()],
 #'    [export_summary_appendix()], [build_fixed_reports()],
 #'    [build_visual_summaries()]. For bounded `GPCM`, use the APA, visual,
@@ -137,16 +158,16 @@
 #'    surfaces; full score-side FACETS review stays blocked, while
 #'    diagnostic/signal-detection design screening has its own caveated
 #'    operating-characteristic route.
-#' 7. (Optional, `RSM` / `PCM`) Review report completeness with
+#' 9. (Optional, `RSM` / `PCM`) Review report completeness with
 #'    [reference_case_review()]. Use `facets_output_contract_review()` only when you
 #'    explicitly need the compatibility layer.
-#' 8. (Optional, `RSM` / `PCM`) For operational linking follow-up, combine
+#' 10. (Optional, `RSM` / `PCM`) For operational linking follow-up, combine
 #'    [review_mfrm_anchors()], [detect_anchor_drift()], and
 #'    [build_equating_chain()] inside [build_linking_review()] before
 #'    exporting appendix-style tables.
-#' 9. (Optional) Check packaged reference cases with
+#' 11. (Optional) Check packaged reference cases with
 #'    [reference_case_benchmark()] when you want package-side reference checks.
-#' 10. (Optional) For design planning or future scoring, move to the
+#' 12. (Optional) For design planning or future scoring, move to the
 #'    simulation/prediction layer:
 #'    [build_mfrm_sim_spec()] / [extract_mfrm_sim_spec()] ->
 #'    [evaluate_mfrm_recovery()] -> [assess_mfrm_recovery()] /
@@ -167,7 +188,7 @@
 #'    scenario forecast helper, not the latent-regression estimator itself.
 #'    Prediction export still requires actual prediction objects in addition to
 #'    `include = "predictions"`.
-#' 11. Use `summary()` for compact text checks and `plot()` (or dedicated plot
+#' 13. Use `summary()` for compact text checks and `plot()` (or dedicated plot
 #'    helpers) for base-R visual diagnostics.
 #'
 #' @section Three practical routes:
@@ -193,7 +214,7 @@
 #'   `"Method Section"` rows -> [build_apa_outputs()] ->
 #'   [build_summary_table_bundle()] -> [apa_table()] or
 #'   [export_summary_appendix()].
-#'   First-release `GPCM`:
+#'   bounded `GPCM`:
 #'   [reporting_checklist()] -> direct table/plot helpers ->
 #'   [build_apa_outputs()] / [build_visual_summaries()] ->
 #'   [export_mfrm_bundle()] with `gpcm_boundary` caveats.
@@ -213,7 +234,7 @@
 #'   Here again, [predict_mfrm_population()] is the
 #'   scenario-level forecast helper, whereas [predict_mfrm_units()] /
 #'   [sample_mfrm_plausible_values()] are the scoring layer. Prediction export
-#'   requires actual prediction objects. First-release `GPCM` now supports
+#'   requires actual prediction objects. Bounded `GPCM` supports
 #'   direct data generation via
 #'   [build_mfrm_sim_spec()], [extract_mfrm_sim_spec()], and
 #'   [simulate_mfrm_data()], [evaluate_mfrm_recovery()],
@@ -222,8 +243,8 @@
 #'   residual diagnostics, and direct curve/report helpers. The current
 #'   planning layer remains role-based for two
 #'   non-person facets even though estimation itself supports arbitrary facet
-#'   counts; future arbitrary-facet planning fields should be treated as
-#'   design metadata rather than finished public behavior.
+#'   counts. Additional arbitrary-facet fields are structural design metadata,
+#'   not Monte Carlo performance results.
 #'
 #' @section Interpreting output:
 #' This help page is a map, not an estimator:

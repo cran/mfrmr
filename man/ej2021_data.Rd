@@ -8,7 +8,7 @@
 \alias{ej2021_study1_itercal}
 \alias{ej2021_study2_itercal}
 \alias{ej2021_combined_itercal}
-\title{Simulated MFRM datasets based on Eckes and Jin (2021)}
+\title{Legacy synthetic MFRM datasets inspired by Eckes and Jin (2021)}
 \format{
 A data.frame with 5 columns:
 \describe{
@@ -39,8 +39,6 @@ All datasets include one row per observed rating.
 \details{
 Available data objects:
 \itemize{
-\item \code{mfrmr_example_core}
-\item \code{mfrmr_example_bias}
 \item \code{ej2021_study1}
 \item \code{ej2021_study2}
 \item \code{ej2021_combined}
@@ -53,7 +51,9 @@ Naming convention:
 \itemize{
 \item \code{study1} / \code{study2}: separate simulation studies
 \item \code{combined}: row-bind of study1 and study2
-\item \verb{_itercal}: iterative-calibration variant
+\item \verb{_itercal}: legacy synthetic sensitivity variant. These objects can differ
+in observed rows as well as scores and should not be interpreted as a
+controlled one-parameter recalibration.
 }
 
 Use \code{\link[=load_mfrmr_data]{load_mfrmr_data()}} for programmatic selection by key.
@@ -70,22 +70,41 @@ study2_itercal \tab 3341 \tab 206 \tab 12 \tab 9 \cr
 combined_itercal \tab 5183 \tab 307 \tab 18 \tab 12
 }
 Score range: 1--4 (four-category rating scale).
+
+For the combined rows, \code{Persons} and \code{Raters} count unique raw labels.
+Treating the two Study labels as distinct namespaces would instead give 513
+person labels and 30 rater labels, but would leave two unlinked components.
 }
 
-\section{Simulation design}{
+\section{Provenance and limits}{
 
-Person ability is drawn from N(0, 1).  Rater severity effects span
-approximately -0.5 to +0.5 logits.  Criterion difficulty effects span
-approximately -0.3 to +0.3 logits.  Scores are generated from the
-resulting linear predictor plus Gaussian noise, then discretized into
-four categories.  The \verb{_itercal} variants use a second iteration of
-calibrated rater severity parameters.
+These are legacy synthetic datasets whose stored responses reproduce the
+dimensions described above. The exact response-generation code and random
+seed are not available, so the objects must not be used as parameter-recovery
+evidence or as evidence for a particular generating distribution. The
+separately stored \verb{_itercal} objects can differ in observed rows as well as
+scores; they are legacy variants, not empirical calibration standards or a
+controlled one-parameter recalibration.
+}
+
+\section{Combined-data caution}{
+
+The \code{combined} objects reuse \code{P001}--\code{P206} and \code{R01}--\code{R12} across the two
+study labels. A combined analysis is meaningful only when those labels encode
+an intended cross-study identity and an explicit anchor or linking design
+establishes a common scale. Prefixing \code{Person} and \code{Rater} by \code{Study} removes
+accidental label collisions, but it creates disconnected study components
+and does not by itself establish a common scale. Analyze the studies
+separately unless the linking design has been specified and reviewed. The
+combined datasets are not beginner workflow examples or direct-fit examples.
 }
 
 \section{Interpreting output}{
 
-Each dataset is already in long format and can be passed directly to
-\code{\link[=fit_mfrm]{fit_mfrm()}} after confirming column-role mapping.
+The study-specific datasets are in long format and can be passed to
+\code{\link[=fit_mfrm]{fit_mfrm()}} after confirming column-role mapping. The \code{combined} objects
+require a reviewed identity and anchor/linking design before a joint fit;
+row-binding or prefixing identifiers alone does not create a common scale.
 }
 
 \section{Typical workflow}{

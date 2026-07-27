@@ -17,9 +17,9 @@
 #'   named vector, or one-row data frame. Names may use canonical variables
 #'   (`n_person`, `n_rater`, `n_criterion`, `raters_per_person`), current
 #'   public aliases (for example `n_judge`, `n_task`, `judge_per_person`), or
-#'   role keywords (`person`, `rater`, `criterion`, `assignment`). The
-#'   schema-only future branch input `design$facets = c(person = ..., judge =
-#'   ..., task = ...)` is also accepted for the currently exposed facet keys.
+#'   role keywords (`person`, `rater`, `criterion`, `assignment`). The nested
+#'   named-facet form `design$facets = c(person = ..., judge = ..., task = ...)`
+#'   is also accepted for the supported person/rater/criterion design.
 #'   Do not specify the same variable through both `design` and the scalar
 #'   count arguments.
 #' @param reps Number of replications used in the forecast simulation.
@@ -113,12 +113,11 @@
 #'   `n_person`/`n_rater`/`n_criterion`/`raters_per_person`
 #' - `design_descriptor`: role-based description of design variables carried
 #'   from the underlying planning object
-#' - `planning_scope`: explicit record of the current planning contract,
-#'   including a `facet_manifest` and future-planner scaffold marker
+#' - `planning_scope`: explicit record of the supported planning contract,
+#'   including a `facet_manifest`
 #' - `planning_constraints`: explicit record of mutable/locked design variables
-#' - `planning_schema`: combined planner-schema contract carrying the role
-#'   table, current boundary, mutability map, facet manifest, and a
-#'   schema-only future facet-count table
+#' - `planning_schema`: structured planning metadata carrying the role
+#'   table, supported boundary, mutability map, and facet manifest
 #' - `gpcm_boundary`: bounded-`GPCM` caveat row when a `GPCM` forecast route is
 #'   used
 #' - `settings`: forecasting settings
@@ -324,11 +323,11 @@ predict_mfrm_population <- function(fit = NULL,
 #' - `design_descriptor`: role-based description of design variables
 #' - `planning_scope`: explicit record of the current planning contract
 #' - `planning_constraints`: explicit record of mutable/locked design variables
-#' - `planning_schema`: combined planner-schema contract
+#' - `planning_schema`: structured planning metadata
 #' - `gpcm_boundary`: bounded-`GPCM` caveat row when present
-#' - `future_branch_active_summary`: compact deterministic summary of the
-#'   schema-only future arbitrary-facet planning branch embedded in the current
-#'   planning schema
+#' - `structural_design_review`: deterministic structural review of the
+#'   named-facet design grid; it is not
+#'   a forecast-uncertainty result
 #' - `ademp`: simulation-study metadata
 #' - `notes`: interpretation notes
 #' @seealso [predict_mfrm_population()]
@@ -378,7 +377,7 @@ summary.mfrm_population_prediction <- function(object, digits = 3, ...) {
     planning_constraints = object$planning_constraints %||% object$settings$planning_constraints %||% simulation_planning_constraints(object$sim_spec),
     planning_schema = object$planning_schema %||% object$settings$planning_schema %||% simulation_planning_schema(object$sim_spec),
     gpcm_boundary = object$gpcm_boundary %||% data.frame(),
-    future_branch_active_summary = simulation_compact_future_branch_active_summary(
+    structural_design_review = simulation_compact_structural_design_review_summary(
       object,
       digits = digits
     ),
@@ -398,10 +397,10 @@ summary.mfrm_population_prediction <- function(object, digits = 3, ...) {
   if (length(schema_note) > 0L && !schema_note %in% out$notes) {
     out$notes <- c(out$notes, schema_note)
   }
-  if (inherits(out$future_branch_active_summary, "summary.mfrm_future_branch_active_branch")) {
+  if (inherits(out$structural_design_review, "summary.mfrm_structural_design_review")) {
     out$notes <- c(
       out$notes,
-      "A deterministic future arbitrary-facet planning scaffold is embedded in `future_branch_active_summary`; it reports structural bookkeeping and conservative recommendation logic, not forecast uncertainty."
+      "The structural design review reports deterministic bookkeeping and conservative design guidance, not forecast uncertainty."
     )
   }
   out$notes <- unique(out$notes)
@@ -436,8 +435,8 @@ print.summary.mfrm_population_prediction <- function(x, ...) {
     cat("\nForecast (preview)\n")
     print(round_df(as.data.frame(preview_df(x$forecast))), row.names = FALSE)
   }
-  print_compact_future_branch_active_summary(
-    x$future_branch_active_summary %||% NULL,
+  print_compact_structural_design_review_summary(
+    x$structural_design_review %||% NULL,
     digits = digits
   )
   if (is.list(x$ademp) && length(x$ademp) > 0L) {
@@ -1141,14 +1140,12 @@ prediction_resolve_fit_method <- function(fit) {
 #' @examples
 #' toy <- load_mfrmr_data("example_core")
 #' keep_people <- unique(toy$Person)[1:18]
-#' toy_fit <- suppressWarnings(
-#'   fit_mfrm(
-#'     toy[toy$Person %in% keep_people, , drop = FALSE],
-#'     "Person", c("Rater", "Criterion"), "Score",
-#'     method = "MML",
-#'     quad_points = 5,
-#'     maxit = 30
-#'   )
+#' toy_fit <- fit_mfrm(
+#'   toy[toy$Person %in% keep_people, , drop = FALSE],
+#'   "Person", c("Rater", "Criterion"), "Score",
+#'   method = "MML",
+#'   quad_points = 5,
+#'   maxit = 30
 #' )
 #' raters <- unique(toy$Rater)[1:2]
 #' criteria <- unique(toy$Criterion)[1:2]
@@ -1340,14 +1337,12 @@ predict_mfrm_units <- function(fit,
 #' @examples
 #' toy <- load_mfrmr_data("example_core")
 #' keep_people <- unique(toy$Person)[1:18]
-#' toy_fit <- suppressWarnings(
-#'   fit_mfrm(
-#'     toy[toy$Person %in% keep_people, , drop = FALSE],
-#'     "Person", c("Rater", "Criterion"), "Score",
-#'     method = "MML",
-#'     quad_points = 5,
-#'     maxit = 30
-#'   )
+#' toy_fit <- fit_mfrm(
+#'   toy[toy$Person %in% keep_people, , drop = FALSE],
+#'   "Person", c("Rater", "Criterion"), "Score",
+#'   method = "MML",
+#'   quad_points = 5,
+#'   maxit = 30
 #' )
 #' new_units <- data.frame(
 #'   Person = c("NEW01", "NEW01"),
@@ -1522,14 +1517,12 @@ print.summary.mfrm_unit_prediction <- function(x, ...) {
 #' @examples
 #' toy <- load_mfrmr_data("example_core")
 #' keep_people <- unique(toy$Person)[1:18]
-#' toy_fit <- suppressWarnings(
-#'   fit_mfrm(
-#'     toy[toy$Person %in% keep_people, , drop = FALSE],
-#'     "Person", c("Rater", "Criterion"), "Score",
-#'     method = "MML",
-#'     quad_points = 5,
-#'     maxit = 30
-#'   )
+#' toy_fit <- fit_mfrm(
+#'   toy[toy$Person %in% keep_people, , drop = FALSE],
+#'   "Person", c("Rater", "Criterion"), "Score",
+#'   method = "MML",
+#'   quad_points = 5,
+#'   maxit = 30
 #' )
 #' new_units <- data.frame(
 #'   Person = c("NEW01", "NEW01"),
@@ -1616,14 +1609,12 @@ sample_mfrm_plausible_values <- function(fit,
 #' @examples
 #' toy <- load_mfrmr_data("example_core")
 #' keep_people <- unique(toy$Person)[1:18]
-#' toy_fit <- suppressWarnings(
-#'   fit_mfrm(
-#'     toy[toy$Person %in% keep_people, , drop = FALSE],
-#'     "Person", c("Rater", "Criterion"), "Score",
-#'     method = "MML",
-#'     quad_points = 5,
-#'     maxit = 30
-#'   )
+#' toy_fit <- fit_mfrm(
+#'   toy[toy$Person %in% keep_people, , drop = FALSE],
+#'   "Person", c("Rater", "Criterion"), "Score",
+#'   method = "MML",
+#'   quad_points = 5,
+#'   maxit = 30
 #' )
 #' new_units <- data.frame(
 #'   Person = c("NEW01", "NEW01"),

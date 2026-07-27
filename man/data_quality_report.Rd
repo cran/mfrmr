@@ -94,10 +94,14 @@ final estimation/reporting.
 }
 
 \examples{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
+toy <- load_mfrmr_data("example_operational")
+fit <- fit_mfrm(
+  toy, "Person", c("Rater", "Criterion"), "Score",
+  method = "MML", quad_points = 7, maxit = 30
+)
 out <- data_quality_report(
-  fit, data = toy, person = "Person",
+  fit,
+  data = toy, person = "Person",
   facets = c("Rater", "Criterion"), score = "Score"
 )
 summary(out)

@@ -38,7 +38,7 @@ test_that("summary(diag) carries the MnSq misfit threshold pair", {
   expect_equal(unname(s$misfit_thresholds), c(0.5, 1.5))
 })
 
-test_that("summary(diag) auto-flag names worst MnSq element", {
+test_that("summary(diag) keeps MnSq details structured while brief warnings suppress IDs", {
   # Force a misfit-flagged diagnostic by injecting an Outfit > 1.5 row.
   poisoned <- .diag
   poisoned$fit$Outfit[1] <- 2.4
@@ -47,17 +47,23 @@ test_that("summary(diag) auto-flag names worst MnSq element", {
   poisoned$fit$InfitZSTD[1] <- 2.6
   s <- summary(poisoned)
   joined <- paste(s$key_warnings, collapse = " | ")
-  expect_true(grepl("MnSq misfit", joined))
-  # Specific element-level naming: "Facet:Level (Infit=..., Outfit=...)"
-  expect_true(grepl("Outfit=2\\.4", joined))
+  expect_true(grepl("MnSq screening flagged 2 element", joined, fixed = TRUE))
+  expect_false(grepl("Outfit=2.4", joined, fixed = TRUE))
+  expect_true(is.data.frame(s$misfit_flagged))
+  expect_true(any(abs(s$misfit_flagged$Outfit - 2.4) < 1e-12, na.rm = TRUE))
 })
 
 test_that("print(summary(diag)) emits the new blocks without error", {
   s <- summary(.diag)
   out <- utils::capture.output(print(s))
   joined <- paste(out, collapse = "\n")
-  expect_true(grepl("Facet variability", joined))
-  expect_true(grepl("Inter-rater agreement summary", joined))
+  expect_true(grepl("Facet precision and spread", joined, fixed = TRUE))
+  expect_true(grepl("Further detail", joined, fixed = TRUE))
+  expect_false(grepl("Inter-rater agreement summary", joined, fixed = TRUE))
+
+  full <- paste(utils::capture.output(print(summary(.diag, detail = "full"))), collapse = "\n")
+  expect_true(grepl("Facet variability", full, fixed = TRUE))
+  expect_true(grepl("Inter-rater agreement summary", full, fixed = TRUE))
 })
 
 # --- summary.mfrm_fit -----------------------------------------------------

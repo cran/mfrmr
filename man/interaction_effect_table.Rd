@@ -20,7 +20,7 @@ model-estimated deviations from the additive main-effects MFRM, not the
 residual screening statistics returned by \code{\link[=estimate_bias]{estimate_bias()}}.
 }
 \details{
-The current release supports two-way interactions between non-person facets,
+mfrmr supports two-way interactions between non-person facets,
 for example \code{facet_interactions = "Rater:Criterion"}. Each interaction matrix
 is identified by zero marginal sums across both participating facets, so the
 interaction estimates are separable from the two main effects. Positive values
@@ -30,6 +30,16 @@ additive model; negative values indicate lower-than-expected scores.
 Use this table for confirmatory model review after specifying the facet pair
 of substantive interest. For exploratory screening without adding parameters
 to the fitted model, use \code{\link[=estimate_bias]{estimate_bias()}} or \code{\link[=estimate_all_bias]{estimate_all_bias()}}.
+}
+\examples{
+toy <- load_mfrmr_data("example_operational")
+fit <- fit_mfrm(
+  toy, person = "Person", facets = c("Rater", "Criterion"),
+  score = "Score", method = "MML", model = "RSM",
+  facet_interactions = "Rater:Criterion",
+  quad_points = 7, maxit = 30
+)
+head(interaction_effect_table(fit))
 }
 \seealso{
 \code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=estimate_bias]{estimate_bias()}}, \code{\link[=compare_mfrm]{compare_mfrm()}}

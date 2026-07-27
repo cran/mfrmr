@@ -3,7 +3,7 @@
 # ==============================================================================
 #
 # Core helpers for `fit_mfrm()`-style pipelines. Split out of
-# `mfrm_core.R` for 0.1.6 so the data-validation, indexing, and
+# `mfrm_core.R` so the data-validation, indexing, and
 # print / formatting utilities live in a single browseable file.
 # Functions are internal (no @export); they are called directly by
 # `mfrm_estimate()` and the surrounding orchestration helpers.
@@ -92,25 +92,76 @@ prepare_mfrm_data <- function(data, person_col, facet_cols, score_col,
          call. = FALSE)
   }
 
-  # 0.1.6 second-pass polish: optional pre-processing step that converts
+  # Optional pre-processing step that converts
   # FACETS / SPSS / SAS sentinel values to NA so the drop_na() downstream
   # behaves intuitively. Accepts TRUE / "default" for the conventional
   # set, or a character vector of custom codes. Recoding is restricted
   # to person / facets / score (weight retains its original meaning).
   missing_audit <- NULL
   if (!is.null(missing_codes) && !isFALSE(missing_codes)) {
-    codes <- if (isTRUE(missing_codes) ||
-                 (is.character(missing_codes) &&
-                  length(missing_codes) == 1L &&
-                  identical(tolower(missing_codes), "default"))) {
+    default_missing_codes <- isTRUE(missing_codes) ||
+      (is.character(missing_codes) &&
+       length(missing_codes) == 1L &&
+       identical(tolower(missing_codes), "default"))
+    codes <- if (default_missing_codes) {
       c("99", "999", "-1", "N", "NA", "n/a", ".", "")
     } else {
       as.character(missing_codes)
     }
     recode_cols <- c(person_col, facet_cols, score_col)
-    data <- recode_missing_codes(data, columns = recode_cols,
-                                 codes = codes, verbose = FALSE)
-    missing_audit <- attr(data, "mfrm_missing_recoding")
+    # The conventional set contains short tokens such as "N" and numeric
+    # strings such as "99" that can be legitimate person or facet labels.
+    # Applying it indiscriminately to identifier columns can silently delete a
+    # complete person or facet level. Therefore the convenience policy acts on
+    # the score column only. An explicit character vector remains an explicit
+    # request to apply those codes across all selected model columns.
+    applied_cols <- if (default_missing_codes) score_col else recode_cols
+    data <- recode_missing_codes(
+      data,
+      columns = applied_cols,
+      codes = codes,
+      verbose = FALSE
+    )
+    applied_audit <- attr(data, "mfrm_missing_recoding")
+    missing_audit <- data.frame(
+      Column = recode_cols,
+      Replaced = 0L,
+      Scope = ifelse(
+        recode_cols %in% applied_cols,
+        if (default_missing_codes) "default_score_only" else "explicit_all_model_columns",
+        "identifier_preserved_by_default"
+      ),
+      stringsAsFactors = FALSE
+    )
+    if (is.data.frame(applied_audit) && nrow(applied_audit) > 0L) {
+      matched <- match(applied_audit$Column, missing_audit$Column)
+      keep <- !is.na(matched)
+      missing_audit$Replaced[matched[keep]] <- as.integer(applied_audit$Replaced[keep])
+    }
+    attr(data, "mfrm_missing_recoding") <- missing_audit
+    replaced_n <- if (is.data.frame(missing_audit) &&
+                      "Replaced" %in% names(missing_audit)) {
+      sum(suppressWarnings(as.integer(missing_audit$Replaced)), na.rm = TRUE)
+    } else {
+      0L
+    }
+    if (replaced_n > 0L) {
+      replaced_cols <- missing_audit$Column[
+        suppressWarnings(as.integer(missing_audit$Replaced)) > 0L
+      ]
+      add_preparation_note(
+        stage = "missing_code_recode",
+        condition = "declared_missing_codes_replaced",
+        severity = "review",
+        count = replaced_n,
+        affected = paste(replaced_cols, collapse = ", "),
+        message = paste0(
+          "Replaced ", replaced_n,
+          " declared missing-code value(s) with NA before row filtering."
+        ),
+        action = "Inspect `fit$prep$missing_recoding` (or `describe_mfrm_data(...)$missing_recoding`) before reporting exclusions."
+      )
+    }
   }
   if (any(duplicated(names(data)))) {
     dupes <- unique(names(data)[duplicated(names(data))])
@@ -151,7 +202,10 @@ prepare_mfrm_data <- function(data, person_col, facet_cols, score_col,
   # real fractional scores like 1.5 or 2.75 while accepting float
   # representation noise for integer codes.
   score_tol <- 1e-6
-  bad_score <- is.na(score_num) & !is.na(raw_score) & nzchar(trimws(raw_score))
+  nonfinite_score <- is.nan(score_num) |
+    (!is.na(score_num) & !is.finite(score_num))
+  bad_score <- is.na(score_num) & !is.nan(score_num) &
+    !is.na(raw_score) & nzchar(trimws(raw_score))
 
   # If essentially every non-empty value is non-numeric (e.g. "low", "medium",
   # "high" text labels), the later `drop_na` would silently remove every row
@@ -166,6 +220,17 @@ prepare_mfrm_data <- function(data, person_col, facet_cols, score_col,
       paste(shQuote(examples), collapse = ", "),
       ") rather than ordered integer category codes. Recode to integers ",
       "(for example 0/1 or 1:5) before calling fit_mfrm().",
+      call. = FALSE
+    )
+  }
+
+  if (any(nonfinite_score)) {
+    examples <- utils::head(unique(raw_score[nonfinite_score]), 5L)
+    stop(
+      "`Score` must contain finite ordered integer category codes. ",
+      "Non-finite value(s) were found: ",
+      paste(examples, collapse = ", "), ". ",
+      "Recode or remove these rows before fitting.",
       call. = FALSE
     )
   }
@@ -211,6 +276,29 @@ prepare_mfrm_data <- function(data, person_col, facet_cols, score_col,
       across(all_of(facet_cols), ~ trimws(as.character(.x))),
       Score = score_num
     )
+  blank_person <- !is.na(df$Person) & !nzchar(df$Person)
+  blank_facets <- vapply(facet_cols, function(facet) {
+    sum(!is.na(df[[facet]]) & !nzchar(df[[facet]]))
+  }, integer(1))
+  if (any(blank_person) || any(blank_facets > 0L)) {
+    blank_facet_names <- names(blank_facets)[blank_facets > 0L]
+    blank_facet_labels <- if (length(blank_facet_names) > 0L) {
+      paste0(blank_facet_names, " (", blank_facets[blank_facet_names], ")")
+    } else {
+      character(0)
+    }
+    affected <- c(
+      if (any(blank_person)) paste0(person_col, " (", sum(blank_person), ")"),
+      blank_facet_labels
+    )
+    stop(
+      "Blank person or facet identifier(s) were found after trimming whitespace: ",
+      paste(affected, collapse = ", "), ". ",
+      "Fill, remove, or explicitly recode these identifiers before fitting; ",
+      "blank labels cannot define measurement levels.",
+      call. = FALSE
+    )
+  }
   # Detect Person / facet IDs that gained / lost surrounding whitespace
   # in the trim and warn so users do not silently end up with a "P01"
   # vs " P01 " split.
@@ -256,7 +344,20 @@ prepare_mfrm_data <- function(data, person_col, facet_cols, score_col,
     df <- df |> mutate(Weight = 1)
   } else {
     weight_num <- suppressWarnings(as.numeric(raw_weight))
-    bad_weight <- is.na(weight_num) & !is.na(raw_weight) & nzchar(trimws(raw_weight))
+    nonfinite_weight <- is.nan(weight_num) |
+      (!is.na(weight_num) & !is.finite(weight_num))
+    if (any(nonfinite_weight)) {
+      examples <- utils::head(unique(raw_weight[nonfinite_weight]), 5L)
+      stop(
+        "`Weight` must contain finite numeric values. Non-finite value(s) ",
+        "were found: ", paste(examples, collapse = ", "), ". ",
+        "Use finite weights or remove the weight column; non-positive finite ",
+        "weights are excluded during data preparation.",
+        call. = FALSE
+      )
+    }
+    bad_weight <- is.na(weight_num) & !is.nan(weight_num) &
+      !is.na(raw_weight) & nzchar(trimws(raw_weight))
     if (any(bad_weight)) {
       bad_weight_n <- sum(bad_weight)
       bad_weight_msg <- paste0(
@@ -328,8 +429,10 @@ prepare_mfrm_data <- function(data, person_col, facet_cols, score_col,
                 duplicated(df[, key_cols, drop = FALSE], fromLast = TRUE)
     n_dup <- sum(dup_mask)
     if (n_dup > 0L) {
+      n_dup_cells <- nrow(unique(df[dup_mask, key_cols, drop = FALSE]))
       duplicate_msg <- paste0(
-        "Detected ", n_dup, " duplicate row(s) sharing the same Person x ",
+        "Detected ", n_dup, " row(s) across ", n_dup_cells,
+        " duplicated Person x ",
         "(", paste(facet_cols, collapse = ", "), ") combination. MFRM ",
         "assumes one observation per cell; aggregate, deduplicate, or ",
         "introduce a distinguishing facet column before fitting. Continuing ",
@@ -344,10 +447,15 @@ prepare_mfrm_data <- function(data, person_col, facet_cols, score_col,
         message = duplicate_msg,
         action = "Aggregate, deduplicate, or add a distinguishing facet before interpreting the fit."
       )
-      warning(
-        duplicate_msg,
-        call. = FALSE
+      duplicate_warning_announced <- isTRUE(
+        getOption("mfrmr._duplicate_warning_announced", FALSE)
       )
+      if (!duplicate_warning_announced) {
+        warning(duplicate_msg, call. = FALSE)
+        if (!is.null(getOption("mfrmr._duplicate_warning_announced"))) {
+          options(mfrmr._duplicate_warning_announced = TRUE)
+        }
+      }
     }
   }
 
@@ -441,16 +549,47 @@ prepare_mfrm_data <- function(data, person_col, facet_cols, score_col,
       all(score_vals %in% expected_vals)
     if (!identical(score_vals, expected_vals) && !isTRUE(boundary_only_gap)) {
       recoded_vals <- seq(rating_min, rating_min + length(score_vals) - 1L)
-      warning(
+      suspected_missing_codes <- intersect(score_vals, c(-1L, 99L, 999L))
+      sentinel_note <- if (length(suspected_missing_codes) > 0L &&
+                           (is.null(missing_codes) || isFALSE(missing_codes))) {
+        paste0(
+          " Value(s) ", paste(suspected_missing_codes, collapse = ", "),
+          " are commonly used as missing-value codes in FACETS, SPSS, or SAS exports. ",
+          "If they mean missing data here, refit with `missing_codes = TRUE` or an explicit code vector."
+        )
+      } else {
+        ""
+      }
+      recode_msg <- paste0(
         "Observed `Score` categories were non-consecutive (",
         paste(score_vals, collapse = ", "),
         ") and were recoded internally to a contiguous scale (",
         paste(recoded_vals, collapse = ", "),
-        ") because `keep_original = FALSE`. Inspect the returned `score_map` ",
-        "(for example `fit$prep$score_map`) to see the mapping or set ",
-        "`keep_original = TRUE` to preserve the original labels.",
-        call. = FALSE
+        ") because `keep_original = FALSE`. Inspect `fit$prep$score_map` ",
+        "before interpreting category labels, or set `keep_original = TRUE` ",
+        "to preserve the declared score support.", sentinel_note
       )
+      add_preparation_note(
+        stage = "score_support",
+        condition = "score_categories_recoded",
+        severity = "warning",
+        count = length(score_vals),
+        affected = score_col,
+        message = recode_msg,
+        action = if (length(suspected_missing_codes) > 0L &&
+                     (is.null(missing_codes) || isFALSE(missing_codes))) {
+          "Confirm whether common sentinel values represent missing data; then set `missing_codes`, `keep_original`, and the rating range explicitly."
+        } else {
+          "Inspect `fit$prep$score_map` and document the mapping, or preserve the intended support explicitly."
+        }
+      )
+      score_recode_announced <- isTRUE(getOption("mfrmr._score_recode_announced"))
+      if (!score_recode_announced) {
+        warning(recode_msg, call. = FALSE)
+        if (!is.null(getOption("mfrmr._score_recode_announced"))) {
+          options(mfrmr._score_recode_announced = TRUE)
+        }
+      }
       df <- df |>
         mutate(Score = match(Score, score_vals) + rating_min - 1)
       rating_max <- rating_min + length(score_vals) - 1
@@ -504,25 +643,22 @@ prepare_mfrm_data <- function(data, person_col, facet_cols, score_col,
   facet_levels <- lapply(facet_names, function(f) levels(df[[f]]))
   names(facet_levels) <- facet_names
 
-  # Minimum data requirement (0.1.6 polish). MFRM needs at least two
-  # persons and enough observations to identify the parameters; below
-  # the threshold, the resulting fit is degenerate but `fit_mfrm()`
-  # would still return an object. Surface the limit as an explicit
-  # stop so callers get a targeted message.
+  # Minimum data requirements. Surface these limits as targeted errors before
+  # estimation starts.
   n_person <- length(levels(df$Person))
   if (n_person < 2L) {
     stop(
-      "fit_mfrm() requires at least 2 persons to identify a measurement model",
-      " (got ", n_person, "). Combine datasets, check the `person` column, or",
-      " use a single-person item analysis via `psych::irt.fa()` instead.",
+      "fit_mfrm() requires at least two persons (got ", n_person, "). ",
+      "Check the `person` column or provide data from multiple persons; ",
+      "a one-person dataset cannot identify person and facet effects in this model.",
       call. = FALSE
     )
   }
   if (nrow(df) < 10L) {
     stop(
-      "fit_mfrm() requires at least 10 observations (got ", nrow(df), "). ",
-      "This is below any Rasch-family sample-size guidance for stable ",
-      "estimates; see `?fit_mfrm` 'Fixed effects assumption' for context.",
+      "fit_mfrm() requires at least 10 response rows (got ", nrow(df), "). ",
+      "This software minimum does not imply that 10 rows are sufficient for ",
+      "stable estimates; evaluate data support for the intended model.",
       call. = FALSE
     )
   }

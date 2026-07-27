@@ -363,7 +363,7 @@ plot-first route, see
 <h2>Minimal setup</h2>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
 <span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a></span>
-<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>toy <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_core&quot;</span>)</span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>toy <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_operational&quot;</span>)</span>
 <span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a></span>
 <span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="co"># The vignette uses compact quadrature so optional local execution stays fast.</span></span>
 <span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="co"># For final manuscript reporting, refit with the package default or a higher</span></span>
@@ -450,15 +450,59 @@ blocks are available.</li>
 wording drift.</li>
 </ul>
 </div>
+<div id="publication-readiness-boundary" class="section level2">
+<h2>Publication-readiness boundary</h2>
+<p>The APA route is strongest when it is used as a structured drafting
+and review workflow. It is not a one-click manuscript generator. Before
+moving text into a journal article, inspect the following objects
+together:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>res <span class="ot">&lt;-</span> <span class="fu">mfrm_results</span>(fit, <span class="at">include =</span> <span class="st">&quot;publication&quot;</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>report <span class="ot">&lt;-</span> <span class="fu">mfrm_report</span>(res, <span class="at">style =</span> <span class="st">&quot;apa&quot;</span>)</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>report<span class="sc">$</span>first_screen</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>report<span class="sc">$</span>claim_readiness</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>report<span class="sc">$</span>report_gaps</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a><span class="fu">head</span>(report<span class="sc">$</span>template_index[, <span class="fu">c</span>(</span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>  <span class="st">&quot;Area&quot;</span>, <span class="st">&quot;Topic&quot;</span>, <span class="st">&quot;BoundaryType&quot;</span>, <span class="st">&quot;ClaimStrength&quot;</span>, <span class="st">&quot;RecommendedUse&quot;</span></span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>)])</span></code></pre></div>
+<p>For a high-stakes manuscript, treat <code>build_apa_outputs()</code>
+and <code>mfrm_report(style = &quot;apa&quot;)</code> as a conservative drafting
+template. Stronger journal claims still require a defensible study
+design, cited measurement rationale, adequate precision evidence, linked
+or balanced design evidence where relevant, and substantive
+interpretation written in the language of the target journal. Do not
+report <code>DraftReady</code>, <code>ReadyForAPA</code>, or
+<code>ClaimStrength</code> as if they were formal acceptance decisions;
+use them to decide what wording is currently safe and which caveats must
+remain visible.</p>
+<p>When the target is a local HTML/CSV/replay bundle rather than an
+interactive review object, use <code>export_mfrm_bundle()</code>
+directly from the fitted object. The result is a potentially identifying
+analysis archive, not a deidentified sharing package:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>bundle <span class="ot">&lt;-</span> <span class="fu">export_mfrm_bundle</span>(</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>  fit,</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag,</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>  <span class="at">output_dir =</span> <span class="st">&quot;mfrmr-report-bundle&quot;</span>,</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>  <span class="at">prefix =</span> <span class="st">&quot;analysis01&quot;</span>,</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>  <span class="at">include =</span> <span class="fu">c</span>(</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>    <span class="st">&quot;core_tables&quot;</span>, <span class="st">&quot;checklist&quot;</span>, <span class="st">&quot;dashboard&quot;</span>, <span class="st">&quot;apa&quot;</span>,</span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>    <span class="st">&quot;summary_tables&quot;</span>, <span class="st">&quot;manifest&quot;</span>, <span class="st">&quot;script&quot;</span>, <span class="st">&quot;html&quot;</span></span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>  ),</span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>  <span class="at">overwrite =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>  <span class="at">acknowledge_sensitive =</span> <span class="cn">TRUE</span></span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a>)</span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a></span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a>bundle<span class="sc">$</span>written_files[bundle<span class="sc">$</span>written_files<span class="sc">$</span>Format <span class="sc">==</span> <span class="st">&quot;html&quot;</span>, ]</span></code></pre></div>
+</div>
 <div id="build-tables-from-the-same-contract" class="section level2">
 <h2>4. Build tables from the same contract</h2>
 <p>Use <code>apa_table()</code> when you want reproducible handoff
 tables without rebuilding captions or notes by hand.</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>tbl_summary <span class="ot">&lt;-</span> <span class="fu">apa_table</span>(fit, <span class="at">which =</span> <span class="st">&quot;summary&quot;</span>)</span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>tbl_reliability <span class="ot">&lt;-</span> <span class="fu">apa_table</span>(fit, <span class="at">which =</span> <span class="st">&quot;reliability&quot;</span>, <span class="at">diagnostics =</span> diag)</span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a></span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>tbl_summary<span class="sc">$</span>caption</span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>tbl_reliability<span class="sc">$</span>note</span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>tbl_summary <span class="ot">&lt;-</span> <span class="fu">apa_table</span>(fit, <span class="at">which =</span> <span class="st">&quot;summary&quot;</span>)</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>tbl_reliability <span class="ot">&lt;-</span> <span class="fu">apa_table</span>(fit, <span class="at">which =</span> <span class="st">&quot;reliability&quot;</span>, <span class="at">diagnostics =</span> diag)</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a></span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>tbl_summary<span class="sc">$</span>caption</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>tbl_reliability<span class="sc">$</span>note</span></code></pre></div>
 <p>The actual table data are stored in <code>tbl_summary$table</code>
 and <code>tbl_reliability$table</code>.</p>
 </div>
@@ -466,14 +510,14 @@ and <code>tbl_reliability$table</code>.</p>
 <h2>5. Add figure-ready visual data</h2>
 <p>For reporting workflows, <code>build_visual_summaries()</code> is the
 bridge between statistical results and figure-ready plot data.</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>vis <span class="ot">&lt;-</span> <span class="fu">build_visual_summaries</span>(</span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>  fit,</span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag,</span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>  <span class="at">threshold_profile =</span> <span class="st">&quot;standard&quot;</span></span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>)</span>
-<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a></span>
-<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a><span class="fu">names</span>(vis)</span>
-<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a><span class="fu">names</span>(vis<span class="sc">$</span>warning_map)</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>vis <span class="ot">&lt;-</span> <span class="fu">build_visual_summaries</span>(</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>  fit,</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag,</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>  <span class="at">threshold_profile =</span> <span class="st">&quot;standard&quot;</span></span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>)</span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a></span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a><span class="fu">names</span>(vis)</span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a><span class="fu">names</span>(vis<span class="sc">$</span>warning_map)</span></code></pre></div>
 </div>
 <div id="reporting-route-when-interaction-screening-matters" class="section level2">
 <h2>6. Reporting route when interaction screening matters</h2>
@@ -481,23 +525,70 @@ bridge between statistical results and figure-ready plot data.</p>
 conservative. The package treats these outputs as screening-oriented
 unless the current precision and design evidence justify stronger
 claims.</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>bias_df <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_bias&quot;</span>)</span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a></span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>fit_bias <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>  bias_df,</span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
-<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
-<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
-<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">7</span></span>
-<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a>)</span>
-<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a></span>
-<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a>diag_bias <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit_bias, <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>)</span>
-<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a>bias <span class="ot">&lt;-</span> <span class="fu">estimate_bias</span>(fit_bias, diag_bias, <span class="at">facet_a =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">facet_b =</span> <span class="st">&quot;Criterion&quot;</span>)</span>
-<span id="cb8-15"><a href="#cb8-15" tabindex="-1"></a>apa_bias <span class="ot">&lt;-</span> <span class="fu">build_apa_outputs</span>(fit_bias, <span class="at">diagnostics =</span> diag_bias, <span class="at">bias_results =</span> bias)</span>
-<span id="cb8-16"><a href="#cb8-16" tabindex="-1"></a></span>
-<span id="cb8-17"><a href="#cb8-17" tabindex="-1"></a>apa_bias<span class="sc">$</span>section_map[, <span class="fu">c</span>(<span class="st">&quot;SectionId&quot;</span>, <span class="st">&quot;Available&quot;</span>, <span class="st">&quot;Heading&quot;</span>)]</span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>bias_df <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_bias&quot;</span>)</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a></span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>fit_bias <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>  bias_df,</span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
+<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
+<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">7</span></span>
+<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a>)</span>
+<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a></span>
+<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a>diag_bias <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit_bias, <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>)</span>
+<span id="cb10-14"><a href="#cb10-14" tabindex="-1"></a>bias <span class="ot">&lt;-</span> <span class="fu">estimate_bias</span>(fit_bias, diag_bias, <span class="at">facet_a =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">facet_b =</span> <span class="st">&quot;Criterion&quot;</span>)</span>
+<span id="cb10-15"><a href="#cb10-15" tabindex="-1"></a>apa_bias <span class="ot">&lt;-</span> <span class="fu">build_apa_outputs</span>(fit_bias, <span class="at">diagnostics =</span> diag_bias, <span class="at">bias_results =</span> bias)</span>
+<span id="cb10-16"><a href="#cb10-16" tabindex="-1"></a></span>
+<span id="cb10-17"><a href="#cb10-17" tabindex="-1"></a>apa_bias<span class="sc">$</span>section_map[, <span class="fu">c</span>(<span class="st">&quot;SectionId&quot;</span>, <span class="st">&quot;Available&quot;</span>, <span class="st">&quot;Heading&quot;</span>)]</span></code></pre></div>
+</div>
+<div id="keep-model-comparison-as-a-reporting-review" class="section level2">
+<h2>7. Keep model comparison as a reporting review</h2>
+<p>When candidate models are fitted, separate same-data comparison from
+the scoring interpretation. <code>compare_mfrm()</code> provides the
+fit-statistic table; <code>build_model_choice_review()</code> attaches
+model roles, downstream route boundaries, and cautious wording. Convert
+the review to a summary-table bundle when the comparison needs to appear
+in an appendix or exported report.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>cmp <span class="ot">&lt;-</span> <span class="fu">compare_mfrm</span>(<span class="at">RSM =</span> fit_rsm, <span class="at">PCM =</span> fit_pcm, <span class="at">GPCM =</span> fit_gpcm)</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>review <span class="ot">&lt;-</span> <span class="fu">build_model_choice_review</span>(</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>  <span class="at">RSM =</span> fit_rsm,</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>  <span class="at">PCM =</span> fit_pcm,</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>  <span class="at">GPCM =</span> fit_gpcm,</span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>  <span class="at">run_weighting_review =</span> <span class="cn">TRUE</span></span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>)</span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>model_choice_tables <span class="ot">&lt;-</span> <span class="fu">build_summary_table_bundle</span>(</span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>  review,</span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>  <span class="at">appendix_preset =</span> <span class="st">&quot;recommended&quot;</span></span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>)</span>
+<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a></span>
+<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a>cmp[, <span class="fu">c</span>(<span class="st">&quot;Model&quot;</span>, <span class="st">&quot;LogLik&quot;</span>, <span class="st">&quot;AIC&quot;</span>, <span class="st">&quot;BIC&quot;</span>, <span class="st">&quot;ICComparable&quot;</span>)]</span>
+<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a>model_choice_tables<span class="sc">$</span>table_index</span></code></pre></div>
+<p>For bounded <code>GPCM</code>, report the fit as a slope-aware
+sensitivity model unless the score interpretation explicitly justifies
+discrimination-based reweighting. Do not use AIC/BIC alone as an
+operational-scoring decision.</p>
+</div>
+<div id="report-the-latent-regression-population-model" class="section level2">
+<h2>8. Report the latent-regression population model</h2>
+<p>Latent-regression fits provide reportable results through the fit
+summary: <code>population_overview</code>,
+<code>population_coefficients</code>, <code>population_coding</code>,
+and <code>caveats</code>. Coefficients are conditional-normal
+population-model parameters, not post-hoc regressions on EAP or MLE
+scores.</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>s_pop <span class="ot">&lt;-</span> <span class="fu">summary</span>(fit_pop)</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>s_pop<span class="sc">$</span>population_overview</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>s_pop<span class="sc">$</span>population_coefficients</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>s_pop<span class="sc">$</span>population_coding</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>s_pop<span class="sc">$</span>caveats</span></code></pre></div>
+<p>Keep latent-regression claims within the documented one-dimensional
+<code>MML</code> <code>RSM</code> / <code>PCM</code> route. Report the
+population formula, coding/contrast handling, population policy, and any
+omitted-person or omitted-row counts; do not imply multidimensional
+latent regression, Wald-test inference, or posterior predictive checking
+from these tables alone.</p>
 </div>
 <div id="recommended-sequence" class="section level2">
 <h2>Recommended sequence</h2>
@@ -510,6 +601,9 @@ claims.</p>
 <li><code>build_apa_outputs()</code></li>
 <li><code>apa_table()</code></li>
 <li><code>build_visual_summaries()</code></li>
+<li><code>compare_mfrm()</code> -&gt;
+<code>build_model_choice_review()</code> when candidate-model
+comparisons are part of the manuscript</li>
 </ol>
 </div>
 <div id="related-help" class="section level2">

@@ -51,6 +51,7 @@ a \code{fit_mfrm(..., facet_shrinkage = "empirical_bayes")} run, so that
 \code{ShrinkageFactor} columns.
 }
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                  method = "JML", maxit = 30)
@@ -62,6 +63,7 @@ head(p$data$table)
 #   prior pulled the estimate strongly; this is most pronounced for
 #   small-N levels. ShrinkageFactor near 1 means most of the
 #   movement was driven by the prior rather than the data.
+}
 }
 \seealso{
 \code{\link[=apply_empirical_bayes_shrinkage]{apply_empirical_bayes_shrinkage()}},

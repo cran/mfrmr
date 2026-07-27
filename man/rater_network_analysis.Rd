@@ -101,7 +101,8 @@ and should not be read as an MFRM severity logit.
 \donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 30)
+  method = "JML", maxit = 30
+)
 if (requireNamespace("igraph", quietly = TRUE)) {
   rn <- rater_network_analysis(fit, mode = "severity_direction")
   rn$summary

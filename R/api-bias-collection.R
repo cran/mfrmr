@@ -34,8 +34,11 @@
 #'
 #' The `summary` table aggregates results across pairs:
 #' - `Rows`: number of interaction cells estimated
-#' - `Significant`: count of cells with \eqn{|t| \ge 2}
+#' - `ScreenPositive`: count of cells with \eqn{|t| \ge 2}
+#' - `Significant`: backward-compatible alias for `ScreenPositive`
 #' - `MeanAbsBias`: average absolute bias magnitude (logits)
+#' - `FormalInferenceEligible` / `PrimaryReportingEligible`: always `FALSE`;
+#'   these conditional plug-in interaction statistics are screening evidence
 #'
 #' Per-pair failures (e.g., insufficient data for a sparse pair) are
 #' captured in `errors` rather than stopping the entire batch.
@@ -53,7 +56,7 @@
 #' 1. Fit with [fit_mfrm()] and diagnose with [diagnose_mfrm()]. For
 #'    `RSM` / `PCM` reporting runs, prefer `method = "MML"` plus
 #'    `diagnostic_mode = "both"` in the diagnostics call.
-#' 2. Run `estimate_all_bias()` to compute app-style multi-pair interactions.
+#' 2. Run `estimate_all_bias()` to compute the requested multi-pair interactions.
 #' 3. Pass the resulting `by_pair` list into [reporting_checklist()] or
 #'    [facet_quality_dashboard()].
 #'
@@ -66,7 +69,7 @@
 #'                 method = "MML", quad_points = 7, maxit = 30)
 #' diag <- diagnose_mfrm(fit, residual_pca = "none", diagnostic_mode = "both")
 #' bias_all <- estimate_all_bias(fit, diagnostics = diag)
-#' bias_all$summary[, c("Interaction", "Rows", "Significant")]
+#' bias_all$summary[, c("Interaction", "Rows", "ScreenPositive")]
 #' }
 #' @export
 estimate_all_bias <- function(fit,
@@ -145,9 +148,15 @@ estimate_all_bias <- function(fit,
         Order = length(facets),
         Facets = paste(facets, collapse = " x "),
         Rows = 0L,
+        ScreenPositive = 0L,
         Significant = 0L,
         MaxAbsT = NA_real_,
         MeanAbsBias = NA_real_,
+        SupportsFormalInference = FALSE,
+        FormalInferenceEligible = FALSE,
+        PrimaryReportingEligible = FALSE,
+        ClassificationSystem = "screening",
+        ReportingUse = "screening_only",
         Kept = FALSE,
         Error = msg,
         stringsAsFactors = FALSE
@@ -178,14 +187,21 @@ estimate_all_bias <- function(fit,
       by_pair[[label]] <- bias_obj
     }
 
+    screen_positive <- sum(is.finite(t_vals) & abs(t_vals) >= 2, na.rm = TRUE)
     summary_rows[[i]] <- data.frame(
       Interaction = label,
       Order = length(facets),
       Facets = paste(facets, collapse = " x "),
       Rows = nrow(tbl),
-      Significant = sum(is.finite(t_vals) & abs(t_vals) >= 2, na.rm = TRUE),
+      ScreenPositive = screen_positive,
+      Significant = screen_positive,
       MaxAbsT = if (any(is.finite(t_vals))) max(abs(t_vals), na.rm = TRUE) else NA_real_,
       MeanAbsBias = if (any(is.finite(bias_vals))) mean(abs(bias_vals), na.rm = TRUE) else NA_real_,
+      SupportsFormalInference = FALSE,
+      FormalInferenceEligible = FALSE,
+      PrimaryReportingEligible = FALSE,
+      ClassificationSystem = "screening",
+      ReportingUse = "screening_only",
       Kept = kept,
       Error = "",
       stringsAsFactors = FALSE
@@ -198,9 +214,15 @@ estimate_all_bias <- function(fit,
       Order = integer(0),
       Facets = character(0),
       Rows = integer(0),
+      ScreenPositive = integer(0),
       Significant = integer(0),
       MaxAbsT = numeric(0),
       MeanAbsBias = numeric(0),
+      SupportsFormalInference = logical(0),
+      FormalInferenceEligible = logical(0),
+      PrimaryReportingEligible = logical(0),
+      ClassificationSystem = character(0),
+      ReportingUse = character(0),
       Kept = logical(0),
       Error = character(0),
       stringsAsFactors = FALSE

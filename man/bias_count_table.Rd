@@ -102,6 +102,7 @@ cells.}
 }
 
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_bias")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "none")
@@ -120,6 +121,7 @@ if (interactive()) {
     palette = c(count = "#2b8cbe", low = "#cb181d"),
     label_angle = 45
   )
+}
 }
 }
 \seealso{

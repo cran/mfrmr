@@ -2,7 +2,7 @@
 % Please edit documentation in R/api-simulation.R
 \name{plot.mfrm_diagnostic_screening}
 \alias{plot.mfrm_diagnostic_screening}
-\title{Plot a diagnostic-screening validation study}
+\title{Plot a diagnostic-screening simulation study}
 \usage{
 \method{plot}{mfrm_diagnostic_screening}(
   x,
@@ -35,7 +35,7 @@ labels. Public design aliases are accepted.}
 
 \item{draw}{Logical; if \code{FALSE}, return the plot-data bundle without drawing.}
 
-\item{...}{Reserved for future extensions.}
+\item{...}{Reserved for generic compatibility.}
 }
 \value{
 An \code{mfrm_plot_data} object with reusable metadata, a long-form

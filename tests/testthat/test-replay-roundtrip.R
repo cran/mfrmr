@@ -24,7 +24,8 @@ bundle_and_source <- function(fit, data, prefix = "rt_test") {
     output_dir = ".",
     prefix = prefix,
     include = c("core_tables", "manifest", "script"),
-    data = data
+    data = data,
+    acknowledge_sensitive = TRUE
   )
   e <- new.env(parent = globalenv())
   suppressMessages(suppressWarnings(
@@ -80,7 +81,7 @@ test_that("replay records a package-version mismatch warning", {
   old_wd <- getwd(); on.exit(setwd(old_wd), add = TRUE); setwd(td2)
   export_mfrm_bundle(.fit, output_dir = ".", prefix = "rt_ver2",
                      include = c("core_tables","manifest","script"),
-                     data = .toy)
+                     data = .toy, acknowledge_sensitive = TRUE)
   script_lines <- readLines(file.path(td2, "rt_ver2_replay.R"))
   # The version-mismatch guard is emitted near the top of the script.
   has_guard <- any(grepl("Recorded mfrmr version", script_lines))

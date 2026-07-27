@@ -12,7 +12,7 @@ build_conquest_overlap_bundle(
   overwrite = FALSE,
   quad_points = 7L,
   maxit = 40L,
-  reltol = 1e-06
+  reltol = 1e-09
 )
 }
 \arguments{
@@ -33,9 +33,13 @@ written. When \code{NULL}, the helper returns the in-memory bundle only.}
 \item{quad_points}{Quadrature points used when \code{fit = NULL} and the
 overlap case is fit on the fly.}
 
-\item{maxit}{Maximum optimizer iterations used when \code{fit = NULL}.}
+\item{maxit}{Maximum optimizer iterations used when \code{fit = NULL}. The
+fitted object's actual value is recorded in the returned summary and
+settings.}
 
-\item{reltol}{Relative convergence tolerance used when \code{fit = NULL}.}
+\item{reltol}{Relative convergence tolerance used when \code{fit = NULL}.
+Default \code{1e-9}. The fitted object's actual value is recorded in the
+returned summary and settings.}
 }
 \value{
 A named list with class \code{mfrm_conquest_overlap_bundle}.
@@ -60,22 +64,37 @@ narrow:
 The returned bundle standardizes the responses to \verb{\{0, 1\}}, pivots them to a
 one-row-per-person wide CSV, stores the corresponding person covariates, and
 records the \code{mfrmr} estimates that should be compared externally.
+It also records the actual \code{mfrmr} optimizer controls, MML engine, terminal
+gradient, convergence status and severity, and inference-readiness decision.
+A fit that is not inference-ready remains available for convergence review,
+but its estimates should not be used for inferential comparison with
+ConQuest until the convergence issue is resolved and the model is refit.
 
 The \code{conquest_command} component is a conservative starting template, not a
 guaranteed version-invariant automation. The \code{conquest_output_contract}
 component records which requested external output should feed each
 normalized review table.
-Use \code{\link[=normalize_conquest_overlap_files]{normalize_conquest_overlap_files()}} or
-\code{\link[=normalize_conquest_overlap_tables]{normalize_conquest_overlap_tables()}} and then \code{\link[=review_conquest_overlap]{review_conquest_overlap()}} only
-after the matching ConQuest run has been executed externally and the relevant
-output tables have been extracted. The bundle and command template alone are
-not external validation evidence.
+Use \code{normalize_conquest_overlap_exports()} for the four CSV files requested
+by the generated command. \code{\link[=normalize_conquest_overlap_files]{normalize_conquest_overlap_files()}} and
+\code{\link[=normalize_conquest_overlap_tables]{normalize_conquest_overlap_tables()}} remain available for already-extracted
+custom tables. Then use \code{\link[=review_conquest_overlap]{review_conquest_overlap()}} only after the matching
+ConQuest run has been executed externally. The bundle and command template
+alone are not external validation evidence.
+
+This is a controlled analysis bundle, not a deidentified or automatically
+shareable export. Response files contain person identifiers and responses;
+the person-data file contains identifiers and covariates; and case-EAP files
+contain identifiers and person-level estimates. When files are written, the
+helper emits a warning and writes an artifact-level privacy notice. Apply the
+study's data-handling policy before sharing or moving any bundle file.
 }
 \section{Comparison targets}{
 
 \itemize{
-\item regression slope: compare directly;
-\item residual variance \code{sigma2}: compare directly;
+\item regression slope: compare after confirming identical covariate coding and
+population-model parameterization;
+\item residual variance \code{sigma2}: compare after confirming the same latent-scale
+and variance parameterization;
 \item item estimates: compare after centering because the Rasch location origin
 remains constraint-dependent;
 \item case EAP estimates: compare as posterior summaries under the fitted
@@ -87,8 +106,8 @@ population model.
 
 The returned object has class \code{mfrm_conquest_overlap_bundle} and includes:
 \itemize{
-\item \code{summary}: one-row scope summary with posterior-basis and
-population-model review fields
+\item \code{summary}: one-row scope summary with posterior-basis, population-model,
+optimizer-control, and convergence-review fields
 \item \code{comparison_targets}: comparison rules for the exported tables
 \item \code{conquest_output_contract}: requested ConQuest outputs and review handoff
 \item \code{response_long}: long-format binary response data used by the bundle
@@ -100,7 +119,9 @@ population-model review fields
 \item \code{mfrmr_case_eap}: posterior EAP summaries for the fitted persons
 \item \code{conquest_command}: conservative ConQuest command template
 \item \code{written_files}: file inventory when \code{output_dir} is supplied
-\item \code{settings}: bundle settings
+\item \code{privacy_notice}: artifact-level sensitive-data inventory
+\item \code{settings}: bundle settings, including the actual \code{mfrmr} fit controls
+and convergence state
 \item \code{notes}: interpretation notes
 }
 }
@@ -109,14 +130,15 @@ population-model review fields
 \donttest{
 bundle <- build_conquest_overlap_bundle(quad_points = 3, maxit = 30)
 bundle$summary[, c("Case", "Facet", "Covariate", "Persons", "Items")]
+summary(bundle)$mfrmr_fit_status
 summary(bundle)$conquest_command_scope
 summary(bundle)$conquest_output_contract
 cat(substr(bundle$conquest_command, 1, 120))
 }
 }
 \seealso{
-\code{\link[=normalize_conquest_overlap_files]{normalize_conquest_overlap_files()}},
-\code{\link[=normalize_conquest_overlap_tables]{normalize_conquest_overlap_tables()}}, \code{\link[=review_conquest_overlap]{review_conquest_overlap()}},
+\code{\link[=normalize_conquest_overlap_files]{normalize_conquest_overlap_files()}}, \code{\link[=normalize_conquest_overlap_tables]{normalize_conquest_overlap_tables()}},
+\code{\link[=review_conquest_overlap]{review_conquest_overlap()}},
 \code{\link[=reference_case_benchmark]{reference_case_benchmark()}}, \code{\link[=build_mfrm_replay_script]{build_mfrm_replay_script()}},
 \code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}}
 }

@@ -21,12 +21,13 @@ build_summary_table_bundle(
 \code{mfrm_reporting_checklist}, \code{mfrm_apa_outputs},
 \code{mfrm_design_evaluation}, \code{mfrm_signal_detection},
 \code{mfrm_recovery_simulation}, \code{mfrm_recovery_assessment},
-\code{mfrm_population_prediction}, \code{mfrm_future_branch_active_branch},
+\code{mfrm_population_prediction},
 \code{mfrm_facets_run}, \code{mfrm_bias}, \code{mfrm_anchor_review},
-\code{mfrm_linking_review}, \code{mfrm_misfit_casebook}, \code{mfrm_weighting_review},
+\code{mfrm_linking_review}, \code{mfrm_misfit_casebook},
+\code{mfrm_model_choice_review}, \code{mfrm_weighting_review},
 \code{mfrm_unit_prediction}, or \code{mfrm_plausible_values} object, one of their
-\code{summary()} outputs, or a \code{summary.mfrmr_recovery_validation} object from
-the packaged validation protocol.}
+\code{summary()} outputs, or a compatible precomputed recovery-evidence
+summary.}
 
 \item{which}{Optional character vector selecting a subset of named tables.}
 
@@ -96,14 +97,15 @@ manuscript-facing subset before plotting or export.
 \item \code{\link[=evaluate_mfrm_signal_detection]{evaluate_mfrm_signal_detection()}} or \code{summary(sig_eval)}
 \item \code{\link[=evaluate_mfrm_recovery]{evaluate_mfrm_recovery()}} or \code{summary(rec)}
 \item \code{\link[=assess_mfrm_recovery]{assess_mfrm_recovery()}} or \code{summary(rec_assessment)}
-\item \code{summary(validation)} from \code{recovery-validation.R}
+\item a compatible precomputed recovery-evidence summary
 \item \code{\link[=predict_mfrm_population]{predict_mfrm_population()}} or \code{summary(pred)}
-\item \code{planning_schema$future_branch_active_branch} or \code{summary(...)}
+\item the \code{structural_design_review} component of a design or prediction summary
 \item \code{\link[=run_mfrm_facets]{run_mfrm_facets()}} or \code{summary(out)}
 \item \code{\link[=estimate_bias]{estimate_bias()}} or \code{summary(bias)}
 \item \code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}} or \code{summary(review)}
 \item \code{\link[=build_linking_review]{build_linking_review()}} or \code{summary(review)}
 \item \code{\link[=build_misfit_casebook]{build_misfit_casebook()}} or \code{summary(casebook)}
+\item \code{\link[=build_model_choice_review]{build_model_choice_review()}} or \code{summary(review)}
 \item \code{\link[=build_weighting_review]{build_weighting_review()}} or \code{summary(review)}
 \item \code{\link[=predict_mfrm_units]{predict_mfrm_units()}} or \code{summary(pred_units)}
 \item \code{\link[=sample_mfrm_plausible_values]{sample_mfrm_plausible_values()}} or \code{summary(pv)}
@@ -127,13 +129,13 @@ classified as diagnostics and stay in \code{recommended} appendix subsets.
 \item recovery-assessment and recovery-validation summaries expose
 \code{diagnostic_reporting_notes} before \code{diagnostic_review} or
 \code{diagnostic_oc_summary} so fit/separation caveats can be reported without
-treating them as recovery or release gates.
+treating them as direct evidence of parameter recovery.
 \item recovery-validation summaries expose \code{condition_reporting_notes} before
 \code{condition_summary} so GPCM generator stress and sparse score support are
 not mistaken for recovery-metric failures.
 \item precision-review summaries expose \code{fit_separation_basis} so fit,
-ZSTD, separation/reliability/strata, and QC thresholds remain separate
-reporting surfaces rather than implicit validation gates.
+ZSTD, separation/reliability/strata, and QC thresholds remain distinct
+forms of evidence rather than interchangeable summaries.
 \item fit-measure and FACETS fit-review summaries expose df/ZSTD sensitivity
 tables under precision-review roles, keeping MnSq status, ZSTD
 standardization, and external FACETS matching distinct in appendix
@@ -141,6 +143,10 @@ handoffs.
 \item latent-regression fit summaries expose \code{population_coding} in the methods
 appendix role so categorical levels, contrasts, and encoded columns can be
 documented with the coefficient table.
+\item model-choice-review summaries expose \code{comparison_table}, \code{model_roles},
+\code{downstream_routes}, and \code{report_templates} so RSM/PCM versus bounded
+\code{GPCM} comparisons remain tied to their equal-weighting, sensitivity, and
+reporting-boundary roles.
 }
 }
 
@@ -168,29 +174,16 @@ plan.
 \donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 30)
+  method = "JML", maxit = 30
+)
 bundle <- build_summary_table_bundle(fit)
 bundle$table_index
 summary(bundle)$role_summary
 }
 
-# Recovery-validation output can be converted to appendix-ready tables.
-\dontrun{
-source(system.file("validation", "recovery-validation.R", package = "mfrmr"))
-validation <- mfrmr_run_recovery_validation(
-  case_ids = c("gpcm_slope_profile", "gpcm_high_dispersion_sparse"),
-  quick = TRUE,
-  seed = 20260525
-)
-validation_bundle <- build_summary_table_bundle(summary(validation))
-validation_bundle$tables$reading_order
-validation_bundle$tables$topline_release_decision
-validation_bundle$tables$condition_reporting_notes
-validation_bundle$tables$condition_summary
-validation_bundle$tables$diagnostic_reporting_notes
-}
 }
 \seealso{
 \code{\link[=summary]{summary()}}, \code{\link[=apa_table]{apa_table()}}, \code{\link[=reporting_checklist]{reporting_checklist()}},
-\code{\link[=build_apa_outputs]{build_apa_outputs()}}
+\code{\link[=build_apa_outputs]{build_apa_outputs()}}, \code{\link[=compare_mfrm]{compare_mfrm()}}, \code{\link[=build_model_choice_review]{build_model_choice_review()}},
+\code{\link[=build_weighting_review]{build_weighting_review()}}
 }

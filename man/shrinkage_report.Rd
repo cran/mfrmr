@@ -20,11 +20,13 @@ Returns \code{NULL} (with a message) when no shrinkage has been applied
 so callers can probe without error.
 }
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                 method = "JML", maxit = 30,
                 facet_shrinkage = "empirical_bayes")
 shrinkage_report(fit)
+}
 }
 \seealso{
 \code{\link[=apply_empirical_bayes_shrinkage]{apply_empirical_bayes_shrinkage()}}, \code{\link[=fit_mfrm]{fit_mfrm()}}.

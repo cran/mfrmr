@@ -1,7 +1,6 @@
 ---
-title: "mfrmr cheatsheet (2 pages)"
-author: "mfrmr authors"
-date: "`r format(Sys.Date(), '%Y-%m-%d')`"
+title: "mfrmr quick reference"
+author: "mfrmr package"
 output:
   pdf_document:
     latex_engine: xelatex
@@ -17,38 +16,87 @@ knitr::opts_chunk$set(
 )
 ```
 
-# Quick reference: mfrmr 0.2.0
+# Data to fitted results
 
-A two-page reference for the fit / diagnose / report loop in mfrmr.
+A compact reference for the data review / fit / summary / plot / diagnose /
+report loop in mfrmr.
 Every snippet assumes `library(mfrmr)` and a long-format
 `data.frame` with `Person`, one or more facet columns, and `Score`.
 
-## 1. Fit
+## 1. Check data roles, score support, and missing codes
+
+```{r data-review}
+toy <- load_mfrmr_data("example_operational")
+
+data_review <- describe_mfrm_data(
+  toy, person = "Person", facets = c("Rater", "Criterion"),
+  score = "Score", rating_min = 1, rating_max = 4
+)
+summary(data_review)
+
+# Declare only codes that mean missing in the study.
+dirty_review <- describe_mfrm_data(
+  dirty_data, "Person", c("Rater", "Criterion"), "Score",
+  missing_codes = c(99, 999, -1, "N/A", "")
+)
+```
+
+Confirm retained and zero-count categories and inspect the score map. Use the
+same `rating_min`, `rating_max`, `keep_original`, and `missing_codes` decisions
+in `fit_mfrm()`.
+
+\newpage
+
+## 2. Fit
 
 ```{r fit}
-toy <- load_mfrmr_data("example_core")
-
 fit <- fit_mfrm(
   toy,
   person = "Person",
   facets = c("Rater", "Criterion"),
   score  = "Score",
-  method = "MML",          # default; "JML" for exploratory speed
-  model  = "RSM"            # "PCM", "GPCM" (bounded) also supported
-  # quad_points = 31 (default, publication tier; 7/15 for iteration)
+  method = "MML",          # recommended starting method
+  model  = "RSM",          # use PCM/GPCM only with a model rationale
+  rating_min = 1,
+  rating_max = 4
 )
 ```
 
-## 2. Diagnose
+For PCM, set the step facet explicitly when its role is not unambiguous. Treat
+bounded GPCM as a slope-aware sensitivity extension and read
+`gpcm_capability_matrix()` before using downstream helpers.
 
-```{r diagnose}
-diag <- diagnose_mfrm(fit, residual_pca = "none")
-# diagnostic_mode = "both" (default) runs residual + strict marginal.
-summary(fit)
-summary(diag)
+## 3. Read summaries, then draw the required Wright map
+
+```{r inspect}
+fit_summary <- summary(fit, profile = "fit", detail = "brief")
+
+# Comprehensive FACETS-organized review; mfrmr remains the estimator.
+review <- summary(fit, profile = "facets", detail = "brief")
+res <- review$results
+diag <- res$diagnostics
+
+# Primary final-scale display: all locations plus available facet uncertainty.
+plot(res, type = "wright", renderer = "native",
+     show_ci = TRUE, top_n = Inf, preset = "publication")
 ```
 
-## 3. Report / APA
+Read optimizer status and terminal-gradient guidance before interpreting
+estimates. The native map is the primary result because it keeps facet
+uncertainty and fitted step locations visible.
+
+## 4. Add only the diagnostics needed for the question
+
+```{r diagnose}
+# Reuse review diagnostics; rerun only for explicit custom settings.
+diag_pca <- diagnose_mfrm(fit, residual_pca = "both")
+
+# Optional follow-up: x = Infit, y = measure. Persons are opt-in.
+plot(fit, type = "fit_pathway", diagnostics = diag,
+     fit_stat = "Infit", include_person = FALSE)
+```
+
+## 5. Report / APA
 
 ```{r report}
 chk  <- reporting_checklist(fit, diagnostics = diag)
@@ -60,22 +108,23 @@ kab  <- as_kable(tbl)       # Markdown / HTML via kableExtra
 ft   <- as_flextable(tbl)   # Word / PowerPoint via flextable
 ```
 
-## 4. Bias / DFF / Equivalence
+## 6. Bias / DFF / Equivalence
 
 ```{r bias}
 bias <- estimate_bias(fit, diag, facet_a = "Rater", facet_b = "Criterion")
 summary(bias)
 plot_bias_interaction(bias, plot = "ranked", show_ci = TRUE)
 
+# Requires a study data frame containing the named grouping column.
 dff <- analyze_dff(fit, diagnostics = diag,
-                   facet = "Rater", group = "Group", data = toy)
+                   facet = "Rater", group = "Group", data = your_data)
 plot_dif_summary(dff)
 
 eq <- analyze_facet_equivalence(fit, facet = "Rater", ci_level = 0.95)
 plot_facet_equivalence(eq, type = "forest")
 ```
 
-## 5. Hierarchical structure and small-N review
+## 7. Hierarchical structure and small-N review
 
 ```{r hier}
 review <- facet_small_sample_review(fit)
@@ -93,7 +142,7 @@ h <- analyze_hierarchical_structure(
 )
 ```
 
-## 6. Empirical-Bayes shrinkage for small-N facets
+## 8. Empirical-Bayes shrinkage for small-N facets
 
 ```{r eb}
 # Integrated:
@@ -105,15 +154,13 @@ shrinkage_report(fit_eb)
 fit_eb2 <- apply_empirical_bayes_shrinkage(fit)
 ```
 
-## 7. Plot surface (selected)
+## 9. Plot surface (selected)
 
 | Function | Purpose |
 |---|---|
 | `plot(fit)` | Wright map (default) |
-| `plot(fit, type = "bundle")` | Wright + pathway + CCC |
-| `plot(fit, type = "ccc_overlay")` | Model + observed theta-bin dots |
-| `plot(fit, type = "wright", group=..., group_data=...)` | DIF density overlay |
-| `plot(fit, type = "shrinkage")` | Shrinkage direction arrows |
+| `plot_wright_unified(fit, renderer="facets")` | Optional FACETS-style `*` ruler; visual convention only |
+| `plot(fit, type="fit_pathway", diagnostics=diag, include_person=TRUE)` | Infit-vs-measure pathway; person rows opt-in |
 | `plot_threshold_ladder(fit)` | Category threshold ordering |
 | `plot_person_fit(fit, diag)` | Per-person Infit/Outfit bubble |
 | `plot_rater_severity_profile(fit, diag)` | Rater ranking + CI bands |
@@ -121,33 +168,53 @@ fit_eb2 <- apply_empirical_bayes_shrinkage(fit)
 | `plot_displacement(fit, show_ci=TRUE)` | Anchor displacement lollipop |
 | `plot_fair_average(fit, show_ci=TRUE)` | Fair averages; CIs for Rasch-family fits |
 | `plot_anchor_drift(drift, type="forest")` | Wave-level anchor CI forest |
-| `plot.mfrm_equating_chain(chain, type="graph")` | Bipartite wave/anchor graph |
-| `plot_apa_figure_one(fit)` | Publication 2x2 composite |
-| `plot_dif_summary(dff)` | DIF effect-size summary |
+| `plot(chain, type="graph")` | Bipartite wave/anchor graph |
 
-## 8. Reproducibility and export
+## 10. Reproducibility and export
 
 ```{r export}
-export_mfrm_bundle(fit, diagnostics = diag, path = "mfrmr_bundle/")
+# The default warning reminds you that this does not deidentify the files.
+export_mfrm_bundle(fit, diagnostics = diag,
+                   output_dir = "mfrmr_bundle/")
+export_mfrm_results(res, output_dir = "mfrmr-results",
+                    preset = "starter", overwrite = TRUE)
+# Add acknowledge_sensitive = TRUE only after reviewing every intended file
+# and confirming that the destination follows the study's handling policy.
 manifest <- build_mfrm_manifest(fit, diagnostics = diag)
 # manifest$environment, $dependencies, $input_hash, $session_info,
 # $hierarchical_review, $missing_recoding, $shrinkage_review
 replay_script <- build_mfrm_replay_script(fit, path = "replay_mfrmr.R")
 ```
 
-## 9. Missing-code pre-processing
+## 11. FACETS and ConQuest users
 
-```{r missing}
-fit <- fit_mfrm(
-  dirty_data, "Person", c("Rater", "Criterion"), "Score",
-  missing_codes = TRUE      # 99 / 999 / -1 / "N/A" / "" -> NA
+- Keep the native Wright map with available facet uncertainty as the primary
+  mfrmr display. Use
+  `renderer = "facets"` when readers benefit from FACETS-style asterisks and
+  ruler layout; this does not reproduce FACETS estimation.
+
+```r
+rubric_labels <- setNames(
+  your_rubric_labels,
+  fit$prep$score_map$OriginalScore
 )
-fit$prep$missing_recoding
+plot_wright_unified(
+  fit, renderer = "facets", show_ci = FALSE,
+  category_labels = rubric_labels
+)
 ```
+
+- Use `facets_feature_coverage()` for feature-by-feature alternatives.
+- Use `build_conquest_overlap_bundle(fit_lr)` only after fitting the documented
+  unidimensional MML comparison. Run the generated `.cqc` file in ConQuest,
+  then pass its four CSV exports to `normalize_conquest_overlap_exports()` and
+  `review_conquest_overlap()`.
+- mfrmr does not execute FACETS or ConQuest and does not claim general
+  numerical equivalence with either program.
 
 ## Package links
 
 - Source and documentation: <https://github.com/Ryuya-dot-com/mfrmr>
 - Citation:      `citation("mfrmr")`
 
-*mfrmr 0.2.0 cheatsheet*. Distributed under MIT License.
+*mfrmr quick reference*. Distributed under the MIT License.

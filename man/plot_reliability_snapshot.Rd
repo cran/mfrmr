@@ -39,6 +39,7 @@ scale, not ICCs; use \code{\link[=compute_facet_icc]{compute_facet_icc()}} for t
 observed-score variance-share view.
 }
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                  method = "JML", maxit = 30)
@@ -50,6 +51,7 @@ p$data$table
 # - Non-Person rows (Rater / Criterion) report the same index but
 #   should be read as "are facet elements distinguishable?"; values
 #   close to 1 mean facet means differ reliably from each other.
+}
 }
 \seealso{
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \link{mfrmr_visual_diagnostics}

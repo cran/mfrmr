@@ -34,7 +34,7 @@ test_that("evaluate_mfrm_recovery returns row-level and summary recovery tables"
                     "MeanInfit", "MeanOutfit", "ValidationUse") %in%
                     names(rec$diagnostic_oc_summary)))
   expect_true(all(rec$diagnostic_oc_summary$ValidationUse ==
-                    "diagnostic_only_not_release_gate"))
+                    "diagnostic_context_only"))
   expect_true(all(is.finite(rec$rep_overview$MinScoreCount)))
   expect_true(any(rec$recovery$ParameterType == "facet"))
   expect_true(any(rec$recovery$ParameterType == "step"))
@@ -111,12 +111,12 @@ test_that("evaluate_mfrm_recovery returns row-level and summary recovery tables"
                     "ValidationUse") %in%
                     names(assessment$condition_reporting_notes)))
   expect_true(all(assessment$condition_reporting_notes$ValidationUse ==
-                    "generator_condition_not_release_gate"))
+                    "generator_condition_context"))
   expect_true(all(c("Facet", "ReportingAttention", "DiagnosticFinding",
                     "Evidence", "ValidationUse") %in%
                     names(assessment$diagnostic_reporting_notes)))
   expect_true(all(assessment$diagnostic_reporting_notes$ValidationUse ==
-                    "diagnostic_only_not_release_gate"))
+                    "diagnostic_context_only"))
   expect_true(all(c("Facet", "MeanSeparation", "MeanReliability",
                     "DiagnosticAvailability", "Status", "ValidationUse",
                     "Interpretation", "NextAction") %in%
@@ -125,7 +125,7 @@ test_that("evaluate_mfrm_recovery returns row-level and summary recovery tables"
                     "available"))
   expect_true(all(assessment$diagnostic_review$Status == "not_assessed"))
   expect_true(all(assessment$diagnostic_review$ValidationUse ==
-                    "diagnostic_only_not_release_gate"))
+                    "diagnostic_context_only"))
   expect_identical(assessment$condition_review$Status[1], "not_assessed")
   expect_true(length(assessment$next_actions) > 0)
 
@@ -161,9 +161,9 @@ test_that("evaluate_mfrm_recovery returns row-level and summary recovery tables"
   expect_s3_class(assessment_status_plot$data$diagnostic_reporting_notes,
                   "data.frame")
   expect_true(all(assessment_status_plot$data$condition_reporting_notes$ValidationUse ==
-                    "generator_condition_not_release_gate"))
+                    "generator_condition_context"))
   expect_true(all(assessment_status_plot$data$diagnostic_reporting_notes$ValidationUse ==
-                    "diagnostic_only_not_release_gate"))
+                    "diagnostic_context_only"))
   expect_true(nrow(assessment_status_plot$data$status_counts) > 0)
   expect_true("AttentionOrder" %in% names(assessment_status_plot$data$section_status))
   expect_true(any(grepl("Read this plot before metric-level plots",
@@ -282,7 +282,7 @@ test_that("evaluate_mfrm_recovery records diagnostic failures without failing re
   expect_equal(nrow(rec$diagnostic_oc), 1L)
   expect_false(rec$diagnostic_oc$DiagnosticOK[1])
   expect_equal(rec$diagnostic_oc$ValidationUse[1],
-               "diagnostic_only_not_release_gate")
+               "diagnostic_context_only")
   expect_match(rec$diagnostic_oc$DiagnosticError[1], "forced diagnostic failure",
                fixed = TRUE)
   expect_equal(nrow(rec$diagnostic_oc_summary), 0L)

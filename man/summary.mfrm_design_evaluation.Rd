@@ -27,10 +27,10 @@ when sparse linked designs are active
 \item \code{design_descriptor}: role-based design-variable metadata
 \item \code{planning_scope}: explicit record of the current planning contract
 \item \code{planning_constraints}: explicit record of mutable/locked design variables
-\item \code{planning_schema}: combined planner-schema contract
-\item \code{future_branch_active_summary}: compact deterministic summary of the
-schema-only future arbitrary-facet planning branch embedded in the current
-planning schema
+\item \code{planning_schema}: structured planning metadata
+\item \code{structural_design_review}: deterministic structural review of the
+named-facet design grid; it reports
+design bookkeeping rather than simulation performance
 \item \code{notes}: short interpretation notes
 }
 }

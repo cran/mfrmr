@@ -41,7 +41,7 @@ test_that("fit_mfrm returns all required components", {
   expect_type(fit$facets$others$Facet, "character")
 })
 
-test_that("summary.mfrm_fit reports legacy population basis for ordinary fits", {
+test_that("summary.mfrm_fit explains the ordinary MML population basis", {
   d <- mfrmr:::sample_mfrm_data(seed = 42)
   fit <- suppressWarnings(fit_mfrm(
     d, "Person", c("Rater", "Task", "Criterion"), "Score",
@@ -71,7 +71,9 @@ test_that("summary.mfrm_fit reports legacy population basis for ordinary fits", 
   expect_identical(as.character(s$population_overview$PosteriorBasis[1]), "legacy_mml")
   expect_true(all(c("StepFacet", "SlopeFacet", "NoncenterFacet", "QuadPoints") %in% names(s$settings_overview)))
   expect_true(all(c("Area", "CoveredHere", "CompanionOutput") %in% names(s$reporting_map)))
-  expect_true(any(grepl("legacy unconditional prior", s$notes, fixed = TRUE)))
+  expect_true(any(grepl("No population model was requested", s$notes, fixed = TRUE)))
+  expect_true(any(grepl("unconditional normal person distribution", s$notes, fixed = TRUE)))
+  expect_false(any(grepl("legacy", s$notes, ignore.case = TRUE)))
 })
 
 test_that("GPCM summaries expose slope overview and diagnostics are now available", {
@@ -157,9 +159,11 @@ test_that("curve/report GPCM workflows open where the probability kernel is alre
     method = "MML", quad_points = 5, maxit = 20
   ))
 
-  p_bundle <- plot(fit, type = "bundle", draw = FALSE)
-  p_ccc <- plot(fit, type = "ccc", draw = FALSE)
-  p_path <- plot(fit, type = "pathway", draw = FALSE)
+  .mfrmr_muffle_expected_warnings({
+    p_bundle <- plot(fit, type = "bundle", draw = FALSE)
+    p_ccc <- plot(fit, type = "ccc", draw = FALSE)
+    p_path <- plot(fit, type = "pathway", draw = FALSE)
+  }, "^Review-only display:")
   cs <- category_structure_report(fit)
   cc <- category_curves_report(fit)
   out_graph <- facets_output_file_bundle(fit, include = "graph", write_files = FALSE)
@@ -171,11 +175,14 @@ test_that("curve/report GPCM workflows open where the probability kernel is alre
   expect_s3_class(cc, "mfrm_category_curves")
   expect_true(all(c("graphfile", "graphfile_syntactic", "settings") %in% names(out_graph)))
 
-  expect_error(
-    estimation_iteration_report(fit, max_iter = 3),
-    "does not support `GPCM` fits",
-    fixed = TRUE
-  )
+  replay <- suppressWarnings(estimation_iteration_report(fit, max_iter = 3))
+  expect_s3_class(replay, "mfrm_iteration_report")
+  expect_true(all(c("table", "summary", "settings", "gpcm_boundary") %in% names(replay)))
+  expect_gt(nrow(replay$table), 0L)
+  expect_true(any(is.finite(replay$table$Objective)))
+  expect_equal(nrow(replay$gpcm_boundary), 1L)
+  expect_identical(replay$gpcm_boundary$Status[1], "supported_with_caveat")
+  expect_match(replay$gpcm_boundary$Boundary[1], "replay", ignore.case = TRUE)
   out_score <- facets_output_file_bundle(fit, include = "score", write_files = FALSE)
   expect_s3_class(out_score, "mfrm_output_bundle")
   expect_true(all(c("scorefile", "gpcm_score_side_contract", "gpcm_boundary") %in% names(out_score)))
@@ -370,6 +377,30 @@ test_that("interrater_agreement_table returns pairs + summary", {
     names(res$pairs)))
   expect_true(all(c("AgreementMinusExpected", "RaterSeparation", "RaterReliability") %in%
     names(res$summary)))
+})
+
+test_that("ExpectedExact uses fitted category probabilities rather than marginal chance", {
+  res <- interrater_agreement_table(.stab_fit, diagnostics = .stab_dx,
+    rater_facet = "Rater")
+  pair <- res$pairs[1, , drop = FALSE]
+  probs <- mfrmr:::compute_prob_matrix(.stab_fit)
+  obs <- .stab_dx$obs
+  context_cols <- c("Person", "Task", "Criterion")
+  context_key <- do.call(paste, c(lapply(obs[context_cols], as.character), sep = "|"))
+  idx1 <- which(as.character(obs$Rater) == as.character(pair$Rater1))
+  idx2 <- which(as.character(obs$Rater) == as.character(pair$Rater2))
+  expect_identical(anyDuplicated(context_key[idx1]), 0L)
+  expect_identical(anyDuplicated(context_key[idx2]), 0L)
+  map1 <- stats::setNames(idx1, context_key[idx1])
+  map2 <- stats::setNames(idx2, context_key[idx2])
+  shared <- intersect(names(map1), names(map2))
+  manual_expected <- vapply(shared, function(key) {
+    sum(probs[map1[[key]], ] * probs[map2[[key]], ])
+  }, numeric(1))
+
+  expect_gt(length(manual_expected), 0L)
+  expect_equal(pair$ExpectedExact, mean(manual_expected), tolerance = 1e-12)
+  expect_equal(pair$ExpectedExactCount, sum(manual_expected), tolerance = 1e-12)
 })
 
 test_that("facets_chisq_table returns table + summary", {

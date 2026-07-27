@@ -11,6 +11,7 @@ plot_bubble(
   view = c("measure", "infit_outfit"),
   bubble_size = NULL,
   facets = NULL,
+  include_person = FALSE,
   fit_range = c(0.5, 1.5),
   top_n = 60,
   main = NULL,
@@ -43,7 +44,11 @@ default for \code{view = "infit_outfit"}), or \code{"equal"}
 (uniform size).}
 
 \item{facets}{Character vector of facets to include. \code{NULL} (default)
-includes all non-person facets.}
+includes every row allowed by \code{include_person}.}
+
+\item{include_person}{If \code{TRUE}, person measures may be included in
+the chart (and in \code{facets} filtering). The default is \code{FALSE}
+because person rows commonly overwhelm facet-level patterns.}
 
 \item{fit_range}{Numeric length-2 vector defining the heuristic fit-review band
 shown as a shaded region (default \code{c(0.5, 1.5)}).}
@@ -113,9 +118,11 @@ Points are colored by facet for easy identification.
 }
 
 \examples{
-toy <- load_mfrmr_data("example_core")
+\donttest{
+toy <- load_mfrmr_data("example_operational")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", model = "RSM", maxit = 30)
+                method = "MML", model = "RSM",
+                quad_points = 7, maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "none")
 p <- plot_bubble(fit, diagnostics = diag, draw = FALSE)
 head(p$data$table[, c("Facet", "Level", "Estimate", "Infit", "Outfit")])
@@ -133,6 +140,7 @@ p_io$data$view
 #   lower-left have both < 0.5 (consistent overfit). Bubble size in
 #   this view defaults to N (observation count) so the visual
 #   weighting matches how seriously the misfit should be taken.
+}
 }
 \seealso{
 \code{\link{diagnose_mfrm}}, \code{\link{plot_unexpected}},

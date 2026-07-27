@@ -71,11 +71,13 @@ exposing the iteration table, convergence summary, and orientation review in
 one bundle.
 }
 \examples{
+\donttest{
 toy <- load_mfrmr_data("example_bias")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "none")
 out <- bias_iteration_report(fit, diagnostics = diag, facet_a = "Rater", facet_b = "Criterion")
 summary(out)
+}
 }
 \seealso{
 \code{\link[=estimate_bias]{estimate_bias()}}, \code{\link[=bias_interaction_report]{bias_interaction_report()}}, \code{\link[=build_fixed_reports]{build_fixed_reports()}}

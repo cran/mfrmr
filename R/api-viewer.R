@@ -658,7 +658,7 @@ mfrm_results_shiny_app <- function(x, top_n = 100L) {
 #' The viewer assumes that fitting, diagnostics, and section selection have
 #' already happened through [mfrm_results()]. This keeps GUI exploration
 #' separate from reproducible analysis setup: the Replay tab displays the
-#' `mfrm_results()` scaffold stored in the result object.
+#' `mfrm_results()` replay script stored in the result object.
 #'
 #' The app includes tabs for overview/triage, QC evidence, APA-style report
 #' text when `include = "publication"` or `"apa"` was used, available bias
@@ -674,7 +674,7 @@ mfrm_results_shiny_app <- function(x, top_n = 100L) {
 #' @return Invisibly returns the value from `shiny::runApp()`, or the Shiny app
 #'   object when `return_app = TRUE`.
 #'
-#' @examples
+#' @examplesIf interactive()
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(
 #'   toy,

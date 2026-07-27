@@ -383,13 +383,13 @@ test_that("latent-regression mean-only, dummy, and null-effect cases behave sens
 sample_gpcm_recovery_case <- function(seed = 20260404,
                                       quad_points = 11L,
                                       maxit = 120L) {
-  fixture <- mfrmr:::sample_mfrm_gpcm_benchmark_data(seed = seed)
+  benchmark <- mfrmr:::sample_mfrm_gpcm_benchmark_data(seed = seed)
   fit <- suppressWarnings(
     fit_mfrm(
-      fixture$data,
-      person = fixture$person,
-      facets = fixture$facets,
-      score = fixture$score,
+      benchmark$data,
+      person = benchmark$person,
+      facets = benchmark$facets,
+      score = benchmark$score,
       method = "MML",
       model = "GPCM",
       step_facet = "Criterion",
@@ -401,8 +401,8 @@ sample_gpcm_recovery_case <- function(seed = 20260404,
 
   slope_tbl <- merge(
     data.frame(
-      SlopeFacet = names(fixture$truth$slopes),
-      Truth = as.numeric(fixture$truth$slopes),
+      SlopeFacet = names(benchmark$truth$slopes),
+      Truth = as.numeric(benchmark$truth$slopes),
       stringsAsFactors = FALSE
     ),
     as.data.frame(fit$slopes)[, c("SlopeFacet", "Estimate"), drop = FALSE],
@@ -413,7 +413,7 @@ sample_gpcm_recovery_case <- function(seed = 20260404,
   slope_tbl$EstimateLog <- log(slope_tbl$Estimate) - mean(log(slope_tbl$Estimate))
 
   step_tbl <- merge(
-    as.data.frame(fixture$truth$steps, stringsAsFactors = FALSE),
+    as.data.frame(benchmark$truth$steps, stringsAsFactors = FALSE),
     as.data.frame(fit$steps)[, c("StepFacet", "Step", "Estimate"), drop = FALSE],
     by = c("StepFacet", "Step"),
     sort = FALSE,
@@ -422,7 +422,7 @@ sample_gpcm_recovery_case <- function(seed = 20260404,
 
   criterion_tbl <- subset(as.data.frame(fit$facets$others), Facet == "Criterion", c(Level, Estimate))
   criterion_tbl <- criterion_tbl[order(criterion_tbl$Level), , drop = FALSE]
-  truth_criterion <- fixture$truth$criterion[criterion_tbl$Level]
+  truth_criterion <- benchmark$truth$criterion[criterion_tbl$Level]
   est_centered <- criterion_tbl$Estimate - mean(criterion_tbl$Estimate)
   truth_centered <- as.numeric(truth_criterion) - mean(as.numeric(truth_criterion))
 

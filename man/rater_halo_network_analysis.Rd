@@ -103,7 +103,8 @@ edge weights are clustered by rater and node.
 \donttest{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 30)
+  method = "JML", maxit = 30
+)
 if (requireNamespace("igraph", quietly = TRUE)) {
   halo <- rater_halo_network_analysis(fit)
   halo$summary

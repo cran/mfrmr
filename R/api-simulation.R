@@ -8,9 +8,9 @@
 #'   named vector, or one-row data frame. When `sim_spec = NULL`, names may use
 #'   canonical variables (`n_person`, `n_rater`, `n_criterion`,
 #'   `raters_per_person`) or role keywords (`person`, `rater`, `criterion`,
-#'   `assignment`). For the currently exposed facet keys, the schema-only
-#'   future branch input `design$facets = c(person = ..., rater = ...,
-#'   criterion = ...)` is also accepted. Do not specify the same variable
+#'   `assignment`). A nested named-facet form,
+#'   `design$facets = c(person = ..., rater = ..., criterion = ...)`, is also
+#'   accepted for the supported person/rater/criterion design. Do not specify the same variable
 #'   through both `design` and the scalar count arguments.
 #' @param score_levels Number of ordered score categories.
 #' @param theta_sd Standard deviation of simulated person measures.
@@ -110,14 +110,14 @@
 #' - if `thresholds` is a named list, numeric matrix, or data frame, threshold
 #'   values may vary by `StepFacet` (currently `Criterion` or `Rater`)
 #'
-#' For bounded `GPCM`, the generator now requires an explicit slope
-#' contract in parallel with the threshold table. The current public branch
-#' keeps `slope_facet == step_facet`, normalizes supplied slopes to the same
-#' geometric-mean-one log-slope identification used by [fit_mfrm()], and uses
-#' the internal `category_prob_gpcm()` helper for response sampling. Broader
-#' arbitrary-facet planning remains restricted until that slope-aware contract
-#' is generalized beyond the current role-based design, population-forecasting,
-#' diagnostic-screening, and signal-detection helpers.
+#' For bounded `GPCM`, the generator requires an explicit slope contract in
+#' parallel with the threshold table. The supported route keeps
+#' `slope_facet == step_facet`, normalizes supplied slopes to the same
+#' geometric-mean-one log-slope identification used by [fit_mfrm()], and
+#' samples responses from the corresponding GPCM category probabilities.
+#' Independent arbitrary slope-facet planning is not supported by these
+#' design, population-forecasting, diagnostic-screening, or signal-detection
+#' helpers.
 #'
 #' Assignment handling is also explicit:
 #' - `"crossed"` uses the full person x rater x criterion design
@@ -1515,11 +1515,11 @@ simulation_facet_manifest <- function(sim_spec = NULL, facet_names = NULL) {
     planning_count_variable = c("n_person", "n_rater", "n_criterion"),
     planning_count_alias = unname(aliases[c("n_person", "n_rater", "n_criterion")]),
     current_planner_role_supported = TRUE,
-    arbitrary_facet_branch_candidate = TRUE
+    arbitrary_facet_design_candidate = TRUE
   )
 }
 
-simulation_future_facet_table <- function(sim_spec = NULL, facet_names = NULL) {
+simulation_structural_facet_table <- function(sim_spec = NULL, facet_names = NULL) {
   facet_manifest <- if (is.null(facet_names)) {
     simulation_facet_manifest(sim_spec)
   } else {
@@ -1532,8 +1532,8 @@ simulation_future_facet_table <- function(sim_spec = NULL, facet_names = NULL) {
     facet = facets,
     facet_kind = facet_kinds,
     level_count = unname(facet_manifest$level_count),
-    future_facet_key = unname(vapply(facets, simulation_design_variable_slug, character(1))),
-    future_axis_class = ifelse(
+    structural_facet_key = unname(vapply(facets, simulation_design_variable_slug, character(1))),
+    design_axis_class = ifelse(
       facet_kinds == "person",
       "person_count",
       "facet_level_count"
@@ -1541,21 +1541,21 @@ simulation_future_facet_table <- function(sim_spec = NULL, facet_names = NULL) {
     current_planning_count_variable = as.character(facet_manifest$planning_count_variable),
     current_planning_count_alias = as.character(facet_manifest$planning_count_alias),
     current_planner_role_supported = as.logical(facet_manifest$current_planner_role_supported),
-    arbitrary_facet_branch_candidate = as.logical(facet_manifest$arbitrary_facet_branch_candidate),
-    branch_stage = "schema_only"
+    arbitrary_facet_design_candidate = as.logical(facet_manifest$arbitrary_facet_design_candidate),
+    review_stage = "structural_metadata"
   )
 }
 
-simulation_future_design_template <- function(sim_spec = NULL, facet_names = NULL) {
-  future_facet_table <- if (is.null(facet_names)) {
-    simulation_future_facet_table(sim_spec)
+simulation_structural_design_template <- function(sim_spec = NULL, facet_names = NULL) {
+  structural_facet_table <- if (is.null(facet_names)) {
+    simulation_structural_facet_table(sim_spec)
   } else {
-    simulation_future_facet_table(facet_names = facet_names)
+    simulation_structural_facet_table(facet_names = facet_names)
   }
 
   facet_counts <- stats::setNames(
-    as.list(unname(future_facet_table$level_count %||% rep(NA_integer_, nrow(future_facet_table)))),
-    as.character(future_facet_table$future_facet_key)
+    as.list(unname(structural_facet_table$level_count %||% rep(NA_integer_, nrow(structural_facet_table)))),
+    as.character(structural_facet_table$structural_facet_key)
   )
 
   assignment_value <- NA_integer_
@@ -1567,9 +1567,8 @@ simulation_future_design_template <- function(sim_spec = NULL, facet_names = NUL
     facets = facet_counts,
     assignment = assignment_value,
     note = paste(
-      "Schema-only stub mirroring the current design through the future-branch",
-      "`design$facets(named counts)` contract while keeping the current",
-      "assignment axis at top level."
+      "Structural design metadata mirrors the named facet counts in",
+      "`design$facets` while keeping the assignment axis at the top level."
     )
   )
 }
@@ -2329,7 +2328,7 @@ recovery_diagnostic_rows_from_diagnostics <- function(diagnostics, rep, fit_df_m
       rep = as.integer(rep),
       Facet = NA_character_,
       DiagnosticOK = FALSE,
-      ValidationUse = "diagnostic_only_not_release_gate",
+      ValidationUse = "diagnostic_context_only",
       DiagnosticError = conditionMessage(diagnostics)
     ))
   }
@@ -2365,7 +2364,7 @@ recovery_diagnostic_rows_from_diagnostics <- function(diagnostics, rep, fit_df_m
       MaxAbsZSTD = recovery_diagnostic_max_abs_zstd(facet_fit),
       DfSensitiveFlagRate = recovery_diagnostic_df_sensitive_rate(facet_fit),
       FitDfMethod = as.character(fit_df_method),
-      ValidationUse = "diagnostic_only_not_release_gate",
+      ValidationUse = "diagnostic_context_only",
       DiagnosticError = NA_character_
     )
   })
@@ -2397,7 +2396,7 @@ recovery_summarize_diagnostic_oc <- function(rows) {
       MeanMaxAbsZSTD = recovery_safe_mean(.data$MaxAbsZSTD),
       MeanDfSensitiveFlagRate = recovery_safe_mean(.data$DfSensitiveFlagRate),
       FitDfMethods = paste(sort(unique(as.character(.data$FitDfMethod))), collapse = "; "),
-      ValidationUse = "diagnostic_only_not_release_gate",
+      ValidationUse = "diagnostic_context_only",
       .groups = "drop"
     ) |>
     dplyr::arrange(.data$Facet)
@@ -2452,7 +2451,7 @@ recovery_build_notes <- function(rep_overview, recovery_summary, model) {
 #' @param include_diagnostics Logical. When `TRUE`, run [diagnose_mfrm()] after
 #'   each successful refit and retain facet-level fit/separation operating
 #'   characteristics. These diagnostics are reported separately from recovery
-#'   metrics and are not release-success criteria by themselves.
+#'   metrics and are not parameter-recovery criteria by themselves.
 #' @param diagnostic_fit_df_method Fit-ZSTD degrees-of-freedom convention used
 #'   for optional diagnostic operating-characteristic summaries. Use `"both"`
 #'   when reviewing FACETS-style df sensitivity.
@@ -2502,8 +2501,9 @@ recovery_build_notes <- function(rep_overview, recovery_summary, model) {
 #' @section Typical workflow:
 #' 1. Build a simulation specification with [build_mfrm_sim_spec()] or pass scalar
 #'    generator arguments directly.
-#' 2. Run `evaluate_mfrm_recovery(...)` with a modest `reps` value for a smoke
-#'    check, then increase `reps` for stable Monte Carlo summaries.
+#' 2. Run `evaluate_mfrm_recovery(...)` with a modest `reps` value for an
+#'    initial end-to-end review, then increase `reps` for stable Monte Carlo
+#'    summaries.
 #' 3. Inspect `summary(x)$recovery_summary` and the row-level `x$recovery` table.
 #'
 #' @seealso [simulate_mfrm_data()], [evaluate_mfrm_design()], [fit_mfrm()]
@@ -2778,7 +2778,7 @@ evaluate_mfrm_recovery <- function(n_person = 50,
       }
     }
     rep_row$RunOK <- TRUE
-    rep_row$Converged <- isTRUE(as.logical(fit$summary$Converged[1]))
+    rep_row$Converged <- mfrm_inference_ready(fit)
     rep_row$RecoveryRows <- nrow(rows)
     rep_rows[[rep]] <- rep_row
     recovery_rows[[rep]] <- rows
@@ -3320,7 +3320,7 @@ recovery_assessment_condition_reporting_notes <- function(condition_review) {
       Evidence = evidence,
       ReportingImplication = implication,
       NextAction = next_action,
-      ValidationUse = "generator_condition_not_release_gate"
+      ValidationUse = "generator_condition_context"
     )
   }
 
@@ -3452,14 +3452,14 @@ recovery_assessment_diagnostic_review <- function(x) {
         TRUE ~ "not_available"
       ),
       Status = "not_assessed",
-      ValidationUse = "diagnostic_only_not_release_gate",
+      ValidationUse = "diagnostic_context_only",
       Interpretation = paste(
         "Fit/separation operating characteristics summarize how diagnostics behaved under the simulated condition;",
         "their availability does not imply adequacy, and they do not replace recovery, convergence, uncertainty, or substantive validity evidence."
       ),
       NextAction = dplyr::case_when(
         .data$DiagnosticAvailability == "available" ~
-          "Use as diagnostic operating-characteristic context; keep separate from release-recovery status.",
+          "Use as diagnostic operating-characteristic context; keep separate from parameter-recovery conclusions.",
         TRUE ~
           "Re-run evaluate_mfrm_recovery(include_diagnostics = TRUE) if fit/separation behavior is needed."
       )
@@ -3515,7 +3515,7 @@ recovery_assessment_diagnostic_reporting_notes <- function(diagnostic_review) {
       Evidence = build_evidence(row),
       ReportingImplication = implication,
       NextAction = next_action,
-      ValidationUse = "diagnostic_only_not_release_gate"
+      ValidationUse = "diagnostic_context_only"
     )
   }
 
@@ -3617,7 +3617,7 @@ recovery_assessment_next_actions <- function(checklist, metric_review, max_n = 6
 #'   [evaluate_mfrm_recovery()]. For `plot.mfrm_recovery_assessment()`, output
 #'   from `assess_mfrm_recovery()`.
 #' @param min_reps Minimum replication count expected before treating the
-#'   simulation as more than a smoke check.
+#'   simulation for inferential use.
 #' @param min_success_rate Minimum acceptable proportion of replications that
 #'   generated data and produced a fitted model.
 #' @param min_convergence_rate Minimum acceptable proportion of replications
@@ -3635,7 +3635,7 @@ recovery_assessment_next_actions <- function(checklist, metric_review, max_n = 6
 #'   `max_rmse`.
 #' @param top_n Number of next-action lines retained in the compact output.
 #' @param digits Digits used by the print method.
-#' @param ... Reserved for future extensions.
+#' @param ... Reserved for generic compatibility.
 #'
 #' @details
 #' RMSE and bias adequacy depends on the substantive scale and the use case, so
@@ -3681,7 +3681,7 @@ recovery_assessment_next_actions <- function(checklist, metric_review, max_n = 6
 #'   `GPCM` slope-regime interpretation and generated score-category support
 #'   when available.
 #' - `condition_reporting_notes`: reporter-facing generator-condition caveats
-#'   separated from recovery metrics and release-gate decisions.
+#'   separated from parameter-recovery conclusions.
 #' - `diagnostic_reporting_notes`: reporter-facing fit/separation caveats
 #'   retained as diagnostic context rather than recovery gates.
 #' - `diagnostic_review`: optional fit/separation operating-characteristic
@@ -4245,7 +4245,7 @@ recovery_assessment_reading_order <- function() {
     Purpose = c(
       "Decide whether the assessment is ready to inspect.",
       "Separate generator stress conditions and sparse score support from parameter-recovery performance before interpreting metrics.",
-      "Check diagnostic behavior without treating fit or separation as release-recovery gates.",
+      "Check diagnostic behavior without treating fit or separation as parameter-recovery criteria.",
       "Find the part of the assessment that needs attention first.",
       "Identify the specific parameter group and metric driving the status.",
       "Diagnose the underlying recovery pattern before changing design or fit settings."
@@ -4622,7 +4622,7 @@ recovery_plot_status_table <- function(rep_tbl) {
 #'   `ErrorRaw` on the same comparison scale.
 #' @param draw If `TRUE`, draw with base graphics. If `FALSE`, return an
 #'   `mfrm_plot_data` object with reusable plot tables and metadata.
-#' @param ... Reserved for future extensions.
+#' @param ... Reserved for generic compatibility.
 #'
 #' @details
 #' These plots are intended as simulation-review graphics. They do not replace
@@ -4894,9 +4894,9 @@ plot.mfrm_recovery_simulation <- function(x,
 #'   (`n_person`, `n_rater`, `n_criterion`, `raters_per_person`), current
 #'   public aliases implied by `sim_spec` (for example `n_judge`, `n_task`,
 #'   `judge_per_person`), or role keywords (`person`, `rater`, `criterion`,
-#'   `assignment`). Values may be vectors. The schema-only future branch input
+#'   `assignment`). Values may be vectors. The nested named-facet form
 #'   `design$facets = c(person = ..., judge = ..., task = ...)` is also
-#'   accepted for the currently exposed facet keys. Do not specify the same
+#'   accepted for the supported person/rater/criterion design. Do not specify the same
 #'   variable through both `design` and the scalar design-grid arguments.
 #' @param reps Number of replications per design condition.
 #' @param score_levels Number of ordered score categories.
@@ -4907,7 +4907,7 @@ plot.mfrm_recovery_simulation <- function(x,
 #' @param step_span Spread of step thresholds on the logit scale.
 #' @param fit_method Estimation method passed to [fit_mfrm()].
 #' @param model Measurement model passed to [fit_mfrm()]. `RSM` and `PCM` use
-#'   the validated Rasch-family design-planning layer. Bounded `GPCM` is
+#'   the documented Rasch-family design-planning layer. Bounded `GPCM` is
 #'   available as a caveated simulation/refit operating-characteristic route.
 #' @param step_facet Step facet passed to [fit_mfrm()] when `model = "PCM"` or
 #'   `model = "GPCM"`.
@@ -4947,9 +4947,8 @@ plot.mfrm_recovery_simulation <- function(x,
 #'   uses `future.apply::future_lapply` and respects whatever
 #'   `future::plan()` is currently active. The Suggests package
 #'   `future.apply` must be installed for the parallel path to
-#'   activate; otherwise the call falls back to serial execution
-#'   with a single message. Cross-design-row parallelism is planned
-#'   for a future release.
+#'   activate; otherwise the call falls back to serial execution with a single
+#'   message. Parallel execution applies to replications within each design row.
 #'
 #' @details
 #' This helper runs a compact Monte Carlo design study for common rater-by-item
@@ -5053,7 +5052,10 @@ plot.mfrm_recovery_simulation <- function(x,
 #' you vary person, rater, criterion, or assignment counts. For analytic
 #' generalizability-theory planning, pair observed variance-component review
 #' from [mfrm_generalizability()] with D-study projections from
-#' [mfrm_d_study()].
+#' [mfrm_d_study()]. Read `IdentificationStatus`, `GStatus`, and `PhiStatus`
+#' before using the projected coefficients: boundary or singular mixed-model
+#' fits are design-identification warnings rather than high-stakes-ready
+#' reliability evidence.
 #'
 #' @section References:
 #' The simulation logic follows the general Monte Carlo / operating-characteristic
@@ -5074,7 +5076,7 @@ plot.mfrm_recovery_simulation <- function(x,
 #' @return An object of class `mfrm_design_evaluation` with components:
 #' - `design_grid`: evaluated design conditions. When `sim_spec` carries custom
 #'   public facet names, matching design-variable alias columns are included
-#'   alongside the canonical internal columns.
+#'   alongside the standard result columns.
 #' - `results`: facet-level replicate results, with the same design-variable
 #'   alias columns when applicable.
 #' - `rep_overview`: run-level status and timing, with the same design-variable
@@ -5084,7 +5086,7 @@ plot.mfrm_recovery_simulation <- function(x,
 #' - `planning_scope`: explicit record of the current planning contract
 #' - `planning_constraints`: explicit record of which design variables remain
 #'   mutable under the current simulation specification
-#' - `planning_schema`: combined planner-schema contract bundling the role
+#' - `planning_schema`: structured planning metadata bundling the role
 #'   descriptor, scope boundary, and current mutability map
 #' - `gpcm_boundary`: bounded-`GPCM` caveat row when a `GPCM` design route is
 #'   used
@@ -5158,16 +5160,9 @@ evaluate_mfrm_design <- function(n_person = c(30, 50, 100),
     parallel <- "no"
   }
   if (identical(parallel, "future")) {
-    # The argument is exposed for forward compatibility. The current
-    # release threads the request through the rep loop via
-    # `future.apply::future_lapply` only when no per-rep state is
-    # accumulated upstream. Full parallelisation across design rows
-    # is planned for a future release; until then, set
-    # `future::plan(multisession, workers = N)` and rerun to use
-    # parallel rep execution within each design row.
-    message("`evaluate_mfrm_design(parallel = 'future')` currently ",
-            "parallelises the rep loop within each design row. ",
-            "Cross-design-row parallelism is planned for a future release.")
+    message("`evaluate_mfrm_design(parallel = 'future')` parallelises ",
+            "replications within each design row; design rows are processed ",
+            "sequentially.")
   }
   residual_pca <- match.arg(residual_pca)
   if (!is.null(sim_spec) && !inherits(sim_spec, "mfrm_sim_spec")) {
@@ -5397,7 +5392,7 @@ evaluate_mfrm_design <- function(n_person = c(30, 50, 100),
         next
       }
 
-      converged <- isTRUE(as.logical(fit$summary$Converged[1]))
+      converged <- mfrm_inference_ready(fit)
       rep_row$RunOK <- TRUE
       rep_row$Converged <- converged
       rep_rows[[rep_idx]] <- rep_row
@@ -5595,10 +5590,10 @@ evaluate_mfrm_design <- function(n_person = c(30, 50, 100),
 #' - `design_descriptor`: role-based design-variable metadata
 #' - `planning_scope`: explicit record of the current planning contract
 #' - `planning_constraints`: explicit record of mutable/locked design variables
-#' - `planning_schema`: combined planner-schema contract
-#' - `future_branch_active_summary`: compact deterministic summary of the
-#'   schema-only future arbitrary-facet planning branch embedded in the current
-#'   planning schema
+#' - `planning_schema`: structured planning metadata
+#' - `structural_design_review`: deterministic structural review of the
+#'   named-facet design grid; it reports
+#'   design bookkeeping rather than simulation performance
 #' - `notes`: short interpretation notes
 #' @seealso [evaluate_mfrm_design()], [plot.mfrm_design_evaluation]
 #' @examples
@@ -5646,7 +5641,7 @@ summary.mfrm_design_evaluation <- function(object, digits = 3, ...) {
   out$planning_constraints <- simulation_object_planning_constraints(object)
   out$planning_schema <- simulation_object_planning_schema(object)
   out$gpcm_boundary <- object$gpcm_boundary %||% data.frame()
-  out$future_branch_active_summary <- simulation_compact_future_branch_active_summary(
+  out$structural_design_review <- simulation_compact_structural_design_review_summary(
     object,
     digits = digits
   )
@@ -5664,10 +5659,10 @@ summary.mfrm_design_evaluation <- function(object, digits = 3, ...) {
   if (length(schema_note) > 0L && !schema_note %in% out$notes) {
     out$notes <- c(out$notes, schema_note)
   }
-  if (inherits(out$future_branch_active_summary, "summary.mfrm_future_branch_active_branch")) {
+  if (inherits(out$structural_design_review, "summary.mfrm_structural_design_review")) {
     out$notes <- c(
       out$notes,
-      "A deterministic future arbitrary-facet planning scaffold is embedded in `future_branch_active_summary`; it reports structural bookkeeping and conservative recommendation logic, not Monte Carlo performance."
+      "The structural design review reports deterministic bookkeeping and conservative design guidance, not Monte Carlo performance."
     )
   }
   out$notes <- unique(out$notes)
@@ -5702,8 +5697,8 @@ print.summary.mfrm_design_evaluation <- function(x, ...) {
     cat("\nSparse linked design review\n")
     print(round_df(as.data.frame(x$sparse_review)), row.names = FALSE)
   }
-  print_compact_future_branch_active_summary(
-    x$future_branch_active_summary %||% NULL,
+  print_compact_structural_design_review_summary(
+    x$structural_design_review %||% NULL,
     digits = digits
   )
   if (is.list(x$ademp) && length(x$ademp) > 0L) {
@@ -5930,7 +5925,7 @@ plot.mfrm_design_evaluation <- function(x,
 #' - `design_descriptor`: role-based design-variable metadata
 #' - `planning_scope`: explicit record of the current planning contract
 #' - `planning_constraints`: explicit record of mutable/locked design variables
-#' - `planning_schema`: combined planner-schema contract
+#' - `planning_schema`: structured planning metadata
 #' - `caveats`: structured warning rows for situations where the
 #'   recommendation rests on weak evidence (e.g., no design met every
 #'   threshold; the recommended design is at the boundary of the
@@ -6253,7 +6248,7 @@ diagnostic_screening_build_latent_misspecification_spec <- function(row_spec_bas
 
   if (isTRUE((row_spec_base$population %||% list(active = FALSE))$active)) {
     stop(
-      "Latent-misspecification screening does not yet support `sim_spec` objects with an active latent-regression population generator.",
+      "Latent-misspecification screening does not support `sim_spec` objects with an active latent-regression population generator.",
       call. = FALSE
     )
   }
@@ -6353,7 +6348,7 @@ diagnostic_screening_build_step_misspecification_spec <- function(row_spec_base,
   }
   if (!is.null(row_spec_base) && isTRUE((row_spec_base$population %||% list(active = FALSE))$active)) {
     stop(
-      "Step-structure screening does not yet support `sim_spec` objects with an active latent-regression population generator.",
+      "Step-structure screening does not support `sim_spec` objects with an active latent-regression population generator.",
       call. = FALSE
     )
   }
@@ -6761,8 +6756,8 @@ diagnostic_screening_summarize_results <- function(results, design_variable_alia
 #'   public aliases implied by `sim_spec`, or role keywords
 #'   (`person`, `rater`, `criterion`, `assignment`). Values may be vectors.
 #' @param reps Number of replications per design condition and scenario.
-#' @param scenarios Screening scenarios to evaluate. The current first release
-#'   supports `"well_specified"`, `"local_dependence"`, and
+#' @param scenarios Screening scenarios to evaluate. Supported values are
+#'   `"well_specified"`, `"local_dependence"`, and
 #'   `"latent_misspecification"`, plus
 #'   `"step_structure_misspecification"`.
 #' @param local_dependence_sd Standard deviation of the shared context effect
@@ -6785,7 +6780,7 @@ diagnostic_screening_summarize_results <- function(results, design_variable_alia
 #' @param slopes Optional bounded-`GPCM` slope specification used by direct
 #'   simulation calls when `sim_spec = NULL`.
 #' @param maxit Maximum iterations passed to [fit_mfrm()].
-#' @param quad_points Quadrature points for the internal `MML` fit.
+#' @param quad_points Quadrature points for the underlying `MML` fit.
 #' @param residual_pca Residual PCA mode passed to [diagnose_mfrm()].
 #' @param sim_spec Optional output from [build_mfrm_sim_spec()] or
 #'   [extract_mfrm_sim_spec()] used as the base data-generating mechanism.
@@ -6800,8 +6795,8 @@ diagnostic_screening_summarize_results <- function(results, design_variable_alia
 #' @param seed Optional seed for reproducible replications.
 #'
 #' @details
-#' This helper performs a compact Monte Carlo validation study for the package's
-#' current diagnostic architecture.
+#' This helper performs a compact Monte Carlo evaluation of the package's
+#' diagnostic architecture under user-specified simulation conditions.
 #'
 #' For each design condition and scenario, the function:
 #' 1. generates synthetic data with [simulate_mfrm_data()]
@@ -6829,7 +6824,7 @@ diagnostic_screening_summarize_results <- function(results, design_variable_alia
 #' step/slope facet mismatch.
 #'
 #' This function is intentionally screening-oriented. The strict marginal branch
-#' remains exploratory in the current release, so the returned summaries should
+#' remains exploratory, so the returned summaries should
 #' be used to compare relative sensitivity across scenarios rather than to claim
 #' calibrated inferential power. Bounded-`GPCM` rows add explicit
 #' `gpcm_boundary` caveats and should be read as slope-aware operating
@@ -6850,7 +6845,7 @@ diagnostic_screening_summarize_results <- function(results, design_variable_alia
 #' - `design_descriptor`: role-based design-variable metadata
 #' - `planning_scope`: explicit record of the current planning contract
 #' - `planning_constraints`: explicit record of mutable/locked design variables
-#' - `planning_schema`: combined planner-schema contract
+#' - `planning_schema`: structured planning metadata
 #' - `gpcm_boundary`: bounded-`GPCM` caveat row when present
 #' - `settings`: simulation and fitting settings
 #' - `ademp`: simulation-study metadata
@@ -7207,7 +7202,7 @@ evaluate_mfrm_diagnostic_screening <- function(n_person = c(30, 50, 100),
 
         metrics <- diagnostic_screening_collect_metrics(diag)
         result_row$RunOK <- TRUE
-        result_row$Converged <- isTRUE(as.logical(fit$summary$Converged[1]))
+        result_row$Converged <- mfrm_inference_ready(fit)
         result_row$LegacyMeanAbsZ <- metrics$LegacyMeanAbsZ
         result_row$LegacyFlaggedLevels <- metrics$LegacyFlaggedLevels
         result_row$MarginalAvailable <- metrics$MarginalAvailable
@@ -7367,10 +7362,10 @@ diagnostic_screening_reading_order <- function(include_report = FALSE) {
       "Confirm that the simulation ran as intended before interpreting screening behavior.",
       "Avoid treating every exported table as equal-priority evidence.",
       "Decide whether to increase replications, inspect run failures, read contrasts, request report signals, or export appendices.",
-      "Keep simulation screening language distinct from inferential, recovery, and release language.",
+      "Keep simulation screening language distinct from inferential and parameter-recovery conclusions.",
       "Choose the smallest figure set that matches the reporting purpose before styling or rendering.",
       "Compare raw screening surfaces across scenarios and design conditions.",
-      "Separate operating behavior from runtime and from validation or release decisions.",
+      "Separate operating behavior from runtime and from inferential or validation conclusions.",
       "Inspect whether misspecification shifts strict screens beyond the well-specified baseline.",
       "Use only when include_report = TRUE; otherwise treat absence as not requested.",
       "Reuse for ggplot2, plotly, Quarto, or supplementary figure construction."
@@ -7468,7 +7463,7 @@ diagnostic_screening_next_actions <- function(overview,
       if (identical(status_reps, "ok")) {
         "Use the replication count in methods text and report Monte Carlo scope explicitly."
       } else {
-        "Treat this as a screening or smoke run; increase reps before making stable operating-characteristic claims."
+        "Treat this as an initial screening run; increase `reps` before interpreting operating characteristics as stable."
       },
       if (identical(status_runs, "ok")) {
         "Proceed to scenario and performance summaries, while still reporting the convergence basis."
@@ -7533,7 +7528,7 @@ diagnostic_screening_reporting_notes <- function(include_report = FALSE) {
     ReportingBoundary = c(
       "Describe as a simulation operating-characteristic study, not as a calibrated hypothesis test.",
       "Do not report ZSTD flags alone as final evidence that the generating mechanism is wrong.",
-      "Do not treat strict marginal/pairwise flags as release gates; interpret them relative to evaluated scenarios.",
+      "Do not treat strict marginal/pairwise flags as standalone validation criteria; interpret them relative to the evaluated scenarios.",
       "Do not generalize contrast direction or magnitude beyond the simulated design grid and replication count.",
       "Do not treat reporting-layer review signals as additional diagnostic tests.",
       "Do not treat exported plot data as independent evidence beyond the underlying summary tables."
@@ -7684,12 +7679,12 @@ diagnostic_screening_interpretation_payload <- function(object, overview = NULL)
   )
 }
 
-#' Summarize a diagnostic-screening validation study
+#' Summarize a diagnostic-screening simulation study
 #'
 #' @description
 #' Summarizes output from [evaluate_mfrm_diagnostic_screening()] for reporting,
 #' appendix export, and draw-free visualization handoff. The summary keeps
-#' simulation operating characteristics separate from validation gates: fit,
+#' simulation operating characteristics separate from inferential conclusions: fit,
 #' marginal, pairwise, and report-review signals are screening readouts rather
 #' than pass/fail evidence.
 #'
@@ -7851,7 +7846,7 @@ print.summary.mfrm_diagnostic_screening <- function(x, ...) {
   if (!is.null(x$gpcm_boundary) && nrow(x$gpcm_boundary) > 0L) {
     cat("\nBounded GPCM boundary\n")
     keep <- intersect(
-      c("Area", "Status", "RecommendedRoute", "NextValidationStep"),
+      c("Area", "Status", "Boundary", "RecommendedRoute"),
       names(x$gpcm_boundary)
     )
     print(as.data.frame(preview_df(x$gpcm_boundary[, keep, drop = FALSE])), row.names = FALSE)
@@ -8119,7 +8114,7 @@ diagnostic_screening_plot_group_labels <- function(plot_tbl, group_var = NULL) {
   paste(scenario, signal, paste0(group_var, "=", as.character(plot_tbl[[group_var]])), sep = " | ")
 }
 
-#' Plot a diagnostic-screening validation study
+#' Plot a diagnostic-screening simulation study
 #'
 #' @description
 #' Builds an integrated visual summary from
@@ -8142,7 +8137,7 @@ diagnostic_screening_plot_group_labels <- function(plot_tbl, group_var = NULL) {
 #' @param group_var Optional additional design variable to include in group
 #'   labels. Public design aliases are accepted.
 #' @param draw Logical; if `FALSE`, return the plot-data bundle without drawing.
-#' @param ... Reserved for future extensions.
+#' @param ... Reserved for generic compatibility.
 #'
 #' @return An `mfrm_plot_data` object with reusable metadata, a long-form
 #'   `plot_long` table, and interpretation handoff tables (`overview`,
@@ -8502,9 +8497,9 @@ signal_eval_metric_col <- function(signal, metric) {
 #'   (`n_person`, `n_rater`, `n_criterion`, `raters_per_person`), current
 #'   public aliases implied by `sim_spec` (for example `n_judge`, `n_task`,
 #'   `judge_per_person`), or role keywords (`person`, `rater`, `criterion`,
-#'   `assignment`). Values may be vectors. The schema-only future branch input
+#'   `assignment`). Values may be vectors. The nested named-facet form
 #'   `design$facets = c(person = ..., judge = ..., task = ...)` is also
-#'   accepted for the currently exposed facet keys. Do not specify the same
+#'   accepted for the supported person/rater/criterion design. Do not specify the same
 #'   variable through both `design` and the scalar design-grid arguments.
 #' @param reps Number of replications per design condition.
 #' @param group_levels Group labels used for DIF simulation. The first two levels
@@ -8664,7 +8659,7 @@ signal_eval_metric_col <- function(signal, metric) {
 #' @return An object of class `mfrm_signal_detection` with:
 #' - `design_grid`: evaluated design conditions. When `sim_spec` carries custom
 #'   public facet names, matching design-variable alias columns are included
-#'   alongside the canonical internal columns.
+#'   alongside the standard result columns.
 #' - `results`: replicate-level detection results, with the same
 #'   design-variable alias columns when applicable.
 #' - `rep_overview`: run-level status and timing, with the same design-variable
@@ -8674,7 +8669,7 @@ signal_eval_metric_col <- function(signal, metric) {
 #' - `planning_scope`: explicit record of the current planning contract
 #' - `planning_constraints`: explicit record of which design variables remain
 #'   mutable under the current simulation specification
-#' - `planning_schema`: combined planner-schema contract bundling the role
+#' - `planning_schema`: structured planning metadata bundling the role
 #'   descriptor, scope boundary, and current mutability map
 #' - `gpcm_boundary`: bounded-`GPCM` caveat row when a `GPCM` screening route
 #'   is used
@@ -8950,7 +8945,7 @@ evaluate_mfrm_signal_detection <- function(n_person = c(30, 50, 100),
         )
       }
       elapsed <- proc.time()[["elapsed"]] - t0
-      converged <- !inherits(fit, "error") && isTRUE(as.logical(fit$summary$Converged[1]))
+      converged <- !inherits(fit, "error") && mfrm_inference_ready(fit)
 
       err_msg <- character(0)
       if (inherits(fit, "error")) err_msg <- c(err_msg, conditionMessage(fit))
@@ -9170,10 +9165,10 @@ evaluate_mfrm_signal_detection <- function(n_person = c(30, 50, 100),
 #' - `design_descriptor`: role-based design-variable metadata
 #' - `planning_scope`: explicit record of the current planning contract
 #' - `planning_constraints`: explicit record of mutable/locked design variables
-#' - `planning_schema`: combined planner-schema contract
-#' - `future_branch_active_summary`: compact deterministic summary of the
-#'   schema-only future arbitrary-facet planning branch embedded in the current
-#'   planning schema
+#' - `planning_schema`: structured planning metadata
+#' - `structural_design_review`: deterministic structural review of the
+#'   named-facet design grid; it reports
+#'   design bookkeeping rather than signal-detection performance
 #' - `gpcm_boundary`: bounded-`GPCM` caveat row when present
 #' - `notes`: short interpretation notes, including the bias-side screening caveat
 #' @seealso [evaluate_mfrm_signal_detection()], [plot.mfrm_signal_detection]
@@ -9220,7 +9215,7 @@ summary.mfrm_signal_detection <- function(object, digits = 3, ...) {
   out$planning_constraints <- simulation_object_planning_constraints(object)
   out$planning_schema <- simulation_object_planning_schema(object)
   out$gpcm_boundary <- object$gpcm_boundary %||% data.frame()
-  out$future_branch_active_summary <- simulation_compact_future_branch_active_summary(
+  out$structural_design_review <- simulation_compact_structural_design_review_summary(
     object,
     digits = digits
   )
@@ -9238,10 +9233,10 @@ summary.mfrm_signal_detection <- function(object, digits = 3, ...) {
   if (length(schema_note) > 0L && !schema_note %in% out$notes) {
     out$notes <- c(out$notes, schema_note)
   }
-  if (inherits(out$future_branch_active_summary, "summary.mfrm_future_branch_active_branch")) {
+  if (inherits(out$structural_design_review, "summary.mfrm_structural_design_review")) {
     out$notes <- c(
       out$notes,
-      "A deterministic future arbitrary-facet planning scaffold is embedded in `future_branch_active_summary`; it reports structural bookkeeping and conservative recommendation logic, not DIF/bias detection power."
+      "The structural design review reports deterministic bookkeeping and conservative design guidance, not DIF/bias detection power."
     )
   }
   out$notes <- unique(out$notes)
@@ -9275,13 +9270,13 @@ print.summary.mfrm_signal_detection <- function(x, ...) {
   if (!is.null(x$gpcm_boundary) && nrow(x$gpcm_boundary) > 0L) {
     cat("\nBounded GPCM boundary\n")
     keep <- intersect(
-      c("Area", "Status", "RecommendedRoute", "NextValidationStep"),
+      c("Area", "Status", "Boundary", "RecommendedRoute"),
       names(x$gpcm_boundary)
     )
     print(as.data.frame(preview_df(x$gpcm_boundary[, keep, drop = FALSE])), row.names = FALSE)
   }
-  print_compact_future_branch_active_summary(
-    x$future_branch_active_summary %||% NULL,
+  print_compact_structural_design_review_summary(
+    x$structural_design_review %||% NULL,
     digits = digits
   )
   if (is.list(x$ademp) && length(x$ademp) > 0L) {

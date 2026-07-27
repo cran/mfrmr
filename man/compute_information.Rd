@@ -195,9 +195,10 @@ be used in reporting, follow with \code{\link[=precision_review_report]{precisio
 }
 
 \examples{
-toy <- load_mfrmr_data("example_core")
+toy <- load_mfrmr_data("example_operational")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                 method = "JML", model = "RSM", maxit = 30)
+                 method = "MML", model = "RSM",
+                 quad_points = 7, maxit = 30)
 info <- compute_information(fit)
 head(info$tif)
 info$tif$Theta[which.max(info$tif$Information)]

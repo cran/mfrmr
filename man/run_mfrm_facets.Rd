@@ -22,7 +22,8 @@ run_mfrm_facets(
   positive_facets = NULL,
   quad_points = 15,
   maxit = 400,
-  reltol = 1e-06,
+  reltol = 1e-09,
+  optimizer = c("auto", "BFGS", "L-BFGS-B"),
   mml_engine = c("direct", "em", "hybrid"),
   top_n_interactions = 20L
 )
@@ -44,7 +45,7 @@ mfrmRFacets(
   positive_facets = NULL,
   quad_points = 15,
   maxit = 400,
-  reltol = 1e-06,
+  reltol = 1e-09,
   mml_engine = c("direct", "em", "hybrid"),
   top_n_interactions = 20L
 )
@@ -83,7 +84,12 @@ columns after person/score/weight mapping.}
 
 \item{maxit}{Maximum optimizer iterations.}
 
-\item{reltol}{Optimization tolerance.}
+\item{reltol}{Relative optimizer tolerance passed to \code{\link[=fit_mfrm]{fit_mfrm()}}. The
+default is \code{1e-9}.}
+
+\item{optimizer}{Direct optimizer passed to \code{\link[=fit_mfrm]{fit_mfrm()}}. \code{"auto"} selects
+L-BFGS-B for MML and JML fits with at least 200 free parameters, and BFGS
+for smaller JML fits.}
 
 \item{mml_engine}{MML optimization engine passed to \code{\link[=fit_mfrm]{fit_mfrm()}}. Applies
 only when \code{method = "MML"}.}
@@ -121,8 +127,8 @@ that existing one-shot scripts expect. For new analysis scripts,
 prefer \code{fit_mfrm(..., method = "MML")} -- MML is the package-wide
 recommended route because person parameters are integrated out
 under an N(0, 1) prior and per-person posterior SEs are available.
-\item \code{method = "JMLE"}: explicit JMLE label; internally equivalent to
-JML route.
+\item \code{method = "JMLE"}: backward-compatible input alias for the JML route;
+fitted objects and generated outputs use the canonical \code{"JML"} label.
 \item \code{method = "MML"}: marginal maximum likelihood route using
 \code{quad_points}. Use \code{mml_engine = "em"} or \code{"hybrid"} only for
 \code{RSM} / \code{PCM} fits when you want the staged MML alternatives.

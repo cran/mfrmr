@@ -193,12 +193,18 @@ test_that("JML and MML produce correlated facet estimates", {
 
   fit_jml <- suppressWarnings(fit_mfrm(
     d, "Person", c("Rater", "Task", "Criterion"), "Score",
-    method = "JML", model = "RSM", maxit = 30
+    method = "JML", model = "RSM", maxit = 400
   ))
   fit_mml <- suppressWarnings(fit_mfrm(
     d, "Person", c("Rater", "Task", "Criterion"), "Score",
-    method = "MML", model = "RSM", maxit = 30, quad_points = 15
+    method = "MML", model = "RSM", maxit = 400, quad_points = 15
   ))
+
+  for (fit in list(fit_jml, fit_mml)) {
+    expect_true(isTRUE(fit$summary$Converged[1]))
+    expect_true(isTRUE(fit$summary$InferenceReady[1]))
+    expect_identical(as.character(fit$summary$ConvergenceSeverity[1]), "pass")
+  }
 
   jml_rater <- fit_jml$facets$others |>
     dplyr::filter(.data$Facet == "Rater") |>

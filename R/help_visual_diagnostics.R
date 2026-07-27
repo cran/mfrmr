@@ -30,7 +30,7 @@
 #'   transformation. Under `GPCM` the fair-average panel of
 #'   [plot_qc_dashboard()] therefore renders with an explicit
 #'   "unavailable" status, and the broader compatibility-export helpers
-#'   stay outside the validated `GPCM` boundary.
+#'   stay outside the documented `GPCM` boundary.
 #'
 #' Use [gpcm_capability_matrix()] for the formal per-helper boundary
 #' before choosing a `GPCM` follow-up plot route.
@@ -96,8 +96,7 @@
 #'   Use [plot_qc_dashboard()] for `RSM` / `PCM`. The bounded `GPCM`
 #'   branch can also call [plot_qc_dashboard()], but its fair-average
 #'   panel reports an explicit unavailability indicator because that
-#'   panel's score-metric semantics have not yet been generalized
-#'   beyond the Rasch-family branch.
+#'   panel's score-metric semantics are limited to the Rasch-family branch.
 #' - "Which figures are already supported by my current run?"
 #'   Use [reporting_checklist()] and review the `"Visual Displays"` rows before
 #'   choosing the next plot.
@@ -130,11 +129,29 @@
 #'    3D-ready category-probability data; `mfrmr` intentionally does not add a
 #'    package-native plotly/rgl renderer for this route.
 #' 8. Use `preset = "publication"` when you want the package's cleaner
-#'    manuscript-oriented styling.
+#'    manuscript-oriented styling, or `preset = "monochrome"` when journals,
+#'    accessibility requirements, or print workflows require grayscale output.
 #'
-#' @section Visual coverage for this release:
-#' This release treats the plotting layer as sufficient when the current run
-#' supports all of the following follow-up roles through public helpers:
+#' @section Customizing figures:
+#' The package's plotting defaults are intended to be safe starting points,
+#' not a closed graphics system. Use `preset = "publication"` for clean
+#' manuscript defaults, or `preset = "monochrome"` for grayscale output that
+#' relies more on line type, point shape, and reference lines than on color.
+#' Use `plot(..., draw = FALSE)` when you want the reusable `mfrm_plot_data`
+#' object instead of immediate base graphics. Then call
+#' [plot_data_components()] to see available components and [plot_data()] to
+#' extract the long tables used by the plot.
+#'
+#' Custom renderers should keep the returned metadata close to the figure:
+#' `reference_lines`, `legend`, `guidance`, `category_support`,
+#' `interpretation_guide`, and any reporting-template rows are part of the
+#' interpretation contract. They let users change colors, labels, panels,
+#' or rendering technology without losing the measurement scale, caveats, and
+#' caption boundary attached to the package-native plot.
+#'
+#' @section Visual coverage:
+#' The plotting layer supports the following public follow-up roles when the
+#' fitted object contains the required data:
 #' - First-pass triage:
 #'   [plot_qc_dashboard()] or the `"Visual Displays"` rows from
 #'   [reporting_checklist()].
@@ -301,9 +318,9 @@
 #'   whether facet elements are statistically distinguishable.
 #' - Residual PCA and bias plots should be interpreted as follow-up layers
 #'   after the main fit screen, not as first-pass diagnostics.
-#' - DFF residual-method plots are screening visuals. ETS A/B/C labels
-#'   should be claimed only for rows whose refit output reports
-#'   `ClassificationSystem == "ETS"`.
+#' - DFF residual- and refit-method plots are screening visuals. Current refit
+#'   rows do not receive ETS A/B/C labels because their plug-in uncertainty
+#'   omits baseline-anchor uncertainty and cross-refit covariance.
 #'
 #' @section Typical workflow:
 #' - Figure-readiness route:

@@ -19,5 +19,5 @@ knitr::opts_chunk$set(
 # gpcm_capability_matrix("blocked")[, c("Area", "Status", "RecommendedRoute")]
 
 ## ----capability-deferred------------------------------------------------------
-# gpcm_capability_matrix("deferred")[, c("Area", "Status", "NextValidationStep")]
+# gpcm_capability_matrix("deferred")[, c("Area", "Status", "Boundary", "RecommendedRoute")]
 

@@ -15,6 +15,68 @@
 # + residual) and returns the variance decomposition + G / Phi
 # coefficients.
 
+mfrmr_gt_boundary_status <- function(fit_lmer,
+                                     lmer_warnings = character(0),
+                                     lmer_messages = character(0),
+                                     tolerance = 1e-4) {
+  singular_fit <- tryCatch(
+    isTRUE(lme4::isSingular(fit_lmer, tol = tolerance)),
+    error = function(e) NA
+  )
+  boundary_text <- c(lmer_warnings, lmer_messages)
+  boundary_message <- any(grepl(
+    "boundary|singular",
+    boundary_text,
+    ignore.case = TRUE
+  ))
+  status <- if (isTRUE(singular_fit) || isTRUE(boundary_message)) {
+    "boundary_or_singular_fit"
+  } else if (is.na(singular_fit)) {
+    "singularity_check_unavailable"
+  } else {
+    "identified"
+  }
+  note <- switch(
+    status,
+    boundary_or_singular_fit = paste(
+      "The lme4 random-effects fit is singular or on a boundary;",
+      "interpret G/D-study coefficients as design-identification",
+      "warnings rather than decision-ready evidence."
+    ),
+    singularity_check_unavailable = paste(
+      "The lme4 singularity check was unavailable;",
+      "treat G/D-study coefficients as caveated until the fitted",
+      "random-effects structure is reviewed."
+    ),
+    "No lme4 boundary or singular fit was detected."
+  )
+  list(
+    identification_status = status,
+    identification_note = note,
+    boundary_fit = identical(status, "boundary_or_singular_fit"),
+    singular_fit = singular_fit,
+    singular_tolerance = tolerance,
+    boundary_message = boundary_message
+  )
+}
+
+mfrmr_gt_classify_coef <- function(value,
+                                   identification_status = "identified") {
+  if (!identical(as.character(identification_status)[1L], "identified")) {
+    return(ifelse(
+      is.finite(value),
+      "identification_warning",
+      "unavailable"
+    ))
+  }
+  dplyr::case_when(
+    !is.finite(value) ~ "unavailable",
+    value >= 0.80 ~ "at_or_above_0.80_reference",
+    value >= 0.70 ~ "at_or_above_0.70_reference",
+    TRUE ~ "below_0.70_reference"
+  )
+}
+
 #' Generalizability-theory variance decomposition for an MFRM design
 #'
 #' Re-fits the rating data underlying an `mfrm_fit` as a crossed
@@ -43,8 +105,9 @@
 #'     `ProportionVariance`.}
 #'   \item{`coefficients`}{One-row data frame with `G`
 #'     (generalizability coefficient, relative decision) and
-#'     `Phi` (dependability coefficient, absolute decision), using the
-#'     single-observation-per-cell convention.}
+#'     `Phi` (dependability coefficient, absolute decision), coefficient
+#'     status labels, and the identification status of the fitted
+#'     random-effects model.}
 #'   \item{`design`}{Description of the crossed-random model.}
 #' }
 #'
@@ -56,8 +119,10 @@
 #'   main effects) + sigma2(Residual))`, before D-study scaling.
 #' - Use [mfrm_d_study()] to project `G` / `Phi` under planned numbers of
 #'   raters, items, criteria, or other random measurement facets.
-#' - Reporting bands follow Brennan (2001): G / Phi >= 0.8 for
-#'   high-stakes decisions, >= 0.7 for routine reporting.
+#' - Values of 0.70 and 0.80 are displayed as familiar planning references,
+#'   not as universal decision rules. Required dependability depends on the
+#'   decision, consequences, population, and evidence beyond a single
+#'   coefficient.
 #'
 #' @section Limitations:
 #' This helper formulates the random-effects model with main effects
@@ -74,6 +139,8 @@
 #' Because person-by-facet interaction terms are not estimated separately,
 #' D-study projections remain practical planning evidence rather than a
 #' replacement for a fully specified G-theory design.
+#' Boundary or singular `lme4` fits are retained as diagnostic evidence but are
+#' not treated as decision-ready G/D-study evidence.
 #'
 #' @section References:
 #' - Cronbach, L. J., Gleser, G. C., Nanda, H., & Rajaratnam, N.
@@ -95,9 +162,15 @@
 #'   #   variance shares mean those conditions add measurement error
 #'   #   relative to person spread.
 #'   gt$coefficients
-#'   # Look for: G >= 0.7 for routine reporting, >= 0.8 for high-stakes.
-#'   #   G < Phi means absolute decisions are noisier than relative
+#'   # Compare G and Phi with study-specific requirements; 0.70 and 0.80
+#'   #   are reference guides only. G < Phi means absolute decisions are noisier than relative
 #'   #   decisions; review whether facet main effects need anchoring.
+#'   # Always check IdentificationStatus before using the bands:
+#'   gt$coefficients[, c("G", "Phi", "GStatus", "PhiStatus",
+#'                       "IdentificationStatus")]
+#'   gt$design$identification_note
+#'   # If IdentificationStatus is not "identified", treat G/Phi as
+#'   # design-review evidence rather than decision-ready reliability.
 #' }
 #' }
 #' @export
@@ -153,12 +226,17 @@ mfrm_generalizability <- function(fit,
   formula <- stats::as.formula(formula_str)
 
   lmer_warnings <- character(0)
+  lmer_messages <- character(0)
   fit_lmer <- tryCatch(
     withCallingHandlers(
       lme4::lmer(formula, data = data, REML = isTRUE(reml)),
       warning = function(w) {
         lmer_warnings <<- c(lmer_warnings, conditionMessage(w))
         invokeRestart("muffleWarning")
+      },
+      message = function(m) {
+        lmer_messages <<- c(lmer_messages, conditionMessage(m))
+        invokeRestart("muffleMessage")
       }
     ),
     error = function(e) e
@@ -166,6 +244,11 @@ mfrm_generalizability <- function(fit,
   if (inherits(fit_lmer, "error")) {
     stop("lme4::lmer failed: ", conditionMessage(fit_lmer), call. = FALSE)
   }
+  boundary_status <- mfrmr_gt_boundary_status(
+    fit_lmer,
+    lmer_warnings = lmer_warnings,
+    lmer_messages = lmer_messages
+  )
 
   vc <- as.data.frame(lme4::VarCorr(fit_lmer))
   vc <- vc[is.na(vc$var2), c("grp", "vcov")]
@@ -208,6 +291,15 @@ mfrm_generalizability <- function(fit,
     coefficients = data.frame(
       G = round(G_coef, 4),
       Phi = round(Phi_coef, 4),
+      GStatus = mfrmr_gt_classify_coef(
+        G_coef,
+        boundary_status$identification_status
+      ),
+      PhiStatus = mfrmr_gt_classify_coef(
+        Phi_coef,
+        boundary_status$identification_status
+      ),
+      IdentificationStatus = boundary_status$identification_status,
       stringsAsFactors = FALSE
     ),
     design = list(
@@ -221,7 +313,14 @@ mfrm_generalizability <- function(fit,
       ),
       formula = format(formula),
       reml = isTRUE(reml),
-      lmer_warnings = lmer_warnings
+      lmer_warnings = lmer_warnings,
+      lmer_messages = lmer_messages,
+      identification_status = boundary_status$identification_status,
+      identification_note = boundary_status$identification_note,
+      boundary_fit = boundary_status$boundary_fit,
+      singular_fit = boundary_status$singular_fit,
+      singular_tolerance = boundary_status$singular_tolerance,
+      boundary_message = boundary_status$boundary_message
     )
   )
   class(out) <- c("mfrm_generalizability", "list")
@@ -278,7 +377,8 @@ mfrm_generalizability <- function(fit,
 #'
 #' @return An object of class `mfrm_d_study`, a data.frame with one row per
 #'   design scenario and columns for planned facet counts, variance terms,
-#'   projected `G`, projected `Phi`, and interpretation bands.
+#'   projected `G`, projected `Phi`, interpretation bands, and identification
+#'   status inherited from [mfrm_generalizability()].
 #'
 #' @references
 #' Cronbach, L. J., Gleser, G. C., Nanda, H., & Rajaratnam, N.
@@ -296,7 +396,11 @@ mfrm_generalizability <- function(fit,
 #'                 method = "JML", maxit = 30)
 #' if (requireNamespace("lme4", quietly = TRUE)) {
 #'   gt <- mfrm_generalizability(fit)
-#'   mfrm_d_study(gt, data.frame(Rater = c(2, 3, 4), Criterion = 4))
+#'   ds <- mfrm_d_study(gt, data.frame(Rater = c(2, 3, 4), Criterion = 4))
+#'   ds[, c("n_Rater", "n_Criterion", "G", "Phi",
+#'          "GStatus", "PhiStatus", "IdentificationStatus")]
+#'   # If IdentificationStatus is not "identified", even large G/Phi
+#'   # values remain identification warnings, not decision-ready evidence.
 #' }
 #' }
 #' @export
@@ -414,13 +518,14 @@ mfrm_d_study <- function(x,
     projected_phi <- sigma2_p / (sigma2_p + abs_error)
   }
 
+  identification_status <- as.character(x$design$identification_status %||% "identified")[1L]
+  if (is.na(identification_status) || !nzchar(identification_status)) {
+    identification_status <- "identified"
+  }
+  identification_note <- as.character(x$design$identification_note %||% "")[1L]
+  boundary_fit <- isTRUE(x$design$boundary_fit)
   classify_coef <- function(value) {
-    dplyr::case_when(
-      !is.finite(value) ~ "unavailable",
-      value >= 0.80 ~ "high_stakes_candidate",
-      value >= 0.70 ~ "routine_candidate",
-      TRUE ~ "review"
-    )
+    mfrmr_gt_classify_coef(value, identification_status)
   }
   out <- cbind(
     data.frame(Scenario = seq_len(nrow(counts)), counts, stringsAsFactors = FALSE),
@@ -434,6 +539,9 @@ mfrm_d_study <- function(x,
       Phi = round(projected_phi, 4),
       GStatus = classify_coef(projected_g),
       PhiStatus = classify_coef(projected_phi),
+      IdentificationStatus = rep(identification_status, nrow(counts)),
+      BoundaryFit = rep(boundary_fit, nrow(counts)),
+      IdentificationNote = rep(identification_note, nrow(counts)),
       stringsAsFactors = FALSE
     )
   )
@@ -441,6 +549,9 @@ mfrm_d_study <- function(x,
   attr(out, "random_facets") <- random_facets
   attr(out, "residual_scaling") <- residual_scaling
   attr(out, "source") <- "mfrm_generalizability"
+  attr(out, "identification_status") <- identification_status
+  attr(out, "identification_note") <- identification_note
+  attr(out, "boundary_fit") <- boundary_fit
   class(out) <- c("mfrm_d_study", "data.frame")
   out
 }
@@ -451,7 +562,16 @@ print.mfrm_d_study <- function(x, ...) {
   cat("  Object of measurement:", attr(x, "object_facet") %||% NA_character_, "\n")
   cat("  Random facets:", paste(attr(x, "random_facets") %||% character(0), collapse = ", "), "\n\n")
   cat("  Residual scaling:", attr(x, "residual_scaling") %||% paste(unique(x$ResidualScaling), collapse = ", "), "\n\n")
+  if (!identical(attr(x, "identification_status") %||% "identified", "identified")) {
+    cat("  Identification status:", attr(x, "identification_status"), "\n")
+    note <- attr(x, "identification_note") %||% ""
+    if (nzchar(note)) {
+      cat("  Note:", note, "\n")
+    }
+    cat("\n")
+  }
   print.data.frame(x, row.names = FALSE, ...)
+  cat("\n  Note: 0.70 and 0.80 are reference guides, not universal decision rules.\n")
   invisible(x)
 }
 
@@ -861,9 +981,9 @@ plot.mfrm_d_study <- function(x,
         new_reference_lines(
           axis = rep("y", 2L),
           value = c(0.70, 0.80),
-          label = c("routine", "high_stakes"),
+          label = c("0.70 reference", "0.80 reference"),
           linetype = c("dotted", "dashed"),
-          role = rep("decision_band", 2L)
+          role = rep("reference_guide", 2L)
         )
       } else {
         new_reference_lines()
@@ -885,9 +1005,18 @@ print.mfrm_generalizability <- function(x, ...) {
   cat(sprintf("\nG (relative): %.3f | Phi (absolute): %.3f\n",
               as.numeric(x$coefficients$G),
               as.numeric(x$coefficients$Phi)))
+  if (!identical(x$design$identification_status %||% "identified", "identified")) {
+    cat(sprintf("\nIdentification status: %s\n",
+                x$design$identification_status))
+    cat(x$design$identification_note, "\n")
+  }
   if (length(x$design$lmer_warnings) > 0L) {
     cat(sprintf("\n%d lme4 warning(s) suppressed; results may be unstable.\n",
                 length(x$design$lmer_warnings)))
+  }
+  if (length(x$design$lmer_messages) > 0L) {
+    cat(sprintf("\n%d lme4 message(s) suppressed; review boundary/convergence diagnostics.\n",
+                length(x$design$lmer_messages)))
   }
   invisible(x)
 }
