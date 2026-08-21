@@ -18,13 +18,103 @@ knitr::opts_chunk$set(
 )
 ```
 
-`mfrmr` includes a bounded implementation of the Generalized Partial Credit
-Model (GPCM; Muraki 1992). The bounded estimator is available under the
+`mfrmr` includes a scope-bounded implementation of the Generalized Partial
+Credit Model (GPCM; Muraki 1992). The estimator is available under the
 documented constraints, while several
 downstream reporting helpers remain restricted because score-side semantics
 under free discrimination differ from the Rasch-family case. This vignette
 documents which helpers are available, which are not, and what to use as a
 substitute when a helper is restricted.
+
+In this guide, *bounded* describes the supported model and workflow boundary;
+it does not mean finite lower and upper parameter bounds. The JML route uses an
+unpenalized identified joint likelihood. A non-representable slope proposal can
+be rejected during line search for numerical safety, but that is not a
+statistical penalty. If the likelihood has a certified recession direction,
+the finite optimizer iterate is retained only as a numerical trace and the
+primary result carries an extended-real or typed boundary status.
+
+## Relationship to generalized many-facet models
+
+Ordinary GPCM adds a positive discrimination parameter to the partial-credit
+kernel; it does not replace the item position or step parameters. In the
+current many-facet notation,
+
+\[
+\log\frac{P(Y_o=k)}{P(Y_o=k-1)}
+  = \alpha_{g(o)}\{\eta_o-\tau_{g(o),k}\},
+\qquad \prod_g\alpha_g=1,
+\]
+
+where the additive predictor \(\eta_o\) contains person ability and the signed
+locations of the observed facets. Thus the selected slope multiplies the
+complete adjacent-category predictor: person ability, every facet location or
+fitted interaction inside \(\eta_o\), and the owned step. It is not a
+loading-only formulation in which discrimination multiplies ability but leaves
+rater severity and other intercept effects unscaled. Unit slopes reduce this
+expression to the equal-discrimination PCM kernel.
+
+The phrase *generalized many-facet Rasch model* is broader and is not a unique
+synonym for this implementation. For example, Uto and Ueno (2020, equation 9)
+use multiplicative task and rater slope blocks,
+\(\alpha_i\alpha_r\), together with rater severity and rater-specific steps.
+By contrast, mfrmr 0.2.3 requires one facet to own both the slope and step
+blocks: `slope_facet == step_facet`. It does not jointly estimate task and
+rater slopes, decouple the slope owner from the step owner, or introduce a
+multidimensional ability vector. The precise name used in the 0.2.3 evidence
+map is therefore **aligned single-owner relative-slope GPCM**.
+
+A rater-owned fit is close to a restricted Uto--Ueno form after suppressing the
+task-slope block, provided the remaining step and identification contracts are
+also aligned. A criterion-owned fit instead has criterion-owned slopes and
+steps and should be described as an analogous restricted many-facet GPCM, not
+as an exact fit of Uto and Ueno's equation. Because free discrimination relaxes
+the defining equal-discrimination Rasch restriction, "generalized MFRM" means
+a model generalized from the MFRM baseline rather than a strict Rasch model.
+
+### Which facet receives different slopes?
+
+The slope is not one common number for the entire fitted GPCM. The selected
+`slope_facet` contributes one positive slope for each of its levels. If it has
+\(G\) levels, the returned table contains \(G\) slopes and the model estimates
+\(G-1\) free relative log-slope contrasts because their geometric mean is fixed
+to one.
+
+| Configuration | Meaning | Current status |
+|---|---|---|
+| `step_facet = "Criterion"`, `slope_facet = "Criterion"` | Each criterion has its own relative discrimination and criterion-specific steps. | Supported bounded route. |
+| `step_facet = "Rater"`, `slope_facet = "Rater"` | Each rater has its own model-conditional relative discrimination and rater-specific steps. | Code-supported with rater-interpretation caveats; a slope is not automatically evidence of rater consistency. |
+| Criterion steps with rater slopes, or conversely | Slope owner and step owner differ. | Unsupported in 0.2.3. |
+| Criterion slopes and rater slopes together | Effective discrimination could involve two slope blocks. | Unsupported in 0.2.3; this is closer to a multiplicative generalized-MFRM extension. |
+
+Every facet that is not selected remains an additive location term inside
+\(\eta\). For example, a criterion-owned GPCM can still estimate rater severity,
+but it does not give each rater a separate discrimination parameter. The
+criterion slope nevertheless scales that rater-severity contribution because
+the contribution is inside \(\eta\). “No separate rater slope” and “rater
+severity is unscaled” are therefore not the same statement.
+
+### An explanation for a high-school reader
+
+Imagine that several teachers grade presentations on several criteria.
+
+- **PCM** gives everyone rulers with the same magnification. One criterion may
+  be harder and one teacher may be stricter, but a one-unit ability difference
+  changes the rating probabilities at the same basic sharpness everywhere.
+- **The current mfrmr GPCM** lets you choose one box of rulers. If the box is
+  `Criterion`, each criterion can have a different magnification. If the box is
+  `Rater`, each rater can have a different magnification. You may choose only
+  one box, and the same box also owns the category steps.
+- **A broader generalized MFRM** can give both the task/criterion and the rater
+  their own magnification knobs. In the Uto--Ueno example, the effective
+  sharpness is the product of the task and rater settings. It can also model
+  rater severity and rater-specific use of rating categories.
+
+Thus the current GPCM is a smaller branch inside the broader family: it adds a
+carefully controlled slope vector to a many-facet PCM, but it is not the full
+two-knob generalized MFRM. Also, once discrimination is allowed to vary, the
+model is generalized *from* the Rasch baseline; it no longer retains the strict
+equal-discrimination Rasch restriction.
 
 ## Before fitting: model-choice triage
 
@@ -42,6 +132,150 @@ equal-weighting reference route; bounded `GPCM` is a slope-aware extension.
 If equal contribution of items, criteria, or raters is part of the validity
 argument, a better-fitting bounded `GPCM` should be reported as sensitivity
 evidence rather than as an automatic replacement.
+
+### Comparing PCM and bounded GPCM
+
+The package provides three complementary comparison layers:
+
+1. `compare_mfrm()` displays same-data log likelihood, AIC, Person-based BIC,
+   SABIC, deltas, and candidate-set weights. Automatic ranking requires
+   inference-ready MML fits, identical prepared rows and constraints, a common
+   quadrature identity, and at least 31 quadrature points. Always inspect
+   `comparison$table$ICComparable` first.
+2. `build_weighting_review()` shows what the GPCM slopes changed: the slope
+   profile, facet-measure shifts, and redistribution of information across
+   levels.
+3. `build_model_choice_review(..., run_weighting_review = TRUE)` bundles the
+   statistical comparison, operational model roles, support boundaries, and
+   the weighting review.
+
+```r
+fit_pcm <- fit_mfrm(
+  dat, "Person", c("Rater", "Criterion"), "Score",
+  method = "MML", model = "PCM",
+  step_facet = "Criterion", quad_points = 31
+)
+
+fit_gpcm <- fit_mfrm(
+  dat, "Person", c("Rater", "Criterion"), "Score",
+  method = "MML", model = "GPCM",
+  step_facet = "Criterion", slope_facet = "Criterion",
+  quad_points = 31
+)
+
+comparison <- compare_mfrm(PCM = fit_pcm, GPCM = fit_gpcm)
+comparison$table[, c(
+  "Label", "LogLik", "AIC", "BIC", "SABIC", "ICComparable"
+)]
+
+weighting <- build_weighting_review(fit_pcm, fit_gpcm)
+summary(weighting)
+weighting$comparison_contract
+
+review <- build_model_choice_review(
+  PCM = fit_pcm,
+  GPCM = fit_gpcm,
+  run_weighting_review = TRUE
+)
+summary(review)
+review$model_roles[, c(
+  "Model", "StepStructure", "StepCoordinates", "FreeStepParameters",
+  "SlopeStructure", "SlopeCoordinates", "FreeSlopeParameters",
+  "FitReadiness", "FormalInference", "Interpretation"
+)]
+```
+
+`StepCoordinates` and `SlopeCoordinates` count the values shown in fitted
+tables. `FreeStepParameters` and `FreeSlopeParameters` count the independent
+coordinates optimized after identification constraints. For example, with
+four score categories and four levels of the step facet, PCM and GPCM display
+12 step coordinates but optimize 8 free step parameters because each
+three-step ladder is sum-zero. GPCM additionally displays four relative slopes
+but optimizes three free log slopes because their geometric mean is one.
+
+The `comparison_contract` keeps four situations separate:
+
+| Evidence tier | What may be concluded? |
+|---|---|
+| `same_basis_mml_information_criteria` | AIC, Person-BIC, and SABIC may be read as candidate-set evidence, together with slope stability and a denser common-grid check. |
+| `mml_screening_or_review_grid_only` or other non-comparable MML tier | Raw fit values are descriptive; repair integration selectability, readiness, or comparison identity first. |
+| `jml_descriptive_reweighting_only` | The fitted slopes, measure shifts, and information redistribution may be reviewed, but the unpenalized JML likelihood gain does not select GPCM. |
+| `jml_optimizer_trace_only_not_inference_ready` | Even the likelihood difference is only a comparison of retained optimizer traces; it is not inferential model evidence. |
+
+For a JML question, follow that table with recovery conditions rather than an
+IC or LRT claim. `evaluate_mfrm_recovery()` already distinguishes
+`unit_slopes`, `near_flat`, `moderate`, and `high_dispersion` generator
+conditions. The unit-slope condition asks how often harmless sampling and
+optimizer variation can create an apparent slope spread; the non-unit
+conditions ask whether the declared heterogeneity can be recovered. FACETS
+can support the aligned PCM/JML side of this review, but its Table 7
+discrimination remains a post-fit diagnostic and not a free-slope GPCM fit.
+
+PCM is obtained from the aligned GPCM response kernel by setting all slopes to
+one. Nevertheless, the current conservative nesting contract does not compute
+a PCM-versus-GPCM chi-square likelihood-ratio test. Calling
+`compare_mfrm(..., nested = TRUE)` records the relation
+`PCM_in_GPCM_ic_only` and withholds the LRT. This keeps an attractive
+information-criterion result from being overstated when GPCM parameter or
+boundary readiness remains unresolved. When the IC comparison is suppressed,
+the raw fit values and weighting review remain descriptive evidence rather
+than an automatic selection rule.
+
+## Response-family boundary
+
+Every current `fit_mfrm()` likelihood is ordered categorical. The distinction
+between response values and observation frequencies is essential:
+
+| Input or estimand | 0.2.3 treatment |
+|---|---|
+| Ordered binary response | Supported as a two-category ordered response. |
+| Ordered polytomous response | Supported through RSM, PCM, or bounded GPCM. |
+| Unordered nominal/multinomial response | Unsupported; category order enters the current likelihood. |
+| Poisson, negative-binomial, or grouped binomial-trial count | Unsupported as a response family. An integer `Score` is only an ordered category code. |
+| Row-frequency/replication weight for an ordered rating | A positive numeric `weight` can weight that row's conditional ordered-category likelihood contribution. |
+
+Thus, the fact that the fitted category probabilities sum to one does not make
+the model a nominal-response or multinomial-logit model. Likewise, a frequency
+weight does not turn the score into a Poisson count or account for dependence
+among replicated ratings. Nor is it a general collapsed-person frequency
+table: under MML, powering responses inside one Person's conditional pattern
+is not equivalent to replicating a complete Person pattern after
+marginalization. FACETS provides separate `Bn` and `P` response models; those
+are outside the current mfrmr estimator even though FACETS-style coverage
+documentation describes the handoff boundary.
+
+Within that supported scope, an explicit identification contract is still
+required. With default MML,
+`gpcm_mml_identification = "free_population"` estimates an intercept-only
+person distribution \(N(\beta_0,\sigma^2)\), while the level-specific log
+slopes are constrained to sum to zero (geometric mean 1). The fitted slopes are
+therefore relative discriminations with \(G-1\) free contrasts, and
+\(\sigma\alpha_g\) gives the equivalent slope on a fixed-latent-standard-
+deviation scale. This retains the conventional common-discrimination degree
+of freedom. The explicit legacy mode
+`gpcm_mml_identification = "fixed_standard_normal"` instead fixes both
+\(\sigma=1\) and the slope geometric mean to one and is a narrower model.
+
+## GPCM is not one estimator
+
+Muraki (1992) supplies the GPCM response model and an MML-EM estimation route;
+it is not a source for the present JML implementation. The present mfrmr JML
+route is an identified fixed-effects, unpenalized joint likelihood with
+post-fit boundary/recession auditing. This differs from penalized JML for GPCM
+(Wijayanto et al. 2021), whose quadratic regularization changes the objective,
+and from software routes that impose finite parameter boxes. A penalized,
+adjusted, or box-constrained point estimate can be a useful comparator, but it
+is not the maximizer of mfrmr's original unpenalized JML objective.
+
+This distinction matters even when all methods return finite numbers. With a
+fixed number of observations per person, jointly estimated person coordinates
+are incidental parameters; structural JML estimates can retain finite-test-
+length bias as the number of persons grows (Hessen 2025). An extreme response
+pattern can additionally make the ordinary finite JML maximum unattained.
+mfrmr therefore keeps recovery/bias evidence, boundary handling, numerical
+convergence, and cross-software agreement as separate gates.
+Under JML, the geometric-mean constraint resolves the scale of the jointly
+estimated person coordinates and slopes.
 
 ## Report wording templates
 
@@ -89,6 +323,159 @@ The matrix is intentionally conservative. A row stays in `blocked` or
 `deferred` even when some individual computation is already available, because the
 scope statement includes the interpretation needed for a complete public
 workflow rather than only checking whether code executes.
+
+## Slope values, boundaries, and uncertainty
+
+The finite `LogEstimate` and `Estimate` columns in `fit$slopes` are optimizer
+outputs, not automatic evidence of a finite estimand. Use `ParameterStatus` and
+the `Primary*` columns first. Under JML, mfrmr can certify a monotone
+sum-to-zero log-slope path while holding the retained additive coordinates
+fixed. Such a result yields `unbounded_low`, `unbounded_high`, or
+`unbounded_both`. If no such path is certified, the joint Person--facet--step--
+slope problem remains unevaluated; the finite optimizer output is retained only
+as a numerical trace. A second bounded check lets additive coordinates move
+with an ordered positive/negative log-slope pair. A competitive path from this
+family is recorded as a candidate, but `ParameterStatus` remains
+`not_evaluated` and the primary value remains unavailable: this sufficient
+path result does not determine the global maximum of the non-concave GPCM
+likelihood. Failure to find such a path is equally limited to that family.
+Under MML, Persons are integrated out, so neither conditional JML result is
+reused as marginal-likelihood evidence. The MML branch records a separate
+sufficient-path check for the fitted finite-quadrature objective, but that
+check is not a complete analysis of the continuous marginal likelihood.
+Whether it finds a path or not, free MML slopes remain `not_evaluated` until
+the applicable parameter-level readiness conditions are established. Use
+[gpcm_mml_quadrature_sensitivity()] to inspect movement across quadrature
+grids; grid stability is numerical evidence, not proof that a finite global
+maximum exists or that slope uncertainty is inferentially eligible.
+
+The same distinction applies to uncertainty. `diagnose_mfrm()` can retain the
+local covariance calculation as `Optimizer*SE` and `Optimizer*CI` fields for
+numerical review. Ordinary slope `SE` and confidence-limit fields remain
+unavailable when `SEEligible` or `CIEligible` is false. This avoids presenting
+a local Hessian around a finite stopping point as uncertainty for a parameter
+whose applicable global boundary status has not been established.
+
+## What can and cannot be compared across programs
+
+A column labelled "discrimination" is not sufficient evidence that two
+programs fitted the same GPCM. FACETS reports an element-discrimination
+diagnostic after estimating its Rasch measures and explicitly does not allow
+that diagnostic to alter the other estimates. It is therefore not a matched
+counterpart of a jointly estimated free slope in `mfrmr`. FACETS remains useful
+for unit- or explicitly fixed-discrimination reductions, category/threshold
+and facet-measure comparisons within a common Rasch specification, and as a
+deliberately different-model diagnostic benchmark.
+
+TAM's MML 2PL/GPCM route does estimate slopes, including grouped or designed
+slopes, but TAM documents that slopes are not estimated by its many-facet
+fitting function. A TAM comparison must therefore use a provably equivalent
+non-faceted or re-expressed design and must match the latent variance,
+threshold convention, slope grouping, category map, and retained observations
+before computing differences. `sirt::rm.facets()` provides a useful second MML
+reference: it estimates item and/or rater slopes under product-one centering and
+an estimated normal trait spread. Its item-only GPCM and equal-discrimination
+many-facet reductions are candidate matched lanes after category, threshold,
+quadrature, and centering conventions are aligned. Its general free-slope rater
+kernel is not the current mfrmr kernel: sirt uses the product of item and rater
+slopes on the trait term while rater severity remains a separate location term,
+whereas mfrmr assigns one slope owner and multiplies the complete adjacent-
+category predictor. Such results are different-model sensitivity evidence, not
+automatic numerical validation. `immer` provides PCM-design JML/CML/CCML
+routes and a hierarchical rater model, not a direct free-GPCM many-facet match.
+Its role is consequently a unit-slope reduction or alternative-model
+sensitivity analysis rather than free-slope numerical validation.
+
+TAM also documents a multifacet slope construction that sends a facet-model
+intercept design `A` and a slope-group design `E` to `tam.mml.2pl()`. That is
+not automatically the current mfrmr kernel. In the TAM construction the slope
+weights the latent-trait term while shared Rater and step effects remain linear
+intercepts; in mfrmr the selected slope weights the complete adjacent-category
+predictor, including Rater severity and steps. Matching the latter would
+require products such as an estimated Criterion slope times an estimated
+Rater severity, which the two independent linear designs do not impose. A
+q=31 `example_core` re-expression was therefore retained as different-model
+sensitivity evidence, not as an exact full-model comparison. This algebraic
+screen makes a second quadrature run unnecessary.
+
+A bounded validation comparison exercises the exact item-only TAM
+overlap on TAM's `data.gpcm` fixture at q=31 and q=41. TAM fixes the latent
+variance and estimates absolute slopes; mfrmr fixes the geometric mean of its
+relative slopes and estimates the latent variance. After applying the analytic
+scale and location transformation, maximum q-specific differences were about
+`1.8e-5` for relative slopes, `1.3e-5` for transition thresholds, `6e-6` for
+fitted category probabilities, and `1.4e-6` for deviance. The transformed TAM
+probability formula itself agreed to binary64 precision. This is external
+evidence for the item-only GPCM kernel, coordinate map, and continuous MML
+target; it is not a comparison of the rater-plus-slope model, a cross-engine
+SE validation, or permission to override mfrmr readiness. The distinction
+follows TAM's documented separation between
+[`tam.mml.2pl()` and `tam.mml.mfr()`](https://alexanderrobitzsch.github.io/TAM/reference/tam.mml.html).
+
+The same coordinate discipline prevents a direct SE comparison. TAM 4.3-25
+retains marginal slope and intercept SEs, but not the joint slope covariance or
+slope--intercept cross-covariance required by the nonlinear transformation to
+mfrmr's relative slopes, thresholds, and free population scale. Two positive-
+definite covariance matrices can preserve exactly those reported marginal SEs
+while producing different transformed SEs. The repository audit demonstrates
+this explicitly and withholds the comparison rather than assuming zero
+covariance. TAM's documented `tam.se()` route also ignores parameter
+covariances, so it does not close this gap.
+
+These distinctions also govern diagnostics. FACETS' discrimination, `mfrmr`
+residual PCA or bias screens, and hierarchical-rater variance components answer
+different questions. Agreement among them can be supporting evidence; a
+difference is not a software error until the fitted likelihood, estimand,
+identification, data rows, and output transformation have first been shown to
+match.
+
+A population-level validation also asked whether the current
+complete-predictor slope and a loading-only slope are merely two coordinate
+systems. They reduce exactly when slopes are all one or when the non-owner
+Rater contrast is zero. In a fully crossed four-Criterion/four-Rater design,
+however, their identifying adjacent-logit difference in differences is zero
+for loading-only and
+\(-\{\alpha_c-\alpha_d\}\{\rho_r-\rho_s\}\) for the current kernel. After all
+available slopes, severities, and transition boundaries were re-estimated,
+moderate and strong fixed conditions retained population KL losses of about
+0.0016 and 0.0085--0.0088 per response, with maximum common-grid probability
+differences of about 0.047--0.184. q=31 and q=41 conclusions agreed closely.
+These are fixed model-form demonstrations, not practical cutoffs or
+finite-sample operating characteristics. They support treating a loading-only
+kernel as a separate possible future family rather than as an interpretation
+switch for an existing `GPCM` fit.
+
+Sparsity changes this distinction structurally, not merely by reducing sample
+size. On an observed Rater-by-Criterion graph with no cycles, the products
+\(\alpha_c\rho_r\) can be represented exactly by new additive Rater and
+Criterion coordinates. Thus even a connected tree cannot distinguish the two
+slope actions. A known-ability validation compared four connected
+graphs. At 250 Persons, truth-selection rates were about 0.96 under complete
+crossing, 0.76--0.78 for a balanced eight-edge cycle, and only 0.58 for an
+eight-edge cycle localized to two Raters and two Criteria; the connected tree
+remained observationally equivalent. Each Person was observed on every edge,
+and abilities and both parameter vectors were supplied to the comparison, so
+these are optimistic fixed-parameter results rather than JML or MML model-
+selection performance. The design lesson is to inspect which slope and
+severity contrasts are traversed by cycles, not to infer identifiability from
+connectedness, density, or an anchor percentage alone.
+
+A subsequent finite-sample validation removed the known-ability advantage and
+refitted both slope actions by direct MML. The common identification estimated
+geometric-mean-one relative slopes, sum-zero Rater severities, mean-zero
+transition boundaries, and a normal population mean and standard deviation.
+Across 12 replications per truth and design at 250 training Persons, all 96
+candidate fits converged and all full 19-coordinate Hessians were positive
+definite. Two starts differed by at most about `7.9e-6` log-likelihood units,
+and q=31 versus q=41 changed none of the 48 paired family decisions. Complete
+crossing selected the true family in every training and independent holdout
+dataset. Under the balanced cycle, training selected the truth in 7--9 of 12
+datasets and median relative-slope RMSE increased from about 0.06 to as much as
+0.12. A stricter retained-solution polish reduced the largest gradient by
+roughly an order of magnitude without materially changing likelihoods. These
+small fixed counts clarify optimizer, curvature, and design contributions;
+they do not calibrate a universal selection, standard-error, or readiness
+rule.
 
 ## Source-grounded recovery interpretation
 
@@ -212,7 +599,9 @@ are:
 
 - Refit with `model = "PCM"` if the discrimination-free assumption is
   defensible for the data and a full FACETS score-side review is required;
-  `compare_mfrm()` quantifies the loss in fit.
+  `compare_mfrm()` quantifies the loss in fit only after every candidate uses
+  the same selectable q>=31 grid; close decisions require a denser common-grid
+  sensitivity check.
 - Keep the report on the `GPCM` fit itself but draft the manuscript section
   manually around the supported tables: `summary(fit)` for parameters,
   `diagnose_mfrm()` for residual fit, `facet_quality_dashboard()` for the
@@ -246,6 +635,7 @@ fit_gpcm <- fit_mfrm(
   person = "Person",
   facets = c("Rater", "Criterion"),
   step_facet = "Criterion",
+  slope_facet = "Criterion",
   score = "Score",
   model = "GPCM",
   method = "MML",
@@ -253,7 +643,10 @@ fit_gpcm <- fit_mfrm(
   maxit = 20
 )
 
-summary(fit_gpcm)
+fit_gpcm
+gpcm_summary <- summary(fit_gpcm, profile = "fit", detail = "brief")
+gpcm_summary$decision
+gpcm_summary$inference_evidence
 
 diag_gpcm <- diagnose_mfrm(fit_gpcm)
 summary(diag_gpcm)
@@ -304,11 +697,32 @@ plot(review_gpcm, type = "metrics", metric = "rmse")
 
 ```
 
+Use the same `Decision` fields as for RSM and PCM. In particular, optimizer
+convergence does not override incomplete GPCM identifiability, curvature, or
+slope-boundary evidence. If `FormalInference` is `"No"`, the diagnostic and
+information calls above are investigative routes for resolving the recorded
+reason; they do not promote the fit to an inferential result.
+
 The fit, summary, residual diagnostics, information, recovery, fair-average, and
 conditional bias-screening helpers all run under `GPCM` with the caveats listed
 above. `build_apa_outputs(fit_gpcm)` returns a caveated sensitivity-reporting
 object with a `gpcm_boundary`; full FACETS score-side review remains on the
 `RSM` / `PCM` route.
+
+## Estimator references
+
+- Muraki, E. (1992). *A generalized partial credit model: Application of an EM
+  algorithm*. Applied Psychological Measurement, 16, 159--176.
+- Uto, M., & Ueno, M. (2020). *A generalized many-facet Rasch model and its
+  Bayesian estimation using Hamiltonian Monte Carlo*. Behaviormetrika, 47,
+  469--496.
+- Wijayanto, F., Mul, K., Groot, P., van Engelen, B. G. M., & Heskes, T.
+  (2021). *Semi-automated Rasch analysis using in-plus-out-of-questionnaire log
+  likelihood*. British Journal of Mathematical and Statistical Psychology, 74,
+  313--339.
+- Hessen, D. J. (2025). *A convexity-constrained parameterization of the random
+  effects generalized partial credit model*. British Journal of Mathematical
+  and Statistical Psychology, 78, 401--419.
 
 ## Current boundary
 

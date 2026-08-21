@@ -91,7 +91,7 @@ test_that("missing_codes accepts custom character vectors", {
   d <- data.frame(
     Person = rep(paste0("P", 1:10), each = 4),
     Rater  = rep(c("R1", "R2"), 20),
-    Task   = rep(c("T1", "T2"), 20),
+    Task   = rep(c("T1", "T1", "T2", "T2"), 10),
     Score  = rep(c(0, 1, 2, "MISSING"), 10),
     stringsAsFactors = FALSE
   )
@@ -102,6 +102,10 @@ test_that("missing_codes accepts custom character vectors", {
   ))
   audit <- fit$prep$missing_recoding
   expect_equal(audit$Replaced[audit$Column == "Score"], 10L)
+  expect_identical(
+    fit$data_review$estimability$readiness$EstimabilityState,
+    "identified"
+  )
 })
 
 test_that("missing_codes = NULL is a strict no-op", {

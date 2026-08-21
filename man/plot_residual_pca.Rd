@@ -42,6 +42,9 @@ A named list of plotting data (class \code{mfrm_plot_data}) with:
 \item \code{facet}: facet name (or \code{NULL})
 \item \code{title}: plot title text
 \item \code{data}: underlying table used for plotting
+\item \code{InferenceTier}, \code{SupportsFormalInference},
+\code{PrimaryReportingEligible}, \code{ReportingUse}, and \code{DecisionUse}:
+machine-readable exploratory-screening guards
 }
 }
 \description{

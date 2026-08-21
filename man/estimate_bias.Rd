@@ -23,7 +23,7 @@ estimate_bias(
 
 \item{facet_a}{First facet name. Provide together with \code{facet_b} for the
 classic pairwise 2-way interaction. Ignored when \code{interaction_facets}
-is supplied.}
+is supplied. The canonical \code{"Person"} role is accepted explicitly.}
 
 \item{facet_b}{Second facet name. See \code{facet_a}.}
 
@@ -31,7 +31,8 @@ is supplied.}
 one interaction effect. When supplied, this takes precedence over
 \code{facet_a}/\code{facet_b}. Use this form (rather than \code{facet_a}/\code{facet_b})
 whenever you want 3+ way interactions, since \code{facet_a/facet_b} is
-restricted to the pairwise case.}
+restricted to the pairwise case. The canonical \code{"Person"} role may be
+supplied explicitly; see the Person-screening boundary below.}
 
 \item{max_abs}{Bound for absolute bias size.}
 
@@ -52,6 +53,8 @@ profile-likelihood columns when available
 \item \code{facet_a}, \code{facet_b}: first two analyzed facet names (legacy compatibility)
 \item \code{interaction_facets}, \code{interaction_order}, \code{interaction_mode}: full
 interaction metadata
+\item \code{person_interaction}, \code{person_source_column}, \code{person_interaction_note}:
+Person-screening provenance and interpretation metadata
 \item \code{iteration}: iteration history/metadata
 \item \code{orientation_review}: facet-orientation sign-consistency review table
 \item \code{mixed_sign}: logical flag indicating whether bias-size signs flip
@@ -100,6 +103,11 @@ fixed.
 \item For two-way mode, use \code{facet_a} and \code{facet_b} (or \code{interaction_facets}
 with length 2).
 \item For higher-order mode, provide \code{interaction_facets} with length >= 3.
+\item A Person-involving result is a conditional plug-in likelihood screen. It
+holds fitted JML person measures or MML EAP scores and the other fitted
+parameters fixed; it is not a jointly fitted Person-by-facet interaction
+and does not support formal inference or a cell-level fairness decision.
+The function emits a classed warning when \code{"Person"} is requested.
 }
 }
 \section{What this screening means}{

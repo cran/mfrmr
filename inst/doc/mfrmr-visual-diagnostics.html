@@ -399,6 +399,10 @@ it keeps facet uncertainty and fitted step locations visible. For a
 closer FACETS-facing handoff, switch the renderer and leave
 <code>show_ci</code> at its default <code>FALSE</code>. The fitted
 coordinates do not change.</p>
+<p>Every retained native facet level is labelled. Only label coordinates
+are displaced for collision avoidance, with leader lines back to the
+fitted points. Step thresholds form one vertical ladder and their labels
+include the fitted transition logits.</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">plot</span>(</span>
 <span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>  fit,</span>
 <span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>  <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>,</span>

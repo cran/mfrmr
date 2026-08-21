@@ -78,6 +78,64 @@ test_that("FACETS positioning distinguishes native estimates from visual emulati
                      fixed = TRUE))
 })
 
+test_that("public documentation does not advertise later-release routes as current", {
+  pkg_root <- documentation_source_root()
+  testthat::skip_if(is.na(pkg_root), "source documentation files are not available")
+  docs <- read_public_text(pkg_root, public_documentation_files(pkg_root))
+  text <- tolower(paste(unlist(docs, use.names = FALSE), collapse = "\n"))
+  flat <- gsub("[[:space:]]+", " ", text)
+
+  prohibited_claims <- c(
+    "supports unrestricted gpcm",
+    "supports an unrestricted gpcm",
+    "provides unrestricted gpcm",
+    "supports multiple observed scales",
+    "supports multiple independent rating scales",
+    "supports general threshold anchors",
+    "supports threshold anchoring",
+    "supports versioned frozen calibration",
+    "supports a versioned frozen calibration",
+    "supports native multidimensional estimation",
+    "provides native multidimensional estimation"
+  )
+  hits <- prohibited_claims[vapply(
+    prohibited_claims,
+    grepl,
+    logical(1),
+    x = flat,
+    fixed = TRUE
+  )]
+
+  expect_identical(hits, character(0))
+  expect_match(flat, "one observed score scale", fixed = TRUE)
+  expect_match(flat, "imported versioned frozen-calibration bundle", fixed = TRUE)
+  expect_match(flat, "posterior scoring from an existing fitted object is a separate", fixed = TRUE)
+})
+
+test_that("public estimator vocabulary keeps JMLE as an input alias only", {
+  pkg_root <- documentation_source_root()
+  testthat::skip_if(is.na(pkg_root), "source documentation files are not available")
+  docs <- read_public_text(pkg_root, public_documentation_files(pkg_root))
+  public_text <- paste(unlist(docs, use.names = FALSE), collapse = "\n")
+
+  fit_help <- paste(readLines(
+    file.path(pkg_root, "man", "fit_mfrm.Rd"),
+    warn = FALSE,
+    encoding = "UTF-8"
+  ), collapse = "\n")
+  package_help <- paste(readLines(
+    file.path(pkg_root, "man", "mfrmr-package.Rd"),
+    warn = FALSE,
+    encoding = "UTF-8"
+  ), collapse = "\n")
+
+  expect_match(fit_help, 'method = c("MML", "JML", "JMLE")', fixed = TRUE)
+  expect_match(fit_help, '"JMLE"} is accepted as a', fixed = TRUE)
+  expect_match(package_help, '"JMLE"} as a backward-compatible alias', fixed = TRUE)
+  expect_false(grepl('method = "MMLE"', public_text, fixed = TRUE))
+  expect_false(grepl("\\bMMLE\\b", public_text, perl = TRUE))
+})
+
 test_that("ConQuest guidance states the external MML comparison boundary", {
   pkg_root <- documentation_source_root()
   testthat::skip_if(is.na(pkg_root), "source documentation files are not available")
@@ -120,6 +178,24 @@ test_that("public maxit guidance prevents result-driven tuning", {
   expect_false(grepl("fast exploratory JML pass", docs_flat, fixed = TRUE))
 })
 
+test_that("first-use guides share one decision-first readiness route", {
+  pkg_root <- documentation_source_root()
+  testthat::skip_if(is.na(pkg_root), "source documentation files are not available")
+  paths <- c(
+    file.path(pkg_root, "README.md"),
+    file.path(pkg_root, "vignettes", "mfrmr-workflow.Rmd"),
+    file.path(pkg_root, "vignettes", "mfrmr-gpcm-scope.Rmd"),
+    file.path(pkg_root, "vignettes", "mfrmr-facets-migration.Rmd")
+  )
+  docs <- read_public_text(pkg_root, paths)
+
+  for (path in names(docs)) {
+    text <- paste(docs[[path]], collapse = "\n")
+    expect_match(text, "$decision", fixed = TRUE, info = path)
+    expect_match(text, "FormalInference", fixed = TRUE, info = path)
+  }
+})
+
 test_that("CRAN-facing documentation excludes development-process language", {
   pkg_root <- documentation_source_root()
   testthat::skip_if(is.na(pkg_root), "source documentation files are not available")
@@ -154,19 +230,36 @@ test_that("CRAN-facing documentation excludes development-process language", {
     "planner-schema contract",
     "second-wave visual layer",
     "package-test coverage",
+    "repository theorem-only",
+    "internal analytic prototype",
+    "retrospective 40-dataset owner panel",
+    "predeclared deterministic challenge",
     "roadmap_only",
     "schema-only future branch",
     "future-branch active planning scaffold"
   )
+
+  # NEWS is an immutable historical record once a release is submitted. Keep
+  # the exact 0.2.2 wording visible without allowing the same process language
+  # to leak into current guides or future release notes.
+  historical_news_allowlist <-
+    "Shiny viewer remains interactive-only. The release-readiness review now"
 
   hits <- character(0)
   for (path in names(docs)) {
     lines <- docs[[path]]
     for (phrase in blocked) {
       idx <- grep(tolower(phrase), tolower(lines), fixed = TRUE)
+      if (identical(basename(path), "NEWS.md") && length(idx) > 0L) {
+        idx <- idx[trimws(lines[idx]) != historical_news_allowlist]
+      }
       if (length(idx) > 0L) {
         hits <- c(hits, paste0(path, ":", idx, ": ", trimws(lines[idx])))
       }
+    }
+    idx <- grep("\\bP[0-9]+[a-z]\\b", lines, perl = TRUE)
+    if (length(idx) > 0L) {
+      hits <- c(hits, paste0(path, ":", idx, ": ", trimws(lines[idx])))
     }
   }
   expect_identical(hits, character(0))

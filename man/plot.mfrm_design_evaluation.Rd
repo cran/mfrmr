@@ -69,7 +69,7 @@ sim_eval <- suppressWarnings(evaluate_mfrm_design(
   n_person = c(8, 12),
   n_rater = 2,
   n_criterion = 2,
-  raters_per_person = 1,
+  raters_per_person = 2,
   reps = 1,
   maxit = 30,
   seed = 123

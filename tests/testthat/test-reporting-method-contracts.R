@@ -158,6 +158,18 @@ test_that("build_apa_report_text without bias mentions no bias data", {
   expect_true(nchar(text) > 0)
 })
 
+test_that("APA draft describes row weights without treating MML rows as persons", {
+  fit_weighted <- .fit_mml
+  fit_weighted$config$weight_col <- "CaseWeight"
+  text <- mfrmr:::build_apa_report_text(fit_weighted, .diag_mml)
+  text <- gsub("\\s+", " ", text)
+
+  expect_match(text, "multiplied row-level ordered-category log-likelihood contributions", fixed = TRUE)
+  expect_match(text, "Person distribution was integrated once per Person", fixed = TRUE)
+  expect_match(text, "not interpreted as replicated independent Person response patterns", fixed = TRUE)
+  expect_false(grepl("applied as frequency counts", text, fixed = TRUE))
+})
+
 test_that("build_apa_outputs surfaces latent-regression population-model wording", {
   set.seed(141)
   persons <- paste0("P", sprintf("%02d", seq_len(24)))

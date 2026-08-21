@@ -55,8 +55,12 @@ An object of class \code{summary.mfrm_fit} with:
 \itemize{
 \item \code{overview}: global model/fit indicators
 \item \code{status}: concise front-door status block for quick review
-\item \code{readiness}: domain-specific numerical, data, design, stability,
-diagnostic, and reporting states
+\item \code{decision}: plain-language interpretation, formal-inference status,
+reason, and highest-priority next action derived from the stored readiness
+contract plus supplied precision evidence; fit readiness alone never
+yields \code{FormalInference = "Yes"}
+\item \code{readiness}: the stored fit-level state plus numerical, data, design,
+stability, diagnostic, and reporting workflow states
 \item \code{data_review}: structured connectivity and facet-support evidence used by
 the non-numerical readiness gates
 \item \code{key_warnings}: highest-priority warnings to review first
@@ -70,12 +74,19 @@ population model is active
 \item \code{population_coding}: categorical covariate levels and contrast provenance
 when a population model uses model-matrix coding
 \item \code{facet_overview}: per-facet estimate distribution summary
-\item \code{person_overview}: person-measure distribution summary
+\item \code{person_overview}: person-measure distribution summary with the actual
+aggregation denominator, blocked extreme-EAP exclusion count, and estimate
+use
 \item \code{targeting}: person-versus-non-person facet targeting overview
 (Wright-map-style mean/SD comparison)
 \item \code{step_overview}: threshold/step diagnostics by PCM/GPCM \code{StepFacet}
 ladder, or for the common RSM ladder
-\item \code{slope_overview}: discrimination summary for \code{GPCM} fits
+\item \code{slope_overview}: parameter-readiness and explicitly labelled optimizer-
+trace summary for \code{GPCM} discriminations
+\item \code{inference_evidence}: for \code{GPCM} MML, a compact separation of optimizer
+stationarity, retained-point local rank, observed-information curvature,
+slope-boundary screening, and the final readiness decision. Supportive
+local evidence does not override an inconclusive boundary audit
 \item \code{interaction_overview}: model-estimated facet-interaction summary
 when the fit was specified with \code{facet_interactions}
 \item \code{settings_overview}: estimation-settings overview that pins the
@@ -94,6 +105,10 @@ reporting sections (data description, diagnostics, category
 checks, draft reporting)
 \item \code{person_high} / \code{person_low}: highest and lowest person measures
 \item \code{facet_extremes}: extreme facet-level estimates
+\item \code{facet_support_boundaries}: observed boundary-constant non-person facet
+levels, kept distinct from parameter-level recession conclusions
+\item \code{facet_recession_review}: certified JML additive facet recession
+directions, including review scope and completeness
 \item \code{caveats}: structured warning/review rows for score-support and
 latent-regression population-model issues
 \item \code{notes}: short interpretation notes
@@ -118,7 +133,7 @@ not claim that FACETS was executed or that estimates are numerically
 equivalent to FACETS output.
 It returns a structured object and prints:
 \itemize{
-\item model fit overview (N, LogLik, AIC/BIC, convergence)
+\item model fit overview (N, LogLik, the canonical/legacy IC status, convergence)
 \item estimation settings that affect identification/scoring interpretation
 \item facet-level estimate distribution (mean/SD/range)
 \item person measure distribution
@@ -133,16 +148,30 @@ measures
 \section{Interpreting output}{
 
 \itemize{
-\item \code{overview}: convergence and information criteria.
-\item \code{readiness}: separate Numerical, Data, Design, Stability, Diagnostics,
-and Reporting states. \code{InferenceReady} contributes only to Numerical;
-a numerical pass cannot override a disconnected-design or boundary-
-separation hold.
+\item \code{overview}: convergence plus the versioned information-criterion contract.
+For eligible fixed-facet MML fits, BIC/SABIC use unique Persons, not
+response rows; JML, non-unit observation weights, and legacy objects do
+not enter the common MML ranking panel. \code{ICSelectable} additionally
+distinguishes raw screening/review criteria at q<31 from criteria that
+may enter automatic same-grid comparison at q>=31; close decisions still
+require a denser common-grid sensitivity check.
+\item \code{readiness}: the stored fit-readiness result followed by Numerical, Data,
+Design, Stability, Diagnostics, and Reporting workflow states.
+\code{InferenceReady} is a conservative compatibility scalar and is \code{TRUE}
+only when the stored \code{FitReadiness} is \code{ready}; numerical convergence
+cannot override input, estimability, category, or boundary review.
+\item \code{decision}: separates that fit gate from formal precision support. A
+fit-only summary returns \code{FormalInference = "No"} until a matching
+\code{mfrm_diagnostics} object is supplied through \verb{diagnostics =}; use
+\code{summary(diagnostics)$decision} for the equivalent precision-aware view.
 \item \code{data_review}: overall multi-facet connectivity, facet-level score
 support, boundary-constant levels, single-level facets, and retained
 preparation notes behind the readiness rows.
 \item \code{facet_overview}: per-facet spread and range of estimates.
-\item \code{person_overview}: distribution of person measures.
+\item \code{person_overview}: distribution of person measures. For a blocked source
+fit, a prior-regularized extreme MML EAP is retained in \code{person_high} /
+\code{person_low} but excluded from this aggregate and \code{targeting}; the table
+records its distribution denominator, exclusion count, and estimate use.
 \item \code{step_overview}: threshold spread and monotonicity checks, reported by
 \code{StepFacet} ladder for PCM/GPCM fits and as one common ladder for RSM fits.
 \item \code{settings_overview}: estimation settings that affect interpretation.
@@ -160,6 +189,12 @@ population-design check row.
 \item \code{reporting_map}: where to get companion outputs for manuscript reporting.
 \item \code{person_high} / \code{person_low} (opt-in for printing) and \code{facet_extremes}:
 extreme estimates for focused review.
+\item \code{facet_support_boundaries}: observed non-person facet levels whose retained
+responses are constant at the minimum or maximum score. This is a data-
+support warning, not by itself a proof that a parameter MLE is infinite.
+\item \code{facet_recession_review}: non-person facet directions certified as
+unbounded in an evaluated JML additive recession subspace. Joint rows are
+relative directions under the fitted identification constraints.
 }
 }
 
@@ -189,12 +224,16 @@ fit <- fit_mfrm(
 )
 s <- summary(fit)
 s$overview[, c(
-  "Model", "Method", "Converged", "InferenceReady",
+  "Model", "Method", "Converged", "FitReadiness", "InferenceReady",
   "ConvergenceSeverity"
 )]
 s$readiness
-# `InferenceReady = TRUE` clears only the numerical gate. Also require the
-# Data, Design, and Stability rows to support the intended interpretation.
+# `InferenceReady = TRUE` means all five stored fit components passed.
+# It does not, by itself, support formal SE/CI or reliability.
+diag <- diagnose_mfrm(fit, residual_pca = "none")
+summary(fit, diagnostics = diag)$decision
+# Design, Stability, Diagnostics, and Reporting remain purpose-specific
+# workflow reviews rather than alternative fit-readiness derivations.
 # If Numerical is not a pass, inspect the retained polish stages; increasing
 # `maxit` alone may not resolve the review.
 s$person_overview

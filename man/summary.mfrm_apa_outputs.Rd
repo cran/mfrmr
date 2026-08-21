@@ -32,6 +32,8 @@ preview for quick QA before manuscript insertion.
 
 \itemize{
 \item \code{overview}: total coverage across standard text components.
+\item \code{decision}: the source-fit decision shown before draft-completeness checks;
+text completeness cannot promote a review or blocked fit.
 \item \code{components}: per-component density and mention checks
 (including residual-PCA mentions).
 \item \code{sections}: package-native section coverage table.

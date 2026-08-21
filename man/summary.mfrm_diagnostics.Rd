@@ -33,6 +33,11 @@ person-level rows remain available in the returned object.}
 An object of class \code{summary.mfrm_diagnostics} with:
 \itemize{
 \item \code{overview}: design-level counts and residual-PCA mode
+\item \code{decision}: the same plain-language fit-readiness decision used by
+\code{summary(fit)}, retained ahead of diagnostic screening results
+\item \code{fit_readiness}, \code{fit_readiness_components}, and
+\code{fit_readiness_parameters}: readiness provenance inherited from the source
+fit and retained separately from diagnostic-screening status
 \item \code{status}: concise front-door status block for quick review
 \item \code{key_warnings}: highest-priority warnings to review first
 \item \code{next_actions}: recommended follow-up helpers
@@ -86,6 +91,8 @@ This method returns a compact diagnostics summary designed for quick review:
 
 \itemize{
 \item \code{overview}: analysis scale, subset count, and residual-PCA mode.
+\item \code{fit_readiness}: the source fit's versioned readiness row. Diagnostics do
+not promote a blocked or review-only fit to inferential use.
 \item \code{diagnostic_basis}: plain-language map of which fit path was computed and
 what each path means statistically.
 \item \code{overall_fit}: global fit indices.

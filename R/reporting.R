@@ -674,6 +674,31 @@ summarize_convergence_metrics <- function(summary_row) {
   loglik <- if ("LogLik" %in% names(summary_row)) to_float(summary_row$LogLik[1]) else NA_real_
   aic <- if ("AIC" %in% names(summary_row)) to_float(summary_row$AIC[1]) else NA_real_
   bic <- if ("BIC" %in% names(summary_row)) to_float(summary_row$BIC[1]) else NA_real_
+  sabic <- if ("SABIC" %in% names(summary_row)) to_float(summary_row$SABIC[1]) else NA_real_
+  contract_current <- "ICContractVersion" %in% names(summary_row) &&
+    identical(
+      as.character(summary_row$ICContractVersion[1]),
+      mfrm_ic_contract_version()
+    )
+  ic_eligible <- contract_current && "ICEligible" %in% names(summary_row) &&
+    isTRUE(as.logical(summary_row$ICEligible[1]))
+  ic_selectable <- ic_eligible && "ICSelectable" %in% names(summary_row) &&
+    isTRUE(as.logical(summary_row$ICSelectable[1]))
+  ic_status <- if ("ICStatus" %in% names(summary_row)) {
+    as.character(summary_row$ICStatus[1])
+  } else {
+    "legacy_or_unknown"
+  }
+  integration_tier <- if ("ICIntegrationTier" %in% names(summary_row)) {
+    as.character(summary_row$ICIntegrationTier[1])
+  } else {
+    "legacy_or_unknown"
+  }
+  integration_q <- if ("ICQuadraturePoints" %in% names(summary_row)) {
+    suppressWarnings(as.integer(summary_row$ICQuadraturePoints[1]))
+  } else {
+    NA_integer_
+  }
   status <- if ("ConvergenceStatus" %in% names(summary_row)) as.character(summary_row$ConvergenceStatus[1]) else NA_character_
   detail <- if ("ConvergenceDetail" %in% names(summary_row)) as.character(summary_row$ConvergenceDetail[1]) else NA_character_
   grad_sup <- if ("TerminalGradientSupNorm" %in% names(summary_row)) to_float(summary_row$TerminalGradientSupNorm[1]) else NA_real_
@@ -695,13 +720,73 @@ summarize_convergence_metrics <- function(summary_row) {
   ll_txt <- if (is.finite(loglik)) fmt_num(loglik, 3) else "NA"
   aic_txt <- if (is.finite(aic)) fmt_num(aic, 3) else "NA"
   bic_txt <- if (is.finite(bic)) fmt_num(bic, 3) else "NA"
+  sabic_txt <- if (is.finite(sabic)) fmt_num(sabic, 3) else "NA"
+  criterion_txt <- if (ic_eligible) {
+    paste0(
+      ", canonical MML AIC = ", aic_txt,
+      ", Person-BIC = ", bic_txt,
+      ", Sclove SABIC = ", sabic_txt
+    )
+  } else {
+    paste0(
+      "). The canonical MML information-criterion panel was not eligible ",
+      "(status: ", ic_status
+    )
+  }
   out <- paste0(
     "Optimization ", conv_txt, " after ", iter_txt,
     " function evaluations",
     if (is.finite(gr_eval)) paste0(" and ", gr_txt, " gradient evaluations") else "",
     " (LogLik = ", ll_txt,
-    ", AIC = ", aic_txt, ", BIC = ", bic_txt, ")."
+    criterion_txt, ")."
   )
+  if (ic_eligible && !ic_selectable) {
+    out <- paste0(
+      out,
+      " These criteria are screening/review values only at q=",
+      if (is.finite(integration_q)) integration_q else "unknown",
+      " (", integration_tier,
+      "); automatic deltas, weights, preferences, and LRT are disabled below ",
+      "q=31."
+    )
+  }
+  persons <- if ("Persons" %in% names(summary_row)) {
+    suppressWarnings(as.integer(summary_row$Persons[1]))
+  } else {
+    NA_integer_
+  }
+  if (ic_eligible && is.finite(persons) && persons <= 22L) {
+    out <- paste0(
+      out,
+      " SABIC was retained for sensitivity only; automatic selection is ",
+      "disabled at 22 or fewer Persons."
+    )
+  } else if (!ic_eligible) {
+    legacy_aic <- if ("LegacyAIC" %in% names(summary_row)) {
+      to_float(summary_row$LegacyAIC[1])
+    } else if (!contract_current && "AIC" %in% names(summary_row)) {
+      to_float(summary_row$AIC[1])
+    } else {
+      NA_real_
+    }
+    legacy_bic <- if ("LegacyBIC" %in% names(summary_row)) {
+      to_float(summary_row$LegacyBIC[1])
+    } else if (!contract_current && "BIC" %in% names(summary_row)) {
+      to_float(summary_row$BIC[1])
+    } else {
+      NA_real_
+    }
+    if (is.finite(legacy_aic) || is.finite(legacy_bic)) {
+      out <- paste0(
+        out,
+        " Legacy descriptive AIC = ",
+        if (is.finite(legacy_aic)) fmt_num(legacy_aic, 3) else "NA",
+        "; legacy descriptive BIC = ",
+        if (is.finite(legacy_bic)) fmt_num(legacy_bic, 3) else "NA",
+        "; neither enters the common MML ranking panel."
+      )
+    }
+  }
   if (is.finite(grad_sup)) {
     out <- paste0(
       out,
@@ -835,6 +920,7 @@ summarize_population_model_for_apa <- function(res) {
   active <- isTRUE(population$active)
   empty <- list(
     active = FALSE,
+    identification_only = FALSE,
     formula_label = "",
     coefficient_count = 0L,
     residual_variance = NA_real_,
@@ -850,6 +936,10 @@ summarize_population_model_for_apa <- function(res) {
   if (!active) {
     return(empty)
   }
+  gpcm_identification_only <- identical(
+    as.character(population$source %||% ""),
+    "gpcm_mml_default_identification"
+  )
 
   formula_label <- if (!is.null(population$formula)) {
     paste(deparse(population$formula), collapse = " ")
@@ -898,7 +988,11 @@ summarize_population_model_for_apa <- function(res) {
   }
 
   result_sentence <- paste0(
-    "The latent-regression population model returned ",
+    if (gpcm_identification_only) {
+      "The intercept-only GPCM population-scale model returned "
+    } else {
+      "The latent-regression population model returned "
+    },
     fmt_count(finite_coefficient_count), " finite coefficient(s) out of ",
     fmt_count(coefficient_count),
     if (length(design_columns) > 0L) {
@@ -918,16 +1012,33 @@ summarize_population_model_for_apa <- function(res) {
     "; omitted persons = ", fmt_count(omitted_persons),
     " and omitted response rows = ", fmt_count(omitted_rows), "."
   )
-  method_sentence <- paste0(
-    "A conditional-normal latent-regression population model was included via ",
-    formula_label,
-    "; coefficients were estimated jointly in the MML model, not as post hoc regression on EAP or MLE person scores."
-  )
-  caution_sentence <- "Latent-regression coefficients should be interpreted as conditional-normal population-model parameters, not as post hoc regression on estimated person scores."
-  conquest_sentence <- "ConQuest overlap is limited to the documented latent-regression MML comparison scope."
+  method_sentence <- if (gpcm_identification_only) {
+    paste0(
+      "An intercept-only conditional-normal population model was activated via ",
+      formula_label,
+      " to estimate the bounded-GPCM MML location and common discrimination scale; it is not a substantive covariate regression."
+    )
+  } else {
+    paste0(
+      "A conditional-normal latent-regression population model was included via ",
+      formula_label,
+      "; coefficients were estimated jointly in the MML model, not as post hoc regression on EAP or MLE person scores."
+    )
+  }
+  caution_sentence <- if (gpcm_identification_only) {
+    "Interpret the population intercept and variance as GPCM identification coordinates; fixed-latent-SD discrimination equals population SD times the relative slope."
+  } else {
+    "Latent-regression coefficients should be interpreted as conditional-normal population-model parameters, not as post hoc regression on estimated person scores."
+  }
+  conquest_sentence <- if (gpcm_identification_only) {
+    "The exact ConQuest scoresfree map is item-only; multifacet equivalence and external acceptance remain unestablished."
+  } else {
+    "ConQuest overlap is limited to the documented latent-regression MML comparison scope."
+  }
 
   list(
     active = TRUE,
+    identification_only = gpcm_identification_only,
     formula_label = formula_label,
     coefficient_count = coefficient_count,
     residual_variance = sigma2,
@@ -1062,8 +1173,12 @@ build_apa_note_map_from_contract <- function(contract) {
   if (isTRUE(availability$has_population_model)) {
     population_summary <- summaries$population_model
     note_map$population_model <- paste0(
-      "Table 5. Latent-regression population model\n",
-      "Note. Coefficients are conditional-normal population-model parameters estimated jointly with the MML model, not post hoc regressions on EAP or MLE person scores. ",
+      if (isTRUE(population_summary$identification_only)) {
+        "Table 5. GPCM population-scale identification model\n"
+      } else {
+        "Table 5. Latent-regression population model\n"
+      },
+      "Note. ", population_summary$caution_sentence, " ",
       "Formula = ", population_summary$formula_label,
       "; residual variance = ",
       if (is.finite(population_summary$residual_variance)) fmt_num(population_summary$residual_variance, 3) else "NA",
@@ -1311,6 +1426,10 @@ build_apa_reporting_contract <- function(res, diagnostics, bias_results = NULL, 
   prep <- res$prep
   config <- res$config
   model <- toupper(as.character(config$model %||% "RSM"))
+  fit_readiness_record <- mfrmr_get_readiness_record(res)
+  fit_inference_ready <- isTRUE(
+    fit_readiness_record$fit$InferenceReady[1]
+  )
 
   n_obs <- if (!is.null(summary)) to_float(summary$N) else NA_real_
   n_person <- if (!is.null(summary)) to_float(summary$Persons) else nrow(res$facets$person)
@@ -1345,7 +1464,8 @@ build_apa_reporting_contract <- function(res, diagnostics, bias_results = NULL, 
     precision_tier <- if (identical(config$method, "MML")) "hybrid" else "exploratory"
   }
   supports_formal_inference <- nrow(precision_profile) > 0 &&
-    isTRUE(precision_profile$SupportsFormalInference[1])
+    isTRUE(precision_profile$SupportsFormalInference[1]) &&
+    fit_inference_ready
   precision_label <- if (supports_formal_inference) {
     "model-based"
   } else if (identical(precision_tier, "hybrid")) {
@@ -1566,7 +1686,18 @@ build_apa_reporting_contract <- function(res, diagnostics, bias_results = NULL, 
   }
 
   if (!is.null(config$weight_col) && nzchar(config$weight_col)) {
-    weight_sentence <- "Observation weights were applied as frequency counts."
+    weight_sentence <- paste0(
+      "Positive observation weights from `", as.character(config$weight_col[1]),
+      "` multiplied row-level ordered-category log-likelihood contributions.",
+      if (identical(method, "MML")) {
+        paste0(
+          " The Person distribution was integrated once per Person; the row weights ",
+          "were not interpreted as replicated independent Person response patterns."
+        )
+      } else {
+        ""
+      }
+    )
     method_estimation_sentences <- c(method_estimation_sentences, weight_sentence)
     method_sentences <- c(method_sentences, weight_sentence)
   }
@@ -1926,6 +2057,20 @@ build_apa_reporting_contract <- function(res, diagnostics, bias_results = NULL, 
   }
 
   contract <- list(
+    readiness = list(
+      fit = as.data.frame(
+        fit_readiness_record$fit, stringsAsFactors = FALSE
+      ),
+      components = as.data.frame(
+        fit_readiness_record$components %||% data.frame(),
+        stringsAsFactors = FALSE
+      ),
+      parameters = as.data.frame(
+        fit_readiness_record$parameters %||%
+          mfrmr_readiness_empty_parameter_table(),
+        stringsAsFactors = FALSE
+      )
+    ),
     metadata = list(
       model = model,
       method = method,

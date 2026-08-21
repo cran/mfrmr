@@ -202,9 +202,19 @@ test_that("JML and MML produce correlated facet estimates", {
 
   for (fit in list(fit_jml, fit_mml)) {
     expect_true(isTRUE(fit$summary$Converged[1]))
-    expect_true(isTRUE(fit$summary$InferenceReady[1]))
     expect_identical(as.character(fit$summary$ConvergenceSeverity[1]), "pass")
   }
+  expect_identical(
+    as.character(fit_jml$summary$FitReadiness[1]),
+    "ready_with_exclusions"
+  )
+  expect_false(isTRUE(fit_jml$summary$InferenceReady[1]))
+  expect_match(
+    as.character(fit_jml$summary$ReadinessReasonCodes[1]),
+    "jml_extreme_"
+  )
+  expect_identical(as.character(fit_mml$summary$FitReadiness[1]), "ready")
+  expect_true(isTRUE(fit_mml$summary$InferenceReady[1]))
 
   jml_rater <- fit_jml$facets$others |>
     dplyr::filter(.data$Facet == "Rater") |>

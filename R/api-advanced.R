@@ -210,18 +210,113 @@ build_dff_summary <- function(tbl, method) {
 }
 
 resolve_dff_refit_controls <- function(fit) {
+  replay <- fit$config$replay_inputs %||% list()
   control <- fit$config$estimation_control %||% list()
+
+  population_active <- isTRUE(fit$config$population_active) ||
+    isTRUE(fit$config$population_spec$active) ||
+    !is.null(replay$population_formula)
+  auto_gpcm_population <- population_active &&
+    identical(as.character(fit$population$source %||% ""),
+              "gpcm_mml_default_identification") &&
+    identical(as.character(fit$config$model %||% ""), "GPCM") &&
+    identical(as.character(fit$config$method %||% ""), "MML")
+  if (population_active && !auto_gpcm_population) {
+    stop(
+      "`analyze_dff(method = \"refit\")` cannot currently reproduce an active ",
+      "latent-regression population model within subgroup fits without changing ",
+      "the fitted population contract. Use `method = \"residual\"` for screening, ",
+      "or fit and link a prespecified subgroup population model outside ",
+      "`analyze_dff()`.",
+      call. = FALSE
+    )
+  }
+
+  interaction_terms <- unique(c(
+    as.character(fit$config$facet_interactions %||% character(0)),
+    names(fit$config$interaction_specs %||% list())
+  ))
+  interaction_terms <- interaction_terms[!is.na(interaction_terms) & nzchar(interaction_terms)]
+  if (length(interaction_terms) > 0L) {
+    stop(
+      "`analyze_dff(method = \"refit\")` cannot currently reproduce fitted ",
+      "facet interactions and anchor their subgroup interaction coordinates on ",
+      "a common scale. Use `method = \"residual\"` for screening, or refit and ",
+      "link the interaction model explicitly outside `analyze_dff()`.",
+      call. = FALSE
+    )
+  }
+
+  anchor_tables <- tryCatch(
+    extract_anchor_tables(fit$config),
+    error = function(e) list(groups = data.frame())
+  )
+  group_anchors <- as.data.frame(
+    replay$group_anchors %||% anchor_tables$groups %||% data.frame(),
+    stringsAsFactors = FALSE
+  )
+  if (nrow(group_anchors) > 0L) {
+    stop(
+      "`analyze_dff(method = \"refit\")` cannot currently preserve a baseline ",
+      "group-anchor constraint while constructing its separate subgroup-linking ",
+      "anchors. Use `method = \"residual\"` for screening, or specify and audit ",
+      "the subgroup linking model outside `analyze_dff()`.",
+      call. = FALSE
+    )
+  }
+
+  rating_min <- suppressWarnings(as.numeric(
+    fit$config$rating_min %||% fit$prep$rating_min %||% NA_real_
+  )[1])
+  rating_max <- suppressWarnings(as.numeric(
+    fit$config$rating_max %||% fit$prep$rating_max %||% NA_real_
+  )[1])
+  if (!is.finite(rating_min) || !is.finite(rating_max) || rating_min >= rating_max) {
+    stop(
+      "`analyze_dff(method = \"refit\")` requires the baseline fit's resolved ",
+      "finite `rating_min` and `rating_max` so subgroup fits cannot redefine the ",
+      "observed score scale. Refit the baseline model with the current mfrmr ",
+      "version or use `method = \"residual\"`.",
+      call. = FALSE
+    )
+  }
+
   list(
     model = fit$config$model %||% fit$summary$Model[1] %||% "RSM",
     method = fit$config$method %||% fit$summary$Method[1] %||% "JML",
     step_facet = fit$config$step_facet %||% NULL,
+    slope_facet = fit$config$slope_facet %||% NULL,
+    gpcm_mml_identification = as.character(
+      replay$gpcm_mml_identification %||%
+        fit$config$gpcm_mml_identification %||%
+        if (identical(as.character(fit$config$model %||% ""), "GPCM") &&
+            identical(as.character(fit$config$method %||% ""), "MML") &&
+            !population_active) {
+          "fixed_standard_normal"
+        } else {
+          "free_population"
+        }
+    )[1],
+    rating_min = rating_min,
+    rating_max = rating_max,
     weight = fit$config$weight_col %||% NULL,
+    keep_original = isTRUE(replay$keep_original %||% fit$config$keep_original),
+    missing_codes = replay$missing_codes %||% NULL,
     noncenter_facet = fit$config$noncenter_facet %||% "Person",
     dummy_facets = fit$config$dummy_facets %||% NULL,
     positive_facets = fit$config$positive_facets %||% NULL,
-    quad_points = as.integer(control$quad_points %||% 15L),
-    maxit = max(25L, min(as.integer(control$maxit %||% 50L), 100L)),
-    reltol = as.numeric(control$reltol %||% 1e-6)
+    min_obs_per_element = as.numeric(replay$min_obs_per_element %||% 30),
+    min_obs_per_category = as.numeric(replay$min_obs_per_category %||% 10),
+    quad_points = as.integer(replay$quad_points %||% control$quad_points %||% 31L),
+    maxit = as.integer(replay$maxit %||% control$maxit %||% 400L),
+    reltol = as.numeric(replay$reltol %||% control$reltol %||% 1e-9),
+    optimizer = as.character(
+      replay$optimizer %||% control$optimizer_requested %||% "auto"
+    )[1],
+    mml_engine = as.character(
+      replay$mml_engine %||% control$mml_engine_requested %||% "direct"
+    )[1],
+    identity_contract = "baseline_response_and_estimation_controls_v1"
   )
 }
 
@@ -437,6 +532,15 @@ extract_dff_group_estimates <- function(sub_fit, sub_diag, facet, fallback_level
 #' covariance. Refit statistics therefore remain screening evidence and set
 #' `FormalInferenceEligible`, `SupportsFormalInference`,
 #' `PrimaryReportingEligible`, and `ETS_Eligible` to `FALSE`.
+#' The subgroup fits replay the baseline response family, resolved score range,
+#' step/slope facets, weighting, optimizer, MML engine, and numerical controls;
+#' the non-target anchors are the intentional linking change. Refit analysis
+#' fails closed when the baseline uses a user-specified active latent-regression
+#' population model, facet interactions, or group-anchor constraints, because
+#' those structures do not yet have a complete subgroup-replay and linking
+#' contract. The automatically generated intercept-only population model used
+#' for default GPCM-MML scale identification is replayed and is not treated as
+#' a substantive covariate model.
 #'
 #' When `facet` refers to an item-like facet (for example `Criterion`), this
 #' recovers the familiar DIF case. When `facet` refers to raters or
@@ -455,9 +559,12 @@ extract_dff_group_estimates <- function(sub_fit, sub_diag, facet, fallback_level
 #' In most first-pass DFF screening, start with `method = "residual"`. It is
 #' faster, reuses the fitted model, and is less fragile in smaller subsets.
 #' Use `method = "refit"` when you specifically want group-specific parameter
-#' estimates and can tolerate extra computation.  Both methods should yield
-#' similar conclusions when sample sizes are adequate (\eqn{N \ge 100} per
-#' group is a useful guideline for stable differential-functioning detection).
+#' estimates and can tolerate extra computation. Agreement between methods is
+#' not guaranteed by a universal per-group sample-size threshold: stability and
+#' detection depend jointly on effect size, category support, response-pattern
+#' overlap, linking strength, slope heterogeneity, and estimator behavior.
+#' `min_obs` is only a cell-computability/sparsity guard; it is not evidence of
+#' power, parameter stability, or sample-size adequacy.
 #'
 #' @section Interpreting output:
 #' - `$dif_table`: one row per facet-level x group-pair with contrast,
@@ -1117,18 +1224,29 @@ analyze_dif <- function(...) {
       person = person_col,
       facets = facet_names,
       score = score_col,
+      rating_min = refit_controls$rating_min,
+      rating_max = refit_controls$rating_max,
       weight = refit_controls$weight,
+      keep_original = refit_controls$keep_original,
+      missing_codes = refit_controls$missing_codes,
       method = refit_controls$method,
       model = refit_controls$model,
       step_facet = refit_controls$step_facet,
+      slope_facet = refit_controls$slope_facet,
+      gpcm_mml_identification = refit_controls$gpcm_mml_identification,
       anchors = if (nrow(linking_setup$anchor_tbl) > 0) linking_setup$anchor_tbl else NULL,
       noncenter_facet = refit_controls$noncenter_facet,
       dummy_facets = refit_controls$dummy_facets,
       positive_facets = refit_controls$positive_facets,
       anchor_policy = "silent",
+      min_common_anchors = linking_setup$min_common_anchors,
+      min_obs_per_element = refit_controls$min_obs_per_element,
+      min_obs_per_category = refit_controls$min_obs_per_category,
       quad_points = refit_controls$quad_points,
       maxit = refit_controls$maxit,
-      reltol = refit_controls$reltol
+      reltol = refit_controls$reltol,
+      optimizer = refit_controls$optimizer,
+      mml_engine = refit_controls$mml_engine
     )
     # Capture the anchor-review issue messages emitted while refitting
     # the subgroup so a silent anchor_policy no longer hides
@@ -1367,6 +1485,12 @@ analyze_dif <- function(...) {
                   focal = focal, group_levels = group_levels,
                   linking_facets = linking_setup$linking_facets,
                   linking_threshold = linking_setup$min_common_anchors,
+                  refit_identity_contract = refit_controls$identity_contract,
+                  refit_rating_range = c(refit_controls$rating_min,
+                                         refit_controls$rating_max),
+                  refit_slope_facet = refit_controls$slope_facet,
+                  refit_optimizer = refit_controls$optimizer,
+                  refit_mml_engine = refit_controls$mml_engine,
                   functioning_label = functioning_label)
   )
   class(out) <- c("mfrm_dff", "mfrm_dif", class(out))
@@ -2938,9 +3062,11 @@ plot_information <- function(x,
 #' @param top_n Maximum number of facet/step locations retained by the native
 #'   renderer for a compact display. Step transitions are always retained and
 #'   omitted facet locations are reported in `retention`; use `Inf` for the
-#'   complete final map. Native text labels remain collision-aware even when
-#'   all coordinates are retained. The FACETS-style payload retains and labels
-#'   every fitted location, grouping coincident labels when needed.
+#'   complete final map. Every retained native location is labelled using
+#'   collision-aware displaced text and leader lines; step transitions are
+#'   shown as one vertical ladder with fitted logits in their labels. The
+#'   FACETS-style payload retains and labels every fitted location, grouping
+#'   coincident labels when needed.
 #' @param show_ci Logical or `NULL`. `NULL` (the default) draws available
 #'   uncertainty intervals for the native renderer and omits them from the
 #'   FACETS-style renderer. Explicit `TRUE` with `renderer = "facets"` creates
@@ -3118,7 +3244,21 @@ plot_wright_unified <- function(fit,
     extreme_placement = extreme_placement,
     persons_per_star = persons_per_star
   )
-  plot_core$person_hist <- graphics::hist(plot_core$person$Estimate, breaks = bins, plot = FALSE)
+  person_hist_values <- plot_core$person$Estimate[
+    is.finite(plot_core$person$Estimate)
+  ]
+  plot_core$person_hist <- if (length(person_hist_values) > 0L) {
+    graphics::hist(person_hist_values, breaks = bins, plot = FALSE)
+  } else {
+    structure(
+      list(
+        breaks = c(-0.5, 0.5), counts = 0L, density = 0,
+        intensities = 0, mids = 0, xname = "finite Person estimates",
+        equidist = TRUE
+      ),
+      class = "histogram"
+    )
+  }
   plot_data <- c(
     list(
       persons = plot_core$person$Estimate,
@@ -3460,8 +3600,9 @@ compute_equating_offset <- function(diffs, se_from = NULL, se_to = NULL,
 #' # criterion identities from one synthetic calibration design.
 #' toy <- load_mfrmr_data("example_core")
 #' people <- unique(toy$Person)
-#' d1 <- toy[toy$Person %in% people[1:24], , drop = FALSE]
-#' d2 <- toy[toy$Person %in% people[25:48], , drop = FALSE]
+#' # Two balanced 12-Person waves retain every Rater and Criterion.
+#' d1 <- toy[toy$Person %in% people[1:12], , drop = FALSE]
+#' d2 <- toy[toy$Person %in% people[13:24], , drop = FALSE]
 #' fit1 <- fit_mfrm(d1, "Person", c("Rater", "Criterion"), "Score",
 #'                  method = "MML", quad_points = 7, maxit = 30)
 #' res <- anchor_to_baseline(d2, fit1, "Person",
@@ -3680,8 +3821,9 @@ print.summary.mfrm_anchored_fit <- function(x, ...) {
 #' # same rater and criterion identities by construction.
 #' toy <- load_mfrmr_data("example_core")
 #' people <- unique(toy$Person)
-#' d1 <- toy[toy$Person %in% people[1:24], , drop = FALSE]
-#' d2 <- toy[toy$Person %in% people[25:48], , drop = FALSE]
+#' # Two balanced 12-Person waves retain every Rater and Criterion.
+#' d1 <- toy[toy$Person %in% people[1:12], , drop = FALSE]
+#' d2 <- toy[toy$Person %in% people[13:24], , drop = FALSE]
 #' fit1 <- fit_mfrm(d1, "Person", c("Rater", "Criterion"), "Score",
 #'                  method = "MML", quad_points = 7, maxit = 30)
 #' fit2 <- fit_mfrm(d2, "Person", c("Rater", "Criterion"), "Score",
@@ -4873,8 +5015,9 @@ print.summary.mfrm_equating_chain <- function(x, ...) {
 #' # same rater and criterion identities by construction.
 #' toy <- load_mfrmr_data("example_core")
 #' people <- unique(toy$Person)
-#' d1 <- toy[toy$Person %in% people[1:24], , drop = FALSE]
-#' d2 <- toy[toy$Person %in% people[25:48], , drop = FALSE]
+#' # Two balanced 12-Person waves retain every Rater and Criterion.
+#' d1 <- toy[toy$Person %in% people[1:12], , drop = FALSE]
+#' d2 <- toy[toy$Person %in% people[13:24], , drop = FALSE]
 #' fit1 <- fit_mfrm(d1, "Person", c("Rater", "Criterion"), "Score",
 #'                  method = "MML", quad_points = 7, maxit = 30)
 #' fit2 <- fit_mfrm(d2, "Person", c("Rater", "Criterion"), "Score",
@@ -6120,6 +6263,8 @@ print.summary.mfrm_linking_review <- function(x, ...) {
 #' @examples
 #' \donttest{
 #' toy <- load_mfrmr_data("example_core")
+#' # A balanced slice retains every Rater and Criterion while running quickly.
+#' toy <- toy[toy$Person %in% unique(toy$Person)[1:12], , drop = FALSE]
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
 #'                 method = "MML", model = "RSM", quad_points = 5)
 #' diag <- diagnose_mfrm(fit, diagnostic_mode = "both", residual_pca = "none")
@@ -6607,6 +6752,132 @@ print.summary.mfrm_misfit_casebook <- function(x, ...) {
     dplyr::ungroup()
 }
 
+.weighting_review_comparison_contract <- function(rasch_fit,
+                                                  gpcm_fit,
+                                                  comparison,
+                                                  reference_model,
+                                                  aligned_pcm_owner,
+                                                  pcm_gpcm_lrt) {
+  basis <- comparison$comparison_basis %||% list()
+  comparison_tbl <- as.data.frame(
+    comparison$table %||% data.frame(),
+    stringsAsFactors = FALSE
+  )
+  reference_method <- public_mfrm_method_label(
+    as.character(rasch_fit$config$method %||% NA_character_)[1]
+  )
+  comparison_method <- public_mfrm_method_label(
+    as.character(gpcm_fit$config$method %||% NA_character_)[1]
+  )
+  same_method <- identical(reference_method, comparison_method)
+  both_jml <- same_method && identical(reference_method, "JML")
+  both_mml <- same_method && identical(reference_method, "MML")
+  same_data <- isTRUE(basis$same_data)
+  both_ready <- isTRUE(
+    basis$all_inference_ready %||% basis$all_converged
+  )
+  ic_comparable <- isTRUE(basis$ic_comparable)
+  ic_selectable <- isTRUE(basis$all_ic_selectable)
+
+  loglik_difference <- NA_real_
+  if (nrow(comparison_tbl) >= 2L && "LogLik" %in% names(comparison_tbl)) {
+    loglik <- suppressWarnings(as.numeric(comparison_tbl$LogLik[seq_len(2L)]))
+    if (length(loglik) == 2L && all(is.finite(loglik))) {
+      loglik_difference <- loglik[2] - loglik[1]
+    }
+  }
+
+  evidence_tier <- if (ic_comparable) {
+    "same_basis_mml_information_criteria"
+  } else if (both_jml && same_data && !both_ready) {
+    "jml_optimizer_trace_only_not_inference_ready"
+  } else if (both_jml && same_data) {
+    "jml_descriptive_reweighting_only"
+  } else if (both_mml && same_data && !both_ready) {
+    "mml_optimizer_trace_only_not_inference_ready"
+  } else if (both_mml && same_data && !ic_selectable) {
+    "mml_screening_or_review_grid_only"
+  } else if (both_mml && same_data) {
+    "mml_noncomparable_descriptive_only"
+  } else {
+    "cross_method_or_data_not_comparable"
+  }
+
+  loglik_status <- if (!is.finite(loglik_difference)) {
+    "unavailable"
+  } else if (!both_ready) {
+    "optimizer_trace_only_not_inference_ready"
+  } else if (both_jml) {
+    "descriptive_unpenalized_gain_not_selection"
+  } else if (ic_comparable) {
+    "available_but_read_with_information_criterion_penalties"
+  } else {
+    "descriptive_noncomparable"
+  }
+
+  formal_selection <- ic_comparable
+  selection_route <- if (formal_selection) {
+    "AIC_PersonBIC_SABIC_candidate_set_review"
+  } else if (both_jml) {
+    "withheld_JML_has_no_automatic_PCM_GPCM_selection"
+  } else {
+    "withheld_comparison_basis_not_selectable"
+  }
+
+  facets_role <- if (identical(reference_model, "PCM") && both_jml &&
+                      aligned_pcm_owner) {
+    "PCM_JML_side_only_no_FACETS_free_slope_GPCM_counterpart"
+  } else if (identical(reference_model, "PCM") && both_jml) {
+    "PCM_JML_side_only_owner_mismatch_blocks_reduction"
+  } else {
+    "not_an_internal_free_slope_comparator"
+  }
+
+  preferred_value <- function(criterion) {
+    if (!formal_selection) return(NA_character_)
+    as.character(comparison$preferred[[criterion]] %||% NA_character_)[1]
+  }
+
+  recommended_use <- if (both_jml) {
+    paste(
+      "Treat the likelihood difference and slopes as descriptive optimizer",
+      "evidence only; use declared unit- and non-unit-slope recovery conditions",
+      "before making a PCM-versus-GPCM claim."
+    )
+  } else if (formal_selection) {
+    paste(
+      "Read candidate-set information criteria together with slope stability,",
+      "information redistribution, and a denser common quadrature sensitivity check."
+    )
+  } else {
+    paste(
+      "Repair inference readiness, integration selectability, or comparison",
+      "identity before using this pair for model selection."
+    )
+  }
+
+  tibble::tibble(
+    ReferenceModel = reference_model,
+    ComparisonModel = as.character(gpcm_fit$config$model %||% NA_character_)[1],
+    ReferenceMethod = reference_method,
+    ComparisonMethod = comparison_method,
+    SameMethod = same_method,
+    SamePreparedData = same_data,
+    BothInferenceReady = both_ready,
+    EvidenceTier = evidence_tier,
+    FormalModelSelectionAvailable = formal_selection,
+    SelectionRoute = selection_route,
+    ObservedLogLikDifference = loglik_difference,
+    LogLikDifferenceStatus = loglik_status,
+    AICPreferred = preferred_value("AIC"),
+    PersonBICPreferred = preferred_value("BIC"),
+    SABICPreferred = preferred_value("SABIC"),
+    PCMvsGPCMLRT = pcm_gpcm_lrt,
+    FACETSComparisonRole = facets_role,
+    RecommendedUse = recommended_use
+  )
+}
+
 #' Build a weighting-policy review between Rasch-family and bounded GPCM fits
 #'
 #' @param rasch_fit Output from [fit_mfrm()] using `model = "RSM"` or `"PCM"`.
@@ -6635,6 +6906,20 @@ print.summary.mfrm_misfit_casebook <- function(x, ...) {
 #' The result is intended for substantive review, not for automatic model
 #' selection. In particular, a better-fitting `GPCM` should not by itself be
 #' interpreted as a reason to discard an equal-weighting Rasch-family route.
+#' The fitted GPCM contains one slope for every level of one designated facet,
+#' not one common slope and not simultaneous criterion-by-rater slope blocks.
+#' The overview records the slope owner, step owner, level count, free relative
+#' slope contrasts, and whether the supplied reference is the exact unit-slope
+#' PCM response-kernel reduction. A formal PCM-versus-GPCM chi-square LRT is
+#' intentionally withheld in the current comparison contract.
+#' The returned `comparison_contract` separates three evidence channels:
+#' selectable same-basis MML information criteria, descriptive JML
+#' reweighting, and non-ready optimizer traces. In particular, a JML
+#' log-likelihood increase is not promoted to automatic PCM-versus-GPCM model
+#' selection because it is unpenalized and the GPCM contains additional slope
+#' parameters. FACETS may serve as a direct comparator for the PCM/JML side
+#' only; its post-fit discrimination statistic is not a jointly estimated
+#' free-slope GPCM counterpart.
 #'
 #' @section Recommended input route:
 #' 1. Fit an equal-weighting reference model with `model = "RSM"` or `"PCM"`.
@@ -6645,6 +6930,12 @@ print.summary.mfrm_misfit_casebook <- function(x, ...) {
 #'
 #' @section What the returned tables mean:
 #' - `model_comparison`: same-data model-comparison bundle from [compare_mfrm()].
+#'   AIC/Person-BIC/SABIC ranking is available only when
+#'   `model_comparison$table$ICComparable` is true. PCM-versus-GPCM LRT remains
+#'   unavailable even though PCM is the aligned GPCM's unit-slope reduction.
+#' - `comparison_contract`: one-row evidence-tier table stating whether formal
+#'   model selection is available, how any observed log-likelihood difference
+#'   may be read, and the bounded role of FACETS in a JML review.
 #' - `facet_shift`: how non-person facet estimates move under bounded `GPCM`.
 #' - `slope_profile`: which `slope_facet` levels are upweighted or downweighted.
 #' - `information_redistribution`: within-facet information-share changes
@@ -6800,12 +7091,51 @@ build_weighting_review <- function(rasch_fit,
 
   support_status <- .weighting_review_support_status()
   comparison_mode <- if (isTRUE(basis$ic_comparable)) "same_basis_fit_comparison" else "descriptive_model_contrast_only"
+  reference_model <- as.character(
+    rasch_fit$config$model %||% NA_character_
+  )[1]
+  reference_step_facet <- as.character(
+    rasch_fit$config$step_facet %||% NA_character_
+  )[1]
+  aligned_pcm_owner <- identical(reference_model, "PCM") &&
+    !is.na(reference_step_facet) && nzchar(reference_step_facet) &&
+    identical(reference_step_facet, step_facet) &&
+    identical(step_facet, slope_facet)
+  pcm_gpcm_lrt <- if (!identical(reference_model, "PCM")) {
+    "not_applicable_reference_is_not_pcm"
+  } else if (aligned_pcm_owner) {
+    "withheld_current_scope"
+  } else {
+    "not_available_owner_mismatch"
+  }
+  comparison_contract <- .weighting_review_comparison_contract(
+    rasch_fit = rasch_fit,
+    gpcm_fit = gpcm_fit,
+    comparison = comparison,
+    reference_model = reference_model,
+    aligned_pcm_owner = aligned_pcm_owner,
+    pcm_gpcm_lrt = pcm_gpcm_lrt
+  )
+  slope_level_count <- nrow(slope_profile)
   overview <- tibble::tibble(
-    ReferenceModel = as.character(rasch_fit$config$model %||% NA_character_)[1],
+    ReferenceModel = reference_model,
     ComparisonModel = as.character(gpcm_fit$config$model %||% NA_character_)[1],
     ReferenceMethod = public_mfrm_method_label(as.character(rasch_fit$config$method %||% NA_character_)[1]),
     ComparisonMethod = public_mfrm_method_label(as.character(gpcm_fit$config$method %||% NA_character_)[1]),
     SlopeFacet = slope_facet,
+    StepFacet = step_facet,
+    ReferenceStepFacet = reference_step_facet,
+    AlignedStepSlopeOwner = aligned_pcm_owner,
+    SlopeLevelCount = as.integer(slope_level_count),
+    FreeRelativeSlopeContrasts = as.integer(max(slope_level_count - 1L, 0L)),
+    SlopeComposition = "single_aligned_facet_level_specific_relative_slopes",
+    SimultaneousCriterionRaterSlopeBlocks = FALSE,
+    UnitSlopePCMReduction = aligned_pcm_owner,
+    PCMvsGPCMLRT = pcm_gpcm_lrt,
+    EvidenceTier = comparison_contract$EvidenceTier,
+    FormalModelSelectionAvailable = comparison_contract$FormalModelSelectionAvailable,
+    ObservedLogLikDifference = comparison_contract$ObservedLogLikDifference,
+    LogLikDifferenceStatus = comparison_contract$LogLikDifferenceStatus,
     ReviewStatus = review_status,
     ComparisonMode = comparison_mode,
     MaxAbsLogSlope = max_abs_log_slope,
@@ -6815,7 +7145,15 @@ build_weighting_review <- function(rasch_fit,
   status <- make_summary_block(
     "Overall status" = review_status,
     "Weighting principle" = "Rasch-family equal weighting vs bounded GPCM discrimination-based reweighting",
-    "Comparison basis" = comparison_mode
+    "Slope ownership" = paste0(
+      slope_facet, " levels; one aligned slope/step owner only"
+    ),
+    "Comparison basis" = comparison_mode,
+    "Evidence tier" = comparison_contract$EvidenceTier,
+    "Formal model selection" = if (isTRUE(
+      comparison_contract$FormalModelSelectionAvailable
+    )) "available" else "withheld",
+    "PCM vs GPCM LRT" = pcm_gpcm_lrt
   )
 
   key_warnings <- character(0)
@@ -6823,6 +7161,36 @@ build_weighting_review <- function(rasch_fit,
     key_warnings <- c(
       key_warnings,
       "Model-comparison weights are descriptive only because the two fits do not share a fully comparable formal MML basis."
+    )
+  }
+  if (identical(comparison_contract$ReferenceMethod, "JML") &&
+      identical(comparison_contract$ComparisonMethod, "JML")) {
+    key_warnings <- c(
+      key_warnings,
+      paste(
+        "The JML log-likelihood difference is unpenalized and cannot select",
+        "PCM versus GPCM; when either fit is not inference-ready it is only an",
+        "optimizer-trace difference."
+      )
+    )
+  }
+  if (aligned_pcm_owner) {
+    key_warnings <- c(
+      key_warnings,
+      paste(
+        "PCM is the all-unit-slope response-kernel reduction of this aligned",
+        "GPCM, but the current automatic comparison does not authorize a",
+        "PCM-versus-GPCM chi-square LRT."
+      )
+    )
+  } else if (identical(reference_model, "PCM")) {
+    key_warnings <- c(
+      key_warnings,
+      paste(
+        "PCM and GPCM do not share the same explicit aligned step/slope owner;",
+        "the unit-slope response-kernel reduction and a PCM-versus-GPCM LRT",
+        "are unavailable for this pair."
+      )
     )
   }
   if (nrow(slope_profile) > 0L) {
@@ -6862,6 +7230,15 @@ build_weighting_review <- function(rasch_fit,
 
   next_actions <- clean_summary_lines(c(
     "Read summary(model_comparison) before interpreting any fit advantage as a scoring recommendation.",
+    if (identical(comparison_contract$ReferenceMethod, "JML") &&
+        identical(comparison_contract$ComparisonMethod, "JML")) {
+      paste(
+        "Use evaluate_mfrm_recovery() under declared unit_slopes and non-unit",
+        "slope regimes before treating JML reweighting as evidence for GPCM."
+      )
+    } else {
+      "For MML selection, require ICComparable and repeat consequential comparisons on a denser common quadrature grid."
+    },
     paste0("Use slope_profile and top_reweighted_levels to inspect whether ", slope_facet, " levels are being upweighted or downweighted in substantively acceptable ways."),
     paste0("Use plot_information(compute_information(rasch_fit), type = \"iif\", facet = \"", slope_facet, "\", draw = FALSE) and the bounded GPCM analogue to inspect precision redistribution visually."),
     "If equal contributions of items and raters are part of the score interpretation, retain the Rasch-family fit as the operational reference even when bounded GPCM fits better."
@@ -6878,7 +7255,7 @@ build_weighting_review <- function(rasch_fit,
     Trigger = c(
       "Use to inspect the equal-weighting reference precision split across slope-facet levels.",
       "Use to inspect how bounded GPCM redistributes precision across the same levels.",
-      "Use to review AIC/BIC and evidence ratios before making a model-choice argument."
+      "Use to review q>=31 comparable AIC/Person-BIC/SABIC and relative candidate-set weights before making a model-choice argument; close decisions need a denser common-grid check."
     )
   )
 
@@ -6898,6 +7275,12 @@ build_weighting_review <- function(rasch_fit,
 
   notes <- clean_summary_lines(c(
     "Observation weights and discrimination-based reweighting are separate concepts in this package.",
+    paste0(
+      "The fitted slopes vary across levels of `", slope_facet,
+      "`; other facets have no separate slope block."
+    ),
+    "Criterion-owned and rater-owned GPCM fits are separate restricted models; both blocks cannot be estimated together in 0.2.3.",
+    "FACETS is a direct JML comparator only for the aligned equal-discrimination PCM side; its reported discrimination is a post-fit diagnostic, not the fitted free-slope GPCM parameter.",
     "The review is intended to make reweighting visible; it does not decide by itself whether bounded GPCM should replace the Rasch-family operational model.",
     "Information-share changes are computed within each facet because the same total information is partitioned separately by facet."
   ))
@@ -6908,6 +7291,7 @@ build_weighting_review <- function(rasch_fit,
     key_warnings = key_warnings,
     next_actions = next_actions,
     model_comparison = comparison,
+    comparison_contract = comparison_contract,
     facet_shift = facet_shift,
     top_measure_shifts = top_measure_shifts,
     slope_profile = slope_profile,
@@ -6941,7 +7325,8 @@ print.mfrm_weighting_review <- function(x, ...) {
 #' @param top_n Number of top rows to retain in compact summary tables.
 #' @param ... Reserved for generic compatibility.
 #'
-#' @return An object of class `summary.mfrm_weighting_review`.
+#' @return An object of class `summary.mfrm_weighting_review`, including the
+#'   evidence-tier `comparison_contract` table.
 #' @seealso [build_weighting_review()]
 #' @export
 summary.mfrm_weighting_review <- function(object, digits = 3, top_n = 10, ...) {
@@ -6955,6 +7340,9 @@ summary.mfrm_weighting_review <- function(object, digits = 3, top_n = 10, ...) {
   out <- list(
     overview = tibble::as_tibble(object$overview %||% tibble::tibble()),
     status = tibble::as_tibble(object$status %||% tibble::tibble()),
+    comparison_contract = tibble::as_tibble(
+      object$comparison_contract %||% tibble::tibble()
+    ),
     key_warnings = clean_summary_lines(object$key_warnings %||% character(0), max_n = 4L),
     next_actions = clean_summary_lines(object$next_actions %||% character(0), max_n = 4L),
     top_measure_shifts = tibble::as_tibble(object$top_measure_shifts %||% tibble::tibble()) |>
@@ -6985,6 +7373,16 @@ print.summary.mfrm_weighting_review <- function(x, ...) {
   if (nrow(x$status) > 0) {
     cat("\nStatus\n")
     print(as.data.frame(x$status), row.names = FALSE)
+  }
+  if (nrow(x$comparison_contract) > 0) {
+    cat("\nComparison Contract\n")
+    print(
+      round_numeric_df(
+        as.data.frame(x$comparison_contract),
+        digits = digits
+      ),
+      row.names = FALSE
+    )
   }
   print_bullet_section("Key Warnings", x$key_warnings)
   print_bullet_section("Next Actions", x$next_actions)
@@ -7045,9 +7443,10 @@ print.summary.mfrm_weighting_review <- function(x, ...) {
     RSM = "Common threshold structure; equal discrimination fixed at 1.",
     PCM = "Step thresholds vary by the designated step facet; equal discrimination fixed at 1.",
     GPCM = paste(
-      "Positive slopes are estimated for the designated slope facet;",
-      "the current bounded route requires slope_facet == step_facet and",
-      "identifies slopes with geometric mean 1."
+      "One positive relative slope is estimated for every level of one",
+      "designated slope facet; the current bounded route requires",
+      "slope_facet == step_facet, identifies slopes with geometric mean 1,",
+      "and does not combine criterion and rater slope blocks."
     ),
     "Ordered-response model; inspect the fitted configuration before reporting."
   )
@@ -7133,12 +7532,33 @@ print.summary.mfrm_weighting_review <- function(x, ...) {
     method <- public_mfrm_method_label(as.character(fit$config$method %||% NA_character_)[1])
     step_facet <- as.character(fit$config$step_facet %||% NA_character_)[1]
     slope_facet <- as.character(fit$config$slope_facet %||% NA_character_)[1]
+    sizes <- build_param_sizes(fit$config)
+    readiness <- mfrmr_get_readiness_record(fit)$fit
+    decision <- mfrm_fit_decision_summary(readiness)
     tibble::tibble(
       Label = labels[[i]],
       Model = model,
       Method = method,
       StepFacet = step_facet,
+      StepStructure = if (identical(model, "RSM")) {
+        "shared_ladder"
+      } else {
+        "step_facet_specific_ladders"
+      },
+      StepCoordinates = nrow(as.data.frame(fit$steps %||% data.frame())),
+      FreeStepParameters = as.integer(sizes$steps %||% 0L),
       SlopeFacet = slope_facet,
+      SlopeStructure = if (identical(model, "GPCM")) {
+        "relative_by_slope_facet_geometric_mean_1"
+      } else {
+        "fixed_equal_at_1"
+      },
+      SlopeCoordinates = nrow(as.data.frame(fit$slopes %||% data.frame())),
+      FreeSlopeParameters = as.integer(sizes$log_slopes %||% 0L),
+      FitReadiness = decision$FitReadiness[1L],
+      FormalInference = decision$FormalInference[1L],
+      Interpretation = decision$Interpretation[1L],
+      ReadinessReason = decision$Why[1L],
       RecommendedRole = .model_choice_role(model),
       ScoreContract = .model_choice_score_contract(model),
       ReportTemplate = .model_choice_report_template(model)
@@ -7197,7 +7617,7 @@ print.summary.mfrm_weighting_review <- function(x, ...) {
       "build_summary_table_bundle(); export_summary_appendix()"
     ),
     Interpretation = c(
-      "Use AIC/BIC/logLik as fit evidence, not as a standalone scoring decision.",
+      "Use q>=31 comparable AIC/Person-BIC/SABIC/logLik as candidate-set fit evidence, not as a standalone scoring decision; close decisions need a denser common-grid check.",
       "Use only when comparing an RSM/PCM reference to bounded GPCM.",
       "Review item/rater/criterion information redistribution before changing the operational model.",
       "Supported for RSM/PCM; available with explicit sensitivity-reporting caveats for bounded GPCM.",
@@ -7252,8 +7672,13 @@ print.summary.mfrm_weighting_review <- function(x, ...) {
 #' `build_model_choice_review()` is a user-facing synthesis helper. It does not
 #' estimate new models. It bundles:
 #'
-#' - [compare_mfrm()] for AIC/BIC/log-likelihood comparison;
+#' - [compare_mfrm()] for verified AIC/Person-BIC/SABIC/log-likelihood
+#'   comparison;
+#' - comparison-boundary warnings captured from [compare_mfrm()] and retained
+#'   in `comparison_warnings` for printing and appendix export;
 #' - model-role guidance for `RSM`, `PCM`, and bounded `GPCM`;
+#' - reported step/slope coordinate counts, identified free-parameter counts,
+#'   and the stored fit-readiness decision for every supplied model;
 #' - downstream-route availability for APA output, score-side export, linking,
 #'   recovery, fair averages, bias screening, and summary-appendix handoff;
 #' - report wording templates that avoid treating better bounded-`GPCM` fit as
@@ -7262,11 +7687,15 @@ print.summary.mfrm_weighting_review <- function(x, ...) {
 #' - optionally, [build_weighting_review()] for the first Rasch-family reference
 #'   versus bounded-`GPCM` pair.
 #'
-#' The word "bounded" is intentional: the package implements a bounded GPCM
-#' route, not every possible generalized partial-credit many-facet extension.
-#' The current route uses positive slopes, requires `slope_facet == step_facet`,
-#' identifies slopes on the log scale with geometric mean 1, and keeps several
-#' downstream score-side/reporting helpers outside the documented boundary.
+#' The word "bounded" describes the documented model and workflow scope: the
+#' package does not implement every possible generalized partial-credit
+#' many-facet extension. It does **not** mean that finite optimizer box bounds
+#' define the estimator. The current route uses positive slopes, requires
+#' `slope_facet == step_facet`, identifies slopes on the log scale with
+#' geometric mean 1, and keeps several downstream score-side/reporting helpers
+#' outside the documented boundary.
+#' Model-choice ranking also requires the current selectable IC contract:
+#' q<31 fits retain raw criteria but produce a screening/review-only bundle.
 #'
 #' @return An object of class `mfrm_model_choice_review`.
 #' @seealso [compare_mfrm()], [build_weighting_review()],
@@ -7275,10 +7704,10 @@ print.summary.mfrm_weighting_review <- function(x, ...) {
 #' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit_rsm <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-#'                     method = "MML", model = "RSM", quad_points = 7)
+#'                     method = "MML", model = "RSM", quad_points = 31)
 #' fit_pcm <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
 #'                     method = "MML", model = "PCM", step_facet = "Criterion",
-#'                     quad_points = 7)
+#'                     quad_points = 31)
 #' review <- build_model_choice_review(RSM = fit_rsm, PCM = fit_pcm)
 #' summary(review)
 #' }
@@ -7305,10 +7734,18 @@ build_model_choice_review <- function(...,
   }
 
   labels <- .model_choice_fit_labels(fits, labels = labels)
-  comparison <- suppressWarnings(do.call(
-    compare_mfrm,
-    c(fits, list(labels = labels, warn_constraints = warn_constraints, nested = FALSE))
-  ))
+  comparison_warnings <- character(0)
+  comparison <- withCallingHandlers(
+    do.call(
+      compare_mfrm,
+      c(fits, list(labels = labels, warn_constraints = warn_constraints, nested = FALSE))
+    ),
+    warning = function(w) {
+      comparison_warnings <<- c(comparison_warnings, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
+  comparison_warnings <- clean_summary_lines(comparison_warnings)
   role_table <- .model_choice_role_table(fits, labels)
   downstream_routes <- .model_choice_downstream_table(role_table)
   report_templates <- .model_choice_report_templates(role_table)
@@ -7341,7 +7778,7 @@ build_model_choice_review <- function(...,
   if (!isTRUE(basis$ic_comparable)) {
     key_warnings <- c(
       key_warnings,
-      "Information-criterion ranking is descriptive because the compared fits do not all share a comparable formal MML basis, observation set, and convergence status."
+      "Information-criterion ranking is suppressed because the compared fits do not all share one current, selectable, verified MML likelihood, observation, constraint, integration, and readiness basis. q<31 fits remain screening/review-only."
     )
   }
   if (isTRUE(has_gpcm) && is.na(ref_labels$reference)) {
@@ -7411,6 +7848,7 @@ build_model_choice_review <- function(...,
   out <- list(
     overview = overview,
     key_warnings = key_warnings,
+    comparison_warnings = comparison_warnings,
     next_actions = next_actions,
     comparison = comparison,
     comparison_table = comparison$table,
@@ -7457,6 +7895,7 @@ summary.mfrm_model_choice_review <- function(object, digits = 3, ...) {
   out <- list(
     overview = tibble::as_tibble(object$overview %||% tibble::tibble()),
     key_warnings = clean_summary_lines(object$key_warnings %||% character(0)),
+    comparison_warnings = clean_summary_lines(object$comparison_warnings %||% character(0)),
     next_actions = clean_summary_lines(object$next_actions %||% character(0)),
     comparison_table = tibble::as_tibble(object$comparison_table %||% tibble::tibble()),
     model_roles = tibble::as_tibble(object$model_roles %||% tibble::tibble()),
@@ -7483,15 +7922,60 @@ print.summary.mfrm_model_choice_review <- function(x, ...) {
     print(round_numeric_df(as.data.frame(x$overview), digits = digits), row.names = FALSE)
   }
   print_bullet_section("Key Warnings", x$key_warnings)
+  print_bullet_section("Comparison Warnings", x$comparison_warnings)
   print_bullet_section("Next Actions", x$next_actions)
   if (nrow(x$comparison_table) > 0L) {
     cat("\nComparison Table\n")
-    print(round_numeric_df(as.data.frame(x$comparison_table), digits = digits), row.names = FALSE)
+    comparison <- round_numeric_df(
+      as.data.frame(x$comparison_table),
+      digits = digits
+    )
+    keep <- intersect(
+      c(
+        "Label", "Model", "Method", "Persons", "Npar", "LogLik",
+        "AIC", "BIC", "SABIC", "Delta_AIC", "Delta_BIC",
+        "Delta_SABIC", "ICStatus", "ICIntegrationTier", "ICSelectable",
+        "ICComparable", "SABICComparable", "InferenceReady"
+      ),
+      names(comparison)
+    )
+    print(comparison[, keep, drop = FALSE], row.names = FALSE)
+    cat("  Full IC audit fields remain available in `$comparison_table`.\n")
   }
   if (nrow(x$model_roles) > 0L) {
-    cat("\nModel Roles\n")
-    print(as.data.frame(x$model_roles[, c("Label", "Model", "RecommendedRole", "ScoreContract"), drop = FALSE]),
-          row.names = FALSE)
+    cat("\nModel Contracts and Readiness\n")
+    roles <- as.data.frame(x$model_roles, stringsAsFactors = FALSE)
+    roles$StepStructure <- dplyr::recode(
+      roles$StepStructure,
+      shared_ladder = "shared ladder",
+      step_facet_specific_ladders = "facet-specific ladders"
+    )
+    roles$SlopeStructure <- dplyr::recode(
+      roles$SlopeStructure,
+      fixed_equal_at_1 = "fixed at 1",
+      relative_by_slope_facet_geometric_mean_1 =
+        "relative by slope facet (GM = 1)"
+    )
+    cat("\nStep parameters (reported values versus independent parameters)\n")
+    steps <- roles[, c(
+      "Label", "Model", "StepStructure", "StepCoordinates",
+      "FreeStepParameters"
+    ), drop = FALSE]
+    names(steps)[4:5] <- c("Reported", "Free")
+    print(steps, row.names = FALSE)
+    cat("\nSlope parameters (reported values versus independent parameters)\n")
+    slopes <- roles[, c(
+      "Label", "Model", "SlopeStructure", "SlopeCoordinates",
+      "FreeSlopeParameters"
+    ), drop = FALSE]
+    names(slopes)[4:5] <- c("Reported", "Free")
+    print(slopes, row.names = FALSE)
+    cat("\nFit readiness\n")
+    print(roles[, c(
+      "Label", "Model", "FitReadiness", "FormalInference",
+      "Interpretation"
+    ), drop = FALSE], row.names = FALSE)
+    cat("  Full score contracts and readiness reasons remain in `$model_roles`.\n")
   }
   if (nrow(x$downstream_routes) > 0L) {
     cat("\nDownstream Routes\n")

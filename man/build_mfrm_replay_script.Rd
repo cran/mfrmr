@@ -103,9 +103,15 @@ The returned object contains:
 \item \code{summary}: a one-row overview of the chosen replay mode and whether bundle
 export was included
 \item \code{script}: the generated R code as a single string
+\item \code{source_readiness}, \code{source_readiness_components}, and
+\code{source_readiness_parameters}: readiness provenance from the source fit
 \item \code{anchors} and \code{group_anchors}: the exact stored constraints that were
 embedded into the script
 }
+
+The source readiness row is not copied into the replayed fit. The generated
+script recomputes readiness and warns when its fit-level decision fields do
+not match the source record.
 
 If \code{ScriptMode} is \code{"facets"}, the script replays the higher-level
 \code{\link[=run_mfrm_facets]{run_mfrm_facets()}} workflow. If it is \code{"fit"}, the script uses

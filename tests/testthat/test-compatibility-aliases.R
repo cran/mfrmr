@@ -95,3 +95,32 @@ test_that("JMLE input resolves immediately to canonical JML state", {
   expect_equal(fit_alias$opt$par, fit_jml$opt$par)
   expect_equal(fit_alias$summary$LogLik, fit_jml$summary$LogLik)
 })
+
+test_that("legacy JMLE labels are canonicalized on public output surfaces", {
+  legacy <- make_toy_fit(method = "JML", maxit = 30)
+  legacy$summary$Method <- "JMLE"
+  legacy$summary$MethodUsed <- "JMLE"
+  legacy$config$method <- "JMLE"
+  legacy$config$method_input <- "JMLE"
+  legacy$config$replay_inputs$method <- "JMLE"
+
+  fit_summary <- summary(legacy, profile = "fit", detail = "brief")
+  expect_identical(as.character(fit_summary$overview$Method[[1]]), "JML")
+  expect_identical(as.character(fit_summary$overview$MethodUsed[[1]]), "JML")
+
+  printed <- paste(capture.output(print(fit_summary)), collapse = "\n")
+  expect_match(printed, "Method: JML", fixed = TRUE)
+  expect_false(grepl("JMLE", printed, fixed = TRUE))
+
+  manifest <- build_mfrm_manifest(legacy)
+  expect_identical(as.character(manifest$summary$Method[[1]]), "JML")
+  expect_identical(as.character(manifest$summary$MethodUsed[[1]]), "JML")
+
+  replay <- build_mfrm_replay_script(
+    legacy,
+    data_file = "analysis_data.csv"
+  )
+  expect_match(replay$script, "Method: JML", fixed = TRUE)
+  expect_match(replay$script, 'method = "JML"', fixed = TRUE)
+  expect_false(grepl('method = "JMLE"', replay$script, fixed = TRUE))
+})

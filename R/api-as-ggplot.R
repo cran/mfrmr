@@ -248,6 +248,13 @@
   summary_df <- as.data.frame(payload$group_summary %||% data.frame(), stringsAsFactors = FALSE)
   if (nrow(summary_df) > 0L &&
       all(c("XBase", "Min", "Max", "Q1", "Q3", "Median", "PlotType") %in% names(summary_df))) {
+    summary_df <- summary_df[
+      as.character(summary_df$PlotType) == "Facet level",
+      ,
+      drop = FALSE
+    ]
+  }
+  if (nrow(summary_df) > 0L) {
     p <- p +
       ggplot2::geom_segment(
         data = summary_df,
@@ -273,6 +280,32 @@
         ),
         inherit.aes = FALSE, colour = "grey20", linewidth = 0.45
       )
+  }
+  step_df <- loc[as.character(loc$PlotType) == "Step threshold", , drop = FALSE]
+  if (nrow(step_df) > 1L && all(c("Group", "XBase") %in% names(step_df))) {
+    step_ladder <- do.call(
+      rbind,
+      lapply(split(step_df, as.character(step_df$Group)), function(tbl) {
+        if (nrow(tbl) < 2L) return(NULL)
+        data.frame(
+          XBase = tbl$XBase[1L],
+          Min = min(tbl$Estimate, na.rm = TRUE),
+          Max = max(tbl$Estimate, na.rm = TRUE),
+          stringsAsFactors = FALSE
+        )
+      })
+    )
+    if (!is.null(step_ladder) && nrow(step_ladder) > 0L) {
+      p <- p + ggplot2::geom_segment(
+        data = step_ladder,
+        ggplot2::aes(
+          x = .data$XBase, xend = .data$XBase,
+          y = .data$Min, yend = .data$Max
+        ),
+        inherit.aes = FALSE, colour = "#D95F02",
+        linewidth = 0.55, alpha = 0.5
+      )
+    }
   }
   person_stats <- as.data.frame(payload$person_stats %||% data.frame(), stringsAsFactors = FALSE)
   if (nrow(person_stats) > 0L && all(c("Mean", "Median") %in% names(person_stats))) {
@@ -330,12 +363,36 @@
     )
   labels <- as.data.frame(payload$label_points %||% data.frame(), stringsAsFactors = FALSE)
   if (nrow(labels) > 0L && all(c("X", "Estimate", "Label") %in% names(labels))) {
-    labels$LabelShort <- truncate_axis_label(labels$Label, width = 14L)
-    p <- p + ggplot2::geom_text(
-      data = labels,
-      ggplot2::aes(x = .data$X, y = .data$Estimate, label = .data$LabelShort),
-      inherit.aes = FALSE, hjust = -0.1, size = 2.5, check_overlap = TRUE
+    labels$LabelX <- suppressWarnings(as.numeric(labels$LabelX %||% labels$X))
+    labels$LabelY <- suppressWarnings(as.numeric(labels$LabelY %||% labels$Estimate))
+    labels$PointY <- suppressWarnings(as.numeric(
+      labels$DisplayEstimate %||% labels$Estimate
+    ))
+    labels$LabelHjust <- suppressWarnings(as.numeric(
+      labels$LabelHjust %||% rep(0, nrow(labels))
+    ))
+    labels$LabelShort <- truncate_axis_label(
+      labels$LabelText %||% labels$Label,
+      width = 22L
     )
+    p <- p +
+      ggplot2::geom_segment(
+        data = labels,
+        ggplot2::aes(
+          x = .data$X, y = .data$PointY,
+          xend = .data$LabelX, yend = .data$LabelY
+        ),
+        inherit.aes = FALSE, colour = "grey45",
+        linewidth = 0.25, alpha = 0.65
+      ) +
+      ggplot2::geom_text(
+        data = labels,
+        ggplot2::aes(
+          x = .data$LabelX, y = .data$LabelY,
+          label = .data$LabelShort, hjust = .data$LabelHjust
+        ),
+        inherit.aes = FALSE, size = 2.5, check_overlap = FALSE
+      )
   }
   .mfrmr_gg_labs(p, payload, x = NULL, y = "Logit scale", fallback = "Wright map")
 }
@@ -555,7 +612,9 @@
   )
   p <- ggplot2::ggplot(prob, mapping)
   p <- if (identical(slope_aes, "linewidth")) {
-    p + ggplot2::geom_line()
+    p +
+      ggplot2::geom_line() +
+      ggplot2::scale_linewidth_continuous(range = c(0.45, 1.35))
   } else {
     p + ggplot2::geom_line(linewidth = 0.85)
   }
@@ -683,7 +742,10 @@
 #' @return A `ggplot2` plot object.
 #' @examples
 #' \donttest{
-#' fit <- fit_mfrm(load_mfrmr_data("example_core"), "Person",
+#' toy <- load_mfrmr_data("example_core")
+#' # A balanced slice retains every Rater and Criterion while running quickly.
+#' toy <- toy[toy$Person %in% unique(toy$Person)[1:12], , drop = FALSE]
+#' fit <- fit_mfrm(toy, "Person",
 #'                 c("Rater", "Criterion"), "Score", maxit = 30)
 #' as_ggplot(fit, type = "wright")
 #' as_ggplot(fit, type = "fit_pathway", include_person = TRUE)

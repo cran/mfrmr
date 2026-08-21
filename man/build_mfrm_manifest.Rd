@@ -35,11 +35,10 @@ bias bundles.}
 exported anchor table.}
 
 \item{data}{Optional original analysis data frame. When supplied,
-the manifest's \code{input_hash} row for \code{data} is computed against
-the user's untouched input rather than the package's internal
-\code{prep$data} (which carries synthesised \code{Weight} / \code{score_k}
-columns) so the recorded fingerprint matches what
-\code{read.csv()} will produce in a replay session.}
+the manifest's \code{input_summary} row for \code{data} describes the user's
+untouched input rather than the package's internal \code{prep$data} (which
+carries synthesised \code{Weight} / \code{score_k} columns). The summary records
+structure, not a byte-level or serialized-object identity claim.}
 }
 \value{
 A named list with class \code{mfrm_manifest}.
@@ -71,6 +70,9 @@ sharing it.
 The returned bundle has class \code{mfrm_manifest} and includes:
 \itemize{
 \item \code{summary}: one-row analysis overview
+\item \code{readiness}, \code{readiness_components}, and \code{readiness_parameters}: the
+source fit's current readiness-contract record, its component review, and
+any parameter-level readiness rows
 \item \code{environment}: package/R/platform metadata
 \item \code{model_settings}: key-value model settings table
 \item \code{source_columns}: key-value data-column table
@@ -83,8 +85,9 @@ small-sample design flags
 \item \code{shrinkage_review}: retained traceability table for shrinkage settings
 \item \code{available_outputs}: availability table for diagnostics/bias/PCA/prediction
 outputs
-\item \code{dependencies}, \code{input_hash}, and \code{session_info}: reproducibility
-metadata tables
+\item \code{dependencies}, \code{input_summary}, and \code{session_info}: reproducibility
+metadata tables. \code{input_summary} records object structure and does not
+claim byte-for-byte identity across platforms or serialization formats
 \item \code{settings}: manifest build settings
 }
 }
@@ -95,6 +98,12 @@ The \code{summary} table is the direct place to confirm that you are looking at
 the intended analysis. The \code{model_settings}, \code{source_columns}, and
 \code{estimation_control} tables are designed for reproducibility records and
 method write-up.
+\code{Converged} records the optimizer return-code decision; \code{InferenceReady}
+records the stricter readiness-contract decision. They need not agree.
+The \code{readiness} tables are provenance: they preserve the decision recorded
+for the source fit, including its contract version and reason codes. They do
+not make a subsequently replayed fit inference-ready; replay must recompute
+readiness from the replayed data and numerical result.
 Active latent-regression fits also record their population-model provenance
 there, including the fitted scoring basis, stored \code{population_formula}, and
 person-level contract used by the fitted population model. When categorical

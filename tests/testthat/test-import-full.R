@@ -76,6 +76,25 @@ test_that("import_tam_fit (single-facet) returns a populated bundle", {
   expect_equal(nrow(imp$facets$person), n_p)
   expect_equal(nrow(imp$facets$others), n_i)
   expect_s3_class(imp$diagnostics, "mfrm_diagnostics")
+  expect_identical(imp$summary$ICStatus[1], "imported_native_descriptive")
+  expect_false(imp$summary$ICEligible[1])
+  expect_false(imp$summary$ICSelectable[1])
+  expect_true(imp$summary$NativeAICFormulaVerified[1])
+  expect_true(imp$summary$NativeBICFormulaVerified[1])
+  expect_true(imp$summary$NativeABICFormulaVerified[1])
+  expect_true(imp$summary$NativeLogLikDevianceConsistent[1])
+  expect_true(imp$summary$NativePersonCountConsistent[1])
+  expect_true(is.finite(imp$summary$Iterations[1]))
+  expect_true(is.finite(imp$summary$IterationCeiling[1]))
+  expect_identical(
+    imp$summary$Iterations[1],
+    imp$source$convergence$Iterations
+  )
+  expect_identical(imp$source$dimensions, 1L)
+  expect_identical(
+    imp$summary$NativeABICFormula[1],
+    "tam_deviance_plus_log_n_minus_2_over_24_k"
+  )
 })
 
 # --- TAM multi-facet (tam.mml.mfr) --------------------------------------

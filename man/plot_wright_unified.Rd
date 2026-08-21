@@ -41,9 +41,11 @@ positions on the map. Default \code{TRUE}.}
 \item{top_n}{Maximum number of facet/step locations retained by the native
 renderer for a compact display. Step transitions are always retained and
 omitted facet locations are reported in \code{retention}; use \code{Inf} for the
-complete final map. Native text labels remain collision-aware even when
-all coordinates are retained. The FACETS-style payload retains and labels
-every fitted location, grouping coincident labels when needed.}
+complete final map. Every retained native location is labelled using
+collision-aware displaced text and leader lines; step transitions are
+shown as one vertical ladder with fitted logits in their labels. The
+FACETS-style payload retains and labels every fitted location, grouping
+coincident labels when needed.}
 
 \item{show_ci}{Logical or \code{NULL}. \code{NULL} (the default) draws available
 uncertainty intervals for the native renderer and omits them from the

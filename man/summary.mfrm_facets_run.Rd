@@ -33,7 +33,8 @@ This method returns a compact cross-object summary that combines:
 \section{Interpreting output}{
 
 \itemize{
-\item \code{overview}: convergence, information criteria, and scale size.
+\item \code{overview}: convergence, scale size, and the canonical/legacy
+information-criterion contract status.
 \item \code{mapping}: sanity check for auto/explicit column mapping.
 \item \code{fit} / \code{diagnostics}: drill-down summaries for reporting decisions.
 }

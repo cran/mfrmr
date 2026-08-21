@@ -23,7 +23,8 @@ round_numeric_frame <- function(df, digits = 3L) {
 #' - nested summaries of `fit` and `diagnostics`
 #'
 #' @section Interpreting output:
-#' - `overview`: convergence, information criteria, and scale size.
+#' - `overview`: convergence, scale size, and the canonical/legacy
+#'   information-criterion contract status.
 #' - `mapping`: sanity check for auto/explicit column mapping.
 #' - `fit` / `diagnostics`: drill-down summaries for reporting decisions.
 #'
@@ -92,7 +93,10 @@ print.summary.mfrm_facets_run <- function(x, ...) {
     ov <- round_numeric_frame(as.data.frame(x$overview), digits = digits)[1, , drop = FALSE]
     cat(sprintf("  Model: %s | Method: %s\n", ov$Model, ov$Method))
     cat(sprintf("  N: %s | Persons: %s | Facets: %s | Categories: %s\n", ov$N, ov$Persons, ov$Facets, ov$Categories))
-    cat(sprintf("  LogLik: %s | AIC: %s | BIC: %s\n", ov$LogLik, ov$AIC, ov$BIC))
+    ic_lines <- mfrm_ic_console_lines(x$overview, digits = digits)
+    if (length(ic_lines) > 0L) {
+      cat(paste0("  ", ic_lines, "\n"), sep = "")
+    }
     convergence <- mfrm_convergence_state(ov)
     cat(sprintf(
       "  Optimizer returned code 0: %s | Formal inference: %s | Iterations: %s\n",

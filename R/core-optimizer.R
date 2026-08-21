@@ -287,7 +287,11 @@ make_mfrm_direct_evaluator <- function(method, cache, idx, config, sizes, quad,
   ensure_shared <- function(par) {
     if (identical(par, cached_par)) return(invisible(NULL))
     cache$ensure(par)
-    cached_par <<- par
+    # Keep an owned snapshot rather than optim()'s callback buffer. The latter
+    # may be reused between calls, which would invalidate exact cache-key
+    # comparisons and make an otherwise deterministic optimization path depend
+    # on allocation history.
+    cached_par <<- par + 0
     cached_gradient <<- NULL
     probability_bundle <<- NULL
     logprob_bundle <<- NULL
@@ -374,6 +378,31 @@ make_mfrm_direct_evaluator <- function(method, cache, idx, config, sizes, quad,
   )
 }
 
+make_mfrm_boundary_safe_objective <- function(evaluator,
+                                                penalty = 1e100) {
+  if (!is.list(evaluator) || !is.function(evaluator$value)) {
+    stop("`evaluator` must expose a callable `value` member.", call. = FALSE)
+  }
+  penalty <- as.numeric(penalty)[1]
+  if (!is.finite(penalty) || penalty <= 0) {
+    stop("`penalty` must be one finite positive value.", call. = FALSE)
+  }
+  rejections <- 0L
+  list(
+    value = function(par, ...) {
+      tryCatch(
+        evaluator$value(par),
+        mfrmr_gpcm_slope_numeric_boundary_error = function(error) {
+          rejections <<- rejections + 1L
+          penalty
+        }
+      )
+    },
+    rejections = function() as.integer(rejections),
+    penalty = penalty
+  )
+}
+
 make_mfrm_em_mstep_evaluator <- function(cache, idx, config, sizes, quad,
                                          obs_posterior,
                                          reuse_probability_workspace = TRUE) {
@@ -385,7 +414,9 @@ make_mfrm_em_mstep_evaluator <- function(cache, idx, config, sizes, quad,
   ensure_shared <- function(par) {
     if (identical(par, cached_par)) return(invisible(NULL))
     cache$ensure(par)
-    cached_par <<- par
+    # See make_mfrm_direct_evaluator(): never retain an optimizer-owned
+    # callback buffer as the cache key.
+    cached_par <<- par + 0
     cached_gradient <<- NULL
     logprob_bundle <<- mfrm_mml_logprob_bundle(
       idx = idx,
@@ -461,7 +492,12 @@ run_mfrm_direct_optimization <- function(start,
     quad = quad,
     reuse_probability_workspace = identical(optimizer_plan$Used, "L-BFGS-B")
   )
-  fn <- function(par, ...) evaluator$value(par)
+  # A non-representable GPCM slope is an invalid line-search proposal, not a
+  # fitted parameter vector. Return a finite, dominating objective so both
+  # BFGS and L-BFGS-B can contract the step. All other errors remain fail-hard,
+  # and expand_params() still rejects an invalid retained solution.
+  safe_objective <- make_mfrm_boundary_safe_objective(evaluator)
+  fn <- function(par, ...) safe_objective$value(par)
   gr <- function(par, ...) evaluator$gradient(par)
 
   run_stage <- function(par, stage_method, stage_reltol, index, label,
@@ -661,7 +697,12 @@ run_mfrm_direct_optimization <- function(start,
     SelectedStage = as.integer(selected$index),
     Stages = stage_table
   )
+  opt$optimizer_stage_parameters <- do.call(rbind, lapply(stages, function(stage) {
+    as.numeric(stage$opt$par %||% numeric(0))
+  }))
   opt$evaluation_cache <- evaluator$diagnostics()
+  opt$evaluation_cache$GPCMSlopeNumericBoundaryRejections <-
+    safe_objective$rejections()
 
   if (!identical(opt$optimizer_diagnostics$ConvergenceSeverity, "pass") &&
       !isTRUE(suppress_convergence_warning)) {
@@ -941,6 +982,9 @@ run_mfrm_mml_em_optimization <- function(start,
     ),
     SelectedStage = 1L,
     Stages = mfrm_optimizer_stage_row(em_stage, selected = TRUE)
+  )
+  opt$optimizer_stage_parameters <- matrix(
+    as.numeric(opt$par %||% numeric(0)), nrow = 1L
   )
   opt$em_diagnostics <- list(
     EMIterations = as.integer(length(ll_trace) - 1L),

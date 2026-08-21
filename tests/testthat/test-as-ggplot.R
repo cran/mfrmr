@@ -29,7 +29,14 @@ test_that("as_ggplot accepts fitted objects and CCC slope styling", {
   expect_s3_class(direct, "ggplot")
   expect_s3_class(ccc, "ggplot")
   expect_no_error(ggplot2::ggplot_build(direct))
-  expect_no_error(ggplot2::ggplot_build(ccc))
+  expect_no_error(ccc_build <- ggplot2::ggplot_build(ccc))
+  linewidths <- suppressWarnings(as.numeric(
+    ccc_build$data[[1L]]$linewidth %||% numeric(0)
+  ))
+  linewidths <- linewidths[is.finite(linewidths)]
+  expect_gt(length(linewidths), 0L)
+  expect_gte(min(linewidths), 0.45)
+  expect_lte(max(linewidths), 1.35)
 })
 
 test_that("as_ggplot converts DIF summary and heatmap payload shapes", {

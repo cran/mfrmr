@@ -79,8 +79,9 @@ support.
 # same rater and criterion identities by construction.
 toy <- load_mfrmr_data("example_core")
 people <- unique(toy$Person)
-d1 <- toy[toy$Person \%in\% people[1:24], , drop = FALSE]
-d2 <- toy[toy$Person \%in\% people[25:48], , drop = FALSE]
+# Two balanced 12-Person waves retain every Rater and Criterion.
+d1 <- toy[toy$Person \%in\% people[1:12], , drop = FALSE]
+d2 <- toy[toy$Person \%in\% people[13:24], , drop = FALSE]
 fit1 <- fit_mfrm(d1, "Person", c("Rater", "Criterion"), "Score",
                  method = "MML", quad_points = 7, maxit = 30)
 fit2 <- fit_mfrm(d2, "Person", c("Rater", "Criterion"), "Score",

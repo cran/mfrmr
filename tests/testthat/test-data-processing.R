@@ -279,17 +279,28 @@ test_that("non-consecutive score recoding is surfaced before estimation", {
   expect_equal(prep$score_map$InternalScore, c(1, 2, 3))
 })
 
-test_that("keep_original=TRUE preserves original score codes", {
+test_that("keep_original=TRUE preserves codes and exposes unsupported internal gaps", {
   d <- mfrmr:::sample_mfrm_data(seed = 42)
   # Only keep scores 1, 3, 5
   d_gap <- d |> dplyr::filter(Score %in% c(1, 3, 5))
-  fit <- suppressWarnings(fit_mfrm(d_gap, "Person",
-    c("Rater", "Task", "Criterion"), "Score",
-    method = "JML", maxit = 30, keep_original = TRUE))
+  prep <- mfrmr:::prepare_mfrm_data(
+    d_gap, "Person", c("Rater", "Task", "Criterion"), "Score",
+    keep_original = TRUE
+  )
+  condition <- tryCatch(
+    suppressWarnings(fit_mfrm(d_gap, "Person",
+      c("Rater", "Task", "Criterion"), "Score",
+      method = "JML", maxit = 30, keep_original = TRUE)),
+    error = identity
+  )
 
-  expect_s3_class(fit, "mfrm_fit")
-  observed_scores <- sort(unique(fit$prep$data$Score))
+  observed_scores <- sort(unique(prep$data$Score))
   expect_true(all(observed_scores %in% c(1, 3, 5)))
+  expect_s3_class(condition, "mfrmr_category_readiness_error")
+  expect_identical(
+    condition$category_support$support_table$UnsupportedCategory,
+    "2;4"
+  )
 })
 
 test_that("explicit rating_min/rating_max override auto-detection", {
@@ -414,48 +425,28 @@ test_that("explicit rating range still collapses internal gaps unless original c
   expect_equal(prep_keep$rating_max, 5L)
   expect_equal(prep_keep$unused_score_categories, c(2L, 4L))
 
-  fit_keep <- suppressWarnings(fit_mfrm(
-    d_gap, "Person", c("Rater", "Task", "Criterion"), "Score",
-    method = "JML", maxit = 30,
-    rating_min = 1,
-    rating_max = 5,
-    keep_original = TRUE
-  ))
-  fit_keep_summary <- summary(fit_keep)
-  rs_keep <- rating_scale_table(fit_keep, drop_unused = FALSE)
-  cs_keep <- category_structure_report(fit_keep)
-  rs_keep_summary <- summary(rs_keep)
-  cs_keep_summary <- summary(cs_keep)
-  surface_keep <- .mfrmr_muffle_expected_warnings(
-    plot(fit_keep, type = "ccc_surface", draw = FALSE, theta_points = 55),
-    "^Review-only display:"
+  condition <- tryCatch(
+    suppressWarnings(fit_mfrm(
+      d_gap, "Person", c("Rater", "Task", "Criterion"), "Score",
+      method = "JML", maxit = 30,
+      rating_min = 1,
+      rating_max = 5,
+      keep_original = TRUE
+    )),
+    error = identity
   )
-  expect_equal(fit_keep_summary$settings_overview$UnusedScoreCategories[1], "2, 4")
-  expect_equal(fit_keep_summary$settings_overview$UnusedScoreCategoryType[1], "internal")
-  expect_match(paste(fit_keep_summary$key_warnings, collapse = " "), "Unused intermediate score")
-  expect_true(all(rs_keep$category_table$WeaklyIdentified[rs_keep$category_table$Category %in% c(2, 4)]))
-  expect_true(any(grepl("zero-count intermediate", rs_keep$threshold_table$ThresholdCaveat, fixed = TRUE)))
-  expect_true(any(grepl("Unused intermediate score", rs_keep$caveats$Message, fixed = TRUE)))
-  expect_true("caveats" %in% names(rs_keep_summary))
-  expect_true(any(grepl("Unused intermediate score", rs_keep_summary$caveats$Message, fixed = TRUE)))
-  expect_true("caveats" %in% names(cs_keep_summary))
-  expect_true(any(grepl("Unused intermediate score", cs_keep_summary$caveats$Message, fixed = TRUE)))
-  expect_true("WeaklyIdentified" %in% names(cs_keep$median_thresholds))
-  expect_true(any(cs_keep$median_thresholds$WeaklyIdentified, na.rm = TRUE))
-  expect_s3_class(surface_keep, "mfrm_plot_data")
-  expect_true(all(as.character(1:5) %in% surface_keep$data$surface$Category))
-  expect_true(all(c("2", "4") %in% surface_keep$data$surface$Category))
+  expect_s3_class(condition, "mfrmr_category_readiness_error")
+  expect_identical(condition$readiness$CategoryState,
+                   "unsupported_coordinate")
   expect_identical(
-    surface_keep$data$category_support$ZeroObserved[surface_keep$data$category_support$Category == "2"][1],
-    TRUE
+    condition$category_support$support_table$UnsupportedCategory,
+    "2;4"
   )
-  expect_match(
-    surface_keep$data$interpretation_guide$Guidance[
-      surface_keep$data$interpretation_guide$Topic == "Zero-frequency categories"
-    ][1],
-    "2, 4",
-    fixed = TRUE
+  expect_identical(
+    condition$category_support$support_table$RetainedForFit,
+    "1;2;3;4;5"
   )
+  expect_identical(nrow(condition$category_support$unsupported_contrasts), 2L)
 })
 
 test_that("single intermediate gap is recoded by default and retained when requested", {

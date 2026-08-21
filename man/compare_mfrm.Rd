@@ -13,9 +13,9 @@ compare_mfrm(..., labels = NULL, warn_constraints = TRUE, nested = FALSE)
 If \code{NULL}, labels are generated from model/method combinations.}
 
 \item{warn_constraints}{Logical. If \code{TRUE} (the default), emit a warning
-when models use different centering constraints (\code{noncenter_facet} or
-\code{dummy_facets}), which can make information-criterion comparisons
-misleading.}
+when models use different score coding or constraint settings. Ranking is
+suppressed whenever this basis differs, regardless of whether the warning
+is displayed.}
 
 \item{nested}{Logical. Set to \code{TRUE} only when the supplied models are
 known to be nested and fitted with the same likelihood basis on the same
@@ -26,10 +26,13 @@ structural nesting review and computes the LRT only for supported nesting patter
 \value{
 An object of class \code{mfrm_comparison} (named list) with:
 \itemize{
-\item \code{table}: data.frame of model-level statistics (LogLik, AIC, BIC,
-Delta_AIC, AkaikeWeight, Delta_BIC, BICWeight, npar, nobs, WeightedN,
-ICSampleSize, ICSampleSizeBasis, Model, Method, Converged,
-InferenceReady, ConvergenceSeverity, ICComparable).
+\item \code{table}: data.frame of model-level statistics including \code{LogLik},
+\code{Deviance}, \code{Npar} (and equal compatibility alias \code{npar}), \code{AIC}, \code{BIC},
+\code{SABIC}, criterion deltas and candidate-set weights, \code{ResponseRows},
+\code{WeightedResponseTotal}, \code{Persons}, \code{ICSampleSize}, formula and integration
+identities, integration tier/selectability, stored-value consistency
+fields, convergence fields,
+\code{ICComparable}, \code{SABICComparable}, and \code{ConstraintComparable}.
 \item \code{lrt}: data.frame with likelihood-ratio test result (only when two models
 are supplied and \code{nested = TRUE}). Contains \code{ChiSq}, \code{df}, \code{p_value}.
 \item \code{evidence_ratios}: data.frame of pairwise Akaike-weight ratios (Model1,
@@ -43,7 +46,8 @@ silently absent.
 }
 \description{
 Produce a side-by-side comparison of multiple \code{\link[=fit_mfrm]{fit_mfrm()}} results using
-information criteria, log-likelihood, and parameter counts. When exactly
+AIC, Person-based BIC, Sclove SABIC, log-likelihood, and free-parameter
+counts. When exactly
 two models are supplied and the current conservative nesting review passes,
 a likelihood-ratio test is included.
 }
@@ -52,21 +56,38 @@ Models should be fit to the \strong{same data} (same rows, same person/facet
 columns) for the comparison to be meaningful. The function checks that
 observation counts match and warns otherwise.
 
-Information-criterion ranking is reported only when all candidate models
-use the package's \code{MML} estimation path, analyze the same observations, and
-converge successfully. Raw \code{AIC} and \code{BIC} values are still shown for each
-model, but \verb{Delta_*}, weights, and preferred-model summaries are suppressed
-when the likelihood basis is not comparable enough for primary reporting.
-The comparison table records both row count (\code{nobs}) and the sample-size
-basis used for the BIC penalty (\code{ICSampleSize}, \code{ICSampleSizeBasis}); for
-weighted fits this is the sum of weights rather than the number of rows.
+Information-criterion ranking is reported only when all candidates are
+inference-ready fits from the package's current \code{MML} contract, use the same
+prepared observations, score coding, constraints, formula contract, and
+integration-evaluation identity, are eligible under the weighting policy,
+and have a selectable integration tier. For fixed-facet MML,
+\code{ICSampleSize} is the number of independent
+Persons and \code{ICSampleSizeBasis} is \code{"person_count"}; response rows and their
+weighted total are retained separately. Explicit all-unit weights are
+eligible, whereas every non-unit observation-weight fit fails closed in
+version 0.2.3.
+
+Canonical \code{AIC}, \code{BIC}, and \code{SABIC} are recomputed from the retained
+objective, optimizer-vector dimension, and Person count. A stale stored
+value, a legacy object without the current contract identity, a JML fit, or
+an ineligible weighted fit cannot enter ranking. Earlier raw values may be
+shown only as explicitly labelled \code{LegacyAIC} and \code{LegacyBIC} fields.
+
+\strong{Integration selection guard}: raw canonical criteria are retained at
+every valid MML quadrature count, but automatic comparison is screening-only
+below 15 points and review-only at 15--30 points. \code{ICSelectable} and
+\code{ICIntegrationSelectable} become \code{TRUE} at q>=31. q=31 is a starting grid,
+not a universal guarantee: close or consequential comparisons should be
+reevaluated at a denser shared grid (normally q>=61). The guard also applies
+to \code{nested = TRUE}, so a coarse-grid LRT cannot bypass it.
 
 \strong{Nesting}: Two models are \emph{nested} when one is a special case of the
 other obtained by imposing equality constraints.  The most common
 nesting in MFRM is RSM (shared thresholds) inside PCM
 (item-specific thresholds).  Models that differ only in estimation
 method (MML vs JML) on the same specification are not nested in the
-usual sense---use information criteria rather than LRT for that
+usual sense, and their information criteria do not share the common MML
+contract. Do not use either the LRT or IC ranking as a direct cross-method
 comparison.
 
 In the \strong{current \code{mfrmr} model space}, the automatic nesting review is
@@ -90,30 +111,36 @@ difference in the number of parameters is positive:
 \deqn{\Lambda = -2 (\ell_{\mathrm{restricted}} - \ell_{\mathrm{full}})
   \sim \chi^2_{\Delta p}}
 
-The LRT is asymptotically valid when models are nested and the data
-are independent.  With small samples or boundary conditions (e.g.,
-variance components near zero), treat p-values as approximate.
+The LRT is asymptotically valid only under its regularity assumptions.
+With small samples or boundary/singular conditions, the reference
+chi-square p-value can be incorrect. At large Person counts, a very small
+practical improvement can also become statistically significant. Read the
+p-value as formal nested-fit evidence, not as an automatic practical model
+preference or evidence that a subscore is useful.
 }
 \section{Information-criterion diagnostics}{
 
-In addition to raw AIC and BIC values, the function computes:
+In addition to the canonical criteria, the function computes:
 \itemize{
-\item \strong{Delta_AIC / Delta_BIC}: difference from the best (minimum) value.
+\item \strong{Delta_AIC / Delta_BIC / Delta_SABIC}: difference from the minimum
+value in the supplied candidate set.
 A Delta < 2 is typically considered negligible; 4--7 suggests
 moderate evidence; > 10 indicates strong evidence against the
 higher-scoring model (Burnham & Anderson, 2002).
-\item \strong{AkaikeWeight / BICWeight}: model probabilities derived from
-\code{exp(-0.5 * Delta)}, normalised across the candidate set.  An
-Akaike weight of 0.90 means the model has a 90\\% probability of
-being the best in the candidate set.
+\item \strong{AkaikeWeight / BICWeight / SABICWeight}: relative candidate-set
+weights derived from \code{exp(-0.5 * Delta)} and normalized only across the
+supplied models. They are not posterior probabilities, probabilities of
+model truth, or guarantees that the candidate set is adequate.
 \item \strong{Evidence ratios}: pairwise ratios of Akaike weights, quantifying
-the relative evidence for one model over another (e.g., an
-evidence ratio of 5 means the preferred model is 5 times more
-likely).
+relative support within this candidate set. A ratio of 5 means only that
+one normalized Akaike weight is five times the other; it does not mean
+that one model is five times more likely to be true.
 }
 
-AIC penalises complexity less than BIC; when they disagree, AIC
-favours the more complex model and BIC the simpler one.
+AIC, BIC, and SABIC answer different approximation/penalty questions. SABIC
+is a sensitivity criterion, not a universal tie-breaker. At 22 or fewer
+Persons its Sclove penalty is non-positive, so \code{SABICSelectable} and
+\code{SABICComparable} are \code{FALSE} and no automatic SABIC preference is returned.
 }
 
 \section{What this comparison means}{
@@ -127,8 +154,11 @@ structure.
 \section{What this comparison does not justify}{
 
 \itemize{
-\item Do not treat AIC/BIC differences as primary evidence when
+\item Do not treat AIC/BIC/SABIC differences as primary evidence when
 \code{table$ICComparable} is \code{FALSE}.
+\item Do not infer numerical adequacy merely because all models share the same
+coarse quadrature identity. Below q=31, raw criteria are diagnostic only
+and automatic deltas, weights, preferences, and LRT are suppressed.
 \item Do not interpret the LRT unless \code{nested = TRUE} and the structural nesting review
 in \code{comparison_basis$nesting_review} passes.
 \item Same-family additive-vs-interaction fits are considered nested only when
@@ -136,19 +166,31 @@ all other structural settings match and the smaller model's
 \code{facet_interactions} set is a subset of the larger model's set.
 \item Do not assume that \code{nested = TRUE} overrides the package's conservative
 nesting boundary; unsupported relations remain unsupported.
+\item PCM is the unit-slope response-kernel reduction of the bounded GPCM when
+both use the same explicit step owner. Nevertheless, the current automatic
+nesting review does not authorize a PCM-versus-GPCM chi-square LRT. Use
+same-basis MML information criteria plus \code{\link[=build_weighting_review]{build_weighting_review()}} and
+inspect the recorded \code{PCM_in_GPCM_ic_only} relation instead.
 \item Do not compare models fit to different datasets, different score codings,
 or materially different constraint systems as if they were commensurate.
+\item At large Person counts, a small systematic likelihood gain can dominate an
+IC difference; boundary or singular fits can also invalidate routine
+asymptotics. Evaluate effect size, stability, interpretability, and score
+consequences separately.
 }
 }
 
 \section{Interpreting output}{
 
 \itemize{
-\item Lower AIC/BIC values indicate better parsimony-accuracy trade-off only
-when \code{table$ICComparable} is \code{TRUE}.
-\item A significant LRT p-value suggests the more complex model provides a
-meaningfully better fit only when the nesting assumption truly holds.
-\item \code{preferred} indicates the model preferred by each criterion.
+\item Lower AIC/BIC values indicate relative support only when
+\code{table$ICComparable} is \code{TRUE}; use SABIC ranking only when
+\code{table$SABICComparable} is also \code{TRUE}.
+\item A significant LRT p-value is formal evidence against the restricted
+model under the stated assumptions; practical gain, score utility, and
+dimensional interpretation require separate checks.
+\item \code{preferred} identifies the minimum criterion within the supplied
+candidate set; it is not an unconditional model verdict.
 \item \code{evidence_ratios} gives pairwise Akaike-weight ratios (returned only
 when Akaike weights can be computed for at least two models).
 \item When comparing more than two models, interpret evidence ratios
@@ -160,7 +202,8 @@ cautiously---they do not adjust for multiple comparisons.
 
 \itemize{
 \item \code{table}: first-pass comparison table; start with \code{ICComparable},
-\code{Model}, \code{Method}, \code{AIC}, and \code{BIC}.
+\code{ICSelectable}, \code{ICIntegrationTier}, \code{Model}, \code{Method}, \code{ICStatus}, \code{AIC},
+\code{BIC}, and \code{SABIC}.
 \item \code{comparison_basis}: records whether IC and LRT claims are defensible for
 the supplied models. Inspect \code{comparison_basis$nesting_review$relation}
 and \code{reason} before reading any LRT output.
@@ -182,10 +225,15 @@ using IC or LRT results in reporting.
 \section{Typical workflow}{
 
 \enumerate{
-\item Fit two models with \code{\link[=fit_mfrm]{fit_mfrm()}} (e.g., RSM and PCM).
-\item Compare with \code{compare_mfrm(fit_rsm, fit_pcm)}.
-\item Inspect \code{summary(comparison)} for AIC/BIC diagnostics and, when
-appropriate, an LRT.
+\item Fit two models with \code{\link[=fit_mfrm]{fit_mfrm()}} (e.g., PCM and bounded GPCM) on the
+same prepared rows, explicit step owner, constraints, and MML quadrature
+setting. Use at least 31 common quadrature points for selectable ICs.
+\item Compare with \code{compare_mfrm(fit_pcm, fit_gpcm)} and start by checking
+\code{comparison$table$ICComparable}.
+\item Inspect \code{summary(comparison)} for AIC/BIC/SABIC diagnostics and, when
+appropriate, an LRT. PCM-versus-GPCM LRT is currently withheld.
+\item Use \code{build_weighting_review(fit_pcm, fit_gpcm)} to inspect which selected
+facet levels and information shares were reweighted by the slopes.
 }
 }
 
@@ -200,6 +248,8 @@ identification. \emph{IEEE Transactions on Automatic Control,
 19}(6), 716-723.
 \item Schwarz, G. (1978). Estimating the dimension of a model.
 \emph{Annals of Statistics, 6}(2), 461-464.
+\item Sclove, S. L. (1987). Application of model-selection criteria to some
+problems in multivariate analysis. \emph{Psychometrika, 52}(3), 333-343.
 }
 }
 
@@ -208,10 +258,10 @@ identification. \emph{IEEE Transactions on Automatic Control,
 toy <- load_mfrmr_data("example_core")
 
 fit_rsm <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                     method = "MML", model = "RSM", quad_points = 7, maxit = 30)
+                     method = "MML", model = "RSM", quad_points = 31, maxit = 30)
 fit_pcm <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                      method = "MML", model = "PCM",
-                     step_facet = "Criterion", quad_points = 7, maxit = 30)
+                     step_facet = "Criterion", quad_points = 31, maxit = 30)
 comp <- compare_mfrm(fit_rsm, fit_pcm, labels = c("RSM", "PCM"))
 comp$table
 comp$evidence_ratios

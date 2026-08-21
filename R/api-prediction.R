@@ -879,7 +879,9 @@ compute_person_posterior_summary <- function(idx,
       eta_q <- base_eta + person_nodes[person_int, q]
       eta_mat <- outer(eta_q, 0:(k_cat - 1))
       log_num <- eta_mat - step_cum_row
-      row_max <- log_num[cbind(seq_len(n), max.col(log_num))]
+      row_max <- log_num[cbind(
+        seq_len(n), max.col(log_num, ties.method = "first")
+      )]
       log_denom <- row_max + log(rowSums(exp(log_num - row_max)))
       lp <- log_num[obs_idx] - log_denom
       if (!is.null(idx$weight)) lp <- lp * idx$weight
@@ -898,7 +900,9 @@ compute_person_posterior_summary <- function(idx,
       eta_q <- base_eta + person_nodes[person_int, q]
       linear_part <- outer(eta_q, k_vals) - step_cum_obs
       log_num <- linear_part * slope_obs
-      row_max <- log_num[cbind(seq_len(n), max.col(log_num))]
+      row_max <- log_num[cbind(
+        seq_len(n), max.col(log_num, ties.method = "first")
+      )]
       log_denom <- row_max + log(rowSums(exp(log_num - row_max)))
       lp <- log_num[obs_idx] - log_denom
       if (!is.null(idx$weight)) lp <- lp * idx$weight
@@ -915,7 +919,9 @@ compute_person_posterior_summary <- function(idx,
     for (q in seq_len(n_nodes)) {
       eta_q <- base_eta + person_nodes[person_int, q]
       log_num <- outer(eta_q, k_vals) - step_cum_obs
-      row_max <- log_num[cbind(seq_len(n), max.col(log_num))]
+      row_max <- log_num[cbind(
+        seq_len(n), max.col(log_num, ties.method = "first")
+      )]
       log_denom <- row_max + log(rowSums(exp(log_num - row_max)))
       lp <- log_num[obs_idx] - log_denom
       if (!is.null(idx$weight)) lp <- lp * idx$weight
@@ -928,7 +934,9 @@ compute_person_posterior_summary <- function(idx,
   n_persons <- nrow(ll_by_person)
   aligned_person_labels <- as.character(person_labels[person_ids])
   log_post <- quad_basis$log_weights[person_ids, , drop = FALSE] + ll_by_person
-  row_max <- log_post[cbind(seq_len(n_persons), max.col(log_post))]
+  row_max <- log_post[cbind(
+    seq_len(n_persons), max.col(log_post, ties.method = "first")
+  )]
   log_norm <- row_max + log(rowSums(exp(log_post - row_max)))
   post_w <- exp(log_post - log_norm)
 

@@ -12,8 +12,8 @@ import_tam_fit(
 )
 }
 \arguments{
-\item{fit}{An object returned by \code{TAM::tam.mml()},
-\code{TAM::tam.jml()}, or \code{TAM::tam.mml.mfr()}.}
+\item{fit}{An object returned by \code{TAM::tam.mml()} or
+\code{TAM::tam.mml.mfr()}.}
 
 \item{model}{Same as \code{\link[=import_mirt_fit]{import_mirt_fit()}}.}
 
@@ -28,15 +28,31 @@ on the returned facet tables, plus build a measurement-side
 }
 \value{
 An \code{mfrm_imported_fit} object. Slots mirror
-\code{\link[=import_mirt_fit]{import_mirt_fit()}}.
+\code{\link[=import_mirt_fit]{import_mirt_fit()}}, with explicit TAM-native IC provenance in \code{summary}
+and \code{source}.
 }
 \description{
-Extracts item / step / person parameters from a \code{\link[TAM:tam.mml]{TAM::tam.mml()}},
-\code{\link[TAM:tam.jml]{TAM::tam.jml()}}, or \code{\link[TAM:tam.mml.mfr]{TAM::tam.mml.mfr()}} fit. The multi-facet
+Extracts item / step / person parameters from a unidimensional
+\code{\link[TAM:tam.mml]{TAM::tam.mml()}} or \code{\link[TAM:tam.mml.mfr]{TAM::tam.mml.mfr()}} fit. The multi-facet
 \code{tam.mml.mfr()} path is detected automatically and each
 non-person facet is mapped onto a row of \code{fit$facets$others}
 so downstream MFRM helpers (e.g. \code{plot_qc_dashboard()}) work
 on the imported object.
+}
+\details{
+The public imported-fit surface is deliberately unidimensional and MML-only.
+A \code{tam.jml} object is not silently relabelled as MML, and a TAM fit with
+\code{ndim > 1} is rejected rather than flattened into one mfrmr scale. Keep
+multidimensional TAM fits in a separate validation workflow.
+
+TAM-native AIC, BIC, and adjusted BIC are retained as explicitly named
+\verb{Native*} fields. Compatibility \code{AIC} and \code{BIC} columns still mirror the
+native TAM values, but the imported object has
+\code{ICStatus = "imported_native_descriptive"}, \code{ICEligible = FALSE}, and cannot
+enter \code{\link[=compare_mfrm]{compare_mfrm()}} as a current mfrmr IC contract. In particular, TAM's
+native \code{aBIC} is not relabelled as the package's Sclove \code{SABIC}. The source
+metadata also retains the TAM version, dimension count, iterations, and
+iteration ceiling used for the conservative imported convergence status.
 }
 \examples{
 \donttest{

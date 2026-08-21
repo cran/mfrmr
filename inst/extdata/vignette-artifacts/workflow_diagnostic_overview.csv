@@ -1,2 +1,2 @@
-"Observations","Persons","Facets","Categories","Subsets","ResidualPCA","DiagnosticMode","Method","PrecisionTier","MarginalFit"
-282,48,2,4,1,"none","both","MML","model_based","available"
+"Observations","Persons","Facets","Categories","Subsets","ResidualPCA","DiagnosticMode","Method","PrecisionTier","MarginalFit","FairAverage"
+282,48,2,4,1,"none","both","MML","model_based","available","embedded_available"

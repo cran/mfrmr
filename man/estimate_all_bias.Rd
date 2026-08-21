@@ -26,10 +26,14 @@ diagnostics are computed with \code{residual_pca = "none"}.}
 \item{pairs}{Optional list of facet specifications. Each element should be a
 character vector of length 2 or more, for example
 \code{list(c("Rater", "Criterion"), c("Task", "Criterion"))}.
-When \code{NULL}, all 2-way combinations of modeled facets are used.}
+Explicit specifications may include canonical \code{"Person"} regardless of
+\code{include_person}. When \code{NULL}, all 2-way combinations of modeled facets
+are used.}
 
 \item{include_person}{If \code{TRUE} and \code{pairs = NULL}, include \code{"Person"} in the
-automatically generated pair set.}
+automatically generated pair set. \code{"Person"} denotes the source column
+supplied as \code{person} to \code{\link[=fit_mfrm]{fit_mfrm()}} and remains opt-in because these
+cells condition on fitted JML person measures or MML EAP scores.}
 
 \item{drop_empty}{If \code{TRUE}, omit empty bias tables from \code{by_pair} while still
 recording them in the summary table.}
@@ -64,6 +68,10 @@ When \code{pairs = NULL}, the function builds all 2-way combinations of
 modelled facets automatically.  For a model with facets Rater,
 Criterion, and Task, this yields Rater\eqn{\times}Criterion,
 Rater\eqn{\times}Task, and Criterion\eqn{\times}Task.
+With \code{include_person = TRUE}, Person\eqn{\times}facet pairs are prepended in
+the fit's facet order. They are conditional plug-in likelihood screens, not
+jointly fitted Person\eqn{\times}facet terms. A single warning records this
+boundary for the batch.
 
 The \code{summary} table aggregates results across pairs:
 \itemize{

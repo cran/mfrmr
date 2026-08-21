@@ -133,7 +133,10 @@ alongside the standard result columns.
 \item \code{results}: facet-level replicate results, with the same design-variable
 alias columns when applicable.
 \item \code{rep_overview}: run-level status and timing, with the same design-variable
-alias columns when applicable.
+alias columns when applicable. Failed fits retain the condition class,
+failure component, and category-support state/reason codes when available;
+a completely failed design still returns the documented zero-row
+\code{results} schema rather than a zero-column table.
 \item \code{design_descriptor}: role-based design-variable metadata used by planning
 summaries and plots
 \item \code{planning_scope}: explicit record of the current planning contract
@@ -290,7 +293,7 @@ reporting}. Psychological Methods.
 \examples{
 \donttest{
 sim_eval <- suppressWarnings(evaluate_mfrm_design(
-  design = list(person = c(8, 12), rater = 2, criterion = 2, assignment = 1),
+  design = list(person = c(8, 12), rater = 2, criterion = 2, assignment = 2),
   reps = 1,
   maxit = 30,
   seed = 123

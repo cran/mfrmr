@@ -69,13 +69,21 @@ gradient, convergence status and severity, and inference-readiness decision.
 A fit that is not inference-ready remains available for convergence review,
 but its estimates should not be used for inferential comparison with
 ConQuest until the convergence issue is resolved and the model is refit.
+The generated ConQuest benchmark template fixes its parameter-change
+criterion at \code{1e-8}, deviance-change criterion at \code{1e-10}, and iteration
+ceiling at \code{2000}; these controls are written into the command, summary, and
+settings so a default stopping rule cannot masquerade as an objective
+discrepancy.
 
 The \code{conquest_command} component is a conservative starting template, not a
 guaranteed version-invariant automation. The \code{conquest_output_contract}
 component records which requested external output should feed each
 normalized review table.
-Use \code{normalize_conquest_overlap_exports()} for the four CSV files requested
-by the generated command. \code{\link[=normalize_conquest_overlap_files]{normalize_conquest_overlap_files()}} and
+Use \code{normalize_conquest_overlap_exports()} for the parameter, regression,
+covariance, and case-EAP CSV files requested by the generated command. The
+additional matrixout history CSV retains the objective trajectory and an
+independent estimated-parameter dimension for release verification; it is not
+parsed as a free-form report. \code{\link[=normalize_conquest_overlap_files]{normalize_conquest_overlap_files()}} and
 \code{\link[=normalize_conquest_overlap_tables]{normalize_conquest_overlap_tables()}} remain available for already-extracted
 custom tables. Then use \code{\link[=review_conquest_overlap]{review_conquest_overlap()}} only after the matching
 ConQuest run has been executed externally. The bundle and command template

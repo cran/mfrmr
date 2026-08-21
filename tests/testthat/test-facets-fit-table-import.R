@@ -33,6 +33,39 @@ test_that("read_facets_fit_table standardizes delimited FACETS-style columns", {
   expect_equal(out$OutfitZSTD, c(0.1, 0.7))
   expect_equal(out$DF_Infit, c(21.5, 22.5))
   expect_equal(out$DF_Outfit, c(23.5, 24.5))
+  expect_true(all(out$SourcePrecisionStatus == "reported_tokens_retained"))
+})
+
+test_that("FACETS imports retain displayed decimals and withhold equality-at-two flags", {
+  path <- tempfile(fileext = ".csv")
+  writeLines(c(
+    "Facet,Level,Measure,Infit MnSq,Outfit MnSq,Infit ZStd,Outfit ZStd,Infit df,Outfit df",
+    "Rater,R1,-0.2500,1.00,1.01,2.0,1.99,21.50,22.50",
+    "Rater,R2,0.2500,1.04,1.07,-2.00,2.01,22.50,23.50"
+  ), path)
+
+  out <- mfrmr::read_facets_fit_table(path)
+
+  expect_equal(out$EstimateRaw, c("-0.2500", "0.2500"))
+  expect_equal(out$InfitZSTDRaw, c("2.0", "-2.00"))
+  expect_equal(out$InfitZSTDReportedDecimals, c(1L, 2L))
+  expect_equal(out$OutfitZSTDReportedDecimals, c(2L, 2L))
+  expect_equal(
+    out$InfitZSTDDisplayState,
+    rep("display_boundary_indeterminate", 2L)
+  )
+  expect_equal(
+    out$ZSTDDisplayFlagState,
+    c("display_boundary_indeterminate", "display_above_threshold")
+  )
+  expect_true(all(out$SourcePrecisionStatus == "reported_tokens_retained"))
+
+  numeric_only <- mfrmr::read_facets_fit_table(data.frame(
+    Facet = "Rater", Level = "R1", InfitZSTD = 2, OutfitZSTD = 1.9
+  ))
+  expect_identical(numeric_only$SourcePrecisionStatus, "numeric_values_only")
+  expect_true(is.na(numeric_only$InfitZSTDRaw))
+  expect_identical(numeric_only$ZSTDDisplayFlagState, "not_available")
 })
 
 test_that("read_facets_fit_table parses FACETS score.N.txt files", {
@@ -62,6 +95,8 @@ test_that("read_facets_fit_table parses FACETS score.N.txt files", {
   expect_equal(out$DF_Infit, c(16.5, 17.2))
   expect_equal(out$DF_Outfit, c(17.5, 18.1))
   expect_equal(out$RawFacetNumber, c("2", "2"))
+  expect_equal(out$EstimateRaw, c("0.10", "-0.20"))
+  expect_equal(out$InfitZSTDRaw, c("-0.10", "0.50"))
 })
 
 test_that("read_facets_fit_table parses fixed-field FACETS score files", {
@@ -116,6 +151,8 @@ test_that("read_facets_fit_table parses fixed-field FACETS score files", {
   expect_equal(out$DF_Infit, c(16.5, 17.2))
   expect_equal(out$DF_Outfit, c(17.5, 18.1))
   expect_equal(out$RawFacetNumber, c("2", "2"))
+  expect_equal(out$EstimateRaw, c("-0.38", "0.25"))
+  expect_equal(out$OutfitZSTDRaw, c("1.0", "0.7"))
 })
 
 test_that("imported FACETS fit table can feed facets_fit_review", {

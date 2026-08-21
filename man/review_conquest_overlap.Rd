@@ -76,8 +76,10 @@ intentionally conservative:
 \itemize{
 \item it does \strong{not} parse raw ConQuest text output automatically;
 \item its primary route expects output from
-\code{normalize_conquest_overlap_exports()}, which reads the four native CSV
-files requested by the generated command; custom extracted tables may use
+\code{normalize_conquest_overlap_exports()}, which reads the four native
+comparison CSV files requested by the generated command; the additional
+matrixout-history CSV is retained for a separate objective/free-dimension
+verification; custom extracted tables may use
 \code{\link[=normalize_conquest_overlap_files]{normalize_conquest_overlap_files()}} or
 \code{\link[=normalize_conquest_overlap_tables]{normalize_conquest_overlap_tables()}};
 \item and it reports numerical differences and missing elements without claiming
@@ -94,7 +96,7 @@ The intended workflow is:
 \item export a bundle for the documented comparison scope with
 \code{\link[=build_conquest_overlap_bundle]{build_conquest_overlap_bundle()}};
 \item run the narrow matching case in ConQuest;
-\item normalize the four requested CSV files with
+\item normalize the four comparison CSV files with
 \code{normalize_conquest_overlap_exports()};
 \item pass those tables here to inspect direct differences, centered item
 agreement, and case-level EAP agreement.

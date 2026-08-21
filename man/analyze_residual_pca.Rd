@@ -61,6 +61,10 @@ matrix). The list is empty when every facet PCA succeeded.
 \item \code{warnings}: named list of non-fatal PCA warnings captured from the
 underlying PCA engine. These indicate exploratory boundary conditions,
 not confirmatory evidence.
+\item \code{InferenceTier}, \code{SupportsFormalInference},
+\code{PrimaryReportingEligible}, \code{ReportingUse}, and \code{DecisionUse}:
+machine-readable guards that keep this route exploratory and prohibit an
+automatic dimensionality or subscore decision.
 }
 }
 \description{

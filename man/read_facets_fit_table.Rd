@@ -62,7 +62,14 @@ Read a FACETS fit table for fit review
 This helper does not run FACETS. It reads FACETS output that already exists
 on disk and normalizes it to columns that \code{\link[=facets_fit_review]{facets_fit_review()}} can consume:
 \code{Facet}, \code{Level}, \code{Estimate}, \code{SE}, \code{N}, \code{Infit}, \code{Outfit}, \code{InfitZSTD},
-\code{OutfitZSTD}, \code{DF_Infit}, and \code{DF_Outfit}.
+\code{OutfitZSTD}, \code{DF_Infit}, and \code{DF_Outfit}. File imports also retain the
+exact reported numeric tokens (for example, \code{InfitZSTDRaw = "2.0"}) and
+their displayed decimal counts. FACETS comparison runs should first request
+the highest practical output precision (for example, \code{Udecim=8} for Measure
+and SE). If the resulting displayed absolute ZSTD is still exactly equal to
+2, it is classified as \code{display_boundary_indeterminate}: the text file does
+not expose whether the unrounded value lies just below, at, or just above
+the conventional threshold.
 
 Two common workflows are supported:
 \itemize{

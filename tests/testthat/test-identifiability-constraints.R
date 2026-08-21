@@ -76,12 +76,26 @@ test_that("constraint method changes preserve ordering and positive correlation"
 
   # Person ability estimates: high correlation across methods
   pers_c <- fit_centered$facets$person |>
-    dplyr::arrange(Person) |>
-    dplyr::pull(Estimate)
+    dplyr::select(Person, Estimate, ParameterStatus) |>
+    dplyr::rename(
+      EstimateCentered = Estimate,
+      StatusCentered = ParameterStatus
+    )
   pers_a <- fit_anchored$facets$person |>
-    dplyr::arrange(Person) |>
-    dplyr::pull(Estimate)
-  expect_gt(cor(pers_c, pers_a), 0.9)
+    dplyr::select(Person, Estimate, ParameterStatus) |>
+    dplyr::rename(
+      EstimateAnchored = Estimate,
+      StatusAnchored = ParameterStatus
+    )
+  pers_common <- dplyr::inner_join(pers_c, pers_a, by = "Person") |>
+    dplyr::filter(
+      StatusCentered == "estimable",
+      StatusAnchored == "estimable",
+      is.finite(EstimateCentered),
+      is.finite(EstimateAnchored)
+    )
+  expect_gt(nrow(pers_common), 2L)
+  expect_gt(cor(pers_common$EstimateCentered, pers_common$EstimateAnchored), 0.9)
 })
 
 # ---- 3.4a  count_facet_params: 3 levels, centered -> 2 free params ------

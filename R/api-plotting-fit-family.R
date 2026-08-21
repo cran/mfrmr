@@ -2,6 +2,18 @@
 
 .mfrm_fit_plot_readiness <- function(fit) {
   convergence <- mfrm_convergence_state(fit)
+  stored <- as.data.frame(
+    mfrmr_get_readiness_record(fit)$fit, stringsAsFactors = FALSE
+  )
+  has_stored <- nrow(stored) == 1L &&
+    "ReadinessContractVersion" %in% names(stored) &&
+    identical(
+      as.character(stored$ReadinessContractVersion[1]),
+      mfrmr_readiness_contract_version()
+    )
+  stored_value <- function(field, default = NA_character_) {
+    if (has_stored && field %in% names(stored)) stored[[field]][1] else default
+  }
   data_review <- fit$data_review %||% list()
   review_status <- as.data.frame(
     data_review$status %||% data.frame(),
@@ -30,17 +42,33 @@
   convergence_severity <- tolower(trimws(as.character(
     convergence$severity %||% "review"
   )[1L]))
-  numerical_status <- if (isTRUE(convergence$inference_ready)) {
+  numerical_status <- if (has_stored) {
+    switch(
+      as.character(stored_value("NumericalState", "legacy_unknown")),
+      ready = "pass", review = "review", failed = "fail", not_run = "fail",
+      legacy_unknown = "legacy_unknown", "not_assessed"
+    )
+  } else if (isTRUE(convergence$inference_ready)) {
     "pass"
   } else if (convergence_severity %in% c("fail", "error")) {
     "fail"
   } else {
     "review"
   }
-  data_status <- domain_status("Data")
+  fit_status <- as.character(stored_value("FitReadiness", "legacy_unknown"))
+  data_status <- if (has_stored) {
+    switch(
+      as.character(stored_value("InputState", "legacy_unknown")),
+      pass = "pass", review = "review", blocked = "blocked",
+      legacy_unknown = "legacy_unknown", "not_assessed"
+    )
+  } else {
+    domain_status("Data")
+  }
   design_status <- domain_status("Design")
   stability_status <- domain_status("Stability")
-  interpretation_ready <- identical(numerical_status, "pass") &&
+  interpretation_ready <- (!has_stored || identical(fit_status, "ready")) &&
+    identical(numerical_status, "pass") &&
     identical(data_status, "pass") &&
     identical(design_status, "pass_linked") &&
     identical(stability_status, "pass")
@@ -50,8 +78,9 @@
     "review_only"
   }
   statuses <- data.frame(
-    Domain = c("Numerical", "Data", "Design", "Stability", "Plot"),
+    Domain = c("Fit", "Numerical", "Data", "Design", "Stability", "Plot"),
     Status = c(
+      fit_status,
       numerical_status,
       data_status,
       design_status,
@@ -62,13 +91,14 @@
   )
   detail <- if (interpretation_ready) {
     paste0(
-      "Fit-level numerical, data-support, connectivity, and stability gates ",
+      "Stored fit readiness plus numerical, data-support, connectivity, and stability gates ",
       "passed. Treat this display as diagnostic evidence, not automatic ",
       "publication approval."
     )
   } else {
     paste0(
-      "Review-only display: Numerical=", numerical_status,
+      "Review-only display: Fit=", fit_status,
+      ", Numerical=", numerical_status,
       ", Data=", data_status,
       ", Design=", design_status,
       ", Stability=", stability_status,
@@ -301,6 +331,8 @@ build_step_curve_spec <- function(x) {
     categories = categories,
     rating_min = rating_min,
     n_cat = n_cat,
+    curve_basis = "zero_additive_facet_profile",
+    predictor_offset = 0,
     groups = groups,
     step_points = step_points
   )
@@ -531,6 +563,15 @@ build_curve_tables <- function(curve_spec, theta_grid) {
   exp_tables <- list()
   idx_prob <- 1L
   idx_exp <- 1L
+  curve_basis <- as.character(
+    curve_spec$curve_basis %||% "zero_additive_facet_profile"
+  )[1]
+  predictor_offset <- suppressWarnings(as.numeric(
+    curve_spec$predictor_offset %||% 0
+  )[1])
+  if (!is.finite(predictor_offset)) {
+    stop("Category curves require a finite predictor offset.")
+  }
   for (g in names(curve_spec$groups)) {
     grp <- curve_spec$groups[[g]]
     slope_val <- if (identical(curve_spec$model, "GPCM")) {
@@ -543,14 +584,14 @@ build_curve_tables <- function(curve_spec, theta_grid) {
     }
     probs <- if (identical(curve_spec$model, "GPCM")) {
       category_prob_gpcm(
-        eta = theta_grid,
+        eta = theta_grid + predictor_offset,
         step_cum_mat = matrix(grp$step_cum, nrow = 1L),
         criterion_idx = rep(1L, length(theta_grid)),
         slopes = slope_val,
         slope_idx = rep(1L, length(theta_grid))
       )
     } else {
-      category_prob_rsm(theta_grid, grp$step_cum)
+      category_prob_rsm(theta_grid + predictor_offset, grp$step_cum)
     }
     k_vals <- as.numeric(curve_spec$categories)
     expected <- as.numeric(probs %*% matrix(k_vals, ncol = 1))
@@ -564,7 +605,9 @@ build_curve_tables <- function(curve_spec, theta_grid) {
       Information = information,
       Slope = slope_val,
       Model = curve_spec$model,
-      CurveGroup = grp$name
+      CurveGroup = grp$name,
+      CurveBasis = curve_basis,
+      PredictorOffset = predictor_offset
     )
     idx_exp <- idx_exp + 1L
     for (k in seq_len(ncol(probs))) {
@@ -581,7 +624,9 @@ build_curve_tables <- function(curve_spec, theta_grid) {
         Slope = slope_val,
         Model = curve_spec$model,
         Category = as.character(curve_spec$categories[k]),
-        CurveGroup = grp$name
+        CurveGroup = grp$name,
+        CurveBasis = curve_basis,
+        PredictorOffset = predictor_offset
       )
       idx_prob <- idx_prob + 1L
     }
@@ -606,7 +651,8 @@ compute_se_for_plot <- function(x, ci_level = 0.95, diagnostics = NULL) {
     keep <- intersect(
       c(
         "Facet", "Level", "Estimate", "SE", "SE_Method", "PrecisionTier",
-        "SupportsFormalInference", "SEUse", "CIBasis", "CIUse"
+        "SupportsFormalInference", "SEUse", "CIBasis", "CIUse",
+        "CIEligible", "CILabel", "CI_Method"
       ),
       names(measures)
     )
@@ -662,6 +708,14 @@ compute_se_for_plot <- function(x, ci_level = 0.95, diagnostics = NULL) {
     )
     se_tbl$CI_Level <- ci_level
     se_tbl$SE_Method <- "Observation-table information"
+    se_tbl$PrecisionTier <- "exploratory"
+    se_tbl$SupportsFormalInference <- FALSE
+    se_tbl$SEUse <- "screening_only"
+    se_tbl$CIBasis <-
+      "Normal interval from exploratory observation-table SE"
+    se_tbl$CIUse <- "screening_only"
+    se_tbl$CIEligible <- FALSE
+    se_tbl$CILabel <- "Approximate interval; screening only"
     se_tbl$Measure_Source <- "fit + observation-table information"
     as.data.frame(se_tbl, stringsAsFactors = FALSE)
   }, error = function(e) NULL)
@@ -711,7 +765,9 @@ compute_se_for_plot <- function(x, ci_level = 0.95, diagnostics = NULL) {
     "person_density",
     if (has_type("Facet level")) "facet_level",
     if (has_type("Step threshold")) "step_threshold",
-    if (nrow(plot_core$group_summary %||% data.frame()) > 0L) "iqr_range",
+    if (any(as.character(
+      (plot_core$group_summary %||% data.frame())$PlotType %||% character(0)
+    ) == "Facet level")) "iqr_range",
     if (ci_available) "ci_whisker",
     if (clipped_available) "ci_continues",
     if (boundary_available) "boundary_endpoint"
@@ -744,7 +800,7 @@ compute_se_for_plot <- function(x, ci_level = 0.95, diagnostics = NULL) {
     value,
     person_density = "histogram",
     facet_level = "point",
-    step_threshold = "point",
+    step_threshold = "line-point",
     iqr_range = "range",
     ci_whisker = "whisker",
     ci_continues = "endpoint",
@@ -757,6 +813,74 @@ compute_se_for_plot <- function(x, ci_level = 0.95, diagnostics = NULL) {
     aesthetic = aesthetic,
     stringsAsFactors = FALSE
   )
+}
+
+.spread_wright_label_positions <- function(values, lower, upper) {
+  values <- suppressWarnings(as.numeric(values))
+  n <- length(values)
+  if (n <= 1L || !is.finite(lower) || !is.finite(upper) || upper <= lower) {
+    return(pmin(upper, pmax(lower, values)))
+  }
+  span <- upper - lower
+  gap <- min(max(0.045 * span, 0.08), 0.92 * span / (n - 1L))
+  ord <- order(values, na.last = TRUE)
+  placed <- pmin(upper, pmax(lower, values[ord]))
+  for (i in 2:n) {
+    placed[i] <- max(placed[i], placed[i - 1L] + gap)
+  }
+  if (placed[n] > upper) {
+    placed <- placed - (placed[n] - upper)
+  }
+  for (i in seq.int(n - 1L, 1L)) {
+    placed[i] <- min(placed[i], placed[i + 1L] - gap)
+  }
+  if (placed[1L] < lower) {
+    placed <- placed + (lower - placed[1L])
+  }
+  out <- numeric(n)
+  out[ord] <- pmin(upper, pmax(lower, placed))
+  out
+}
+
+.build_wright_label_layout <- function(point_tbl, y_range) {
+  out <- as.data.frame(point_tbl, stringsAsFactors = FALSE)
+  if (nrow(out) == 0L) return(tibble::as_tibble(out))
+  out$LabelY <- suppressWarnings(as.numeric(out$DisplayEstimate))
+  out$LabelSide <- "right"
+  out$LabelX <- suppressWarnings(as.numeric(out$X)) + 0.075
+  out$LabelHjust <- 0
+  out$LabelText <- as.character(out$DisplayLabel)
+
+  groups <- unique(as.character(out$Group))
+  for (group in groups) {
+    idx <- which(as.character(out$Group) == group)
+    ord <- idx[order(out$DisplayEstimate[idx], as.character(out$Label[idx]))]
+    out$LabelY[ord] <- .spread_wright_label_positions(
+      out$DisplayEstimate[ord], y_range[1L], y_range[2L]
+    )
+    is_step <- as.character(out$PlotType[ord]) == "Step threshold"
+    side <- ifelse(
+      is_step,
+      rep(c("left", "right"), length.out = length(ord)),
+      ifelse(out$X[ord] <= out$XBase[ord], "left", "right")
+    )
+    if (length(ord) == 1L && !is_step[1L]) side <- "right"
+    out$LabelSide[ord] <- side
+    out$LabelX[ord] <- out$X[ord] + ifelse(side == "right", 0.075, -0.075)
+    out$LabelHjust[ord] <- ifelse(side == "right", 0, 1)
+    out$LabelText[ord] <- ifelse(
+      is_step,
+      sprintf(
+        "%s (%+.2f)",
+        as.character(out$DisplayLabel[ord]),
+        suppressWarnings(as.numeric(out$OriginalEstimate[ord]))
+      ),
+      as.character(out$DisplayLabel[ord])
+    )
+  }
+  out$LabelDisplaced <- abs(out$LabelY - out$DisplayEstimate) >
+    sqrt(.Machine$double.eps)
+  tibble::as_tibble(out)
 }
 
 .wright_map_legend <- function(plot_core,
@@ -831,8 +955,60 @@ build_wright_map_data <- function(x,
   }
   wright_style <- match_wright_style(wright_style, renderer = renderer)
   person_tbl <- tibble::as_tibble(x$facets$person)
-  person_tbl <- person_tbl[is.finite(person_tbl$Estimate), , drop = FALSE]
-  if (nrow(person_tbl) == 0) stop("Person estimates are not available for Wright map.")
+  source_fit_state <- if (
+    "SourceFitReadiness" %in% names(person_tbl) && nrow(person_tbl) > 0L
+  ) {
+    as.character(person_tbl$SourceFitReadiness[1L])
+  } else {
+    fit_readiness <- as.data.frame(
+      mfrmr_get_readiness_record(x)$fit %||% data.frame(),
+      stringsAsFactors = FALSE
+    )
+    if (nrow(fit_readiness) == 1L &&
+        "FitReadiness" %in% names(fit_readiness)) {
+      as.character(fit_readiness$FitReadiness[1L])
+    } else {
+      "legacy_unknown"
+    }
+  }
+  prior_regularized_extreme <- if ("ReasonCodes" %in% names(person_tbl)) {
+    grepl(
+      "(^|;)mml_extreme_response_prior_regularized($|;)",
+      as.character(person_tbl$ReasonCodes)
+    )
+  } else {
+    rep(FALSE, nrow(person_tbl))
+  }
+  blocked_extreme <- identical(source_fit_state, "blocked") &
+    prior_regularized_extreme
+  person_exclusions <- person_tbl[blocked_extreme, , drop = FALSE]
+  if (nrow(person_exclusions) > 0L) {
+    person_exclusions$PlotExclusionReason <-
+      "prior_regularized_extreme_eap_from_blocked_source_fit"
+  }
+  typed_extreme <- if ("ParameterStatus" %in% names(person_tbl)) {
+    as.character(person_tbl$ParameterStatus) %in%
+      c("unbounded_low", "unbounded_high")
+  } else {
+    rep(FALSE, nrow(person_tbl))
+  }
+  keep_person <- !blocked_extreme & (is.finite(person_tbl$Estimate) |
+    (identical(wright_style, "facets_style") & typed_extreme)
+  )
+  person_tbl <- person_tbl[keep_person, , drop = FALSE]
+  if (nrow(person_tbl) == 0L) {
+    if (nrow(person_exclusions) > 0L) {
+      stop(
+        paste(
+          "A Wright map is unavailable because every Person estimate is a",
+          "prior-regularized extreme EAP from a blocked source fit.",
+          "Inspect `summary(fit)$decision` and refit before plotting."
+        ),
+        call. = FALSE
+      )
+    }
+    stop("Person estimates are not available for Wright map.")
+  }
 
   facet_tbl <- tibble::as_tibble(x$facets$others)
   if (!all(c("Facet", "Level", "Estimate") %in% names(facet_tbl))) {
@@ -889,7 +1065,8 @@ build_wright_map_data <- function(x,
       c(
         "Facet", "Level", "SE",
         "CI_Level", "SE_Method", "PrecisionTier", "SupportsFormalInference",
-        "SEUse", "CIBasis", "CIUse", "Measure_Source"
+        "SEUse", "CIBasis", "CIUse", "CIEligible", "CILabel",
+        "Measure_Source"
       ),
       names(se_tbl)
     ), drop = FALSE]
@@ -1007,6 +1184,18 @@ build_wright_map_data <- function(x,
   } else {
     ""
   }
+  if (nrow(person_exclusions) > 0L) {
+    person_note <- paste0(
+      nrow(person_exclusions),
+      " prior-regularized extreme Person EAP(s) from the blocked source fit ",
+      "were omitted from the plotted scale; exact values remain in ",
+      "`fit$facets$person` and `person_exclusions`."
+    )
+    retention_note <- paste(
+      c(retention_note[nzchar(retention_note)], person_note),
+      collapse = " "
+    )
+  }
 
   group_levels <- unique(point_tbl$Group)
   point_tbl <- point_tbl |>
@@ -1015,14 +1204,42 @@ build_wright_map_data <- function(x,
     dplyr::arrange(.data$Estimate, .by_group = TRUE) |>
     dplyr::mutate(
       XBase = as.numeric(.data$Group),
-      X = if (dplyr::n() == 1) .data$XBase else .data$XBase + seq(-0.18, 0.18, length.out = dplyr::n())
+      X = if (dplyr::n() == 1) .data$XBase else .data$XBase + seq(-0.18, 0.18, length.out = dplyr::n()),
+      X = ifelse(.data$PlotType == "Step threshold", .data$XBase, .data$X)
     ) |>
     dplyr::ungroup()
 
-  hist_data <- graphics::hist(person_tbl$Estimate, breaks = "FD", plot = FALSE)
-  y_range <- range(c(point_tbl$Estimate, person_tbl$Estimate), finite = TRUE)
+  finite_person_estimates <- person_tbl$Estimate[is.finite(person_tbl$Estimate)]
+  finite_person_center <- if (length(finite_person_estimates) > 0L) {
+    mean(finite_person_estimates)
+  } else {
+    NA_real_
+  }
+  hist_data <- if (length(finite_person_estimates) > 0L) {
+    graphics::hist(finite_person_estimates, breaks = "FD", plot = FALSE)
+  } else {
+    structure(
+      list(
+        breaks = c(-0.5, 0.5), counts = 0L, density = 0,
+        intensities = 0, mids = 0, xname = "finite Person estimates",
+        equidist = TRUE
+      ),
+      class = "histogram"
+    )
+  }
+  finite_range_basis <- c(point_tbl$Estimate, finite_person_estimates)
+  finite_range_basis <- finite_range_basis[is.finite(finite_range_basis)]
+  y_range <- if (length(finite_range_basis) > 0L) {
+    range(finite_range_basis)
+  } else {
+    c(-0.5, 0.5)
+  }
   if (!all(is.finite(y_range)) || diff(y_range) <= sqrt(.Machine$double.eps)) {
-    center <- mean(c(point_tbl$Estimate, person_tbl$Estimate), na.rm = TRUE)
+    center <- if (length(finite_range_basis) > 0L) {
+      mean(finite_range_basis)
+    } else {
+      0
+    }
     y_range <- center + c(-0.5, 0.5)
   }
   auto_range_policy <- "all_fitted_locations"
@@ -1052,20 +1269,13 @@ build_wright_map_data <- function(x,
     upper = y_range[2]
   ))
 
-  step_label_tbl <- point_tbl |>
-    dplyr::filter(.data$PlotType == "Step threshold")
-  facet_label_tbl <- point_tbl |>
-    dplyr::filter(.data$PlotType != "Step threshold") |>
-    dplyr::group_by(.data$Group) |>
-    dplyr::slice(c(1L, dplyr::n())) |>
-    dplyr::ungroup() |>
-    dplyr::distinct(.data$Group, .data$Label, .keep_all = TRUE)
-  facet_label_limit <- max(0L, top_n - nrow(step_label_tbl))
-  if (nrow(facet_label_tbl) > facet_label_limit) {
-    facet_label_tbl <- utils::head(facet_label_tbl, facet_label_limit)
-  }
-  label_tbl <- dplyr::bind_rows(facet_label_tbl, step_label_tbl) |>
-    dplyr::distinct(.data$Group, .data$Label, .keep_all = TRUE)
+  # Every retained location remains identifiable. Collision avoidance changes
+  # label coordinates rather than silently dropping interior facet levels.
+  label_tbl <- .build_wright_label_layout(
+    point_tbl |>
+      dplyr::distinct(.data$Group, .data$Label, .keep_all = TRUE),
+    y_range = y_range
+  )
 
   group_summary <- point_tbl |>
     dplyr::group_by(.data$Group, .data$PlotType) |>
@@ -1085,15 +1295,26 @@ build_wright_map_data <- function(x,
       .groups = "drop"
     ) |>
     dplyr::mutate(
-      TargetGap = .data$Median - mean(person_tbl$Estimate, na.rm = TRUE),
-      DisplayTargetGap = .data$DisplayMedian - mean(person_tbl$Estimate, na.rm = TRUE)
+      TargetGap = .data$Median - finite_person_center,
+      DisplayTargetGap = .data$DisplayMedian - finite_person_center
     )
 
   person_stats <- tibble::tibble(
     N = nrow(person_tbl),
-    Mean = mean(person_tbl$Estimate, na.rm = TRUE),
-    Median = stats::median(person_tbl$Estimate, na.rm = TRUE),
-    SD = stats::sd(person_tbl$Estimate, na.rm = TRUE)
+    ReviewExcludedN = nrow(person_exclusions),
+    FiniteN = length(finite_person_estimates),
+    BoundaryExcludedN = nrow(person_tbl) - length(finite_person_estimates),
+    Mean = finite_person_center,
+    Median = if (length(finite_person_estimates) > 0L) {
+      stats::median(finite_person_estimates)
+    } else {
+      NA_real_
+    },
+    SD = if (length(finite_person_estimates) > 1L) {
+      stats::sd(finite_person_estimates)
+    } else {
+      NA_real_
+    }
   )
 
   display_settings <- tibble::tibble(
@@ -1121,6 +1342,7 @@ build_wright_map_data <- function(x,
       "mfrmr native Wright-map layout"
     },
     person = person_tbl,
+    person_exclusions = person_exclusions,
     person_hist = hist_data,
     person_stats = person_stats,
     locations = point_tbl,
@@ -1299,7 +1521,10 @@ draw_wright_map <- function(plot_data,
   }
 
   xr <- c(0.5, length(plot_data$group_levels) + 0.75)
-  graphics::par(mar = c(bottom_margin, 2.4, 3.2, 2.8))
+  # Reserve a dedicated right-hand gutter for the legend. Keeping the legend
+  # outside the measurement ruler prevents it from hiding high step thresholds
+  # (especially when a GPCM supplies one step ladder per curve group).
+  graphics::par(mar = c(bottom_margin, 2.4, 3.2, 10.5))
   graphics::plot(
     x = loc$X,
     y = loc_y,
@@ -1327,6 +1552,13 @@ draw_wright_map <- function(plot_data,
   graphics::abline(h = pretty_y, col = pal["grid"], lty = 1)
   graphics::abline(h = 0, col = grDevices::adjustcolor("gray35", alpha.f = 0.9), lty = 2)
   group_summary <- plot_data$group_summary
+  if (!is.null(group_summary) && nrow(group_summary) > 0) {
+    group_summary <- group_summary[
+      as.character(group_summary$PlotType) == "Facet level",
+      ,
+      drop = FALSE
+    ]
+  }
   if (!is.null(group_summary) && nrow(group_summary) > 0) {
     summary_value <- function(display_name, original_name) {
       if (display_name %in% names(group_summary)) {
@@ -1382,6 +1614,20 @@ draw_wright_map <- function(plot_data,
   )
   cols <- ifelse(loc$PlotType == "Step threshold", pal["step_threshold"], pal["facet_level"])
   pch <- ifelse(loc$PlotType == "Step threshold", 17, 16)
+  step_loc <- loc[as.character(loc$PlotType) == "Step threshold", , drop = FALSE]
+  if (nrow(step_loc) > 1L) {
+    for (group in unique(as.character(step_loc$Group))) {
+      sub <- step_loc[as.character(step_loc$Group) == group, , drop = FALSE]
+      if (nrow(sub) > 1L) {
+        graphics::segments(
+          x0 = sub$XBase[1L], y0 = min(sub$DisplayEstimate, na.rm = TRUE),
+          x1 = sub$XBase[1L], y1 = max(sub$DisplayEstimate, na.rm = TRUE),
+          col = grDevices::adjustcolor(pal["step_threshold"], alpha.f = 0.48),
+          lwd = 1.2
+        )
+      }
+    }
+  }
   boundary_color <- "#9A3412"
   boundary_lower <- boundary_end == "lower"
   boundary_upper <- boundary_end == "upper"
@@ -1445,27 +1691,44 @@ draw_wright_map <- function(plot_data,
   )
   label_tbl <- plot_data$label_points
   if (!is.null(label_tbl) && nrow(label_tbl) > 0) {
-    place_left <- label_tbl$X > xr[1] + 0.72 * diff(xr)
-    graphics::text(
-      x = ifelse(place_left, label_tbl$X - 0.06, label_tbl$X + 0.06),
-      y = if ("DisplayEstimate" %in% names(label_tbl)) {
-        label_tbl$DisplayEstimate
-      } else {
-        label_tbl$Estimate
-      },
-      labels = truncate_axis_label(
-        if ("DisplayLabel" %in% names(label_tbl)) {
-          label_tbl$DisplayLabel
-        } else {
-          label_tbl$Label
-        },
-        width = 14L
-      ),
-      pos = ifelse(place_left, 2, 4),
-      cex = 0.72,
-      xpd = NA,
-      col = grDevices::adjustcolor("gray20", alpha.f = 0.95)
+    label_x <- suppressWarnings(as.numeric(label_tbl$LabelX %||% label_tbl$X))
+    label_y <- suppressWarnings(as.numeric(
+      label_tbl$LabelY %||% label_tbl$DisplayEstimate %||% label_tbl$Estimate
+    ))
+    label_text <- as.character(
+      label_tbl$LabelText %||% label_tbl$DisplayLabel %||% label_tbl$Label
     )
+    label_side <- as.character(
+      label_tbl$LabelSide %||% rep("right", nrow(label_tbl))
+    )
+    point_y <- suppressWarnings(as.numeric(
+      label_tbl$DisplayEstimate %||% label_tbl$Estimate
+    ))
+    label_col <- ifelse(
+      as.character(label_tbl$PlotType) == "Step threshold",
+      pal["step_threshold"],
+      "gray20"
+    )
+    graphics::segments(
+      x0 = label_tbl$X, y0 = point_y,
+      x1 = label_x, y1 = label_y,
+      col = grDevices::adjustcolor(label_col, alpha.f = 0.62),
+      lwd = 0.7,
+      xpd = NA
+    )
+    for (side in c("left", "right")) {
+      keep <- label_side == side
+      if (!any(keep)) next
+      graphics::text(
+        x = label_x[keep],
+        y = label_y[keep],
+        labels = truncate_axis_label(label_text[keep], width = 22L),
+        adj = c(if (identical(side, "left")) 1 else 0, 0.5),
+        cex = 0.70,
+        xpd = NA,
+        col = grDevices::adjustcolor(label_col[keep], alpha.f = 0.95)
+      )
+    }
   }
   legend_spec <- .wright_native_legend_spec(
     plot_data,
@@ -1483,14 +1746,14 @@ draw_wright_map <- function(plot_data,
     boundary_endpoint = 24L
   ), integer(1))
   legend_lty <- ifelse(
-    legend_spec$key %in% c("iqr_range", "ci_whisker"),
+    legend_spec$key %in% c("step_threshold", "iqr_range", "ci_whisker"),
     1,
     0
   )
   legend_lwd <- ifelse(
     legend_spec$key == "iqr_range",
     4,
-    ifelse(legend_spec$key == "ci_whisker", 1.2, NA_real_)
+    ifelse(legend_spec$key %in% c("step_threshold", "ci_whisker"), 1.2, NA_real_)
   )
   legend_col <- vapply(legend_spec$key, function(key) switch(
     key,
@@ -1502,8 +1765,13 @@ draw_wright_map <- function(plot_data,
     ci_continues = unname(pal["facet_level"]),
     boundary_endpoint = boundary_color
   ), character(1))
+  ruler_usr <- graphics::par("usr")
+  ruler_span <- diff(ruler_usr[1:2])
   graphics::legend(
-    "topright",
+    x = ruler_usr[2] + 0.075 * ruler_span,
+    y = ruler_usr[4],
+    xjust = 0,
+    yjust = 1,
     legend = legend_spec$label,
     pch = legend_pch,
     pt.bg = ifelse(
@@ -1515,7 +1783,8 @@ draw_wright_map <- function(plot_data,
     lwd = legend_lwd,
     col = legend_col,
     bty = "n",
-    cex = 0.9
+    cex = 0.82,
+    xpd = NA
   )
   if (length(footer_lines) > 0L) {
     footer_col <- rep("#9A3412", length(footer_lines))
@@ -2142,8 +2411,68 @@ build_ccc_data <- function(x, theta_range = c(-6, 6), theta_points = 241L) {
   prob_df <- build_curve_tables(curve_spec, theta_grid)$probabilities
   list(
     title = "Category Characteristic Curves",
-    probabilities = prob_df
+    probabilities = prob_df,
+    curve_basis = data.frame(
+      CurveBasis = curve_spec$curve_basis,
+      PredictorOffset = curve_spec$predictor_offset,
+      Description = paste(
+        "Estimated step and, for GPCM, slope parameters are retained;",
+        "additive facet main effects and fitted interactions are fixed at zero."
+      ),
+      stringsAsFactors = FALSE
+    )
   )
+}
+
+.ccc_reference_subtitle <- function(prefix = "Category response probabilities across theta") {
+  paste0(
+    prefix,
+    "; reference profile fixes additive facet effects and fitted interactions at zero"
+  )
+}
+
+.ccc_category_defaults <- function(categories, preset = "standard") {
+  categories <- as.character(categories)
+  colors <- if (identical(as.character(preset)[1L], "monochrome")) {
+    grDevices::gray.colors(max(3L, length(categories)), start = 0.12, end = 0.68)
+  } else {
+    rep(
+      c(
+        "#0072B2", "#D55E00", "#009E73", "#CC79A7",
+        "#E69F00", "#56B4E9", "#000000", "#F0E442"
+      ),
+      length.out = length(categories)
+    )
+  }
+  stats::setNames(colors[seq_along(categories)], categories)
+}
+
+.ccc_plot_legend <- function(plot_core, style, palette = NULL, overlay = FALSE) {
+  prob_df <- as.data.frame(plot_core$probabilities %||% data.frame(), stringsAsFactors = FALSE)
+  categories <- unique(as.character(prob_df$Category %||% character(0)))
+  defaults <- .ccc_category_defaults(categories, preset = style$name)
+  colors <- resolve_palette(
+    palette = palette,
+    defaults = defaults
+  )
+  legend <- new_plot_legend(
+    label = paste("Category", categories),
+    role = rep("probability", length(categories)),
+    aesthetic = rep("line", length(categories)),
+    value = unname(colors[categories])
+  )
+  if (isTRUE(overlay)) {
+    legend <- rbind(
+      legend,
+      new_plot_legend(
+        label = "Observed bin proportion",
+        role = "empirical",
+        aesthetic = "point",
+        value = "matching_category_color"
+      )
+    )
+  }
+  legend
 }
 
 build_ccc_surface_data <- function(x, theta_range = c(-6, 6), theta_points = 121L) {
@@ -2267,28 +2596,94 @@ build_ccc_surface_data <- function(x, theta_range = c(-6, 6), theta_points = 121
 
 draw_ccc <- function(plot_data, title = NULL, palette = NULL) {
   prob_df <- plot_data$probabilities
-  traces <- unique(paste(prob_df$CurveGroup, prob_df$Category, sep = " | Cat "))
-  defaults <- stats::setNames(
-    grDevices::hcl.colors(max(3L, length(traces)), "Dark 3")[seq_along(traces)],
-    traces
+  groups <- unique(as.character(prob_df$CurveGroup))
+  categories <- unique(as.character(prob_df$Category))
+  defaults <- .ccc_category_defaults(
+    categories,
+    preset = as.character(plot_data$preset %||% "standard")
   )
   cols <- resolve_palette(palette = palette, defaults = defaults)
-  graphics::plot(
-    x = range(prob_df$Theta, finite = TRUE),
-    y = c(0, 1),
-    type = "n",
-    xlab = "Theta / Logit",
-    ylab = "Probability",
-    main = .mfrm_plot_display_title(
-      plot_data,
-      title = title,
-      fallback = "Category characteristic curves"
-    )
+  line_types <- stats::setNames(
+    if (identical(as.character(plot_data$preset %||% "standard"), "monochrome")) {
+      rep(c(1, 2, 3, 4, 5, 6), length.out = length(categories))
+    } else {
+      rep(1L, length(categories))
+    },
+    categories
   )
-  for (i in seq_along(traces)) {
-    parts <- strsplit(traces[i], " \\| Cat ", fixed = FALSE)[[1]]
-    sub <- prob_df[prob_df$CurveGroup == parts[1] & prob_df$Category == parts[2], , drop = FALSE]
-    graphics::lines(sub$Theta, sub$Probability, col = cols[traces[i]], lwd = 1.5)
+  display_title <- .mfrm_plot_display_title(
+    plot_data,
+    title = title,
+    fallback = "Category characteristic curves"
+  )
+  curve_basis <- as.data.frame(plot_data$curve_basis %||% data.frame(), stringsAsFactors = FALSE)
+  basis_note <- if (nrow(curve_basis) > 0L && "Description" %in% names(curve_basis)) {
+    as.character(curve_basis$Description[1L])
+  } else {
+    "Reference profile: additive facet effects and fitted interactions are fixed at zero."
+  }
+  overlay <- as.data.frame(plot_data$overlay %||% data.frame(), stringsAsFactors = FALSE)
+  overlay_ok <- nrow(overlay) > 0L &&
+    all(c("Theta", "Proportion", "Category") %in% names(overlay))
+
+  draw_panel <- function(group, panel_title) {
+    panel <- prob_df[as.character(prob_df$CurveGroup) == group, , drop = FALSE]
+    graphics::plot(
+      x = range(prob_df$Theta, finite = TRUE),
+      y = c(0, 1),
+      type = "n",
+      xlab = "Theta / Logit",
+      ylab = "Probability",
+      main = panel_title
+    )
+    graphics::abline(v = 0, lty = 3, col = "gray75")
+    for (category in categories) {
+      sub <- panel[as.character(panel$Category) == category, , drop = FALSE]
+      if (nrow(sub) == 0L) next
+      graphics::lines(
+        sub$Theta, sub$Probability,
+        col = cols[category], lwd = 1.6, lty = line_types[category]
+      )
+    }
+    if (overlay_ok) {
+      max_n <- max(overlay$N, na.rm = TRUE)
+      for (category in categories) {
+        sub <- overlay[as.character(overlay$Category) == category, , drop = FALSE]
+        if (nrow(sub) == 0L) next
+        graphics::points(
+          sub$Theta, sub$Proportion,
+          pch = 21, bg = cols[category], col = "white",
+          cex = 0.72 + 0.5 * sqrt(sub$N / max(1, max_n))
+        )
+      }
+    }
+    graphics::legend(
+      "topright",
+      legend = paste("Category", categories),
+      col = cols[categories], lty = line_types[categories], lwd = 1.6,
+      bty = "n", cex = 0.72
+    )
+  }
+
+  old_par <- graphics::par(no.readonly = TRUE)
+  on.exit(graphics::par(old_par), add = TRUE)
+  if (length(groups) > 1L) {
+    n_cols <- ceiling(sqrt(length(groups)))
+    n_rows <- ceiling(length(groups) / n_cols)
+    graphics::par(
+      mfrow = c(n_rows, n_cols),
+      mar = c(3.8, 3.8, 2.3, 0.8),
+      oma = c(2.7, 0.2, 3.1, 0.2)
+    )
+    for (group in groups) {
+      draw_panel(group, truncate_axis_label(group, width = 28L))
+    }
+    graphics::mtext(display_title, side = 3, outer = TRUE, line = 1.35, font = 2)
+    graphics::mtext(basis_note, side = 1, outer = TRUE, line = 1.1, cex = 0.68)
+  } else {
+    graphics::par(mar = c(5.4, 4.1, 3.2, 1.1))
+    draw_panel(groups[1L], display_title)
+    graphics::mtext(basis_note, side = 1, line = 3.8, cex = 0.70)
   }
 }
 
@@ -2491,9 +2886,12 @@ draw_facet_plot <- function(facet_tbl,
 #' compact native default records any omitted facet locations in
 #' `data$retention` and annotates the subtitle and drawn figure; use
 #' `top_n = Inf` to retain every fitted location in the final Wright map.
-#' Native text labels remain collision-aware, so a retained point may be
-#' unlabeled; its exact level and estimate remain available in the returned
-#' plot data. When the fit records boundary-separated facet levels and no
+#' Every retained native location is labelled. Collision-aware `LabelX` /
+#' `LabelY` coordinates and leader lines displace text without moving the
+#' fitted point; `label_points` retains both point and text coordinates for
+#' custom renderers. Step transitions share one vertical ladder and their
+#' labels include the fitted threshold logit. When the fit records
+#' boundary-separated facet levels and no
 #' display range was supplied, the native and FACETS-style maps use the same
 #' robust automatic range and place those levels at ruler ends. Exact fitted
 #' values and intervals remain in `OriginalEstimate`, `CI_Lower`, and
@@ -2510,6 +2908,11 @@ draw_facet_plot <- function(facet_tbl,
 #' stability gate requires review, the coordinates remain available for
 #' diagnosis, but the call warns and marks the returned subtitle and drawn
 #' title `REVIEW ONLY`.
+#' A prior-regularized extreme MML EAP remains in `fit$facets$person`. If its
+#' source fit is blocked, however, it is omitted from the Wright-map scale so
+#' that a finite but non-interpretable trace cannot collapse the display. The
+#' exact excluded rows and reason remain in `data$person_exclusions`, and the
+#' omission is stated in `data$retention_note`.
 #'
 #' `type = "wright"` shows persons, facet levels, and step thresholds on
 #' a shared logit scale. Estimates are plotted as fitted, so the sign
@@ -2546,7 +2949,14 @@ draw_facet_plot <- function(facet_tbl,
 #' `fit_status`, and `curve_fit_status`, so R users can rebuild the pathway
 #' map in ggplot2, plotly, or a report pipeline while keeping the same
 #' underfit/overfit labels used by [fit_measures_table()]. `type = "ccc"` shows
-#' category response probabilities. `type = "ccc_surface"` or
+#' category response probabilities. Multiple curve groups are faceted rather
+#' than overplotted by the native renderer, and category-specific legends use
+#' the same colours across panels. For `GPCM`, these curves retain the
+#' estimated step-facet slope; all curve families are reference-profile curves
+#' with additive facet main effects and fitted interactions fixed at zero; the
+#' native footer and ggplot subtitle disclose that conditioning.
+#' The draw-free `curve_basis`, `CurveBasis`, and `PredictorOffset` fields make
+#' that conditioning explicit. `type = "ccc_surface"` or
 #' `type = "category_surface"` returns 3D-ready category-probability surface
 #' data for external rendering; it deliberately does not add a
 #' plotly/rgl dependency or replace the 2D CCC/pathway reporting figures. The
@@ -2573,7 +2983,9 @@ draw_facet_plot <- function(facet_tbl,
 #'   single `type`), or an `mfrm_plot_bundle` when
 #'   `type = "bundle"` / `"all"` / `"default"`. Each returned fit plot
 #'   includes domain-specific readiness and an interpretation status in its
-#'   data payload.
+#'   data payload. It also includes a one-row `scale_contract` table recording
+#'   the fitted coordinate basis, population SD when applicable,
+#'   discrimination basis, and bounded-GPCM MML identification convention.
 #' @seealso [fit_mfrm()], [plot_wright_unified()], [plot_bubble()],
 #'   [mfrmr_visual_diagnostics]
 #' @concept confidence intervals
@@ -2712,7 +3124,9 @@ plot.mfrm_fit <- function(x,
   as_plot_data <- function(name, data) {
     data_names <- names(data) %||% rep("", length(data))
     duplicated_named <- nzchar(data_names) & duplicated(data_names, fromLast = TRUE)
-    out <- new_mfrm_plot_data(name, data[!duplicated_named])
+    data <- data[!duplicated_named]
+    data$scale_contract <- mfrm_fit_scale_contract(x)
+    out <- new_mfrm_plot_data(name, data)
     out <- .mfrm_attach_plot_readiness(out, fit_plot_readiness)
     if (!isTRUE(fit_plot_readiness$ready) && !isTRUE(readiness_warning_emitted)) {
       warning(fit_plot_readiness$detail, call. = FALSE)
@@ -2755,6 +3169,11 @@ plot.mfrm_fit <- function(x,
       wright_range = wright_range,
       extreme_placement = extreme_placement,
       persons_per_star = persons_per_star
+    )
+    ccc_core <- build_ccc_data(
+      x,
+      theta_range = theta_range,
+      theta_points = theta_points
     )
     out <- list(
       wright_map = as_plot_data("wright_map", c(
@@ -2805,17 +3224,12 @@ plot.mfrm_fit <- function(x,
         )
       )),
       category_characteristic_curves = as_plot_data("category_characteristic_curves", c(
-        build_ccc_data(x, theta_range = theta_range, theta_points = theta_points),
+        ccc_core,
         list(
           title = title %||% "Category characteristic curves",
-          subtitle = "Category response probabilities across theta",
+          subtitle = .ccc_reference_subtitle(),
           preset = style$name,
-          legend = new_plot_legend(
-            label = "Category curves",
-            role = "probability",
-            aesthetic = "line",
-            value = "category_palette"
-          ),
+          legend = .ccc_plot_legend(ccc_core, style = style, palette = palette),
           reference_lines = new_reference_lines("v", 0, "Centered theta reference", "dashed", "reference")
         )
       ))
@@ -2848,7 +3262,7 @@ plot.mfrm_fit <- function(x,
       draw_ccc(
         out$category_characteristic_curves$data,
         title = title,
-        palette = palette %||% c(style$accent_primary, style$accent_secondary, style$accent_tertiary, style$warn)
+        palette = palette
       )
     }
     return(invisible(out))
@@ -3106,26 +3520,24 @@ plot.mfrm_fit <- function(x,
     return(invisible(out))
   }
   if (type == "ccc") {
+    ccc_core <- build_ccc_data(
+      x,
+      theta_range = theta_range,
+      theta_points = theta_points
+    )
     out <- as_plot_data("category_characteristic_curves", c(
-      build_ccc_data(x, theta_range = theta_range, theta_points = theta_points),
+      ccc_core,
       list(
         title = title %||% "Category characteristic curves",
-        subtitle = "Category response probabilities across theta",
+        subtitle = .ccc_reference_subtitle(),
         preset = style$name,
-        legend = new_plot_legend(
-          label = "Category curves",
-          role = "probability",
-          aesthetic = "line",
-          value = "category_palette"
-        ),
+        legend = .ccc_plot_legend(ccc_core, style = style, palette = palette),
         reference_lines = new_reference_lines("v", 0, "Centered theta reference", "dashed", "reference")
       )
     ))
     if (isTRUE(draw)) {
       apply_plot_preset(style)
-      draw_ccc(out$data, title = title, palette = palette %||% c(
-        style$accent_primary, style$accent_secondary, style$accent_tertiary, style$warn
-      ))
+      draw_ccc(out$data, title = title, palette = palette)
     }
     return(invisible(out))
   }
@@ -3200,16 +3612,16 @@ plot.mfrm_fit <- function(x,
       list(
         overlay = overlay,
         title = title %||% "Category curves with empirical overlay",
-        subtitle = sprintf(
+        subtitle = .ccc_reference_subtitle(sprintf(
           "Model curves vs observed proportions in %d theta bin(s)",
           length(unique(overlay$Bin))
-        ),
+        )),
         preset = style$name,
-        legend = new_plot_legend(
-          label = c("Model category curves", "Observed bin proportion"),
-          role = c("probability", "empirical"),
-          aesthetic = c("line", "point"),
-          value = c(style$accent_primary, style$fail)
+        legend = .ccc_plot_legend(
+          ccc_payload,
+          style = style,
+          palette = palette,
+          overlay = TRUE
         ),
         reference_lines = new_reference_lines("v", 0, "Centered theta reference",
                                                "dashed", "reference")
@@ -3217,22 +3629,7 @@ plot.mfrm_fit <- function(x,
     ))
     if (isTRUE(draw)) {
       apply_plot_preset(style)
-      draw_ccc(out$data, title = title,
-               palette = palette %||% c(
-                 style$accent_primary, style$accent_secondary,
-                 style$accent_tertiary, style$warn
-               ))
-      if (nrow(overlay) > 0L) {
-        cats <- sort(unique(overlay$Category))
-        cat_palette <- grDevices::hcl.colors(length(cats), "Dark 3")
-        max_n <- max(overlay$N, na.rm = TRUE)
-        for (i in seq_along(cats)) {
-          sub <- overlay[overlay$Category == cats[i], , drop = FALSE]
-          graphics::points(sub$Theta, sub$Proportion, pch = 21,
-                           bg = cat_palette[i], col = "white",
-                           cex = 0.8 + 0.6 * sqrt(sub$N / max(1, max_n)))
-        }
-      }
+      draw_ccc(out$data, title = title, palette = palette)
     }
     return(invisible(out))
   }
@@ -3334,7 +3731,14 @@ plot.mfrm_fit <- function(x,
   }
   if (isTRUE(show_ci) && !is.null(se_tbl_ci) && is.data.frame(se_tbl_ci) &&
       nrow(se_tbl_ci) > 0 && all(c("Facet", "Level", "SE") %in% names(se_tbl_ci))) {
-    se_join <- se_tbl_ci[, intersect(c("Facet", "Level", "SE"), names(se_tbl_ci)), drop = FALSE]
+    se_join <- se_tbl_ci[, intersect(
+      c(
+        "Facet", "Level", "SE", "SE_Method", "PrecisionTier",
+        "SupportsFormalInference", "SEUse", "CIBasis", "CIUse",
+        "CIEligible", "CILabel", "Measure_Source"
+      ),
+      names(se_tbl_ci)
+    ), drop = FALSE]
     se_join$Level <- as.character(se_join$Level)
     facet_tbl$Level <- as.character(facet_tbl$Level)
     facet_tbl <- merge(facet_tbl, se_join, by = c("Facet", "Level"), all.x = TRUE, sort = FALSE)

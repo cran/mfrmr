@@ -1,0 +1,2 @@
+"Interpretation","FormalInference","FitReadiness","Why","NextAction"
+"Fit gates passed; formal precision review required","No","ready","Formal precision support has not been evaluated.","Run `diagnose_mfrm()` and pass its result as `diagnostics =` to evaluate formal precision support; fit readiness alone is not a formal-inference decision."

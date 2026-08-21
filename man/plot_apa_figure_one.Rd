@@ -47,8 +47,9 @@ with the rest of the package.
 \section{Interpreting output}{
 
 Designed as a single-figure Methods or Results draft. The
-summary panel prints the model class, sample size, log-likelihood,
-AIC/BIC, and the largest non-Person facet's separation /
+summary panel prints the model class, sample size, log-likelihood, the
+canonical MML IC panel or an explicit ineligibility/legacy label, and the
+largest non-Person facet's separation /
 reliability if available. A fit that has not passed its numerical, data,
 design, and stability gates produces one warning and a visible
 \code{"REVIEW ONLY"} label. Resolve that review before treating the composite as

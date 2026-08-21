@@ -38,6 +38,10 @@ bias/DFF reporting templates, misfit/pathway reporting templates,
 linking/anchor reporting templates, ZSTD-convention table,
 evidence-boundary table, next-action table, and optional Markdown or HTML
 report.
+The object and its table list retain the exact source-fit
+\verb{fit_readiness*} tables from \code{mfrm_results()}; report synthesis does not
+reinterpret or upgrade them. The \code{decision} table translates that same
+record into interpretation, formal-inference, reason, and next-action text.
 }
 \details{
 The intended workflow is:

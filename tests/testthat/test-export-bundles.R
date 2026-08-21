@@ -663,6 +663,21 @@ test_that("build_mfrm_manifest captures reproducibility metadata", {
   expect_true(is.data.frame(manifest$summary))
   expect_true(is.data.frame(manifest$environment))
   expect_true(is.data.frame(manifest$available_outputs))
+  expect_true(is.data.frame(manifest$input_summary))
+  expect_false("input_hash" %in% names(manifest))
+  expect_identical(
+    manifest$input_summary$Object,
+    c("data", "anchors", "group_anchors", "score_map")
+  )
+  expect_true(all(c(
+    "Available", "ObjectClass", "Rows", "Columns", "Elements",
+    "FieldNames", "FieldClasses", "MissingValues"
+  ) %in% names(manifest$input_summary)))
+  expect_false(any(grepl(
+    "sha|md5|hash",
+    names(manifest$input_summary),
+    ignore.case = TRUE
+  )))
   expect_true(any(manifest$available_outputs$Component == "residual_pca"))
   expect_true(
     manifest$available_outputs$Available[manifest$available_outputs$Component == "bias_results"][1]
@@ -671,6 +686,46 @@ test_that("build_mfrm_manifest captures reproducibility metadata", {
   expect_equal(manifest$summary$MethodUsed[[1]], "JML")
   expect_equal(manifest$summary$Observations[[1]], nrow(export_core_fixture$fit$prep$data))
   expect_equal(manifest$summary$Persons[[1]], export_core_fixture$fit$config$n_person)
+  convergence <- mfrmr:::mfrm_convergence_state(export_core_fixture$fit)
+  expect_identical(manifest$summary$Converged[[1]], convergence$code_converged)
+  expect_identical(
+    manifest$summary$InferenceReady[[1]],
+    convergence$inference_ready
+  )
+})
+
+test_that("manifest preserves the exact fail-closed readiness provenance", {
+  fit <- export_core_fixture$fit
+  manifest <- build_mfrm_manifest(
+    fit = fit,
+    diagnostics = export_core_fixture$diagnostics
+  )
+  source <- mfrmr:::mfrmr_get_readiness_record(fit)
+
+  expect_equal(manifest$readiness, source$fit)
+  expect_equal(manifest$readiness_components, source$components)
+  expect_equal(manifest$readiness_parameters, source$parameters)
+  expect_identical(
+    manifest$summary$ReadinessContractVersion[[1]],
+    source$fit$ReadinessContractVersion[[1]]
+  )
+  expect_identical(
+    manifest$summary$ReadinessReasonCodes[[1]],
+    source$fit$ReasonCodes[[1]]
+  )
+
+  legacy <- fit
+  legacy$readiness <- NULL
+  legacy_manifest <- build_mfrm_manifest(
+    fit = legacy,
+    diagnostics = export_core_fixture$diagnostics
+  )
+  expect_identical(legacy_manifest$readiness$FitReadiness[[1]], "legacy_unknown")
+  expect_false(legacy_manifest$readiness$InferenceReady[[1]])
+  expect_identical(
+    legacy_manifest$readiness$ReasonCodes[[1]],
+    "legacy_contract_missing"
+  )
 })
 
 test_that("build_mfrm_manifest and replay script support FACETS-mode runs", {
@@ -687,6 +742,36 @@ test_that("build_mfrm_manifest and replay script support FACETS-mode runs", {
   expect_match(replay$script, "analysis_data\\.csv")
   expect_match(replay$script, "estimate_bias\\(")
   expect_match(replay$script, "# posterior_basis = legacy_mml", fixed = TRUE)
+})
+
+test_that("replay preserves source readiness but recomputes replay readiness", {
+  fit <- export_core_fixture$fit
+  replay <- build_mfrm_replay_script(
+    fit,
+    diagnostics = export_core_fixture$diagnostics,
+    data_file = "analysis_data.csv"
+  )
+  source <- mfrmr:::mfrmr_get_readiness_record(fit)
+
+  expect_equal(replay$source_readiness, source$fit)
+  expect_equal(replay$source_readiness_components, source$components)
+  expect_equal(replay$source_readiness_parameters, source$parameters)
+  expect_match(
+    replay$script,
+    "Readiness provenance from the source fit",
+    fixed = TRUE
+  )
+  expect_match(
+    replay$script,
+    "Recompute readiness from the replayed fit; never inherit source status",
+    fixed = TRUE
+  )
+  expect_match(
+    replay$script,
+    "replay_readiness_matches_source",
+    fixed = TRUE
+  )
+  expect_silent(parse(text = replay$script))
 })
 
 test_that("build_mfrm_manifest records optional prediction artifacts", {
@@ -1032,6 +1117,9 @@ test_that("build_conquest_overlap_bundle returns a minimal supported-scope bundl
   expect_identical(bundle$summary$PopulationResponseRowsOmitted[[1]], 0L)
   expect_identical(bundle$summary$MfrmrQuadraturePoints[[1]], 7L)
   expect_identical(bundle$summary$ConQuestQuadratureNodes[[1]], 7L)
+  expect_equal(bundle$summary$ConQuestConvergence[[1]], 1e-8)
+  expect_equal(bundle$summary$ConQuestDevianceChange[[1]], 1e-10)
+  expect_identical(bundle$summary$ConQuestMaxIterations[[1]], 2000L)
   expect_identical(bundle$summary$MfrmrMaxit[[1]], 40L)
   expect_equal(bundle$summary$MfrmrReltol[[1]], 1e-9)
   expect_identical(bundle$summary$MfrmrMMLEngineUsed[[1]], "direct")
@@ -1044,6 +1132,9 @@ test_that("build_conquest_overlap_bundle returns a minimal supported-scope bundl
   }
   expect_identical(fit_setting("mfrmr_maxit"), "40")
   expect_identical(fit_setting("mfrmr_reltol"), "1e-09")
+  expect_identical(fit_setting("conquest_convergence"), "1e-08")
+  expect_identical(fit_setting("conquest_deviance_change"), "1e-10")
+  expect_identical(fit_setting("conquest_max_iterations"), "2000")
   expect_identical(fit_setting("mfrmr_mml_engine_used"), "direct")
   expect_identical(
     fit_setting("mfrmr_convergence_status"),
@@ -1077,7 +1168,7 @@ test_that("build_conquest_overlap_bundle returns a minimal supported-scope bundl
     "DataHandling",
     "RequiredForReview"
   ) %in% names(bundle$conquest_output_contract)))
-  expect_equal(sum(bundle$conquest_output_contract$RequiredForReview %in% TRUE), 4)
+  expect_equal(sum(bundle$conquest_output_contract$RequiredForReview %in% TRUE), 5)
   expect_match(
     bundle$conquest_output_contract$DataHandling[
       grepl("_conquest_cases_eap.csv", bundle$conquest_output_contract$ExternalFile, fixed = TRUE)
@@ -1091,16 +1182,20 @@ test_that("build_conquest_overlap_bundle returns a minimal supported-scope bundl
   expect_true(is.numeric(bundle$person_data$X))
   expect_true(all(c("Person", "X", sprintf("I%03d", 1:6)) %in% names(bundle$response_wide)))
   expect_match(bundle$conquest_command, "filetype=csv", fixed = TRUE)
-  expect_match(bundle$conquest_command, "/*", fixed = TRUE)
-  expect_match(bundle$conquest_command, "*/", fixed = TRUE)
-  expect_false(any(grepl("^\\*\\s", strsplit(bundle$conquest_command, "\n", fixed = TRUE)[[1]])))
+  expect_false(grepl("/*", bundle$conquest_command, fixed = TRUE))
+  expect_false(grepl("*/", bundle$conquest_command, fixed = TRUE))
+  expect_true(startsWith(bundle$conquest_command, "datafile "))
   expect_match(bundle$conquest_command, "pidwidth=32", fixed = TRUE)
   expect_match(bundle$conquest_command, "keepswidth=32", fixed = TRUE)
   expect_match(bundle$conquest_command, "regression X;", fixed = TRUE)
   expect_match(bundle$conquest_command, "model item;", fixed = TRUE)
   expect_match(
     bundle$conquest_command,
-    "estimate ! method=quadrature, nodes=7, fit=no, stderr=quick;",
+    paste0(
+      "estimate ! method=quadrature, nodes=7, fit=no, stderr=quick, ",
+      "matrixout=mfrmrCQ, convergence=0.00000001, ",
+      "deviancechange=0.0000000001, iterations=2000;"
+    ),
     fixed = TRUE
   )
   expect_false(grepl("score (0,1);", bundle$conquest_command, fixed = TRUE))
@@ -1108,6 +1203,8 @@ test_that("build_conquest_overlap_bundle returns a minimal supported-scope bundl
   expect_match(bundle$conquest_command, "export reg_coefficients ! filetype=csv", fixed = TRUE)
   expect_match(bundle$conquest_command, "export covariance ! filetype=csv", fixed = TRUE)
   expect_match(bundle$conquest_command, "show cases ! estimates=eap, filetype=csv, regressors=yes", fixed = TRUE)
+  expect_match(bundle$conquest_command, "write mfrmrCQ_history ! filetype=csv", fixed = TRUE)
+  expect_true(any(grepl("_conquest_history.csv", bundle$conquest_output_contract$ExternalFile, fixed = TRUE)))
   expect_match(bundle$conquest_command, "show parameters ! tables=1:2:3:4", fixed = TRUE)
   expect_match(bundle$conquest_command, "quit;", fixed = TRUE)
 
@@ -1136,7 +1233,7 @@ test_that("build_conquest_overlap_bundle returns a minimal supported-scope bundl
   )
   expect_identical(
     as.character(s$conquest_command_scope$Status[s$conquest_command_scope$Area == "Command-comment syntax"][1]),
-    "block comments"
+    "comment-free executable input"
   )
   expect_identical(
     as.character(s$conquest_command_scope$Status[s$conquest_command_scope$Area == "External comparison scope"][1]),
@@ -1149,7 +1246,7 @@ test_that("build_conquest_overlap_bundle returns a minimal supported-scope bundl
   expect_match(printed, "Inference ready", fixed = TRUE)
   expect_match(printed, "ConQuest command scope", fixed = TRUE)
   expect_match(printed, "ConQuest output contract", fixed = TRUE)
-  expect_match(printed, "block comments", fixed = TRUE)
+  expect_match(printed, "comment-free executable input", fixed = TRUE)
   expect_match(printed, "explicit CSV widths", fixed = TRUE)
   expect_match(printed, "not claimed", fixed = TRUE)
 })
@@ -1428,6 +1525,7 @@ test_that("build_conquest_overlap_bundle writes expected external-comparison fil
   expect_false(bundle$summary$MfrmrInferenceReady[[1]])
   expect_match(readme, "Requested external ConQuest outputs", fixed = TRUE)
   expect_match(readme, "cq_overlap_test_conquest_reg_coefficients.csv", fixed = TRUE)
+  expect_match(readme, "cq_overlap_test_conquest_history.csv", fixed = TRUE)
   expect_match(readme, "normalize_conquest_overlap_exports()", fixed = TRUE)
   expect_match(readme, "not a deidentified or automatically shareable export", fixed = TRUE)
   expect_match(readme, "ConQuest case-EAP output contain person identifiers", fixed = TRUE)
@@ -2629,8 +2727,7 @@ test_that("ConQuest overlap helpers auto-resolve conservative alias columns", {
 })
 
 test_that("build_mfrm_replay_script preserves keep_original and rating range", {
-  dat <- mfrmr:::sample_mfrm_data(seed = 42) |>
-    dplyr::filter(.data$Score %in% c(1, 3, 5))
+  dat <- mfrmr:::sample_mfrm_data(seed = 42)
 
   fit <- suppressWarnings(fit_mfrm(
     dat,
@@ -2676,12 +2773,30 @@ test_that("export_mfrm_bundle writes requested tables and html output", {
   expect_true(is.data.frame(bundle$written_files))
   expect_true(any(bundle$written_files$Component == "bundle_html"))
   expect_true(any(grepl("bundle_test_manifest_summary.csv$", bundle$written_files$Path)))
+  expect_true(any(grepl("bundle_test_manifest_readiness.csv$", bundle$written_files$Path)))
+  expect_true(any(grepl("bundle_test_manifest_readiness_components.csv$", bundle$written_files$Path)))
+  expect_true(any(grepl("bundle_test_manifest_readiness_parameters.csv$", bundle$written_files$Path)))
   expect_true(any(grepl("bundle_test_checklist.csv$", bundle$written_files$Path)))
   expect_true(any(grepl("bundle_test_facet_dashboard_detail.csv$", bundle$written_files$Path)))
   expect_true(any(grepl("bundle_test_replay.R$", bundle$written_files$Path)))
+  expect_true(any(grepl("bundle_test_replay_source_readiness.csv$", bundle$written_files$Path)))
+  expect_true(any(grepl("bundle_test_replay_source_readiness_components.csv$", bundle$written_files$Path)))
+  expect_true(any(grepl("bundle_test_replay_source_readiness_parameters.csv$", bundle$written_files$Path)))
   expect_true(any(grepl("bundle_test_visual_warning_counts.csv$", bundle$written_files$Path)))
   expect_true(file.exists(file.path(out_dir, "bundle_test_bundle.html")))
   expect_true(file.exists(file.path(out_dir, "bundle_test_manifest.txt")))
+  exported_readiness <- utils::read.csv(
+    file.path(out_dir, "bundle_test_manifest_readiness.csv"),
+    stringsAsFactors = FALSE
+  )
+  expect_identical(
+    exported_readiness$ReadinessContractVersion[[1]],
+    bundle$manifest$readiness$ReadinessContractVersion[[1]]
+  )
+  expect_identical(
+    exported_readiness$ReasonCodes[[1]],
+    bundle$manifest$readiness$ReasonCodes[[1]]
+  )
   expect_true(file.exists(file.path(out_dir, "bundle_test_replay.R")))
   expect_true(file.exists(file.path(out_dir, "bundle_test_visual_warning_map.txt")))
 })

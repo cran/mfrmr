@@ -1,4 +1,4 @@
-test_that("JML preserves explicit zero-count score support when requested", {
+test_that("JML rejects an explicit unsupported internal category contrast", {
   set.seed(20260515)
   dat <- expand.grid(
     Person = paste0("P", sprintf("%02d", seq_len(10))),
@@ -16,8 +16,8 @@ test_that("JML preserves explicit zero-count score support when requested", {
 
   expect_false(3L %in% dat$Score)
 
-  fit <- suppressWarnings(
-    fit_mfrm(
+  condition <- tryCatch(
+    suppressWarnings(fit_mfrm(
       dat,
       person = "Person",
       facets = c("Rater", "Criterion"),
@@ -29,39 +29,21 @@ test_that("JML preserves explicit zero-count score support when requested", {
       model = "RSM",
       maxit = 30,
       reltol = 1e-4
-    )
+    )),
+    error = identity
   )
 
-  expect_s3_class(fit, "mfrm_fit")
-  expect_equal(as.integer(fit$summary$Categories[1]), 5L)
-  expect_true(isTRUE(fit$summary$Converged[1]))
-  expect_equal(fit$prep$score_map$OriginalScore, 0:4)
-  expect_equal(fit$prep$score_map$InternalScore, 0:4)
-  expect_true(all(is.finite(fit$steps$Estimate)))
-
-  diagnostics <- suppressWarnings(
-    diagnose_mfrm(fit, residual_pca = "none", diagnostic_mode = "legacy")
+  expect_s3_class(condition, "mfrmr_category_readiness_error")
+  expect_identical(condition$readiness$CategoryState,
+                   "unsupported_coordinate")
+  expect_identical(
+    condition$category_support$support_table$UnsupportedCategory,
+    "3"
   )
-  expect_s3_class(diagnostics, "mfrm_diagnostics")
-  expect_equal(nrow(diagnostics$obs), nrow(dat))
-
-  dq <- data_quality_report(
-    fit,
-    data = dat,
-    person = "Person",
-    facets = c("Rater", "Criterion"),
-    score = "Score"
+  expect_identical(
+    condition$category_support$unsupported_contrasts$Direction,
+    "Step3 - Step4"
   )
-  expect_s3_class(dq, "mfrm_data_quality")
-  expect_true("score_support_review" %in% names(dq))
-
-  score_3 <- dq$score_support_review[
-    dq$score_support_review$Score == 3L,
-    ,
-    drop = FALSE
-  ]
-  expect_equal(nrow(score_3), 1L)
-  expect_true(isTRUE(score_3$ZeroCount[1]))
-  expect_true(isTRUE(score_3$WeaklyIdentified[1]))
-  expect_true(any(dq$quality_flags$Area == "Score support"))
+  expect_match(condition$readiness$ReasonCodes,
+               "step_scope_category_unobserved", fixed = TRUE)
 })

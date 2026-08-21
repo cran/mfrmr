@@ -1,3 +1,68 @@
+test_that("mfrm_results only soft-fails typed availability conditions", {
+  unavailable <- mfrmr:::mfrm_results_safe(
+    mfrmr:::stop_mfrm_results_unavailable("Expected capability boundary.")
+  )
+  expect_false(unavailable$ok)
+  expect_match(unavailable$message, "Expected capability boundary", fixed = TRUE)
+  expect_match(
+    unavailable$condition_class,
+    "mfrmr_results_unavailable_error",
+    fixed = TRUE
+  )
+
+  expect_error(
+    mfrmr:::mfrm_results_safe(stop("Unexpected internal regression.", call. = FALSE)),
+    "Unexpected internal regression",
+    fixed = TRUE
+  )
+})
+
+test_that("diagnostic fallback is limited to typed availability failures", {
+  fit <- structure(list(), class = "mfrm_fit")
+  calls <- 0L
+  testthat::local_mocked_bindings(
+    diagnose_mfrm = function(...) {
+      calls <<- calls + 1L
+      stop("Unexpected diagnostic regression.", call. = FALSE)
+    },
+    .package = "mfrmr"
+  )
+
+  expect_error(
+    mfrmr:::mfrm_results_diagnose(fit),
+    "Unexpected diagnostic regression",
+    fixed = TRUE
+  )
+  expect_identical(calls, 1L)
+})
+
+test_that("typed diagnostic unavailability permits the narrow fallback", {
+  fit <- structure(list(), class = "mfrm_fit")
+  calls <- 0L
+  testthat::local_mocked_bindings(
+    diagnose_mfrm = function(...) {
+      calls <<- calls + 1L
+      if (calls == 1L) {
+        mfrmr:::stop_mfrm_results_unavailable(
+          "Broad diagnostic route is unavailable."
+        )
+      }
+      structure(list(), class = "mfrm_diagnostics")
+    },
+    .package = "mfrmr"
+  )
+
+  result <- mfrmr:::mfrm_results_diagnose(fit)
+  expect_identical(calls, 2L)
+  expect_identical(result$provenance, "computed_fallback")
+  expect_identical(result$status$Status, "ok")
+  expect_match(
+    result$status$Detail,
+    "mfrmr_results_unavailable_error",
+    fixed = TRUE
+  )
+})
+
 test_that("mfrm_results builds a comprehensive object from a fitted model", {
   toy <- load_mfrmr_data("example_core")
   toy_small <- toy[toy$Person %in% unique(toy$Person)[1:8], , drop = FALSE]
@@ -23,6 +88,10 @@ test_that("mfrm_results builds a comprehensive object from a fitted model", {
   expect_true(any(res$status$Section == "diagnostics" & res$status$Status == "ok"))
   expect_true("fit" %in% names(res$components))
   expect_true(length(res$tables) > 0)
+  readiness_record <- mfrmr:::mfrmr_get_readiness_record(fit)
+  expect_equal(res$fit_readiness, readiness_record$fit)
+  expect_equal(res$fit_readiness_components, readiness_record$components)
+  expect_equal(res$fit_readiness_parameters, readiness_record$parameters)
 
   sx <- summary(res)
   expect_s3_class(sx, "summary.mfrm_results")
@@ -45,6 +114,10 @@ test_that("mfrm_results builds a comprehensive object from a fitted model", {
   expect_true(any(sx$plot_map$Type == "fit_pathway" &
                     grepl("facet_labels = 'flagged'", sx$plot_map$Route, fixed = TRUE)))
   expect_true(any(sx$next_actions$Area == "Wright map"))
+  expect_equal(sx$fit_readiness, readiness_record$fit)
+  expect_equal(sx$fit_readiness_components, readiness_record$components)
+  expect_equal(sx$fit_readiness_parameters, readiness_record$parameters)
+  expect_equal(sx$decision$FitReadiness, readiness_record$fit$FitReadiness)
 
   primary_plot <- plot(res, draw = FALSE)
   expect_s3_class(primary_plot, "mfrm_plot_data")
@@ -79,6 +152,10 @@ test_that("mfrm_results builds a comprehensive object from a fitted model", {
 
   report <- mfrm_report(res, style = "qc")
   expect_s3_class(report, "mfrm_report")
+  expect_equal(report$fit_readiness, readiness_record$fit)
+  expect_equal(report$fit_readiness_components, readiness_record$components)
+  expect_equal(report$fit_readiness_parameters, readiness_record$parameters)
+  expect_equal(report$decision, sx$decision)
   printed_report <- capture.output(print(report))
   expect_true(any(grepl("Read order: summary(report)", printed_report, fixed = TRUE)))
   expect_true(any(grepl("Detailed tables are available in report$tables.", printed_report, fixed = TRUE)))
@@ -86,8 +163,10 @@ test_that("mfrm_results builds a comprehensive object from a fitted model", {
   expect_false(any(grepl("^Fit reporting templates$", printed_report)))
   report_summary <- summary(report)
   expect_s3_class(report_summary, "summary.mfrm_report")
+  expect_equal(report_summary$fit_readiness, readiness_record$fit)
+  expect_equal(report_summary$decision, report$decision)
   expect_true(all(c(
-    "overview", "first_screen", "status_counts", "immediate_actions",
+    "overview", "decision", "first_screen", "status_counts", "immediate_actions",
     "optional_sections", "claim_readiness", "report_gaps", "boundary_index",
     "routes"
   ) %in% names(report_summary)))
@@ -224,6 +303,7 @@ test_that("mfrm_results builds a comprehensive object from a fitted model", {
   expect_type(markdown, "character")
   expect_length(markdown, 1L)
   expect_match(markdown, "Evidence Boundary", fixed = TRUE)
+  expect_match(markdown, "Fit Decision", fixed = TRUE)
   expect_match(markdown, "First Screen", fixed = TRUE)
   expect_match(markdown, "Report Index", fixed = TRUE)
   expect_match(markdown, "Template Index", fixed = TRUE)
@@ -247,6 +327,7 @@ test_that("mfrm_results builds a comprehensive object from a fitted model", {
   expect_true(file.exists(html$path))
   expect_match(html$html, "Reader guidance", fixed = TRUE)
   expect_match(html$html, "report_summary_overview", fixed = TRUE)
+  expect_match(html$html, "report_summary_decision", fixed = TRUE)
   expect_match(html$html, "report_summary_first_screen", fixed = TRUE)
   expect_match(html$html, "Report Markdown", fixed = TRUE)
   expect_lt(
@@ -378,6 +459,13 @@ test_that("export_mfrm_results writes privacy-labelled analysis archives", {
   expect_true(nrow(exported$written_files) > 0L)
   expect_true(all(file.exists(exported$written_files$Path)))
   expect_true(any(exported$written_files$Component == "summary_overview"))
+  expect_true(any(exported$written_files$Component == "summary_fit_readiness"))
+  expect_true(any(
+    exported$written_files$Component == "summary_fit_readiness_components"
+  ))
+  expect_true(any(
+    exported$written_files$Component == "summary_fit_readiness_parameters"
+  ))
   expect_true(any(exported$written_files$Component == "results_html"))
   expect_true(any(exported$written_files$Component == "results_rds"))
   expect_true(any(exported$written_files$Component == "replay_code"))
@@ -389,6 +477,24 @@ test_that("export_mfrm_results writes privacy-labelled analysis archives", {
   expect_false(exported$summary$ShareableWithoutReview[[1]])
   expect_true(exported$summary$SensitiveDataAcknowledged[[1]])
   expect_true(is.data.frame(exported$privacy_notice))
+
+  readiness_path <- exported$written_files$Path[
+    exported$written_files$Component == "summary_fit_readiness"
+  ][1]
+  exported_readiness <- utils::read.csv(
+    readiness_path,
+    stringsAsFactors = FALSE,
+    colClasses = "character",
+    na.strings = "NA"
+  )
+  expect_identical(
+    exported_readiness$ReadinessContractVersion[[1]],
+    res$fit_readiness$ReadinessContractVersion[[1]]
+  )
+  expect_identical(
+    exported_readiness$ReasonCodes[[1]],
+    res$fit_readiness$ReasonCodes[[1]]
+  )
 
   manifest_path <- exported$written_files$Path[exported$written_files$Component == "written_files"][1]
   manifest <- utils::read.csv(manifest_path, stringsAsFactors = FALSE)

@@ -177,7 +177,9 @@ Invisibly, an \code{mfrm_plot_data} object (default and for any
 single \code{type}), or an \code{mfrm_plot_bundle} when
 \code{type = "bundle"} / \code{"all"} / \code{"default"}. Each returned fit plot
 includes domain-specific readiness and an interpretation status in its
-data payload.
+data payload. It also includes a one-row \code{scale_contract} table recording
+the fitted coordinate basis, population SD when applicable,
+discrimination basis, and bounded-GPCM MML identification convention.
 }
 \description{
 Plot fitted MFRM results with base R
@@ -192,9 +194,12 @@ Wright map, pathway map, and category characteristic curves. The
 compact native default records any omitted facet locations in
 \code{data$retention} and annotates the subtitle and drawn figure; use
 \code{top_n = Inf} to retain every fitted location in the final Wright map.
-Native text labels remain collision-aware, so a retained point may be
-unlabeled; its exact level and estimate remain available in the returned
-plot data. When the fit records boundary-separated facet levels and no
+Every retained native location is labelled. Collision-aware \code{LabelX} /
+\code{LabelY} coordinates and leader lines displace text without moving the
+fitted point; \code{label_points} retains both point and text coordinates for
+custom renderers. Step transitions share one vertical ladder and their
+labels include the fitted threshold logit. When the fit records
+boundary-separated facet levels and no
 display range was supplied, the native and FACETS-style maps use the same
 robust automatic range and place those levels at ruler ends. Exact fitted
 values and intervals remain in \code{OriginalEstimate}, \code{CI_Lower}, and
@@ -211,6 +216,11 @@ and interpretability are separate: when a numerical, data, design, or
 stability gate requires review, the coordinates remain available for
 diagnosis, but the call warns and marks the returned subtitle and drawn
 title \verb{REVIEW ONLY}.
+A prior-regularized extreme MML EAP remains in \code{fit$facets$person}. If its
+source fit is blocked, however, it is omitted from the Wright-map scale so
+that a finite but non-interpretable trace cannot collapse the display. The
+exact excluded rows and reason remain in \code{data$person_exclusions}, and the
+omission is stated in \code{data$retention_note}.
 
 \code{type = "wright"} shows persons, facet levels, and step thresholds on
 a shared logit scale. Estimates are plotted as fitted, so the sign
@@ -247,7 +257,14 @@ includes \code{pathway_long}, \code{pathway_annotations}, \code{fit_measures},
 \code{fit_status}, and \code{curve_fit_status}, so R users can rebuild the pathway
 map in ggplot2, plotly, or a report pipeline while keeping the same
 underfit/overfit labels used by \code{\link[=fit_measures_table]{fit_measures_table()}}. \code{type = "ccc"} shows
-category response probabilities. \code{type = "ccc_surface"} or
+category response probabilities. Multiple curve groups are faceted rather
+than overplotted by the native renderer, and category-specific legends use
+the same colours across panels. For \code{GPCM}, these curves retain the
+estimated step-facet slope; all curve families are reference-profile curves
+with additive facet main effects and fitted interactions fixed at zero; the
+native footer and ggplot subtitle disclose that conditioning.
+The draw-free \code{curve_basis}, \code{CurveBasis}, and \code{PredictorOffset} fields make
+that conditioning explicit. \code{type = "ccc_surface"} or
 \code{type = "category_surface"} returns 3D-ready category-probability surface
 data for external rendering; it deliberately does not add a
 plotly/rgl dependency or replace the 2D CCC/pathway reporting figures. The

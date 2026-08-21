@@ -514,9 +514,20 @@ build_facets_style_wright_data <- function(fit,
   extreme[is.na(extreme) | !nzchar(extreme)] <- "none"
   person$OriginalEstimate <- suppressWarnings(as.numeric(person$Estimate))
   person$DisplayEstimate <- person$OriginalEstimate
+  typed_unbounded <- if ("ParameterStatus" %in% names(person)) {
+    as.character(person$ParameterStatus) %in%
+      c("unbounded_low", "unbounded_high")
+  } else {
+    rep(FALSE, nrow(person))
+  }
   if (identical(extreme_placement, "ends")) {
     person$DisplayEstimate[extreme == "low"] <- lower
     person$DisplayEstimate[extreme == "high"] <- upper
+  } else {
+    # A typed JML boundary has no finite estimate to place. `estimate` retains
+    # the primary value in OriginalEstimate and omits it from the ruler rather
+    # than silently substituting the optimizer iterate.
+    person$DisplayEstimate[typed_unbounded] <- NA_real_
   }
   person$BelowRange <- person$DisplayEstimate < lower
   person$AboveRange <- person$DisplayEstimate > upper

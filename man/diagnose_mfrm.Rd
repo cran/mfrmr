@@ -85,6 +85,9 @@ for bounded \code{GPCM})
 \item \code{approximation_notes}: method notes for SE/CI/reliability summaries
 \item \code{diagnostic_basis}: guide to the statistical target of each diagnostic path
 \item \code{fit_standardization}: guide to the df convention behind fit ZSTD values
+\item \code{fit_readiness}, \code{fit_readiness_components}, and
+\code{fit_readiness_parameters}: the source fit's versioned readiness decision;
+diagnostic computation does not override a blocked or review-only fit
 \item \code{marginal_fit}: optional strict marginal-fit companion based on
 posterior-expected first-order category counts
 \item \code{residual_pca_overall}: optional overall PCA object
@@ -164,7 +167,7 @@ external FACETS fit comparison requires a JMLE-style residual basis
 \item MnSq < 0.5: overfit (too predictable; may inflate reliability)
 \item MnSq 0.5--1.5: productive for measurement
 \item MnSq > 1.5: underfit (noise degrades measurement)
-\item \eqn{|\mathrm{ZSTD}| > 2}: conventional approximate-normal review flag;
+\item \eqn{|\mathrm{ZSTD}| \ge 2}: package convention for the approximate-normal review flag;
 not a calibrated 5\\% hypothesis test, especially after parameter estimation
 and repeated screening across elements
 }
@@ -282,16 +285,10 @@ programs}. Winsteps.com. (WHEXACT / FACETS standardized fit df notes.)
 
 \examples{
 \donttest{
-# Minimal diagnostic example without residual PCA.
+# Diagnostic example without residual PCA.
 toy <- load_mfrmr_data("example_operational")
-fit_quick <- fit_mfrm(
-  toy, "Person", c("Rater", "Criterion"), "Score",
-  method = "MML", model = "RSM", quad_points = 7, maxit = 30
-)
-diag_quick <- diagnose_mfrm(fit_quick, diagnostic_mode = "both",
-                            residual_pca = "none")
-summary(diag_quick)$overview[, c("Observations", "Facets", "Categories")]
-
+# Seven quadrature points keep this example short; use the prespecified
+# final grid and a denser sensitivity grid for substantive analysis.
 fit <- fit_mfrm(
   toy, "Person", c("Rater", "Criterion"), "Score",
   method = "MML", model = "RSM", quad_points = 7, maxit = 30

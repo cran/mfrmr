@@ -77,6 +77,9 @@
 #' If the intended rating scale includes categories not observed in the current
 #' data, make that support explicit. For example, use
 #' `rating_min = 1, rating_max = 5` for a 1-5 scale with only 2-5 observed.
+#' This preserves the declaration in the data-support review. A zero-count
+#' boundary is review evidence for the separate element-boundary contract; it
+#' is not by itself an unsupported free-step contrast.
 #' If an intermediate category is unobserved (for example 1, 2, 4, 5 with no
 #' 3), also set `keep_original = TRUE` if the zero-count category should remain
 #' in the fitted support. `summary(describe_mfrm_data(...))` reports retained
@@ -84,8 +87,9 @@
 #' `summary(fit)` carries full structured rows into printed `Caveats` and
 #' `$caveats`, with `Key warnings` as a short triage subset. Summary-table
 #' exports route those rows through `score_category_caveats` or
-#' `analysis_caveats`. Adjacent threshold estimates should still be treated as
-#' weakly identified when an intermediate category is unobserved.
+#' `analysis_caveats`. In a polytomous fitted ladder, a retained zero-count
+#' internal category creates an unsupported adjacent-step contrast and stops
+#' fitting before optimization.
 #'
 #' @section Planned assignment and structural missingness:
 #' A long-format table alone does not reveal whether an absent Person x facet
@@ -223,6 +227,8 @@
 #'   [compute_information()] / [plot_information()] when you want to inspect
 #'   whether bounded `GPCM` is introducing substantively acceptable
 #'   discrimination-based reweighting relative to the Rasch-family reference.
+#'   Use one selectable q>=31 grid for every candidate and a denser common-grid
+#'   sensitivity check when the comparison is close or consequential.
 #' - Design planning and forecasting:
 #'   [build_mfrm_sim_spec()] or [extract_mfrm_sim_spec()] ->
 #'   [evaluate_mfrm_recovery()] -> [assess_mfrm_recovery()] for

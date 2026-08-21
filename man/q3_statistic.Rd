@@ -102,7 +102,7 @@ comparable with raw-row Q3.
 For both reasons, treat the values returned here as a \strong{screening
 summary} rather than a direct substitute for the published Q3
 thresholds. A formal raw-residual Q3 procedure would require a separately
-implemented and validated design-specific bootstrap; mfrmr 0.2.2 does not
+implemented and validated design-specific bootstrap; mfrmr 0.2.3 does not
 provide that procedure.
 }
 

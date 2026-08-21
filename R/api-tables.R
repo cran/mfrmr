@@ -2770,10 +2770,11 @@ table6_2_facet_statistics <- function(fit,
 
   metric_ranges <- purrr::map_dfr(numeric_metrics, function(metric) {
     vals <- suppressWarnings(as.numeric(measure_tbl[[metric]]))
+    vals <- vals[is.finite(vals)]
     tibble::tibble(
       Metric = metric,
-      GlobalMin = if (any(is.finite(vals))) min(vals, na.rm = TRUE) else NA_real_,
-      GlobalMax = if (any(is.finite(vals))) max(vals, na.rm = TRUE) else NA_real_
+      GlobalMin = if (length(vals) > 0L) min(vals) else NA_real_,
+      GlobalMax = if (length(vals) > 0L) max(vals) else NA_real_
     )
   })
 
@@ -2822,10 +2823,24 @@ table6_2_facet_statistics <- function(fit,
       dplyr::group_by(.data$Facet) |>
       dplyr::summarise(
         Levels = dplyr::n(),
-        Mean = mean(.data[[metric]], na.rm = TRUE),
-        SD = stats::sd(.data[[metric]], na.rm = TRUE),
-        Min = min(.data[[metric]], na.rm = TRUE),
-        Max = max(.data[[metric]], na.rm = TRUE),
+        FiniteLevels = sum(is.finite(.data[[metric]])),
+        ExcludedLevels = dplyr::n() - sum(is.finite(.data[[metric]])),
+        Mean = {
+          values <- .data[[metric]][is.finite(.data[[metric]])]
+          if (length(values) > 0L) mean(values) else NA_real_
+        },
+        SD = {
+          values <- .data[[metric]][is.finite(.data[[metric]])]
+          if (length(values) > 1L) stats::sd(values) else NA_real_
+        },
+        Min = {
+          values <- .data[[metric]][is.finite(.data[[metric]])]
+          if (length(values) > 0L) min(values) else NA_real_
+        },
+        Max = {
+          values <- .data[[metric]][is.finite(.data[[metric]])]
+          if (length(values) > 0L) max(values) else NA_real_
+        },
         .groups = "drop"
       ) |>
       dplyr::mutate(
@@ -3474,7 +3489,7 @@ build_data_quality_quality_flags <- function(summary_tbl,
     add_flag(
       "Score support", "high", "Intermediate score categories have zero observations",
       get_summary_count("IntermediateZeroCountScoreCategories"), "categories",
-      "Treat adjacent thresholds as weakly supported and document the score-support gap.",
+      "Do not report finite adjacent steps; collect data, revise the score support, or separate the ladder.",
       denominator = "categories"
     )
     add_flag(
@@ -3904,9 +3919,9 @@ collect_mfrm_caveats <- function(fit = NULL,
         message = paste0(
           "Unused intermediate score categories retained in the ", support_phrase, ": ",
           internal_text,
-          ". Adjacent threshold estimates are weakly identified; review `rating_scale_table()` / `category_structure_report()` and consider category collapsing before treating the thresholds as stable."
+          ". Under the current sum-zero step parameterization, a zero-count internal category creates an unsupported adjacent-step recession direction in its fitted ladder. New fits stop before optimization; legacy or descriptive objects must not present the adjacent steps as finite identified estimates."
         ),
-        action = "Review adjacent thresholds and category curves; collapse categories or collect additional data when threshold stability is required."
+        action = "Collect observations in the internal category, revise the score support or response model, or separate the affected ladder before fitting."
       )
     }
     if (length(boundary) > 0L) {
@@ -4402,6 +4417,12 @@ table8_barchart_export <- function(fit,
 #' - `fixed`: fixed-width report text (when `include_fixed = TRUE`)
 #' - `settings`: applied options
 #'
+#' Curve coordinates retain estimated step parameters and, for `GPCM`, the
+#' estimated slope for each step-facet group. They are reference-profile
+#' curves: additive facet main effects and fitted interactions are fixed at
+#' zero. `CurveBasis` and `PredictorOffset` record this condition explicitly;
+#' the output is not an arbitrary observed-cell conditional curve.
+#'
 #' @seealso [category_structure_report()], [rating_scale_table()], [plot.mfrm_fit()]
 #' @examples
 #' toy <- load_mfrmr_data("example_core")
@@ -4504,7 +4525,7 @@ table8_curves_export <- function(fit,
             "CurveGroup", "Theta", "Category", "Probability",
             "ExpectedScore", "ScoreVariance", "Information",
             "CategoryInformation", "CategoryInformationShare",
-            "Slope", "Model"
+            "Slope", "Model", "CurveBasis", "PredictorOffset"
           ),
         stringsAsFactors = FALSE
       )
@@ -4514,6 +4535,12 @@ table8_curves_export <- function(fit,
       theta_range = theta_range,
       theta_points = theta_points,
       digits = digits,
+      curve_basis = curve_spec$curve_basis,
+      predictor_offset = curve_spec$predictor_offset,
+      curve_basis_description = paste(
+        "Estimated step and, for GPCM, slope parameters are retained;",
+        "additive facet main effects and fitted interactions are fixed at zero."
+      ),
       include_fixed = isTRUE(include_fixed),
       fixed_max_rows = max(25L, as.integer(fixed_max_rows)),
       scales = as.data.frame(
@@ -5869,6 +5896,10 @@ infer_facet_names <- function(diagnostics) {
 #' - `warnings`: named list of non-fatal PCA warnings captured from the
 #'   underlying PCA engine. These indicate exploratory boundary conditions,
 #'   not confirmatory evidence.
+#' - `InferenceTier`, `SupportsFormalInference`,
+#'   `PrimaryReportingEligible`, `ReportingUse`, and `DecisionUse`:
+#'   machine-readable guards that keep this route exploratory and prohibit an
+#'   automatic dimensionality or subscore decision.
 #'
 #' @seealso [diagnose_mfrm()], [plot_residual_pca()], [mfrmr_visual_diagnostics]
 #' @examples
@@ -6060,7 +6091,12 @@ analyze_residual_pca <- function(diagnostics,
     },
     parallel_status = build_residual_parallel_status(out_overall, out_by_facet),
     errors = pca_errors,
-    warnings = pca_warnings
+    warnings = pca_warnings,
+    InferenceTier = "exploratory",
+    SupportsFormalInference = FALSE,
+    PrimaryReportingEligible = FALSE,
+    ReportingUse = "screening_only",
+    DecisionUse = "no_automatic_dimensionality_decision"
   )
   as_mfrm_bundle(out, "mfrm_residual_pca")
 }
@@ -6165,6 +6201,9 @@ extract_loading_table <- function(pca_bundle, component = 1L, top_n = 20L) {
 #' - `facet`: facet name (or `NULL`)
 #' - `title`: plot title text
 #' - `data`: underlying table used for plotting
+#' - `InferenceTier`, `SupportsFormalInference`,
+#'   `PrimaryReportingEligible`, `ReportingUse`, and `DecisionUse`:
+#'   machine-readable exploratory-screening guards
 #'
 #' @seealso [analyze_residual_pca()], [diagnose_mfrm()]
 #' @examples
@@ -6308,6 +6347,11 @@ plot_residual_pca <- function(x,
                                                 c("dashed", "dotted", "dotted", "dotted"),
                                                 rep("reference", length(rasch_refs))),
           data = tbl,
+          InferenceTier = "exploratory",
+          SupportsFormalInference = FALSE,
+          PrimaryReportingEligible = FALSE,
+          ReportingUse = "screening_only",
+          DecisionUse = "no_automatic_dimensionality_decision",
           preset = style$name
         )
       )
@@ -6347,6 +6391,11 @@ plot_residual_pca <- function(x,
           ),
           reference_lines = new_reference_lines("h", 0, "Permutation cutoff", "dashed", "reference"),
           data = tbl,
+          InferenceTier = "exploratory",
+          SupportsFormalInference = FALSE,
+          PrimaryReportingEligible = FALSE,
+          ReportingUse = "screening_only",
+          DecisionUse = "no_automatic_dimensionality_decision",
           preset = style$name
         )
       )
@@ -6388,6 +6437,11 @@ plot_residual_pca <- function(x,
                                               c("dashed", "dotted", "dotted", "dotted"),
                                               rep("reference", length(rasch_refs))),
         data = tbl,
+        InferenceTier = "exploratory",
+        SupportsFormalInference = FALSE,
+        PrimaryReportingEligible = FALSE,
+        ReportingUse = "screening_only",
+        DecisionUse = "no_automatic_dimensionality_decision",
         preset = style$name
       )
     )
@@ -6438,10 +6492,48 @@ plot_residual_pca <- function(x,
       reference_lines = new_reference_lines("v", 0, "Zero-loading reference", "dashed", "reference"),
       component = as.integer(component),
       data = load_tbl,
+      InferenceTier = "exploratory",
+      SupportsFormalInference = FALSE,
+      PrimaryReportingEligible = FALSE,
+      ReportingUse = "screening_only",
+      DecisionUse = "no_automatic_dimensionality_decision",
       preset = style$name
     )
   )
   invisible(out)
+}
+
+bias_person_screen_note <- function(fit = NULL) {
+  source_person <- as.character(
+    fit$config$source_columns$person %||% "Person"
+  )[1]
+  source_note <- if (!is.na(source_person) && nzchar(source_person) &&
+      !identical(source_person, "Person")) {
+    paste0(
+      " In this fit, canonical `Person` denotes the source person column `",
+      source_person, "`."
+    )
+  } else {
+    ""
+  }
+  paste0(
+    "A Person-involving bias result is a cellwise conditional plug-in ",
+    "likelihood screen: fitted JML person measures or MML EAP scores, facet ",
+    "effects, and step parameters are held fixed.", source_note,
+    " It is not a jointly fitted Person x facet interaction from ",
+    "`fit_mfrm(facet_interactions = ...)`, and it does not support formal ",
+    "inference or a cell-level fairness decision. Sparse cells can be ",
+    "especially unstable; inspect `ObsN`, `Observd Count`, and `d.f.`, and ",
+    "use `bias_count_table(..., min_count_warn = 10)` before interpreting ",
+    "individual cells."
+  )
+}
+
+warn_bias_person_screen <- function(fit, helper = "estimate_bias()") {
+  rlang::warn(
+    paste0("`", helper, "` included `Person`. ", bias_person_screen_note(fit)),
+    class = "mfrmr_person_bias_screen_warning"
+  )
 }
 
 #' Estimate bias and interaction screening terms
@@ -6450,13 +6542,14 @@ plot_residual_pca <- function(x,
 #' @param diagnostics Output from [diagnose_mfrm()].
 #' @param facet_a First facet name. Provide together with `facet_b` for the
 #'   classic pairwise 2-way interaction. Ignored when `interaction_facets`
-#'   is supplied.
+#'   is supplied. The canonical `"Person"` role is accepted explicitly.
 #' @param facet_b Second facet name. See `facet_a`.
 #' @param interaction_facets Character vector of two or more facets to model as
 #'   one interaction effect. When supplied, this takes precedence over
 #'   `facet_a`/`facet_b`. Use this form (rather than `facet_a`/`facet_b`)
 #'   whenever you want 3+ way interactions, since `facet_a/facet_b` is
-#'   restricted to the pairwise case.
+#'   restricted to the pairwise case. The canonical `"Person"` role may be
+#'   supplied explicitly; see the Person-screening boundary below.
 #' @param max_abs Bound for absolute bias size.
 #' @param omit_extreme Omit extreme-only elements.
 #' @param max_iter Iteration cap.
@@ -6492,6 +6585,11 @@ plot_residual_pca <- function(x,
 #' - For two-way mode, use `facet_a` and `facet_b` (or `interaction_facets`
 #'   with length 2).
 #' - For higher-order mode, provide `interaction_facets` with length >= 3.
+#' - A Person-involving result is a conditional plug-in likelihood screen. It
+#'   holds fitted JML person measures or MML EAP scores and the other fitted
+#'   parameters fixed; it is not a jointly fitted Person-by-facet interaction
+#'   and does not support formal inference or a cell-level fairness decision.
+#'   The function emits a classed warning when `"Person"` is requested.
 #'
 #' @section What this screening means:
 #' `estimate_bias()` summarizes interaction departures from the additive MFRM.
@@ -6559,6 +6657,8 @@ plot_residual_pca <- function(x,
 #' - `facet_a`, `facet_b`: first two analyzed facet names (legacy compatibility)
 #' - `interaction_facets`, `interaction_order`, `interaction_mode`: full
 #'   interaction metadata
+#' - `person_interaction`, `person_source_column`, `person_interaction_note`:
+#'   Person-screening provenance and interpretation metadata
 #' - `iteration`: iteration history/metadata
 #' - `orientation_review`: facet-orientation sign-consistency review table
 #' - `mixed_sign`: logical flag indicating whether bias-size signs flip
@@ -6655,7 +6755,10 @@ estimate_bias <- function(fit,
   # Validate that every requested facet label actually names a facet in the
   # fit. Without this check, a typo (e.g. "Raters" with trailing s) used to
   # fall through as an empty list, which silently masked the error.
-  known_facets <- as.character(fit$config$facet_names %||% character())
+  known_facets <- unique(c(
+    "Person",
+    as.character(fit$config$facet_names %||% character())
+  ))
   unknown <- setdiff(as.character(interaction_facets), known_facets)
   if (length(unknown) > 0L) {
     stop(
@@ -6666,6 +6769,11 @@ estimate_bias <- function(fit,
       paste(shQuote(known_facets), collapse = ", "), ".",
       call. = FALSE
     )
+  }
+
+  person_interaction <- "Person" %in% interaction_facets
+  if (isTRUE(person_interaction)) {
+    warn_bias_person_screen(fit, helper = "estimate_bias()")
   }
 
   out <- estimate_bias_interaction(
@@ -6681,6 +6789,15 @@ estimate_bias <- function(fit,
   )
   if (is.list(out) && length(out) > 0) {
     class(out) <- c("mfrm_bias", class(out))
+    out$person_interaction <- person_interaction
+    out$person_source_column <- as.character(
+      fit$config$source_columns$person %||% "Person"
+    )[1]
+    out$person_interaction_note <- if (isTRUE(person_interaction)) {
+      bias_person_screen_note(fit)
+    } else {
+      ""
+    }
     if (identical(fit_model, "GPCM")) {
       out$method <- "GPCM-slope-aware"
       out$caveat <- paste0(

@@ -1,6 +1,7 @@
 make_qc_score_gap_case <- function(keep_original = TRUE, maxit = 8) {
   d <- mfrmr:::sample_mfrm_data(seed = 42)
-  d <- d[d$Score != 3, , drop = FALSE]
+  omitted_score <- if (isTRUE(keep_original)) 1L else 3L
+  d <- d[d$Score != omitted_score, , drop = FALSE]
   fit <- suppressWarnings(
     fit_mfrm(
       d, "Person", c("Rater", "Task", "Criterion"), "Score",
@@ -113,9 +114,9 @@ test_that("quality flags and overview summarize the same QC evidence", {
   facet_use <- overview[overview$Area == "Facet category use", , drop = FALSE]
   patterns <- overview[overview$Area == "Facet response patterns", , drop = FALSE]
 
-  expect_equal(score_support$Status, "high")
+  expect_equal(score_support$Status, "review")
   expect_equal(score_support$Count, summary_tbl$ZeroCountScoreCategories)
-  expect_equal(facet_use$Status, "high")
+  expect_equal(facet_use$Status, "review")
   expect_equal(
     facet_use$Count,
     max(

@@ -2,7 +2,7 @@
 % Please edit documentation in R/api-reports.R
 \name{apa_table}
 \alias{apa_table}
-\title{Build APA-style table output using base R structures}
+\title{Build an APA-oriented table handoff using base R structures}
 \usage{
 apa_table(
   x,
@@ -27,7 +27,7 @@ list, or bias-result list.}
 \item{diagnostics}{Optional diagnostics from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} (used when
 \code{x} is \code{mfrm_fit} and \code{which} targets diagnostics tables).}
 
-\item{digits}{Number of rounding digits for numeric columns.}
+\item{digits}{Uniform number of rounding digits for numeric columns.}
 
 \item{caption}{Optional caption text.}
 
@@ -56,11 +56,15 @@ A list of class \code{apa_table} with fields:
 }
 }
 \description{
-Build APA-style table output using base R structures
+Build an APA-oriented table handoff using base R structures
 }
 \details{
 This helper avoids styling dependencies and returns a reproducible base
-\code{data.frame} plus metadata.
+\code{data.frame} plus manuscript-oriented metadata. It does not claim complete
+APA 7 or JARS compliance: \code{digits} applies the same rounding rule to every
+numeric column, so statistic-specific formatting (for example, exact
+\emph{p}-value, confidence-interval, and effect-size conventions) and the target
+journal's final typography still require human review.
 
 Supported \code{which} values:
 \itemize{

@@ -21,6 +21,10 @@ A data.frame with columns:
 \item \code{FACETSReference}
 \item \code{mfrmrRoute}
 \item \code{Status}
+\item \code{SurfaceCoverage}
+\item \code{StatisticalContract}
+\item \code{ValidationEvidence}
+\item \code{OperationalStatus}
 \item \code{Capability}
 \item \code{Limitation}
 \item \code{Alternative}
@@ -66,6 +70,20 @@ option surface, file type, or external integration.
 the documented package scope.
 \item \code{not_targeted}: the feature is tied to FACETS UI, Web/Excel handoff, or
 another external program format and is outside the package scope.
+}
+
+The four contract axes are deliberately independent:
+\itemize{
+\item \code{SurfaceCoverage} records whether a corresponding package surface exists;
+familiar visual grammar belongs only to this axis.
+\item \code{StatisticalContract} records the package-native statistical scope and
+never implies a FACETS-matched estimand.
+\item \code{ValidationEvidence} records whether this table establishes matched
+external numerical evidence. It currently does not; validation belongs to
+a separate candidate-linked evidence contract.
+\item \code{OperationalStatus} records route availability. A package route being
+available does not make \code{mfrmr} operationally interchangeable with
+FACETS.
 }
 }
 \examples{

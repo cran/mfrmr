@@ -16,7 +16,8 @@
 \item{...}{Reserved for generic compatibility.}
 }
 \value{
-An object of class \code{summary.mfrm_weighting_review}.
+An object of class \code{summary.mfrm_weighting_review}, including the
+evidence-tier \code{comparison_contract} table.
 }
 \description{
 Summarize a weighting-review object

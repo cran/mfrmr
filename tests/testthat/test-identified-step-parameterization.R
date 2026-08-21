@@ -36,12 +36,13 @@ test_that("step parameter counts match the sum-zero identification", {
   expect_equal(sizes_gpcm$steps, criterion_n * max(n_steps - 1L, 0L))
   expect_equal(sizes_gpcm$log_slopes, criterion_n - 1L)
 
-  implied_k <- function(fit) {
-    as.numeric((fit$summary$AIC[1] + 2 * fit$summary$LogLik[1]) / 2)
-  }
-  expect_equal(implied_k(fit_rsm), sum(unlist(sizes_rsm)), tolerance = 1e-8)
-  expect_equal(implied_k(fit_pcm), sum(unlist(sizes_pcm)), tolerance = 1e-8)
-  expect_equal(implied_k(fit_gpcm), sum(unlist(sizes_gpcm)), tolerance = 1e-8)
+  canonical_k <- function(fit) as.integer(fit$summary$Npar[1])
+  expect_equal(canonical_k(fit_rsm), sum(unlist(sizes_rsm)))
+  expect_equal(canonical_k(fit_pcm), sum(unlist(sizes_pcm)))
+  expect_equal(canonical_k(fit_gpcm), sum(unlist(sizes_gpcm)))
+  expect_equal(canonical_k(fit_rsm), length(fit_rsm$opt$par))
+  expect_equal(canonical_k(fit_pcm), length(fit_pcm$opt$par))
+  expect_equal(canonical_k(fit_gpcm), length(fit_gpcm$opt$par))
 
   expect_equal(sum(fit_rsm$steps$Estimate), 0, tolerance = 1e-8)
   step_sums <- tapply(fit_pcm$steps$Estimate, fit_pcm$steps$StepFacet, sum)
@@ -51,7 +52,7 @@ test_that("step parameter counts match the sum-zero identification", {
   expect_equal(prod(fit_gpcm$slopes$Estimate), 1, tolerance = 1e-8)
 })
 
-test_that("GPCM diagnostics expose joint-covariance SEs for steps and slopes", {
+test_that("GPCM diagnostics retain covariance traces but gate slope inference", {
   d <- mfrmr:::sample_mfrm_data(seed = 422)
   fit <- suppressMessages(suppressWarnings(
     fit_mfrm(
@@ -74,10 +75,21 @@ test_that("GPCM diagnostics expose joint-covariance SEs for steps and slopes", {
   expect_true(is.list(unc))
   expect_true(all(c("steps", "slopes", "summary") %in% names(unc)))
   expect_true(all(c("SE", "CI_Lower", "CI_Upper", "SE_Method", "SE_Status") %in% names(unc$steps)))
-  expect_true(all(c("LogSE", "SE", "LogCI_Lower", "LogCI_Upper", "CI_Lower", "CI_Upper") %in% names(unc$slopes)))
+  expect_true(all(c(
+    "LogSE", "SE", "LogCI_Lower", "LogCI_Upper", "CI_Lower", "CI_Upper",
+    "OptimizerLogSE", "OptimizerSE", "OptimizerLogCI_Lower",
+    "OptimizerLogCI_Upper", "OptimizerCI_Lower", "OptimizerCI_Upper",
+    "UncertaintyEligibility"
+  ) %in% names(unc$slopes)))
   expect_true(any(is.finite(unc$steps$SE)))
-  expect_true(any(is.finite(unc$slopes$SE)))
-  expect_true(all(unc$slopes$CI_Lower > 0, na.rm = TRUE))
+  expect_true(all(is.na(unc$slopes$SE)))
+  expect_true(all(is.na(unc$slopes$CI_Lower)))
+  expect_true(any(is.finite(unc$slopes$OptimizerSE)))
+  expect_true(all(unc$slopes$OptimizerCI_Lower > 0, na.rm = TRUE))
+  expect_true(all(
+    unc$slopes$UncertaintyEligibility ==
+      "not_eligible_parameter_readiness"
+  ))
   expect_true(unc$status %in% c("ok", "regularized"))
 
   attached <- mfrmr:::attach_diagnostics_to_fit(fit)
@@ -85,7 +97,8 @@ test_that("GPCM diagnostics expose joint-covariance SEs for steps and slopes", {
   expect_true("SE" %in% names(attached$slopes))
   expect_true("LogSE" %in% names(attached$slopes))
   expect_true(any(is.finite(attached$steps$SE)))
-  expect_true(any(is.finite(attached$slopes$SE)))
+  expect_true(all(is.na(attached$slopes$SE)))
+  expect_true(any(is.finite(attached$slopes$OptimizerSE)))
 })
 
 test_that("identified GPCM MML gradient agrees with finite differences", {

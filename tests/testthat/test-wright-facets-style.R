@@ -1,7 +1,31 @@
 make_wright_ready_fit <- function(...) {
   fit <- make_toy_fit(...)
+  fit$readiness$fit$InputState <- "pass"
+  fit$readiness$fit$EstimabilityState <- "identified"
+  fit$readiness$fit$CategoryState <- "adequate"
+  fit$readiness$fit$BoundaryState <- "finite"
+  fit$readiness$fit$NumericalState <- "ready"
+  fit$readiness$fit$FitReadiness <- "ready"
+  fit$readiness$fit$InferenceReady <- TRUE
+  fit$readiness$fit$ReasonCodes <- ""
+  fit$readiness$components$State <- c(
+    input = "pass",
+    estimability = "identified",
+    category = "adequate",
+    boundary = "finite",
+    numerical = "ready"
+  )[fit$readiness$components$Component]
+  fit$readiness$components$Complete <- TRUE
+  fit$readiness$components$ReasonCodes <- ""
   fit$summary$Converged <- TRUE
+  fit$summary$InputState <- "pass"
+  fit$summary$EstimabilityState <- "identified"
+  fit$summary$CategoryState <- "adequate"
+  fit$summary$BoundaryState <- "finite"
+  fit$summary$NumericalState <- "ready"
+  fit$summary$FitReadiness <- "ready"
   fit$summary$InferenceReady <- TRUE
+  fit$summary$ReadinessReasonCodes <- ""
   fit$summary$ConvergenceSeverity <- "pass"
   fit$summary$ConvergenceStatus <- "converged"
   fit
@@ -9,8 +33,19 @@ make_wright_ready_fit <- function(...) {
 
 test_that("plot readiness preserves a failed numerical state", {
   fit <- make_wright_ready_fit()
+  fit$readiness$fit$NumericalState <- "failed"
+  fit$readiness$fit$FitReadiness <- "blocked"
+  fit$readiness$fit$InferenceReady <- FALSE
+  fit$readiness$fit$ReasonCodes <- "optimizer_failed;iteration_limit"
+  numerical_row <- fit$readiness$components$Component == "numerical"
+  fit$readiness$components$State[numerical_row] <- "failed"
+  fit$readiness$components$ReasonCodes[numerical_row] <-
+    "optimizer_failed;iteration_limit"
   fit$summary$Converged <- FALSE
+  fit$summary$NumericalState <- "failed"
+  fit$summary$FitReadiness <- "blocked"
   fit$summary$InferenceReady <- FALSE
+  fit$summary$ReadinessReasonCodes <- "optimizer_failed;iteration_limit"
   fit$summary$ConvergenceSeverity <- "fail"
   fit$summary$ConvergenceStatus <- "iteration_limit"
 
@@ -53,6 +88,19 @@ test_that("native top_n compacts facets but retains every step transition", {
     ,
     drop = FALSE
   ]
+  full_location_keys <- paste(full$data$locations$Group, full$data$locations$Label)
+  full_label_keys <- paste(full$data$label_points$Group, full$data$label_points$Label)
+  expect_setequal(full_label_keys, full_location_keys)
+  expect_true(all(c(
+    "LabelX", "LabelY", "LabelSide", "LabelText", "LabelDisplaced"
+  ) %in% names(full$data$label_points)))
+  full_step_labels <- full$data$label_points[
+    full$data$label_points$PlotType == "Step threshold",
+    ,
+    drop = FALSE
+  ]
+  expect_equal(full_steps$X, full_steps$XBase)
+  expect_true(all(grepl("\\([+-][0-9]", full_step_labels$LabelText)))
   compact_steps <- compact$data$locations[
     compact$data$locations$PlotType == "Step threshold",
     ,

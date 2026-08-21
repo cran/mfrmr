@@ -53,6 +53,13 @@ convention of accumulating modeled probabilities across ordered categories
 \code{P(X <= k) = .5}, with \code{BoundaryStatus} and \code{CrossingCount} to avoid
 over-interpreting boundaries outside the requested theta range or with
 multiple crossings.
+
+These are reference-profile curves. Estimated step parameters and, for
+\code{GPCM}, each step-facet group's estimated slope are retained, while additive
+facet main effects and fitted interactions are fixed at zero. The
+\code{CurveBasis} and \code{PredictorOffset} columns, and the corresponding entries in
+\code{settings}, make that conditioning explicit. Thus the curves do not
+represent an arbitrary observed Person-by-facet cell.
 }
 \section{Interpreting output}{
 

@@ -146,7 +146,12 @@ fit_mfrm(
 declaration becomes `rating_min = 1, rating_max = 5`. For a partial-credit
 specification, pass `model = "PCM"` and identify the facet that carries the
 step thresholds with `step_facet = "Rater"` (or the appropriate facet
-name).
+name). The declaration preserves the intended category map, but it is not a
+threshold anchor. A missing boundary category remains review evidence for the
+separate element-boundary contract. A missing internal category in a
+polytomous fitted ladder creates an unsupported adjacent-step contrast and
+stops fitting before optimization. Review or revise the data support rather
+than copying FACETS category-dropping behavior implicitly.
 
 ### Anchoring
 
@@ -195,12 +200,20 @@ object:
 
 ```r
 review <- summary(fit, profile = "facets", detail = "brief")
+review$decision
 res <- review$results
 
 # Primary final-scale figure: all locations and available facet uncertainty.
 plot(res, type = "wright", renderer = "native", show_ci = TRUE,
      top_n = Inf, preset = "publication")
 ```
+
+Read `review$decision` before using the FACETS-organized tables. It reports the
+same stored mfrmr readiness decision shown by `print(fit)`; the `facets`
+profile changes the organization of the review, not the estimator and not the
+evidence threshold. `FormalInference = "No"` therefore remains a stop on
+substantive reporting even when a familiar FACETS-style table or plot is
+available.
 
 `plot_wright_unified()` is the corresponding explicit helper when the Wright
 map is the main figure. For readers who expect the FACETS Table 6-style

@@ -189,10 +189,107 @@ test_that("GPCM response-probability bundle obeys moment identities", {
   )
 })
 
+test_that("GPCM slopes act on the complete adjacent-category predictor", {
+  theta <- 0.7
+  rater_contribution <- -0.35
+  slopes <- c(0.6, 1.5)
+  eta <- c(
+    theta, theta + rater_contribution,
+    theta, theta + rater_contribution
+  )
+  slope_idx <- c(1L, 1L, 2L, 2L)
+
+  probabilities <- mfrmr:::category_prob_gpcm(
+    eta = eta,
+    step_cum_mat = matrix(c(0, 0.25), nrow = 1L),
+    criterion_idx = rep(1L, length(eta)),
+    slopes = slopes,
+    slope_idx = slope_idx
+  )
+  adjacent_logits <- log(probabilities[, 2L] / probabilities[, 1L])
+  observed_rater_shifts <- c(
+    adjacent_logits[2L] - adjacent_logits[1L],
+    adjacent_logits[4L] - adjacent_logits[3L]
+  )
+
+  expect_equal(
+    observed_rater_shifts,
+    slopes * rater_contribution,
+    tolerance = 1e-12
+  )
+  expect_false(isTRUE(all.equal(
+    observed_rater_shifts,
+    rep(rater_contribution, length(slopes)),
+    tolerance = 1e-12
+  )))
+})
+
+test_that("unit GPCM slopes reduce exactly to the PCM probability kernel", {
+  eta <- c(-0.7, 0.2, 0.9)
+  step_cum_mat <- rbind(
+    c(0, -0.4, 0.1, 0.8),
+    c(0, -0.2, 0.4, 0.9)
+  )
+  step_idx <- c(1L, 2L, 1L)
+
+  gpcm <- mfrmr:::category_prob_gpcm(
+    eta = eta,
+    step_cum_mat = step_cum_mat,
+    criterion_idx = step_idx,
+    slopes = c(1, 1),
+    slope_idx = step_idx
+  )
+  pcm <- mfrmr:::category_prob_pcm(
+    eta = eta,
+    step_cum_mat = step_cum_mat,
+    criterion_idx = step_idx
+  )
+
+  expect_equal(gpcm, pcm, tolerance = 1e-15)
+})
+
 test_that("category-curve reports conserve probabilities, moments, and information", {
   expect_curve_moment_identities(make_toy_fit(maxit = 12, model = "RSM"))
   expect_curve_moment_identities(make_consistency_pcm_fit(), theta_points = 9)
   expect_curve_moment_identities(make_consistency_gpcm_fit(), theta_points = 9)
+})
+
+test_that("GPCM category curves retain slope and disclose their reference profile", {
+  fit <- make_consistency_gpcm_fit()
+  curves <- category_curves_report(fit, theta_points = 9, digits = 12)
+  .mfrmr_muffle_expected_warnings({
+    ccc <- plot(fit, type = "ccc", draw = FALSE, theta_points = 9)
+  }, "^Review-only display:")
+
+  slope_lookup <- stats::setNames(
+    as.numeric(fit$slopes$Estimate),
+    as.character(fit$slopes$SlopeFacet)
+  )
+  reported_slope <- stats::setNames(
+    as.numeric(curves$probabilities$Slope),
+    as.character(curves$probabilities$CurveGroup)
+  )
+  groups <- intersect(names(slope_lookup), names(reported_slope))
+
+  expect_gt(length(groups), 0L)
+  expect_equal(unname(reported_slope[groups]), unname(slope_lookup[groups]))
+  expect_true(all(curves$probabilities$CurveBasis == "zero_additive_facet_profile"))
+  expect_true(all(curves$probabilities$PredictorOffset == 0))
+  expect_identical(curves$settings$curve_basis, "zero_additive_facet_profile")
+  expect_equal(curves$settings$predictor_offset, 0)
+  expect_identical(
+    ccc$data$curve_basis$CurveBasis,
+    "zero_additive_facet_profile"
+  )
+  expect_setequal(
+    ccc$data$legend$label,
+    paste("Category", unique(as.character(ccc$data$probabilities$Category)))
+  )
+  expect_match(
+    ccc$data$subtitle,
+    "reference profile fixes additive facet effects and fitted interactions at zero",
+    fixed = TRUE
+  )
 })
 
 test_that("draw-free category plots expose the same curve data as reports", {

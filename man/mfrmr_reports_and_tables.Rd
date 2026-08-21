@@ -128,8 +128,9 @@ supported for the fitted result.
 substitutes for overall fit review.
 \item Treat zero-count score categories as scale-functioning caveats. Boundary
 zero-count categories can be retained with explicit \code{rating_min} /
-\code{rating_max}; intermediate zero-count categories require
-\code{keep_original = TRUE} and make adjacent thresholds weakly identified.
+\code{rating_max}; retaining an intermediate zero-count category with
+\code{keep_original = TRUE} creates an unsupported adjacent-step contrast in a
+polytomous fitted ladder, so new fits stop before optimization.
 \code{summary(describe_mfrm_data(...))} exposes these in \code{Notes}, printed
 \code{Caveats}, and \verb{$caveats}; \code{summary(fit)} carries full structured caveats
 into printed \code{Caveats} and \verb{$caveats}, with \verb{Key warnings} as a short

@@ -287,15 +287,15 @@ import_mirt_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
 
 #' Import a `TAM` fit to an mfrmr-compatible bundle
 #'
-#' Extracts item / step / person parameters from a [TAM::tam.mml()],
-#' [TAM::tam.jml()], or [TAM::tam.mml.mfr()] fit. The multi-facet
+#' Extracts item / step / person parameters from a unidimensional
+#' [TAM::tam.mml()] or [TAM::tam.mml.mfr()] fit. The multi-facet
 #' `tam.mml.mfr()` path is detected automatically and each
 #' non-person facet is mapped onto a row of `fit$facets$others`
 #' so downstream MFRM helpers (e.g. `plot_qc_dashboard()`) work
 #' on the imported object.
 #'
-#' @param fit An object returned by `TAM::tam.mml()`,
-#'   `TAM::tam.jml()`, or `TAM::tam.mml.mfr()`.
+#' @param fit An object returned by `TAM::tam.mml()` or
+#'   `TAM::tam.mml.mfr()`.
 #' @param model Same as [import_mirt_fit()].
 #' @param item_facet Name to assign to the item facet for the
 #'   single-facet path. Ignored when the input is a multi-facet
@@ -305,8 +305,24 @@ import_mirt_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
 #'   on the returned facet tables, plus build a measurement-side
 #'   `mfrm_diagnostics` bundle. Default `FALSE`.
 #'
+#' @details
+#' The public imported-fit surface is deliberately unidimensional and MML-only.
+#' A `tam.jml` object is not silently relabelled as MML, and a TAM fit with
+#' `ndim > 1` is rejected rather than flattened into one mfrmr scale. Keep
+#' multidimensional TAM fits in a separate validation workflow.
+#'
+#' TAM-native AIC, BIC, and adjusted BIC are retained as explicitly named
+#' `Native*` fields. Compatibility `AIC` and `BIC` columns still mirror the
+#' native TAM values, but the imported object has
+#' `ICStatus = "imported_native_descriptive"`, `ICEligible = FALSE`, and cannot
+#' enter [compare_mfrm()] as a current mfrmr IC contract. In particular, TAM's
+#' native `aBIC` is not relabelled as the package's Sclove `SABIC`. The source
+#' metadata also retains the TAM version, dimension count, iterations, and
+#' iteration ceiling used for the conservative imported convergence status.
+#'
 #' @return An `mfrm_imported_fit` object. Slots mirror
-#'   [import_mirt_fit()].
+#'   [import_mirt_fit()], with explicit TAM-native IC provenance in `summary`
+#'   and `source`.
 #' @seealso [import_mirt_fit()], [import_erm_fit()]
 #' @examples
 #' \donttest{
@@ -326,6 +342,7 @@ import_tam_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
     stop("`import_tam_fit()` requires the `TAM` package (suggested).",
          call. = FALSE)
   }
+  import_scope <- .tam_validate_import_scope(fit)
   if (!is.list(fit) || is.null(fit$xsi) || is.null(fit$person)) {
     stop("`fit` does not look like a TAM result (missing `xsi` / `person`).",
          call. = FALSE)
@@ -381,6 +398,8 @@ import_tam_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
     }
   }
 
+  native_ic <- .tam_native_ic_record(fit, persons = persons)
+  convergence <- .tam_import_convergence_state(fit)
   summary_tbl <- data.frame(
     Model = model,
     Method = "MML",
@@ -389,11 +408,32 @@ import_tam_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
     Persons = nrow(persons),
     Facets = length(unique(facet_others$Facet)),
     Categories = NA_integer_,
-    LogLik = as.numeric(fit$ic$loglike %||% NA_real_),
-    AIC = as.numeric(fit$ic$AIC %||% NA_real_),
-    BIC = as.numeric(fit$ic$BIC %||% NA_real_),
-    Converged = TRUE,
-    ConvergenceStatus = "imported",
+    LogLik = native_ic$NativeLogLik,
+    AIC = native_ic$NativeAIC,
+    BIC = native_ic$NativeBIC,
+    ICContractVersion = "external_native_tam_v1",
+    ICEligible = FALSE,
+    ICSelectable = FALSE,
+    ICStatus = "imported_native_descriptive",
+    NativeDeviance = native_ic$NativeDeviance,
+    NativeLogLik = native_ic$NativeLogLik,
+    NativeNpar = native_ic$NativeNpar,
+    NativeICSampleSize = native_ic$NativeICSampleSize,
+    NativeAIC = native_ic$NativeAIC,
+    NativeBIC = native_ic$NativeBIC,
+    NativeABIC = native_ic$NativeABIC,
+    NativeAICFormula = "tam_deviance_plus_2k",
+    NativeBICFormula = "tam_deviance_plus_log_n_k",
+    NativeABICFormula = "tam_deviance_plus_log_n_minus_2_over_24_k",
+    NativeAICFormulaVerified = native_ic$NativeAICFormulaVerified,
+    NativeBICFormulaVerified = native_ic$NativeBICFormulaVerified,
+    NativeABICFormulaVerified = native_ic$NativeABICFormulaVerified,
+    NativeLogLikDevianceConsistent = native_ic$NativeLogLikDevianceConsistent,
+    NativePersonCountConsistent = native_ic$NativePersonCountConsistent,
+    Converged = convergence$Converged,
+    ConvergenceStatus = convergence$Status,
+    Iterations = convergence$Iterations,
+    IterationCeiling = convergence$IterationCeiling,
     stringsAsFactors = FALSE
   )
 
@@ -416,9 +456,14 @@ import_tam_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
     config = list(model = model, method = "MML",
                   facet_names = facet_names,
                   source = "TAM",
+                  ndim = import_scope$Dimensions,
                   multi_facet = is_mfr),
     source = list(package = "TAM",
+                  package_version = native_ic$TAMVersion,
                   source_object_class = class(fit)[1],
+                  dimensions = import_scope$Dimensions,
+                  ic_contract = "external_native_tam_v1",
+                  convergence = convergence,
                   multi_facet = is_mfr,
                   compute_fit = isTRUE(compute_fit))
   )
@@ -427,6 +472,117 @@ import_tam_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
 }
 
 # --- TAM internal extractors ---------------------------------------------
+
+.tam_validate_import_scope <- function(fit) {
+  if (inherits(fit, "tam.jml")) {
+    stop(
+      "`import_tam_fit()` does not import `tam.jml` objects as MML. Keep TAM JML output in an explicitly JML-labelled external workflow.",
+      call. = FALSE
+    )
+  }
+  if (!inherits(fit, "tam.mml")) {
+    stop("`fit` must inherit from `tam.mml`.", call. = FALSE)
+  }
+  dimensions_raw <- suppressWarnings(as.numeric(fit$ndim %||% NA_real_)[1])
+  if (!is.finite(dimensions_raw) && !is.null(fit$beta)) {
+    beta_dim <- dim(fit$beta)
+    if (length(beta_dim) == 2L) dimensions_raw <- beta_dim[2]
+  }
+  if (!is.finite(dimensions_raw) || dimensions_raw < 1 ||
+      abs(dimensions_raw - round(dimensions_raw)) >
+        sqrt(.Machine$double.eps)) {
+    stop("The TAM latent dimension could not be verified.", call. = FALSE)
+  }
+  dimensions <- as.integer(round(dimensions_raw))
+  if (dimensions != 1L) {
+    stop(
+      "`import_tam_fit()` supports unidimensional TAM MML only; `ndim = ",
+      dimensions,
+      "` must remain in a separate multidimensional validation workflow and cannot be exposed as one mfrmr scale.",
+      call. = FALSE
+    )
+  }
+  list(Method = "MML", Dimensions = dimensions)
+}
+
+.tam_ic_scalar <- function(ic, names, fallback = NA_real_) {
+  if (is.null(ic)) return(as.numeric(fallback)[1])
+  for (name in names) {
+    if (name %in% colnames(ic)) {
+      return(suppressWarnings(as.numeric(ic[[name]][1])))
+    }
+  }
+  as.numeric(fallback)[1]
+}
+
+.tam_native_ic_record <- function(fit,
+                                  persons,
+                                  tolerance = 1e-8) {
+  ic <- tryCatch(
+    as.data.frame(fit$ic, stringsAsFactors = FALSE),
+    error = function(error) data.frame()
+  )
+  deviance <- .tam_ic_scalar(ic, c("deviance", "Deviance"), fit$deviance)
+  loglik <- .tam_ic_scalar(ic, c("loglike", "logLik"), -deviance / 2)
+  npar <- .tam_ic_scalar(ic, c("np", "Npars"))
+  native_n <- .tam_ic_scalar(ic, "n", nrow(persons))
+  native_aic <- .tam_ic_scalar(ic, "AIC")
+  native_bic <- .tam_ic_scalar(ic, "BIC")
+  native_abic <- .tam_ic_scalar(ic, "aBIC")
+  matches <- function(actual, expected) {
+    is.finite(actual) && is.finite(expected) &&
+      abs(actual - expected) <= tolerance * max(1, abs(expected))
+  }
+  expected_aic <- deviance + 2 * npar
+  expected_bic <- deviance + log(native_n) * npar
+  expected_abic <- if (is.finite(native_n) && native_n > 2) {
+    deviance + log((native_n - 2) / 24) * npar
+  } else {
+    NA_real_
+  }
+  list(
+    TAMVersion = as.character(utils::packageVersion("TAM")),
+    NativeDeviance = deviance,
+    NativeLogLik = loglik,
+    NativeNpar = npar,
+    NativeICSampleSize = native_n,
+    NativeAIC = native_aic,
+    NativeBIC = native_bic,
+    NativeABIC = native_abic,
+    NativeAICFormulaVerified = matches(native_aic, expected_aic),
+    NativeBICFormulaVerified = matches(native_bic, expected_bic),
+    NativeABICFormulaVerified = matches(native_abic, expected_abic),
+    NativeLogLikDevianceConsistent = matches(deviance, -2 * loglik),
+    NativePersonCountConsistent = is.finite(native_n) &&
+      identical(as.integer(round(native_n)), as.integer(nrow(persons)))
+  )
+}
+
+.tam_import_convergence_state <- function(fit) {
+  iterations <- suppressWarnings(as.integer(fit$iter %||% NA_integer_)[1])
+  max_iterations <- suppressWarnings(as.integer(
+    fit$control$maxiter %||% NA_integer_
+  )[1])
+  if (is.finite(iterations) && is.finite(max_iterations)) {
+    converged <- iterations < max_iterations
+    return(list(
+      Converged = converged,
+      Status = if (converged) {
+        "imported_tam_stopped_before_iteration_ceiling"
+      } else {
+        "imported_tam_iteration_ceiling_or_convergence_unverified"
+      },
+      Iterations = iterations,
+      IterationCeiling = max_iterations
+    ))
+  }
+  list(
+    Converged = NA,
+    Status = "imported_tam_convergence_unverified",
+    Iterations = iterations,
+    IterationCeiling = max_iterations
+  )
+}
 
 .tam_extract_persons <- function(fit) {
   person_in <- as.data.frame(fit$person, stringsAsFactors = FALSE)

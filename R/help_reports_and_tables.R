@@ -113,8 +113,9 @@
 #'   substitutes for overall fit review.
 #' - Treat zero-count score categories as scale-functioning caveats. Boundary
 #'   zero-count categories can be retained with explicit `rating_min` /
-#'   `rating_max`; intermediate zero-count categories require
-#'   `keep_original = TRUE` and make adjacent thresholds weakly identified.
+#'   `rating_max`; retaining an intermediate zero-count category with
+#'   `keep_original = TRUE` creates an unsupported adjacent-step contrast in a
+#'   polytomous fitted ladder, so new fits stop before optimization.
 #'   `summary(describe_mfrm_data(...))` exposes these in `Notes`, printed
 #'   `Caveats`, and `$caveats`; `summary(fit)` carries full structured caveats
 #'   into printed `Caveats` and `$caveats`, with `Key warnings` as a short
@@ -834,7 +835,7 @@ mfrmr_output_guide <- function(scope = c("all", "public", "beginner", "psychomet
       "Verify that each displayed transition uses the instrument's real category wording; do not infer numerical equivalence from the layout.",
       "Treat flagged or extreme person points as review prompts and document any substantive follow-up rule separately.",
       "Read the scope note before generating a comparison bundle or extracting tables from an external ConQuest run.",
-      "Run the generated command in ConQuest, then use normalize_conquest_overlap_exports() on its four CSV files and review_conquest_overlap()."
+      "Run the generated command in ConQuest, use normalize_conquest_overlap_exports() on its four comparison CSV files, retain the history CSV for objective/free-dimension verification, and then use review_conquest_overlap()."
     ),
     GPCMStatus = c(
       rep("supported_with_caveat", 4L),
@@ -918,7 +919,7 @@ mfrmr_output_guide <- function(scope = c("all", "public", "beginner", "psychomet
       "You want a pre-interpretation QC screen for zero categories, dominant raters, or dropped rows.",
       "You need standalone residual rows or connected-subset membership files for a reviewer, spreadsheet, or external QC workflow.",
       "You need the narrow documented MML latent-regression overlap bundle.",
-      "You have the four CSV files requested by the generated ConQuest command.",
+      "You have the four comparison CSV files requested by the generated ConQuest command and have retained its additional history CSV for verification.",
       "You need to explain why a ConQuest command-file workflow is not interchangeable with this package.",
       "You want to draw your own ggplot2/base/plotly figure from package plot data.",
       "You want the dashboard tables without accepting the package's default base-R drawing.",

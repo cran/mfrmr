@@ -40,8 +40,13 @@ Build a model-choice review across RSM, PCM, and bounded GPCM fits
 \code{build_model_choice_review()} is a user-facing synthesis helper. It does not
 estimate new models. It bundles:
 \itemize{
-\item \code{\link[=compare_mfrm]{compare_mfrm()}} for AIC/BIC/log-likelihood comparison;
+\item \code{\link[=compare_mfrm]{compare_mfrm()}} for verified AIC/Person-BIC/SABIC/log-likelihood
+comparison;
+\item comparison-boundary warnings captured from \code{\link[=compare_mfrm]{compare_mfrm()}} and retained
+in \code{comparison_warnings} for printing and appendix export;
 \item model-role guidance for \code{RSM}, \code{PCM}, and bounded \code{GPCM};
+\item reported step/slope coordinate counts, identified free-parameter counts,
+and the stored fit-readiness decision for every supplied model;
 \item downstream-route availability for APA output, score-side export, linking,
 recovery, fair averages, bias screening, and summary-appendix handoff;
 \item report wording templates that avoid treating better bounded-\code{GPCM} fit as
@@ -51,20 +56,24 @@ an automatic operational-scoring decision;
 versus bounded-\code{GPCM} pair.
 }
 
-The word "bounded" is intentional: the package implements a bounded GPCM
-route, not every possible generalized partial-credit many-facet extension.
-The current route uses positive slopes, requires \code{slope_facet == step_facet},
-identifies slopes on the log scale with geometric mean 1, and keeps several
-downstream score-side/reporting helpers outside the documented boundary.
+The word "bounded" describes the documented model and workflow scope: the
+package does not implement every possible generalized partial-credit
+many-facet extension. It does \strong{not} mean that finite optimizer box bounds
+define the estimator. The current route uses positive slopes, requires
+\code{slope_facet == step_facet}, identifies slopes on the log scale with
+geometric mean 1, and keeps several downstream score-side/reporting helpers
+outside the documented boundary.
+Model-choice ranking also requires the current selectable IC contract:
+q<31 fits retain raw criteria but produce a screening/review-only bundle.
 }
 \examples{
 \donttest{
 toy <- load_mfrmr_data("example_core")
 fit_rsm <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                    method = "MML", model = "RSM", quad_points = 7)
+                    method = "MML", model = "RSM", quad_points = 31)
 fit_pcm <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                     method = "MML", model = "PCM", step_facet = "Criterion",
-                    quad_points = 7)
+                    quad_points = 31)
 review <- build_model_choice_review(RSM = fit_rsm, PCM = fit_pcm)
 summary(review)
 }

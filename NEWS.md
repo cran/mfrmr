@@ -1,3 +1,113 @@
+# mfrmr 0.2.3
+
+mfrmr 0.2.3 improves the reliability and interpretation of the existing
+many-facet workflows, with particular emphasis on the bounded GPCM introduced
+before this release. No existing exported function has been removed.
+
+## Bounded GPCM
+
+* Clarified the supported GPCM as an aligned, single-owner relative-slope
+  model. A slope multiplies the complete adjacent-category predictor, including
+  the ability, facet, interaction, and owned-step terms. This is distinct from
+  loading-only GPCM variants and multiplicative generalized MFRM families.
+* Corrected the default scale identification for GPCM marginal maximum
+  likelihood fits. When no population formula is supplied, an intercept-only
+  population model now provides the latent location and scale while relative
+  slopes use their documented geometric-mean constraint.
+* Added parameter-level status for free GPCM slopes. Standard errors and
+  confidence intervals are reported as ordinary inferential results only when
+  the fitted solution and the parameter both satisfy the relevant readiness
+  checks. Optimizer- and Hessian-based quantities remain available as clearly
+  labelled diagnostic evidence when formal inference is not supported.
+* Improved handling of extreme response patterns. Joint-maximum-likelihood
+  Person estimates can retain an unbounded primary status, while finite
+  adjusted displays remain explicitly separate. Prior-regularized marginal
+  EAP estimates remain available but do not override a blocked source fit.
+* Added `gpcm_mml_quadrature_sensitivity()` for explicit same-data comparison of
+  a fitted GPCM-MML result across quadrature grids. It reports changes in the
+  marginal likelihood, relative slopes, raw observed-information quantities,
+  population scale, and fitted probabilities without silently refitting during
+  `summary()` or `print()`. Results support `summary()`, `print()`,
+  `as.data.frame()`, and `apa_table()`.
+
+## Estimation and readiness
+
+* Added pre-fit checks for category and step support and strengthened
+  constrained-estimability checks for sparse many-facet designs. Unsupported
+  step contrasts and structurally unidentified comparisons now stop or fail
+  closed before they can be presented as ordinary estimates.
+* Strengthened numerical and boundary reporting for JML and GPCM fits.
+  Optimizer convergence, terminal gradients, local rank, curvature, boundary
+  evidence, and formal inference readiness are retained as separate concepts.
+* Corrected the alignment of MML Person EAP estimates and posterior standard
+  deviations when observations or Person rows are filtered during fitting.
+* Fit-level readiness is propagated to Person results, plots, model-choice
+  reviews, reports, and exported tables. A finite value from a blocked fit is
+  no longer presented as an unrestricted inferential estimate.
+
+## Summaries, diagnostics, and plots
+
+* `print()` and `summary()` for fitted models now begin with a plain-language
+  interpretation status, the availability of formal inference, the main reason
+  for any hold, and a suggested next action.
+* Formal-inference reporting now distinguishes a successful fit gate from the
+  separate precision contract. A fit-only summary does not claim formal
+  inference until matching diagnostics support the standard-error,
+  confidence-interval, and reliability basis.
+* GPCM uncertainty labels are consistent across fitted objects, summaries, and
+  plots. Intervals calculated for observation-table Wright or facet displays
+  are labelled `screening_only` and are not described as confidence intervals.
+* PCM/GPCM model-choice reviews retain comparison warnings and keep information
+  criteria, automatic preferences, and likelihood-ratio results unavailable
+  when the compared fits do not share an eligible basis. Model-choice warnings
+  can also be included in exported summary appendices.
+* Differential-facet-functioning refits now replay the baseline response
+  family, scoring range, estimator, weighting, and numerical settings. They
+  fail closed for model structures that do not yet have a valid subgroup replay
+  and linking contract. `min_obs` remains a computability guard rather than a
+  claim about power or adequate sample size.
+* Residual-PCA results now carry machine-readable exploratory-use guards.
+  Returned components and warnings are descriptive diagnostics and do not
+  automatically support dimensionality or subscore decisions.
+* Corrected Person-involving bias-screen collection for explicitly requested
+  facet pairs and expanded machine-readable FACETS feature-coverage guidance.
+* FACETS table import retains the reported numeric text and displayed decimal
+  precision so rounded output is not silently treated as hidden full-precision
+  data.
+* The Infit-versus-measure pathway now has a regression-tested default: Infit
+  is on the horizontal axis and the fitted measure remains on the vertical
+  axis. GPCM category curves retain estimated step-facet slopes and now state
+  explicitly that additive facet effects and interactions are fixed at zero.
+  Multiple GPCM curve groups are shown in separate panels with category
+  legends instead of as unlabelled overlaid traces.
+* Native Wright maps label every retained facet level using displaced text and
+  leader lines. Step thresholds are displayed as a vertical ladder with the
+  score transition and fitted logit in each label.
+
+## Reporting and reproducibility
+
+* Reproducibility manifests describe inputs through semantic summaries such as
+  class, dimensions, fields, and missingness instead of environment-sensitive
+  serialization hashes. The `digest` package is no longer required by the
+  distributed package.
+* Reporting, APA tables, model summaries, and plots use the same readiness and
+  estimate-use vocabulary. Added fields may affect code that assumes an exact
+  number of rows or columns in a summary component; selecting fields by name is
+  recommended.
+* APA output is described as an APA/JARS-informed drafting aid rather than a
+  compliance certificate. The reporting guide now lists study-level fields
+  that the fitted model cannot supply, and weighted-method prose distinguishes
+  row-level likelihood weighting from replicated Person response patterns.
+* External programs are not required to install or use mfrmr. Comparisons with
+  FACETS, ConQuest, TAM, or immer remain model- and estimator-specific and are
+  not general interchangeability claims.
+
+## Scope
+
+* This release does not add unrestricted GPCM, loading-only or multiplicative
+  generalized MFRM estimation, native multidimensional estimation, or new
+  public multivariate G-theory and D-study functionality.
+
 # mfrmr 0.2.2
 
 * Standardized the package's canonical joint-maximum-likelihood label as

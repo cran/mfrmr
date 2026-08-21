@@ -46,7 +46,7 @@ fit <- fit_mfrm(
   score = "Score",
   method = "MML",
   model = "RSM",
-  quad_points = 7
+  quad_points = 31
 )
 
 diag <- diagnose_mfrm(fit, residual_pca = "none")
@@ -178,7 +178,7 @@ fit_interaction <- fit_mfrm(
   method = "MML",
   model = "RSM",
   facet_interactions = "Rater:Criterion",
-  quad_points = 7
+  quad_points = 31
 )
 
 interaction_effect_table(fit_interaction)

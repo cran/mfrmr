@@ -82,11 +82,10 @@ local R installation.}
 \item{data}{Optional original analysis data frame. When supplied,
 \code{export_mfrm_bundle()} co-locates a CSV copy of the data
 alongside the replay script and updates the script's
-\code{read.csv()} path to point at it. The manifest's \code{input_hash}
-row for \code{data} is also computed against the user's untouched
-input so the recorded fingerprint matches what the replay
-script will load. Default \code{NULL} falls back to the legacy
-\code{your_data.csv} placeholder path.}
+\code{read.csv()} path to point at it. The manifest's \code{input_summary}
+row for \code{data} describes the user's untouched input structure; it is not
+a byte-level equality claim about the CSV replay representation. Default
+\code{NULL} falls back to the legacy \code{your_data.csv} placeholder path.}
 }
 \value{
 A named list with class \code{mfrm_export_bundle}.
@@ -149,10 +148,13 @@ Depending on \code{include}, the exporter can write:
 \item manuscript-summary CSVs via \code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}}
 \item anchor CSV via \code{\link[=make_anchor_table]{make_anchor_table()}}
 \item manifest CSV/TXT via \code{\link[=build_mfrm_manifest]{build_mfrm_manifest()}}
+\item exact source-fit readiness CSVs with fit, component, and parameter scope
 \item visual warning/summary artifacts via \code{\link[=build_visual_summaries]{build_visual_summaries()}}
 \item prediction/forecast CSVs via \code{\link[=predict_mfrm_population]{predict_mfrm_population()}},
 \code{\link[=predict_mfrm_units]{predict_mfrm_units()}}, and \code{\link[=sample_mfrm_plausible_values]{sample_mfrm_plausible_values()}}
 \item a package-native replay script via \code{\link[=build_mfrm_replay_script]{build_mfrm_replay_script()}}
+\item replay-source readiness CSVs retained as provenance; the replayed fit
+recomputes its own readiness
 \item for latent-regression fits, a replay-side person-data CSV paired with the
 replay script
 \item a lightweight HTML report that bundles the exported tables/text and, for

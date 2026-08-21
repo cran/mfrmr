@@ -78,6 +78,7 @@ knitr::opts_chunk$set(
 # )
 # res_toy <- facets_summary_toy$results
 # 
+# fit_summary_toy$decision
 # fit_summary_toy$overview
 # fit_summary_toy$readiness
 # fit_summary_toy$data_review
@@ -132,6 +133,7 @@ knitr::opts_chunk$set(
 # availability_only$section_status
 
 ## ----toy-setup-artifacts, echo = FALSE, eval = is_cran_check------------------
+vignette_artifact("workflow_fit_decision.csv")
 vignette_artifact("workflow_fit_overview.csv")
 vignette_artifact("workflow_diagnostic_overview.csv")
 vignette_artifact("workflow_plot_components.csv")
@@ -151,7 +153,9 @@ vignette_artifact("workflow_plot_components.csv")
 #   overwrite = TRUE,
 #   acknowledge_sensitive = TRUE
 # )
-# head(export_toy$written_files)
+# export_preview <- head(export_toy$written_files)
+# export_preview$Path <- basename(export_preview$Path)
+# export_preview
 
 ## ----primary-route-artifacts, echo = FALSE, eval = is_cran_check--------------
 vignette_artifact("workflow_next_actions.csv")

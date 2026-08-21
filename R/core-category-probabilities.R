@@ -71,7 +71,10 @@ category_prob_pcm <- function(eta, step_cum_mat, criterion_idx,
 # Partial Credit Model (GPCM; Muraki, 1992). Discriminations
 # (`slopes`) must be strictly positive; the internal convention is
 # sum-to-zero on the log-slope scale with geometric-mean-one
-# identification.
+# identification. `eta` already contains the person coordinate and every
+# additive facet/interaction contribution. The slope multiplies that complete
+# predictor and the owned cumulative step; it is not a trait-loading-only
+# parameterization with unscaled facet intercepts.
 category_prob_gpcm <- function(eta, step_cum_mat, criterion_idx, slopes,
                                slope_idx = criterion_idx) {
   n <- length(eta)

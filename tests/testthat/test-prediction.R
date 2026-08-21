@@ -512,10 +512,11 @@ test_that("predict_mfrm_units supports bounded GPCM fixed-calibration scoring", 
 
   expect_s3_class(pred, "mfrm_unit_prediction")
   expect_equal(pred$settings$method, "MML")
-  expect_identical(pred$settings$posterior_basis, "legacy_mml")
+  expect_identical(pred$settings$posterior_basis, "population_model")
   expect_equal(sort(unique(pred$estimates$Person)), c("NEW01", "NEW02"))
   expect_true(all(is.finite(pred$estimates$Estimate)))
-  expect_true(any(grepl("fixed fitted MML calibration", pred$notes, fixed = TRUE)))
+  expect_true(any(grepl("conditional normal population model", pred$notes,
+                        fixed = TRUE)))
   expect_s3_class(pv, "mfrm_plausible_values")
   expect_equal(nrow(pv$values), 4)
 })

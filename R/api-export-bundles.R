@@ -76,7 +76,8 @@ render_r_object_literal <- function(x) {
 # the `replay_inputs` list that `fit_mfrm()` stores on `fit$config`.
 # The helper emits every argument that materially affects the fit
 # (including inputs that older serialized fits may not retain:
-# `missing_codes`, `optimizer`, `mml_engine`, `slope_facet`, `anchor_policy`,
+# `missing_codes`, `optimizer`, `mml_engine`, `slope_facet`,
+# `gpcm_mml_identification`, `anchor_policy`,
 # `min_obs_per_*`, `min_common_anchors`, `facet_shrinkage`,
 # `facet_prior_sd`, `shrink_person`, `attach_diagnostics`).
 #
@@ -115,6 +116,22 @@ build_replay_fit_mfrm_lines <- function(replay_inputs,
     )
   }
 
+  replay_gpcm_identification <- ri$gpcm_mml_identification %||%
+    cfg$gpcm_mml_identification
+  if (is.null(replay_gpcm_identification) ||
+      !nzchar(as.character(replay_gpcm_identification)[1])) {
+    is_legacy_gpcm_mml <- identical(
+      toupper(as.character(ri$model %||% cfg$model %||% "")), "GPCM"
+    ) && identical(
+      public_mfrm_method_label(ri$method %||% cfg$method %||% ""), "MML"
+    ) && !isTRUE(fit_population$active)
+    replay_gpcm_identification <- if (is_legacy_gpcm_mml) {
+      "fixed_standard_normal"
+    } else {
+      "free_population"
+    }
+  }
+
   emit <- function(name, value, suffix = ",", literal = NULL) {
     if (!is.null(literal)) {
       paste0("  ", name, " = ", literal, suffix)
@@ -147,9 +164,16 @@ build_replay_fit_mfrm_lines <- function(replay_inputs,
     emit("keep_original", isTRUE(ri$keep_original)),
     add_optional("missing_codes", ri$missing_codes),
     emit("model", as.character(ri$model %||% "RSM")),
-    emit("method", as.character(ri$method %||% "JML")),
+    emit(
+      "method",
+      as.character(public_mfrm_method_label(
+        ri$method %||% cfg$method_input %||% cfg$method %||% "JML",
+        default = "JML"
+      ))
+    ),
     add_optional("step_facet", ri$step_facet),
     add_optional("slope_facet", ri$slope_facet),
+    emit("gpcm_mml_identification", as.character(replay_gpcm_identification)),
     "  anchors = anchors,",
     "  group_anchors = group_anchors,",
     emit("noncenter_facet", as.character(ri$noncenter_facet %||% "Person")),
@@ -383,11 +407,10 @@ validate_bias_results_input <- function(bias_results,
 #' @param include_person_anchors If `TRUE`, include person measures in the
 #'   exported anchor table.
 #' @param data Optional original analysis data frame. When supplied,
-#'   the manifest's `input_hash` row for `data` is computed against
-#'   the user's untouched input rather than the package's internal
-#'   `prep$data` (which carries synthesised `Weight` / `score_k`
-#'   columns) so the recorded fingerprint matches what
-#'   `read.csv()` will produce in a replay session.
+#'   the manifest's `input_summary` row for `data` describes the user's
+#'   untouched input rather than the package's internal `prep$data` (which
+#'   carries synthesised `Weight` / `score_k` columns). The summary records
+#'   structure, not a byte-level or serialized-object identity claim.
 #'
 #' @details
 #' This helper creates a compact package-native analysis record. It summarizes
@@ -407,6 +430,9 @@ validate_bias_results_input <- function(bias_results,
 #' @section Output:
 #' The returned bundle has class `mfrm_manifest` and includes:
 #' - `summary`: one-row analysis overview
+#' - `readiness`, `readiness_components`, and `readiness_parameters`: the
+#'   source fit's current readiness-contract record, its component review, and
+#'   any parameter-level readiness rows
 #' - `environment`: package/R/platform metadata
 #' - `model_settings`: key-value model settings table
 #' - `source_columns`: key-value data-column table
@@ -419,8 +445,9 @@ validate_bias_results_input <- function(bias_results,
 #' - `shrinkage_review`: retained traceability table for shrinkage settings
 #' - `available_outputs`: availability table for diagnostics/bias/PCA/prediction
 #'   outputs
-#' - `dependencies`, `input_hash`, and `session_info`: reproducibility
-#'   metadata tables
+#' - `dependencies`, `input_summary`, and `session_info`: reproducibility
+#'   metadata tables. `input_summary` records object structure and does not
+#'   claim byte-for-byte identity across platforms or serialization formats
 #' - `settings`: manifest build settings
 #'
 #' @section Interpreting output:
@@ -428,6 +455,12 @@ validate_bias_results_input <- function(bias_results,
 #' the intended analysis. The `model_settings`, `source_columns`, and
 #' `estimation_control` tables are designed for reproducibility records and
 #' method write-up.
+#' `Converged` records the optimizer return-code decision; `InferenceReady`
+#' records the stricter readiness-contract decision. They need not agree.
+#' The `readiness` tables are provenance: they preserve the decision recorded
+#' for the source fit, including its contract version and reason codes. They do
+#' not make a subsequently replayed fit inference-ready; replay must recompute
+#' readiness from the replayed data and numerical result.
 #' Active latent-regression fits also record their population-model provenance
 #' there, including the fitted scoring basis, stored `population_formula`, and
 #' person-level contract used by the fitted population model. When categorical
@@ -509,6 +542,7 @@ build_mfrm_manifest <- function(fit,
   )
 
   cfg <- fit$config %||% list()
+  scale_contract <- mfrm_fit_scale_contract(fit)
   prep <- fit$prep %||% list()
   est_ctl <- cfg$estimation_control %||% list()
   fit_population <- fit$population %||% list(
@@ -524,10 +558,19 @@ build_mfrm_manifest <- function(fit,
   )
 
   convergence <- mfrm_convergence_state(fit)
+  readiness_tables <- mfrm_readiness_export_tables(fit)
+  readiness_fit <- readiness_tables$fit
+  manifest_method <- public_mfrm_method_label(
+    cfg$method_input %||% cfg$method %||% fit$summary$Method[1] %||%
+      NA_character_
+  )
+  manifest_method_used <- public_mfrm_method_label(
+    cfg$method %||% fit$summary$MethodUsed[1] %||% manifest_method
+  )
   summary_tbl <- data.frame(
     Model = as.character(cfg$model %||% NA_character_),
-    Method = as.character(cfg$method_input %||% cfg$method %||% NA_character_),
-    MethodUsed = as.character(cfg$method %||% NA_character_),
+    Method = as.character(manifest_method),
+    MethodUsed = as.character(manifest_method_used),
     Observations = as.integer(prep$n_obs %||% fit$summary$N[1] %||% NA_integer_),
     Persons = as.integer(prep$n_person %||% cfg$n_person %||% fit$summary$Persons[1] %||% NA_integer_),
     Facets = length(as.character(cfg$facet_names %||% character(0))),
@@ -536,9 +579,15 @@ build_mfrm_manifest <- function(fit,
     HasResidualPCA = export_has_residual_pca(diagnostics),
     FitPopulationActive = isTRUE(fit_population$active),
     FitPosteriorBasis = as.character(fit_population$posterior_basis %||% "legacy_mml"),
-    Converged = convergence$inference_ready,
+    Converged = convergence$code_converged,
     OptimizerCodeZero = convergence$code_converged,
     ConvergenceSeverity = convergence$severity,
+    ReadinessContractVersion = as.character(
+      readiness_fit$ReadinessContractVersion[1]
+    ),
+    FitReadiness = as.character(readiness_fit$FitReadiness[1]),
+    InferenceReady = isTRUE(readiness_fit$InferenceReady[1]),
+    ReadinessReasonCodes = as.character(readiness_fit$ReasonCodes[1]),
     stringsAsFactors = FALSE
   )
 
@@ -567,15 +616,48 @@ build_mfrm_manifest <- function(fit,
 
   model_settings <- dashboard_settings_table(list(
     model = as.character(cfg$model %||% NA_character_),
-    method = as.character(cfg$method_input %||% cfg$method %||% NA_character_),
-    method_used = as.character(cfg$method %||% NA_character_),
+    method = as.character(manifest_method),
+    method_used = as.character(manifest_method_used),
     facet_names = paste(as.character(cfg$facet_names %||% character(0)), collapse = ", "),
     noncenter_facet = as.character(cfg$noncenter_facet %||% ""),
     step_facet = as.character(cfg$step_facet %||% ""),
+    slope_facet = as.character(cfg$slope_facet %||% ""),
+    gpcm_mml_identification = as.character(
+      cfg$gpcm_mml_identification %||% "not_recorded"
+    ),
+    gpcm_common_discrimination = as.character(
+      cfg$gpcm_common_discrimination %||% "not_recorded"
+    ),
+    gpcm_model_family = as.character(
+      scale_contract$GpcmModelFamily[1]
+    ),
+    gpcm_slope_action = as.character(
+      scale_contract$GpcmSlopeAction[1]
+    ),
+    gpcm_slope_composition = as.character(
+      scale_contract$GpcmSlopeComposition[1]
+    ),
+    gpcm_latent_dimension_count = as.integer(
+      scale_contract$GpcmLatentDimensionCount[1]
+    ),
+    gpcm_estimator_family = as.character(
+      scale_contract$GpcmEstimatorFamily[1]
+    ),
+    gpcm_statistical_penalty = as.character(
+      scale_contract$GpcmStatisticalPenalty[1]
+    ),
+    gpcm_finite_parameter_box = scale_contract$GpcmFiniteParameterBox[1],
+    gpcm_extreme_person_policy = as.character(
+      scale_contract$GpcmExtremePersonPolicy[1]
+    ),
     dummy_facets = paste(as.character(cfg$dummy_facets %||% character(0)), collapse = ", "),
     n_categories = as.character(cfg$n_cat %||% NA_character_),
     population_active = isTRUE(fit_population$active),
     posterior_basis = as.character(fit_population$posterior_basis %||% "legacy_mml"),
+    population_source = as.character(fit_population$source %||% "none"),
+    population_identification_role = as.character(
+      fit_population$identification_role %||% "not_applicable"
+    ),
     population_formula = if (!is.null(fit_population$formula)) {
       paste(deparse(fit_population$formula), collapse = " ")
     } else {
@@ -635,6 +717,32 @@ build_mfrm_manifest <- function(fit,
     plausible_values = !is.null(plausible_values),
     fit_population_active = isTRUE(fit_population$active),
     fit_posterior_basis = as.character(fit_population$posterior_basis %||% "legacy_mml"),
+    fit_population_source = as.character(fit_population$source %||% "none"),
+    fit_gpcm_mml_identification = as.character(
+      cfg$gpcm_mml_identification %||% "not_recorded"
+    ),
+    fit_gpcm_model_family = as.character(
+      scale_contract$GpcmModelFamily[1]
+    ),
+    fit_gpcm_slope_action = as.character(
+      scale_contract$GpcmSlopeAction[1]
+    ),
+    fit_gpcm_slope_composition = as.character(
+      scale_contract$GpcmSlopeComposition[1]
+    ),
+    fit_gpcm_latent_dimension_count = as.integer(
+      scale_contract$GpcmLatentDimensionCount[1]
+    ),
+    fit_gpcm_estimator_family = as.character(
+      scale_contract$GpcmEstimatorFamily[1]
+    ),
+    fit_gpcm_statistical_penalty = as.character(
+      scale_contract$GpcmStatisticalPenalty[1]
+    ),
+    fit_gpcm_finite_parameter_box = scale_contract$GpcmFiniteParameterBox[1],
+    fit_gpcm_extreme_person_policy = as.character(
+      scale_contract$GpcmExtremePersonPolicy[1]
+    ),
     fit_population_formula = if (!is.null(fit_population$formula)) {
       paste(deparse(fit_population$formula), collapse = " ")
     } else {
@@ -723,27 +831,24 @@ build_mfrm_manifest <- function(fit,
     stringsAsFactors = FALSE
   ))
 
-  # Reproducibility tables are always
-  # populated (never NULL) so downstream writers can rely on the column
-  # contract, but individual fields may be NA when the underlying
-  # helper is unavailable (e.g. `digest` in Suggests but not installed).
+  # Reproducibility tables are always populated (never NULL) so downstream
+  # writers can rely on the column contract.
   dependencies_tbl <- build_mfrm_dependency_table(
     c("dplyr", "tidyr", "tibble", "purrr", "stringr", "psych",
       "lifecycle", "rlang", "cpp11",
-      "igraph", "lme4", "digest", "kableExtra", "flextable")
+      "igraph", "lme4", "kableExtra", "flextable")
   )
 
-  # Hash the user's *original* data when supplied, so the recorded
-  # fingerprint matches what `read.csv()` will produce in the replay
-  # session. `prep$data` carries synthesized `Weight` / `score_k`
-  # columns that the user could not reconstruct from their CSV.
-  hash_data <- if (is.data.frame(data) && nrow(data) > 0L) {
+  # Describe the user's *original* data when supplied. `prep$data` carries
+  # synthesized `Weight` / `score_k` columns that are not part of the input
+  # structure the user provided.
+  summary_data <- if (is.data.frame(data) && nrow(data) > 0L) {
     data
   } else {
     prep$data %||% NULL
   }
-  input_hash_tbl <- build_mfrm_input_hash_table(
-    data = hash_data,
+  input_summary_tbl <- build_mfrm_input_summary_table(
+    data = summary_data,
     anchors = anchor_tbl,
     group_anchors = fit$config$group_anchors %||% NULL,
     score_map = prep$score_map %||% NULL
@@ -787,6 +892,9 @@ build_mfrm_manifest <- function(fit,
 
   out <- list(
     summary = summary_tbl,
+    readiness = readiness_tables$fit,
+    readiness_components = readiness_tables$components,
+    readiness_parameters = readiness_tables$parameters,
     environment = environment_tbl,
     model_settings = model_settings,
     source_columns = source_columns,
@@ -797,7 +905,7 @@ build_mfrm_manifest <- function(fit,
     missing_recoding = missing_recoding_review,
     shrinkage_review = shrinkage_review,
     dependencies = dependencies_tbl,
-    input_hash = input_hash_tbl,
+    input_summary = input_summary_tbl,
     session_info = session_info_tbl,
     available_outputs = available_outputs,
     gpcm_boundary = gpcm_capability_boundary_table(
@@ -815,6 +923,25 @@ build_mfrm_manifest <- function(fit,
 }
 
 # ---- helpers for manifest reproducibility --------------------------------
+
+# Keep the readiness export contract centralized. The adapter is deliberately
+# fail-closed: legacy objects are represented by the current contract's
+# `legacy_unknown` row rather than inheriting an old TRUE/FALSE scalar.
+#' @keywords internal
+#' @noRd
+mfrm_readiness_export_tables <- function(fit) {
+  record <- mfrmr_get_readiness_record(fit)
+  list(
+    fit = as.data.frame(record$fit, stringsAsFactors = FALSE),
+    components = as.data.frame(
+      record$components %||% data.frame(), stringsAsFactors = FALSE
+    ),
+    parameters = as.data.frame(
+      record$parameters %||% mfrmr_readiness_empty_parameter_table(),
+      stringsAsFactors = FALSE
+    )
+  )
+}
 
 #' @keywords internal
 #' @noRd
@@ -851,40 +978,71 @@ build_mfrm_dependency_table <- function(pkgs) {
 
 #' @keywords internal
 #' @noRd
-build_mfrm_input_hash_table <- function(data = NULL, anchors = NULL,
-                                        group_anchors = NULL,
-                                        score_map = NULL) {
-  hash_one <- function(x) {
-    if (is.null(x)) return(NA_character_)
-    if (requireNamespace("digest", quietly = TRUE)) {
-      return(digest::digest(x, algo = "sha256"))
+build_mfrm_input_summary_table <- function(data = NULL, anchors = NULL,
+                                           group_anchors = NULL,
+                                           score_map = NULL) {
+  summarize_one <- function(object, name) {
+    if (is.null(object)) {
+      return(data.frame(
+        Object = name,
+        Available = FALSE,
+        ObjectClass = NA_character_,
+        Rows = NA_integer_,
+        Columns = NA_integer_,
+        Elements = NA_integer_,
+        FieldNames = "",
+        FieldClasses = "",
+        MissingValues = NA_integer_,
+        stringsAsFactors = FALSE
+      ))
     }
-    # Fallback: serialize + tools::md5sum via a temp file so we still
-    # record a stable fingerprint even when digest is absent.
-    tf <- tempfile()
-    on.exit(unlink(tf), add = TRUE)
-    saveRDS(x, tf)
-    unname(tools::md5sum(tf))
-  }
-  n_rows <- function(x) if (is.null(x)) NA_integer_ else {
-    if (is.data.frame(x)) nrow(x) else length(x)
+
+    is_rectangular <- is.data.frame(object) || is.matrix(object)
+    field_names <- if (is_rectangular) {
+      colnames(object) %||% character(0)
+    } else {
+      names(object) %||% character(0)
+    }
+    field_classes <- if (is.data.frame(object) || is.list(object)) {
+      vapply(
+        object,
+        function(value) paste(class(value), collapse = "/"),
+        character(1)
+      )
+    } else if (is.matrix(object)) {
+      rep(paste(class(object), collapse = "/"), ncol(object))
+    } else {
+      paste(class(object), collapse = "/")
+    }
+    missing_values <- if (is.atomic(object) || is.data.frame(object)) {
+      as.integer(sum(is.na(object)))
+    } else {
+      NA_integer_
+    }
+
+    data.frame(
+      Object = name,
+      Available = TRUE,
+      ObjectClass = paste(class(object), collapse = "/"),
+      Rows = if (is_rectangular) nrow(object) else NA_integer_,
+      Columns = if (is_rectangular) ncol(object) else NA_integer_,
+      Elements = length(object),
+      FieldNames = paste(field_names, collapse = "|"),
+      FieldClasses = paste(field_classes, collapse = "|"),
+      MissingValues = missing_values,
+      stringsAsFactors = FALSE
+    )
   }
 
-  data.frame(
-    Object = c("data", "anchors", "group_anchors", "score_map"),
-    Hash = c(hash_one(data),
-             hash_one(anchors),
-             hash_one(group_anchors),
-             hash_one(score_map)),
-    NRows = c(n_rows(data),
-              n_rows(anchors),
-              n_rows(group_anchors),
-              n_rows(score_map)),
-    Algorithm = c(rep(
-      if (requireNamespace("digest", quietly = TRUE)) "sha256"
-      else "md5-of-rds",
-      4L)),
-    stringsAsFactors = FALSE
+  objects <- list(
+    data = data,
+    anchors = anchors,
+    group_anchors = group_anchors,
+    score_map = score_map
+  )
+  do.call(
+    rbind,
+    Map(summarize_one, objects, names(objects))
   )
 }
 
@@ -992,8 +1150,14 @@ build_mfrm_session_info_table <- function() {
 #' - `summary`: a one-row overview of the chosen replay mode and whether bundle
 #'   export was included
 #' - `script`: the generated R code as a single string
+#' - `source_readiness`, `source_readiness_components`, and
+#'   `source_readiness_parameters`: readiness provenance from the source fit
 #' - `anchors` and `group_anchors`: the exact stored constraints that were
 #'   embedded into the script
+#'
+#' The source readiness row is not copied into the replayed fit. The generated
+#' script recomputes readiness and warns when its fit-level decision fields do
+#' not match the source record.
 #'
 #' If `ScriptMode` is `"facets"`, the script replays the higher-level
 #' [run_mfrm_facets()] workflow. If it is `"fit"`, the script uses
@@ -1138,13 +1302,22 @@ build_mfrm_replay_script <- function(fit,
   recorded_pkg_version <- as.character(
     cfg$replay_inputs$package_version %||% utils::packageVersion("mfrmr")
   )
+  replay_method <- public_mfrm_method_label(
+    cfg$method_input %||% cfg$method %||% fit$summary$Method[1] %||% "JML",
+    default = "JML"
+  )
+  replay_method_used <- public_mfrm_method_label(
+    cfg$method %||% fit$summary$MethodUsed[1] %||% replay_method,
+    default = replay_method
+  )
+  source_readiness <- mfrm_readiness_export_tables(fit)
   lines <- c(
     "#!/usr/bin/env Rscript",
     "# Generated by mfrmr::build_mfrm_replay_script()",
     paste0("# Model: ", as.character(cfg$model %||% NA_character_),
-           " | Method: ", as.character(cfg$method_input %||% cfg$method %||% NA_character_),
-           if (!identical(cfg$method_input %||% NULL, cfg$method %||% NULL)) {
-             paste0(" | ResolvedMethod: ", as.character(cfg$method %||% NA_character_))
+           " | Method: ", as.character(replay_method),
+           if (!identical(replay_method, replay_method_used)) {
+             paste0(" | ResolvedMethod: ", as.character(replay_method_used))
            } else {
              ""
            }),
@@ -1161,6 +1334,21 @@ build_mfrm_replay_script <- function(fit,
       recorded_pkg_version,
       "; you are running \", as.character(utils::packageVersion(\"mfrmr\")), \". \", ",
       "\"Estimates may differ.\")"
+    ),
+    "",
+    "# Readiness provenance from the source fit. This is evidence to compare,",
+    "# not a status to copy into the replayed fit.",
+    paste0(
+      "source_readiness <- ",
+      render_r_object_literal(source_readiness$fit)
+    ),
+    paste0(
+      "source_readiness_components <- ",
+      render_r_object_literal(source_readiness$components)
+    ),
+    paste0(
+      "source_readiness_parameters <- ",
+      render_r_object_literal(source_readiness$parameters)
     ),
     "",
     paste0("data <- utils::read.csv(", render_r_object_literal(as.character(data_file[1])), ", stringsAsFactors = FALSE)")
@@ -1212,7 +1400,7 @@ build_mfrm_replay_script <- function(fit,
       paste0("  rating_max = ", render_r_object_literal(as.integer(cfg$rating_max %||% NA_integer_)), ","),
 	    paste0("  keep_original = ", render_r_object_literal(isTRUE(cfg$keep_original)), ","),
 	    paste0("  model = ", render_r_object_literal(as.character(cfg$model %||% "RSM")), ","),
-	    paste0("  method = ", render_r_object_literal(as.character(cfg$method_input %||% cfg$method %||% "JML")), ","),
+	    paste0("  method = ", render_r_object_literal(as.character(replay_method)), ","),
 	    paste0("  step_facet = ", if (!is.null(cfg$step_facet) && nzchar(as.character(cfg$step_facet))) render_r_object_literal(as.character(cfg$step_facet)) else "NULL", ","),
 	    "  anchors = anchors,",
 	    "  group_anchors = group_anchors,",
@@ -1306,6 +1494,16 @@ build_mfrm_replay_script <- function(fit,
       )
     }
   }
+
+  lines <- c(
+    lines,
+    "",
+    "# Recompute readiness from the replayed fit; never inherit source status.",
+    "replay_readiness <- if (is.list(fit$readiness) && is.data.frame(fit$readiness$fit)) fit$readiness$fit else data.frame()",
+    "readiness_identity_fields <- c(\"ReadinessContractVersion\", \"ReadinessScope\", \"InputState\", \"EstimabilityState\", \"CategoryState\", \"BoundaryState\", \"NumericalState\", \"FitReadiness\", \"InferenceReady\", \"ReasonCodes\", \"AuditProvenance\")",
+    "replay_readiness_matches_source <- nrow(replay_readiness) == 1L && all(readiness_identity_fields %in% names(replay_readiness)) && isTRUE(all.equal(source_readiness[, readiness_identity_fields, drop = FALSE], replay_readiness[, readiness_identity_fields, drop = FALSE], check.attributes = FALSE))",
+    "if (!replay_readiness_matches_source) warning(\"Replayed fit readiness differs from the source readiness provenance; inspect both records before using inferential outputs.\", call. = FALSE)"
+  )
 
   if (length(bias_pairs) > 0) {
     bias_lines <- vapply(seq_along(bias_pairs), function(i) {
@@ -1491,6 +1689,18 @@ build_mfrm_replay_script <- function(fit,
     Anchors = nrow(anchor_df),
     GroupAnchors = nrow(group_anchor_df),
     IncludeBundle = isTRUE(include_bundle),
+    ReadinessContractVersion = as.character(
+      source_readiness$fit$ReadinessContractVersion[1]
+    ),
+    SourceFitReadiness = as.character(
+      source_readiness$fit$FitReadiness[1]
+    ),
+    SourceInferenceReady = isTRUE(
+      source_readiness$fit$InferenceReady[1]
+    ),
+    SourceReadinessReasonCodes = as.character(
+      source_readiness$fit$ReasonCodes[1]
+    ),
     stringsAsFactors = FALSE
   )
   settings <- dashboard_settings_table(list(
@@ -1532,6 +1742,9 @@ build_mfrm_replay_script <- function(fit,
   out <- list(
     summary = summary_tbl,
     script = script_text,
+    source_readiness = source_readiness$fit,
+    source_readiness_components = source_readiness$components,
+    source_readiness_parameters = source_readiness$parameters,
     settings = settings,
     gpcm_boundary = gpcm_capability_boundary_table(
       fit,
@@ -1803,24 +2016,26 @@ conquest_overlap_response_spec <- function(response_vars) {
   paste0(response_vars[1], " to ", utils::tail(response_vars, 1))
 }
 
+conquest_overlap_estimation_controls <- function() {
+  list(
+    convergence = 1e-8,
+    deviance_change = 1e-10,
+    iterations = 2000L
+  )
+}
+
 build_conquest_overlap_command_template <- function(data_file,
                                                     response_vars,
                                                     covariate,
                                                     prefix = "conquest_overlap",
                                                     quad_points = 31L) {
   response_spec <- conquest_overlap_response_spec(response_vars)
+  controls <- conquest_overlap_estimation_controls()
   quad_points <- suppressWarnings(as.integer(quad_points[1]))
   if (!is.finite(quad_points) || quad_points < 1L) {
     stop("`quad_points` must be a positive integer for the ConQuest command.", call. = FALSE)
   }
   c(
-    "/*",
-    "Generated by mfrmr::build_conquest_overlap_bundle()",
-    "Scope: ordered-response RSM/PCM, operationalized here as binary item-only latent-regression MML with one numeric person covariate.",
-    "The command requests machine-readable parameter, regression, covariance, and case-EAP CSV outputs.",
-    "Pass the four CSV exports to mfrmr::normalize_conquest_overlap_exports().",
-    "Confirm local ConQuest syntax/options before treating this as an external benchmark run.",
-    "*/",
     paste0(
       "datafile ",
       as.character(data_file[1]),
@@ -1833,11 +2048,19 @@ build_conquest_overlap_command_template <- function(data_file,
     ),
     paste0("regression ", as.character(covariate[1]), ";"),
     "model item;",
-    paste0("estimate ! method=quadrature, nodes=", quad_points, ", fit=no, stderr=quick;"),
+    paste0(
+      "estimate ! method=quadrature, nodes=", quad_points,
+      ", fit=no, stderr=quick, matrixout=mfrmrCQ",
+      ", convergence=", format(controls$convergence, scientific = FALSE, trim = TRUE),
+      ", deviancechange=", format(controls$deviance_change, scientific = FALSE, trim = TRUE),
+      ", iterations=", controls$iterations,
+      ";"
+    ),
     paste0("export parameters ! filetype=csv >> ", as.character(prefix[1]), "_conquest_parameters.csv;"),
     paste0("export reg_coefficients ! filetype=csv >> ", as.character(prefix[1]), "_conquest_reg_coefficients.csv;"),
     paste0("export covariance ! filetype=csv >> ", as.character(prefix[1]), "_conquest_covariance.csv;"),
     paste0("show cases ! estimates=eap, filetype=csv, regressors=yes >> ", as.character(prefix[1]), "_conquest_cases_eap.csv;"),
+    paste0("write mfrmrCQ_history ! filetype=csv >> ", as.character(prefix[1]), "_conquest_history.csv;"),
     paste0("show parameters ! tables=1:2:3:4, estimates=eap >> ", as.character(prefix[1]), "_conquest_parameters_review.txt;"),
     "quit;"
   )
@@ -1851,6 +2074,7 @@ build_conquest_overlap_output_contract <- function(prefix = "conquest_overlap") 
       paste0(prefix, "_conquest_reg_coefficients.csv"),
       paste0(prefix, "_conquest_covariance.csv"),
       paste0(prefix, "_conquest_cases_eap.csv"),
+      paste0(prefix, "_conquest_history.csv"),
       paste0(prefix, "_conquest_parameters_review.txt")
     ),
     ConQuestCommand = c(
@@ -1858,6 +2082,7 @@ build_conquest_overlap_output_contract <- function(prefix = "conquest_overlap") 
       "export reg_coefficients ! filetype=csv",
       "export covariance ! filetype=csv",
       "show cases ! estimates=eap, filetype=csv, regressors=yes",
+      "write mfrmrCQ_history ! filetype=csv",
       "show parameters ! tables=1:2:3:4, estimates=eap"
     ),
     ReviewHandoff = c(
@@ -1865,6 +2090,7 @@ build_conquest_overlap_output_contract <- function(prefix = "conquest_overlap") 
       "Pass to normalize_conquest_overlap_exports() as the regression file.",
       "Pass to normalize_conquest_overlap_exports() as the covariance file.",
       "Pass to normalize_conquest_overlap_exports() as the case-EAP file.",
+      "Retain for the objective/free-dimension verification; this is the estimate matrixout history, not a parsed report table.",
       "Human-readable review only; do not treat this text file as a parsed review table."
     ),
     DataHandling = c(
@@ -1872,9 +2098,10 @@ build_conquest_overlap_output_contract <- function(prefix = "conquest_overlap") 
       "Review covariate labels and analysis metadata before sharing.",
       "Review covariance results and analysis metadata before sharing.",
       "Contains person identifiers and person-level EAP estimates; restricted handling is required.",
+      "Review model labels, iteration history, and analysis metadata before sharing.",
       "Review parameter labels and analysis metadata before sharing."
     ),
-    RequiredForReview = c(TRUE, TRUE, TRUE, TRUE, FALSE),
+    RequiredForReview = c(TRUE, TRUE, TRUE, TRUE, TRUE, FALSE),
     stringsAsFactors = FALSE
   )
 }
@@ -1937,6 +2164,7 @@ build_conquest_overlap_readme <- function(summary_tbl,
     "- *_conquest_output_contract.csv",
     "- *_conquest_parameters.csv / *_conquest_reg_coefficients.csv / *_conquest_covariance.csv are requested by the generated command template",
     "- *_conquest_cases_eap.csv is requested by the generated command template",
+    "- *_conquest_history.csv retains the matrixout estimation history for objective and free-dimension verification",
     "",
     "Requested external ConQuest outputs:",
     paste0(
@@ -1949,8 +2177,8 @@ build_conquest_overlap_readme <- function(summary_tbl,
     ),
     "",
     "After the ConQuest run (once the mfrmr fit is inference-ready):",
-    "Use normalize_conquest_overlap_exports() with the four generated CSV files,",
-    "then pass the returned object to review_conquest_overlap().",
+    "Use normalize_conquest_overlap_exports() with the parameter, regression, covariance, and case-EAP CSV files,",
+    "then pass the returned object to review_conquest_overlap(). Retain the history CSV for the separate objective/free-dimension verification.",
     "",
     "Comparison rules:",
     paste0(
@@ -2054,13 +2282,21 @@ conquest_overlap_component_sensitivity <- function(component) {
 #' A fit that is not inference-ready remains available for convergence review,
 #' but its estimates should not be used for inferential comparison with
 #' ConQuest until the convergence issue is resolved and the model is refit.
+#' The generated ConQuest benchmark template fixes its parameter-change
+#' criterion at `1e-8`, deviance-change criterion at `1e-10`, and iteration
+#' ceiling at `2000`; these controls are written into the command, summary, and
+#' settings so a default stopping rule cannot masquerade as an objective
+#' discrepancy.
 #'
 #' The `conquest_command` component is a conservative starting template, not a
 #' guaranteed version-invariant automation. The `conquest_output_contract`
 #' component records which requested external output should feed each
 #' normalized review table.
-#' Use `normalize_conquest_overlap_exports()` for the four CSV files requested
-#' by the generated command. [normalize_conquest_overlap_files()] and
+#' Use `normalize_conquest_overlap_exports()` for the parameter, regression,
+#' covariance, and case-EAP CSV files requested by the generated command. The
+#' additional matrixout history CSV retains the objective trajectory and an
+#' independent estimated-parameter dimension for release verification; it is not
+#' parsed as a free-form report. [normalize_conquest_overlap_files()] and
 #' [normalize_conquest_overlap_tables()] remain available for already-extracted
 #' custom tables. Then use [review_conquest_overlap()] only after the matching
 #' ConQuest run has been executed externally. The bundle and command template
@@ -2144,6 +2380,7 @@ build_conquest_overlap_bundle <- function(fit = NULL,
   fit <- prepared$fit
   pop <- fit$population
   mfrmr_fit_status <- conquest_overlap_mfrmr_fit_status(fit)
+  conquest_controls <- conquest_overlap_estimation_controls()
   conquest_quad_points <- suppressWarnings(as.integer(
     fit$config$quad_points %||% quad_points %||% 31L
   ))
@@ -2279,6 +2516,9 @@ build_conquest_overlap_bundle <- function(fit = NULL,
       PopulationResponseRowsOmitted = suppressWarnings(as.integer(pop$response_rows_omitted %||% NA_integer_)),
       MfrmrQuadraturePoints = conquest_quad_points,
       ConQuestQuadratureNodes = conquest_quad_points,
+      ConQuestConvergence = conquest_controls$convergence,
+      ConQuestDevianceChange = conquest_controls$deviance_change,
+      ConQuestMaxIterations = conquest_controls$iterations,
       MfrmrMaxit = mfrmr_fit_status$maxit,
       MfrmrReltol = mfrmr_fit_status$reltol,
       MfrmrMMLEngineUsed = mfrmr_fit_status$engine,
@@ -2297,6 +2537,7 @@ build_conquest_overlap_bundle <- function(fit = NULL,
   notes <- c(
     "This bundle is intentionally restricted to the documented binary item-only latent-regression comparison case.",
     "Use the ConQuest command text as a conservative template, not as a claim of guaranteed version-invariant automation.",
+    "The ConQuest command records strict benchmark stopping controls so objective comparison is not based on unstored software defaults.",
     "Item estimates should be centered before external comparison.",
     "This bundle contains person identifiers, responses, covariates, and case-EAP results; it is not deidentified or automatically shareable.",
     mfrmr_fit_status$note
@@ -2367,6 +2608,9 @@ build_conquest_overlap_bundle <- function(fit = NULL,
     prefix = as.character(prefix[1]),
     mfrmr_quad_points = conquest_quad_points,
     conquest_quadrature_nodes = conquest_quad_points,
+    conquest_convergence = conquest_controls$convergence,
+    conquest_deviance_change = conquest_controls$deviance_change,
+    conquest_max_iterations = conquest_controls$iterations,
     mfrmr_maxit = mfrmr_fit_status$maxit,
     mfrmr_reltol = mfrmr_fit_status$reltol,
     mfrmr_mml_engine_used = mfrmr_fit_status$engine,
@@ -3262,8 +3506,10 @@ normalize_conquest_overlap_files <- function(population_file,
 #'
 #' - it does **not** parse raw ConQuest text output automatically;
 #' - its primary route expects output from
-#'   `normalize_conquest_overlap_exports()`, which reads the four native CSV
-#'   files requested by the generated command; custom extracted tables may use
+#'   `normalize_conquest_overlap_exports()`, which reads the four native
+#'   comparison CSV files requested by the generated command; the additional
+#'   matrixout-history CSV is retained for a separate objective/free-dimension
+#'   verification; custom extracted tables may use
 #'   [normalize_conquest_overlap_files()] or
 #'   [normalize_conquest_overlap_tables()];
 #' - and it reports numerical differences and missing elements without claiming
@@ -3279,7 +3525,7 @@ normalize_conquest_overlap_files <- function(population_file,
 #' 1. export a bundle for the documented comparison scope with
 #'    [build_conquest_overlap_bundle()];
 #' 2. run the narrow matching case in ConQuest;
-#' 3. normalize the four requested CSV files with
+#' 3. normalize the four comparison CSV files with
 #'    `normalize_conquest_overlap_exports()`;
 #' 4. pass those tables here to inspect direct differences, centered item
 #'    agreement, and case-level EAP agreement.
@@ -4211,11 +4457,10 @@ export_summary_appendix <- function(x,
 #' @param data Optional original analysis data frame. When supplied,
 #'   `export_mfrm_bundle()` co-locates a CSV copy of the data
 #'   alongside the replay script and updates the script's
-#'   `read.csv()` path to point at it. The manifest's `input_hash`
-#'   row for `data` is also computed against the user's untouched
-#'   input so the recorded fingerprint matches what the replay
-#'   script will load. Default `NULL` falls back to the legacy
-#'   `your_data.csv` placeholder path.
+#'   `read.csv()` path to point at it. The manifest's `input_summary`
+#'   row for `data` describes the user's untouched input structure; it is not
+#'   a byte-level equality claim about the CSV replay representation. Default
+#'   `NULL` falls back to the legacy `your_data.csv` placeholder path.
 #'
 #' @details
 #' This function is the one-call fit-level archive and HTML route. It reuses
@@ -4264,10 +4509,13 @@ export_summary_appendix <- function(x,
 #' - manuscript-summary CSVs via [build_summary_table_bundle()]
 #' - anchor CSV via [make_anchor_table()]
 #' - manifest CSV/TXT via [build_mfrm_manifest()]
+#' - exact source-fit readiness CSVs with fit, component, and parameter scope
 #' - visual warning/summary artifacts via [build_visual_summaries()]
 #' - prediction/forecast CSVs via [predict_mfrm_population()],
 #'   [predict_mfrm_units()], and [sample_mfrm_plausible_values()]
 #' - a package-native replay script via [build_mfrm_replay_script()]
+#' - replay-source readiness CSVs retained as provenance; the replayed fit
+#'   recomputes its own readiness
 #' - for latent-regression fits, a replay-side person-data CSV paired with the
 #'   replay script
 #' - a lightweight HTML report that bundles the exported tables/text and, for
@@ -4929,6 +5177,19 @@ export_mfrm_bundle <- function(fit,
 
   if ("manifest" %in% include && !is.null(manifest)) {
     write_csv(manifest$summary, paste0(prefix, "_manifest_summary.csv"), "manifest_summary")
+    write_csv(manifest$readiness, paste0(prefix, "_manifest_readiness.csv"), "manifest_readiness")
+    if (nrow(as.data.frame(manifest$readiness_components, stringsAsFactors = FALSE)) > 0) {
+      write_csv(
+        manifest$readiness_components,
+        paste0(prefix, "_manifest_readiness_components.csv"),
+        "manifest_readiness_components"
+      )
+    }
+    write_csv(
+      manifest$readiness_parameters,
+      paste0(prefix, "_manifest_readiness_parameters.csv"),
+      "manifest_readiness_parameters"
+    )
     write_csv(manifest$environment, paste0(prefix, "_manifest_environment.csv"), "manifest_environment")
     write_csv(manifest$model_settings, paste0(prefix, "_manifest_model_settings.csv"), "manifest_model_settings")
     write_csv(manifest$source_columns, paste0(prefix, "_manifest_source_columns.csv"), "manifest_source_columns")
@@ -4947,6 +5208,13 @@ export_mfrm_bundle <- function(fit,
     }
     write_text(render_mfrm_manifest_text(manifest), paste0(prefix, "_manifest.txt"), "manifest_text")
     html_tables$manifest_summary <- manifest$summary
+    html_tables$manifest_readiness <- manifest$readiness
+    if (nrow(as.data.frame(manifest$readiness_components, stringsAsFactors = FALSE)) > 0) {
+      html_tables$manifest_readiness_components <- manifest$readiness_components
+    }
+    if (nrow(as.data.frame(manifest$readiness_parameters, stringsAsFactors = FALSE)) > 0) {
+      html_tables$manifest_readiness_parameters <- manifest$readiness_parameters
+    }
     html_tables$manifest_available_outputs <- manifest$available_outputs
     html_tables$manifest_settings <- manifest$settings
   }
@@ -4992,7 +5260,7 @@ export_mfrm_bundle <- function(fit,
       )
     }
     # Bundle the user's original input data when supplied so the
-    # replay script and its hash record point to a co-located file.
+    # replay script and its manifest record point to a co-located file.
     # Falls back to the legacy `your_data.csv` placeholder when the
     # user did not pass `data` to `export_mfrm_bundle()`.
     replay_data_file <- "your_data.csv"
@@ -5013,6 +5281,23 @@ export_mfrm_bundle <- function(fit,
       bundle_dir = "replayed_bundle",
       bundle_prefix = prefix
     )
+    write_csv(
+      replay$source_readiness,
+      paste0(prefix, "_replay_source_readiness.csv"),
+      "replay_source_readiness"
+    )
+    if (nrow(as.data.frame(replay$source_readiness_components, stringsAsFactors = FALSE)) > 0) {
+      write_csv(
+        replay$source_readiness_components,
+        paste0(prefix, "_replay_source_readiness_components.csv"),
+        "replay_source_readiness_components"
+      )
+    }
+    write_csv(
+      replay$source_readiness_parameters,
+      paste0(prefix, "_replay_source_readiness_parameters.csv"),
+      "replay_source_readiness_parameters"
+    )
     write_script(replay$script, paste0(prefix, "_replay.R"), "replay_script")
     html_text$replay_script <- replay$script
     replay_artifacts <- data.frame(
@@ -5022,6 +5307,37 @@ export_mfrm_bundle <- function(fit,
       Detail = "Executable package-native replay script.",
       stringsAsFactors = FALSE
     )
+    replay_artifacts <- rbind(
+      replay_artifacts,
+      data.frame(
+        Artifact = c(
+          "source_readiness",
+          "source_readiness_parameters"
+        ),
+        Format = "csv",
+        File = c(
+          paste0(prefix, "_replay_source_readiness.csv"),
+          paste0(prefix, "_replay_source_readiness_parameters.csv")
+        ),
+        Detail = c(
+          "Fit-level readiness provenance recorded before replay.",
+          "Parameter-level readiness provenance recorded before replay."
+        ),
+        stringsAsFactors = FALSE
+      )
+    )
+    if (nrow(as.data.frame(replay$source_readiness_components, stringsAsFactors = FALSE)) > 0) {
+      replay_artifacts <- rbind(
+        replay_artifacts,
+        data.frame(
+          Artifact = "source_readiness_components",
+          Format = "csv",
+          File = paste0(prefix, "_replay_source_readiness_components.csv"),
+          Detail = "Component-level readiness provenance recorded before replay.",
+          stringsAsFactors = FALSE
+        )
+      )
+    }
     if (!identical(replay_data_file, "your_data.csv")) {
       replay_artifacts <- rbind(
         replay_artifacts,
@@ -5256,6 +5572,7 @@ export_normalize_summary_table_inputs <- function(summary_tables,
     "mfrm_anchor_review",
     "mfrm_linking_review",
     "mfrm_misfit_casebook",
+    "mfrm_model_choice_review",
     "mfrm_weighting_review",
     "mfrm_unit_prediction",
     "mfrm_plausible_values",
@@ -5280,6 +5597,7 @@ export_normalize_summary_table_inputs <- function(summary_tables,
     "summary.mfrm_anchor_review",
     "summary.mfrm_linking_review",
     "summary.mfrm_misfit_casebook",
+    "summary.mfrm_model_choice_review",
     "summary.mfrm_weighting_review",
     "summary.mfrm_unit_prediction",
     "summary.mfrm_plausible_values"
@@ -6014,6 +6332,9 @@ export_available_outputs_table <- function(diagnostics,
 render_mfrm_manifest_text <- function(manifest) {
   sections <- list(
     Summary = manifest$summary,
+    Readiness = manifest$readiness,
+    ReadinessComponents = manifest$readiness_components,
+    ReadinessParameters = manifest$readiness_parameters,
     Environment = manifest$environment,
     ModelSettings = manifest$model_settings,
     SourceColumns = manifest$source_columns,

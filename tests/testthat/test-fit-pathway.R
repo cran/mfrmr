@@ -26,6 +26,21 @@ test_that("fit pathway keeps fit on x and logits on y", {
                     names(out$data$uncertainty_basis)))
 })
 
+test_that("fit pathway defaults to Infit on the horizontal axis", {
+  fit <- make_toy_fit(maxit = 20)
+  diag <- make_toy_diagnostics(fit)
+  out <- suppressWarnings(plot(
+    fit,
+    type = "fit_pathway",
+    diagnostics = diag,
+    draw = FALSE
+  ))
+
+  expect_identical(out$data$fit_stat, "Infit")
+  expect_identical(out$data$fit_column, "Infit")
+  expect_equal(out$data$table$FitValue, out$data$table$Infit)
+})
+
 test_that("fit pathway supports person selection and labels", {
   fit <- make_toy_fit(maxit = 20)
   diag <- make_toy_diagnostics(fit)

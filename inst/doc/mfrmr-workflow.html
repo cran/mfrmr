@@ -359,9 +359,10 @@ fixed-calibration prediction</li>
 target:</p>
 <ul>
 <li>test code mechanics on a small deterministic subset or, for an MML
-workflow, a temporary <code>quad_points = 7</code> grid; restore the
-prespecified final MML grid (31 points by default) and check quadrature
-sensitivity before reporting</li>
+workflow, a temporary <code>quad_points = 7</code> grid; that grid is
+screening-only and cannot support automatic IC ranking or LRT. Restore
+the prespecified final MML grid (31 points by default) and check a
+denser common grid when a comparison is close or consequential</li>
 <li>choose <code>method = &quot;JML&quot;</code> only when its person-parameter
 treatment is methodologically appropriate, not merely as a faster
 substitute for MML</li>
@@ -472,44 +473,60 @@ complete-crossing example for fast help-page checks.</p>
 <span id="cb2-42"><a href="#cb2-42" tabindex="-1"></a>)</span>
 <span id="cb2-43"><a href="#cb2-43" tabindex="-1"></a>res_toy <span class="ot">&lt;-</span> facets_summary_toy<span class="sc">$</span>results</span>
 <span id="cb2-44"><a href="#cb2-44" tabindex="-1"></a></span>
-<span id="cb2-45"><a href="#cb2-45" tabindex="-1"></a>fit_summary_toy<span class="sc">$</span>overview</span>
-<span id="cb2-46"><a href="#cb2-46" tabindex="-1"></a>fit_summary_toy<span class="sc">$</span>readiness</span>
-<span id="cb2-47"><a href="#cb2-47" tabindex="-1"></a>fit_summary_toy<span class="sc">$</span>data_review</span>
-<span id="cb2-48"><a href="#cb2-48" tabindex="-1"></a><span class="fu">summary</span>(diag_toy)<span class="sc">$</span>overview</span>
-<span id="cb2-49"><a href="#cb2-49" tabindex="-1"></a>facets_summary_toy</span>
-<span id="cb2-50"><a href="#cb2-50" tabindex="-1"></a></span>
-<span id="cb2-51"><a href="#cb2-51" tabindex="-1"></a><span class="co"># Required first fitted-scale figure.</span></span>
-<span id="cb2-52"><a href="#cb2-52" tabindex="-1"></a><span class="fu">plot</span>(res_toy, <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>, <span class="at">show_ci =</span> <span class="cn">TRUE</span>, <span class="at">top_n =</span> <span class="cn">Inf</span>)</span>
-<span id="cb2-53"><a href="#cb2-53" tabindex="-1"></a></span>
-<span id="cb2-54"><a href="#cb2-54" tabindex="-1"></a><span class="co"># Optional FACETS-style ruler. Replace these examples with the study rubric.</span></span>
-<span id="cb2-55"><a href="#cb2-55" tabindex="-1"></a>rubric_labels <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
-<span id="cb2-56"><a href="#cb2-56" tabindex="-1"></a>  <span class="st">&quot;1&quot;</span> <span class="ot">=</span> <span class="st">&quot;Level 1&quot;</span>,</span>
-<span id="cb2-57"><a href="#cb2-57" tabindex="-1"></a>  <span class="st">&quot;2&quot;</span> <span class="ot">=</span> <span class="st">&quot;Level 2&quot;</span>,</span>
-<span id="cb2-58"><a href="#cb2-58" tabindex="-1"></a>  <span class="st">&quot;3&quot;</span> <span class="ot">=</span> <span class="st">&quot;Level 3&quot;</span>,</span>
-<span id="cb2-59"><a href="#cb2-59" tabindex="-1"></a>  <span class="st">&quot;4&quot;</span> <span class="ot">=</span> <span class="st">&quot;Level 4&quot;</span></span>
-<span id="cb2-60"><a href="#cb2-60" tabindex="-1"></a>)</span>
-<span id="cb2-61"><a href="#cb2-61" tabindex="-1"></a><span class="fu">plot</span>(</span>
-<span id="cb2-62"><a href="#cb2-62" tabindex="-1"></a>  res_toy,</span>
-<span id="cb2-63"><a href="#cb2-63" tabindex="-1"></a>  <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>,</span>
-<span id="cb2-64"><a href="#cb2-64" tabindex="-1"></a>  <span class="at">renderer =</span> <span class="st">&quot;facets&quot;</span>,</span>
-<span id="cb2-65"><a href="#cb2-65" tabindex="-1"></a>  <span class="at">category_labels =</span> rubric_labels,</span>
-<span id="cb2-66"><a href="#cb2-66" tabindex="-1"></a>  <span class="at">show_ci =</span> <span class="cn">FALSE</span>,</span>
-<span id="cb2-67"><a href="#cb2-67" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
-<span id="cb2-68"><a href="#cb2-68" tabindex="-1"></a>)</span>
-<span id="cb2-69"><a href="#cb2-69" tabindex="-1"></a><span class="co"># Setting show_ci = TRUE on this FACETS-style ruler is available as a</span></span>
-<span id="cb2-70"><a href="#cb2-70" tabindex="-1"></a><span class="co"># deliberate hybrid: FACETS ruler grammar plus mfrmr uncertainty intervals.</span></span>
-<span id="cb2-71"><a href="#cb2-71" tabindex="-1"></a></span>
-<span id="cb2-72"><a href="#cb2-72" tabindex="-1"></a><span class="co"># Optional follow-up: Infit on x, measure on y; persons are explicit opt-in.</span></span>
-<span id="cb2-73"><a href="#cb2-73" tabindex="-1"></a><span class="fu">plot</span>(</span>
-<span id="cb2-74"><a href="#cb2-74" tabindex="-1"></a>  res_toy,</span>
-<span id="cb2-75"><a href="#cb2-75" tabindex="-1"></a>  <span class="at">type =</span> <span class="st">&quot;fit_pathway&quot;</span>,</span>
-<span id="cb2-76"><a href="#cb2-76" tabindex="-1"></a>  <span class="at">fit_stat =</span> <span class="st">&quot;Infit&quot;</span>,</span>
-<span id="cb2-77"><a href="#cb2-77" tabindex="-1"></a>  <span class="at">include_person =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb2-78"><a href="#cb2-78" tabindex="-1"></a>  <span class="at">top_n_person =</span> <span class="dv">12</span>,</span>
-<span id="cb2-79"><a href="#cb2-79" tabindex="-1"></a>  <span class="at">person_labels =</span> <span class="st">&quot;none&quot;</span>,</span>
-<span id="cb2-80"><a href="#cb2-80" tabindex="-1"></a>  <span class="at">facet_labels =</span> <span class="st">&quot;flagged&quot;</span>,</span>
-<span id="cb2-81"><a href="#cb2-81" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
-<span id="cb2-82"><a href="#cb2-82" tabindex="-1"></a>)</span></code></pre></div>
+<span id="cb2-45"><a href="#cb2-45" tabindex="-1"></a>fit_summary_toy<span class="sc">$</span>decision</span>
+<span id="cb2-46"><a href="#cb2-46" tabindex="-1"></a>fit_summary_toy<span class="sc">$</span>overview</span>
+<span id="cb2-47"><a href="#cb2-47" tabindex="-1"></a>fit_summary_toy<span class="sc">$</span>readiness</span>
+<span id="cb2-48"><a href="#cb2-48" tabindex="-1"></a>fit_summary_toy<span class="sc">$</span>data_review</span>
+<span id="cb2-49"><a href="#cb2-49" tabindex="-1"></a><span class="fu">summary</span>(diag_toy)<span class="sc">$</span>overview</span>
+<span id="cb2-50"><a href="#cb2-50" tabindex="-1"></a>facets_summary_toy</span>
+<span id="cb2-51"><a href="#cb2-51" tabindex="-1"></a></span>
+<span id="cb2-52"><a href="#cb2-52" tabindex="-1"></a><span class="co"># Required first fitted-scale figure.</span></span>
+<span id="cb2-53"><a href="#cb2-53" tabindex="-1"></a><span class="fu">plot</span>(res_toy, <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>, <span class="at">show_ci =</span> <span class="cn">TRUE</span>, <span class="at">top_n =</span> <span class="cn">Inf</span>)</span>
+<span id="cb2-54"><a href="#cb2-54" tabindex="-1"></a></span>
+<span id="cb2-55"><a href="#cb2-55" tabindex="-1"></a><span class="co"># Optional FACETS-style ruler. Replace these examples with the study rubric.</span></span>
+<span id="cb2-56"><a href="#cb2-56" tabindex="-1"></a>rubric_labels <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
+<span id="cb2-57"><a href="#cb2-57" tabindex="-1"></a>  <span class="st">&quot;1&quot;</span> <span class="ot">=</span> <span class="st">&quot;Level 1&quot;</span>,</span>
+<span id="cb2-58"><a href="#cb2-58" tabindex="-1"></a>  <span class="st">&quot;2&quot;</span> <span class="ot">=</span> <span class="st">&quot;Level 2&quot;</span>,</span>
+<span id="cb2-59"><a href="#cb2-59" tabindex="-1"></a>  <span class="st">&quot;3&quot;</span> <span class="ot">=</span> <span class="st">&quot;Level 3&quot;</span>,</span>
+<span id="cb2-60"><a href="#cb2-60" tabindex="-1"></a>  <span class="st">&quot;4&quot;</span> <span class="ot">=</span> <span class="st">&quot;Level 4&quot;</span></span>
+<span id="cb2-61"><a href="#cb2-61" tabindex="-1"></a>)</span>
+<span id="cb2-62"><a href="#cb2-62" tabindex="-1"></a><span class="fu">plot</span>(</span>
+<span id="cb2-63"><a href="#cb2-63" tabindex="-1"></a>  res_toy,</span>
+<span id="cb2-64"><a href="#cb2-64" tabindex="-1"></a>  <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>,</span>
+<span id="cb2-65"><a href="#cb2-65" tabindex="-1"></a>  <span class="at">renderer =</span> <span class="st">&quot;facets&quot;</span>,</span>
+<span id="cb2-66"><a href="#cb2-66" tabindex="-1"></a>  <span class="at">category_labels =</span> rubric_labels,</span>
+<span id="cb2-67"><a href="#cb2-67" tabindex="-1"></a>  <span class="at">show_ci =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb2-68"><a href="#cb2-68" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
+<span id="cb2-69"><a href="#cb2-69" tabindex="-1"></a>)</span>
+<span id="cb2-70"><a href="#cb2-70" tabindex="-1"></a><span class="co"># Setting show_ci = TRUE on this FACETS-style ruler is available as a</span></span>
+<span id="cb2-71"><a href="#cb2-71" tabindex="-1"></a><span class="co"># deliberate hybrid: FACETS ruler grammar plus mfrmr uncertainty intervals.</span></span>
+<span id="cb2-72"><a href="#cb2-72" tabindex="-1"></a></span>
+<span id="cb2-73"><a href="#cb2-73" tabindex="-1"></a><span class="co"># Optional follow-up: Infit on x, measure on y; persons are explicit opt-in.</span></span>
+<span id="cb2-74"><a href="#cb2-74" tabindex="-1"></a><span class="fu">plot</span>(</span>
+<span id="cb2-75"><a href="#cb2-75" tabindex="-1"></a>  res_toy,</span>
+<span id="cb2-76"><a href="#cb2-76" tabindex="-1"></a>  <span class="at">type =</span> <span class="st">&quot;fit_pathway&quot;</span>,</span>
+<span id="cb2-77"><a href="#cb2-77" tabindex="-1"></a>  <span class="at">fit_stat =</span> <span class="st">&quot;Infit&quot;</span>,</span>
+<span id="cb2-78"><a href="#cb2-78" tabindex="-1"></a>  <span class="at">include_person =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb2-79"><a href="#cb2-79" tabindex="-1"></a>  <span class="at">top_n_person =</span> <span class="dv">12</span>,</span>
+<span id="cb2-80"><a href="#cb2-80" tabindex="-1"></a>  <span class="at">person_labels =</span> <span class="st">&quot;none&quot;</span>,</span>
+<span id="cb2-81"><a href="#cb2-81" tabindex="-1"></a>  <span class="at">facet_labels =</span> <span class="st">&quot;flagged&quot;</span>,</span>
+<span id="cb2-82"><a href="#cb2-82" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
+<span id="cb2-83"><a href="#cb2-83" tabindex="-1"></a>)</span></code></pre></div>
+<p>Read <code>$decision</code> before the parameter tables. The same
+five fields are used for RSM, PCM, and bounded GPCM: interpretation
+status, formal-inference status, fit readiness, the reason, and the
+highest-priority next action. This block does not add a new acceptance
+test. It combines the stored readiness record with any supplied
+precision evidence. A fit-only summary returns
+<code>FormalInference = &quot;No&quot;</code> until a matching
+<code>diagnose_mfrm()</code> result is supplied;
+<code>InferenceReady = TRUE</code> alone is not evidence for formal
+SE/CI or reliability. Use
+<code>summary(fit_toy, diagnostics = diag_toy)$decision</code> or
+<code>summary(diag_toy)$decision</code> for the precision-aware
+decision. When <code>FormalInference</code> is <code>&quot;No&quot;</code>,
+diagnostic work may continue to investigate the stated reason, but
+estimates and plots must not be reported as formal results.</p>
 <p>Optimizer code zero is only one numerical signal.
 <code>fit_mfrm()</code> also checks the terminal gradient; when the
 initial direct or hybrid solution stops with a larger gradient and
@@ -526,16 +543,18 @@ unless the analysis protocol states otherwise. If a run reaches
 <code>ConvergenceStatus = &quot;iteration_limit&quot;</code>, keep it review-only
 and repeat the same data, model, method, anchors, optimizer, tolerance,
 and quadrature rule with the next ceiling in a prespecified sequence.
-Interpret only a run with <code>Converged = TRUE</code>,
+Interpret only a run with <code>FitReadiness = ready</code>,
 <code>InferenceReady = TRUE</code>, and <code>Numerical = pass</code>.
 If two separately ready runs differ materially, investigate numerical
 stability instead of selecting the preferred result. Report the
 requested ceiling, actual evaluations, convergence reason, and terminal
 gradient.</p>
-<p><code>InferenceReady</code> describes this numerical gate only: Data,
-Design, Stability, Diagnostics, and Reporting remain separate rows in
-<code>fit_summary_toy$readiness</code>. For example, a disconnected
-design remains a reporting hold even if its optimizer converges.
+<p><code>InferenceReady</code> is a conservative fit-level first screen:
+Input, Estimability, Category, Boundary, and Numerical components must
+all pass. Design, Stability, Diagnostics, and Reporting remain
+purpose-specific workflow rows in
+<code>fit_summary_toy$readiness</code>. For example, a diagnostic or
+reporting review can remain even when the stored fit record is ready.
 Conversely, <code>ready_for_diagnostics_and_reporting_follow_up</code>
 means that fitting completed and diagnostic review is the next stage; it
 is neither an optimization failure nor a claim that the analysis is
@@ -574,22 +593,48 @@ the readiness issue is resolved.</p>
 <p>Bias/DIF, residual PCA, and anchor-drift/linking analyses are
 deliberately not auto-run by any summary profile. They require explicit
 contrasts, diagnostic settings, or multi-fit designs.</p>
-<pre><code>#&gt;   Model Method MethodUsed   N Persons Facets FacetInteractions
-#&gt; 1   RSM    MML        MML 282      48      2                 0
+<pre><code>#&gt;                                       Interpretation FormalInference
+#&gt; 1 Fit gates passed; formal precision review required              No
+#&gt;   FitReadiness                                              Why
+#&gt; 1        ready Formal precision support has not been evaluated.
+#&gt;                                                                                                                                                   NextAction
+#&gt; 1 Run `diagnose_mfrm()` and pass its result as `diagnostics =` to evaluate formal precision support; fit readiness alone is not a formal-inference decision.
+#&gt;   Model Method MethodUsed  ICContractVersion   N ResponseRows
+#&gt; 1   RSM    MML        MML mfrmr_ic_person_v2 282          282
+#&gt;   WeightedResponseTotal Persons Npar Facets FacetInteractions
+#&gt; 1                   282      48    9      2                 0
 #&gt;   InteractionParameters InteractionCells InteractionSparseCells Categories
 #&gt; 1                     0                0                      0          4
-#&gt;              LogLik              AIC              BIC Converged InferenceReady
-#&gt; 1 -347.239803707285 712.479607414569 745.256771053012      TRUE           TRUE
-#&gt;   Iterations      IterationsBasis MMLEngineRequested MMLEngineUsed
-#&gt; 1         28 function_evaluations             direct        direct
-#&gt;                            MMLEngineDetail EMIterations EMConverged
-#&gt; 1 Direct marginal likelihood optimization.                         
-#&gt;   EMRelativeChange OptimizerMethod OptimizerInitialMethod OptimizerPolished
-#&gt; 1                         L-BFGS-B               L-BFGS-B              TRUE
-#&gt;   OptimizerPolishSucceeded OptimizerPolishStages RequestedReltol
-#&gt; 1                     TRUE                     2           1e-09
-#&gt;   EffectiveReltol  OptimizerFactr       OptimizerPgtol
-#&gt; 1           1e-13 450.35996273705 1.49011611938477e-08
+#&gt;              LogLik         Deviance WeightPolicy ICEligible ICSelectable
+#&gt; 1 -347.239803707285 694.479607414569   unweighted       TRUE         TRUE
+#&gt;   ICStatus ICSampleSize ICSampleSizeBasis              AIC             BIC
+#&gt; 1       ok           48      person_count 712.479607414569 729.32041651274
+#&gt;              SABIC SABICSelectable           AICFormula       BICFormula
+#&gt; 1 701.085329990291            TRUE aic_deviance_plus_2k bic_person_count
+#&gt;              SABICFormula  IntegrationEvaluationId ICQuadraturePoints
+#&gt; 1 sclove_n_plus_2_over_24 mfrmr_ghq_normal_v1:q=31                 31
+#&gt;   ICIntegrationTier ICIntegrationStatus ICIntegrationSelectable
+#&gt; 1    standard_start     selection_start                    TRUE
+#&gt;          LegacyAIC        LegacyBIC LegacyICSampleSize LegacyICSampleSizeBasis
+#&gt; 1 712.479607414569 745.256771053012                282               row_count
+#&gt;   Converged ReadinessContractVersion FitReadiness InferenceReady InputState
+#&gt; 1      TRUE mfrmr-readiness-0.2.3-v3        ready           TRUE       pass
+#&gt;   EstimabilityState CategoryState BoundaryState NumericalState
+#&gt; 1        identified      adequate        finite          ready
+#&gt;   ReadinessReasonCodes
+#&gt; 1                     
+#&gt;                                                                                      ReadinessAuditProvenance
+#&gt; 1 fit_readiness_builder_v1;contract=mfrmr-readiness-0.2.3-v3;method=MML;model=RSM;scale=single_observed_scale
+#&gt;   BoundaryReasonCodes Iterations      IterationsBasis MMLEngineRequested
+#&gt; 1                             28 function_evaluations             direct
+#&gt;   MMLEngineUsed                          MMLEngineDetail EMIterations
+#&gt; 1        direct Direct marginal likelihood optimization.             
+#&gt;   EMConverged EMRelativeChange OptimizerMethod OptimizerInitialMethod
+#&gt; 1                                     L-BFGS-B               L-BFGS-B
+#&gt;   OptimizerPolished OptimizerPolishSucceeded OptimizerPolishStages
+#&gt; 1              TRUE                     TRUE                     2
+#&gt;   RequestedReltol EffectiveReltol  OptimizerFactr       OptimizerPgtol
+#&gt; 1           1e-09           1e-13 450.35996273705 1.49011611938477e-08
 #&gt;   InitialTerminalGradientSupNorm ConvergenceCode   ConvergenceBasis
 #&gt; 1           0.000693846262430853               0 optimizer_gradient
 #&gt;   ConvergenceStatus ConvergenceReason ConvergenceSeverity
@@ -606,8 +651,8 @@ contrasts, diagnostic settings, or multi-fit designs.</p>
 #&gt; 1             38                0            0           0
 #&gt;   Observations Persons Facets Categories Subsets ResidualPCA DiagnosticMode
 #&gt; 1          282      48      2          4       1        none           both
-#&gt;   Method PrecisionTier MarginalFit
-#&gt; 1    MML   model_based   available
+#&gt;   Method PrecisionTier MarginalFit        FairAverage
+#&gt; 1    MML   model_based   available embedded_available
 #&gt;   Component
 #&gt; 1      name
 #&gt; 2      data</code></pre>
@@ -627,11 +672,15 @@ workflow:</p>
 <span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a>  <span class="at">overwrite =</span> <span class="cn">TRUE</span>,</span>
 <span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a>  <span class="at">acknowledge_sensitive =</span> <span class="cn">TRUE</span></span>
 <span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a>)</span>
-<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a><span class="fu">head</span>(export_toy<span class="sc">$</span>written_files)</span></code></pre></div>
+<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a>export_preview <span class="ot">&lt;-</span> <span class="fu">head</span>(export_toy<span class="sc">$</span>written_files)</span>
+<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a>export_preview<span class="sc">$</span>Path <span class="ot">&lt;-</span> <span class="fu">basename</span>(export_preview<span class="sc">$</span>Path)</span>
+<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a>export_preview</span></code></pre></div>
 <p>The acknowledgement suppresses the warning only; it does not redact
 person identifiers, person-level results, local paths, or the complete
-RDS object. Review every exported file under the study’s data-handling
-policy before sharing.</p>
+RDS object. The preview above deliberately shows path basenames only;
+the returned export object retains the actual local paths needed by the
+current analysis session. Review every exported file under the study’s
+data-handling policy before sharing.</p>
 <pre><code>#&gt;   Priority               Area
 #&gt; 1        1           Overview
 #&gt; 2        2             Triage
@@ -678,20 +727,20 @@ policy before sharing.</p>
 #&gt; 1             3                0       1
 #&gt;                                                       SourceInclude
 #&gt; 1 fit, diagnostics, tables, precision, reporting, categories, plots
-#&gt;                 Component Format                                      Path Note
-#&gt; 1        summary_overview    csv        mfrmr_results_summary_overview.csv     
-#&gt; 2          summary_status    csv          mfrmr_results_summary_status.csv     
-#&gt; 3 summary_component_index    csv mfrmr_results_summary_component_index.csv     
-#&gt; 4     summary_table_index    csv     mfrmr_results_summary_table_index.csv     
-#&gt; 5        summary_plot_map    csv        mfrmr_results_summary_plot_map.csv     
-#&gt; 6          summary_triage    csv          mfrmr_results_summary_triage.csv     
-#&gt;            DataHandling
-#&gt; 1 review_before_sharing
-#&gt; 2 review_before_sharing
-#&gt; 3 review_before_sharing
-#&gt; 4 review_before_sharing
-#&gt; 5 review_before_sharing
-#&gt; 6 review_before_sharing</code></pre>
+#&gt;                          Component Format
+#&gt; 1                 summary_overview    csv
+#&gt; 2                 summary_decision    csv
+#&gt; 3                   summary_status    csv
+#&gt; 4            summary_fit_readiness    csv
+#&gt; 5 summary_fit_readiness_components    csv
+#&gt; 6 summary_fit_readiness_parameters    csv
+#&gt;                                                 Path Note          DataHandling
+#&gt; 1                 mfrmr_results_summary_overview.csv      review_before_sharing
+#&gt; 2                 mfrmr_results_summary_decision.csv      review_before_sharing
+#&gt; 3                   mfrmr_results_summary_status.csv      review_before_sharing
+#&gt; 4            mfrmr_results_summary_fit_readiness.csv      review_before_sharing
+#&gt; 5 mfrmr_results_summary_fit_readiness_components.csv      review_before_sharing
+#&gt; 6 mfrmr_results_summary_fit_readiness_parameters.csv      review_before_sharing</code></pre>
 </div>
 <div id="diagnostics-and-reporting" class="section level2">
 <h2>Diagnostics and Reporting</h2>

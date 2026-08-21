@@ -65,7 +65,9 @@ loglik_pcm <- function(eta, score_k, step_cum_mat, criterion_idx, weight = NULL,
     nr <- length(rows)
     eta_mat <- outer(eta_c, 0:(k_cat - 1))
     log_num <- eta_mat - matrix(step_cum, nrow = nr, ncol = k_cat, byrow = TRUE)
-    row_max <- log_num[cbind(seq_len(nr), max.col(log_num))]
+    row_max <- log_num[cbind(
+      seq_len(nr), max.col(log_num, ties.method = "first")
+    )]
     log_denom <- row_max + log(rowSums(exp(log_num - row_max)))
     log_num_obs <- log_num[cbind(seq_len(nr), score_k[rows] + 1)]
     diff <- log_num_obs - log_denom
@@ -80,7 +82,7 @@ loglik_pcm <- function(eta, score_k, step_cum_mat, criterion_idx, weight = NULL,
 
 # GPCM log-likelihood: same adjacent-category structure as PCM but with a
 # positive discrimination attached to each designated slope-facet level.
-# For the bounded GPCM parameterization:
+# For the identified, scope-bounded GPCM parameterization:
 #   log(P_k / P_{k-1}) = a_c * (eta - tau_{c,k})
 # so category k has kernel exp(a_c * (k * eta - tau_{c,k}^{cum})).
 loglik_gpcm <- function(eta, score_k, step_cum_mat, criterion_idx, slopes,
@@ -239,7 +241,7 @@ compute_response_probability_bundle <- function(config, idx, params, eta) {
 #   ZSTD = (MnSq^(1/3) - (1 - 2/(9*df))) / sqrt(2/(9*df))
 # When whexact = TRUE, uses the simpler linear approximation:
 #   ZSTD = (MnSq - 1) * sqrt(df / 2)
-# Values near 0 indicate expected fit; |ZSTD| > 2 flags potential misfit.
+# Values near 0 indicate expected fit; mfrmr uses |ZSTD| >= 2 as its review flag.
 zstd_from_mnsq <- function(mnsq, df, whexact = FALSE) {
   mnsq <- as.numeric(mnsq)
   df <- as.numeric(df)

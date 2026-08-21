@@ -68,6 +68,19 @@ test_that("CRAN smoke covers the primary MML review and export route", {
   expect_s3_class(fit_summary, "summary.mfrm_fit")
   expect_s3_class(facets_summary, "summary.mfrm_fit")
   expect_s3_class(facets_summary$results, "mfrm_results")
+  expect_identical(
+    fit_summary$decision$Interpretation,
+    "Fit gates passed; formal precision review required"
+  )
+  expect_identical(fit_summary$decision$FormalInference, "No")
+  expect_identical(fit_summary$decision$FitReadiness, "ready")
+  expect_identical(facets_summary$decision$Interpretation,
+                   "Ready for formal inference")
+  expect_identical(facets_summary$decision$FormalInference, "Yes")
+  expect_identical(
+    fit_summary$decision$NextAction,
+    fit_summary$next_actions[1L]
+  )
 
   native <- plot(
     fit,
@@ -147,4 +160,37 @@ test_that("the executable fit_mfrm example remains short and inference-ready", {
   )
   expect_true(isTRUE(fit$summary$InferenceReady))
   expect_identical(fit$summary$ConvergenceSeverity, "pass")
+})
+
+test_that("the canonical PCM first-use route separates coordinates from freedom", {
+  dat <- load_mfrmr_data("example_operational")
+  expect_silent(
+    fit <- fit_mfrm(
+      dat,
+      person = "Person",
+      facets = c("Rater", "Criterion"),
+      score = "Score",
+      method = "MML",
+      model = "PCM",
+      step_facet = "Criterion",
+      quad_points = 7,
+      maxit = 30,
+      reltol = 1e-11
+    )
+  )
+  fit_summary <- summary(fit, profile = "fit", detail = "brief")
+  sizes <- mfrmr:::build_param_sizes(fit$config)
+
+  expect_identical(fit_summary$decision$Interpretation,
+                   "Fit gates passed; formal precision review required")
+  expect_identical(fit_summary$decision$FormalInference, "No")
+  expect_match(
+    fit_summary$decision$NextAction,
+    "diagnose_mfrm()",
+    fixed = TRUE
+  )
+  expect_identical(nrow(fit$steps), 9L)
+  expect_identical(as.integer(sizes$steps), 6L)
+  expect_identical(nrow(fit$slopes), 0L)
+  expect_null(sizes$log_slopes)
 })

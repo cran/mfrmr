@@ -333,6 +333,12 @@ order:
    redistribution, bias-screening rows, fair averages, or conclusions. Do not
    let fit improvement alone decide the operational model.
 
+After fitting candidates, `build_model_choice_review()` places the reported
+step/slope coordinate counts, identified free-parameter counts, and each fit's
+stored readiness decision in `review$model_roles`. Read those fields before
+the information criteria: a more flexible fit that is not inference-ready
+cannot become the selected operational model through AIC or BIC alone.
+
 This sequence keeps the interpretation aligned with the validation boundary:
 `RSM`/`PCM` support the full manuscript/reporting route, while bounded `GPCM`
 supports the documented direct and caveated routes.

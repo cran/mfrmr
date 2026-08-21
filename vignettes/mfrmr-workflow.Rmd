@@ -49,8 +49,10 @@ For a plot-first companion guide, see the separate
 For a faster preliminary run without changing the final analysis target:
 
 - test code mechanics on a small deterministic subset or, for an MML workflow,
-  a temporary `quad_points = 7` grid; restore the prespecified final MML grid
-  (31 points by default) and check quadrature sensitivity before reporting
+  a temporary `quad_points = 7` grid; that grid is screening-only and cannot
+  support automatic IC ranking or LRT. Restore the prespecified final MML grid
+  (31 points by default) and check a denser common grid when a comparison is
+  close or consequential
 - choose `method = "JML"` only when its person-parameter treatment is
   methodologically appropriate, not merely as a faster substitute for MML
 - use `diagnose_mfrm(..., residual_pca = "none", diagnostic_mode = "both",
@@ -154,6 +156,7 @@ facets_summary_toy <- summary(
 )
 res_toy <- facets_summary_toy$results
 
+fit_summary_toy$decision
 fit_summary_toy$overview
 fit_summary_toy$readiness
 fit_summary_toy$data_review
@@ -194,6 +197,18 @@ plot(
 )
 ```
 
+Read `$decision` before the parameter tables. The same five fields are used
+for RSM, PCM, and bounded GPCM: interpretation status, formal-inference status,
+fit readiness, the reason, and the highest-priority next action. This block
+does not add a new acceptance test. It combines the stored readiness record
+with any supplied precision evidence. A fit-only summary returns
+`FormalInference = "No"` until a matching `diagnose_mfrm()` result is supplied;
+`InferenceReady = TRUE` alone is not evidence for formal SE/CI or reliability.
+Use `summary(fit_toy, diagnostics = diag_toy)$decision` or
+`summary(diag_toy)$decision` for the precision-aware decision. When
+`FormalInference` is `"No"`, diagnostic work may continue to investigate the
+stated reason, but estimates and plots must not be reported as formal results.
+
 Optimizer code zero is only one numerical signal. `fit_mfrm()` also checks the
 terminal gradient; when the initial direct or hybrid solution stops with a
 larger gradient and `reltol <= 1e-9`, it runs a bounded sequence of
@@ -208,16 +223,17 @@ package default `maxit = 400` unless the analysis protocol states otherwise.
 If a run reaches `ConvergenceStatus = "iteration_limit"`, keep it review-only
 and repeat the same data, model, method, anchors, optimizer, tolerance, and
 quadrature rule with the next ceiling in a prespecified sequence. Interpret
-only a run with `Converged = TRUE`, `InferenceReady = TRUE`, and
+only a run with `FitReadiness = ready`, `InferenceReady = TRUE`, and
 `Numerical = pass`. If two separately ready runs differ materially, investigate
 numerical stability instead of selecting the preferred result. Report the
 requested ceiling, actual evaluations, convergence reason, and terminal
 gradient.
 
-`InferenceReady` describes this numerical gate only: Data, Design, Stability,
-Diagnostics, and Reporting remain separate rows in `fit_summary_toy$readiness`.
-For example, a disconnected design remains a reporting hold even if its
-optimizer converges. Conversely,
+`InferenceReady` is a conservative fit-level first screen: Input,
+Estimability, Category, Boundary, and Numerical components must all pass.
+Design, Stability, Diagnostics, and Reporting remain purpose-specific workflow
+rows in `fit_summary_toy$readiness`. For example, a diagnostic or reporting
+review can remain even when the stored fit record is ready. Conversely,
 `ready_for_diagnostics_and_reporting_follow_up` means that fitting completed
 and diagnostic review is the next stage; it is neither an optimization failure
 nor a claim that the analysis is already manuscript-ready.
@@ -261,6 +277,7 @@ auto-run by any summary profile. They require explicit contrasts, diagnostic
 settings, or multi-fit designs.
 
 ```{r toy-setup-artifacts, echo = FALSE, eval = is_cran_check}
+vignette_artifact("workflow_fit_decision.csv")
 vignette_artifact("workflow_fit_overview.csv")
 vignette_artifact("workflow_diagnostic_overview.csv")
 vignette_artifact("workflow_plot_components.csv")
@@ -283,11 +300,15 @@ export_toy <- export_mfrm_results(
   overwrite = TRUE,
   acknowledge_sensitive = TRUE
 )
-head(export_toy$written_files)
+export_preview <- head(export_toy$written_files)
+export_preview$Path <- basename(export_preview$Path)
+export_preview
 ```
 
 The acknowledgement suppresses the warning only; it does not redact person
 identifiers, person-level results, local paths, or the complete RDS object.
+The preview above deliberately shows path basenames only; the returned export
+object retains the actual local paths needed by the current analysis session.
 Review every exported file under the study's data-handling policy before sharing.
 
 ```{r primary-route-artifacts, echo = FALSE, eval = is_cran_check}

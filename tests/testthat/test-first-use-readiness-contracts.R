@@ -21,10 +21,10 @@
   unname(x$status$Value[match(item, x$status$Item)][1L])
 }
 
-test_that("disconnected designs remain reporting holds after numerical convergence", {
+test_that("exactly aliased disconnected designs stop before optimization", {
   dat <- .make_disconnected_first_use_data()
-  expect_warning(
-    fit <- fit_mfrm(
+  condition <- tryCatch(
+    suppressWarnings(fit_mfrm(
       dat,
       person = "Person",
       facets = c("Rater", "Criterion"),
@@ -32,77 +32,22 @@ test_that("disconnected designs remain reporting holds after numerical convergen
       rating_min = 1,
       rating_max = 4,
       method = "MML"
-    ),
-    "disconnected subset"
+    )),
+    error = identity
   )
-
-  expect_true(isTRUE(fit$summary$InferenceReady))
-  expect_equal(fit$data_review$overall_connectivity$components, 2L)
+  expect_s3_class(condition, "mfrmr_estimability_error")
+  expect_s3_class(condition, "mfrmr_readiness_condition")
   expect_identical(
-    fit$data_review$status$Status[fit$data_review$status$Domain == "Design"],
-    "hold_disconnected"
+    condition$readiness$EstimabilityState,
+    "structurally_unidentified"
   )
-
-  fit_summary <- summary(fit, profile = "fit", detail = "brief")
-  expect_identical(
-    .summary_status_value(fit_summary, "Overall status"),
-    "review_required"
-  )
-  expect_identical(
-    .summary_status_value(fit_summary, "Reporting readiness"),
-    "hold_for_design_review"
-  )
-  expect_identical(
-    fit_summary$required_visual$InterpretationStatus[1L],
-    "review_only"
-  )
-  expect_false(fit_summary$required_visual$InterpretationReady[1L])
-
-  expect_warning(
-    wright <- plot(fit, type = "wright", top_n = Inf, draw = FALSE),
-    "Review-only display"
-  )
-  expect_identical(wright$data$interpretation_status, "review_only")
-  expect_match(wright$data$subtitle, "REVIEW ONLY", fixed = TRUE)
-  expect_true(any(grepl("CI", wright$data$legend$label, fixed = TRUE)))
-  expect_identical(
-    mfrmr:::.mfrm_plot_display_title(
-      wright$data,
-      title = NULL,
-      fallback = "Wright map"
-    ),
-    "REVIEW ONLY - Wright map"
-  )
-
-  expect_warning(
-    unified <- plot_wright_unified(fit, draw = FALSE),
-    "Review-only display"
-  )
-  expect_identical(unified$interpretation_status, "review_only")
-  expect_identical(
-    mfrmr:::.mfrm_plot_display_title(
-      unified,
-      title = unified$title,
-      fallback = "Unified Wright Map"
-    ),
-    paste0("REVIEW ONLY - ", unified$title)
-  )
-
-  diagnostics <- diagnose_mfrm(
-    fit,
-    residual_pca = "none",
-    diagnostic_mode = "legacy"
-  )
-  checklist <- reporting_checklist(fit, diagnostics = diagnostics)
-  connectivity <- checklist$checklist[
-    checklist$checklist$Item == "Connectivity assessed",
-    ,
-    drop = FALSE
-  ]
-  expect_true(connectivity$Available)
-  expect_false(connectivity$DraftReady)
-  expect_identical(connectivity$Severity, "required")
-  expect_match(connectivity$Detail, "2 disconnected subsets", fixed = TRUE)
+  expect_identical(condition$estimability$observed_components, 2L)
+  expect_gt(condition$estimability$design$nullity, 0L)
+  expect_match(condition$readiness$ReasonCodes,
+               "disconnected_without_link", fixed = TRUE)
+  expect_match(conditionMessage(condition), "Optimization was not run",
+               fixed = TRUE)
+  expect_false(grepl("P01|P11", conditionMessage(condition)))
 })
 
 test_that("boundary separation is a stability hold, not a numerical pass", {
@@ -130,7 +75,9 @@ test_that("boundary separation is a stability hold, not a numerical pass", {
     "Boundary-constant"
   )
 
-  expect_true(isTRUE(fit$summary$InferenceReady))
+  expect_false(isTRUE(fit$summary$InferenceReady))
+  expect_identical(fit$summary$FitReadiness, "review")
+  expect_identical(fit$summary$CategoryState, "weak_information")
   expect_identical(
     fit$data_review$status$Status[
       fit$data_review$status$Domain == "Stability"

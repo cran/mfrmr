@@ -524,7 +524,13 @@ the <code>R5</code> rating-scale declaration becomes
 <code>rating_min = 1, rating_max = 5</code>. For a partial-credit
 specification, pass <code>model = &quot;PCM&quot;</code> and identify the facet
 that carries the step thresholds with <code>step_facet = &quot;Rater&quot;</code>
-(or the appropriate facet name).</p>
+(or the appropriate facet name). The declaration preserves the intended
+category map, but it is not a threshold anchor. A missing boundary
+category remains review evidence for the separate element-boundary
+contract. A missing internal category in a polytomous fitted ladder
+creates an unsupported adjacent-step contrast and stops fitting before
+optimization. Review or revise the data support rather than copying
+FACETS category-dropping behavior implicitly.</p>
 </div>
 <div id="anchoring" class="section level3">
 <h3>Anchoring</h3>
@@ -561,11 +567,19 @@ pair in one call.</p>
 thresholds, first create the FACETS-organized summary and retain its
 result object:</p>
 <div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>review <span class="ot">&lt;-</span> <span class="fu">summary</span>(fit, <span class="at">profile =</span> <span class="st">&quot;facets&quot;</span>, <span class="at">detail =</span> <span class="st">&quot;brief&quot;</span>)</span>
-<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>res <span class="ot">&lt;-</span> review<span class="sc">$</span>results</span>
-<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a></span>
-<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a><span class="co"># Primary final-scale figure: all locations and available facet uncertainty.</span></span>
-<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="fu">plot</span>(res, <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>, <span class="at">renderer =</span> <span class="st">&quot;native&quot;</span>, <span class="at">show_ci =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>     <span class="at">top_n =</span> <span class="cn">Inf</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>review<span class="sc">$</span>decision</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>res <span class="ot">&lt;-</span> review<span class="sc">$</span>results</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a></span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="co"># Primary final-scale figure: all locations and available facet uncertainty.</span></span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a><span class="fu">plot</span>(res, <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>, <span class="at">renderer =</span> <span class="st">&quot;native&quot;</span>, <span class="at">show_ci =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>     <span class="at">top_n =</span> <span class="cn">Inf</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
+<p>Read <code>review$decision</code> before using the FACETS-organized
+tables. It reports the same stored mfrmr readiness decision shown by
+<code>print(fit)</code>; the <code>facets</code> profile changes the
+organization of the review, not the estimator and not the evidence
+threshold. <code>FormalInference = &quot;No&quot;</code> therefore remains a stop
+on substantive reporting even when a familiar FACETS-style table or plot
+is available.</p>
 <p><code>plot_wright_unified()</code> is the corresponding explicit
 helper when the Wright map is the main figure. For readers who expect
 the FACETS Table 6-style asterisk ruler and horizontal, rubric-labelled

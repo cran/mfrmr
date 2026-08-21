@@ -231,6 +231,10 @@ test_that("facets_feature_coverage separates implemented and unsupported FACETS 
     "FACETSReference",
     "mfrmrRoute",
     "Status",
+    "SurfaceCoverage",
+    "StatisticalContract",
+    "ValidationEvidence",
+    "OperationalStatus",
     "Capability",
     "Limitation",
     "Alternative"
@@ -239,6 +243,15 @@ test_that("facets_feature_coverage separates implemented and unsupported FACETS 
   expect_true(all(nzchar(coverage$Capability)))
   expect_true(all(nzchar(coverage$Limitation)))
   expect_true(all(nzchar(coverage$Alternative)))
+  expect_true(all(nzchar(coverage$SurfaceCoverage)))
+  expect_true(all(nzchar(coverage$StatisticalContract)))
+  expect_true(all(nzchar(coverage$ValidationEvidence)))
+  expect_true(all(nzchar(coverage$OperationalStatus)))
+  expect_true(all(
+    coverage$ValidationEvidence[coverage$Status %in% c(
+      "implemented", "supported_with_caveat", "partial"
+    )] == "external_match_not_established"
+  ))
   expect_true(any(grepl(
     "documented FACETS version",
     coverage$Limitation,
@@ -256,7 +269,15 @@ test_that("facets_feature_coverage separates implemented and unsupported FACETS 
                     grepl("one RSM scale", coverage$Capability, fixed = TRUE) &
                     grepl("Multiple independent scales", coverage$Limitation, fixed = TRUE)))
   expect_true(any(grepl("Wright map", coverage$FACETSFeature, fixed = TRUE) &
-                    coverage$Status == "implemented"))
+                    coverage$Status == "implemented" &
+                    coverage$SurfaceCoverage ==
+                      "familiar_visual_grammar_available" &
+                    coverage$StatisticalContract ==
+                      "package_native_not_facets_equivalent" &
+                    coverage$ValidationEvidence ==
+                      "external_match_not_established" &
+                    coverage$OperationalStatus ==
+                      "package_route_available"))
   expect_true(any(grepl("Generalizability Theory", coverage$FACETSFeature, fixed = TRUE) &
                     coverage$Status == "supported_with_caveat" &
                     grepl("mfrm_d_study", coverage$mfrmrRoute, fixed = TRUE) &
@@ -293,6 +314,88 @@ test_that("facets_feature_coverage separates implemented and unsupported FACETS 
   expect_true(all(missing$Status == "not_implemented"))
 })
 
+test_that("facets_feature_coverage keeps future 0.2.3 routes fail closed", {
+  coverage <- facets_feature_coverage()
+  future_features <- c(
+    "Versioned frozen-calibration import and operational scoring",
+    "General threshold or step anchors and starting-value import",
+    "Multiple observed scales and scale-specific PCM",
+    "Nominal/multinomial response models",
+    "Binomial-trial and Poisson/count response models",
+    "Native multidimensional estimation and dimension-specific scores",
+    "Unrestricted GPCM",
+    "FACETS free-slope polytomous GPCM comparison"
+  )
+  future <- coverage[
+    coverage$FACETSArea == "Current scope boundary" &
+      coverage$FACETSFeature %in% future_features,
+    ,
+    drop = FALSE
+  ]
+
+  expect_setequal(future$FACETSFeature, future_features)
+  expect_true(all(future$Status == "not_implemented"))
+  expect_true(all(future$SurfaceCoverage == "unavailable"))
+  expect_true(all(future$StatisticalContract == "not_available"))
+  expect_true(all(future$ValidationEvidence == "not_applicable"))
+  expect_true(all(future$OperationalStatus == "blocked"))
+  expect_true(any(
+    future$FACETSFeature == "Versioned frozen-calibration import and operational scoring" &
+      grepl("existing fitted object", future$Limitation, fixed = TRUE)
+  ))
+  expect_true(any(
+    future$FACETSFeature == "Unrestricted GPCM" &
+      grepl("bounded", future$Capability, fixed = TRUE)
+  ))
+  expect_true(any(
+    future$FACETSFeature == "Nominal/multinomial response models" &
+      grepl("ordered category", future$Capability, fixed = TRUE) &
+      grepl("not an unordered", future$Limitation, fixed = TRUE)
+  ))
+  expect_true(any(
+    future$FACETSFeature == "Binomial-trial and Poisson/count response models" &
+      grepl("integer scores", future$Limitation, fixed = TRUE)
+  ))
+  expect_true(any(
+    future$FACETSFeature == "FACETS free-slope polytomous GPCM comparison" &
+      grepl("post-fit diagnostic", future$Limitation, fixed = TRUE) &
+      grepl("PCM/JML lane", future$Alternative, fixed = TRUE)
+  ))
+})
+
+test_that("facets_feature_coverage separates frequency weights from count outcomes", {
+  coverage <- facets_feature_coverage()
+  frequency <- coverage[
+    coverage$FACETSFeature == "Row-frequency weights for ordered ratings",
+    , drop = FALSE
+  ]
+
+  expect_equal(nrow(frequency), 1L)
+  expect_identical(frequency$Status, "supported_with_caveat")
+  expect_match(frequency$mfrmrRoute, "fit_mfrm(weight = ...)", fixed = TRUE)
+  expect_match(frequency$Capability, "positive numeric observation weight", fixed = TRUE)
+  expect_match(frequency$Capability, "row-replication weight", fixed = TRUE)
+  expect_match(frequency$Limitation, "not a general collapsed-person frequency table", fixed = TRUE)
+  expect_match(frequency$Limitation, "after marginalization", fixed = TRUE)
+  expect_match(frequency$Limitation, "does not create a count-response family", fixed = TRUE)
+  expect_match(frequency$Limitation, "information-criterion panel", fixed = TRUE)
+})
+
+test_that("fit_mfrm signature does not expose later-release calibration routes", {
+  current_args <- names(formals(fit_mfrm))
+  later_release_args <- c(
+    "calibration_bundle",
+    "frozen_calibration",
+    "threshold_anchors",
+    "step_anchors",
+    "scale_id",
+    "dimensions"
+  )
+
+  expect_false("..." %in% current_args)
+  expect_false(any(later_release_args %in% current_args))
+})
+
 test_that("facets_positioning_guide prevents FACETS numerical-clone wording", {
   guide <- facets_positioning_guide()
 
@@ -313,6 +416,12 @@ test_that("facets_positioning_guide prevents FACETS numerical-clone wording", {
   expect_true(any(grepl("read_facets_fit_table", guide$PrimaryRoute, fixed = TRUE)))
   expect_true(any(grepl("not as a general FACETS operational-calibration replacement",
                         guide$RecommendedWording,
+                        fixed = TRUE)))
+  expect_true(any(grepl("imported versioned frozen calibration",
+                        guide$Position,
+                        fixed = TRUE)))
+  expect_true(any(grepl("existing fitted object",
+                        guide$Position,
                         fixed = TRUE)))
   expect_false(any(grepl("\\baudit\\b", unlist(guide), ignore.case = TRUE)))
 })

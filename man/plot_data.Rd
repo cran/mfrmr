@@ -33,6 +33,8 @@ one.
 \examples{
 \donttest{
 toy <- load_mfrmr_data("example_core")
+# A balanced slice retains every Rater and Criterion while running quickly.
+toy <- toy[toy$Person \%in\% unique(toy$Person)[1:12], , drop = FALSE]
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", maxit = 30)
 
 wright_plot_data <- plot_data(fit, type = "wright")

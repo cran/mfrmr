@@ -53,7 +53,7 @@ test_that("data_quality_report returns a bundle", {
 
 test_that("data_quality_report flags retained zero-frequency score categories", {
   d <- mfrmr:::sample_mfrm_data(seed = 42)
-  d <- d[d$Score != 3, , drop = FALSE]
+  d <- d[d$Score != 1, , drop = FALSE]
   fit <- suppressWarnings(
     fit_mfrm(
       d, "Person", c("Rater", "Task", "Criterion"), "Score",
@@ -69,13 +69,13 @@ test_that("data_quality_report flags retained zero-frequency score categories", 
     facets = c("Rater", "Task", "Criterion"),
     score = "Score"
   )
-  zero_row <- dq$category_counts[dq$category_counts$Score == 3, , drop = FALSE]
+  zero_row <- dq$category_counts[dq$category_counts$Score == 1, , drop = FALSE]
   expect_equal(nrow(zero_row), 1L)
   expect_true(isTRUE(zero_row$ZeroCount[1]))
-  expect_identical(zero_row$UnusedCategoryType[1], "internal")
-  expect_true("zero_count_intermediate_score_category" %in% dq$caveats$Condition)
-  expect_true(any(dq$quality_flags$Flag == "Intermediate score categories have zero observations"))
-  expect_true(any(dq$quality_overview$Area == "Score support" & dq$quality_overview$Status == "high"))
+  expect_identical(zero_row$UnusedCategoryType[1], "boundary")
+  expect_true("zero_count_boundary_score_category" %in% dq$caveats$Condition)
+  expect_true(any(dq$quality_flags$Flag == "Declared score categories have zero observations"))
+  expect_true(any(dq$quality_overview$Area == "Score support" & dq$quality_overview$Status == "review"))
   expect_identical(summary(dq)$preview_name, "quality_flags")
 
   p <- plot(dq, type = "score_support", preset = "monochrome", draw = FALSE)
@@ -334,6 +334,8 @@ test_that("category_curves_report returns a bundle", {
                     names(cc$cumulative_probabilities)))
   expect_true(any(cc$cumulative_probabilities$Direction == "at_or_below"))
   expect_true(any(cc$cumulative_probabilities$Direction == "at_or_above"))
+  expect_true(all(c("CurveBasis", "PredictorOffset") %in% names(cc$probabilities)))
+  expect_identical(cc$settings$curve_basis, "zero_additive_facet_profile")
 })
 
 test_that("standalone residual and subset writers create files", {
@@ -981,17 +983,94 @@ test_that("bias reports flag mixed-sign orientation when facets mix score direct
 
 test_that("build_apa_outputs produces structured APA text", {
   apa <- build_apa_outputs(.fit, diagnostics = .diag)
+  readiness_record <- mfrmr:::mfrmr_get_readiness_record(.fit)
+  expect_equal(apa$fit_readiness, readiness_record$fit)
+  expect_equal(apa$fit_readiness_components, readiness_record$components)
+  expect_equal(apa$fit_readiness_parameters, readiness_record$parameters)
+  expect_equal(apa$contract$readiness$fit, readiness_record$fit)
+  expect_equal(summary(apa)$fit_readiness, readiness_record$fit)
+  expect_equal(apa$decision$FitReadiness, readiness_record$fit$FitReadiness)
   expect_s3_class(apa, "mfrm_apa_outputs")
   expect_true("report_text" %in% names(apa))
   expect_true("section_map" %in% names(apa))
   expect_true(nchar(apa$report_text) > 50)
   s <- summary(apa)
   expect_s3_class(s, "summary.mfrm_apa_outputs")
+  expect_identical(
+    names(s$decision),
+    c("Interpretation", "FormalInference", "FitReadiness", "Why", "NextAction")
+  )
   expect_true(is.data.frame(s$sections))
   expect_true("DraftContractPass" %in% names(s$overview))
   expect_true(any(grepl("contract completeness", s$notes, fixed = TRUE)))
   out <- capture.output(print(s))
-  expect_true(length(out) > 0)
+  expect_true(any(grepl("^Decision$", out)))
+  expect_true(any(grepl("Formal inference:", out, fixed = TRUE)))
+})
+
+test_that("APA precision cannot override blocked fit readiness", {
+  data <- load_mfrmr_data("example_core")
+  fit <- suppressWarnings(fit_mfrm(
+    data,
+    "Person",
+    c("Rater", "Criterion"),
+    "Score",
+    method = "MML",
+    model = "PCM",
+    step_facet = "Criterion",
+    quad_points = 7,
+    maxit = 1,
+    reltol = 1e-12
+  ))
+  diagnostics <- suppressWarnings(diagnose_mfrm(
+    fit, residual_pca = "none"
+  ))
+  diagnostics$precision_profile$SupportsFormalInference <- TRUE
+  apa <- build_apa_outputs(fit, diagnostics = diagnostics)
+
+  expect_identical(apa$fit_readiness$FitReadiness[[1]], "blocked")
+  expect_false(apa$fit_readiness$InferenceReady[[1]])
+  expect_identical(apa$decision$FormalInference[[1]], "No")
+  expect_match(apa$decision$Why[[1]], "Numerical convergence failed", fixed = TRUE)
+  expect_false(apa$contract$precision$supports_formal_inference)
+  expect_match(
+    apa$fit_readiness$ReasonCodes[[1]],
+    "iteration_limit",
+    fixed = TRUE
+  )
+})
+
+test_that("APA formal-inference decision requires precision support after fit gates pass", {
+  data <- load_mfrmr_data("example_core")
+  fit <- suppressWarnings(fit_mfrm(
+    data,
+    "Person",
+    c("Rater", "Criterion"),
+    "Score",
+    method = "JML",
+    model = "RSM",
+    maxit = 60
+  ))
+  diagnostics <- suppressWarnings(diagnose_mfrm(
+    fit,
+    residual_pca = "none"
+  ))
+  apa <- build_apa_outputs(fit, diagnostics = diagnostics)
+
+  expect_true(fit$readiness$fit$InferenceReady[[1]])
+  expect_false(apa$contract$precision$supports_formal_inference)
+  expect_identical(apa$contract$precision$tier, "exploratory")
+  expect_identical(apa$decision$FormalInference[[1]], "No")
+  expect_match(
+    apa$decision$Why[[1]],
+    "precision contract does not support formal inference",
+    fixed = TRUE
+  )
+  expect_match(
+    apa$decision$NextAction[[1]],
+    "keep the draft exploratory",
+    fixed = TRUE
+  )
 })
 
 test_that("build_apa_outputs with bias produces extended text", {

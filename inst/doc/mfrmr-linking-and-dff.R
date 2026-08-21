@@ -23,7 +23,7 @@ knitr::opts_chunk$set(
 #   score = "Score",
 #   method = "MML",
 #   model = "RSM",
-#   quad_points = 7
+#   quad_points = 31
 # )
 # 
 # diag <- diagnose_mfrm(fit, residual_pca = "none")
@@ -104,7 +104,7 @@ knitr::opts_chunk$set(
 #   method = "MML",
 #   model = "RSM",
 #   facet_interactions = "Rater:Criterion",
-#   quad_points = 7
+#   quad_points = 31
 # )
 # 
 # interaction_effect_table(fit_interaction)

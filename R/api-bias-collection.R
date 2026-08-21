@@ -6,9 +6,13 @@
 #' @param pairs Optional list of facet specifications. Each element should be a
 #'   character vector of length 2 or more, for example
 #'   `list(c("Rater", "Criterion"), c("Task", "Criterion"))`.
-#'   When `NULL`, all 2-way combinations of modeled facets are used.
+#'   Explicit specifications may include canonical `"Person"` regardless of
+#'   `include_person`. When `NULL`, all 2-way combinations of modeled facets
+#'   are used.
 #' @param include_person If `TRUE` and `pairs = NULL`, include `"Person"` in the
-#'   automatically generated pair set.
+#'   automatically generated pair set. `"Person"` denotes the source column
+#'   supplied as `person` to [fit_mfrm()] and remains opt-in because these
+#'   cells condition on fitted JML person measures or MML EAP scores.
 #' @param drop_empty If `TRUE`, omit empty bias tables from `by_pair` while still
 #'   recording them in the summary table.
 #' @param keep_errors If `TRUE`, retain per-pair error rows in the returned
@@ -31,6 +35,10 @@
 #' modelled facets automatically.  For a model with facets Rater,
 #' Criterion, and Task, this yields Rater\eqn{\times}Criterion,
 #' Rater\eqn{\times}Task, and Criterion\eqn{\times}Task.
+#' With `include_person = TRUE`, Person\eqn{\times}facet pairs are prepended in
+#' the fit's facet order. They are conditional plug-in likelihood screens, not
+#' jointly fitted Person\eqn{\times}facet terms. A single warning records this
+#' boundary for the batch.
 #'
 #' The `summary` table aggregates results across pairs:
 #' - `Rows`: number of interaction cells estimated
@@ -99,6 +107,14 @@ estimate_all_bias <- function(fit,
     pairs = pairs,
     include_person = include_person
   )
+  person_requested <- any(vapply(
+    pair_specs,
+    function(spec) "Person" %in% as.character(spec$facets),
+    logical(1)
+  ))
+  if (person_requested) {
+    warn_bias_person_screen(fit, helper = "estimate_all_bias()")
+  }
 
   by_pair <- list()
   summary_rows <- vector("list", length(pair_specs))
@@ -129,14 +145,19 @@ estimate_all_bias <- function(fit,
     }
 
     bias_obj <- tryCatch(
-      estimate_bias(
-        fit = fit,
-        diagnostics = diagnostics,
-        interaction_facets = facets,
-        max_abs = max_abs,
-        omit_extreme = omit_extreme,
-        max_iter = max_iter,
-        tol = tol
+      withCallingHandlers(
+        estimate_bias(
+          fit = fit,
+          diagnostics = diagnostics,
+          interaction_facets = facets,
+          max_abs = max_abs,
+          omit_extreme = omit_extreme,
+          max_iter = max_iter,
+          tol = tol
+        ),
+        mfrmr_person_bias_screen_warning = function(cnd) {
+          invokeRestart("muffleWarning")
+        }
       ),
       error = function(e) e
     )
@@ -247,6 +268,7 @@ estimate_all_bias <- function(fit,
     successful_pairs = length(by_pair),
     diagnostics_supplied = diagnostics_supplied,
     include_person = isTRUE(include_person),
+    person_pairs_requested = person_requested,
     drop_empty = isTRUE(drop_empty),
     keep_errors = isTRUE(keep_errors),
     max_abs = as.numeric(max_abs[1]),
@@ -266,18 +288,23 @@ estimate_all_bias <- function(fit,
 }
 
 resolve_bias_collection_pairs <- function(fit, pairs = NULL, include_person = FALSE) {
-  available <- as.character(fit$config$facet_names %||% character(0))
-  available <- available[!is.na(available) & nzchar(available)]
+  modeled_facets <- as.character(fit$config$facet_names %||% character(0))
+  modeled_facets <- modeled_facets[!is.na(modeled_facets) & nzchar(modeled_facets)]
+  modeled_facets <- unique(modeled_facets)
+
+  # `include_person` controls automatic enumeration only. Explicit `pairs`
+  # may name the canonical Person role directly.
+  known_facets <- unique(c("Person", modeled_facets))
+  available <- modeled_facets
   if (isTRUE(include_person)) {
     available <- c("Person", available)
   }
   available <- unique(available)
 
-  if (length(available) < 2L) {
-    stop("At least two available facets are required for multi-pair bias estimation.", call. = FALSE)
-  }
-
   if (is.null(pairs)) {
+    if (length(available) < 2L) {
+      stop("At least two available facets are required for multi-pair bias estimation.", call. = FALSE)
+    }
     auto_pairs <- utils::combn(available, 2, simplify = FALSE)
     return(lapply(auto_pairs, function(x) list(facets = x, label = paste(x, collapse = " x "))))
   }
@@ -293,13 +320,13 @@ resolve_bias_collection_pairs <- function(fit, pairs = NULL, include_person = FA
     if (length(pair) < 2L) {
       stop("Each element of `pairs` must contain at least two facet names.", call. = FALSE)
     }
-    bad <- setdiff(pair, available)
+    bad <- setdiff(pair, known_facets)
     if (length(bad) > 0) {
       stop(
         "Unknown facet(s) in `pairs[[", i, "]]`: ",
         paste(bad, collapse = ", "),
         ". Available: ",
-        paste(available, collapse = ", "),
+        paste(known_facets, collapse = ", "),
         call. = FALSE
       )
     }

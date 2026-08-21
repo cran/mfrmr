@@ -144,11 +144,12 @@ test_that("Rd execution guards have a narrow semantic allowlist", {
   )
 })
 
-test_that("former interactive demonstrations run in the donttest pass", {
+test_that("comparatively expensive demonstrations run in the donttest pass", {
   pkg_root <- example_policy_source_root()
   testthat::skip_if(is.na(pkg_root), "source files are not available")
 
   expected <- sort(c(
+    "gpcm_mml_quadrature_sensitivity",
     "dif_interaction_table", "plot_dif_heatmap", "facet_quality_dashboard",
     "summary.mfrm_facet_dashboard", "plot_facet_quality_dashboard",
     "diagnose_mfrm", "build_mfrm_manifest", "build_mfrm_replay_script",

@@ -158,6 +158,29 @@ Do not report `DraftReady`, `ReadyForAPA`, or `ClaimStrength` as if they were
 formal acceptance decisions; use them to decide what wording is currently safe
 and which caveats must remain visible.
 
+### Standards basis—and what the template cannot certify
+
+The helpers are APA-oriented drafting aids, informed by the *Publication
+Manual of the American Psychological Association* (7th ed.) and the
+quantitative Journal Article Reporting Standards (JARS-Quant; Appelbaum et
+al., 2018). MFRM-specific prompts are also tied to the measurement references
+returned by `reporting_checklist(..., include_references = TRUE)`, including
+Eckes, Myford and Wolfe, Linacre, Wright and Masters, and Muraki for GPCM.
+
+This is not a certification of APA or JARS compliance. A fitted measurement
+object cannot supply or verify hypotheses and their confirmatory/exploratory
+status, recruitment and participant characteristics, ethics, sample-size
+rationale, the missing-data mechanism and exclusions, multiplicity or
+deviations from plan, or complete data/code availability statements. Complete
+those study-level fields manually. Also review effect sizes and uncertainty,
+statistic-specific rounding (especially *p* values and confidence intervals),
+and the target journal's typography after exporting `apa_table()`.
+
+Reference: Appelbaum, M., Cooper, H., Kline, R. B., Mayo-Wilson, E., Nezu,
+A. M., & Rao, S. M. (2018). Journal article reporting standards for
+quantitative research in psychology. *American Psychologist, 73*(1), 3–25.
+[https://doi.org/10.1037/amp0000191](https://doi.org/10.1037/amp0000191)
+
 When the target is a local HTML/CSV/replay bundle rather than an interactive
 review object, use `export_mfrm_bundle()` directly from the fitted object. The
 result is a potentially identifying analysis archive, not a deidentified
@@ -194,7 +217,8 @@ tbl_reliability$note
 ```
 
 The actual table data are stored in `tbl_summary$table` and
-`tbl_reliability$table`.
+`tbl_reliability$table`. The `digits` argument applies uniform rounding to all
+numeric columns; it is deliberately not a statistic-aware APA formatter.
 
 ## 5. Add figure-ready visual data
 
@@ -244,7 +268,10 @@ When candidate models are fitted, separate same-data comparison from the
 scoring interpretation. `compare_mfrm()` provides the fit-statistic table;
 `build_model_choice_review()` attaches model roles, downstream route
 boundaries, and cautious wording. Convert the review to a summary-table bundle
-when the comparison needs to appear in an appendix or exported report.
+when the comparison needs to appear in an appendix or exported report. Fit all
+candidates on the same q>=31 grid before automatic ranking; below q=31 the raw
+criteria remain screening/review-only, and a close decision still requires a
+prespecified denser common-grid check.
 
 ```{r model-choice-route, eval=FALSE}
 cmp <- compare_mfrm(RSM = fit_rsm, PCM = fit_pcm, GPCM = fit_gpcm)

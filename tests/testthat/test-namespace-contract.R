@@ -377,7 +377,12 @@ test_that("NAMESPACE roxygen contract keeps expected exports and methods", {
     "S3method(as_ggplot,mfrm_design_evaluation_plot_data)",
     "S3method(as_ggplot,mfrm_plot_data)",
     "S3method(as_ggplot,mfrm_signal_detection)",
-    "S3method(as_ggplot,mfrm_signal_detection_plot_data)"
+    "S3method(as_ggplot,mfrm_signal_detection_plot_data)",
+    # 0.2.3: explicit GPCM-MML quadrature-sensitivity result surface.
+    "S3method(as.data.frame,mfrm_quadrature_sensitivity)",
+    "S3method(print,mfrm_quadrature_sensitivity)",
+    "S3method(print,summary.mfrm_quadrature_sensitivity)",
+    "S3method(summary,mfrm_quadrature_sensitivity)"
   )
   expect_setequal(s3, expected_s3)
 })

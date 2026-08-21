@@ -80,6 +80,11 @@ facet uncertainty and fitted step locations visible. For a closer FACETS-facing 
 renderer and leave `show_ci` at its default `FALSE`. The fitted coordinates do
 not change.
 
+Every retained native facet level is labelled. Only label coordinates are
+displaced for collision avoidance, with leader lines back to the fitted
+points. Step thresholds form one vertical ladder and their labels include the
+fitted transition logits.
+
 ```{r wright-facets-style}
 plot(
   fit,

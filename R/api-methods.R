@@ -734,6 +734,13 @@ summarize_residual_pca_bundle <- function(object, digits = 3, top_n = 10) {
     Facets = length(facet_names),
     OverallComponents = nrow(bundle_component_table(object, "overall_table")),
     FacetComponentRows = nrow(bundle_component_table(object, "by_facet_table")),
+    InferenceTier = as.character(object$InferenceTier %||% "exploratory"),
+    SupportsFormalInference = isTRUE(object$SupportsFormalInference),
+    PrimaryReportingEligible = isTRUE(object$PrimaryReportingEligible),
+    ReportingUse = as.character(object$ReportingUse %||% "screening_only"),
+    DecisionUse = as.character(
+      object$DecisionUse %||% "no_automatic_dimensionality_decision"
+    ),
     stringsAsFactors = FALSE
   )
   summarize_known_bundle(
@@ -742,7 +749,11 @@ summarize_residual_pca_bundle <- function(object, digits = 3, top_n = 10) {
     summary_candidates = character(0),
     preview_candidates = c("overall_table", "by_facet_table"),
     settings_candidates = character(0),
-    notes = "Residual PCA summary for unidimensionality checks (overall and/or by facet).",
+    notes = paste(
+      "Residual PCA is exploratory residual-structure screening",
+      "(overall and/or by facet), not a standalone dimensionality test or",
+      "an automatic decision about dimensions or subscores."
+    ),
     digits = digits,
     top_n = top_n,
     summary_override = summary_tbl
@@ -1261,8 +1272,7 @@ conquest_overlap_command_scope <- function(object) {
   covariate <- as.character(summary_tbl$Covariate[1] %||% "")
   has_widths <- grepl("pidwidth=", command, fixed = TRUE) &&
     grepl("keepswidth=", command, fixed = TRUE)
-  has_block_comment <- grepl("^\\s*/\\*", command) &&
-    grepl("\\*/", command)
+  comment_free <- !grepl("/\\*|\\*/", command)
   has_exports <- all(vapply(
     c(
       "export parameters ! filetype=csv",
@@ -1285,7 +1295,7 @@ conquest_overlap_command_scope <- function(object) {
     ),
     Status = c(
       "template only",
-      if (has_block_comment) "block comments" else "review required",
+      if (comment_free) "comment-free executable input" else "review required",
       if (has_widths) "explicit CSV widths" else "review required",
       "narrow overlap only",
       if (has_exports) "requested" else "review required",
@@ -1293,7 +1303,11 @@ conquest_overlap_command_scope <- function(object) {
     ),
     Evidence = c(
       "bundle$conquest_command",
-      if (has_block_comment) "command text starts with /* and closes with */" else "ConQuest block comment markers not detected",
+      if (comment_free) {
+        "no prose or C-style comment markers precede the datafile command"
+      } else {
+        "comment markers require runtime review"
+      },
       if (has_widths) "pidwidth and keepswidth are present" else "pidwidth or keepswidth is missing",
       paste0("binary ", facet, " facet with numeric covariate `", covariate, "`"),
       "parameters, reg_coefficients, covariance, and cases EAP CSV outputs",
@@ -1301,7 +1315,7 @@ conquest_overlap_command_scope <- function(object) {
     ),
     Interpretation = c(
       "Use the command text as a starting point for a local ConQuest run, not as an executed benchmark.",
-      "Generated comments follow the documented ConQuest block-comment style rather than FACETS-style leading asterisks.",
+      "The executable command contains commands only; explanatory prose remains in the bundle README.",
       "CSV input with PID/keeps variables needs explicit widths in the command template.",
       "The bundle does not generalize to full many-facet or polytomous ConQuest workflows.",
       "Review and combine external parameter, beta, sigma, and case outputs before review normalization.",
@@ -7003,6 +7017,8 @@ plot.mfrm_bundle <- function(x, y = NULL, type = NULL, ...) {
 #'
 #' @section Interpreting output:
 #' - `overview`: analysis scale, subset count, and residual-PCA mode.
+#' - `fit_readiness`: the source fit's versioned readiness row. Diagnostics do
+#'   not promote a blocked or review-only fit to inferential use.
 #' - `diagnostic_basis`: plain-language map of which fit path was computed and
 #'   what each path means statistically.
 #' - `overall_fit`: global fit indices.
@@ -7020,6 +7036,11 @@ plot.mfrm_bundle <- function(x, y = NULL, type = NULL, ...) {
 #'
 #' @return An object of class `summary.mfrm_diagnostics` with:
 #' - `overview`: design-level counts and residual-PCA mode
+#' - `decision`: the same plain-language fit-readiness decision used by
+#'   `summary(fit)`, retained ahead of diagnostic screening results
+#' - `fit_readiness`, `fit_readiness_components`, and
+#'   `fit_readiness_parameters`: readiness provenance inherited from the source
+#'   fit and retained separately from diagnostic-screening status
 #' - `status`: concise front-door status block for quick review
 #' - `key_warnings`: highest-priority warnings to review first
 #' - `next_actions`: recommended follow-up helpers
@@ -7109,7 +7130,41 @@ summary.mfrm_diagnostics <- function(object,
   facets_chisq_tbl <- tibble::as_tibble(object$facets_chisq %||% tibble::tibble())
   marginal_available <- isTRUE(object$marginal_fit$available)
   marginal_pairwise_available <- isTRUE(object$marginal_fit$pairwise$available)
+  fair_average_tbl <- tibble::as_tibble(
+    object$fair_average$stacked %||% tibble::tibble()
+  )
+  fair_average_status <- as.character(
+    object$fair_average$status %||%
+      if (nrow(fair_average_tbl) > 0L) "embedded_available" else "not_available"
+  )[1L]
   diagnostic_mode <- as.character(object$diagnostic_mode %||% "legacy")
+  fit_readiness_tbl <- tibble::as_tibble(
+    object$fit_readiness %||% data.frame()
+  )
+  fit_readiness_components_tbl <- tibble::as_tibble(
+    object$fit_readiness_components %||% data.frame()
+  )
+  fit_readiness_parameters_tbl <- tibble::as_tibble(
+    object$fit_readiness_parameters %||% data.frame()
+  )
+  fit_readiness_known <- nrow(fit_readiness_tbl) == 1L &&
+    all(c("FitReadiness", "InferenceReady") %in% names(fit_readiness_tbl))
+  source_fit_state <- if (fit_readiness_known) {
+    as.character(fit_readiness_tbl$FitReadiness[1])
+  } else {
+    "not_available"
+  }
+  source_inference_ready <- fit_readiness_known &&
+    isTRUE(fit_readiness_tbl$InferenceReady[1])
+  source_fit_label <- switch(
+    source_fit_state,
+    ready = "ready; fit gates passed, with formal precision evaluated separately",
+    ready_with_exclusions = "ready with exclusions; review parameter eligibility",
+    review = "review required; formal inference is not ready",
+    blocked = "blocked; formal inference is not ready",
+    legacy_unknown = "legacy readiness unknown; refit or re-audit required",
+    "readiness not available"
+  )
 
   n_obs <- nrow(obs_tbl)
   n_person <- if ("Person" %in% names(obs_tbl)) dplyr::n_distinct(obs_tbl$Person) else NA_integer_
@@ -7128,7 +7183,8 @@ summary.mfrm_diagnostics <- function(object,
       summary_method = precision_profile_tbl$Method[1] %||% NA_character_
     ),
     PrecisionTier = as.character(precision_profile_tbl$PrecisionTier[1] %||% NA_character_),
-    MarginalFit = if (marginal_available) "available" else "not_available"
+    MarginalFit = if (marginal_available) "available" else "not_available",
+    FairAverage = fair_average_status
   )
 
   reliability_overview <- tibble::tibble()
@@ -7303,6 +7359,20 @@ summary.mfrm_diagnostics <- function(object,
   )
 
   key_warnings <- character(0)
+  if (fit_readiness_known && !source_inference_ready) {
+    key_warnings <- c(
+      key_warnings,
+      paste0(
+        "The source fit is ", source_fit_state,
+        " and is not inference-ready; all diagnostic outputs remain review-only."
+      )
+    )
+  } else if (!fit_readiness_known) {
+    key_warnings <- c(
+      key_warnings,
+      "Source-fit readiness is unavailable; do not use diagnostics to infer that the fit passed its numerical and identification gates."
+    )
+  }
   if (nrow(precision_review_tbl) > 0 && "Status" %in% names(precision_review_tbl)) {
     flagged_checks <- precision_review_tbl |>
       dplyr::filter(.data$Status %in% c("review", "warn"))
@@ -7393,6 +7463,12 @@ summary.mfrm_diagnostics <- function(object,
   next_actions <- c(
     "Inspect `diagnostic_basis` before comparing legacy residual evidence with strict marginal evidence."
   )
+  if (!source_inference_ready) {
+    next_actions <- c(
+      "Inspect `summary(fit)$readiness` and resolve the source-fit gate before interpreting diagnostic magnitudes substantively.",
+      next_actions
+    )
+  }
   if (!identical(as.character(precision_profile_tbl$Method[1] %||% NA_character_), "MML")) {
     next_actions <- c(
       next_actions,
@@ -7424,6 +7500,18 @@ summary.mfrm_diagnostics <- function(object,
     )
   }
   next_actions <- clean_summary_lines(next_actions, max_n = 4L)
+  decision <- mfrm_fit_decision_summary(
+    fit_readiness_tbl,
+    next_action = next_actions[1L] %||% NA_character_,
+    supports_formal_inference = if (nrow(precision_profile_tbl) > 0L) {
+      isTRUE(precision_profile_tbl$SupportsFormalInference[1L])
+    } else {
+      NA
+    },
+    precision_tier = as.character(
+      precision_profile_tbl$PrecisionTier[1L] %||% NA_character_
+    )
+  )
 
   overall_status <- dplyr::case_when(
     any(key_warnings != "No immediate warnings from diagnostics summary.") ~ "follow_up_needed",
@@ -7432,6 +7520,7 @@ summary.mfrm_diagnostics <- function(object,
   )
   status <- make_summary_block(
     "Overall status" = overall_status,
+    "Source fit readiness" = source_fit_label,
     "Diagnostic path" = diagnostic_mode,
     "Strict marginal fit" = strict_path_status,
     "Precision tier" = precision_tier,
@@ -7443,6 +7532,7 @@ summary.mfrm_diagnostics <- function(object,
       "Overall fit / reliability",
       "Precision basis / inferential caveats",
       "Strict marginal fit",
+      "Fair averages / adjusted-score review",
       "Residual PCA / local structure",
       "Unexpected responses / displacement",
       "Connectivity / subsets",
@@ -7452,6 +7542,13 @@ summary.mfrm_diagnostics <- function(object,
       "yes",
       "yes",
       if (marginal_available) "yes" else if (identical(diagnostic_mode, "legacy")) "no" else "requested_not_available",
+      if (identical(fair_average_status, "available_direct_only")) {
+        "direct_only"
+      } else if (identical(fair_average_status, "embedded_available")) {
+        "yes"
+      } else {
+        "no"
+      },
       "partial",
       "partial",
       "partial",
@@ -7464,6 +7561,14 @@ summary.mfrm_diagnostics <- function(object,
         "diagnostics$marginal_fit / rating_scale_table(..., diagnostics = diagnostics)"
       } else {
         "diagnose_mfrm(..., diagnostic_mode = \"both\")"
+      },
+      if (identical(fair_average_status, "available_direct_only")) {
+        as.character(
+          object$fair_average$direct_route %||%
+            "fair_average_table(fit, diagnostics = diagnostics)"
+        )
+      } else {
+        "diagnostics$fair_average / fair_average_table(fit, diagnostics = diagnostics)"
       },
       "analyze_residual_pca() / diagnostics$pca details",
       "unexpected_response_table() / displacement_table() / interaction tables",
@@ -7478,6 +7583,16 @@ summary.mfrm_diagnostics <- function(object,
   }
   if (nrow(precision_profile_tbl) > 0 && identical(as.character(precision_profile_tbl$PrecisionTier[1]), "hybrid")) {
     notes <- c(notes, "Precision outputs are hybrid for this run; inspect levels that fell back to observation-table information before treating the run as fully inferential.")
+  }
+  if (identical(fair_average_status, "available_direct_only")) {
+    notes <- c(
+      notes,
+      paste0(
+        "The embedded fair-average dashboard panel is disabled for bounded GPCM; ",
+        "use `fair_average_table(fit, diagnostics = diagnostics)` for the ",
+        "supported slope-aware element-conditional table."
+      )
+    )
   }
   if (isTRUE(n_subsets > 1L)) {
     notes <- c(notes, "Multiple disconnected subsets were detected.")
@@ -7571,7 +7686,11 @@ summary.mfrm_diagnostics <- function(object,
 
   out <- list(
     overview = overview,
+    decision = decision,
     status = status,
+    fit_readiness = fit_readiness_tbl,
+    fit_readiness_components = fit_readiness_components_tbl,
+    fit_readiness_parameters = fit_readiness_parameters_tbl,
     key_warnings = key_warnings,
     next_actions = next_actions,
     diagnostic_basis = diagnostic_basis_tbl,
@@ -7618,6 +7737,8 @@ print.summary.mfrm_diagnostics <- function(x, ...) {
       hybrid = "Mixed model-based and fallback precision",
       exploratory = "Exploratory precision",
       available = "Available",
+      embedded_available = "Available in diagnostics",
+      available_direct_only = "Available via direct table only",
       not_available = "Not available",
       not_requested = "Not requested",
       requested_not_available = "Requested but not available",
@@ -7656,7 +7777,11 @@ print.summary.mfrm_diagnostics <- function(x, ...) {
       cat(sprintf("  Diagnostic mode: %s\n", display_value(ov$DiagnosticMode)))
       cat(sprintf("  Strict marginal fit: %s\n", display_value(ov$MarginalFit)))
     }
+    if ("FairAverage" %in% names(ov)) {
+      cat(sprintf("  Fair average: %s\n", display_value(ov$FairAverage)))
+    }
   }
+  print_fit_decision_section(x$decision)
   if (!is.null(x$status) && nrow(x$status) > 0) {
     print_bullet_section(
       "Status",
@@ -8073,7 +8198,7 @@ print.summary.mfrm_bias <- function(x, ...) {
 #' not claim that FACETS was executed or that estimates are numerically
 #' equivalent to FACETS output.
 #' It returns a structured object and prints:
-#' - model fit overview (N, LogLik, AIC/BIC, convergence)
+#' - model fit overview (N, LogLik, the canonical/legacy IC status, convergence)
 #' - estimation settings that affect identification/scoring interpretation
 #' - facet-level estimate distribution (mean/SD/range)
 #' - person measure distribution
@@ -8085,16 +8210,30 @@ print.summary.mfrm_bias <- function(x, ...) {
 #'   measures
 #'
 #' @section Interpreting output:
-#' - `overview`: convergence and information criteria.
-#' - `readiness`: separate Numerical, Data, Design, Stability, Diagnostics,
-#'   and Reporting states. `InferenceReady` contributes only to Numerical;
-#'   a numerical pass cannot override a disconnected-design or boundary-
-#'   separation hold.
+#' - `overview`: convergence plus the versioned information-criterion contract.
+#'   For eligible fixed-facet MML fits, BIC/SABIC use unique Persons, not
+#'   response rows; JML, non-unit observation weights, and legacy objects do
+#'   not enter the common MML ranking panel. `ICSelectable` additionally
+#'   distinguishes raw screening/review criteria at q<31 from criteria that
+#'   may enter automatic same-grid comparison at q>=31; close decisions still
+#'   require a denser common-grid sensitivity check.
+#' - `readiness`: the stored fit-readiness result followed by Numerical, Data,
+#'   Design, Stability, Diagnostics, and Reporting workflow states.
+#'   `InferenceReady` is a conservative compatibility scalar and is `TRUE`
+#'   only when the stored `FitReadiness` is `ready`; numerical convergence
+#'   cannot override input, estimability, category, or boundary review.
+#' - `decision`: separates that fit gate from formal precision support. A
+#'   fit-only summary returns `FormalInference = "No"` until a matching
+#'   `mfrm_diagnostics` object is supplied through `diagnostics =`; use
+#'   `summary(diagnostics)$decision` for the equivalent precision-aware view.
 #' - `data_review`: overall multi-facet connectivity, facet-level score
 #'   support, boundary-constant levels, single-level facets, and retained
 #'   preparation notes behind the readiness rows.
 #' - `facet_overview`: per-facet spread and range of estimates.
-#' - `person_overview`: distribution of person measures.
+#' - `person_overview`: distribution of person measures. For a blocked source
+#'   fit, a prior-regularized extreme MML EAP is retained in `person_high` /
+#'   `person_low` but excluded from this aggregate and `targeting`; the table
+#'   records its distribution denominator, exclusion count, and estimate use.
 #' - `step_overview`: threshold spread and monotonicity checks, reported by
 #'   `StepFacet` ladder for PCM/GPCM fits and as one common ladder for RSM fits.
 #' - `settings_overview`: estimation settings that affect interpretation.
@@ -8112,6 +8251,12 @@ print.summary.mfrm_bias <- function(x, ...) {
 #' - `reporting_map`: where to get companion outputs for manuscript reporting.
 #' - `person_high` / `person_low` (opt-in for printing) and `facet_extremes`:
 #'   extreme estimates for focused review.
+#' - `facet_support_boundaries`: observed non-person facet levels whose retained
+#'   responses are constant at the minimum or maximum score. This is a data-
+#'   support warning, not by itself a proof that a parameter MLE is infinite.
+#' - `facet_recession_review`: non-person facet directions certified as
+#'   unbounded in an evaluated JML additive recession subspace. Joint rows are
+#'   relative directions under the fitted identification constraints.
 #'
 #' @section Typical workflow:
 #' 1. Review data and score support with [describe_mfrm_data()].
@@ -8128,8 +8273,12 @@ print.summary.mfrm_bias <- function(x, ...) {
 #' @return An object of class `summary.mfrm_fit` with:
 #' - `overview`: global model/fit indicators
 #' - `status`: concise front-door status block for quick review
-#' - `readiness`: domain-specific numerical, data, design, stability,
-#'   diagnostic, and reporting states
+#' - `decision`: plain-language interpretation, formal-inference status,
+#'   reason, and highest-priority next action derived from the stored readiness
+#'   contract plus supplied precision evidence; fit readiness alone never
+#'   yields `FormalInference = "Yes"`
+#' - `readiness`: the stored fit-level state plus numerical, data, design,
+#'   stability, diagnostic, and reporting workflow states
 #' - `data_review`: structured connectivity and facet-support evidence used by
 #'   the non-numerical readiness gates
 #' - `key_warnings`: highest-priority warnings to review first
@@ -8143,12 +8292,19 @@ print.summary.mfrm_bias <- function(x, ...) {
 #' - `population_coding`: categorical covariate levels and contrast provenance
 #'   when a population model uses model-matrix coding
 #' - `facet_overview`: per-facet estimate distribution summary
-#' - `person_overview`: person-measure distribution summary
+#' - `person_overview`: person-measure distribution summary with the actual
+#'   aggregation denominator, blocked extreme-EAP exclusion count, and estimate
+#'   use
 #' - `targeting`: person-versus-non-person facet targeting overview
 #'   (Wright-map-style mean/SD comparison)
 #' - `step_overview`: threshold/step diagnostics by PCM/GPCM `StepFacet`
 #'   ladder, or for the common RSM ladder
-#' - `slope_overview`: discrimination summary for `GPCM` fits
+#' - `slope_overview`: parameter-readiness and explicitly labelled optimizer-
+#'   trace summary for `GPCM` discriminations
+#' - `inference_evidence`: for `GPCM` MML, a compact separation of optimizer
+#'   stationarity, retained-point local rank, observed-information curvature,
+#'   slope-boundary screening, and the final readiness decision. Supportive
+#'   local evidence does not override an inconclusive boundary audit
 #' - `interaction_overview`: model-estimated facet-interaction summary
 #'   when the fit was specified with `facet_interactions`
 #' - `settings_overview`: estimation-settings overview that pins the
@@ -8167,6 +8323,10 @@ print.summary.mfrm_bias <- function(x, ...) {
 #'   checks, draft reporting)
 #' - `person_high` / `person_low`: highest and lowest person measures
 #' - `facet_extremes`: extreme facet-level estimates
+#' - `facet_support_boundaries`: observed boundary-constant non-person facet
+#'   levels, kept distinct from parameter-level recession conclusions
+#' - `facet_recession_review`: certified JML additive facet recession
+#'   directions, including review scope and completeness
 #' - `caveats`: structured warning/review rows for score-support and
 #'   latent-regression population-model issues
 #' - `notes`: short interpretation notes
@@ -8190,12 +8350,16 @@ print.summary.mfrm_bias <- function(x, ...) {
 #' )
 #' s <- summary(fit)
 #' s$overview[, c(
-#'   "Model", "Method", "Converged", "InferenceReady",
+#'   "Model", "Method", "Converged", "FitReadiness", "InferenceReady",
 #'   "ConvergenceSeverity"
 #' )]
 #' s$readiness
-#' # `InferenceReady = TRUE` clears only the numerical gate. Also require the
-#' # Data, Design, and Stability rows to support the intended interpretation.
+#' # `InferenceReady = TRUE` means all five stored fit components passed.
+#' # It does not, by itself, support formal SE/CI or reliability.
+#' diag <- diagnose_mfrm(fit, residual_pca = "none")
+#' summary(fit, diagnostics = diag)$decision
+#' # Design, Stability, Diagnostics, and Reporting remain purpose-specific
+#' # workflow reviews rather than alternative fit-readiness derivations.
 #' # If Numerical is not a pass, inspect the retained polish stages; increasing
 #' # `maxit` alone may not resolve the review.
 #' s$person_overview
@@ -8251,6 +8415,343 @@ summary.mfrm_fit <- function(object, digits = 3, top_n = 5, ...,
   )
 }
 
+mfrm_summary_facet_support_boundaries <- function(object) {
+  boundary_levels <- as.data.frame(
+    object$data_review$boundary_levels %||% data.frame(),
+    stringsAsFactors = FALSE
+  )
+  if (nrow(boundary_levels) == 0L) return(tibble::tibble())
+
+  keep <- intersect(
+    c(
+      "Facet", "Level", "ConstantScore", "BoundaryConstant",
+      "Observations", "WeightedN", "DistinctScores", "MinScore", "MaxScore"
+    ),
+    names(boundary_levels)
+  )
+  if (!all(c("Facet", "Level") %in% keep)) return(tibble::tibble())
+  tibble::as_tibble(boundary_levels[, keep, drop = FALSE])
+}
+
+mfrm_summary_facet_recession_review <- function(object) {
+  audits <- object$config$boundary_audit %||% list()
+  audit_names <- c("structural_additive", "joint_additive")
+  scope_labels <- c(
+    structural_additive = "structural_fixed_person",
+    joint_additive = "joint_person_structural"
+  )
+  rows <- lapply(audit_names, function(audit_name) {
+    audit <- audits[[audit_name]] %||% list()
+    targets <- as.data.frame(
+      audit$target_status %||% data.frame(),
+      stringsAsFactors = FALSE
+    )
+    required <- c(
+      "ParameterId", "ParameterClass", "Facet", "Level",
+      "OptimizerEstimate", "CandidateStatus", "EvaluationState", "ReasonCodes"
+    )
+    if (nrow(targets) == 0L || !all(required %in% names(targets))) {
+      return(data.frame())
+    }
+    keep <- as.character(targets$ParameterClass) == "facet" &
+      as.character(targets$CandidateStatus) %in%
+        c("unbounded_low", "unbounded_high", "unbounded_both") &
+      startsWith(as.character(targets$EvaluationState), "evaluated")
+    targets <- targets[keep, , drop = FALSE]
+    if (nrow(targets) == 0L) return(data.frame())
+    data.frame(
+      ParameterId = as.character(targets$ParameterId),
+      Facet = as.character(targets$Facet),
+      Level = as.character(targets$Level),
+      BoundaryStatus = as.character(targets$CandidateStatus),
+      OptimizerEstimate = suppressWarnings(as.numeric(targets$OptimizerEstimate)),
+      AuditScope = unname(scope_labels[[audit_name]]),
+      AuditComplete = isTRUE(audit$complete),
+      StatusBasis = "certified_in_audited_additive_subspace",
+      ReasonCodes = as.character(targets$ReasonCodes),
+      stringsAsFactors = FALSE
+    )
+  })
+  out <- dplyr::bind_rows(rows)
+  if (nrow(out) == 0L) return(tibble::tibble())
+
+  # A fixed-Person structural certificate is the narrower statement and is
+  # preferred when the same expanded parameter is also certified in the joint
+  # Person-structural audit. The joint-only rows remain relative directions
+  # under the fit's identification constraints, not independent levelwise MLEs.
+  out |>
+    dplyr::mutate(
+      AuditPriority = match(.data$AuditScope,
+                            c("structural_fixed_person", "joint_person_structural"))
+    ) |>
+    dplyr::arrange(.data$AuditPriority, .data$Facet, .data$Level) |>
+    dplyr::distinct(.data$ParameterId, .keep_all = TRUE) |>
+    dplyr::select(-"AuditPriority", -"ParameterId") |>
+    tibble::as_tibble()
+}
+
+mfrm_gpcm_mml_inference_evidence <- function(object) {
+  config <- object$config %||% list()
+  model <- toupper(as.character(
+    config$model %||% object$summary$Model[1] %||% ""
+  )[1])
+  method <- toupper(as.character(
+    config$method %||% object$summary$Method[1] %||% ""
+  )[1])
+  if (!identical(model, "GPCM") || !identical(method, "MML")) {
+    return(tibble::tibble())
+  }
+
+  estimability <- object$data_review$estimability %||%
+    config$estimability_audit %||% list()
+  local <- estimability$nonlinear_local_estimability %||% list()
+  information <- estimability$fitted_information %||% list()
+  boundary <- config$boundary_audit$gpcm_slope_boundary %||% list()
+  readiness <- as.data.frame(
+    mfrmr_get_readiness_record(object)$fit,
+    stringsAsFactors = FALSE
+  )
+  optimizer <- object$opt$optimizer_diagnostics %||% list()
+
+  eigenvalues <- as.data.frame(
+    information$eigenvalue_summary %||% data.frame(),
+    stringsAsFactors = FALSE
+  )
+  minimum_eigenvalue <- if (
+    nrow(eigenvalues) > 0L && "Smallest" %in% names(eigenvalues)
+  ) {
+    as.numeric(eigenvalues$Smallest[1])
+  } else {
+    NA_real_
+  }
+  maximum_eigenvalue <- if (
+    nrow(eigenvalues) > 0L && "Largest" %in% names(eigenvalues)
+  ) {
+    as.numeric(eigenvalues$Largest[1])
+  } else {
+    NA_real_
+  }
+  condition_number <- if (
+    is.finite(minimum_eigenvalue) && minimum_eigenvalue > 0 &&
+      is.finite(maximum_eigenvalue)
+  ) {
+    maximum_eigenvalue / minimum_eigenvalue
+  } else {
+    NA_real_
+  }
+
+  rank_ladder <- as.data.frame(
+    information$rank_ladder %||% data.frame(),
+    stringsAsFactors = FALSE
+  )
+  free_dimension <- as.integer(information$free_dimension %||% NA_integer_)
+  positive_definite <- identical(
+    as.character(information$status %||% ""),
+    "evaluated_diagnostic_only"
+  ) && is.finite(minimum_eigenvalue) && minimum_eigenvalue > 0 &&
+    nrow(rank_ladder) > 0L &&
+    all(c("PositiveRank", "NegativeCount", "NearZeroCount") %in%
+          names(rank_ladder)) &&
+    all(as.integer(rank_ladder$PositiveRank) == free_dimension) &&
+    all(as.integer(rank_ladder$NegativeCount) == 0L) &&
+    all(as.integer(rank_ladder$NearZeroCount) == 0L)
+
+  optimizer_severity <- as.character(
+    optimizer$ConvergenceSeverity %||% "not_evaluated"
+  )[1]
+  optimizer_state <- if (identical(optimizer_severity, "pass")) {
+    "stationary_candidate"
+  } else {
+    paste0("optimizer_", tolower(optimizer_severity))
+  }
+  local_state <- as.character(local$state %||% "not_evaluated")[1]
+  curvature_state <- if (positive_definite) {
+    "locally_positive_definite_at_recorded_tolerances"
+  } else {
+    as.character(information$status %||% "not_evaluated")[1]
+  }
+  boundary_state <- as.character(boundary$state %||% "not_evaluated")[1]
+  readiness_state <- if (nrow(readiness) == 1L) {
+    as.character(readiness$FitReadiness[1])
+  } else {
+    "not_evaluated"
+  }
+  readiness_reasons <- if (
+    nrow(readiness) == 1L && "ReasonCodes" %in% names(readiness)
+  ) {
+    as.character(readiness$ReasonCodes[1])
+  } else {
+    "readiness_record_unavailable"
+  }
+  if (length(readiness_reasons) != 1L || is.na(readiness_reasons) ||
+      !nzchar(readiness_reasons)) {
+    readiness_reasons <- "none_recorded"
+  }
+
+  tibble::tibble(
+    EvidenceArea = c(
+      "optimizer_stationarity", "local_estimability",
+      "observed_information_curvature", "slope_boundary_screen",
+      "fit_readiness"
+    ),
+    State = c(
+      optimizer_state, local_state, curvature_state, boundary_state,
+      readiness_state
+    ),
+    Complete = c(
+      identical(optimizer_severity, "pass"),
+      isTRUE(local$local_first_order_classified),
+      identical(as.character(information$status %||% ""),
+                "evaluated_diagnostic_only"),
+      isTRUE(boundary$complete) && isTRUE(boundary$scope_complete),
+      nrow(readiness) == 1L
+    ),
+    Rank = c(
+      NA_integer_, as.integer(local$local_rank %||% NA_integer_),
+      if (positive_definite) free_dimension else NA_integer_,
+      NA_integer_, NA_integer_
+    ),
+    Dimension = c(
+      NA_integer_, as.integer(local$free_dimension %||% NA_integer_),
+      free_dimension, NA_integer_, NA_integer_
+    ),
+    MinimumEigenvalue = c(
+      NA_real_, NA_real_, minimum_eigenvalue, NA_real_, NA_real_
+    ),
+    MaximumEigenvalue = c(
+      NA_real_, NA_real_, maximum_eigenvalue, NA_real_, NA_real_
+    ),
+    ConditionNumber = c(
+      NA_real_, NA_real_, condition_number, NA_real_, NA_real_
+    ),
+    Interpretation = c(
+      "Necessary numerical condition; not an inference decision.",
+      "Supportive retained-point local rank; not global identification.",
+      paste(
+        "Diagnostic local curvature only; inspect Optimizer*SE in",
+        "diagnose_mfrm(fit)$parameter_uncertainty."
+      ),
+      if (startsWith(boundary_state, "none_certified")) {
+        paste(
+          "No audited path was certified; this is inconclusive and does not",
+          "prove an interior finite maximum."
+        )
+      } else {
+        as.character(boundary$detail %||% "Boundary status was not resolved.")
+      },
+      paste0(
+        "Formal decision; reasons: ",
+        readiness_reasons, "."
+      )
+    )
+  )
+}
+
+mfrm_fit_scale_contract <- function(object) {
+  config <- object$config %||% list()
+  population <- object$population %||% list()
+  summary_row <- as.data.frame(object$summary %||% data.frame(), stringsAsFactors = FALSE)
+  summary_model <- if (nrow(summary_row) > 0L && "Model" %in% names(summary_row)) {
+    summary_row$Model[1]
+  } else {
+    NA_character_
+  }
+  summary_method <- if (nrow(summary_row) > 0L && "Method" %in% names(summary_row)) {
+    summary_row$Method[1]
+  } else {
+    NA_character_
+  }
+  model <- toupper(as.character(config$model %||% summary_model)[1])
+  method <- public_mfrm_method_label(
+    as.character(config$method %||% summary_method)[1]
+  )
+  population_active <- isTRUE(population$active)
+  population_sd <- if (population_active) {
+    sqrt(suppressWarnings(as.numeric(population$sigma2 %||% NA_real_)[1]))
+  } else if (identical(method, "MML")) {
+    1
+  } else {
+    NA_real_
+  }
+  if (!is.finite(population_sd) || population_sd <= 0) {
+    population_sd <- NA_real_
+  }
+
+  coordinate_basis <- if (identical(method, "MML") && population_active) {
+    "estimated_population_scale"
+  } else if (identical(method, "MML")) {
+    "fixed_standard_normal"
+  } else {
+    "joint_person_coordinate_scale"
+  }
+  slope_basis <- if (identical(model, "GPCM")) {
+    "geometric_mean_one_relative_discrimination"
+  } else {
+    "unit_discrimination"
+  }
+  estimator_family <- if (!identical(model, "GPCM")) {
+    "not_applicable"
+  } else if (identical(method, "JML")) {
+    "unpenalized_identified_jml"
+  } else {
+    "marginal_maximum_likelihood"
+  }
+  extreme_person_policy <- if (!identical(model, "GPCM")) {
+    "not_applicable"
+  } else if (identical(method, "JML")) {
+    "extended_real_primary_when_certified"
+  } else {
+    "posterior_eap_under_population_model"
+  }
+  gpcm_identity <- mfrmr_gpcm_model_identity(model)
+
+  tibble::tibble(
+    Model = model,
+    Method = method,
+    CoordinateBasis = coordinate_basis,
+    PopulationSD = population_sd,
+    SlopeBasis = slope_basis,
+    GpcmModelFamily = as.character(
+      config$gpcm_model_family %||% gpcm_identity$model_family
+    ),
+    GpcmSlopeAction = as.character(
+      config$gpcm_slope_action %||% gpcm_identity$slope_action
+    ),
+    GpcmSlopeComposition = as.character(
+      config$gpcm_slope_composition %||%
+        gpcm_identity$slope_composition
+    ),
+    GpcmLatentDimensionCount = as.integer(
+      config$gpcm_latent_dimension_count %||%
+        gpcm_identity$latent_dimension_count
+    ),
+    GpcmMmlIdentification = as.character(
+      config$gpcm_mml_identification %||% "not_applicable"
+    ),
+    GpcmEstimatorFamily = as.character(
+      config$gpcm_estimator_family %||% estimator_family
+    ),
+    GpcmStatisticalPenalty = as.character(
+      config$gpcm_statistical_penalty %||%
+        if (identical(model, "GPCM")) "none" else "not_applicable"
+    ),
+    GpcmFiniteParameterBox = if (identical(model, "GPCM")) {
+      isTRUE(config$gpcm_finite_parameter_box)
+    } else {
+      NA
+    },
+    GpcmExtremePersonPolicy = as.character(
+      config$gpcm_extreme_person_policy %||% extreme_person_policy
+    ),
+    FixedLatentSDSlopeField = if (identical(model, "GPCM") &&
+                                     identical(method, "MML")) {
+      "FixedLatentSDOptimizerEstimate"
+    } else {
+      NA_character_
+    }
+  )
+}
+
 mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
   if (is.null(object$summary) || nrow(object$summary) == 0) {
     stop("`object` does not contain fit summary information.")
@@ -8265,10 +8766,13 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
     overview$Method <- public_mfrm_method_label(overview$Method)
   }
   if (!"MethodUsed" %in% names(overview)) {
-    overview$MethodUsed <- as.character(config$method %||% NA_character_)
+    overview$MethodUsed <- public_mfrm_method_label(
+      config$method %||% NA_character_
+    )
   } else {
     missing_used <- is.na(overview$MethodUsed) | !nzchar(trimws(as.character(overview$MethodUsed)))
     overview$MethodUsed[missing_used] <- as.character(config$method %||% NA_character_)
+    overview$MethodUsed <- public_mfrm_method_label(overview$MethodUsed)
   }
   prep <- object$prep %||% list()
   data_review <- object$data_review %||% list()
@@ -8289,6 +8793,7 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
   step_tbl <- tibble::as_tibble(step_raw)
   slope_tbl <- tibble::as_tibble(slope_raw)
   interaction_tbl <- tibble::as_tibble(interaction_raw)
+  scale_contract <- mfrm_fit_scale_contract(object)
   population_coding <- population_coding_summary_table(population_raw)
   population_coding_variables <- if (nrow(population_coding) > 0L) {
     paste(population_coding$Variable, collapse = ", ")
@@ -8303,12 +8808,27 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
   population_overview <- tibble::tibble(
     PopulationModel = isTRUE(population_raw$active),
     PosteriorBasis = as.character(population_raw$posterior_basis %||% "legacy_mml"),
+    Source = as.character(population_raw$source %||% "none"),
+    IdentificationRole = as.character(
+      population_raw$identification_role %||% "not_applicable"
+    ),
     Formula = if (!is.null(population_raw$formula)) paste(deparse(population_raw$formula), collapse = " ") else NA_character_,
     PersonRows = if (!is.null(population_raw$person_table)) nrow(as.data.frame(population_raw$person_table, stringsAsFactors = FALSE)) else NA_integer_,
     DesignColumns = if (!is.null(population_raw$design_matrix)) ncol(population_raw$design_matrix) else NA_integer_,
     CodingVariables = population_coding_variables,
     ContrastVariables = population_contrast_variables,
     Policy = as.character(population_raw$policy %||% NA_character_),
+    EstimationConverged = isTRUE(
+      population_raw$estimation_converged %||%
+        object$summary$Converged[1] %||% FALSE
+    ),
+    InferenceReady = isTRUE(
+      population_raw$inference_ready %||%
+        object$summary$InferenceReady[1] %||% FALSE
+    ),
+    LegacyConvergedBasis = as.character(
+      population_raw$converged_basis %||% "legacy_unspecified"
+    ),
     ResidualVariance = as.numeric(population_raw$sigma2 %||% NA_real_),
     OmittedPersons = length(population_raw$omitted_persons %||% character(0)),
     OmittedRows = as.integer(population_raw$response_rows_omitted %||% NA_integer_)
@@ -8382,20 +8902,70 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
       dplyr::arrange(.data$Facet)
   }
 
+  person_distribution_excluded <- rep(FALSE, nrow(person_tbl))
+  if (nrow(person_tbl) > 0L &&
+      all(c("SourceFitReadiness", "ReasonCodes") %in% names(person_tbl))) {
+    person_distribution_excluded <-
+      as.character(person_tbl$SourceFitReadiness) == "blocked" &
+      grepl(
+        "(^|;)mml_extreme_response_prior_regularized($|;)",
+        as.character(person_tbl$ReasonCodes)
+      )
+  }
+  person_distribution_tbl <- person_tbl[
+    !person_distribution_excluded, , drop = FALSE
+  ]
+  person_distribution_excluded_n <- sum(person_distribution_excluded)
+
   person_overview <- tibble::tibble()
   if (nrow(person_tbl) > 0 && "Estimate" %in% names(person_tbl)) {
+    distribution_estimates <- as.numeric(person_distribution_tbl$Estimate)
+    distribution_estimates <- distribution_estimates[
+      is.finite(distribution_estimates)
+    ]
+    distribution_value <- function(fun) {
+      if (length(distribution_estimates) == 0L) return(NA_real_)
+      fun(distribution_estimates)
+    }
+    distribution_use <- if (person_distribution_excluded_n > 0L) {
+      "review_only_blocked_extreme_eap_excluded"
+    } else if (
+      "SourceInferenceReady" %in% names(person_tbl) &&
+        all(person_tbl$SourceInferenceReady %in% TRUE)
+    ) {
+      "source_fit_ready"
+    } else {
+      "review_only_source_fit_not_ready"
+    }
     person_overview <- tibble::tibble(
       Persons = nrow(person_tbl),
-      Mean = mean(person_tbl$Estimate, na.rm = TRUE),
-      SD = stats::sd(person_tbl$Estimate, na.rm = TRUE),
-      Median = stats::median(person_tbl$Estimate, na.rm = TRUE),
-      Min = min(person_tbl$Estimate, na.rm = TRUE),
-      Max = max(person_tbl$Estimate, na.rm = TRUE),
-      Span = max(person_tbl$Estimate, na.rm = TRUE) - min(person_tbl$Estimate, na.rm = TRUE)
+      DistributionN = length(distribution_estimates),
+      ReviewExcludedExtremeEAPs = person_distribution_excluded_n,
+      EstimateUse = distribution_use,
+      Mean = distribution_value(mean),
+      SD = if (length(distribution_estimates) > 1L) {
+        stats::sd(distribution_estimates)
+      } else {
+        NA_real_
+      },
+      Median = distribution_value(stats::median),
+      Min = distribution_value(min),
+      Max = distribution_value(max),
+      Span = if (length(distribution_estimates) > 0L) {
+        max(distribution_estimates) - min(distribution_estimates)
+      } else {
+        NA_real_
+      }
     )
 
     if ("SD" %in% names(person_tbl)) {
-      person_overview$MeanPosteriorSD <- mean(person_tbl$SD, na.rm = TRUE)
+      posterior_sd <- as.numeric(person_distribution_tbl$SD)
+      posterior_sd <- posterior_sd[is.finite(posterior_sd)]
+      person_overview$MeanPosteriorSD <- if (length(posterior_sd) > 0L) {
+        mean(posterior_sd)
+      } else {
+        NA_real_
+      }
     }
   }
 
@@ -8471,14 +9041,94 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
 
   slope_overview <- tibble::tibble()
   if (nrow(slope_tbl) > 0 && "Estimate" %in% names(slope_tbl)) {
+    optimizer_slope <- if ("OptimizerEstimate" %in% names(slope_tbl)) {
+      as.numeric(slope_tbl$OptimizerEstimate)
+    } else {
+      as.numeric(slope_tbl$Estimate)
+    }
+    primary_slope <- if ("PrimaryEstimate" %in% names(slope_tbl)) {
+      as.numeric(slope_tbl$PrimaryEstimate)
+    } else {
+      as.numeric(slope_tbl$Estimate)
+    }
+    slope_range_value <- function(x, fun) {
+      x <- x[is.finite(x)]
+      if (length(x) == 0L) return(NA_real_)
+      fun(x)
+    }
+    slope_geometric_mean <- function(x) {
+      x <- x[is.finite(x) & x > 0]
+      if (length(x) == 0L) return(NA_real_)
+      exp(mean(log(x)))
+    }
+    parameter_status <- if ("ParameterStatus" %in% names(slope_tbl)) {
+      paste(sort(unique(as.character(slope_tbl$ParameterStatus))), collapse = ",")
+    } else {
+      "legacy_unknown"
+    }
+    primary_ready <- length(primary_slope) > 0L &&
+      all(is.finite(primary_slope) & primary_slope > 0)
+    value_basis <- if (primary_ready) {
+      "primary"
+    } else if ("OptimizerEstimate" %in% names(slope_tbl)) {
+      "optimizer_trace"
+    } else {
+      "legacy_estimate"
+    }
     slope_overview <- tibble::tibble(
+      SlopeOwner = as.character(config$slope_facet %||% NA_character_)[1],
+      StepOwner = as.character(config$step_facet %||% NA_character_)[1],
+      OwnerInterpretation =
+        "model_conditional_discrimination_not_rater_consistency",
       Slopes = nrow(slope_tbl),
-      Min = min(slope_tbl$Estimate, na.rm = TRUE),
-      Max = max(slope_tbl$Estimate, na.rm = TRUE),
-      GeometricMean = exp(mean(log(slope_tbl$Estimate), na.rm = TRUE)),
-      Positive = all(is.finite(slope_tbl$Estimate) & slope_tbl$Estimate > 0)
+      ValueBasis = value_basis,
+      ParameterStatus = parameter_status,
+      PrimaryReady = primary_ready,
+      PrimaryFinite = sum(is.finite(primary_slope)),
+      Min = slope_range_value(primary_slope, min),
+      Max = slope_range_value(primary_slope, max),
+      GeometricMean = slope_geometric_mean(primary_slope),
+      Positive = if (primary_ready) TRUE else NA,
+      OptimizerMin = slope_range_value(optimizer_slope, min),
+      OptimizerMax = slope_range_value(optimizer_slope, max),
+      OptimizerGeometricMean = slope_geometric_mean(optimizer_slope),
+      OptimizerPositive = all(is.finite(optimizer_slope) & optimizer_slope > 0),
+      PopulationSD = if ("PopulationSD" %in% names(slope_tbl)) {
+        as.numeric(slope_tbl$PopulationSD[1])
+      } else {
+        NA_real_
+      },
+      FixedLatentSDOptimizerGeometricMean = if (
+        "FixedLatentSDOptimizerEstimate" %in% names(slope_tbl)
+      ) {
+        slope_geometric_mean(slope_tbl$FixedLatentSDOptimizerEstimate)
+      } else {
+        NA_real_
+      },
+      FixedLatentSDBasis = if ("FixedLatentSDBasis" %in% names(slope_tbl)) {
+        as.character(slope_tbl$FixedLatentSDBasis[1])
+      } else {
+        "not_available"
+      },
+      SEEligible = if ("SEEligible" %in% names(slope_tbl)) {
+        sum(as.logical(slope_tbl$SEEligible), na.rm = TRUE)
+      } else {
+        NA_integer_
+      },
+      CIEligible = if ("CIEligible" %in% names(slope_tbl)) {
+        sum(as.logical(slope_tbl$CIEligible), na.rm = TRUE)
+      } else {
+        NA_integer_
+      },
+      ComparisonEligible = if ("ComparisonEligibility" %in% names(slope_tbl)) {
+        sum(as.character(slope_tbl$ComparisonEligibility) == "eligible", na.rm = TRUE)
+      } else {
+        NA_integer_
+      }
     )
   }
+
+  inference_evidence <- mfrm_gpcm_mml_inference_evidence(object)
 
   interaction_overview <- tibble::tibble()
   if (nrow(interaction_tbl) > 0 &&
@@ -8499,6 +9149,28 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
     StepFacetSource = as.character(config$step_facet_source %||% "unknown"),
     StepFacetNote = as.character(config$step_facet_note %||% ""),
     SlopeFacet = as.character(config$slope_facet %||% NA_character_),
+    GpcmMmlIdentification = as.character(
+      config$gpcm_mml_identification %||% "not_recorded"
+    ),
+    GpcmCommonDiscrimination = as.character(
+      config$gpcm_common_discrimination %||% "not_recorded"
+    ),
+    GpcmModelFamily = as.character(scale_contract$GpcmModelFamily[1]),
+    GpcmSlopeAction = as.character(scale_contract$GpcmSlopeAction[1]),
+    GpcmSlopeComposition = as.character(
+      scale_contract$GpcmSlopeComposition[1]
+    ),
+    GpcmLatentDimensionCount = as.integer(
+      scale_contract$GpcmLatentDimensionCount[1]
+    ),
+    GpcmEstimatorFamily = as.character(scale_contract$GpcmEstimatorFamily[1]),
+    GpcmStatisticalPenalty = as.character(
+      scale_contract$GpcmStatisticalPenalty[1]
+    ),
+    GpcmFiniteParameterBox = scale_contract$GpcmFiniteParameterBox[1],
+    GpcmExtremePersonPolicy = as.character(
+      scale_contract$GpcmExtremePersonPolicy[1]
+    ),
     NoncenterFacet = as.character(config$noncenter_facet %||% "Person"),
     WeightColumn = as.character(config$weight_col %||% NA_character_),
     QuadPoints = as.integer(config$estimation_control$quad_points %||% NA_integer_),
@@ -8589,6 +9261,8 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
       dplyr::slice_head(n = top_n) |>
       dplyr::select("Facet", "Level", "Estimate")
   }
+  facet_support_boundaries <- mfrm_summary_facet_support_boundaries(object)
+  facet_recession_review <- mfrm_summary_facet_recession_review(object)
 
   person_high <- tibble::tibble()
   person_low <- tibble::tibble()
@@ -8627,6 +9301,17 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
     } else {
       notes <- c(notes, "Optimization did not converge; interpret parameter estimates cautiously.")
     }
+  }
+  if (person_distribution_excluded_n > 0L) {
+    notes <- c(
+      notes,
+      paste0(
+        "Person distribution and targeting summaries omit ",
+        person_distribution_excluded_n,
+        " prior-regularized extreme EAP(s) from the blocked source fit; ",
+        "the exact review-only values remain in the highest/lowest Person tables."
+      )
+    )
   }
   if (identical(as.character(overview$Method[1] %||% NA_character_), "MML")) {
     engine_requested <- as.character(overview$MMLEngineRequested[1] %||% NA_character_)
@@ -8671,13 +9356,41 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
   if (nrow(slope_overview) > 0) {
     notes <- c(
       notes,
-      "GPCM discriminations are reported under the package's positive log-slope identification with geometric-mean-one scaling."
+      paste(
+        "GPCM discriminations use positive log-slope identification with",
+        "geometric-mean-one scaling; primary summaries remain missing until",
+        "parameter readiness is established, while finite optimizer traces",
+        "are labelled separately. The configured slope owner identifies",
+        "model-conditional discrimination and must not be relabelled as",
+        "rater consistency."
+      )
     )
   }
   if (nrow(interaction_overview) > 0) {
     notes <- c(
       notes,
       "Facet interactions are model-estimated fixed effects with zero marginal sums; interpret them as deviations from the additive main-effects MFRM."
+    )
+  }
+  if (nrow(facet_support_boundaries) > 0L) {
+    notes <- c(
+      notes,
+      paste(
+        "Observed boundary-constant facet levels are support/separation warnings;",
+        "a finite optimizer or MML estimate does not by itself establish",
+        "regularization or an interior maximum for that facet parameter."
+      )
+    )
+  }
+  if (nrow(facet_recession_review) > 0L &&
+      any(facet_recession_review$AuditScope == "joint_person_structural")) {
+    notes <- c(
+      notes,
+      paste(
+        "Certified joint JML facet directions are relative, jointly identified",
+        "recession directions. Under sum-to-zero coding, compensating levels",
+        "can be flagged and must not be read as independent extreme-response levels."
+      )
     )
   }
   if (length(notes) == 0) {
@@ -8691,6 +9404,25 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
   converged <- isTRUE(overview$Converged[1])
   engine_requested <- as.character(overview$MMLEngineRequested[1] %||% NA_character_)
   engine_used <- as.character(overview$MMLEngineUsed[1] %||% NA_character_)
+  stored_readiness <- as.data.frame(
+    mfrmr_get_readiness_record(object)$fit, stringsAsFactors = FALSE
+  )
+  has_stored_readiness <- nrow(stored_readiness) == 1L &&
+    "ReadinessContractVersion" %in% names(stored_readiness) &&
+    identical(
+      as.character(stored_readiness$ReadinessContractVersion[1]),
+      mfrmr_readiness_contract_version()
+    )
+  stored_value <- function(field, default = NA_character_) {
+    if (has_stored_readiness && field %in% names(stored_readiness)) {
+      stored_readiness[[field]][1]
+    } else {
+      default
+    }
+  }
+  fit_readiness_state <- as.character(stored_value(
+    "FitReadiness", "legacy_unknown"
+  ))
 
   review_status <- as.data.frame(
     data_review$status %||% data.frame(),
@@ -8706,24 +9438,58 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
       as.character(value[1L])
     }
   }
-  data_status <- domain_status("Data")
+  data_status <- if (has_stored_readiness) {
+    switch(
+      as.character(stored_value("InputState", "legacy_unknown")),
+      pass = "pass",
+      review = "review",
+      blocked = "blocked",
+      legacy_unknown = "legacy_unknown",
+      "not_assessed"
+    )
+  } else {
+    domain_status("Data")
+  }
   design_status <- domain_status("Design")
   stability_status <- domain_status("Stability")
-  numerical_status <- dplyr::case_when(
-    identical(convergence_severity, "pass") && converged ~ "pass",
-    identical(convergence_severity, "review") ~ "review",
-    TRUE ~ "fail"
-  )
+  numerical_status <- if (has_stored_readiness) {
+    switch(
+      as.character(stored_value("NumericalState", "legacy_unknown")),
+      ready = "pass",
+      review = "review",
+      failed = "fail",
+      not_run = "fail",
+      legacy_unknown = "legacy_unknown",
+      "not_assessed"
+    )
+  } else {
+    dplyr::case_when(
+      identical(convergence_severity, "pass") && converged ~ "pass",
+      identical(convergence_severity, "review") ~ "review",
+      TRUE ~ "fail"
+    )
+  }
   reporting_readiness <- dplyr::case_when(
+    identical(fit_readiness_state, "blocked") ~ "blocked_by_fit_readiness",
+    identical(fit_readiness_state, "legacy_unknown") && has_stored_readiness ~
+      "legacy_reaudit_or_refit_required",
     startsWith(design_status, "hold_") ~ "hold_for_design_review",
     startsWith(stability_status, "hold_") ~ "hold_for_stability_review",
-    !identical(numerical_status, "pass") ~ "review_before_reporting",
     startsWith(design_status, "review_") ~ "review_design_before_reporting",
+    fit_readiness_state %in% c("review", "ready_with_exclusions") ~
+      "review_before_reporting",
+    !identical(numerical_status, "pass") ~ "review_before_reporting",
     !identical(data_status, "pass") ~ "review_data_before_reporting",
     identical(method_label, "MML") ~ "ready_for_diagnostics_and_reporting_follow_up",
     TRUE ~ "exploratory_fit_ready_for_diagnostics"
   )
   overall_status <- dplyr::case_when(
+    identical(fit_readiness_state, "blocked") ~ "fit_blocked",
+    identical(fit_readiness_state, "review") ~ "review_required",
+    identical(fit_readiness_state, "ready_with_exclusions") ~
+      "usable_with_exclusions",
+    identical(fit_readiness_state, "legacy_unknown") && has_stored_readiness ~
+      "legacy_review_required",
     startsWith(design_status, "hold_") ||
       startsWith(stability_status, "hold_") ~ "review_required",
     identical(numerical_status, "review") ~ "reviewable_fit",
@@ -8775,9 +9541,11 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
   )
   readiness <- data.frame(
     Domain = c(
-      "Numerical", "Data", "Design", "Stability", "Diagnostics", "Reporting"
+      "Fit", "Numerical", "Data", "Design", "Stability", "Diagnostics",
+      "Reporting"
     ),
     Status = c(
+      fit_readiness_state,
       numerical_status,
       data_status,
       design_status,
@@ -8786,6 +9554,16 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
       reporting_readiness
     ),
     Detail = c(
+      if (has_stored_readiness) {
+        reasons <- as.character(stored_value("ReasonCodes", ""))
+        if (nzchar(reasons)) {
+          paste0("Stored readiness reasons: ", reasons, ".")
+        } else {
+          "All stored fit-readiness components passed."
+        }
+      } else {
+        "No current stored fit-readiness contract is available."
+      },
       as.character(overview$ConvergenceDetail[1] %||% ""),
       if (identical(data_status, "pass")) {
         "No preparation warning or review row was retained."
@@ -8879,6 +9657,17 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
   }
   if (identical(model_label, "GPCM")) {
     next_actions <- c(
+      if (identical(method_label, "MML") &&
+          identical(numerical_status, "pass") &&
+          !mfrm_inference_ready(object)) {
+        paste(
+          "The optimizer already passed its numerical gate; inspect",
+          "`summary(fit)$inference_evidence` and",
+          "`diagnose_mfrm(fit)$parameter_uncertainty` before changing",
+          "optimizer controls. Optimizer*SE remains diagnostic until",
+          "parameter readiness is established."
+        )
+      },
       next_actions,
       "Use `compute_information()` / `plot_information()` for reporting-oriented precision follow-up."
     )
@@ -8895,6 +9684,10 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
     "Use `reporting_checklist(fit, diagnostics = review$results$diagnostics)` for reporting readiness."
   )
   next_actions <- clean_summary_lines(next_actions, max_n = 6L)
+  decision <- mfrm_fit_decision_summary(
+    stored_readiness,
+    next_action = next_actions[1L] %||% NA_character_
+  )
 
   attached_diagnostics_flag <- isTRUE(config$attached_diagnostics)
   attached_diagnostics_cols <- as.character(config$attached_diagnostics_cols %||% character(0))
@@ -8903,6 +9696,7 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
     overview = overview,
     status = status,
     readiness = readiness,
+    decision = decision,
     data_review = data_review,
     key_warnings = key_warnings,
     next_actions = next_actions,
@@ -8915,6 +9709,7 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
     targeting = targeting_overview,
     step_overview = step_overview,
     slope_overview = slope_overview,
+    inference_evidence = inference_evidence,
     interaction_overview = interaction_overview,
     settings_overview = settings_overview,
     attached_diagnostics = attached_diagnostics_flag,
@@ -8924,6 +9719,8 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
     reporting_map = reporting_map,
     caveats = fit_caveats,
     facet_extremes = facet_extremes,
+    facet_support_boundaries = facet_support_boundaries,
+    facet_recession_review = facet_recession_review,
     person_high = person_high,
     person_low = person_low,
     notes = notes,
@@ -9310,6 +10107,39 @@ mfrm_fit_summary_workflow <- function(out, fit, profile, detail,
     digits = out$digits %||% 3L,
     top_n = max(5L, nrow(out$facet_extremes %||% data.frame()))
   )
+  decision_diagnostics <- if (inherits(diagnostics, "mfrm_diagnostics")) {
+    diagnostics
+  } else if (inherits(results$diagnostics, "mfrm_diagnostics")) {
+    results$diagnostics
+  } else {
+    NULL
+  }
+  precision_profile <- as.data.frame(
+    decision_diagnostics$precision_profile %||% data.frame(),
+    stringsAsFactors = FALSE
+  )
+  if (nrow(precision_profile) > 0L) {
+    out$decision <- mfrm_fit_decision_summary(
+      mfrmr_get_readiness_record(fit)$fit,
+      next_action = out$next_actions[1L] %||% NA_character_,
+      supports_formal_inference = isTRUE(
+        precision_profile$SupportsFormalInference[1L]
+      ),
+      precision_tier = as.character(
+        precision_profile$PrecisionTier[1L] %||% NA_character_
+      )
+    )
+  } else if (isTRUE(mfrm_inference_ready(fit))) {
+    out$next_actions <- clean_summary_lines(c(
+      paste(
+        "Run `diagnose_mfrm()` and pass its result as `diagnostics =` to",
+        "evaluate formal precision support; fit readiness alone is not a",
+        "formal-inference decision."
+      ),
+      out$next_actions
+    ), max_n = 6L)
+  }
+  out$decision$NextAction <- out$next_actions[1L] %||% NA_character_
   class(out) <- "summary.mfrm_fit"
   out
 }
@@ -9354,18 +10184,166 @@ make_summary_block <- function(...) {
   )
 }
 
+mfrm_fit_decision_summary <- function(readiness,
+                                      next_action = NA_character_,
+                                      supports_formal_inference = NA,
+                                      precision_tier = NA_character_) {
+  readiness <- as.data.frame(readiness %||% data.frame(), stringsAsFactors = FALSE)
+  required <- c(
+    "InputState", "EstimabilityState", "CategoryState", "BoundaryState",
+    "NumericalState", "FitReadiness", "InferenceReady"
+  )
+  if (nrow(readiness) != 1L || !all(required %in% names(readiness))) {
+    return(data.frame(
+      Interpretation = "Re-audit or refit before interpretation",
+      FormalInference = "No",
+      FitReadiness = "legacy_unknown",
+      Why = "A current fit-readiness record is unavailable.",
+      NextAction = as.character(next_action)[1L],
+      stringsAsFactors = FALSE
+    ))
+  }
+
+  value <- function(field) as.character(readiness[[field]][1L])
+  fit_state <- value("FitReadiness")
+  precision_known <- length(supports_formal_inference) == 1L &&
+    !is.na(supports_formal_inference)
+  precision_supported <- precision_known && isTRUE(supports_formal_inference)
+  fit_gate_ready <- isTRUE(readiness$InferenceReady[1L])
+  formal_supported <- fit_gate_ready && precision_supported
+  precision_tier <- as.character(precision_tier)[1L]
+  interpretation <- switch(
+    fit_state,
+    ready = if (formal_supported) {
+      "Ready for formal inference"
+    } else if (precision_known) {
+      "Fit gates passed; formal inference is not supported"
+    } else {
+      "Fit gates passed; formal precision review required"
+    },
+    ready_with_exclusions = "Usable only with the recorded exclusions",
+    review = "Review before reporting or inference",
+    blocked = "Do not interpret this fit",
+    legacy_unknown = "Re-audit or refit before interpretation",
+    "Review before reporting or inference"
+  )
+  reasons <- c(
+    if (value("InputState") == "review")
+      "Input preparation requires review",
+    if (value("InputState") == "blocked")
+      "The retained input is blocked",
+    if (value("EstimabilityState") == "not_evaluated")
+      "Identifiability evidence is incomplete",
+    if (value("EstimabilityState") == "weak_information")
+      "The design provides weak information",
+    if (value("EstimabilityState") == "structurally_unidentified")
+      "The model is structurally unidentified",
+    if (value("EstimabilityState") == "population_assumption_linked")
+      "Identification depends on the population model",
+    if (value("CategoryState") == "weak_information")
+      "One or more categories provide weak information",
+    if (value("CategoryState") == "unsupported_coordinate")
+      "One or more category parameters are unsupported",
+    if (value("CategoryState") == "not_evaluated")
+      "Category support is incomplete",
+    if (value("BoundaryState") == "has_exclusions")
+      "One or more boundary parameters are excluded",
+    if (value("BoundaryState") == "not_evaluated")
+      "Boundary evidence is incomplete",
+    if (value("NumericalState") == "review")
+      "Numerical convergence requires review",
+    if (value("NumericalState") %in% c("failed", "not_run"))
+      "Numerical convergence failed",
+    if (fit_gate_ready && !precision_known)
+      "Formal precision support has not been evaluated",
+    if (fit_gate_ready && precision_known && !precision_supported)
+      paste0(
+        "The precision contract does not support formal inference",
+        if (!is.na(precision_tier) && nzchar(precision_tier)) {
+          paste0(" (tier: ", precision_tier, ")")
+        } else {
+          ""
+        }
+      ),
+    if (fit_state == "legacy_unknown")
+      "The stored readiness contract is not current"
+  )
+  reasons <- unique(reasons[!is.na(reasons) & nzchar(reasons)])
+  if (!length(reasons)) {
+    reasons <- if (identical(fit_state, "ready")) {
+      "All stored fit-readiness components passed."
+    } else {
+      "Review the stored readiness components before interpretation."
+    }
+  } else {
+    reasons <- paste0(paste(reasons, collapse = "; "), ".")
+  }
+  data.frame(
+    Interpretation = interpretation,
+    FormalInference = if (formal_supported) "Yes" else "No",
+    FitReadiness = fit_state,
+    Why = reasons,
+    NextAction = as.character(next_action)[1L],
+    stringsAsFactors = FALSE
+  )
+}
+
 summary_lines_are_default <- function(lines, default_line) {
   lines <- clean_summary_lines(lines)
   length(lines) == 1L && identical(lines, default_line)
+}
+
+print_fit_decision_section <- function(decision) {
+  decision <- as.data.frame(decision %||% data.frame(), stringsAsFactors = FALSE)
+  required <- c(
+    "Interpretation", "FormalInference", "FitReadiness", "Why", "NextAction"
+  )
+  if (nrow(decision) != 1L || !all(required %in% names(decision))) {
+    return(invisible(NULL))
+  }
+  print_bullet_section("Decision", c(
+    paste0("Interpretation: ", decision$Interpretation[1L]),
+    paste0(
+      "Formal inference: ", decision$FormalInference[1L],
+      " (fit readiness: ", decision$FitReadiness[1L], ")"
+    ),
+    paste0("Why: ", decision$Why[1L]),
+    if (!is.na(decision$NextAction[1L]) &&
+        nzchar(decision$NextAction[1L])) {
+      paste0("Next: ", decision$NextAction[1L])
+    }
+  ))
+  invisible(NULL)
+}
+
+mfrm_console_width <- function() {
+  width <- getOption("width", 80L)
+  if (length(width) != 1L || !is.numeric(width) || is.na(width) ||
+      !is.finite(width)) {
+    width <- 80L
+  }
+  min(100L, max(50L, as.integer(width)))
+}
+
+print_wrapped_line <- function(line, prefix = "  ") {
+  line <- as.character(line)
+  line <- line[!is.na(line) & nzchar(line)]
+  if (!length(line)) return(invisible(NULL))
+  console_width <- mfrm_console_width()
+  content_width <- max(30L, console_width - nchar(prefix))
+  for (value in line) {
+    wrapped <- strwrap(value, width = content_width)
+    if (!length(wrapped)) next
+    for (part in wrapped) cat(prefix, part, "\n", sep = "")
+  }
+  invisible(NULL)
 }
 
 print_bullet_section <- function(title, lines, prefix = " - ") {
   lines <- clean_summary_lines(lines)
   if (length(lines) == 0) return(invisible(NULL))
   cat("\n", title, "\n", sep = "")
-  console_width <- suppressWarnings(as.integer(getOption("width", 80L)))
-  if (!is.finite(console_width)) console_width <- 80L
-  console_width <- min(100L, max(50L, console_width))
+  console_width <- mfrm_console_width()
   content_width <- max(30L, console_width - nchar(prefix))
   continuation <- paste(rep(" ", nchar(prefix)), collapse = "")
   for (line in lines) {
@@ -9459,15 +10437,16 @@ print.summary.mfrm_fit <- function(x, ...) {
   cat("Many-Facet Measurement Model Summary\n")
   if (nrow(overview) > 0) {
     ov <- overview[1, , drop = FALSE]
-    cat(sprintf(
-      "  Model: %s | Method: %s | N: %s | Persons: %s | Facets: %s | Categories: %s\n",
+    print_wrapped_line(sprintf(
+      "Model: %s | Method: %s | N: %s | Persons: %s | Facets: %s | Categories: %s",
       ov$Model, ov$Method, ov$N, ov$Persons, ov$Facets, ov$Categories
     ))
+    print_fit_decision_section(x$decision)
     if (isTRUE(x$attached_diagnostics)) {
       attached_cols <- as.character(x$attached_diagnostics_cols %||% character(0))
       if (length(attached_cols) > 0L) {
-        cat(sprintf(
-          "  Attached diagnostics: %s\n",
+        print_wrapped_line(sprintf(
+          "Attached diagnostics: %s",
           paste(attached_cols, collapse = ", ")
         ))
       } else {
@@ -9478,22 +10457,44 @@ print.summary.mfrm_fit <- function(x, ...) {
     if (!is.na(ov$MethodUsed %||% NA_character_) &&
         nzchar(as.character(ov$MethodUsed %||% "")) &&
         !identical(as.character(used_public), as.character(ov$Method))) {
-      cat(sprintf("  Resolved estimator: %s\n", ov$MethodUsed))
+      print_wrapped_line(paste0("Resolved estimator: ", ov$MethodUsed))
     }
     if (identical(as.character(ov$Method %||% NA_character_), "MML") &&
         !is.na(ov$MMLEngineUsed %||% NA_character_)) {
-      cat(sprintf(
-        "  MML engine: %s (requested: %s)\n",
+      print_wrapped_line(sprintf(
+        "MML engine: %s (requested: %s)",
         ov$MMLEngineUsed %||% NA_character_,
         ov$MMLEngineRequested %||% NA_character_
       ))
       if (is.finite(ov$EMIterations %||% NA_real_)) {
-        cat(sprintf(
-          "  EM iterations: %s | EM converged: %s | Last relative change: %s\n",
+        print_wrapped_line(sprintf(
+          "EM iterations: %s | EM converged: %s | Last relative change: %s",
           ov$EMIterations %||% NA,
           ifelse(isTRUE(ov$EMConverged), "Yes", "No"),
           ov$EMRelativeChange %||% NA_real_
         ))
+      }
+    }
+    settings <- as.data.frame(x$settings_overview %||% data.frame())
+    if (identical(as.character(ov$Model %||% NA_character_), "GPCM") &&
+        nrow(settings) > 0L && "GpcmEstimatorFamily" %in% names(settings)) {
+      finite_box <- if (isTRUE(settings$GpcmFiniteParameterBox[1])) "yes" else "no"
+      print_wrapped_line(sprintf(
+        "GPCM estimator: %s | Statistical penalty: %s | Finite parameter box: %s",
+        settings$GpcmEstimatorFamily[1],
+        settings$GpcmStatisticalPenalty[1],
+        finite_box
+      ))
+      print_wrapped_line(sprintf(
+        "GPCM kernel: %s | Slope action: %s",
+        settings$GpcmModelFamily[1],
+        settings$GpcmSlopeAction[1]
+      ))
+    }
+    if (identical(detail, "brief")) {
+      ic_lines <- mfrm_ic_console_lines(overview_raw, digits = digits)
+      if (length(ic_lines) > 0L) {
+        print_wrapped_line(ic_lines)
       }
     }
   }
@@ -9502,8 +10503,8 @@ print.summary.mfrm_fit <- function(x, ...) {
       x$provenance$OrganizationBoundary[1] %||%
         "FACETS-style organization; not numerical equivalence."
     )
-    cat(sprintf("\nWorkflow profile: %s\n", profile))
-    cat("  ", boundary, "\n", sep = "")
+    cat("\nWorkflow profile: ", profile, "\n", sep = "")
+    print_wrapped_line(boundary)
   }
   if (nrow(x$required_visual %||% data.frame()) > 0L) {
     cat("\nVisual workflow (in order)\n")
@@ -9528,7 +10529,7 @@ print.summary.mfrm_fit <- function(x, ...) {
         reviewable_fit = "Fit completed, but numerical convergence requires review",
         fit_needs_review = "Fit requires numerical review before interpretation",
         review_required = "Fit completed, but data, design, stability, or diagnostics require review",
-        review_before_reporting = "Resolve numerical warnings before reporting",
+        review_before_reporting = "Resolve stored readiness reviews before reporting",
         hold_for_design_review = "Reporting is on hold until disconnected-design comparability is resolved",
         hold_for_stability_review = "Reporting is on hold until boundary/separation stability is resolved",
         review_design_before_reporting = "Review the design-linking justification before reporting",
@@ -9540,7 +10541,10 @@ print.summary.mfrm_fit <- function(x, ...) {
       )
       value <- gsub("sup-norm", "maximum absolute gradient", value, fixed = TRUE)
       status_line <- paste0(x$status$Item[i], ": ", value)
-      wrapped <- strwrap(status_line, width = 96L)
+      wrapped <- strwrap(
+        status_line,
+        width = max(30L, mfrm_console_width() - 3L)
+      )
       cat(" - ", wrapped[1], "\n", sep = "")
       if (length(wrapped) > 1L) {
         for (part in wrapped[-1L]) cat("   ", part, "\n", sep = "")
@@ -9571,6 +10575,40 @@ print.summary.mfrm_fit <- function(x, ...) {
     }
   } else {
     print_preparation_section(x$preparation_notes)
+  }
+
+  if (nrow(x$facet_support_boundaries %||% data.frame()) > 0L) {
+    cat("\nObserved boundary-constant facet support\n")
+    print(
+      round_numeric_df(
+        as.data.frame(x$facet_support_boundaries),
+        digits = digits
+      ),
+      row.names = FALSE
+    )
+    cat("  Data-support warning only; it is not by itself an infinite-parameter certificate.\n")
+  }
+  if (nrow(x$facet_recession_review %||% data.frame()) > 0L) {
+    cat("\nCertified JML facet recession directions\n")
+    recession <- as.data.frame(
+      x$facet_recession_review,
+      stringsAsFactors = FALSE
+    )
+    keep <- intersect(
+      c(
+        "Facet", "Level", "BoundaryStatus", "OptimizerEstimate",
+        "AuditScope", "AuditComplete", "StatusBasis"
+      ),
+      names(recession)
+    )
+    print(
+      round_numeric_df(recession[, keep, drop = FALSE], digits = digits),
+      row.names = FALSE
+    )
+    cat(paste(
+      "  Joint-scope rows are relative directions under identification;",
+      "finite optimizer values are numerical traces, not finite JML maxima.\n"
+    ))
   }
 
   if (identical(detail, "brief")) {
@@ -9727,7 +10765,10 @@ print.summary.mfrm_fit <- function(x, ...) {
       as.character(raw_ov$ConvergenceStatus %||% NA_character_)
     )
     cat("\nFit overview\n")
-    cat(sprintf("  LogLik: %s | AIC: %s | BIC: %s\n", ov$LogLik, ov$AIC, ov$BIC))
+    ic_lines <- mfrm_ic_console_lines(raw_ov, digits = digits)
+    if (length(ic_lines) > 0L) {
+      cat(paste0("  ", ic_lines, "\n"), sep = "")
+    }
     cat(sprintf(
       "  Optimizer code 0: %s | Status: %s | Basis: %s | Fn evals: %s | Gr evals: %s\n",
       ifelse(isTRUE(ov$Converged), "Yes", "No"),
@@ -9762,6 +10803,26 @@ print.summary.mfrm_fit <- function(x, ...) {
     cat("\nPopulation basis\n")
     print(round_numeric_df(as.data.frame(x$population_overview), digits = digits), row.names = FALSE)
   }
+  if (nrow(x$inference_evidence %||% data.frame()) > 0L) {
+    cat("\nGPCM-MML inference evidence\n")
+    evidence <- as.data.frame(x$inference_evidence, stringsAsFactors = FALSE)
+    keep <- intersect(
+      c(
+        "EvidenceArea", "State", "Complete", "Rank", "Dimension",
+        "MinimumEigenvalue", "MaximumEigenvalue", "ConditionNumber"
+      ),
+      names(evidence)
+    )
+    print(
+      round_numeric_df(evidence[, keep, drop = FALSE], digits = digits),
+      row.names = FALSE
+    )
+    cat(paste(
+      "  Local rank and curvature are supportive evidence only; the",
+      "slope-boundary row remains inconclusive unless its audit establishes",
+      "a boundary conclusion. See `$inference_evidence$Interpretation`.\n"
+    ))
+  }
   if (nrow(x$population_design %||% data.frame()) > 0) {
     cat("\nPopulation design matrix\n")
     print(round_numeric_df(as.data.frame(x$population_design), digits = digits), row.names = FALSE)
@@ -9795,7 +10856,7 @@ print.summary.mfrm_fit <- function(x, ...) {
     print(round_numeric_df(as.data.frame(x$step_overview), digits = digits), row.names = FALSE)
   }
   if (nrow(x$slope_overview %||% data.frame()) > 0) {
-    cat("\nSlope summary\n")
+    cat("\nSlope parameter readiness and optimizer trace\n")
     print(round_numeric_df(as.data.frame(x$slope_overview), digits = digits), row.names = FALSE)
   }
   if (nrow(x$interaction_overview %||% data.frame()) > 0) {

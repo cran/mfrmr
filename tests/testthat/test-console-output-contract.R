@@ -38,6 +38,38 @@ expect_public_console_output <- function(lines, person_ids = character(0)) {
   )))
 }
 
+test_that("fit output leads with a plain-language decision", {
+  fit <- make_toy_fit(method = "JML", maxit = 25)
+  fit_lines <- capture.output(print(fit))
+  brief <- summary(fit, profile = "fit", detail = "brief")
+  brief_lines <- capture.output(print(brief))
+
+  expect_identical(
+    names(brief$decision),
+    c(
+      "Interpretation", "FormalInference", "FitReadiness", "Why",
+      "NextAction"
+    )
+  )
+  expect_identical(brief$decision$Interpretation, "Do not interpret this fit")
+  expect_identical(brief$decision$FormalInference, "No")
+  expect_match(brief$decision$Why, "Numerical convergence failed", fixed = TRUE)
+  expect_lt(
+    which(grepl("^Decision$", fit_lines)),
+    which(grepl("^  Scale:", fit_lines))
+  )
+  expect_lt(
+    which(grepl("^Decision$", brief_lines)),
+    which(grepl("^Visual workflow", brief_lines))
+  )
+  expect_false(any(grepl("^  Summary status:", fit_lines)))
+  expect_false(any(grepl("^  Key warning:", fit_lines)))
+  expect_public_console_output(
+    fit_lines,
+    person_ids = unique(as.character(fit$facets$person$Person))
+  )
+})
+
 test_that("major beginner-facing summaries respect the 80-column privacy contract", {
   old_options <- options(width = 80L)
   on.exit(options(old_options), add = TRUE)
@@ -81,6 +113,13 @@ test_that("major beginner-facing summaries respect the 80-column privacy contrac
       ids = conquest_person_ids
     )
   )
+
+  diagnostics_lines <- outputs$diagnostics$lines
+  results_lines <- outputs$results_brief$lines
+  expect_true(any(grepl("^Decision$", diagnostics_lines)))
+  expect_true(any(grepl("Formal inference:", diagnostics_lines, fixed = TRUE)))
+  expect_true(any(grepl("^Decision$", results_lines)))
+  expect_true(any(grepl("Formal inference:", results_lines, fixed = TRUE)))
 
   conquest_lines <- outputs$conquest_bundle$lines
   expect_false(conquest_bundle$summary$MfrmrInferenceReady[[1]])

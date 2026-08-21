@@ -2298,10 +2298,10 @@ recovery_diagnostic_df_sensitive_rate <- function(fit_tbl) {
   if (nrow(fit_tbl) == 0L || !all(required %in% names(fit_tbl))) {
     return(NA_real_)
   }
-  engine_flag <- abs(suppressWarnings(as.numeric(fit_tbl$InfitZSTD_ENGINE))) > 2 |
-    abs(suppressWarnings(as.numeric(fit_tbl$OutfitZSTD_ENGINE))) > 2
-  facets_flag <- abs(suppressWarnings(as.numeric(fit_tbl$InfitZSTD_FACETS))) > 2 |
-    abs(suppressWarnings(as.numeric(fit_tbl$OutfitZSTD_FACETS))) > 2
+  engine_flag <- abs(suppressWarnings(as.numeric(fit_tbl$InfitZSTD_ENGINE))) >= 2 |
+    abs(suppressWarnings(as.numeric(fit_tbl$OutfitZSTD_ENGINE))) >= 2
+  facets_flag <- abs(suppressWarnings(as.numeric(fit_tbl$InfitZSTD_FACETS))) >= 2 |
+    abs(suppressWarnings(as.numeric(fit_tbl$OutfitZSTD_FACETS))) >= 2
   changed <- engine_flag != facets_flag
   if (all(is.na(changed))) return(NA_real_)
   mean(changed, na.rm = TRUE)
@@ -4883,6 +4883,49 @@ plot.mfrm_recovery_simulation <- function(x,
   invisible(out)
 }
 
+design_eval_result_prototype <- function() {
+  tibble::tibble(
+    design_id = character(0),
+    rep = integer(0),
+    Facet = character(0),
+    n_person = integer(0),
+    n_rater = integer(0),
+    n_criterion = integer(0),
+    raters_per_person = integer(0),
+    Observations = integer(0),
+    MinCategoryCount = integer(0),
+    SparseDesignActive = logical(0),
+    DesignDensity = numeric(0),
+    PlannedMissingRate = numeric(0),
+    LinkPersons = integer(0),
+    LinkFractionActual = numeric(0),
+    LinkRatersPerPerson = numeric(0),
+    MinCommonPersonsPerRaterPair = numeric(0),
+    ZeroCommonRaterPairs = integer(0),
+    RaterPairsBelowTarget = integer(0),
+    TargetCommonPersonsPerRaterPair = integer(0),
+    ElapsedSec = numeric(0),
+    Converged = logical(0),
+    GeneratorModel = character(0),
+    GeneratorStepFacet = character(0),
+    FitModel = character(0),
+    FitStepFacet = character(0),
+    RecoveryComparable = logical(0),
+    RecoveryBasis = character(0),
+    Levels = integer(0),
+    Separation = numeric(0),
+    Strata = numeric(0),
+    Reliability = numeric(0),
+    MeanInfit = numeric(0),
+    MeanOutfit = numeric(0),
+    MisfitRate = numeric(0),
+    SeverityRMSE = numeric(0),
+    SeverityBias = numeric(0),
+    SeverityRMSERaw = numeric(0),
+    SeverityBiasRaw = numeric(0)
+  )
+}
+
 #' Evaluate MFRM design conditions by repeated simulation
 #'
 #' @param n_person Vector of person counts to evaluate.
@@ -5080,7 +5123,10 @@ plot.mfrm_recovery_simulation <- function(x,
 #' - `results`: facet-level replicate results, with the same design-variable
 #'   alias columns when applicable.
 #' - `rep_overview`: run-level status and timing, with the same design-variable
-#'   alias columns when applicable.
+#'   alias columns when applicable. Failed fits retain the condition class,
+#'   failure component, and category-support state/reason codes when available;
+#'   a completely failed design still returns the documented zero-row
+#'   `results` schema rather than a zero-column table.
 #' - `design_descriptor`: role-based design-variable metadata used by planning
 #'   summaries and plots
 #' - `planning_scope`: explicit record of the current planning contract
@@ -5097,7 +5143,7 @@ plot.mfrm_recovery_simulation <- function(x,
 #' @examples
 #' \donttest{
 #' sim_eval <- suppressWarnings(evaluate_mfrm_design(
-#'   design = list(person = c(8, 12), rater = 2, criterion = 2, assignment = 1),
+#'   design = list(person = c(8, 12), rater = 2, criterion = 2, assignment = 2),
 #'   reps = 1,
 #'   maxit = 30,
 #'   seed = 123
@@ -5378,16 +5424,32 @@ evaluate_mfrm_design <- function(n_person = c(30, 50, 100),
         ElapsedSec = elapsed,
         RunOK = FALSE,
         Converged = FALSE,
-        Error = NA_character_
+        Error = NA_character_,
+        ErrorClass = NA_character_,
+        ErrorComponent = NA_character_,
+        CategoryState = NA_character_,
+        CategoryReasonCodes = NA_character_
       )
 
       if (inherits(fit, "error")) {
         rep_row$Error <- conditionMessage(fit)
+        rep_row$ErrorClass <- class(fit)[1]
+        rep_row$ErrorComponent <- "fit"
+        if (inherits(fit, "mfrmr_category_readiness_error")) {
+          rep_row$CategoryState <- as.character(
+            fit$readiness$CategoryState[1] %||% NA_character_
+          )
+          rep_row$CategoryReasonCodes <- as.character(
+            fit$readiness$ReasonCodes[1] %||% NA_character_
+          )
+        }
         rep_rows[[rep_idx]] <- rep_row
         next
       }
       if (inherits(diag, "error")) {
         rep_row$Error <- conditionMessage(diag)
+        rep_row$ErrorClass <- class(diag)[1]
+        rep_row$ErrorComponent <- "diagnostics"
         rep_rows[[rep_idx]] <- rep_row
         next
       }
@@ -5480,7 +5542,10 @@ evaluate_mfrm_design <- function(n_person = c(30, 50, 100),
     }
   }
 
-  results <- dplyr::bind_rows(result_rows[seq_len(result_idx)])
+  results <- dplyr::bind_rows(
+    design_eval_result_prototype(),
+    result_rows[seq_len(result_idx)]
+  )
   rep_overview <- dplyr::bind_rows(rep_rows[seq_len(rep_idx)])
   results <- simulation_append_design_alias_columns(results, design_variable_aliases)
   rep_overview <- simulation_append_design_alias_columns(rep_overview, design_variable_aliases)
@@ -5602,7 +5667,7 @@ evaluate_mfrm_design <- function(n_person = c(30, 50, 100),
 #'   n_person = c(8, 12),
 #'   n_rater = 2,
 #'   n_criterion = 2,
-#'   raters_per_person = 1,
+#'   raters_per_person = 2,
 #'   reps = 1,
 #'   maxit = 30,
 #'   seed = 123
@@ -5757,7 +5822,7 @@ print.summary.mfrm_design_evaluation <- function(x, ...) {
 #'   n_person = c(8, 12),
 #'   n_rater = 2,
 #'   n_criterion = 2,
-#'   raters_per_person = 1,
+#'   raters_per_person = 2,
 #'   reps = 1,
 #'   maxit = 30,
 #'   seed = 123
@@ -5938,7 +6003,7 @@ plot.mfrm_design_evaluation <- function(x,
 #'   n_person = c(8, 12),
 #'   n_rater = 2,
 #'   n_criterion = 2,
-#'   raters_per_person = 1,
+#'   raters_per_person = 2,
 #'   reps = 1,
 #'   maxit = 30,
 #'   seed = 123
@@ -8680,7 +8745,7 @@ signal_eval_metric_col <- function(signal, metric) {
 #' @examples
 #' \donttest{
 #' sig_eval <- suppressWarnings(evaluate_mfrm_signal_detection(
-#'   design = list(person = 8, rater = 2, criterion = 2, assignment = 1),
+#'   design = list(person = 8, rater = 2, criterion = 2, assignment = 2),
 #'   reps = 1,
 #'   maxit = 30,
 #'   bias_max_iter = 1,

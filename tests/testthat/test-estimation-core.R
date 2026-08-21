@@ -381,9 +381,19 @@ test_that("JML and MML facet estimates are highly correlated", {
 
   for (fit in list(fit_jml, fit_mml)) {
     expect_true(isTRUE(fit$summary$Converged[1]))
-    expect_true(isTRUE(fit$summary$InferenceReady[1]))
     expect_identical(as.character(fit$summary$ConvergenceSeverity[1]), "pass")
   }
+  expect_identical(
+    as.character(fit_jml$summary$FitReadiness[1]),
+    "ready_with_exclusions"
+  )
+  expect_false(isTRUE(fit_jml$summary$InferenceReady[1]))
+  expect_match(
+    as.character(fit_jml$summary$ReadinessReasonCodes[1]),
+    "jml_extreme_"
+  )
+  expect_identical(as.character(fit_mml$summary$FitReadiness[1]), "ready")
+  expect_true(isTRUE(fit_mml$summary$InferenceReady[1]))
 
   for (facet in c("Rater", "Task", "Criterion")) {
     est_jml <- fit_jml$facets$others |>
@@ -1060,6 +1070,28 @@ test_that("MML auto optimizer records shared probability workspace use", {
   expect_gt(fit$opt$evaluation_cache$SharedEvaluations, 0L)
   expect_gt(fit$opt$evaluation_cache$GradientBuilds, 0L)
   expect_gte(fit$opt$evaluation_cache$GradientCacheHits, 1L)
+})
+
+test_that("direct optimizer cache keys are owned snapshots", {
+  evaluator <- local({
+    cached_par <- NULL
+    evaluations <- 0L
+    list(
+      value = function(par) {
+        if (!identical(par, cached_par)) {
+          cached_par <<- par + 0
+          evaluations <<- evaluations + 1L
+        }
+        sum(par^2)
+      },
+      evaluations = function() evaluations
+    )
+  })
+  par <- c(a = 1, b = 2)
+  expect_equal(evaluator$value(par), 5)
+  par[] <- c(3, 4)
+  expect_equal(evaluator$value(par), 25)
+  expect_identical(evaluator$evaluations(), 2L)
 })
 
 test_that("MML engine planner falls back only for unsupported combinations", {

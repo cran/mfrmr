@@ -58,7 +58,8 @@ the same row-level status taxonomy as \code{fit_measures_table()$df_sensitivity}
 the |ZSTD| flag or materially changes ZSTD interpretation
 \item \code{df_sensitivity_summary}: counts by df-sensitivity status
 \item \code{external_table_quality}: completeness and duplicate-key review for the
-supplied FACETS fit table
+supplied FACETS fit table, including reported-token and displayed-ZSTD
+boundary counts
 \item \code{external_comparison}: optional external FACETS-vs-mfrmr comparison
 \item \code{df_conversion_guide}: formulas, column map, and comparison decisions for
 FACETS-style df/ZSTD review

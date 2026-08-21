@@ -127,7 +127,12 @@ only the measurement columns needed for estimation.
 Start with \code{summary(res)}. The most useful fields are:
 \itemize{
 \item \code{overview}: input mode, model, method, table count, and plot-route count
+\item \code{decision}: plain-language interpretation, formal-inference, reason, and
+next-action text derived from the source-fit readiness record
 \item \code{readiness}: separate analysis and plot-interpretation gates
+\item \code{fit_readiness}, \code{fit_readiness_components}, and
+\code{fit_readiness_parameters}: the exact source-fit readiness record retained
+separately from the workflow-level \code{readiness} table
 \item \code{triage}: first-screen signals ordered by unavailable/review/info/ok
 \item \code{status}: which sections were available, skipped, or unsupported
 \item \code{plot_map}: supported plot routes, availability, and interpretation status

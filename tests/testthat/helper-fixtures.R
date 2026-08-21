@@ -16,6 +16,21 @@
 # the public helpers below.
 .mfrmr_test_cache <- new.env(parent = emptyenv())
 
+# Repository-only integration fixtures occasionally need the development
+# namespace. Both `devtools::test()` and installed-package checks load it before
+# helpers run. Reloading it here would create stale function/namespace pairs and
+# make later mocked-binding tests order-dependent.
+.mfrmr_test_ensure_source_namespace <- function(root) {
+  if (!file.exists(file.path(root, "DESCRIPTION"))) {
+    stop("The mfrmr source root is unavailable.", call. = FALSE)
+  }
+  if (!"mfrmr" %in% loadedNamespaces()) {
+    stop("The mfrmr namespace must be loaded before repository tests run.",
+         call. = FALSE)
+  }
+  invisible(asNamespace("mfrmr"))
+}
+
 # Muffle only warnings that a test has explicitly classified as unrelated
 # setup noise. Any warning that does not match one of `patterns` continues to
 # propagate, so new package warnings cannot be hidden accidentally.

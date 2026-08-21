@@ -80,6 +80,8 @@ marginal sources; it should not be read as a formal inferential case test.
 \examples{
 \donttest{
 toy <- load_mfrmr_data("example_core")
+# A balanced slice retains every Rater and Criterion while running quickly.
+toy <- toy[toy$Person \%in\% unique(toy$Person)[1:12], , drop = FALSE]
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                 method = "MML", model = "RSM", quad_points = 5)
 diag <- diagnose_mfrm(fit, diagnostic_mode = "both", residual_pca = "none")

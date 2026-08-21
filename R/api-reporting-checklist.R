@@ -55,6 +55,9 @@
 #'   `DraftReady = TRUE` means the item can be drafted into a report with the
 #'   package's documented caveats. `ReadyForAPA` is a backward-compatible alias
 #'   of the same flag; neither field certifies formal inferential adequacy.
+#' - `fit_readiness`, `fit_readiness_components`, and
+#'   `fit_readiness_parameters`: exact source-fit v3 readiness provenance;
+#'   these fields are not re-derived from checklist completeness.
 #' - `section_summary`: available items by section.
 #' - The Global Fit section includes a "Fit/separation reporting boundary"
 #'   row that points to [precision_review_report()], [fit_measures_table()],
@@ -111,6 +114,8 @@
 #' \donttest{
 #' # Minimal checklist example using a JML fit and lightweight diagnostics.
 #' toy <- load_mfrmr_data("example_core")
+#' # A balanced slice retains every Rater and Criterion while running quickly.
+#' toy <- toy[toy$Person %in% unique(toy$Person)[1:12], , drop = FALSE]
 #' fit_quick <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
 #'                       method = "JML", maxit = 30)
 #' diag_quick <- diagnose_mfrm(fit_quick, residual_pca = "none",
@@ -171,6 +176,7 @@ reporting_checklist <- function(fit,
   n_bias_errors <- if (is.data.frame(bias_error_tbl)) nrow(bias_error_tbl) else 0L
 
   convergence <- mfrm_convergence_state(fit)
+  fit_readiness_record <- mfrmr_get_readiness_record(fit)
   converged <- convergence$inference_ready
   summary_msg <- if (is.data.frame(fit$summary) && "Message" %in% names(fit$summary)) {
     as.character(fit$summary$Message[1] %||% "")
@@ -263,6 +269,9 @@ reporting_checklist <- function(fit,
   )
   population <- fit$population %||% list()
   population_active <- isTRUE(population$active)
+  population_is_gpcm_identification <- population_active &&
+    identical(as.character(population$source %||% ""),
+              "gpcm_mml_default_identification")
   population_coefficients <- as.numeric(population$coefficients %||% numeric(0))
   population_coefficients_finite <- length(population_coefficients) > 0L &&
     all(is.finite(population_coefficients))
@@ -352,7 +361,11 @@ reporting_checklist <- function(fit,
     population_items <- list(
       add_item(
         "Population Model",
-        "Latent-regression basis",
+        if (population_is_gpcm_identification) {
+          "GPCM population-scale identification basis"
+        } else {
+          "Latent-regression basis"
+        },
         population_active && identical(population_posterior_basis, "population_model"),
         detail = paste0(
           "Formula=", population_formula,
@@ -364,7 +377,11 @@ reporting_checklist <- function(fit,
         severity = "required",
         ready_for_apa = population_active && identical(population_posterior_basis, "population_model"),
         missing_action = "Fit with `method = \"MML\"`, `population_formula`, and one-row-per-person `person_data` before reporting latent regression.",
-        available_action = "Describe the fit as a conditional-normal latent-regression MML model, not as a post hoc regression on EAP/MLE scores."
+        available_action = if (population_is_gpcm_identification) {
+          "Describe the intercept-only population model as the GPCM MML scale-identification basis, not as a substantive covariate regression."
+        } else {
+          "Describe the fit as a conditional-normal latent-regression MML model, not as a post hoc regression on EAP/MLE scores."
+        }
       ),
       add_item(
         "Population Model",
@@ -378,7 +395,11 @@ reporting_checklist <- function(fit,
         severity = "required",
         ready_for_apa = population_coefficients_finite && is.finite(population_sigma2) && population_sigma2 > 0,
         missing_action = "Inspect `summary(fit)$population_coefficients` and `summary(fit)$population_overview` before reporting latent-regression effects.",
-        available_action = "Report coefficients and residual variance as conditional-normal population-model parameters, with scale/coding notes."
+        available_action = if (population_is_gpcm_identification) {
+          "Report the population intercept and variance as GPCM location/scale coordinates; use population SD times relative slope for fixed-latent-SD discrimination comparisons."
+        } else {
+          "Report coefficients and residual variance as conditional-normal population-model parameters, with scale/coding notes."
+        }
       ),
       add_item(
         "Population Model",
@@ -420,11 +441,19 @@ reporting_checklist <- function(fit,
         "Population Model",
         "ConQuest overlap wording",
         TRUE,
-        detail = "Current overlap is narrow RSM/PCM unidimensional conditional-normal latent regression; ConQuest comparison is scoped to the documented external-table workflow.",
+        detail = if (population_is_gpcm_identification) {
+          "An exact probability/coordinate map exists for item-only bounded-GPCM MML and ConQuest scoresfree; multifacet generalized-item equivalence remains unproved and the public external-table bundle does not yet cover GPCM."
+        } else {
+          "Current public external-table overlap is narrow RSM/PCM unidimensional conditional-normal latent regression."
+        },
         source_component = "README latent-regression status + review_conquest_overlap()",
         severity = "recommended",
         ready_for_apa = FALSE,
-        available_action = "Use conservative wording: ConQuest overlap is limited to the documented latent-regression MML comparison scope."
+        available_action = if (population_is_gpcm_identification) {
+          "Use conservative wording: the exact ConQuest GPCM map is item-only and parameterization-level; it is not a many-facet or accepted external-equivalence claim."
+        } else {
+          "Use conservative wording: ConQuest overlap is limited to the documented latent-regression MML comparison scope."
+        }
       )
     )
   }
@@ -1028,15 +1057,21 @@ reporting_checklist <- function(fit,
   references <- if (isTRUE(include_references)) {
     data.frame(
       Citation = c(
+        "American Psychological Association (2020)",
+        "Appelbaum et al. (2018)",
         "Eckes (2005)",
         "Koizumi et al. (2019)",
+        "Muraki (1992, 1993)",
         "Myford & Wolfe (2003, 2004)",
         "Linacre (1989, 2002)",
         "Wright & Masters (1982)"
       ),
       Topic = c(
+        "APA 7 manuscript and statistical-reporting conventions",
+        "APA JARS-Quant reporting framework",
         "Rater effects in MFRM",
         "Validity / MFRM task reporting",
+        "Generalized partial-credit model and information functions",
         "Bias and interaction analysis",
         "MFRM and rating scale guidance",
         "Rating scale analysis"
@@ -1057,6 +1092,18 @@ reporting_checklist <- function(fit,
 
   out <- list(
     checklist = checklist,
+    fit_readiness = as.data.frame(
+      fit_readiness_record$fit, stringsAsFactors = FALSE
+    ),
+    fit_readiness_components = as.data.frame(
+      fit_readiness_record$components %||% data.frame(),
+      stringsAsFactors = FALSE
+    ),
+    fit_readiness_parameters = as.data.frame(
+      fit_readiness_record$parameters %||%
+        mfrmr_readiness_empty_parameter_table(),
+      stringsAsFactors = FALSE
+    ),
     summary = as.data.frame(section_summary, stringsAsFactors = FALSE),
     section_summary = as.data.frame(section_summary, stringsAsFactors = FALSE),
     software_scope = external_software_scope_table(fit),
@@ -1332,6 +1379,18 @@ summary.mfrm_reporting_checklist <- function(object, top_n = 10, ...) {
 
   out <- list(
     overview = overview,
+    fit_readiness = as.data.frame(
+      object$fit_readiness %||% data.frame(), stringsAsFactors = FALSE
+    ),
+    fit_readiness_components = as.data.frame(
+      object$fit_readiness_components %||% data.frame(),
+      stringsAsFactors = FALSE
+    ),
+    fit_readiness_parameters = as.data.frame(
+      object$fit_readiness_parameters %||%
+        mfrmr_readiness_empty_parameter_table(),
+      stringsAsFactors = FALSE
+    ),
     section_summary = section_summary,
     software_scope = software_scope,
     facets_positioning = facets_positioning,

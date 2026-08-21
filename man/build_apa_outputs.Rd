@@ -26,7 +26,12 @@ build_apa_outputs(
 \value{
 An object of class \code{mfrm_apa_outputs} with:
 \itemize{
-\item \code{report_text}: APA-style Method/Results draft prose
+\item \code{report_text}: APA-oriented Method/Results draft prose
+\item \code{decision}: plain-language source-fit interpretation plus the separate
+precision-contract decision; \code{FormalInference} is \code{"Yes"} only when both
+the fit gate and \code{contract$precision$supports_formal_inference} pass
+\item \code{fit_readiness}, \code{fit_readiness_components}, and
+\code{fit_readiness_parameters}: exact source-fit readiness provenance
 \item \code{table_figure_notes}: consolidated draft notes for tables/visuals
 \item \code{table_figure_captions}: draft caption candidates without figure numbering
 \item \code{section_map}: package-native section table for manuscript assembly
@@ -58,7 +63,10 @@ design-forecasting evidence.
 By default, \code{report_text} includes:
 \itemize{
 \item model/data design summary (N, facet counts, scale range)
-\item optimization/convergence metrics (\code{Converged}, \code{Iterations}, \code{LogLik}, \code{AIC}, \code{BIC})
+\item optimization/convergence metrics (\code{Converged}, \code{Iterations}, \code{LogLik}) plus
+the eligible canonical MML AIC/Person-BIC/SABIC panel or its explicit
+ineligibility and legacy-descriptive status; q<31 MML criteria are
+explicitly labelled screening/review-only rather than automatic ranking
 \item anchor/constraint summary (\code{noncenter_facet}, anchored levels, group anchors, dummy facets)
 \item latent-regression population-model wording when \code{fit} has an active
 \code{population_formula}
@@ -73,8 +81,10 @@ By default, \code{report_text} includes:
 \item \code{report_text}: manuscript-draft narrative covering Method (model
 specification, estimation, convergence) and Results (global fit,
 facet separation/reliability, misfit triage, category diagnostics,
-residual-PCA screening, bias screening).  Written in third-person past tense
-following APA 7th edition conventions, but still intended for human review.
+residual-PCA screening, bias screening), organized as an APA-oriented,
+third-person Method/Results draft. It is
+intended for human review and is not a claim of complete APA 7 or JARS
+compliance.
 \item \code{table_figure_notes}: reusable draft note blocks for table/figure appendices.
 \item \code{table_figure_captions}: draft caption candidates aligned to generated outputs.
 \item active latent-regression fits add a population-model section and Table 5
@@ -123,6 +133,8 @@ package-native bias helper that provides a table component.
 \donttest{
 # Minimal APA-output example using a JML fit and lightweight diagnostics.
 toy <- load_mfrmr_data("example_core")
+# A balanced slice retains every Rater and Criterion while running quickly.
+toy <- toy[toy$Person \%in\% unique(toy$Person)[1:12], , drop = FALSE]
 fit_quick <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
   method = "JML", maxit = 30
 )

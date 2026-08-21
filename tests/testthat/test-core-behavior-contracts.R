@@ -462,8 +462,8 @@ test_that("build_facet_constraint with anchors", {
   )
   expect_true(is.list(result))
   expect_equal(result$levels, c("R1", "R2", "R3"))
-  expect_true(!is.na(result$anchors["R1"]))
-  expect_true(is.na(result$anchors["R2"]))
+  expect_true(isTRUE(!is.na(result$anchors["R1"])))
+  expect_true(isTRUE(is.na(result$anchors["R2"])))
 })
 
 test_that("build_facet_constraint with groups", {

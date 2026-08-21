@@ -143,9 +143,10 @@ handoffs.
 \item latent-regression fit summaries expose \code{population_coding} in the methods
 appendix role so categorical levels, contrasts, and encoded columns can be
 documented with the coefficient table.
-\item model-choice-review summaries expose \code{comparison_table}, \code{model_roles},
-\code{downstream_routes}, and \code{report_templates} so RSM/PCM versus bounded
-\code{GPCM} comparisons remain tied to their equal-weighting, sensitivity, and
+\item model-choice-review summaries expose \code{comparison_table},
+\code{comparison_warnings}, \code{model_roles}, \code{downstream_routes}, and
+\code{report_templates} so RSM/PCM versus bounded \code{GPCM} comparisons remain
+tied to their same-basis limits, equal-weighting, sensitivity, and
 reporting-boundary roles.
 }
 }

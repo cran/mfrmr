@@ -921,8 +921,9 @@ plot_dif_summary <- function(x,
 #'
 #' @section Interpreting output:
 #' Designed as a single-figure Methods or Results draft. The
-#' summary panel prints the model class, sample size, log-likelihood,
-#' AIC/BIC, and the largest non-Person facet's separation /
+#' summary panel prints the model class, sample size, log-likelihood, the
+#' canonical MML IC panel or an explicit ineligibility/legacy label, and the
+#' largest non-Person facet's separation /
 #' reliability if available. A fit that has not passed its numerical, data,
 #' design, and stability gates produces one warning and a visible
 #' `"REVIEW ONLY"` label. Resolve that review before treating the composite as
@@ -1007,9 +1008,6 @@ plot_apa_figure_one <- function(fit,
       fallback = fit$prep$n_person %||%
         if (!is.null(fit$facets$person)) nrow(fit$facets$person) else NA_integer_
     )
-    loglik <- suppressWarnings(as.numeric(first_summary_value(s, "LogLik", NA_real_)))
-    aic <- suppressWarnings(as.numeric(first_summary_value(s, "AIC", NA_real_)))
-    bic <- suppressWarnings(as.numeric(first_summary_value(s, "BIC", NA_real_)))
     summary_lines <- c(
       sprintf("Model: %s | Method: %s",
               as.character(first_summary_value(s, "Model", NA_character_)),
@@ -1017,10 +1015,7 @@ plot_apa_figure_one <- function(fit,
       sprintf("N obs = %s | Persons = %s",
               format(n_obs, big.mark = ","),
               format(n_person, big.mark = ",")),
-      sprintf("LogLik = %.2f | AIC = %.2f | BIC = %.2f",
-              loglik,
-              aic,
-              bic)
+      mfrm_ic_console_lines(s, digits = 2L)
     )
   }
   rel <- diagnostics$reliability
