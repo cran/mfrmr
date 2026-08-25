@@ -1,7 +1,7 @@
-34ebf499e08dee04bc639becf722f962 *DESCRIPTION
+67c6bfae3b020a852ec36abb535acf6b *DESCRIPTION
 edc8a97596ce052af482c16f3e006956 *LICENSE
 11a1558b76afd53833f93337babd98f2 *NAMESPACE
-245fa0048ec8901177399f26f0ae87ad *NEWS.md
+d2933046ff45122b212784ad27a12b6d *NEWS.md
 7f0f95c21e53f83295770188974d0e5c *R/api-advanced.R
 8c613fc0bf923e896f89351dd4ce522e *R/api-as-ggplot.R
 89275ed1cc2a9ff090c72c8bb447beda *R/api-bias-collection.R
@@ -10,7 +10,7 @@ edc8a97596ce052af482c16f3e006956 *LICENSE
 a9dbfdc57e76eb6873fa61f43917d989 *R/api-export-bundles.R
 7e651beb269cae270f48d3d769a51a09 *R/api-facet-equivalence.R
 a25163583f956d274a803c378c5a9a42 *R/api-generalizability.R
-f2fa754e5581aef264c532eeadeee708 *R/api-hierarchical-audit.R
+68ab26b91c8438206dc0d6700ee1cf7f *R/api-hierarchical-audit.R
 17510e3f0709c52a8cb6a8b7a681c676 *R/api-import.R
 9a714b0ce4a853e1345a224243c9221c *R/api-methods-print.R
 4c356bfe048f6f2803447d43bda4b26f *R/api-methods.R
@@ -35,7 +35,7 @@ da4c468b2a4dcd0d7f30399343d36b3b *R/api-results.R
 2627a9cd45395a27032fc0a7038a2aca *R/api-simulation-spec.R
 dfa18fdd42b82af8213599b0d006a750 *R/api-simulation-structural-design.R
 11992559268acedb1b168c73376b66f1 *R/api-simulation.R
-1152c57695f51b2f46abbd89f2d08ec7 *R/api-tables.R
+8ff26c8ec505479ffed655af5e4c1409 *R/api-tables.R
 c74bfc12fd1103df20969f05eb9fa504 *R/api-viewer.R
 bbc863c967d9e4b3ca372e1410038ab8 *R/core-anchor-audit.R
 4469728139440bd211ad970bd0401138 *R/core-category-probabilities.R
@@ -72,7 +72,7 @@ a2626e372bc0e9132f47b87778510908 *R/cpp11.R
 e2562b53f3e6b2e8d5ca3ce0a909112d *R/facets_mode_methods.R
 01615524f1ff28fca987210765a75d80 *R/globals.R
 e078c78e3c0b97b843c5297b3eab1ff9 *R/help_compatibility_layer.R
-f1ea1148ac104914a74a9fba1e45da26 *R/help_facets_coverage.R
+a7375044f7c6b6b363745dd6b34a4984 *R/help_facets_coverage.R
 7465c0201a40e029cb647244d3d77235 *R/help_gpcm_scope.R
 7fb7a83c4aecde45d744f6ff00334077 *R/help_linking_and_dff.R
 05c415b9deb479d235dda736ae6b6786 *R/help_reporting_and_apa.R
@@ -83,7 +83,7 @@ c79df4ce149da868e1f33e6950fa65b0 *R/help_visual_diagnostics.R
 a4bc795687d996b9c57863114ab93ce4 *R/mfrmr-package.R
 af6b40398acf648e32955611eaa60ab2 *R/reporting.R
 d5ce7738b53442109a8858d03e8a557f *R/utils-method-labels.R
-bcf983df4f48a5884f207e6c9464ba28 *README.md
+a3b7ebb68902b88cfbe613bfafa14659 *README.md
 21c9401b8c07f38d762ade4612fc4ffe *build/partial.rdb
 59591beef0df503fc8c926dbe3d58a50 *build/vignette.rds
 74cfa485d446eb864d69770e41b78ef0 *data/ej2021_combined.rda
@@ -123,7 +123,7 @@ e4a3b88bc3cb2fbc2fe09db1255f36ac *inst/doc/mfrmr-visual-diagnostics.Rmd
 135b53b0b6641056ce36f4987ab5d7fb *inst/doc/mfrmr-workflow.html
 1607fea713c3a995fc6f76eabe2ea0d7 *inst/extdata/README_sim_data.txt
 5dad7bea32cc88a2018d00185445ee69 *inst/extdata/vignette-artifacts/README.md
-a04e86d219aac93024b419cc6053b2d9 *inst/extdata/vignette-artifacts/manifest.csv
+daf2466ab73ef89ac5c607b70eda4c6e *inst/extdata/vignette-artifacts/manifest.csv
 ee15c0f8a328e17a349c8d34f11f6b98 *inst/extdata/vignette-artifacts/workflow_diagnostic_overview.csv
 e467519b74c96b1844d9f77368dd148d *inst/extdata/vignette-artifacts/workflow_export_files.csv
 b09e41acb38a7f292999241110476f52 *inst/extdata/vignette-artifacts/workflow_fit_decision.csv
@@ -138,7 +138,7 @@ bc8ecf8cb76ffc66235228d52634e7e5 *inst/extdata/vignette-artifacts/workflow_repor
 55cd91407529d2892392cff076577ec6 *inst/references/facets_column_contract.csv
 d21270699f5b53c5ac0be82f882c7b10 *man/analyze_dff.Rd
 4924c64e36676c0c74016e922a4c08f2 *man/analyze_facet_equivalence.Rd
-bdeae3415538e047de34a433542458a4 *man/analyze_hierarchical_structure.Rd
+20a3a17c3e9cd9117abacc0350051a61 *man/analyze_hierarchical_structure.Rd
 8290a56f1e1526907cbeaeda0576b5fa *man/analyze_residual_pca.Rd
 4a0e53445e5ff7d87ce83554d2838583 *man/anchor_to_baseline.Rd
 705d9fcc8965c56215199dfcc0a6b214 *man/apa_table.Rd
@@ -202,10 +202,10 @@ e53dfea1c04a46a5e1d3607a2f0d2840 *man/evaluate_mfrm_design.Rd
 b3ee2ea7b03d9b28432d873bd6d7c5ed *man/export_summary_appendix.Rd
 f87385a5c66dc1ba2b6534ba84c59401 *man/extract_mfrm_sim_spec.Rd
 8c0fc4204b929abdd5da6a8cb11ad9b3 *man/facet_quality_dashboard.Rd
-1ebfce956f0c960b61965520426cd26f *man/facet_small_sample_review.Rd
+a42d8986bb32744e906d0cd6d71e5e3b *man/facet_small_sample_review.Rd
 881dafaa23c03e5d65e179b226596f76 *man/facet_statistics_report.Rd
 4d529a56d7c7b19bb9c57b1020f97a64 *man/facets_chisq_table.Rd
-774bcb3bfc0e25add678895ea58a27eb *man/facets_feature_coverage.Rd
+d7596a524e72bafc55db515918e482c2 *man/facets_feature_coverage.Rd
 d344789b1e2294374b8b33531b3cbc05 *man/facets_fit_df_guide.Rd
 f307ad12c496a3e21a4f62989911e917 *man/facets_fit_review.Rd
 83697f4687429226c0a7cfbb753883d7 *man/facets_output_contract_review.Rd
@@ -213,7 +213,7 @@ f307ad12c496a3e21a4f62989911e917 *man/facets_fit_review.Rd
 9fb2f726216cb17ac2f12c2349379b61 *man/facets_positioning_guide.Rd
 0aecf4e435e71b443dbe792c1d806b55 *man/facets_term_crosswalk.Rd
 69b0310840d0a994437d6d4f3f361ab7 *man/facets_visual_contract.Rd
-c1295265adadcc10779eb356f51cc2ff *man/fair_average_table.Rd
+e5c6d363d17fc8c0f56152e6f644753e *man/fair_average_table.Rd
 a5404d2bee4791d06ea394534b03acd6 *man/figures/logo-source.svg
 4452baa25e06d407f59268a98ea8377d *man/figures/logo.png
 a43c63fae16f8eef84b9e80ee10c3fc7 *man/fit_measures_table.Rd
@@ -359,8 +359,8 @@ b5bf9e22e57bf432ceba35ec3d1b89a6 *man/visual_reporting_template.Rd
 8d5c9990d05118210a0025ee9a6d9180 *man/write_mfrm_residual_file.Rd
 575080d0808ceb5edccbbfdd04e1b4df *man/write_mfrm_subset_file.Rd
 b40c734e33bd49e511eafd3891c4cfc9 *src/cpp11.cpp
-27a1bc5175f9a8be42f496f39d190b12 *src/mml_backend.cpp
-98242954a491789d431e162b86e6b864 *tests/testthat.R
+fb67fbd0c3844cba6d8662ada460763a *src/mml_backend.cpp
+b679097ab5fdbe413a65ee34897c9cdf *tests/testthat.R
 fdca60a93c754fab6f87fddc69dc93ee *tests/testthat/fixtures/mfrm-fit-0.2.2-pcm-jml.rds
 5ab0242a904dd5f0ed88b7b11225c586 *tests/testthat/helper-fixtures.R
 937c0ae589e800a52e9bfd25d5e953ae *tests/testthat/test-anchor-equating.R
@@ -378,6 +378,7 @@ bf9616cbba53ca6f76cf655a8eae276d *tests/testthat/test-bubble-chart.R
 6b55738341d878454e4ac4205bc90f05 *tests/testthat/test-category-step-support-audit.R
 dfa0f5fd722d67c459d0166cf5973956 *tests/testthat/test-ci-api-consistency.R
 99acac1fc7a32d0fb43752f463909773 *tests/testthat/test-compatibility-aliases.R
+28eb60d4a3747d7c37d69a6089370f3e *tests/testthat/test-compiled-header-contract.R
 579671fecfa73f00f3f24fe05a969652 *tests/testthat/test-console-output-contract.R
 8307ae411b9e6ae5121d8f1d86beff91 *tests/testthat/test-core-behavior-contracts.R
 d47dff09544a45b71452e6c1a4df00a1 *tests/testthat/test-core-edge-paths.R

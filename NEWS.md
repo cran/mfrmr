@@ -1,3 +1,18 @@
+# mfrmr 0.2.3.1
+
+mfrmr 0.2.3.1 is a focused CRAN maintenance release. It does not change the
+public R API or the fitted-model contracts introduced in 0.2.3.
+
+* Fixed the additional link-time-optimization check by allowing every C++
+  translation unit to use R's configured `Rboolean` definition. This removes
+  the cross-translation-unit `Rboolean` and `R_UnwindProtect` one-definition-
+  rule warnings reported under GCC LTO.
+* Added a lightweight source contract that rejects local overrides of
+  `HAVE_ENUM_BASE_TYPE`, including overrides introduced through `Makevars`, so
+  cpp11 registration regeneration cannot silently recreate the mismatch.
+* Removed links to FACETS/Winsteps pages whose upstream TLS certificate had
+  expired while retaining the substantive model distinctions and references.
+
 # mfrmr 0.2.3
 
 mfrmr 0.2.3 improves the reliability and interpretation of the existing

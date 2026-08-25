@@ -94,10 +94,8 @@ facets_feature_coverage("not_implemented")
 }
 \references{
 Linacre, J. M. (2026). \emph{A user's guide to FACETS, version 4.5.0}.
-Current FACETS software release:
-\url{https://www.winsteps.com/facets.htm}.
-Output tables - files - plots - graphs:
-\url{https://www.winsteps.com/facetman64/outputtableindex.htm}.
+Winsteps.com. See the guide's output-table index for the documented
+FACETS files, plots, and graphs.
 }
 \seealso{
 \code{\link[=facets_positioning_guide]{facets_positioning_guide()}}, \code{\link[=mfrmr_output_guide]{mfrmr_output_guide()}},

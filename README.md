@@ -141,8 +141,7 @@ one Person's conditional pattern is not equivalent to replicating a complete
 Person response pattern after marginalization. It also does not change the
 response family or model dependence among repeated ratings. Non-unit
 observation-weight fits are excluded from the common MML information-criterion
-panel. [FACETS has separate `Bn` binomial-trial
-and `P` Poisson response models](https://www.winsteps.com/facetman64/models.htm);
+panel. FACETS has separate `Bn` binomial-trial and `P` Poisson response models;
 those are not reproduced by mfrmr's binary ordered-score route.
 
 Each row should represent a distinguishable rating event. Exact duplicate
@@ -891,10 +890,10 @@ information criteria, whereas an unpenalized JML likelihood difference is not
 turned into an automatic PCM-versus-GPCM choice.
 
 Cross-software slope values are not automatically matched estimands. FACETS
-does not jointly fit Muraki's free-slope polytomous GPCM. [FACETS' reported
-element discrimination](https://www.winsteps.com/facetman64/t7menu.htm) is a
-post-fit diagnostic computed after the Rasch measures and does not feed back
-into the other estimates; it must not be treated as a free-GPCM slope estimate
+does not jointly fit Muraki's free-slope polytomous GPCM. FACETS' reported
+element discrimination is a post-fit diagnostic computed after the Rasch
+measures and does not feed back into the other estimates; it must not be
+treated as a free-GPCM slope estimate
 from `mfrmr`. TAM can estimate GPCM
 slopes through its 2PL/GPCM MML route, but its many-facet fitting route does
 not estimate those slopes. The current `immer` estimation routes provide PCM-

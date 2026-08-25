@@ -140,7 +140,7 @@ results from many-facets-Rasch model analyses} (Doctoral thesis,
 Brigham Young University). \url{https://scholarsarchive.byu.edu/etd/6689/}
 
 Linacre, J. M. (2026). \emph{A User's Guide to FACETS, Version 4.5.0}.
-Winsteps.com. \url{https://www.winsteps.com/facets.htm}
+Winsteps.com.
 
 Kish, L. (1965). \emph{Survey Sampling}. New York: Wiley.
 

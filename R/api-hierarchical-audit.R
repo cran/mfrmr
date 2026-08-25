@@ -369,7 +369,7 @@ detect_facet_nesting <- function(data, facets, person = NULL,
 #'
 #' @references
 #' Linacre, J. M. (2026). *A User's Guide to FACETS, Version 4.5.0*.
-#' Winsteps.com. <https://www.winsteps.com/facets.htm>
+#' Winsteps.com.
 #'
 #' Linacre, J. M. (1994). Sample size and item calibration stability.
 #' *Rasch Measurement Transactions, 7*(4), 328.
@@ -1188,7 +1188,7 @@ compute_facet_design_effect <- function(data, facets, icc_table = NULL,
 #' Brigham Young University). <https://scholarsarchive.byu.edu/etd/6689/>
 #'
 #' Linacre, J. M. (2026). *A User's Guide to FACETS, Version 4.5.0*.
-#' Winsteps.com. <https://www.winsteps.com/facets.htm>
+#' Winsteps.com.
 #'
 #' Kish, L. (1965). *Survey Sampling*. New York: Wiley.
 #'

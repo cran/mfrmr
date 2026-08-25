@@ -97,7 +97,7 @@ strict$facet_summary
 }
 \references{
 Linacre, J. M. (2026). \emph{A User's Guide to FACETS, Version 4.5.0}.
-Winsteps.com. \url{https://www.winsteps.com/facets.htm}
+Winsteps.com.
 
 Linacre, J. M. (1994). Sample size and item calibration stability.
 \emph{Rasch Measurement Transactions, 7}(4), 328.

@@ -1,8 +1,3 @@
-// Keep this block before cpp11/R headers. With R 4.5 on Apple clang 21,
-// the fixed-enum Rboolean branch can emit a non-actionable CRAN-check warning.
-// The portable fallback keeps the compiled backend warning-clean.
-#include <Rconfig.h>
-#undef HAVE_ENUM_BASE_TYPE
 #include <cpp11.hpp>
 
 #include <cmath>

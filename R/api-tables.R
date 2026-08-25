@@ -579,7 +579,7 @@ unexpected_response_table <- function(fit,
 #' - Linacre, J. M. (1994). *Many-facet Rasch Measurement* (2nd ed.).
 #'   MESA Press.
 #' - Linacre, J. M. (2026). *A user's guide to FACETS, version 4.5.0*.
-#'   Winsteps.com. <https://www.winsteps.com/facets.htm>
+#'   Winsteps.com.
 #'   (FACETS Table 12 corresponds to the fair-average
 #'   construction implemented here for `RSM` / `PCM` fits; the
 #'   slope-aware element-conditional construction for bounded `GPCM`

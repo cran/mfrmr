@@ -270,10 +270,8 @@ facets_visual_contract <- function() {
 #'
 #' @references
 #' Linacre, J. M. (2026). *A user's guide to FACETS, version 4.5.0*.
-#' Current FACETS software release:
-#' <https://www.winsteps.com/facets.htm>.
-#' Output tables - files - plots - graphs:
-#' <https://www.winsteps.com/facetman64/outputtableindex.htm>.
+#' Winsteps.com. See the guide's output-table index for the documented
+#' FACETS files, plots, and graphs.
 #'
 #' @seealso [facets_positioning_guide()], [mfrmr_output_guide()],
 #'   [facets_fit_df_guide()], [read_facets_fit_table()], [facets_fit_review()],

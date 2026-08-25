@@ -13,6 +13,7 @@ is_cran_check <- local({
 cran_light_tests <- c(
   "cran-smoke",
   "compatibility-aliases",
+  "compiled-header-contract",
   "data-and-citation",
   "example-datasets",
   "mml-cpp11-backend",

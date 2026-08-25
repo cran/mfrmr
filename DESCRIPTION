@@ -1,10 +1,10 @@
 Package: mfrmr
 Type: Package
 Title: Estimation and Diagnostics for Many-Facet Measurement Models
-Version: 0.2.3
-Date: 2026-08-16
+Version: 0.2.3.1
+Date: 2026-08-25
 Config/mfrmr/release-status: candidate
-Config/mfrmr/public-version: 0.2.2
+Config/mfrmr/public-version: 0.2.3
 Authors@R: 
     person(given = "Ryuya", family = "Komuro", role = c("aut", "cre", "cph"),
            email = "ryuya.komuro.c4@tohoku.ac.jp",
@@ -40,9 +40,9 @@ Config/testthat/edition: 3
 Config/Needs/website: pkgdown
 Config/roxygen2/version: 8.1.0
 NeedsCompilation: yes
-Packaged: 2026-08-20 13:27:41 UTC; tohokusla
+Packaged: 2026-08-25 02:07:18 UTC; tohokusla
 Author: Ryuya Komuro [aut, cre, cph] (ORCID:
     <https://orcid.org/0000-0001-9205-0926>)
 Maintainer: Ryuya Komuro <ryuya.komuro.c4@tohoku.ac.jp>
 Repository: CRAN
-Date/Publication: 2026-08-21 05:41:38 UTC
+Date/Publication: 2026-08-25 12:40:02 UTC
