@@ -2,6 +2,7 @@
 % Please edit documentation in R/api-prediction.R
 \name{sample_mfrm_plausible_values}
 \alias{sample_mfrm_plausible_values}
+\alias{summary.mfrm_plausible_values}
 \title{Sample approximate plausible values under fitted posterior scoring}
 \usage{
 sample_mfrm_plausible_values(
@@ -16,8 +17,13 @@ sample_mfrm_plausible_values(
   population_policy = c("error", "omit"),
   n_draws = 5,
   interval_level = 0.95,
-  seed = NULL
+  scoring_quad_points = 31L,
+  readiness_policy = c("error", "review"),
+  seed = NULL,
+  scoring_prior = NULL
 )
+
+\method{summary}{mfrm_plausible_values}(object, digits = 3, ...)
 }
 \arguments{
 \item{fit}{Output from \code{\link[=fit_mfrm]{fit_mfrm()}} estimated with \code{method = "MML"} or
@@ -42,12 +48,14 @@ column recorded in \code{fit}, if any.}
 
 \item{person_data}{Optional one-row-per-person data.frame with the
 background variables required by a latent-regression fit. Ignored for
-ordinary fixed-calibration scoring. Intercept-only latent-regression fits
+ordinary fitted-object posterior scoring. Intercept-only latent-regression fits
 can reconstruct the minimal scored-person table internally. This is the
 scoring-time table for \code{new_data}, not the fit object's replay/export
 provenance table. For categorical background variables, supply values on
 the same coding scale used at fit time; the fitted factor levels and
-contrasts are reused when building the scoring design matrix.}
+contrasts are reused when building the scoring design matrix.
+Fitted standardization and polynomial/spline bases are also reused;
+they are not re-estimated from the scoring cohort.}
 
 \item{person_id}{Optional person-ID column in \code{person_data}.}
 
@@ -60,14 +68,37 @@ complete covariates and records that omission in \code{population_review}.}
 integer.}
 
 \item{interval_level}{Posterior interval level passed to
-\code{\link[=predict_mfrm_units]{predict_mfrm_units()}} for the accompanying EAP summary table.}
+\code{\link[=predict_mfrm_units]{predict_mfrm_units()}} for the accompanying EAP summary table. The same
+level selects the empirical draw quantiles reported by \code{summary()}.}
+
+\item{scoring_quad_points}{Number of Gauss-Hermite nodes used only for this
+scoring call. Passed to \code{\link[=predict_mfrm_units]{predict_mfrm_units()}} and independent of the
+fit-time quadrature order. Fixed or adaptive integration is inherited
+from \code{fit}.}
+
+\item{readiness_policy}{Source-fit readiness policy passed to
+\code{\link[=predict_mfrm_units]{predict_mfrm_units()}}. Conditional calibration and scoring-integration
+checks are shared with that function and retained in the returned settings.}
 
 \item{seed}{Optional seed for reproducible posterior draws.}
+
+\item{scoring_prior}{Optional normal scoring prior, \code{list(mean = ..., sd = ...)},
+passed to \code{\link[=predict_mfrm_units]{predict_mfrm_units()}}. \code{NULL} retains the fitted scoring prior.
+Estimates and draws retain both the original and the supplied prior;
+checks of the fitted calibration and numerical accuracy are unchanged.}
+
+\item{object}{Output from \code{\link[=sample_mfrm_plausible_values]{sample_mfrm_plausible_values()}}.}
+
+\item{digits}{Number of digits used in numeric summaries.}
+
+\item{...}{Reserved for generic compatibility.}
 }
 \value{
 An object of class \code{mfrm_plausible_values} with components:
 \itemize{
 \item \code{values}: one row per person per draw
+\item \code{fit_identity}: source calibration, fitted population coding and scoring
+status retained from \code{\link[=predict_mfrm_units]{predict_mfrm_units()}}
 \item \code{estimates}: companion posterior EAP summaries
 \item \code{row_review}: row-preparation review
 \item \code{population_review}: optional person-level omission review for
@@ -78,19 +109,31 @@ latent-regression scoring; \code{NULL} otherwise
 \item \code{settings}: scoring settings
 \item \code{notes}: interpretation notes
 }
+
+For \code{summary()}: An object of class \code{summary.mfrm_plausible_values} with:
+\itemize{
+\item \code{draw_summary}: empirical summaries of the sampled values by person
+\item \code{estimates}: companion posterior EAP summaries
+\item \code{row_review}: row-preparation review
+\item \code{population_review}: optional person-level omission review for
+latent-regression scoring
+\item \code{settings}: scoring settings
+\item \code{notes}: interpretation notes
+}
 }
 \description{
 Sample approximate plausible values under fitted posterior scoring
 }
 \details{
-\code{sample_mfrm_plausible_values()} is a thin public wrapper around
-\code{\link[=predict_mfrm_units]{predict_mfrm_units()}} that exposes the fixed-calibration posterior draws as
+\code{sample_mfrm_plausible_values()} uses \code{\link[=predict_mfrm_units]{predict_mfrm_units()}} to return
+draws from each Person's posterior distribution as
 a standalone object. It is useful when downstream workflows want repeated
 latent-value imputations rather than just one posterior EAP summary.
 
 In the current \code{mfrmr} implementation these are \strong{approximate plausible
 values} drawn from the fitted quadrature-grid posterior under the scoring
-basis implied by \code{fit}. For ordinary \code{MML} fits this is the fitted marginal
+basis implied by \code{fit}, unless \code{scoring_prior} explicitly supplies another
+normal prior. With the default prior, for ordinary \code{MML} fits this is the fitted marginal
 calibration; for latent-regression \code{MML} fits it is the fitted conditional
 normal population model for the scored persons; for \code{JML} fits it is the
 fixed facet/step calibration together with a standard normal reference prior
@@ -104,6 +147,8 @@ layered on top of the fitted joint-likelihood calibration, whereas the
 latent-regression \code{MML} path uses the fitted one-dimensional conditional
 normal population model. Neither path should be described as a full
 many-facet plausible-values system with all ConQuest-style extensions.
+
+\code{summary()} method: Summarize approximate plausible values from posterior scoring
 }
 \section{Interpreting output}{
 
@@ -112,14 +157,25 @@ many-facet plausible-values system with all ConQuest-style extensions.
 \item \code{estimates} contains the companion posterior EAP summaries from
 \code{\link[=predict_mfrm_units]{predict_mfrm_units()}}.
 \item \code{summary()} reports draw counts and empirical draw summaries by person.
+\code{LowerValue} and \code{UpperValue} use the requested \code{interval_level} and are
+labelled with \code{IntervalLevel} and \code{DrawSummaryBasis}. They are empirical
+quantiles of a finite sample of discrete draws, not the continuous posterior
+limits in the companion estimates table. With few draws they are coarse;
+one draw has an unavailable empirical SD.
+Recreate older summaries from the original plausible-values object to
+update these limits and labels; no refitting or resampling is needed.
 }
 }
 
 \section{What this does not justify}{
 
 This helper does not update the calibration, estimate new non-person facet
-levels, or provide exact future true values. It samples from the fixed-grid
-posterior implied by the existing fixed calibration.
+levels, or provide exact future true values. It samples from the quadrature-
+grid posterior implied by the existing fitted-model scoring basis, using
+fixed or Person-specific adaptive nodes according to the fit's setting.
+Calibration and population parameters remain fixed. These draws alone do
+not validate downstream group comparisons or regressions; those analyses
+require a compatible conditioning model and sampling design.
 }
 
 \section{References}{
@@ -128,7 +184,7 @@ The underlying posterior scoring follows the usual quadrature-based EAP
 framework of Bock and Aitkin (1981). The interpretation of multiple
 posterior draws as plausible-value-style summaries follows the general logic
 discussed by Mislevy (1991), while the current implementation remains a
-practical fixed-calibration approximation rather than a full published
+practical fitted-object posterior approximation rather than a full published
 many-facet plausible-values method. For \code{JML} source fits, the quadrature
 posterior uses a package-level standard normal reference prior for this
 post hoc scoring layer.
@@ -141,7 +197,18 @@ variables from complex samples}. Psychometrika, 56(2), 177-196.
 }
 }
 
+\section{Saved-result reuse}{
+
+Fit-level export and replay helpers check the source calibration and scoring
+status of supplied draws. Recreate older results from the saved fit and
+original scoring inputs/settings, including the seed. This repeats drawing
+values without refitting the calibration. See \link{mfrmr_compatibility_layer}.
+}
+
 \examples{
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("sample_mfrm_plausible_values", run.dontrun = TRUE)
+\dontrun{
 toy <- load_mfrmr_data("example_core")
 keep_people <- unique(toy$Person)[1:18]
 toy_fit <- fit_mfrm(
@@ -160,6 +227,30 @@ new_units <- data.frame(
 pv <- sample_mfrm_plausible_values(toy_fit, new_units, n_draws = 3, seed = 1)
 summary(pv)$draw_summary
 }
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("summary.mfrm_plausible_values", run.dontrun = TRUE)
+\dontrun{
+toy <- load_mfrmr_data("example_core")
+keep_people <- unique(toy$Person)[1:18]
+toy_fit <- fit_mfrm(
+  toy[toy$Person \%in\% keep_people, , drop = FALSE],
+  "Person", c("Rater", "Criterion"), "Score",
+  method = "MML",
+  quad_points = 5,
+  maxit = 30
+)
+new_units <- data.frame(
+  Person = c("NEW01", "NEW01"),
+  Rater = unique(toy$Rater)[1],
+  Criterion = unique(toy$Criterion)[1:2],
+  Score = c(2, 3)
+)
+pv <- sample_mfrm_plausible_values(toy_fit, new_units, n_draws = 3, seed = 1)
+summary(pv)
+}
+}
 \seealso{
 \code{\link[=predict_mfrm_units]{predict_mfrm_units()}}, \link{summary.mfrm_plausible_values}
+
+\code{\link[=sample_mfrm_plausible_values]{sample_mfrm_plausible_values()}}
 }

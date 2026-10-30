@@ -159,7 +159,7 @@ test_that("build_misfit_casebook can return a no-flagged-cases status", {
   expect_equal(nrow(casebook$top_cases), 0)
 })
 
-test_that("build_misfit_casebook marks bounded GPCM as supported with caveat", {
+test_that("build_misfit_casebook marks GPCM as supported with caveat", {
   toy <- load_mfrmr_data("example_core")
   keep_people <- unique(toy$Person)[1:10]
   toy <- toy[toy$Person %in% keep_people, , drop = FALSE]
@@ -178,7 +178,7 @@ test_that("build_misfit_casebook marks bounded GPCM as supported with caveat", {
   ))
 
   casebook <- build_misfit_casebook(fit, top_n = 6)
-  gpcm_row <- casebook$support_status[casebook$support_status$Scope == "bounded GPCM", , drop = FALSE]
+  gpcm_row <- casebook$support_status[casebook$support_status$Scope == "GPCM", , drop = FALSE]
   gpcm_sources <- casebook$source_support
 
   expect_equal(gpcm_row$Status[[1]], "supported_with_caveat")

@@ -88,8 +88,9 @@ test_that("GPCM diagnostics retain covariance traces but gate slope inference", 
   expect_true(all(unc$slopes$OptimizerCI_Lower > 0, na.rm = TRUE))
   expect_true(all(
     unc$slopes$UncertaintyEligibility ==
-      "not_eligible_parameter_readiness"
+      if (identical(unc$status, "ok")) "not_eligible_solution" else "not_eligible_covariance"
   ))
+  expect_false(any(unc$slopes$SEEligible | unc$slopes$CIEligible))
   expect_true(unc$status %in% c("ok", "regularized"))
 
   attached <- mfrmr:::attach_diagnostics_to_fit(fit)

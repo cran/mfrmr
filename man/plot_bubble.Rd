@@ -17,7 +17,8 @@ plot_bubble(
   main = NULL,
   palette = NULL,
   draw = TRUE,
-  preset = c("standard", "publication", "compact", "monochrome")
+  preset = c("standard", "publication", "compact", "monochrome"),
+  title = NULL
 )
 }
 \arguments{
@@ -55,13 +56,22 @@ shown as a shaded region (default \code{c(0.5, 1.5)}).}
 
 \item{top_n}{Maximum number of elements to plot (default 60).}
 
-\item{main}{Optional custom plot title.}
+\item{main}{Compatibility title argument. Omitted or \code{NULL} keeps the default
+title. Existing calls remain supported without a deprecation warning.
+For new code, prefer \code{title}; do not supply both arguments.}
 
 \item{palette}{Optional named colour vector keyed by facet name.}
 
 \item{draw}{If \code{TRUE} (default), render the plot using base graphics.}
 
 \item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, \code{"compact"}, or \code{"monochrome"}).}
+
+\item{title}{Plot title. Omit it to keep the default, supply one character
+string to replace it, or use \code{NULL} (or \code{""}) to suppress it. This changes
+only the heading; numerical results, reference lines, subtitles and
+interpretation notes remain. Both \code{main} and \code{title} explicitly supplied
+is an error, even if equal or \code{NULL}. Positional legacy arguments retain
+their order; use the exact name \code{title}.}
 }
 \value{
 Invisibly, an object of class \code{mfrm_plot_data}.
@@ -83,12 +93,18 @@ category).  The y-axis shows the selected fit mean-square statistic.
 A shaded band between \code{fit_range[1]} and \code{fit_range[2]}
 highlights a common heuristic review range.
 
+\code{preset = "monochrome"} uses gray facet colours unless overridden with
+\code{palette}. \code{\link[=as_ggplot]{as_ggplot()}} retains the saved radius ratios and facet colours,
+but uses physical point sizes rather than base graphics' plot units. It
+also retains the reference lines; this is not a pixel-identical rendering.
+
 Bubble radius options:
 \itemize{
 \item \code{"SE"}: inversely proportional to standard error---larger
 circles indicate more precisely estimated elements under the current
 SE approximation.
-\item \code{"N"}: proportional to observation count---larger
+\item \code{"N"}: radius proportional to the square root of
+observation count, so circle area is proportional to count---larger
 circles indicate elements with more data.
 \item \code{"equal"}: uniform size, useful when SE or N differences
 distract from the fit pattern.
@@ -113,36 +129,73 @@ Points are colored by facet for easy identification.
 \enumerate{
 \item Fit a model with \code{\link{fit_mfrm}()}.
 \item Compute diagnostics once with \code{\link{diagnose_mfrm}()}.
-\item Call \code{plot_bubble(fit, diagnostics = diag)} to inspect the most extreme elements.
+\item Call \code{plot(fit, type = "bubble", diagnostics = diag)} to inspect the most extreme elements.
 }
 }
 
+\section{Migration in 0.2.4}{
+
+This renderer is internal. Use the corresponding \code{plot()} route in
+\link{mfrmr_plot_migration}; the former exported name is no longer available.
+}
+
+\section{Session plot defaults}{
+
+Set \code{options(mfrmr.plot_preset = "publication")} to choose a session default
+for plotting functions that expose the common \code{preset} argument. The
+supported values are \code{"standard"}, \code{"publication"}, \code{"compact"} and
+\code{"monochrome"}. Precedence is an explicit call argument, then the session
+option, then \code{"standard"}. For example, \code{preset = "standard"} overrides
+a session set to \code{"monochrome"}. Explicit \code{preset = NULL} retains the
+earlier package-default behavior; it does not read the session option.
+Invalid session values cause an error only when that option is needed.
+
+The category-curve, data-quality, fit-review, connectivity and network
+routes of \code{plot()} for report bundles use the same option through \code{...}.
+Plots without a common \code{preset} argument, including extended-model plots
+with their own \code{palette} controls, keep their own settings. This option
+selects a preset, not a universal theme or a guarantee that all renderers
+implement every appearance control identically.
+
+New plot payloads retain the resolved preset for supported saved-data
+rendering. Converting an existing payload with \code{\link[=as_ggplot]{as_ggplot()}} uses its saved
+appearance, even after the session option changes. A call that creates a
+new plot from a fit or statistical result uses the current default.
+For a reproducible script, supply \code{preset} explicitly or set the option in
+that script. Saving only the fitted model does not save a session option.
+No global ggplot theme is changed.
+
+Restore previous settings with \code{old <- options(mfrmr.plot_preset = "monochrome")} followed by \code{options(old)}. Use
+\code{options(mfrmr.plot_preset = NULL)} to remove the option. The preset changes
+appearance, not estimates, confidence levels or diagnostic thresholds.
+}
+
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_operational")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "MML", model = "RSM",
-                quad_points = 7, maxit = 30)
-diag <- diagnose_mfrm(fit, residual_pca = "none")
-p <- plot_bubble(fit, diagnostics = diag, draw = FALSE)
-head(p$data$table[, c("Facet", "Level", "Estimate", "Infit", "Outfit")])
-# Look for (default `view = "measure"`): bubbles inside the shaded
-#   0.5-1.5 fit-review band. Bubbles above the band are underfit
-#   (noisy elements); below the band are overfit (overly predictable).
-#
-# For the Winsteps Table 30 layout pass `view = "infit_outfit"`:
-p_io <- plot_bubble(fit, diagnostics = diag, view = "infit_outfit",
-                     draw = FALSE)
-p_io$data$view
-# Look for: bubbles clustered inside the central [0.5, 1.5] x [0.5, 1.5]
-#   square. Points outside the upper-right corner have both Infit
-#   AND Outfit > 1.5 (consistent underfit); points outside the
-#   lower-left have both < 0.5 (consistent overfit). Bubble size in
-#   this view defaults to N (observation count) so the visual
-#   weighting matches how seriously the misfit should be taken.
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("plot_bubble", run.dontrun = TRUE)
+\dontrun{
+library(mfrmr)
+
+# Saved synthetic MML/RSM analysis of example_operational.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "operational-mml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+
+# Use the diagnostics saved with this fit
+diagnostics <- example_fit$diagnostics
+
+# Compare facet estimates (horizontal axis) with Infit (vertical axis)
+plot(fit, type = "bubble", diagnostics = diagnostics)
+# Above the review band: more response variation than expected; below: less
+# By default, larger bubbles indicate greater precision, not greater misfit
+
+# Optional: compare Infit (horizontal) and Outfit (vertical) directly
+plot(fit, type = "bubble", diagnostics = diagnostics, view = "infit_outfit")
+# Here bubble size represents observation count; bands are review aids
 }
 }
 \seealso{
 \code{\link{diagnose_mfrm}}, \code{\link{plot_unexpected}},
 \code{\link{plot_fair_average}}
 }
+\keyword{internal}

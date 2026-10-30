@@ -1,0 +1,881 @@
+---
+title: "Exploring person, rater, and task attributes"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Exploring person, rater, and task attributes}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+is_cran_check <- !isTRUE(as.logical(Sys.getenv("NOT_CRAN", "false")))
+available <- !is_cran_check && requireNamespace("mice", quietly = TRUE) &&
+  requireNamespace("cluster", quietly = TRUE)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = !is_cran_check && available)
+```
+
+An assessment team wants to describe its raters' backgrounds before planning
+training. Do groups summarize different combinations of experience, workload,
+and training? Would those descriptions change with the number of groups,
+feature weights, or plausible replacements for unrecorded attributes?
+
+This example follows that question from a feature table to a comparison of
+partitions. It uses **120 fictional raters**, not observations from an assessment
+program. No true groups are planted. Successful execution does not establish
+that these features, imputation models, or groups are appropriate for your
+raters. The groups describe backgrounds; they do not measure rater quality,
+severity, or ability, and do not identify which training will be effective.
+Later sections add separate person and task attributes, link all three
+classifications to a sparse assignment roster, and explain the roles of
+feature selection and PCA.
+
+These APIs are available from version 0.2.4. Install the optional
+`cluster` and `mice` packages to run the entire example.
+
+## Choose attributes and their meaning
+
+Use one row per rater, rather than repeating attributes for every rating.
+Keep identifiers separate from features. Select variables for the question
+before examining which choices produce attractive groups.
+
+| Column | Meaning and coding | Role here |
+| --- | --- | --- |
+| `ExperienceYears` | Completed years of rating experience; numeric | Feature |
+| `AnnualRatings` | Number of responses rated in the previous year; numeric | Feature |
+| `Specialty` | Main subject area; unordered factor | Feature |
+| `TrainingLevel` | Highest completed training stage; ordered factor | Feature |
+| `Certified` | Holds the relevant certification; logical | Feature |
+| `WorkshopHours` | Hours of workshops attended in the previous year; numeric | Auxiliary imputation predictor |
+| `MentoringYears` | Years in a formal mentoring role; undefined without that role | Reviewed, then excluded from the all-rater feature set |
+
+```{r attributes}
+library(mfrmr)
+set.seed(20260921)
+n <- 120L
+raters <- data.frame(
+  Rater = sprintf("R%03d", seq_len(n)),
+  ExperienceYears = sample(0:30, n, replace = TRUE),
+  AnnualRatings = round(exp(rnorm(n, log(250), 0.6))),
+  Specialty = factor(sample(c("Language", "Science", "Social science"),
+                            n, replace = TRUE)),
+  TrainingLevel = ordered(sample(c("Introductory", "Intermediate", "Advanced"),
+                                 n, replace = TRUE),
+                          levels = c("Introductory", "Intermediate", "Advanced")),
+  Certified = sample(c(FALSE, TRUE), n, replace = TRUE),
+  WorkshopHours = sample(0:80, n, replace = TRUE)
+)
+has_mentoring_role <- sample(c(FALSE, TRUE), n, replace = TRUE, prob = c(.7, .3))
+raters$MentoringYears <- ifelse(has_mentoring_role,
+  pmin(raters$ExperienceYears, sample(0:10, n, replace = TRUE)), NA_real_)
+
+# Introduce unrecorded values only after generating the fictional attributes.
+feature_names <- c("ExperienceYears", "AnnualRatings", "Specialty",
+                   "TrainingLevel", "Certified")
+missing_counts <- c(12L, 18L, 6L, 10L, 10L)
+for (j in seq_along(feature_names)) {
+  raters[[feature_names[j]]][sample.int(n, missing_counts[j])] <- NA
+}
+head(raters)
+```
+
+The [Gower distance calculation](https://stat.ethz.ch/R-manual/R-devel/library/cluster/html/daisy.html)
+accommodates these mixed types. Numeric features use their
+observed ranges. Ordered levels use ordered integer codes, so the declared
+order and the spacing implicit in that coding matter. Logical features treat
+both matches (`FALSE/FALSE` and `TRUE/TRUE`) alike. Certification is therefore
+not coded as a special presence-only attribute. Equal feature weights are a
+starting choice; correlated or redundant attributes can still receive too much
+combined influence. A highly unusual numeric value can also change its
+feature's range and hence other raters' distances.
+
+## Distinguish unrecorded and undefined values
+
+Here a missing mentoring duration means that the attribute does not apply.
+It is not a duration waiting to be estimated. A duration of zero would instead
+mean an applicable mentoring role with no completed years.
+
+```{r missing-reasons}
+all_features <- c(feature_names, "MentoringYears")
+initial <- mfrm_features(raters, "Rater", all_features)
+reasons <- initial$missing
+reasons$Reason <- ifelse(reasons$Feature == "MentoringYears",
+                        "Not applicable: no mentoring role", "Not recorded")
+review <- mfrm_features(raters, "Rater", all_features, reasons)
+summary(review)
+table(review$missing$Reason)
+```
+
+The target is a description of **all raters**. Requiring a mentoring duration
+would exclude nonmentors. We therefore leave it out of the selected features
+and the imputation predictors, retaining the original review. A separate
+analysis confined to mentors would address a different population.
+
+```{r selected-features}
+selected_reasons <- subset(review$missing, Feature %in% feature_names)
+features <- mfrm_features(raters, "Rater", feature_names, selected_reasons)
+features$feature_summary
+table(features$row_summary$Complete)
+```
+
+`mfrm_cluster_pam(features, k = 3)` would stop on the remaining missing values.
+Explicit `missing = "omit"` is available, but selects complete raters and
+changes the population being described. It does not correct missing-data bias.
+
+## Fit an explicit imputation model
+
+Only cells reviewed as unrecorded are eligible here. The fictional omissions
+were introduced at random; in an actual program, an explanation based on the
+data collection process is needed. Missingness reasons alone do not identify
+a statistical missingness mechanism. Unobserved-value-dependent nonresponse
+requires additional sensitivity assumptions.
+
+The [mice documentation](https://amices.org/mice/reference/mice.html) describes
+the methods and predictor controls used below. `WorkshopHours` can help predict
+unrecorded attributes without becoming a clustering feature. The identifier
+is neither imputed nor used to predict other variables.
+
+```{r imputation, fig.width=8, fig.height=6, fig.alt="Imputation-chain means and standard deviations across iterations for experience years and annual rating workload. These traces help review mixing; they do not establish that the imputation model is appropriate."}
+eligible <- subset(features$missing, Reason == "Not recorded")
+imputation_data <- raters[c("Rater", feature_names, "WorkshopHours")]
+where <- matrix(FALSE, nrow(imputation_data), ncol(imputation_data),
+                dimnames = dimnames(imputation_data))
+where[cbind(match(eligible$ID, imputation_data$Rater),
+            match(eligible$Feature, names(imputation_data)))] <- TRUE
+methods <- mice::make.method(imputation_data, where = where)
+methods[feature_names] <- c("pmm", "pmm", "polyreg", "polr", "logreg")
+methods["Rater"] <- ""
+predictors <- mice::make.predictorMatrix(imputation_data)
+predictors[, "Rater"] <- 0
+predictors["Rater", ] <- 0
+model <- mice::mice(imputation_data, m = 5, maxit = 5,
+  method = methods, predictorMatrix = predictors, where = where,
+  seed = 724, printFlag = FALSE)
+model$loggedEvents
+plot(model, c("ExperienceYears", "AnnualRatings"), layout = c(2, 2))
+```
+
+Five imputations and five iterations keep this executable example short; they
+are not an adequacy recommendation. The plot shows the mean and standard
+deviation of imputed values along each chain for two numeric features.
+Persistent drift or differences between chains call for investigation;
+overlapping lines in this short example do not establish convergence.
+Inspect logged events, chain behavior,
+observed versus imputed distributions, and substantive plausibility. A lack
+of logged events does not establish convergence or a suitable model.
+`mfrm_cluster_imputed()` checks consistency of the data, not these assumptions.
+
+## Describe groups and compare choices
+
+Reuse the **same fitted imputation model** for every setting. Changing the
+imputations as well as the weights would change two things at once.
+
+```{r grouping}
+experience_weights <- setNames(rep(1, length(feature_names)), feature_names)
+experience_weights["ExperienceYears"] <- 3
+analyses <- list(
+  TwoGroups = mfrm_cluster_imputed(features, model, eligible, k = 2),
+  ThreeGroups = mfrm_cluster_imputed(features, model, eligible, k = 3),
+  ExperienceWeighted = mfrm_cluster_imputed(features, model, eligible, k = 3,
+                                          weights = experience_weights)
+)
+comparison <- mfrm_cluster_compare(analyses)
+comparison$analysis_summary
+summary(comparison)
+weight_effect <- subset(comparison$comparison_summary,
+  First == "ThreeGroups" & Second == "ExperienceWeighted")
+```
+
+`MeanChangedFraction` describes the fraction of rater pairs whose together/apart
+status changes between settings, averaged over the supplied imputations.
+The minimum and maximum show its range. The individual rows in
+`comparison$comparisons` retain every imputation, including split/join counts
+and adjusted Rand indices. An adjusted Rand index of one indicates identical
+partitions, allowing arbitrary group numbering. Neither high agreement nor a
+large silhouette proves that the groups are meaningful. Silhouettes under
+different weights use different distances and should not automatically select
+the weights.
+
+In this fictional example, keeping three groups and raising the experience
+weight from one to three changes the together/apart status of
+`r if (!is_cran_check && available) sprintf("%.1f%%", 100 * weight_effect$MeanChangedFraction) else "the fraction shown in the table"`
+of rater pairs on average across imputations. Thus, the selected weights
+materially affect this particular description; presenting a single partition
+would conceal that dependence. This percentage concerns pairs, not the
+percentage of raters assigned to a different numbered group. It is not evidence
+about an actual assessment program.
+
+Also inspect `MinGroupSize`. A rare category can produce a very small group,
+and repeated profiles can give high separation values. A high overall
+silhouette can coexist with these conditions.
+
+## Compare feature selections
+
+Does including annual rating workload change the background groups? Hold the
+raters, group count, method, and imputation model fixed, and remove
+`AnnualRatings` from the clustering features. Select the corresponding
+eligible cells rather than passing cells for an unselected feature.
+
+```{r feature-selection}
+background_names <- setdiff(feature_names, "AnnualRatings")
+background_features <- mfrm_features(raters, "Rater", background_names,
+  subset(selected_reasons, Feature %in% background_names))
+background_only <- mfrm_cluster_imputed(background_features, model,
+  subset(eligible, Feature %in% background_names), k = 3)
+feature_comparison <- mfrm_cluster_compare(list(
+  WithWorkload = analyses$ThreeGroups, WithoutWorkload = background_only))
+feature_comparison$analysis_summary
+feature_comparison$weights
+summary(feature_comparison)
+```
+
+Here, removing workload changes the together/apart status of
+`r if (!is_cran_check && available) sprintf("%.1f%%", 100 * feature_comparison$comparison_summary$MeanChangedFraction) else "the fraction shown in the table"`
+of rater pairs on average across the five imputations. This measures the
+description's dependence on including workload, not whether workload should
+be excluded. The `Features` column records each analysis's feature count;
+`weights` lists only its selected features. Silhouettes now use different
+distances and cannot automatically choose a feature set.
+
+Workload remains in the imputation model, so this does not examine removing
+it as a predictor of missing attributes. Different feature selections must
+reuse the same fitted `mids` object, and stored completed values are checked
+against the corresponding imputation. A selection containing only complete
+attributes can use its empty `missing` table as `impute`; it retains a
+partition for every completion for comparison purposes.
+
+The included entities must match across all results. With `missing = "omit"`,
+removing an incomplete feature may admit additional raters, in which case the
+comparison stops. Define and report a common cohort before fitting if that
+is the intended question; the API does not silently intersect samples.
+
+## Interpret the retained profiles
+
+Inspect the actual profiles before attaching interpretations to the groups:
+
+```{r interpretation}
+one_completion <- analyses$ThreeGroups$analyses[[1]]
+one_completion$profiles$numeric
+subset(one_completion$profiles$categorical, Feature == "TrainingLevel")
+head(one_completion$membership)
+analyses$ThreeGroups$co_membership[1:5, 1:5]
+```
+
+These profiles describe **one completion**, not an average cluster or a final
+assignment. Group numbers can change across completions. The `co_membership`
+matrix instead records how often each pair is grouped together across all
+imputations. For example, 0.8 means four of the five completions, conditional
+on this model and these settings. It is not an 80% probability of a true shared
+class. Numeric ranges are recalculated within each completion; their changes
+also contribute to sensitivity.
+
+The workflow answers whether proposed background descriptions depend strongly
+on the supplied choices. It supplies no automatic preferred group count,
+consensus assignment, resampling stability, Rubin-pooled inference, or
+imputation of rating responses. Before using groups to make decisions about
+raters, establish that the attributes and proposed use address the intended
+question and assess the consequences with appropriate evidence.
+
+## Read separation, feature profiles, and imputation sensitivity
+
+The silhouette plot shows which raters fit their assigned group less clearly
+under the selected distances. Negative widths warrant examining the rater's
+profile and nearby groups; high widths do not establish useful or stable types.
+The dashed line is the overall mean. Raters excluded from clustering have no
+width; their IDs remain in the returned plot data.
+
+```{r silhouette, fig.width=7, fig.height=5, fig.alt="Rater silhouette widths grouped by the descriptive partition in one completion. The dashed line is the overall mean; negative widths indicate profiles to inspect, not poor rater quality."}
+plot(one_completion)
+```
+
+Inspect one feature at a time so that its units and categories remain clear.
+Numeric profiles show means and medians in original units, without confidence
+intervals. Categorical profiles show proportions within each group, preserving
+the order of training levels. These are descriptions of this completion only.
+
+```{r profiles, fig.width=7, fig.height=5, fig.alt=c("Experience in years summarized by descriptive rater group, with means and medians in the original units and no confidence intervals.", "Proportions of ordered training levels within each descriptive rater group. These profiles describe one imputed table, not effects of training.")}
+plot(one_completion, type = "profile", feature = "ExperienceYears")
+plot(one_completion, type = "profile", feature = "TrainingLevel")
+```
+
+The development version also offers dedicated ggplot conversion for these
+saved summaries. For example, remove the heading while keeping the original
+units, group sizes and interpretation note:
+
+```{r profile-ggplot, fig.width=7, fig.height=5, fig.alt="Experience in years summarized by the saved groups from one completed feature table. Circles mark means and triangles mark medians, offset vertically so equal values remain visible. Group labels give counts; no confidence intervals are shown."}
+if (requireNamespace("ggplot2", quietly = TRUE)) {
+  profile_figure <- as_ggplot(one_completion, type = "profile",
+    feature = "ExperienceYears", preset = "monochrome") +
+    ggplot2::labs(title = NULL)
+  print(profile_figure)
+}
+```
+
+Use `as_ggplot(one_completion)` for the silhouette view, retaining negative
+widths and the saved overall-mean line. Use the profile call with
+`feature = "TrainingLevel"` for a categorical heatmap, including unused levels
+in their original order. The default and `component = "table"` keep the full
+view; categorical profiles also accept `component = "matrix"`. Means and
+medians are descriptive, not effect estimates or interval bounds. The slight
+vertical offsets improve visibility without changing the values. Saved
+summaries and excluded IDs remain available through `plot_data()`.
+
+The next heatmap asks which pairs remain together across imputations. For
+readability, this view explicitly selects the first 20 IDs in the input table;
+it does not recluster them, change the denominator, or represent the remaining
+pairs. Omit `ids` to display all raters. By default, ID labels are hidden above
+50 displayed entities; the data are never sampled automatically.
+
+```{r co-membership, fig.width=7, fig.height=6, fig.alt="Pairwise co-membership proportions across imputations for the first twenty rater IDs. The scale runs from zero to one; unavailable pairs are grey. These proportions are imputation sensitivity, not sampling stability."}
+plot(analyses$ThreeGroups, ids = raters$Rater[1:20])
+```
+
+The colour scale always runs from zero to one. Grey denotes unavailable pairs
+involving excluded raters, not pairs that never share a group. Rows retain
+the requested ID order. The map does not infer a consensus partition or a
+hierarchy, and it does not measure stability under new samples of raters.
+
+For a custom figure, extract the same values without drawing or refitting:
+
+```{r plot-values}
+view <- plot(analyses$ThreeGroups, ids = raters$Rater[1:5], draw = FALSE)
+plot_data(view)$matrix
+```
+
+The development version also converts this same five-ID view to ggplot:
+
+```{r co-membership-ggplot, fig.width=7, fig.height=6, fig.alt="Co-membership fractions for the five selected rater IDs, in the saved order on both axes. The scale is fixed from zero to one; crosses mark unavailable cells, if any. Values use all supplied imputations and do not measure sampling stability."}
+if (requireNamespace("ggplot2", quietly = TRUE)) {
+  co_membership_figure <- as_ggplot(view, component = "matrix") +
+    ggplot2::labs(title = NULL)
+  print(co_membership_figure)
+}
+```
+
+The default and `component = "matrix"` retain the same complete heatmap.
+For a new selection, use `as_ggplot(analyses$ThreeGroups, ids = ...)` or create
+another saved plot with `plot(..., draw = FALSE)`. A saved view keeps its
+preset and label choice even after session options change. Grey cells also
+carry crosses, so unavailable pairs remain distinct from zero in monochrome.
+`plot_data(co_membership_figure)` retains the matrix, selected IDs, excluded
+IDs and number of imputations. Hiding headings with `ggplot2::labs()` does
+not remove those records or change the meaning of the fractions.
+
+## Custom distribution plots
+
+Profile means do not show individual variation. Retrieve one original-unit
+value per rater and feature, with group membership and inclusion status:
+
+```{r profile-observations}
+values <- plot_data(one_completion, "observations", type = "profile",
+  feature = "ExperienceYears")
+head(values)
+```
+
+`Value` is the selected completion's experience in years. `Included = FALSE`
+retains omitted raters, even when this particular feature is observed. In this
+completed example, missing values have been imputed; retain the original
+`features$missing` record to distinguish them from observed attributes.
+A completion's values are not repeated independent observations, and its
+arbitrary group labels must not be averaged across imputations.
+
+The following raincloud combines a half-density, a box and individual points.
+All plotting choices remain editable in ordinary ggplot2. The density is a
+visual smoothing of a discrete years variable; for small groups or ordinal
+rubric scores prefer points/counts. Group differences are partly built into the
+clustering and are not independent tests validating the groups.
+
+```{r raincloud, fig.width=7, fig.height=4.5}
+if (requireNamespace("ggplot2", quietly = TRUE)) {
+  displayed <- subset(values, Included & is.finite(Value))
+  displayed$Group <- factor(displayed$Cluster)
+  displayed$Position <- as.integer(displayed$Group)
+  clouds <- lapply(split(displayed, displayed$Group), function(d) {
+    if (nrow(d) < 5L || length(unique(d$Value)) < 2L) return(NULL)
+    density <- stats::density(d$Value, from = min(d$Value), to = max(d$Value))
+    center <- d$Position[1]
+    data.frame(X = c(center, center + .38*density$y/max(density$y), center),
+      Value = c(density$x[1], density$x, tail(density$x, 1)),
+      Group = d$Group[1])
+  })
+  clouds <- do.call(rbind, clouds)
+  raincloud <- ggplot2::ggplot(displayed,
+    ggplot2::aes(x = Position, y = Value, group = Group))
+  if (!is.null(clouds)) raincloud <- raincloud +
+    ggplot2::geom_polygon(data = clouds,
+      ggplot2::aes(x = X, y = Value, group = Group, fill = Group),
+      inherit.aes = FALSE, alpha = .35, colour = NA)
+  raincloud <- raincloud +
+    ggplot2::geom_boxplot(width = .08, outlier.shape = NA) +
+    ggplot2::geom_point(ggplot2::aes(x = Position - .15), alpha = .5, size = 1.2,
+      position = ggplot2::position_jitter(width = .045, height = 0, seed = 1)) +
+    ggplot2::scale_x_continuous(breaks = seq_along(levels(displayed$Group)),
+      labels = paste("Group", levels(displayed$Group))) +
+    ggplot2::labs(x = NULL, y = "Rating experience (years)") +
+    ggplot2::theme_minimal() + ggplot2::theme(legend.position = "none")
+  print(raincloud)
+}
+```
+
+```{r save-profile-values, eval=FALSE}
+write.csv(values, "rater-experience-long.csv", row.names = FALSE)
+saveRDS(one_completion, "feature-groups.rds")
+ggplot2::ggsave("experience-raincloud.pdf", raincloud, width = 7, height = 4.5)
+```
+
+For a selected wide plot table, `plot_data(..., format = "long", value_cols = ...)`
+gathers explicitly chosen quantities; other columns remain identifiers or metadata.
+Matrices retain row/column indices and labels, including missing cells.
+The [network/reporting lesson](mfrmr-networks-and-reporting.html) shows how to
+export node, edge and coordinate tables without adopting a fixed figure style.
+
+## Compare PAM with a hierarchy
+
+A hierarchy asks which groups merge as dissimilarity increases. Fit it
+separately from PAM: `mfrm_cluster_hierarchical()` uses average linkage
+(the mean of all cross-group Gower dissimilarities) or complete linkage
+(their maximum). The same feature types, weights, and missingness rules apply.
+Choose the group count explicitly; a tree does not automatically identify it.
+
+For multiply imputed features, reuse the same model and eligible cells. This
+holds the completed tables fixed while changing the grouping method.
+
+```{r hierarchical-comparison}
+average <- mfrm_cluster_imputed(features, model, eligible, k = 3,
+  method = "hierarchical", linkage = "average")
+complete <- mfrm_cluster_imputed(features, model, eligible, k = 3,
+  method = "hierarchical", linkage = "complete")
+method_comparison <- mfrm_cluster_compare(list(
+  PAM = analyses$ThreeGroups, Average = average, Complete = complete))
+method_comparison$analysis_summary
+summary(method_comparison)
+```
+
+The comparison identifies methods and linkages, alongside group sizes and
+separation. As before, pair-change summaries describe sensitivity to the
+supplied choices; they do not select a preferred algorithm or establish true
+rater types. Substantively different profiles or very small groups deserve
+inspection even when the overall pair agreement is high.
+
+```{r dendrogram, fig.width=7, fig.height=5, fig.alt="Average-linkage hierarchy from Gower dissimilarities in one completed rater-feature table. Boxes mark three groups; all 120 raters are included. Heights are dissimilarities, not significance or branch support."}
+plot(average$analyses[[1]])
+```
+
+This is the full tree for **one completion**, with boxes marking its three
+groups. The 120 raters are all included; ID labels are hidden by default above
+50 entities. For a smaller cohort, labels appear automatically. Use
+`plot_data(plot(average$analyses[[1]], draw = FALSE))$table` to inspect IDs and
+memberships in leaf order. Excluded raters retain unavailable memberships but
+have no leaves. No entities are sampled to draw the tree.
+
+In the development version, `as_ggplot(average$analyses[[1]])` converts this
+same saved tree with its group boxes, leaf order and merge heights. The default
+and `component = "tree"` retain the full view; use `plot_data()` for the
+membership table. Conversion does not refit, recut or combine trees across
+completions. Add `ggplot2::labs(title = NULL, subtitle = NULL)` to omit headings,
+while retaining the caption about what heights mean.
+
+Merge heights are linkage dissimilarities, not significance levels or branch
+support. Tied distances can produce alternative trees; the group cut uses
+merge order, so a unique horizontal cutting height may not exist. Inspect
+each completion's profiles with `type = "profile"` or silhouettes with
+`type = "silhouette"`. `plot(average)` displays pairwise co-membership across
+imputations; it does not combine the trees into a consensus hierarchy.
+
+## How this relates to MFRM rater-type research
+
+Clustering has been used alongside MFRM, with both hierarchical and
+nonhierarchical methods. In writing assessment,
+[Eckes (2012), *Operational Rater Types in Writing Assessment*](https://doi.org/10.1080/15434303.2011.649381),
+clustered MFRM rater-by-criterion bias estimates using hierarchical Ward
+clustering, also checking complete and average linkage solutions. In music
+performance assessment,
+[Wesolowski (2019), *Predicting Operational Rater-Type Classifications Using
+Rasch Measurement Theory and Random Forests*](https://doi.org/10.1111/jedm.12227),
+reported nonhierarchical k-means clustering of 29 differential rater functioning
+indices, followed by random-forest prediction of the resulting labels.
+The forest is supervised prediction, not the clustering step. Avoid using
+labels discovered from the full sample as if out-of-bag classification alone
+validated those groups. For **residual** profiles, use `mfrm_residual_network()`
+then `mfrm_report()`; its help explains its different features, common-person
+correlation distances, validation requirements and RF follow-up limitations.
+
+Those analyses ask about patterns of rating behaviour. This tutorial instead
+groups external backgrounds such as experience and specialty. Its Gower
+distances accommodate the selected mix of variable types, and PAM produces
+a partition rather than a hierarchy. The separate hierarchical API uses
+average or complete linkage. Ward's variance criterion requires appropriate
+Euclidean geometry; this Gower interface does not define a Euclidean
+conversion and does not offer Ward clustering (see
+[Murtagh and Legendre, 2014](https://doi.org/10.1007/s00357-014-9161-z)). The cited
+studies do not validate the present attributes, weights, imputation model, or
+PAM groups, and do not establish that one method is preferable for all uses.
+Grouping estimated MFRM effects would additionally require consideration of
+their measurement uncertainty and comparability. The present external-feature
+API does not propagate that uncertainty.
+
+## Link separately grouped persons, raters, and tasks
+
+An assessment team may also ask whether different kinds of persons and tasks
+are represented across its rater groups. Keep three feature tables, with one
+row per person, rater, or task, and a separate rating table containing their
+IDs. The tables can have different numbers and types of features. Clustering
+the joined rating rows would repeat attributes according to assignment
+frequency and answer a different question about rating events.
+
+| Table | Example features | Unit classified |
+| --- | --- | --- |
+| Persons | Years of language study, preparation hours, instruction mode | One person |
+| Raters | Experience, workload, specialty, training, certification | One rater |
+| Tasks | Time limit, word limit, response format | One task |
+
+The following extends the fictional example with 240 persons and 12 tasks.
+It uses the existing rater partition from **one completed table** only to
+illustrate joining by ID. The other two tables have no missing attributes.
+The group counts are illustrative choices, not estimated numbers of types.
+
+```{r other-facet-features}
+set.seed(7241)
+persons <- data.frame(
+  Person = sprintf("P%03d", 1:240),
+  LanguageStudyYears = sample(0:15, 240, replace = TRUE),
+  PreparationHours = round(exp(rnorm(240, log(20), 0.5))),
+  InstructionMode = factor(sample(c("Classroom", "Online", "Hybrid"),
+                                  240, replace = TRUE)))
+tasks <- data.frame(
+  Task = sprintf("T%02d", 1:12),
+  TimeLimitMinutes = sample(c(10, 20, 30), 12, replace = TRUE),
+  WordLimit = sample(c(100, 200, 400), 12, replace = TRUE),
+  ResponseFormat = factor(rep(c("Summary", "Argument", "Explanation"), 4)))
+person_groups <- mfrm_cluster_pam(mfrm_features(persons, "Person",
+  c("LanguageStudyYears", "PreparationHours", "InstructionMode")), k = 3)
+task_groups <- mfrm_cluster_pam(mfrm_features(tasks, "Task",
+  c("TimeLimitMinutes", "WordLimit", "ResponseFormat")), k = 3)
+```
+
+Record the planned assignments before collecting scores. Here each person
+receives three distinct tasks and each performance is assigned two distinct
+raters. The full Person-by-Rater-by-Task cross-product is not the assignment
+roster. Random scores below are placeholders for demonstrating coverage;
+they provide no evidence about achievement, rater effects, or model fit.
+
+```{r sparse-rating-roster}
+assignments <- do.call(rbind, lapply(persons$Person, function(id) {
+  do.call(rbind, lapply(sample(tasks$Task, 3), function(task) {
+    data.frame(Person = id, Rater = sample(raters$Rater, 2), Task = task)
+  }))
+}))
+ratings <- assignments
+ratings$Score <- sample(1:4, nrow(ratings), replace = TRUE)
+ratings$Score[sample(nrow(ratings), 72)] <- NA_integer_
+rating_review <- describe_mfrm_data(ratings, person = "Person",
+  facets = c("Rater", "Task"), score = "Score",
+  rating_min = 1, rating_max = 4, keep_original = TRUE,
+  include_agreement = FALSE, expected_design = assignments)
+rating_review$structural_missingness$summary
+rating_review$design_connectivity
+```
+
+There are 1,440 assigned cells out of 345,600 possible combinations, and
+72 assigned scores are absent. Assignment coverage is therefore 95%, even
+though fewer than 0.5% of all combinations were assigned. Neither a zero
+score nor an imputed score is inserted into unassigned cells. With actual
+data, supply the original roster: reconstructing it from observed scores
+would conceal missing assigned ratings.
+
+Start from the assignment roster so that even an entirely absent rating row
+remains in the denominator. This example has one score per Person-Rater-Task
+key; check uniqueness before joining. For repeated occasions, include the
+occasion in the key. Attach the three independently obtained group labels
+by ID with `match()`; row position in a feature table is not an ID.
+The check stops this illustration if an ID is unknown or an entity has no
+classification. In an analysis allowing omitted entities, report their
+unclassified ratings separately rather than silently dropping them.
+
+```{r link-facet-groups}
+rating_key <- c("Person", "Rater", "Task")
+stopifnot(!anyDuplicated(assignments[rating_key]),
+          !anyDuplicated(ratings[rating_key]))
+labeled <- merge(assignments, ratings, by = rating_key,
+                 all.x = TRUE, sort = FALSE)
+labeled$PersonGroup <- person_groups$membership$Cluster[
+  match(labeled$Person, person_groups$membership$ID)]
+labeled$RaterGroup <- one_completion$membership$Cluster[
+  match(labeled$Rater, one_completion$membership$ID)]
+labeled$TaskGroup <- task_groups$membership$Cluster[
+  match(labeled$Task, task_groups$membership$ID)]
+group_columns <- c("PersonGroup", "RaterGroup", "TaskGroup")
+stopifnot(!anyNA(labeled[group_columns]))
+for (column in group_columns) labeled[[column]] <- factor(labeled[[column]], 1:3)
+labeled$Assigned <- 1L
+labeled$Observed <- as.integer(!is.na(labeled$Score))
+planned_counts <- xtabs(Assigned ~ PersonGroup + RaterGroup + TaskGroup,
+                        data = labeled)
+observed_counts <- xtabs(Observed ~ PersonGroup + RaterGroup + TaskGroup,
+                         data = labeled)
+group_coverage <- as.data.frame(planned_counts, responseName = "Assigned")
+group_coverage$Observed <- as.vector(observed_counts)
+group_coverage$Coverage <- ifelse(group_coverage$Assigned > 0,
+  group_coverage$Observed / group_coverage$Assigned, NA_real_)
+group_coverage
+```
+
+This table answers which group combinations were assigned and how many of
+their scores were recorded. A combination with no assignments has unavailable
+coverage, not zero coverage. Counts reflect the assignment design; they do
+not demonstrate associations between traits or differences in rating quality.
+Ratings share persons, raters, and tasks, so an ordinary independent-row
+test of group differences would not account for this dependence. Raw score
+means also confound person composition, rater severity, and task difficulty.
+Such comparisons need an appropriate measurement model and sufficient
+overlap, rather than treating the group labels as established latent classes.
+
+If attributes are imputed for several facets, each imputation model must
+respect its unit of analysis and relevant dependencies. The current API
+analyzes one entity table at a time; it does not fit a joint cross-facet
+imputation model or pool group-by-group rating effects. Pairing the first
+completion of independently fitted person and rater models does not establish
+a valid joint imputation. Nor can numeric group labels be matched across
+completions without addressing label changes and membership uncertainty.
+
+## Distinguish sparse assignment from missing attributes
+
+Four situations require different decisions:
+
+| Situation | Example | What to retain or review |
+| --- | --- | --- |
+| Unassigned rating | A rater was never scheduled to score a performance | Original assignment roster; no invented observation |
+| Missing assigned rating | A scheduled score was not submitted | Assigned denominator, absence reason, observed overlap |
+| Unrecorded external attribute | Training hours were not recorded | Eligible cells, predictors, imputation assumptions |
+| Undefined external attribute | Mentoring years for someone with no mentoring role | Meaning of the attribute; not an ordinary imputation target |
+
+Sparseness describes how much of a design is observed and how those
+observations connect. MCAR means that missingness does not depend on the
+observed or missing values. MAR allows dependence on observed values, but
+not on missing values after conditioning on the observed information. MNAR
+allows additional dependence on the missing values. Planned allocation
+does not automatically imply MCAR: assignment may depend on recorded
+proficiency or on information absent from the analysis. A missingness rate
+or diagnostic test alone cannot establish MAR. See
+[Rubin (1976), *Inference and Missing Data*](https://doi.org/10.1093/biomet/63.3.581)
+for the conditions for ignoring a missingness process in inference.
+
+Inspect both planned and observed connectivity, per-level support, and
+coverage within relevant subgroups. Connected Person-facet graphs do not
+by themselves establish identification of a complete model, especially with
+interactions, or adequate precision. In a simulation of sparse MFRM designs,
+[Wind and Ge (2021)](https://doi.org/10.1177/0013164420988108)
+found that detecting differential rater functioning depended on the linking
+design, not merely on having incomplete ratings. Their findings do not give
+a universal acceptable missingness percentage. Imputing external attributes
+does not add observed links or resolve confounding between disconnected
+rating blocks. Grouping noisy estimated effects from sparse data may also
+reflect differences in precision, which this feature API does not model.
+
+## Many features, k-means, and PCA
+
+More columns are not necessarily more useful information. Repeated measures
+of one attribute can dominate a distance through their combined weight;
+unrelated columns can obscure the differences of interest.
+[Steinley and Brusco (2008)](https://doi.org/10.1007/s11336-007-9019-y)
+examined variable selection for clustering and found that non-informative
+variables and their distributions affected performance. Choose features and
+their substantive domains before choosing weights. For example, equal total
+weight for a domain containing ten features and one containing two requires
+different per-feature weights. This is a substantive choice, not an automatic
+correction for correlations. The comparison API supports both positive
+feature weights and different selections on the same entities, as illustrated
+above. Choosing features to maximize an attractive grouping still requires
+separate validation; the comparison does not automate feature selection.
+
+PCA and k-means answer different questions. PCA represents variation in
+numeric features with orthogonal continuous components. K-means partitions
+entities to minimize within-group squared Euclidean distances to centroids.
+[Ding and He (2004), *Principal Component Analysis and Effective K-means
+Clustering*](https://doi.org/10.1137/1.9781611972740.54)
+describe their relationship through a continuous relaxation of discrete
+cluster membership. This does not make ordinary PCA and discrete clustering
+equivalent, or establish that the first two PCs recover useful groups.
+
+For a fixed numeric input, retaining all nonzero PC scores without further
+rescaling preserves its Euclidean distances. Truncating components changes
+those distances and may remove low-variance separation as well as noise.
+Standardizing features before PCA, or whitening the scores afterwards,
+also changes the chosen geometry. An explained-variance threshold alone is
+not evidence that a clustering structure was preserved. A two-component
+plot is a projection, not a test for the existence of clusters.
+
+Ordinary PCA and k-means should not receive arbitrary numeric codes for
+nominal categories such as specialty. Keep Gower/PAM or average/complete
+linkage for mixed features. For selected numeric attributes, `mfrm_pca()` and
+`mfrm_cluster_kmeans()` use R's
+[`prcomp()`](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/prcomp.html)
+and [`kmeans()`](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/kmeans.html).
+They center features and, by default, divide by sample standard deviations.
+Positive feature weights apply to **squared Euclidean distances**. The fitted
+transformation, original units, entity IDs and missingness accounting remain
+available. No automatic feature, component or group-count selection is performed.
+
+Here the question is whether grouping experience, annual workload and workshop
+hours changes when those three attributes are represented by two components.
+The same already fitted imputation model supplies both analyses. Workshop
+hours remain a predictor in that model whether or not they are selected for
+clustering. These numeric selections answer a different question from the
+mixed-background groups above; specialty and training level are not numeric
+inputs to this PCA.
+
+```{r numeric-grouping}
+numeric_names <- c("ExperienceYears", "AnnualRatings", "WorkshopHours")
+numeric_review <- mfrm_features(raters, "Rater", numeric_names)
+numeric_direct <- mfrm_cluster_imputed(numeric_review, model,
+  numeric_review$missing, k = 3, method = "kmeans", seed = 42)
+numeric_reduced <- mfrm_cluster_imputed(numeric_review, model,
+  numeric_review$missing, k = 3, method = "kmeans", components = 2, seed = 42)
+numeric_comparison <- mfrm_cluster_compare(list(
+  StandardizedFeatures = numeric_direct, TwoComponents = numeric_reduced))
+numeric_comparison$analysis_summary
+summary(numeric_comparison)
+```
+
+Read `Space`, `Scaling` and `Components` before comparing the partitions.
+`ChangedFraction` measures changed together/apart pairs, allowing arbitrary
+renumbering of clusters. Different component counts change distances, so
+silhouette widths do not provide a common-scale test that one analysis is
+better. The default 25 random starts and fixed seed make this execution
+reproducible, but do not prove a global optimum. Assess another seed separately
+if initialization sensitivity matters.
+
+```{r numeric-pca-views, fig.width=8, fig.height=6, fig.alt=c("Explained-variance scree plot for numeric rater features in one completion. Filled points identify retained components and open points identify omitted components.", "Scores on the first two principal components, with descriptive k-means groups distinguished by colour and point shape. This projection is not a latent ability or rater-quality scale.", "First-component loadings for the transformed numeric rater features. Their signs are arbitrary and the coefficients are not original-unit correlations.", "Experience in years summarized by the k-means groups fitted in the retained principal-component space. The original-unit profile describes this completion only.")}
+first_numeric <- numeric_reduced$analyses[[1]]
+summary(first_numeric$pca)
+first_numeric$pca$loadings
+plot(first_numeric$pca)  # The full explained-variance table, including omitted PCs.
+plot(first_numeric$pca, type = "scores", groups = first_numeric, labels = FALSE)
+plot(first_numeric$pca, type = "loadings", components = 1)
+plot(first_numeric, type = "profile", feature = "ExperienceYears")
+```
+
+The first-completion score plot annotates a two-dimensional projection with
+that completion's group labels. Colour and point shape distinguish groups;
+`preset = "monochrome"` retains the shapes. Shapes repeat after six groups,
+so inspect `plot_data()` for IDs and encodings in crowded views. Filled/open
+scree points distinguish retained/omitted components. Loadings are coefficients in the transformed
+feature space, not correlations in original units. Their signs are arbitrary.
+Inspect the original-unit profiles to explain what distinguishes the groups.
+No view establishes ability, severity, rater quality or an effect of training.
+
+Every completion retains its own centering, standard deviations and PCA basis.
+The comparison pairs the same completions, while allowing these transformations
+to change as imputed values change. It compares partitions; it does not average
+PCA scores, loadings or arbitrary group numbers, and it does not Rubin-pool
+inference. These functions impute no rating scores.
+
+For an already complete numeric table, use `mfrm_cluster_kmeans(review, k=3)`
+directly. To inspect and retain a specific reduction, fit
+`pca <- mfrm_pca(review, components=2)` and then
+`mfrm_cluster_kmeans(pca, k=3)`. Passing a PCA object uses its scores exactly,
+without further standardization, range scaling or whitening. Save that PCA
+and its grouping together. `plot()` and `mfrm_cluster_compare()` reuse saved
+results; changing features, component counts, weights or seeds requires the
+corresponding new analysis. `mfrmr_output_guide("features")` lists the dedicated
+output routes. Use `summary()` for partition comparisons, and `plot()` or
+`plot_data()` for fitted PCA and grouping views.
+
+In the development version, `as_ggplot()` has dedicated conversions for PCA
+scree, scores and loadings. The scores view keeps the selected components,
+equal axis units and the saved group colours and shapes. Only included
+entities are drawn; excluded IDs and the feature transformation remain in
+`plot_data()`. This example shows the same first completion used above:
+
+```{r numeric-pca-ggplot, fig.width=8, fig.height=6, fig.alt="Scores on the first two external-feature principal components for one completed feature dataset. K-means groups use grayscale colours and different point shapes. Headings and entity labels are omitted; the saved data still identify the completion's transformation and excluded entities."}
+if (requireNamespace("ggplot2", quietly = TRUE)) {
+  numeric_figure <- as_ggplot(first_numeric$pca, type = "scores",
+    groups = first_numeric, labels = FALSE, preset = "monochrome") +
+    ggplot2::labs(title = NULL, subtitle = NULL)
+  print(numeric_figure)
+  plot_data(numeric_figure)$components
+}
+```
+
+Use `type = "scree"` for explained-variance percentages and `type = "loadings"`
+for coefficients in the transformed feature space. The default and explicit
+`component = "table"` keep the same complete view. For already saved plot
+payloads, `as_ggplot()` uses their saved preset and label choice; set those
+choices when making the payload. A change of heading does not change the
+analysis. Saved dendrograms also have dedicated conversion as described above.
+Imputation co-membership also has dedicated conversion as described above.
+Silhouettes and numeric/categorical profiles also have dedicated conversion.
+All these views retain their saved summaries; use `plot_data()` for further
+custom graphics.
+
+### Reopen an analysis without repeating imputation or clustering
+
+Keep the comparison result to retain both analyses, every completion, its
+transformation and partition, the fitted imputation model, and the co-membership
+summaries. A saved plot view also retains the selected display settings.
+The same saving route applies to `comparison`, `feature_comparison` and
+`method_comparison` above. The example uses temporary files; choose permanent
+paths to continue in a later session.
+
+```{r feature-save-reopen}
+feature_file <- tempfile(fileext = ".rds")
+feature_view <- plot(first_numeric$pca, type = "scores", groups = first_numeric,
+  labels = FALSE, preset = "monochrome", draw = FALSE)
+saveRDS(list(comparison = numeric_comparison, view = feature_view), feature_file)
+saved_features <- readRDS(feature_file)
+summary(saved_features$comparison)
+saved_features$comparison$analysis_summary  # Each setting and completion.
+plot_data(saved_features$view)    # Inspect this first-completion view.
+feature_summary_file <- tempfile(fileext = ".csv")
+write.csv(summary(saved_features$comparison), feature_summary_file, row.names = FALSE)
+if (requireNamespace("ggplot2", quietly = TRUE)) {
+  saved_figure <- as_ggplot(saved_features$view)
+}
+```
+
+Changing a session plotting option does not restyle a saved view. Create a
+new view from the saved analysis to change its preset; changing the analysis
+settings requires a new analysis. The CSV contains only the comparison summary;
+keep the RDS for its analyses, transformations, omitted IDs and assumptions.
+These feature results use their own
+`summary()`, `plot()` and `plot_data()` methods. They are separate from
+`mfrm_results()` and from the pooled response-score intervals described in
+`vignette("mfrmr-response-imputation")`. Saved feature files retain identifiers
+and original attributes, so review what they contain before sharing them.
+
+## Plan for the size of the analysis
+
+K-means can explicitly omit silhouettes with `silhouette = FALSE`, avoiding
+their quadratic distance matrix. Those silhouettes are unavailable, not zero;
+profile plots and partition comparisons remain available. PCA itself uses a
+numeric matrix decomposition whose cost depends on both entity and feature
+counts. Neither option promises a universal capacity limit. The imputation
+co-membership matrix remains quadratic even with silhouettes disabled.
+
+Pairwise distances require memory that grows quadratically with the number
+of raters. Gower/PAM and hierarchical clustering permit up to 5,000 included entities; the
+imputation workflow permits up to 5,000 total entities because its comparison
+matrix includes excluded IDs. These are input limits, not a guarantee of low
+memory use or acceptable run time. Multiple imputations also retain every
+completed analysis. Save the fitted imputation model and clustering results;
+`mfrm_cluster_compare()` reuses them without repeating the fits.
+
+Plan for temporary distance and silhouette calculations as well as the saved
+result. For scale, a run with 5,000 entities and eight mixed-type features,
+fitting two hierarchical configurations and comparing them, used about
+1.5 GiB of peak process memory on macOS arm64 with R 4.6.1. The returned
+comparison occupied about 3.3 MiB. Average and complete linkage gave similar
+memory requirements in this example. These single-run measurements include
+R startup and data preparation; they are not a memory bound or a prediction
+for other machines, features, or imputation counts. The 5,000-entity imputation
+workflow was not evaluated in that example.
+
+Increasing feature count also increases distance calculations and stored
+profiles. A separate run with 1,000 entities and 1,000 mixed-type features,
+again fitting and comparing two configurations, took about six seconds per
+method and used approximately 400--430 MiB of peak process memory on the
+same platform, for PAM, average linkage, and complete linkage. This was a
+complete-feature workload without planted groups. It does not establish
+useful classification, joint performance at the largest entity and feature
+counts, or feasibility of a 1,000-feature imputation model. A large imputation
+model requires its own predictor selection and checks for information,
+dependence, and model fit.

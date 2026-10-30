@@ -41,23 +41,28 @@
 #' @param fit Optional `mfrm_fit` from [fit_mfrm()]. Required to decide
 #'   whether the person estimates are JML/fixed-effect estimates for which
 #'   the Snijders (2001) correction is computed. MML/EAP person scores
-#'   return `NA` for `lz_star` with an explanatory status.
+#'   return `NA` for `lz_star` with an explanatory status. Supplied fit and
+#'   diagnostics must identify the same analysis.
 #'
 #' @return A data frame of class `mfrm_person_fit_indices` with one row per
 #' Person and columns:
 #' \describe{
 #'   \item{`Person`}{Person ID.}
-#'   \item{`N`}{Number of contributing response opportunities.}
+#'   \item{`TotalN`, `N`, `UnavailableN`}{Total responses, responses with
+#'     valid probability and log-likelihood moments, and unavailable responses.
+#'     An incomplete response set does not produce a person-fit statistic.}
 #'   \item{`LogLik`}{Sum of log P(X = x | theta) under the fitted
 #'     model. Computed from the per-observation category probability
 #'     `PrObserved` (the model probability of the observed category),
 #'     not from a Gaussian residual approximation.}
 #'   \item{`lz`}{Drasgow et al. (1985) standardized log-likelihood,
-#'     in its proper polytomous form.}
+#'     in its polytomous form, treating each retained response once regardless
+#'     of calibration weights. `lz_status` records computational availability.}
 #'   \item{`lz_star`}{Snijders-corrected `lz*` when the source fit used
 #'     JML/fixed-effect person estimates, conditioning on the fitted
 #'     non-person calibration, and the diagnostics include the required
-#'     derivative terms; otherwise `NA`.}
+#'     derivative terms. Numerical convergence, a finite person estimate and
+#'     unit observation weights are required; otherwise `NA`.}
 #'   \item{`lz_star_status`}{Status string for `lz_star`, such as
 #'     `"computed_jml_conditional_calibration"`, `"fit_required"`,
 #'     `"not_applicable_eap"`, or `"insufficient_information"`.}
@@ -68,7 +73,8 @@
 #'   \item{`lz_flag_5pct`, `lz_flag_1pct`}{Logical flags for practical
 #'     two-sided `lz` thresholds of `|z| > 1.96` and `|z| > 2.58`.}
 #'   \item{`lz_star_flag_5pct`, `lz_star_flag_1pct`}{The same flags for
-#'     `lz_star`, returned as `FALSE` when `lz_star` is unavailable.}
+#'     `lz_star`. All index flags, including `ReportFlag`, remain `NA` when
+#'     the corresponding statistic is unavailable.}
 #'   \item{`ReportIndex`, `ReportValue`, `ReportFlagLevel`,
 #'     `ReportFlag`, `ReviewStatus`, `ReviewReason`, `ReportCaveat`}{Compact
 #'     reporting columns. `ReportIndex` prefers `lz_star` when the Snijders
@@ -76,16 +82,27 @@
 #'     explicit caveat.}
 #' }
 #'
-#' Under the conditional-independence assumption of the MFRM, `lz` is
-#' asymptotically standard normal. Practical reporting thresholds:
-#' |lz| > 1.96 flags a person at the 5% level; |lz| > 2.58 at the
-#' 1% level. When
+#' The `5pct` and `1pct` flag names refer to standard-normal reference cutoffs:
+#' |lz| > 1.96 and |lz| > 2.58. Treat them as screening thresholds, not a
+#' guarantee of those false-positive rates for fitted person scores.
+#' Read `ReportCaveat` and `lz_star_status` with every flagged result. When
 #' `lz_star_status == "computed_jml_conditional_calibration"`, `lz_star`
 #' applies Snijders' estimated-ability correction for JML person estimates,
 #' conditional on the fitted non-person parameters. This does not propagate
 #' non-person calibration uncertainty. For MML/EAP person scores, use `lz`
 #' with its documented caveat rather than treating EAP scores as if they
-#' satisfied the Snijders estimating equation.
+#' satisfied the Snijders estimating equation. Positive and negative flags
+#' indicate more and less predictable patterns, respectively; neither alone
+#' establishes invalid responses or justifies exclusion. The implemented
+#' correction does not cover non-unit observation weights, even if normalized
+#' to mean one. No multiple-person error-rate control is provided.
+#'
+#' Small positive probabilities are used without a lower floor. Zero, invalid
+#' or missing observed probabilities make the person statistic unavailable.
+#' Missing derivative information withholds the correction for the whole person.
+#' With the matching fit supplied, older probability-moment diagnostics are
+#' refreshed from that fit without re-estimation. Otherwise recompute
+#' diagnostics first. Older saved person-fit tables/summaries must be rebuilt.
 #'
 #' Note: this implementation reads the model category probabilities
 #' directly from the diagnostics bundle. Earlier mfrmr releases used
@@ -117,36 +134,55 @@
 #'
 #' @seealso [diagnose_mfrm()]
 #' @examples
-#' \donttest{
-#' toy <- load_mfrmr_data("example_core")
-#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-#'                 method = "JML", maxit = 30)
-#' diag <- diagnose_mfrm(fit, residual_pca = "none",
-#'                       diagnostic_mode = "legacy")
-#' pf <- compute_person_fit_indices(diag, fit = fit)
-#' head(pf)
-#' summary(pf)
-#' # Look for: |lz| > 1.96 (5% level) flags a person whose response
-#' #   pattern is statistically inconsistent with the model; > 2.58 is
-#' #   a 1% flag. lz_star is populated for JML/fixed-effect person
-#' #   estimates and left NA for MML/EAP estimates. Use ReportIndex /
-#' #   ReviewStatus for a compact report-ready reading.
-#' }
+#' library(mfrmr)
+#'
+#' # Saved synthetic MML/RSM analysis of example_operational.
+#' # For your own data, fit a model first; see ?fit_mfrm.
+#' example_fit <- readRDS(system.file("examples", "operational-mml.rds", package = "mfrmr"))
+#' fit <- example_fit$fit
+#'
+#' # Use the diagnostics saved with this fit
+#' diagnostics <- example_fit$diagnostics
+#'
+#' # Screen for unusual person response patterns
+#' person_fit <- compute_person_fit_indices(diagnostics, fit = fit)
+#' head(person_fit[, c("Person", "N", "ReportIndex", "ReportValue", "ReviewStatus")])
+#'
+#' # Inspect flagged persons and the limitations of their reported index
+#' subset(person_fit, ReportFlag,
+#'        c("Person", "ReportValue", "ReviewReason", "ReportCaveat"))
+#' # With MML/EAP scores, lz_star is unavailable; lz is an uncorrected screening index
+#' # A flag alone does not establish invalid responses or justify excluding a person
 #' @export
+#' @order 1
 compute_person_fit_indices <- function(diagnostics, fit = NULL) {
   if (is.null(diagnostics) || !is.list(diagnostics) ||
       is.null(diagnostics$obs)) {
     stop("`diagnostics` must be a non-empty `mfrm_diagnostics` bundle.",
          call. = FALSE)
   }
-  obs <- as.data.frame(diagnostics$obs, stringsAsFactors = FALSE)
+  if (!is.null(fit)) {
+    mfrm_results_validate_diagnostics_identity(fit, diagnostics, helper = "compute_person_fit_indices()")
+  }
+  obs <- diagnostics$obs
+  if (inherits(diagnostics, "mfrm_diagnostics") &&
+      !identical(attr(obs, "person_fit_moments_version", exact = TRUE), 2L)) {
+    if (is.null(fit)) {
+      stop("Recreate these diagnostics with diagnose_mfrm(fit, ...) or supply the matching fit to refresh person-fit probabilities.", call. = FALSE)
+    }
+    obs <- compute_obs_table(fit)
+  }
+  obs <- as.data.frame(obs, stringsAsFactors = FALSE)
+  if (!nrow(obs) || anyNA(obs$Person) || any(!nzchar(as.character(obs$Person)))) {
+    stop("Person-fit calculations require observations with non-missing Person identifiers.", call. = FALSE)
+  }
   needed <- c("Person", "PrObserved", "ItemEntropy", "ItemVarLogP")
   missing_cols <- setdiff(needed, names(obs))
   if (length(missing_cols) > 0L) {
     stop("`diagnostics$obs` is missing required columns: ",
          paste(missing_cols, collapse = ", "),
          ". This typically means the diagnostics bundle was generated ",
-         "by an mfrmr version older than 0.2.0; refit and re-diagnose ",
+         "by an older mfrmr version; re-run diagnose_mfrm(fit, ...) ",
          "to populate the per-observation probability columns.",
          call. = FALSE)
   }
@@ -160,7 +196,9 @@ compute_person_fit_indices <- function(diagnostics, fit = NULL) {
   # category; e_logp is the per-item negentropy E[log P]; var_logp is
   # the per-item Var(log P). All three terms are summed across each
   # person's observations to form lz = (l - E[l]) / sqrt(Var[l]).
-  log_p <- log(pmax(obs$PrObserved, .Machine$double.eps))
+  valid_probability <- is.finite(obs$PrObserved) & obs$PrObserved > 0 & obs$PrObserved <= 1
+  log_p <- rep(NA_real_, nrow(obs))
+  log_p[valid_probability] <- log(obs$PrObserved[valid_probability])
 
   agg <- by(
     data.frame(log_p = log_p,
@@ -171,31 +209,39 @@ compute_person_fit_indices <- function(diagnostics, fit = NULL) {
     function(d) {
       ok <- is.finite(d$log_p) & is.finite(d$e_logp) &
             is.finite(d$var_logp) & d$var_logp >= 0
-      d <- d[ok, , drop = FALSE]
-      if (nrow(d) == 0L) {
-        return(c(N = 0L, LogLik = NA_real_, lz = NA_real_))
+      total <- nrow(d)
+      n <- sum(ok)
+      if (n < total) {
+        return(c(TotalN = total, N = n, UnavailableN = total - n, LogLik = NA_real_, lz = NA_real_))
       }
       ll <- sum(d$log_p)
       e_ll <- sum(d$e_logp)
       var_ll <- sum(d$var_logp)
-      lz_val <- if (var_ll > 0) (ll - e_ll) / sqrt(var_ll) else NA_real_
-      c(N = nrow(d), LogLik = ll, lz = lz_val)
+      lz_val <- if (is.finite(var_ll) && var_ll > 0) (ll - e_ll) / sqrt(var_ll) else NA_real_
+      c(TotalN = total, N = n, UnavailableN = 0, LogLik = ll, lz = lz_val)
     }
   )
   out <- do.call(rbind, lapply(agg, function(x) as.data.frame(t(x))))
   out$Person <- rownames(out)
   rownames(out) <- NULL
-  out <- out[, c("Person", "N", "LogLik", "lz"), drop = FALSE]
+  out <- out[, c("Person", "TotalN", "N", "UnavailableN", "LogLik", "lz"), drop = FALSE]
   out$N <- as.integer(out$N)
+  out$TotalN <- as.integer(out$TotalN)
+  out$UnavailableN <- as.integer(out$UnavailableN)
+  out$lz_status <- ifelse(out$UnavailableN > 0L, "incomplete_observation_terms",
+                          ifelse(is.finite(out$lz), "computed", "insufficient_variance"))
 
-  lz_star_tbl <- compute_snijders_lz_star(obs, out$Person, fit = fit)
+  numerical_ready <- is.null(fit) || !fit$config$method %in% c("JML", "JMLE") ||
+    identical(as.character(mfrmr_get_readiness_record(fit)$fit$NumericalState[1]), "ready")
+  lz_star_tbl <- compute_snijders_lz_star(obs, out$Person, fit = if (numerical_ready) fit else NULL)
+  if (!numerical_ready) lz_star_tbl$lz_star_status[] <- "fit_not_converged"
   lz_idx <- match(out$Person, lz_star_tbl$Person)
   out$lz_star <- lz_star_tbl$lz_star[lz_idx]
   out$lz_star_status <- lz_star_tbl$lz_star_status[lz_idx]
   out$lz_star_c <- lz_star_tbl$lz_star_c[lz_idx]
   out$lz_star_variance <- lz_star_tbl$lz_star_variance[lz_idx]
   out <- add_person_fit_reporting_columns(out)
-  out <- out[, c("Person", "N", "LogLik", "lz", "lz_star", "lz_star_status",
+  out <- out[, c("Person", "TotalN", "N", "UnavailableN", "LogLik", "lz", "lz_status", "lz_star", "lz_star_status",
                  "lz_star_c", "lz_star_variance",
                  "lz_flag_5pct", "lz_flag_1pct",
                  "lz_star_flag_5pct", "lz_star_flag_1pct",
@@ -203,6 +249,7 @@ compute_person_fit_indices <- function(diagnostics, fit = NULL) {
                  "ReviewStatus", "ReviewReason", "ReportCaveat"),
              drop = FALSE]
   attr(out, "person_fit_thresholds") <- person_fit_threshold_table()
+  attr(out, "person_fit_calculation_version") <- 2L
   class(out) <- c("mfrm_person_fit_indices", class(out))
   out
 }
@@ -221,10 +268,10 @@ add_person_fit_reporting_columns <- function(out) {
   z_5pct <- stats::qnorm(0.975)
   z_1pct <- stats::qnorm(0.995)
 
-  out$lz_flag_5pct <- is.finite(out$lz) & abs(out$lz) > z_5pct
-  out$lz_flag_1pct <- is.finite(out$lz) & abs(out$lz) > z_1pct
-  out$lz_star_flag_5pct <- is.finite(out$lz_star) & abs(out$lz_star) > z_5pct
-  out$lz_star_flag_1pct <- is.finite(out$lz_star) & abs(out$lz_star) > z_1pct
+  out$lz_flag_5pct <- ifelse(is.finite(out$lz), abs(out$lz) > z_5pct, NA)
+  out$lz_flag_1pct <- ifelse(is.finite(out$lz), abs(out$lz) > z_1pct, NA)
+  out$lz_star_flag_5pct <- ifelse(is.finite(out$lz_star), abs(out$lz_star) > z_5pct, NA)
+  out$lz_star_flag_1pct <- ifelse(is.finite(out$lz_star), abs(out$lz_star) > z_1pct, NA)
 
   snijders_ready <- is.finite(out$lz_star) &
     identical_length_status(out$lz_star_status, "computed_jml_conditional_calibration")
@@ -240,7 +287,7 @@ add_person_fit_reporting_columns <- function(out) {
     ifelse(abs_report > z_1pct, "1pct",
            ifelse(abs_report > z_5pct, "5pct", "none"))
   )
-  out$ReportFlag <- out$ReportFlagLevel %in% c("5pct", "1pct")
+  out$ReportFlag <- ifelse(is.finite(out$ReportValue), out$ReportFlagLevel %in% c("5pct", "1pct"), NA)
   out$ReviewStatus <- ifelse(
     out$ReportFlagLevel == "1pct", "review_1pct",
     ifelse(out$ReportFlagLevel == "5pct", "review_5pct",
@@ -250,10 +297,10 @@ add_person_fit_reporting_columns <- function(out) {
 
   threshold_reason <- ifelse(
     out$ReportFlagLevel == "1pct",
-    paste0(out$ReportIndex, " exceeds |z| > 2.58."),
+    paste0(ifelse(out$ReportIndex == "lz_star", "lz*", "lz"), " exceeds the absolute normal-reference cutoff 2.58."),
     ifelse(
       out$ReportFlagLevel == "5pct",
-      paste0(out$ReportIndex, " exceeds |z| > 1.96."),
+      paste0(ifelse(out$ReportIndex == "lz_star", "lz*", "lz"), " exceeds the absolute normal-reference cutoff 1.96."),
       ifelse(
         out$ReportFlagLevel == "none",
         "No report-level flag under the practical two-sided thresholds.",
@@ -264,21 +311,33 @@ add_person_fit_reporting_columns <- function(out) {
   out$ReviewReason <- threshold_reason
 
   status <- as.character(out$lz_star_status)
-  out$ReportCaveat <- ifelse(
-    snijders_ready,
-    paste(
-      "lz_star applies the Snijders correction conditional on fitted",
-      "non-person calibration; non-person parameter uncertainty is not propagated."
-    ),
-    ifelse(
-      lz_ready,
-      paste0(
-        "lz is the uncorrected standardized log-likelihood; ",
-        "lz_star_status = ", status, "."
-      ),
-      paste0("No report index selected; lz_star_status = ", status, ".")
-    )
+  reason <- person_fit_correction_note(status)
+  out$ReportCaveat <- ifelse(snijders_ready,
+    "lz* conditions on the fitted non-person calibration; calibration uncertainty is omitted.",
+    paste(ifelse(lz_ready, "lz is an uncorrected, unweighted response-pattern screen.",
+      "No person-fit index is available."), reason))
+  incomplete <- out$lz_status == "incomplete_observation_terms"
+  out$ReportCaveat[incomplete] <- paste(
+    "Response probability or log-likelihood moment information is incomplete.",
+    "A statistic is not calculated on a selected subset of responses."
   )
+  out
+}
+
+person_fit_correction_note <- function(status) {
+  notes <- c(
+    computed_jml_conditional_calibration = "The ability correction conditions on the fitted calibration.",
+    fit_required = "Supply the matching fit to assess the ability correction.",
+    not_applicable_eap = "The implemented correction does not apply to MML/EAP person scores.",
+    nonunit_weights = "The implemented ability correction does not cover non-unit observation weights.",
+    nonfinite_person_estimate = "The person estimate is not finite, so the ability correction is unavailable.",
+    fit_not_converged = "Numerical convergence is not established; the ability correction is unavailable.",
+    incomplete_observation_terms = "The ability correction requires complete probability and derivative information for all responses.",
+    diagnostics_missing_snijders_terms = "Recompute diagnostics to supply the required score derivatives.",
+    insufficient_information = "There is insufficient information for the ability correction."
+  )
+  out <- unname(notes[as.character(status)])
+  out[is.na(out)] <- "The ability correction is unavailable for this result."
   out
 }
 
@@ -324,8 +383,11 @@ person_fit_validate_table <- function(object) {
     stop("`object` must be a data frame returned by `compute_person_fit_indices()`.",
          call. = FALSE)
   }
+  if (!identical(attr(object, "person_fit_calculation_version", exact = TRUE), 2L)) {
+    stop("Recreate this person-fit result with compute_person_fit_indices(diagnostics, fit) to retain unavailable responses and flags.", call. = FALSE)
+  }
   needed <- c(
-    "Person", "N", "LogLik", "lz", "lz_star", "lz_star_status",
+    "Person", "TotalN", "N", "UnavailableN", "LogLik", "lz", "lz_star", "lz_star_status",
     "ReportIndex", "ReportValue", "ReportFlagLevel", "ReportFlag",
     "ReviewStatus", "ReviewReason", "ReportCaveat"
   )
@@ -339,15 +401,13 @@ person_fit_validate_table <- function(object) {
   as.data.frame(object, stringsAsFactors = FALSE)
 }
 
-#' Summarize person-fit indices
-#'
-#' @description
-#' `summary()` for [compute_person_fit_indices()] output gives a compact,
+#' @rdname compute_person_fit_indices
+#' @details `summary()` method: Summarize person-fit indices
+#' @details `summary()` method: `summary()` for [compute_person_fit_indices()] output gives a compact,
 #' report-ready reading order: first the number of persons and flags, then
 #' status counts, then the highest-priority review rows. The summary keeps
 #' `lz_star` availability visible so users do not silently treat uncorrected
 #' `lz` as Snijders-corrected output.
-#'
 #' @param object Output from [compute_person_fit_indices()].
 #' @param digits Number of digits used when printing numeric columns.
 #' @param top_n Number of review rows retained in `top_review`.
@@ -355,8 +415,7 @@ person_fit_validate_table <- function(object) {
 #'   preview. The default retains the rows in the returned object but suppresses
 #'   identifiers from console output.
 #' @param ... Unused.
-#'
-#' @return An object of class `summary.mfrm_person_fit_indices` with:
+#' @return For `summary()`: An object of class `summary.mfrm_person_fit_indices` with:
 #' - `overview`
 #' - `status_summary`
 #' - `report_index_summary`
@@ -386,7 +445,7 @@ summary.mfrm_person_fit_indices <- function(object,
   overview <- data.frame(
     Persons = nrow(tbl),
     ReportableRows = sum(is.finite(report_value)),
-    ReportFlaggedRows = sum(report_flag),
+    ReportFlaggedRows = if (any(is.finite(report_value))) sum(report_flag) else NA_integer_,
     Review1PctRows = sum(status == "review_1pct", na.rm = TRUE),
     Review5PctRows = sum(status == "review_5pct", na.rm = TRUE),
     NotFlaggedRows = sum(status == "not_flagged", na.rm = TRUE),
@@ -455,13 +514,14 @@ summary.mfrm_person_fit_indices <- function(object,
       "overview / status_summary / lz_star_status_summary",
       "top_review",
       "build_misfit_casebook() / unexpected_response_table()",
-      "plot_person_fit(..., fit_index = \"loglik\", draw = FALSE) / plot_data()"
+      "plot(..., type = \"person_fit\", fit_index = \"loglik\", draw = FALSE) / plot_data()"
     ),
     stringsAsFactors = FALSE
   )
 
   notes <- c(
-    "ReportIndex uses lz_star only when the Snijders correction was computed; otherwise it falls back to lz with the status caveat visible.",
+    "The reported index uses lz* when its conditional ability correction is available; otherwise it uses uncorrected lz where possible.",
+    "The two-sided normal cutoffs are screening references; neither individual nor multiple-person false-positive rates are calibrated for these fitted scores.",
     "Person-fit flags are screening evidence. Review response-level evidence before making substantive claims about a person."
   )
 
@@ -476,7 +536,8 @@ summary.mfrm_person_fit_indices <- function(object,
     reporting_map = reporting_map,
     notes = notes,
     digits = digits,
-    include_person = isTRUE(include_person)
+    include_person = isTRUE(include_person),
+    calculation_version = 2L
   )
   class(out) <- "summary.mfrm_person_fit_indices"
   out
@@ -484,34 +545,35 @@ summary.mfrm_person_fit_indices <- function(object,
 
 #' @export
 print.summary.mfrm_person_fit_indices <- function(x, ...) {
+  if (!identical(x$calculation_version, 2L)) {
+    stop("Recreate this summary from compute_person_fit_indices(diagnostics, fit).", call. = FALSE)
+  }
   cat("Person-Fit Summary\n")
-  if (!is.null(x$overview) && nrow(x$overview) > 0L) {
-    cat("\nOverview\n")
-    print(round_numeric_df(as.data.frame(x$overview), digits = x$digits %||% 3L),
-          row.names = FALSE)
+  overview <- x$overview[, c("Persons", "ReportableRows", "NotAvailableRows", "ReportFlaggedRows", "FlagRate"), drop = FALSE]
+  names(overview) <- c("Persons", "Available", "Unavailable", "Flagged", "Flag rate")
+  print_bundle_section("Overview", overview, digits = x$digits)
+  cat(sprintf("Ability-corrected lz*: %d; uncorrected lz: %d.\n",
+              x$overview$SnijdersRows, x$overview$LzFallbackRows))
+  if (isTRUE(x$include_person) && nrow(x$top_review)) {
+    rows <- x$top_review[, c("Person", "N", "ReportIndex", "ReportValue", "ReviewReason"), drop = FALSE]
+    rows$ReportIndex <- ifelse(rows$ReportIndex == "lz_star", "lz*",
+                              ifelse(rows$ReportIndex == "lz", "lz", "Unavailable"))
+    names(rows) <- c("Person", "Responses", "Index", "Value", "Review")
+    print_bundle_section("Person review", rows, digits = x$digits)
+  } else {
+    cat("Person identifiers are omitted; use include_person = TRUE to display the review rows.\n")
   }
-  if (!is.null(x$status_summary) && nrow(x$status_summary) > 0L) {
-    cat("\nReview status\n")
-    print(round_numeric_df(as.data.frame(x$status_summary), digits = x$digits %||% 3L),
-          row.names = FALSE)
+  print_bullet_section("Interpretation", unique(c(x$caveats$ReportCaveat, x$notes)))
+  invisible(x)
+}
+
+#' @export
+print.mfrm_person_fit_indices <- function(x, ...) {
+  if (all(c("Person", "N", "LogLik", "lz_star", "ReviewStatus", "ReportValue", "ReportCaveat") %in% names(x))) {
+    print(summary(x, ...))
+  } else {
+    print(as.data.frame(x), ...)
   }
-  if (!is.null(x$report_index_summary) && nrow(x$report_index_summary) > 0L) {
-    cat("\nReport index\n")
-    print(round_numeric_df(as.data.frame(x$report_index_summary), digits = x$digits %||% 3L),
-          row.names = FALSE)
-  }
-  if (!is.null(x$top_review) && nrow(x$top_review) > 0L) {
-    if (isTRUE(x$include_person)) {
-      cat("\nTop review rows\n")
-      print(as.data.frame(x$top_review), row.names = FALSE)
-    } else {
-      cat(sprintf(
-        "\nPerson-level review rows: %d; identifiers suppressed. Use `include_person = TRUE` only under appropriate privacy controls.\n",
-        nrow(x$top_review)
-      ))
-    }
-  }
-  print_bullet_section("Notes", x$notes)
   invisible(x)
 }
 
@@ -541,6 +603,12 @@ compute_snijders_lz_star <- function(obs, persons, fit = NULL) {
     return(empty)
   }
 
+  weights <- get_weights(obs)
+  if (any(!is.finite(weights) | weights != 1)) {
+    empty$lz_star_status <- "nonunit_weights"
+    return(empty)
+  }
+
   needed <- c("ItemLogPScoreCov", "ScoreInformation")
   missing_cols <- setdiff(needed, names(obs))
   if (length(missing_cols) > 0L) {
@@ -561,7 +629,9 @@ compute_snijders_lz_star <- function(obs, persons, fit = NULL) {
     return(empty)
   }
 
-  log_p <- log(pmax(obs$PrObserved, .Machine$double.eps))
+  valid_probability <- is.finite(obs$PrObserved) & obs$PrObserved > 0 & obs$PrObserved <= 1
+  log_p <- rep(NA_real_, nrow(obs))
+  log_p[valid_probability] <- log(obs$PrObserved[valid_probability])
   obs$.WCentered <- log_p - obs$ItemEntropy
   obs$Person <- as.character(obs$Person)
 
@@ -577,14 +647,17 @@ compute_snijders_lz_star <- function(obs, persons, fit = NULL) {
     ok <- is.finite(d$.WCentered) &
       is.finite(d$ItemVarLogP) & d$ItemVarLogP >= 0 &
       is.finite(d$ItemLogPScoreCov) &
-      is.finite(d$ScoreInformation) & d$ScoreInformation > 0 &
+      is.finite(d$ScoreInformation) & d$ScoreInformation >= 0 &
       is.finite(d$ObservedScoreDerivative)
-    d <- d[ok, , drop = FALSE]
-    if (nrow(d) == 0L) {
-      out$lz_star_status[i] <- "insufficient_information"
+    if (any(!ok)) {
+      out$lz_star_status[i] <- "incomplete_observation_terms"
       next
     }
 
+    if ("PersonMeasure" %in% names(d) && any(!is.finite(d$PersonMeasure))) {
+      out$lz_star_status[i] <- "nonfinite_person_estimate"
+      next
+    }
     info_total <- sum(d$ScoreInformation)
     cov_total <- sum(d$ItemLogPScoreCov)
     var_logp_total <- sum(d$ItemVarLogP)

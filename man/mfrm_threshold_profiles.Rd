@@ -2,13 +2,25 @@
 % Please edit documentation in R/api-reports.R
 \name{mfrm_threshold_profiles}
 \alias{mfrm_threshold_profiles}
+\alias{summary.mfrm_threshold_profiles}
 \title{List literature-based warning threshold profiles}
 \usage{
 mfrm_threshold_profiles()
+
+\method{summary}{mfrm_threshold_profiles}(object, digits = 3, ...)
+}
+\arguments{
+\item{object}{Output from \code{\link[=mfrm_threshold_profiles]{mfrm_threshold_profiles()}}.}
+
+\item{digits}{Number of digits used for numeric summaries.}
+
+\item{...}{Reserved for generic compatibility.}
 }
 \value{
 An object of class \code{mfrm_threshold_profiles} with
 \code{profiles} (\code{strict}, \code{standard}, \code{lenient}) and \code{pca_reference_bands}.
+
+For \code{summary()}: An object of class \code{summary.mfrm_threshold_profiles}.
 }
 \description{
 List literature-based warning threshold profiles
@@ -19,8 +31,13 @@ Use this function to inspect available profile presets before calling
 
 \code{profiles} contains thresholds used by warning logic
 (sample size, fit ratios, PCA cutoffs, etc.).
-\code{pca_reference_bands} contains literature-oriented descriptive bands used in
-summary text.
+\code{pca_reference_bands} contains uncalibrated descriptive references used in
+summary text; these are not dimensionality-test critical values.
+
+\code{summary()} method: Summarize threshold-profile presets for visual warning logic
+
+For \code{summary()}: Summarizes available warning presets and their PCA reference bands used by
+\code{\link[=build_visual_summaries]{build_visual_summaries()}}.
 }
 \section{Interpreting output}{
 
@@ -28,6 +45,17 @@ summary text.
 \item \code{profiles}: numeric threshold presets (\code{strict}, \code{standard}, \code{lenient}).
 \item \code{pca_reference_bands}: narrative reference bands for PCA interpretation.
 }
+
+
+For \code{summary()}:
+\itemize{
+\item \code{thresholds}: raw preset values by profile (\code{strict}, \code{standard}, \code{lenient}).
+\item \code{threshold_ranges}: per-threshold span across profiles (sensitivity to profile choice).
+\item \code{pca_reference}: literature bands used for PCA narrative labeling.
+}
+
+Larger \code{Span} in \code{threshold_ranges} indicates settings that most change
+warning behavior between strict and lenient modes.
 }
 
 \section{Typical workflow}{
@@ -37,13 +65,29 @@ summary text.
 \item Pick a default profile for project policy.
 \item Override only selected fields in \code{\link[=build_visual_summaries]{build_visual_summaries()}} when needed.
 }
+
+
+For \code{summary()}:
+\enumerate{
+\item Inspect \code{summary(mfrm_threshold_profiles())}.
+\item Choose profile (\code{strict} / \code{standard} / \code{lenient}) for project policy.
+\item Override selected thresholds in \code{\link[=build_visual_summaries]{build_visual_summaries()}} only when justified.
+}
 }
 
 \examples{
 profiles <- mfrm_threshold_profiles()
 s_profiles <- summary(profiles)
 s_profiles$overview
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("summary.mfrm_threshold_profiles", run.dontrun = TRUE)
+\dontrun{
+profiles <- mfrm_threshold_profiles()
+summary(profiles)
+}
 }
 \seealso{
 \code{\link[=build_visual_summaries]{build_visual_summaries()}}
+
+\code{\link[=mfrm_threshold_profiles]{mfrm_threshold_profiles()}}, \code{\link[=build_visual_summaries]{build_visual_summaries()}}
 }

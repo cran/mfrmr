@@ -70,6 +70,24 @@ data file at \code{data_file}.
 Anchor and group-anchor constraints are embedded directly from the fitted
 object's stored configuration, so the script can replay anchored analyses
 without manual table reconstruction.
+The script retains \code{centering_scope}; a native fit saved before this setting
+was recorded uses \code{"remainder"}. Running it performs a new fit under that
+convention, not a conversion of the saved object. To adopt whole-facet
+centering, review the generated call and change it to \code{"facet"}, preserving
+the intended population, uncentered facet, rubric and step/slope owners.
+Recheck the resulting constraints and readiness. Use \code{saveRDS()}/\code{readRDS()}
+to reopen an unchanged fit, or the replay from \code{\link[=export_mfrm_results]{export_mfrm_results()}} to
+reopen a saved results bundle without refitting.
+
+Adjustments made with \code{\link[=apply_empirical_bayes_shrinkage]{apply_empirical_bayes_shrinkage()}} are replayed after
+fitting, using the most recently recorded prior and Person settings. The
+original fitting settings remain separate so that attaching diagnostic SEs
+and then applying shrinkage is reproduced in the same order. For a workflow
+object with a post-fit adjustment, \code{"auto"} selects \code{"fit"} mode; an explicit
+\code{"facets"} request is refused because it cannot retain that operation order.
+Older shrinkage results without complete settings must first be refreshed
+with \code{\link[=apply_empirical_bayes_shrinkage]{apply_empirical_bayes_shrinkage()}}. Manually edited SEs or other table
+edits require their own reproducible editing steps.
 
 When the supplied fit uses the latent-regression \code{MML} branch, the generated
 fit-mode script also carries the stored replay-ready person table together
@@ -79,7 +97,7 @@ By default that replay-ready table is embedded inline; when
 \code{fit_person_data_file} is supplied, the generated script reads it from that
 sidecar CSV relative to the replay script location.
 
-For bounded \code{GPCM}, replay scripts are available with an explicit
+For \code{GPCM}, replay scripts are available with an explicit
 \code{gpcm_boundary} table. The generated script records \code{step_facet} and
 \code{slope_facet} settings, but full FACETS score-side contract review remains
 outside this replay contract. Role-based design forecasting is available
@@ -112,6 +130,12 @@ embedded into the script
 The source readiness row is not copied into the replayed fit. The generated
 script recomputes readiness and warns when its fit-level decision fields do
 not match the source record.
+Identifier columns are read as text, preserving leading zeros and literal
+\code{"NA"} labels. Original column names and factor coding in exported
+person-level background data are retained. Stored diagnostic settings are
+replayed as well; older diagnostic objects may not retain interaction
+selection or PCA limits, so rerun \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} before exporting them
+when those settings matter.
 
 If \code{ScriptMode} is \code{"facets"}, the script replays the higher-level
 \code{\link[=run_mfrm_facets]{run_mfrm_facets()}} workflow. If it is \code{"fit"}, the script uses
@@ -141,11 +165,26 @@ you.
 }
 }
 
+\section{Saved-result reuse}{
+
+Supplied screening results must describe this fitted analysis. Results from
+another fit or older results without identity metadata are refused. See
+\link{mfrmr_compatibility_layer} to recreate them from the saved fit and matching
+diagnostics without refitting the model.
+Supplied unit scores, plausible values and fit-derived forecasts must also
+match this calibration. A forecast created with \code{sim_spec} remains a separate
+scenario; its source is recorded without asserting a match to the fit.
+}
+
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 30)
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("build_mfrm_replay_script", run.dontrun = TRUE)
+\dontrun{
+library(mfrmr)
+# Saved synthetic MML/RSM analysis of example_operational.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "operational-mml.rds", package = "mfrmr"))
+fit <- example_fit$fit
 replay <- build_mfrm_replay_script(fit, data_file = "your_data.csv")
 replay$summary[, c("ScriptMode", "ResidualPCA", "BiasPairs")]
 cat(substr(replay$script, 1, 120))

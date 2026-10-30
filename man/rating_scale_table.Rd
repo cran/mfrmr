@@ -14,20 +14,38 @@ rating_scale_table(
 \arguments{
 \item{fit}{Output from \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
-\item{diagnostics}{Optional output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.}
+\item{diagnostics}{Optional matching output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}. Stored
+step uncertainty and marginal-fit results are reused when supplied. Without
+diagnostics, only observed/plug-in category statistics and step points are
+calculated; no covariance or full diagnostic calculation is started.}
 
-\item{whexact}{Use exact ZSTD transformation for category fit.}
+\item{whexact}{Retained for call compatibility. Category ZSTD is unavailable
+because grouping by the observed category changes its reference distribution.}
 
 \item{drop_unused}{If \code{TRUE}, remove categories with zero count from the
-displayed category table; \code{summary} and \code{caveats} still retain the omitted
-score-support warning.}
+displayed category table. Usage totals still cover the full declared scale;
+unavailable counts remain visible, and score-support caveats are retained.}
 }
 \value{
 A named list with:
 \itemize{
-\item \code{category_table}: category-level counts, expected counts, fit, and ZSTD
-\item \code{threshold_table}: model step/threshold estimates
-\item \code{summary}: one-row summary (usage and threshold monotonicity)
+\item \code{category_table}: counts, generating measures and descriptive residuals.
+\code{AvgMeasure} is the observed-category average oriented predictor;
+\code{ExpectedMeasure} weights all predictors by their category probabilities.
+\code{AvgPersonMeasure} and \code{ExpectedAverage} retain distinct Person-only and
+predicted-score summaries. Category ZSTD and fit flags are NA: selecting
+by observed outcome destroys the universal unit-residual baseline.
+\item \code{owner_category_table}: unfiltered counts within each step owner
+\item \code{model_context}: model, estimator, step/slope owners and step scale
+\item \code{notes}: interpretation outside the figure
+\item \code{threshold_table}: model step/threshold estimates and stored uncertainty
+\item \code{summary}: one-row summary with available/unavailable category counts and
+adjacent-threshold comparisons. Category-fit means identify their available
+denominators and describe displayed rows. Missing fit statistics/flags stay
+\code{NA}, including unused categories with no estimable category fit.
+\item \code{category_usage}: counts across the full scale, before \code{drop_unused}
+\item \code{threshold_coverage}: available, unavailable and decreasing adjacent-pair
+counts; \code{NotApplicable} distinguishes binary scales from missing estimates
 \item \code{caveats}: structured score-support warning/review rows
 \item \code{diagnostic_mode}: character scalar carried from
 \code{diagnostics$diagnostic_mode} (\code{"legacy"}, \code{"both"}, or
@@ -46,9 +64,12 @@ Build a rating-scale diagnostics report
 \details{
 This helper provides category usage/fit statistics and threshold summaries
 for reviewing score-category functioning.
-The category usage portion is a global observed-score screen. In PCM fits
-with a \code{step_facet}, threshold diagnostics should be interpreted within each
-\code{StepFacet} rather than as one pooled whole-scale verdict.
+\code{category_table} is a global observed-score screen. \code{owner_category_table}
+retains every declared category within each level of the fitted \code{step_facet}
+(or one \code{Common} family for RSM). Its percentages use that owner's total
+weight. These are observed ratings, not independent Persons or planned
+assignments. Missing categories alone cannot establish structural absence.
+\code{drop_unused} only filters the global display; owner counts stay complete.
 
 Typical checks:
 \itemize{
@@ -76,6 +97,24 @@ Then inspect:
 \item \code{threshold_table} for adjacent-step gaps and ordering within each
 \code{StepFacet}.
 }
+
+Stored \code{diagnostics$parameter_uncertainty$steps} are matched by threshold
+family and step, with fitted estimates and source identity checked. Inspect
+\code{SE_Status}, \code{CIEligible}, \code{CIUse} and \code{UncertaintySourceStatus}. Missing rows
+remain unavailable; duplicate or mismatched keys are rejected. Older
+diagnostics without a verifiable fitted-calibration identity must be
+regenerated with \code{diagnose_mfrm(fit, ...)}; model refitting is not required.
+Reordering stored step rows does not change their keyed correspondence.
+A bare fit supplies
+step points with \code{SE_Status = "not_supplied"}. A binary centered step has
+no free within-owner contrast (\code{fixed_by_step_centering}).
+
+Native thresholds here are centered step offsets. They are not full
+ability-axis crossings, cumulative-50\% boundaries or decision cuts. An SE
+for a step does not include the covariance required for a crossing or an
+adjacent-step difference. Threshold disorder is descriptive, not an
+automatic category-merging rule. Two-family GPCM diagnostics remain
+unsupported by this helper; use its dedicated response/curve routes.
 }
 
 \section{Typical workflow}{
@@ -86,6 +125,12 @@ Then inspect:
 \item Run \code{rating_scale_table()} and review \code{summary()}.
 \item Use \code{plot()} to visualize category profile quickly.
 }
+
+Save the complete result to retain owner counts, uncertainty status and
+notes. \code{plot(out, type = "counts")} shows global counts; use
+\code{plot(out, type = "thresholds")} for the stored step points. Both support
+\code{\link[=as_ggplot]{as_ggplot()}} without recalculating values. Step figures do not draw stored
+SEs as crossing, gap or curve intervals; inspect \code{threshold_table} separately.
 }
 
 \section{Further guidance}{
@@ -100,32 +145,59 @@ For a plot-selection guide and a longer walkthrough, see
 The \code{category_table} data.frame contains:
 \describe{
 \item{Category}{Score category value.}
-\item{Count, Percent}{Observed count and percentage of total.}
+\item{Count, Percent}{Observed count and percentage of total. With observation
+weights, counts are sums of weights, not independent sample sizes. Missing
+or invalid scores/weights make the usage counts unavailable.}
+\item{AvgMeasure, ExpectedMeasure}{Observed-category mean oriented predictor
+and its model expectation, weighted by category probabilities across
+all retained observations.}
 \item{AvgPersonMeasure}{Mean person measure for respondents in this
-category.}
-\item{Infit, Outfit}{Category-level fit statistics.}
-\item{InfitZSTD, OutfitZSTD}{Standardized fit values.}
+category; distinct from the oriented predictor.}
+\item{ExpectedAverage}{Mean predicted score among observations in this
+observed category; distinct from the expected generating measure.}
+\item{Infit, Outfit}{Descriptive category residual mean squares.}
+\item{InfitZSTD, OutfitZSTD}{Unavailable (NA); conditioning on the observed
+category does not preserve a universal unit-residual reference.}
 \item{ExpectedCount, DiffCount}{Expected count and observed-expected
 difference.}
 \item{LowCount}{Logical; \code{TRUE} if count is below minimum threshold.}
-\item{InfitFlag, OutfitFlag, ZSTDFlag}{Fit-based warning flags.}
+\item{InfitFlag, OutfitFlag, ZSTDFlag}{Unavailable (NA). Outcome-selected
+residual summaries do not have a universal unit baseline or calibrated
+ZSTD reference. Low-count and generating-measure warnings remain descriptive.}
 \item{ZeroCount, UnusedCategoryType, WeaklyIdentified, CategoryCaveat}{
 Structured score-support caveats for retained zero-count categories.}
 }
 
+The \code{owner_category_table} contains \code{StepOwner} (facet name), \code{StepFacet}
+(level), \code{Category} (model score), \code{CategoryLabel} (original score), raw and
+weighted counts (\code{RawCount}, \code{Count}), denominators (\code{OwnerRatings},
+\code{OwnerWeight}), \code{Percent}, \code{ZeroCount} and \code{UsageStatus}. Status distinguishes
+observed, not observed, zero weight, no exposure and unavailable counts.
+No-exposure counts are zero but percentages are unavailable.
+
 The \code{threshold_table} data.frame contains:
 \describe{
-\item{Step}{Step label (e.g., "1-2", "2-3").}
+\item{Step}{Step label (e.g., \code{Step_1}, \code{Step_2}). Use \code{LowerCategory}
+and \code{UpperCategory} to identify the corresponding score transition.}
 \item{Estimate}{Estimated threshold/step difficulty (logits).}
+\item{StepOwner}{Name of the facet owning the steps, or \code{Common} for RSM.}
 \item{StepFacet}{Threshold family identifier when the fit uses facet-specific
 threshold sets.}
-\item{GapFromPrev}{Difference from the previous threshold within the same
-\code{StepFacet} when thresholds are facet-specific. Gaps below
-1.4 logits may indicate category underuse; gaps above 5.0 may
-indicate wide unused regions (Linacre, 2002).}
+\item{SE, CI_Lower, CI_Upper, SE_Status, CIEligible, CIUse}{Stored
+step uncertainty and reporting status, without new inference.}
+\item{LowerCategoryLabel, UpperCategoryLabel}{Original scores at the transition.}
+\item{LowerOwnerCount, UpperOwnerCount, OwnerSupportStatus}{Weighted
+counts and support within this threshold owner, not pooled frequencies.}
+\item{GapFromPrev}{Difference between adjacent numbered thresholds within
+the same \code{StepFacet}. Missing thresholds are not skipped to form a gap.
+No automatic category-merging rule is applied.}
 \item{ThresholdMonotonic}{Logical flag repeated within each threshold set.
-For PCM fits, read this within \code{StepFacet}, not as a pooled item-bank
-verdict.}
+\code{FALSE} records at least one decreasing adjacent pair; \code{TRUE} requires
+every expected pair to be available and nondecreasing, allowing numerical
+differences up to \code{sqrt(.Machine$double.eps)}. Equal thresholds meet this
+descriptive condition. Otherwise the flag is \code{NA}. A binary scale has
+only one threshold and no applicable ordering comparison. This is a
+statement about point estimates, not a test of category adequacy.}
 \item{LowerCategory, UpperCategory, WeaklyIdentified, ThresholdCaveat}{
 Adjacent score-category support metadata. Thresholds adjacent to retained
 zero-count categories are flagged for cautious interpretation.}
@@ -142,29 +214,36 @@ categories}. Psychometrika, 43(4), 561-573.
 Psychometrika, 47(2), 149-174. \doi{10.1007/BF02296272}
 \item Linacre, J. M. (2002). What do Infit and Outfit, mean-square and
 standardized mean? \emph{Rasch Measurement Transactions, 16}(2), 878.
-(Source for the 0.5-1.5 mean-square heuristic review interval and the
-threshold-gap heuristics used in \code{summary(t8)$summary}.)
+(Source for the 0.5-1.5 mean-square heuristic review interval; this is
+not a source for threshold-gap rules.)
 \item Wind, S. A. (2023). \emph{Detecting rating scale malfunctioning with the
 partial credit model and generalized partial credit model}.
 Educational and Psychological Measurement, 83(5), 953-983.
 \doi{10.1177/00131644221116292} (Recent simulation evidence on
 PCM- and GPCM-based rating-scale diagnostics; useful for
-interpreting the \code{summary(t8)$summary} flags in the bounded
+interpreting the \code{summary(t8)$summary} flags in the
 \code{GPCM} route.)
 }
 }
 
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
-t8 <- rating_scale_table(fit)
-summary(t8)
-summary(t8)$summary
-p_t8 <- plot(t8, draw = FALSE)
-p_t8$data$plot
+library(mfrmr)
 
-}
+# Saved synthetic MML/RSM analysis of example_operational.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "operational-mml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+
+# Review category use and the fitted transitions between scores
+categories <- rating_scale_table(fit)
+review <- summary(categories)
+review$summary
+categories$model_context
+head(categories$owner_category_table)
+
+# Bars show observed counts; the line shows model-expected counts
+# Recreate saved tables with the original fit and diagnostics after updating.
+plot(categories)
 }
 \seealso{
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=measurable_summary_table]{measurable_summary_table()}}, \code{\link[=plot.mfrm_fit]{plot.mfrm_fit()}},

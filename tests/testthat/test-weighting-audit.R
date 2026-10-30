@@ -122,12 +122,8 @@ test_that("summary methods for build_weighting_review expose front-door tables",
   expect_true(audit$overview$UnitSlopePCMReduction)
   expect_identical(audit$overview$ReferenceStepFacet, "Criterion")
   expect_true(audit$overview$AlignedStepSlopeOwner)
-  expect_identical(audit$overview$PCMvsGPCMLRT, "withheld_current_scope")
-  expect_true(any(grepl(
-    "PCM-versus-GPCM chi-square LRT",
-    audit$key_warnings,
-    fixed = TRUE
-  )))
+  expect_identical(audit$overview$PCMvsGPCMLRT, "not_requested")
+  expect_false(any(grepl("LRT was not computed", audit$key_warnings, fixed = TRUE)))
   expect_true(any(grepl(
     "other facets have no separate slope block",
     audit$notes,
@@ -141,10 +137,19 @@ test_that("summary methods for build_weighting_review expose front-door tables",
     "plot_map", "reporting_map", "support_status"
   ) %in% names(sx)))
   expect_lte(nrow(sx$top_measure_shifts), 3)
+  stale <- audit
+  stale$comparison_contract$BothNumericallyReady <- NULL
+  expect_error(summary(stale), "Recreate it with build_weighting_review()", fixed = TRUE)
+  stale_summary <- sx
+  stale_summary$comparison_contract$BothNumericallyReady <- NULL
+  expect_error(print(stale_summary), "no model refit is needed", fixed = TRUE)
   expect_lte(nrow(sx$top_reweighted_levels), 3)
+  printed <- paste(capture.output(print(sx)), collapse = "\n")
+  expect_match(printed, "Comparison interpretation", fixed = TRUE)
+  expect_false(grepl("withheld_current_scope|single_aligned|supported_with_caveat|mml_numerical_review|Repair inference", printed))
 })
 
-test_that("JML weighting review is typed as descriptive or optimizer-trace evidence", {
+test_that("JML weighting review is keeps numerical review separate from descriptive evidence", {
   toy <- load_mfrmr_data("example_core")
   keep_people <- unique(toy$Person)[1:12]
   toy <- toy[toy$Person %in% keep_people, , drop = FALSE]
@@ -185,7 +190,7 @@ test_that("JML weighting review is typed as descriptive or optimizer-trace evide
     "withheld_JML_has_no_automatic_PCM_GPCM_selection"
   )
   expect_true(audit$comparison_contract$LogLikDifferenceStatus %in% c(
-    "optimizer_trace_only_not_inference_ready",
+    "numerical_review_required",
     "descriptive_unpenalized_gain_not_selection",
     "unavailable"
   ))
@@ -199,7 +204,7 @@ test_that("JML weighting review is typed as descriptive or optimizer-trace evide
     fixed = TRUE
   )))
   expect_true(any(grepl(
-    "unit_slopes",
+    "Use IC ranking only when ICComparable is true",
     audit$next_actions,
     fixed = TRUE
   )))

@@ -1,6 +1,6 @@
-test_that("evaluate_mfrm_recovery returns row-level and summary recovery tables", {
+test_that("simulate_mfrm_recovery returns row-level and summary recovery tables", {
   rec <- suppressWarnings(
-    evaluate_mfrm_recovery(
+    simulate_mfrm_recovery(
       n_person = 12,
       n_rater = 2,
       n_criterion = 2,
@@ -85,6 +85,10 @@ test_that("evaluate_mfrm_recovery returns row-level and summary recovery tables"
     max_abs_bias = c(default = 1)
   )
   expect_s3_class(assessment, "mfrm_recovery_assessment")
+  expect_error(
+    assess_mfrm_recovery(rec, max_rmse = 1, max_rms = 0.1),
+    "must be empty"
+  )
   expect_s3_class(assessment$overview, "data.frame")
   expect_s3_class(assessment$checklist, "data.frame")
   expect_s3_class(assessment$condition_review, "data.frame")
@@ -213,9 +217,9 @@ test_that("evaluate_mfrm_recovery returns row-level and summary recovery tables"
   )
 })
 
-test_that("evaluate_mfrm_recovery keeps optional diagnostics non-gating", {
+test_that("simulate_mfrm_recovery keeps optional diagnostics non-gating", {
   rec <- suppressWarnings(
-    evaluate_mfrm_recovery(
+    simulate_mfrm_recovery(
       n_person = 10,
       n_rater = 2,
       n_criterion = 2,
@@ -254,14 +258,14 @@ test_that("evaluate_mfrm_recovery keeps optional diagnostics non-gating", {
                          fixed = TRUE)))
 })
 
-test_that("evaluate_mfrm_recovery records diagnostic failures without failing recovery", {
+test_that("simulate_mfrm_recovery records diagnostic failures without failing recovery", {
   testthat::local_mocked_bindings(
     diagnose_mfrm = function(...) stop("forced diagnostic failure"),
     .package = "mfrmr"
   )
 
   rec <- suppressWarnings(
-    evaluate_mfrm_recovery(
+    simulate_mfrm_recovery(
       n_person = 10,
       n_rater = 2,
       n_criterion = 2,
@@ -306,7 +310,7 @@ test_that("evaluate_mfrm_recovery records diagnostic failures without failing re
                         assessment$notes, fixed = TRUE)))
 })
 
-test_that("evaluate_mfrm_recovery refits on the declared generator score support", {
+test_that("simulate_mfrm_recovery refits on the declared generator score support", {
   sim <- simulate_mfrm_data(
     n_person = 10,
     n_rater = 2,
@@ -322,7 +326,7 @@ test_that("evaluate_mfrm_recovery refits on the declared generator score support
   messages <- character()
   rec <- withCallingHandlers(
     suppressWarnings(
-      evaluate_mfrm_recovery(
+      simulate_mfrm_recovery(
         n_person = 10,
         n_rater = 2,
         n_criterion = 2,
@@ -343,7 +347,7 @@ test_that("evaluate_mfrm_recovery refits on the declared generator score support
   expect_false(any(grepl("Rating range inferred", messages, fixed = TRUE)))
 })
 
-test_that("evaluate_mfrm_recovery supports fitted bounded GPCM slope rows", {
+test_that("simulate_mfrm_recovery supports fitted GPCM slope rows", {
   spec <- build_mfrm_sim_spec(
     n_person = 14,
     n_rater = 2,
@@ -397,7 +401,7 @@ test_that("evaluate_mfrm_recovery supports fitted bounded GPCM slope rows", {
   expect_identical(attr(sim_flat, "mfrm_simulation_spec")$slope_regime, "near_flat")
 
   rec <- suppressWarnings(
-    evaluate_mfrm_recovery(
+    simulate_mfrm_recovery(
       sim_spec = spec,
       reps = 1,
       fit_method = "MML",
@@ -421,7 +425,7 @@ test_that("evaluate_mfrm_recovery supports fitted bounded GPCM slope rows", {
   expect_true(all(is.finite(slope_rows$RawEstimate)))
   expect_equal(exp(mean(log(slope_rows$RawTruth))), 1, tolerance = 1e-12)
   expect_true(any(rec$recovery_summary$ParameterType == "slope"))
-  expect_true(any(grepl("Bounded GPCM recovery", rec$notes, fixed = TRUE)))
+  expect_true(any(grepl("GPCM recovery", rec$notes, fixed = TRUE)))
 
   slope_plot <- plot(rec, type = "summary", metric = "bias",
                      parameter_type = "slope", draw = FALSE)

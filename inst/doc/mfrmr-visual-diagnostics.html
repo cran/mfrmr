@@ -341,50 +341,537 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 
 
-<p>This vignette is a compact map of the main base-R diagnostics in
-<code>mfrmr</code>. It is organized around four practical questions:</p>
+<p>Start with the <a href="https://ryuya-dot-com.github.io/mfrmr/articles/visual-gallery.html">interactive
+ggplot2 gallery</a> for three worked examples with Plotly views, static
+figures and underlying values.</p>
+<p>This vignette connects figures to questions about fitted ratings,
+external attributes and observed-score planning. It is organized around
+six practical questions:</p>
 <ul>
 <li>How well do persons, facet levels, and categories target each
 other?</li>
 <li>Which observations or levels look locally unstable?</li>
 <li>Is the design linked well enough across subsets or forms?</li>
 <li>Where do residual structure and interaction screens point next?</li>
+<li>How can external attributes describe groups of raters?</li>
+<li>How could changing the number of tasks affect an observed-score
+composite?</li>
 </ul>
-<p>All examples use packaged data and
-<code>preset = &quot;publication&quot;</code> so the same code is suitable for
-manuscript-oriented graphics.</p>
+<p>Model examples use packaged data; the feature hierarchy uses eight
+fictional raters. The <code>&quot;publication&quot;</code> and
+<code>&quot;monochrome&quot;</code> presets illustrate reusable styles, including
+views that remain interpretable without colour.</p>
 <p>If you are selecting figures for a report, use
 <code>reporting_checklist()</code> before or alongside this vignette.
 Its <code>&quot;Visual Displays&quot;</code> rows now mirror the public plotting
 family shown here.</p>
+<div id="find-a-figure-by-purpose" class="section level2">
+<h2>Find a figure by purpose</h2>
+<p>Use <code>plot()</code> on the fitted model or saved analysis result.
+In 0.2.4, the 33 former standalone drawing helpers are no longer
+exported. For existing scripts,
+<code>help(&quot;mfrmr_plot_migration&quot;)</code> gives every replacement and
+explains which <code>type</code>, <code>view</code> and
+<code>metric</code> controls apply.</p>
+<p>For observed rating agreement before model fitting, the <a href="mfrmr-rating-agreement.html#see-the-disagreement-then-compare-the-coefficients">rating-agreement
+tutorial</a> shows matched-score counts and pairwise QWK with retained
+sample sizes. Those custom ggplots use
+<code>pairwise_kappa_table()</code> output. They are distinct from the
+fitted-workflow exact-agreement/correlation heatmap below.</p>
+<p>For group comparisons of a rater or task, the <a href="mfrmr-linking-and-dff.html#compare-group-residuals">DFF
+tutorial</a> pairs a summary figure with response counts, display
+omissions and exclusion reasons. It explains why residual differences
+and linked-refit differences have different sign interpretations and
+what subgroup linking can establish.</p>
+<p>Use the plot guide before choosing a specialized function. It
+includes rater feedback, category curves, external-feature groups and
+G/D-study planning.</p>
+<p>Open a preview for the full figure, interpretation and the values
+used to draw it. These are different questions: a severe rater need not
+misfit; feature groups describe backgrounds; a D-study plans an
+observed-score measurement.</p>
+<style>
+.mfrmr-gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: 1rem; margin: 1.5rem 0; }
+.mfrmr-gallery-card { border: 1px solid #737373; border-radius: .4rem; padding: .85rem; background: #fff; color: #202020; min-width: 0; }
+.mfrmr-gallery-card a { display: block; color: #164f78; text-decoration: underline; text-underline-offset: .15em; }
+.mfrmr-gallery-card a:focus-visible { outline: 3px solid #164f78; outline-offset: 4px; }
+.mfrmr-gallery-card img { display: block; width: 100%; height: auto; margin: 0 0 .65rem; }
+.mfrmr-gallery-card p:last-child { margin-bottom: 0; }
+@media print { .mfrmr-gallery { display: block; } .mfrmr-gallery-card { break-inside: avoid; margin-bottom: 1rem; } }
+</style>
+<div class="mfrmr-gallery">
+<div class="mfrmr-gallery-card">
+<p><a href="#figure-wright"><strong>Compare persons, facet levels and
+category steps</strong></a></p>
+<p>Base R and dedicated ggplot conversion</p>
+</div>
+<div class="mfrmr-gallery-card">
+<p><a href="#figure-fit-pathway"><strong>Review severity together with
+response fit</strong></a></p>
+<p>Base R and dedicated ggplot conversion</p>
+</div>
+<div class="mfrmr-gallery-card">
+<p><a href="#figure-category-curves"><strong>Inspect category
+functioning</strong></a></p>
+<p>Base R and dedicated ggplot conversion</p>
+</div>
+<div class="mfrmr-gallery-card">
+<p><a href="#figure-linking"><strong>Inspect observed coverage across
+rating subsets</strong></a></p>
+<p>Base R; ggplot offers a different, table-based view</p>
+</div>
+<div class="mfrmr-gallery-card">
+<p><a href="#figure-feature-hierarchy"><strong>Inspect a hierarchy of
+external-feature groups</strong></a></p>
+<p>Base R and dedicated ggplot conversion</p>
+</div>
+<div class="mfrmr-gallery-card">
+<p><a href="#figure-d-study-planning"><strong>Plan reliability for a
+multivariate score or composite</strong></a></p>
+<p>Base R and dedicated ggplot conversion</p>
+</div>
+</div>
+<details>
+<summary>
+Browse all selected plot routes
+</summary>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>figures <span class="ot">&lt;-</span> mfrmr<span class="sc">::</span><span class="fu">mfrmr_output_guide</span>(<span class="st">&quot;plots&quot;</span>)</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(figures[, <span class="fu">c</span>(<span class="st">&quot;Question&quot;</span>, <span class="st">&quot;ResultFunction&quot;</span>, <span class="st">&quot;GGPlot&quot;</span>)])</span></code></pre></div>
+<table>
+<colgroup>
+<col width="69%" />
+<col width="21%" />
+<col width="9%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="left">Question</th>
+<th align="left">ResultFunction</th>
+<th align="left">GGPlot</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">Inspect signed pairwise rater agreement</td>
+<td align="left">rater_network_analysis</td>
+<td align="left">unavailable</td>
+</tr>
+<tr class="even">
+<td align="left">Compare weighted network inconsistency indices</td>
+<td align="left">rater_network_analysis</td>
+<td align="left">unavailable</td>
+</tr>
+<tr class="odd">
+<td align="left">Inspect conditional binary-network coefficients</td>
+<td align="left">fit_rater_network</td>
+<td align="left">unavailable</td>
+</tr>
+<tr class="even">
+<td align="left">Compare a binary network with model simulations</td>
+<td align="left">fit_rater_network</td>
+<td align="left">unavailable</td>
+</tr>
+<tr class="odd">
+<td align="left">Compare persons, facet levels and category steps</td>
+<td align="left">fit_mfrm</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="even">
+<td align="left">Show expected scores across ability</td>
+<td align="left">fit_mfrm</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="odd">
+<td align="left">Review severity together with response fit</td>
+<td align="left">fit_mfrm</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="even">
+<td align="left">Compare facet locations and their uncertainty</td>
+<td align="left">fit_mfrm</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="odd">
+<td align="left">Inspect category functioning</td>
+<td align="left">fit_mfrm</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="even">
+<td align="left">Review pooled category counts</td>
+<td align="left">rating_scale_table</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="odd">
+<td align="left">Review steps within their threshold owner</td>
+<td align="left">rating_scale_table</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="even">
+<td align="left">Compare category curve families</td>
+<td align="left">category_curves_report</td>
+<td align="left">unavailable</td>
+</tr>
+<tr class="odd">
+<td align="left">Compare fixed-rater estimates and interval methods</td>
+<td align="left">mfrm_facet_intervals</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="even">
+<td align="left">Review conditional interaction departures</td>
+<td align="left">bias_interaction_report</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="odd">
+<td align="left">Explore bias across all facet pairs</td>
+<td align="left">estimate_all_bias</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="even">
+<td align="left">Read latent-regression coefficients and
+uncertainty</td>
+<td align="left">mfrm_population_intervals</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="odd">
+<td align="left">Read prespecified conditional population contrasts</td>
+<td align="left">mfrm_population_intervals</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="even">
+<td align="left">Compare same-rater and other-rater score
+associations</td>
+<td align="left">rater_halo_network_analysis</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="odd">
+<td align="left">Show GPCM slope uncertainty</td>
+<td align="left">confint.mfrm_fit</td>
+<td align="left">native</td>
+</tr>
+<tr class="even">
+<td align="left">Show GPCM probability or information uncertainty</td>
+<td align="left">mfrm_curve_intervals</td>
+<td align="left">native</td>
+</tr>
+<tr class="odd">
+<td align="left">Compare observed raters in a shared-rater model</td>
+<td align="left">fit_mfrm_random_rater</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="even">
+<td align="left">Inspect testlet-model facet estimates</td>
+<td align="left">fit_mfrm_testlet</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="odd">
+<td align="left">Review conditional Person scores from a shared-rater
+model</td>
+<td align="left">score_mfrm_random_rater</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="even">
+<td align="left">Review conditional Person scores from a testlet
+model</td>
+<td align="left">predict.mfrm_testlet</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="odd">
+<td align="left">Review response residuals under supported RSMs,
+two-family GPCM MML or corrected GPCM JML</td>
+<td align="left">mfrm_response_diagnostics</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="even">
+<td align="left">Compare ordinary and extended model results</td>
+<td align="left">compare_mfrm</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="odd">
+<td align="left">Compare screening rules across known-truth
+conditions</td>
+<td align="left">mfrm_screening_sensitivity</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="even">
+<td align="left">Show screening performance with uncertainty</td>
+<td align="left">mfrm_screening_performance</td>
+<td align="left">unavailable</td>
+</tr>
+<tr class="odd">
+<td align="left">Show pooled fixed-facet intervals after multiple
+imputation</td>
+<td align="left">pool_mfrm_imputed</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="even">
+<td align="left">Report saved external posterior intervals</td>
+<td align="left">read_mfrm_posterior</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="odd">
+<td align="left">Inspect all residual associations and missing
+pairs</td>
+<td align="left">mfrm_residual_network</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="even">
+<td align="left">Locate residual co-movement after model review</td>
+<td align="left">mfrm_residual_network</td>
+<td align="left">unavailable</td>
+</tr>
+<tr class="odd">
+<td align="left">Inspect exploratory groups of residual profiles</td>
+<td align="left">mfrm_residual_network</td>
+<td align="left">unavailable</td>
+</tr>
+<tr class="even">
+<td align="left">Inspect separation of external-feature groups</td>
+<td align="left">mfrm_cluster</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="odd">
+<td align="left">Describe an external feature within groups</td>
+<td align="left">mfrm_cluster</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="even">
+<td align="left">Inspect a hierarchy of external-feature groups</td>
+<td align="left">mfrm_cluster_hierarchical</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="odd">
+<td align="left">Inspect group stability across feature imputations</td>
+<td align="left">mfrm_cluster_imputed</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="even">
+<td align="left">Choose how many external-feature components to
+inspect</td>
+<td align="left">mfrm_pca</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="odd">
+<td align="left">Locate entities on external-feature components</td>
+<td align="left">mfrm_pca</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="even">
+<td align="left">Identify features contributing to a component</td>
+<td align="left">mfrm_pca</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="odd">
+<td align="left">Plan facet counts with an observed-score D-study</td>
+<td align="left">mfrm_d_study</td>
+<td align="left">unavailable</td>
+</tr>
+<tr class="even">
+<td align="left">Inspect sources of observed-score variation</td>
+<td align="left">mfrm_g_study</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="odd">
+<td align="left">Plan reliability for a multivariate score or
+composite</td>
+<td align="left">mfrm_d_study</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="even">
+<td align="left">Plan absolute or relative error in score units</td>
+<td align="left">mfrm_d_study</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="odd">
+<td align="left">Explain which error sources change across plans</td>
+<td align="left">mfrm_d_study</td>
+<td align="left">dedicated</td>
+</tr>
+<tr class="even">
+<td align="left">Compare D-study plans including the reference</td>
+<td align="left">mfrm_multivariate_d_compare</td>
+<td align="left">unavailable</td>
+</tr>
+<tr class="odd">
+<td align="left">Inspect observed coverage across rating subsets</td>
+<td align="left">subset_connectivity_report</td>
+<td align="left">generic</td>
+</tr>
+<tr class="even">
+<td align="left">Customize the underlying precision values</td>
+<td align="left">compute_information</td>
+<td align="left">generic</td>
+</tr>
+</tbody>
+</table>
+</details>
+<p>Open the help for <code>ResultFunction</code> if you have not created
+the required result. Choose a row and read <code>PlotCall</code>,
+<code>GGPlotCall</code>, <code>DataComponent</code> and
+<code>Notes</code>. Replace <code>x</code> in <code>PlotCall</code> with
+the indicated result, and save its return value as <code>p</code>. The
+call uses <code>draw = FALSE</code> to prepare the figure without
+opening a window. Change it to <code>TRUE</code> to display it, or
+follow <code>GGPlotCall</code> to customize it with ggplot2. A data
+component is a table to inspect; passing that component to
+<code>as_ggplot()</code> may produce a different view from the full
+figure.</p>
+<p><code>dedicated</code> means there is a converter for the figure;
+<code>native</code> means the plot already returns ggplot.
+<code>generic</code> describes a table-based graphic that need not
+reproduce the original layout or annotations. <code>unavailable</code>
+still allows the original plot and custom graphics from
+<code>plot_data(p)</code>. This is a selected map, not a claim that
+every plot or component has been covered. Graphical support does not
+extend the model’s statistical assumptions.</p>
+</div>
+<div id="latent-regression-coefficients-and-specified-comparisons" class="section level2">
+<h2>Latent regression: coefficients and specified comparisons</h2>
+<p>Latent regression asks how the conditional mean of ability relates to
+Person predictors. It differs from a residual PCA or a plot of rater
+attributes. An example coefficient might describe a group difference
+under the fitted coding, rather than an individual learner’s score or a
+rater’s severity.</p>
+<p>The bundled-data example in <code>?mfrm_population_intervals</code>
+fits an RSM model with a clearly labeled fictional predictor, calculates
+intervals once and creates <code>ci</code>. After running that example,
+inspect the result as follows:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">summary</span>(ci)                           <span class="co"># estimates, intervals and status</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>p <span class="ot">&lt;-</span> <span class="fu">plot</span>(ci, <span class="at">type =</span> <span class="st">&quot;contrasts&quot;</span>)     <span class="co"># the saved comparison, without refitting</span></span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="fu">plot_data</span>(p, <span class="st">&quot;contrast_weights&quot;</span>)      <span class="co"># which conditional means were compared?</span></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="fu">plot_data</span>(p, <span class="st">&quot;population_coding&quot;</span>)     <span class="co"># factor levels and coding, if applicable</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="fu">plot_data</span>(p, <span class="st">&quot;notes&quot;</span>)                 <span class="co"># assumptions and experimental limits</span></span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="fu">as_ggplot</span>(p)                          <span class="co"># the same saved values for customization</span></span></code></pre></div>
+<p>Use <code>plot(ci)</code> for coefficients. A coefficient for a
+continuous predictor is per unit of its fitted predictor; the intercept
+depends on zero values and factor coding. Read the saved formula and
+trained terms in <code>plot_data(p, &quot;population_spec&quot;)</code> when
+transformations or interactions are involved. Different predictor units
+prevent a simple ranking of importance by coefficient magnitude. A
+positive mean difference predicts higher <em>coded</em> ratings; the
+rubric determines whether higher ratings are favorable.</p>
+<p>Filled points and lines show available pointwise intervals. A cross
+and <code>CI unavailable</code> label retain a point whose interval
+could not be supplied; inspect its <code>Status</code>,
+<code>InferenceReview</code> and saved checks. A wide interval is still
+shown. Numerical availability does not establish coverage, and crossing
+zero is not an automatic practical decision. These RSM/PCM intervals
+remain experimental. Residual variance stays in <code>summary(ci)</code>
+because its units differ from coefficients and mean contrasts. Save
+<code>ci</code> to preserve all targets and numerical checks, and save
+<code>p</code> when retaining this particular display.</p>
+</div>
+<div id="connect-a-figure-to-a-claim" class="section level2">
+<h2>Connect a figure to a claim</h2>
+<p>Choose the proposed score interpretation before choosing a figure.
+The <a href="../reference/mfrmr_methods_reference.html#use-results-as-evidence-about-a-construct">methods
+guide</a> shows how to connect that claim to a design, expected pattern,
+competing explanation and conclusion. These are complementary views; a
+report need not include every figure.</p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Figure</th>
+<th>What to read</th>
+<th>What the figure does not establish</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Wright map</td>
+<td>Whether fitted persons and rubric transitions occupy comparable
+parts of the scale, with the stated uncertainty</td>
+<td>Coverage of all intended content or proof of one latent
+dimension</td>
+</tr>
+<tr class="even">
+<td>Category curves and counts</td>
+<td>Predicted category use alongside actual category support for the
+relevant owner</td>
+<td>That a rarely dominant category should automatically be merged</td>
+</tr>
+<tr class="odd">
+<td>Fit pathway and residual displays</td>
+<td>Where the selected model leaves unexpected variation</td>
+<td>A psychological cause, halo/horn, or a rule for excluding a
+rater</td>
+</tr>
+<tr class="even">
+<td>G-study component/covariance plots</td>
+<td>Where score variation and relations arise, including interactions
+and combined residual</td>
+<td>A correlation scale, a latent factor solution, or which individual
+judge caused an effect</td>
+</tr>
+<tr class="odd">
+<td>D-study curves and interval forests</td>
+<td>Dependability/SEM for specified plans, or a separately requested
+paired difference</td>
+<td>A winner, a universally adequate cutoff, or a paired test inferred
+from marginal interval overlap</td>
+</tr>
+</tbody>
+</table>
+<p>For example, satisfactory fit and a high G coefficient can coexist
+with uncertain relations between criteria. Those results address
+different claims; one does not override the other. Read the <a href="mfrmr-gtheory.html#examine-a-construct-claim">worked covariance
+example</a> for an unresolved result and a reporting example. Keep
+methods, unavailable states and notes with saved figures. A colour
+change or a new panel layout does not change their inferential
+scope.</p>
+</div>
 <div id="minimal-setup" class="section level2">
 <h2>Minimal setup</h2>
-<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
-<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a></span>
-<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>toy <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_operational&quot;</span>)</span>
-<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a></span>
-<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
-<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>  toy,</span>
-<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
-<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
-<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
-<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span></span>
-<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>)</span>
-<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a></span>
-<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a>diag <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit, <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>)</span>
-<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a>checklist <span class="ot">&lt;-</span> <span class="fu">reporting_checklist</span>(fit, <span class="at">diagnostics =</span> diag)</span>
-<span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a><span class="fu">subset</span>(</span>
-<span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a>  checklist<span class="sc">$</span>checklist,</span>
-<span id="cb1-18"><a href="#cb1-18" tabindex="-1"></a>  Section <span class="sc">==</span> <span class="st">&quot;Visual Displays&quot;</span>,</span>
-<span id="cb1-19"><a href="#cb1-19" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;Item&quot;</span>, <span class="st">&quot;Available&quot;</span>, <span class="st">&quot;NextAction&quot;</span>)</span>
-<span id="cb1-20"><a href="#cb1-20" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>toy <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_operational&quot;</span>)</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>  toy,</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span></span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a>)</span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a></span>
+<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a>diag <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit, <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>)</span>
+<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a>checklist <span class="ot">&lt;-</span> <span class="fu">reporting_checklist</span>(fit, <span class="at">diagnostics =</span> diag)</span>
+<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a><span class="fu">subset</span>(</span>
+<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a>  checklist<span class="sc">$</span>checklist,</span>
+<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a>  Section <span class="sc">==</span> <span class="st">&quot;Visual Displays&quot;</span>,</span>
+<span id="cb3-19"><a href="#cb3-19" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;Item&quot;</span>, <span class="st">&quot;Available&quot;</span>, <span class="st">&quot;NextAction&quot;</span>)</span>
+<span id="cb3-20"><a href="#cb3-20" tabindex="-1"></a>)</span></code></pre></div>
 </div>
 <div id="targeting-and-scale-structure" class="section level2">
 <h2>1. Targeting and scale structure</h2>
+<div id="establish-what-higher-scores-mean" class="section level3">
+<h3>Establish what higher scores mean</h3>
+<p>A logit value needs a rubric direction and a model role. For
+comprehensibility, 1 = difficult / 4 = easy makes higher Person
+locations mean easier speech; 1 = easy / 4 = difficult makes them mean
+more difficult speech. In both cases, higher Person locations predict
+higher coded scores. With the default negative Rater orientation, higher
+Rater locations predict <strong>lower</strong> coded scores, so
+“stricter” is appropriate only when higher scores are more
+favorable.</p>
+<p>Record both endpoint labels with the analysis.
+<code>positive_facets</code> changes the orientation of the selected
+facet parameters; it does not reverse the outcome categories. Renaming
+categories in a figure also leaves the model unchanged. The <a href="../reference/mfrmr_visual_diagnostics.html#read-score-direction-and-diagnostic-terms-first">visual-diagnostics
+help</a> explains recoding, anchors and the terms used below. The
+package can report the fitted signs but cannot infer the substantive
+meaning of your rubric.</p>
+</div>
+<div id="figure-wright" class="section level3">
+<h3>Wright map</h3>
 <p>Use the Wright map first when you want one shared logit view of
 persons, facet levels, and step thresholds.</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">plot</span>(fit, <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>, <span class="at">show_ci =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>wright <span class="ot">&lt;-</span> <span class="fu">plot</span>(fit, <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>, <span class="at">show_ci =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
 <p>Interpretation:</p>
 <ul>
 <li>Compare person density on the left to facet and step locations on
@@ -394,6 +881,32 @@ the right.</li>
 estimate the relevant pairwise contrast directly before claiming that
 two levels are separated or indistinguishable.</li>
 </ul>
+<p>The locations used in the figure remain available as a table:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">plot_data</span>(wright, <span class="at">component =</span> <span class="st">&quot;locations&quot;</span>))</span></code></pre></div>
+<p>Read the accompanying definitions and fitted directions outside the
+figure:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(<span class="fu">plot_data</span>(wright, <span class="st">&quot;notes&quot;</span>), <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span></code></pre></div>
+<p>To find a particular judge, use their ID from the fitted data. The
+<code>&gt;</code> prefix marks your selection in color or monochrome; it
+does not flag a statistical problem. Use another facet name in the list
+to select its levels instead.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>judge <span class="ot">&lt;-</span> <span class="fu">as.character</span>(toy<span class="sc">$</span>Rater[<span class="dv">1</span>])</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>focused <span class="ot">&lt;-</span> <span class="fu">plot</span>(fit, <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>, <span class="at">highlight =</span> <span class="fu">list</span>(<span class="at">Rater =</span> judge),</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>                <span class="at">draw =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="fu">subset</span>(<span class="fu">plot_data</span>(focused, <span class="st">&quot;locations&quot;</span>), Highlighted)</span></code></pre></div>
+<p>Selected levels remain visible even if the compact <code>top_n</code>
+selection would omit them. They are added to the usual selection, so
+inspect <code>plot_data(focused, &quot;retention&quot;)</code> for the displayed
+and omitted counts. <code>top_n = Inf</code> retains all levels.
+Selection does not recenter or refit the model, and the automatic logit
+range is determined before compaction.</p>
+<p>Here <strong>Step</strong> means a transition between adjacent score
+categories: 1 to 2, 2 to 3, or 3 to 4. At a transition’s crossing, those
+two categories are equally probable; other categories remain possible,
+so this does not mean 50 percent each. The displayed reference sets
+other additive facet effects to zero. For a particular judge and
+criterion, their effects shift the crossing along the Person scale. A
+Step is not a developmental stage or a contest pass mark.</p>
 <p>The native view above remains the recommended analytic figure because
 it keeps facet uncertainty and fitted step locations visible. For a
 closer FACETS-facing handoff, switch the renderer and leave
@@ -403,14 +916,14 @@ coordinates do not change.</p>
 are displaced for collision avoidance, with leader lines back to the
 fitted points. Step thresholds form one vertical ladder and their labels
 include the fitted transition logits.</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">plot</span>(</span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>  fit,</span>
-<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>  <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>,</span>
-<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  <span class="at">renderer =</span> <span class="st">&quot;facets&quot;</span>,</span>
-<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>  <span class="at">category_labels =</span> <span class="fu">c</span>(</span>
-<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>    <span class="st">`</span><span class="at">1</span><span class="st">`</span> <span class="ot">=</span> <span class="st">&quot;Beginning&quot;</span>, <span class="st">`</span><span class="at">2</span><span class="st">`</span> <span class="ot">=</span> <span class="st">&quot;Developing&quot;</span>, <span class="st">`</span><span class="at">3</span><span class="st">`</span> <span class="ot">=</span> <span class="st">&quot;Secure&quot;</span>, <span class="st">`</span><span class="at">4</span><span class="st">`</span> <span class="ot">=</span> <span class="st">&quot;Advanced&quot;</span></span>
-<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>  )</span>
-<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">plot</span>(</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>  fit,</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>,</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>  <span class="at">renderer =</span> <span class="st">&quot;facets&quot;</span>,</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>  <span class="at">category_labels =</span> <span class="fu">c</span>(</span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>    <span class="st">`</span><span class="at">1</span><span class="st">`</span> <span class="ot">=</span> <span class="st">&quot;Beginning&quot;</span>, <span class="st">`</span><span class="at">2</span><span class="st">`</span> <span class="ot">=</span> <span class="st">&quot;Developing&quot;</span>, <span class="st">`</span><span class="at">3</span><span class="st">`</span> <span class="ot">=</span> <span class="st">&quot;Secure&quot;</span>, <span class="st">`</span><span class="at">4</span><span class="st">`</span> <span class="ot">=</span> <span class="st">&quot;Advanced&quot;</span></span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>  )</span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>)</span></code></pre></div>
 <p>This renderer uses one common logit ruler, a <code>*</code>
 person-frequency column, signed facet headers, every facet level, and
 short labeled score-transition lines. It is FACETS-style visual
@@ -424,7 +937,7 @@ uncertainty extension. Use <code>draw = FALSE</code> and inspect the
 ggplot2 or another graphics system.</p>
 <p>Next, use the pathway map when you want to see how expected scores
 progress across theta.</p>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">plot</span>(fit, <span class="at">type =</span> <span class="st">&quot;pathway&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="fu">plot</span>(fit, <span class="at">type =</span> <span class="st">&quot;pathway&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
 <p>Interpretation:</p>
 <ul>
 <li>Steeper rises indicate stronger score progression.</li>
@@ -432,19 +945,28 @@ progress across theta.</p>
 govern the score.</li>
 <li>Flat or compressed regions suggest weaker category separation.</li>
 </ul>
+</div>
+<div id="figure-fit-pathway" class="section level3">
+<h3>Fit pathway</h3>
 <p>The expected-score pathway is not a fit pathway. To review measure
-against Infit, place Infit on the horizontal axis and include person
-rows explicitly:</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">plot</span>(</span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>  fit,</span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  <span class="at">type =</span> <span class="st">&quot;fit_pathway&quot;</span>,</span>
-<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag,</span>
-<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>  <span class="at">fit_stat =</span> <span class="st">&quot;Infit&quot;</span>,</span>
-<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>  <span class="at">fit_scale =</span> <span class="st">&quot;mnsq&quot;</span>,</span>
-<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>  <span class="at">include_person =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>  <span class="at">show_ci =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
-<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a>)</span></code></pre></div>
+against Infit, place Infit on the horizontal axis. This focused view
+retains all facet levels and the 12 persons furthest from expected fit.
+It is a review screen, not a representative sample of person fit. Labels
+are limited to flagged facet levels; the table below identifies every
+displayed row.</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>fit_pathway <span class="ot">&lt;-</span> <span class="fu">plot</span>(</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>  fit,</span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>  <span class="at">type =</span> <span class="st">&quot;fit_pathway&quot;</span>,</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag,</span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>  <span class="at">fit_stat =</span> <span class="st">&quot;Infit&quot;</span>,</span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>  <span class="at">fit_scale =</span> <span class="st">&quot;mnsq&quot;</span>,</span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>  <span class="at">include_person =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a>  <span class="at">top_n_person =</span> <span class="dv">12</span>,</span>
+<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a>  <span class="at">person_labels =</span> <span class="st">&quot;none&quot;</span>,</span>
+<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a>  <span class="at">facet_labels =</span> <span class="st">&quot;flagged&quot;</span>,</span>
+<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a>  <span class="at">show_ci =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
+<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a>)</span></code></pre></div>
 <p>Interpretation:</p>
 <ul>
 <li>The vertical axis remains the fitted measure in logits.</li>
@@ -456,18 +978,59 @@ metadata.</li>
 <li>Treat displaced or flagged rows as review prompts, not automatic
 exclusions.</li>
 </ul>
+<p><strong>Overfit</strong> means less residual variation than the model
+expects (mean square below 1); <strong>underfit</strong> means more
+(above 1). The selected bands determine screening flags, so not every
+deviation from 1 triggers a flag. Infit and Outfit weight residuals
+differently; ZSTD has a zero-centered reference. Calibrated
+speech-contest judges can agree or have similar severity without
+overfit. If low fit values occur, inspect actual residual patterns,
+category use and rating independence before attributing them to
+training. Shared discussion/copying and consistent independent rubric
+use are different processes. Neither a low nor a high value alone
+establishes the cause or justifies removing a judge. See the linked help
+for the definitions and sources.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>fit_values <span class="ot">&lt;-</span> <span class="fu">plot_data</span>(fit_pathway, <span class="at">component =</span> <span class="st">&quot;table&quot;</span>)</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>fit_values[, <span class="fu">c</span>(<span class="st">&quot;Facet&quot;</span>, <span class="st">&quot;Level&quot;</span>, <span class="st">&quot;FitValue&quot;</span>, <span class="st">&quot;Measure&quot;</span>, <span class="st">&quot;CIEligible&quot;</span>)]</span></code></pre></div>
+<p><code>CIEligible = FALSE</code> means that a location interval is
+unavailable under the stored inference rules, not that its uncertainty
+is zero. Inspect <code>CIBasis</code> and <code>CIUse</code> in the same
+table before interpreting whiskers. Set <code>top_n_person = Inf</code>
+to retain all persons, or <code>include_person = FALSE</code> to focus
+on facet levels. A crowded view can be read through its table without
+changing the model or the fit-screening rules.</p>
+</div>
+<div id="figure-category-curves" class="section level3">
+<h3>Category probabilities</h3>
+<p>Category curves ask which ordered score is most probable at each
+ability. They complement the expected-score pathway: a single expected
+score can hide which categories contribute to it.</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>category_curves <span class="ot">&lt;-</span> <span class="fu">plot</span>(fit, <span class="at">type =</span> <span class="st">&quot;ccc&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;monochrome&quot;</span>)</span></code></pre></div>
+<p>These are reference-profile probabilities, not observed category
+frequencies or uncertainty bands. For PCM/GPCM, select and interpret the
+relevant step/slope owner. A rarely dominant category is a reason to
+inspect counts and rubric meaning, not automatic evidence that
+categories should be merged.</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">plot_data</span>(category_curves, <span class="at">component =</span> <span class="st">&quot;probabilities&quot;</span>))</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a><span class="co"># Optional customization without refitting:</span></span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a><span class="co"># as_ggplot(category_curves)</span></span></code></pre></div>
+<p>For observed counts and stored step points, save
+<code>rating_scale_table(fit, diag)</code> and use
+<code>plot(result, type = &quot;counts&quot;)</code> or
+<code>type = &quot;thresholds&quot;</code>; both support <code>as_ggplot()</code>.
+Counts in that figure are pooled: inspect
+<code>owner_category_table</code> for each step owner’s denominator and
+category support. Stored step SEs are not curve or gap intervals. The
+separate <code>category_curves_report()</code> bundle uses base graphics
+for its multi-family overview and selected curve views; custom graphics
+from <code>plot_data()</code> must retain the curve family and
+group.</p>
+</div>
 </div>
 <div id="local-response-and-level-issues" class="section level2">
 <h2>2. Local response and level issues</h2>
 <p>Unexpected-response screening is useful for case-level review.</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">plot_unexpected</span>(</span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  fit,</span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag,</span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="at">abs_z_min =</span> <span class="fl">1.5</span>,</span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  <span class="at">prob_max =</span> <span class="fl">0.4</span>,</span>
-<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>  <span class="at">plot_type =</span> <span class="st">&quot;scatter&quot;</span>,</span>
-<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
-<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="fu">plot</span>(fit, <span class="at">type =</span> <span class="st">&quot;unexpected&quot;</span>, <span class="at">diagnostics =</span> diag, <span class="at">abs_z_min =</span> <span class="fl">1.5</span>, <span class="at">prob_max =</span> <span class="fl">0.4</span>, <span class="at">view =</span> <span class="st">&quot;scatter&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
 <p>Interpretation:</p>
 <ul>
 <li>Upper corners combine large residual mismatch with low model
@@ -477,13 +1040,7 @@ informative than a single extreme point.</li>
 </ul>
 <p>Displacement focuses on level movement rather than individual
 responses.</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="fu">plot_displacement</span>(</span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>  fit,</span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag,</span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>  <span class="at">anchored_only =</span> <span class="cn">FALSE</span>,</span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>  <span class="at">plot_type =</span> <span class="st">&quot;lollipop&quot;</span>,</span>
-<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
-<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="fu">plot</span>(fit, <span class="at">type =</span> <span class="st">&quot;displacement&quot;</span>, <span class="at">diagnostics =</span> diag, <span class="at">anchored_only =</span> <span class="cn">FALSE</span>, <span class="at">view =</span> <span class="st">&quot;lollipop&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
 <p>Interpretation:</p>
 <ul>
 <li>Large absolute displacement indicates stronger tension between
@@ -496,39 +1053,35 @@ screen.</li>
 <p>When you need the package’s latent-integrated follow-up path, switch
 to <code>MML</code> and request <code>diagnostic_mode = &quot;both&quot;</code> so
 the legacy and strict branches stay visible side by side. The chunk
-below uses compact quadrature for optional local execution; final
-reporting should be refit with the package default or a higher
+below uses compact quadrature for a shorter runtime; final reporting
+should be based on a refit with the package default or a higher
 quadrature setting.</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>fit_strict <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>  toy,</span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
-<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
-<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">7</span>,</span>
-<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a>  <span class="at">maxit =</span> <span class="dv">40</span></span>
-<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a>)</span>
-<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a></span>
-<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a>diag_strict <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(</span>
-<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a>  fit_strict,</span>
-<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a>  <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>,</span>
-<span id="cb8-15"><a href="#cb8-15" tabindex="-1"></a>  <span class="at">diagnostic_mode =</span> <span class="st">&quot;both&quot;</span></span>
-<span id="cb8-16"><a href="#cb8-16" tabindex="-1"></a>)</span>
-<span id="cb8-17"><a href="#cb8-17" tabindex="-1"></a></span>
-<span id="cb8-18"><a href="#cb8-18" tabindex="-1"></a>strict_checklist <span class="ot">&lt;-</span> <span class="fu">reporting_checklist</span>(fit_strict, <span class="at">diagnostics =</span> diag_strict)</span>
-<span id="cb8-19"><a href="#cb8-19" tabindex="-1"></a><span class="fu">subset</span>(</span>
-<span id="cb8-20"><a href="#cb8-20" tabindex="-1"></a>  strict_checklist<span class="sc">$</span>checklist,</span>
-<span id="cb8-21"><a href="#cb8-21" tabindex="-1"></a>  Section <span class="sc">==</span> <span class="st">&quot;Visual Displays&quot;</span> <span class="sc">&amp;</span></span>
-<span id="cb8-22"><a href="#cb8-22" tabindex="-1"></a>    Item <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;QC / facet dashboard&quot;</span>, <span class="st">&quot;Strict marginal visuals&quot;</span>),</span>
-<span id="cb8-23"><a href="#cb8-23" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;Item&quot;</span>, <span class="st">&quot;Available&quot;</span>, <span class="st">&quot;NextAction&quot;</span>)</span>
-<span id="cb8-24"><a href="#cb8-24" tabindex="-1"></a>)</span>
-<span id="cb8-25"><a href="#cb8-25" tabindex="-1"></a></span>
-<span id="cb8-26"><a href="#cb8-26" tabindex="-1"></a><span class="fu">plot_marginal_fit</span>(</span>
-<span id="cb8-27"><a href="#cb8-27" tabindex="-1"></a>  diag_strict,</span>
-<span id="cb8-28"><a href="#cb8-28" tabindex="-1"></a>  <span class="at">top_n =</span> <span class="dv">12</span>,</span>
-<span id="cb8-29"><a href="#cb8-29" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
-<span id="cb8-30"><a href="#cb8-30" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>fit_strict <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a>  toy,</span>
+<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
+<span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
+<span id="cb16-8"><a href="#cb16-8" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">7</span>,</span>
+<span id="cb16-9"><a href="#cb16-9" tabindex="-1"></a>  <span class="at">maxit =</span> <span class="dv">40</span></span>
+<span id="cb16-10"><a href="#cb16-10" tabindex="-1"></a>)</span>
+<span id="cb16-11"><a href="#cb16-11" tabindex="-1"></a></span>
+<span id="cb16-12"><a href="#cb16-12" tabindex="-1"></a>diag_strict <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(</span>
+<span id="cb16-13"><a href="#cb16-13" tabindex="-1"></a>  fit_strict,</span>
+<span id="cb16-14"><a href="#cb16-14" tabindex="-1"></a>  <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>,</span>
+<span id="cb16-15"><a href="#cb16-15" tabindex="-1"></a>  <span class="at">diagnostic_mode =</span> <span class="st">&quot;both&quot;</span></span>
+<span id="cb16-16"><a href="#cb16-16" tabindex="-1"></a>)</span>
+<span id="cb16-17"><a href="#cb16-17" tabindex="-1"></a></span>
+<span id="cb16-18"><a href="#cb16-18" tabindex="-1"></a>strict_checklist <span class="ot">&lt;-</span> <span class="fu">reporting_checklist</span>(fit_strict, <span class="at">diagnostics =</span> diag_strict)</span>
+<span id="cb16-19"><a href="#cb16-19" tabindex="-1"></a><span class="fu">subset</span>(</span>
+<span id="cb16-20"><a href="#cb16-20" tabindex="-1"></a>  strict_checklist<span class="sc">$</span>checklist,</span>
+<span id="cb16-21"><a href="#cb16-21" tabindex="-1"></a>  Section <span class="sc">==</span> <span class="st">&quot;Visual Displays&quot;</span> <span class="sc">&amp;</span></span>
+<span id="cb16-22"><a href="#cb16-22" tabindex="-1"></a>    Item <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;QC / facet dashboard&quot;</span>, <span class="st">&quot;Strict marginal visuals&quot;</span>),</span>
+<span id="cb16-23"><a href="#cb16-23" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;Item&quot;</span>, <span class="st">&quot;Available&quot;</span>, <span class="st">&quot;NextAction&quot;</span>)</span>
+<span id="cb16-24"><a href="#cb16-24" tabindex="-1"></a>)</span>
+<span id="cb16-25"><a href="#cb16-25" tabindex="-1"></a></span>
+<span id="cb16-26"><a href="#cb16-26" tabindex="-1"></a><span class="fu">plot</span>(diag_strict, <span class="at">type =</span> <span class="st">&quot;marginal_fit&quot;</span>, <span class="at">top_n =</span> <span class="dv">12</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
 <p>Interpretation:</p>
 <ul>
 <li>Treat strict marginal plots as exploratory corroboration screens,
@@ -536,33 +1089,85 @@ not as standalone inferential tests.</li>
 <li>Use the checklist rows to confirm that the current run actually
 supports the strict branch before routing figures into a report.</li>
 <li>When pairwise follow-up is needed, continue with
-<code>plot_marginal_pairwise(diag_strict, preset = &quot;publication&quot;)</code>.</li>
+<code>plot(diag_strict, type = &quot;marginal_pairwise&quot;, preset = &quot;publication&quot;)</code>.</li>
 </ul>
 </div>
 </div>
-<div id="linking-and-coverage" class="section level2">
+<div id="figure-linking" class="section level2">
 <h2>3. Linking and coverage</h2>
 <p>When the design may be incomplete or spread across subsets, inspect
 the coverage matrix before interpreting cross-subset contrasts.</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>sc <span class="ot">&lt;-</span> <span class="fu">subset_connectivity_report</span>(fit, <span class="at">diagnostics =</span> diag)</span>
-<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="fu">plot</span>(sc, <span class="at">type =</span> <span class="st">&quot;design_matrix&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
-<p>Interpretation:</p>
-<ul>
-<li>Sparse rows or columns indicate weak subset coverage.</li>
-<li>Facets with low overlap are weaker anchors for cross-subset
-comparisons.</li>
-</ul>
+<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a>sc <span class="ot">&lt;-</span> <span class="fu">subset_connectivity_report</span>(fit, <span class="at">diagnostics =</span> diag)</span>
+<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a>coverage <span class="ot">&lt;-</span> <span class="fu">plot</span>(sc, <span class="at">type =</span> <span class="st">&quot;design_matrix&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
+<p>The cells divide each subset’s observed number of facet levels by the
+largest such count for that facet among the observed subsets. They do
+not show the proportion of planned ratings that were completed. A single
+connected subset can therefore have coverage values of one even with a
+sparse rating design. Low relative counts invite a closer assignment
+review; they do not alone establish weak linking, informative
+missingness, or random missingness.</p>
+<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a><span class="fu">plot_data</span>(coverage, <span class="at">component =</span> <span class="st">&quot;matrix&quot;</span>)</span>
+<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">plot_data</span>(coverage, <span class="at">component =</span> <span class="st">&quot;table&quot;</span>))</span>
+<span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a><span class="co"># Only the matrix is converted; the observation-share panel is not included.</span></span>
+<span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a><span class="co"># as_ggplot(coverage, component = &quot;matrix&quot;)</span></span></code></pre></div>
+<p>Compare an explicit assignment roster with observed ratings when
+distinguishing unassigned cells from missing assigned scores. Neither
+should be coded as zero.</p>
+<p>Keep three uses of <em>network</em> separate.
+<code>mfrm_network_analysis()</code> analyzes the
+assignment/co-observation graph and can expose disconnected measurement
+subsets. <code>rater_network_analysis()</code> analyzes pairwise score
+relations, and <code>rater_halo_network_analysis()</code> analyzes
+rater-by-criterion score-profile correlations. The latter two do not
+establish assignment connectedness or a common scale. Their centrality
+statistics are graph-theoretic quantities, not rating-scale central
+tendency, MFRM severity logits, or causal halo evidence.</p>
+<p>For a severity comparison, use
+<code>plot(fit, type = &quot;rater_severity&quot;, diagnostics = diagnostics, draw = FALSE)</code>
+and inspect its returned <code>data</code> component with
+<code>plot_data()</code>. <code>CIUse</code>, <code>SE_Method</code> and
+<code>IntervalStatus</code> explain whether the whiskers support
+reporting, screening or further review. They are normal uncertainty
+bands; “severity profile” does not mean a likelihood-profile interval.
+Ordinary JML bands remain exploratory. Fixed values use diamonds, points
+without intervals use crosses, and unavailable estimates keep their
+rows. <code>as_ggplot()</code> preserves the saved endpoints and notes.
+Comparing two individual whiskers does not replace an interval for their
+contrast.</p>
+<p>No magnitude bands are drawn by default. Explicit
+<code>show_bands = TRUE</code> adds gray distance-from-zero guides;
+their numerical ranges are retained in the <code>Band</code> column.
+They are not homogeneity or equivalence decisions. Locations of -0.5 and
++0.5 are one logit apart even though both lie in the central range. An
+origin shift can change the ranges without changing that difference. Use
+<code>analyze_facet_equivalence()</code> with a substantively justified
+bound and eligible MML contrast uncertainty for a separate equivalence
+analysis. An insignificant difference or overlapping individual
+intervals is insufficient. Older saved plots retain their original
+colors and labels; redraw from the saved fit and matching diagnostics to
+adopt the new default.</p>
 <p>If you are working across administrations, follow up with
 anchor-drift plots:</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>drift <span class="ot">&lt;-</span> <span class="fu">detect_anchor_drift</span>(current_fit, <span class="at">baseline =</span> baseline_anchors)</span>
-<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a><span class="fu">plot_anchor_drift</span>(drift, <span class="at">type =</span> <span class="st">&quot;heatmap&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a>drift <span class="ot">&lt;-</span> <span class="fu">detect_anchor_drift</span>(current_fit, <span class="at">baseline =</span> baseline_anchors)</span>
+<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a><span class="fu">plot</span>(drift, <span class="at">type =</span> <span class="st">&quot;heatmap&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
 </div>
 <div id="residual-structure-and-interaction-screens" class="section level2">
 <h2>4. Residual structure and interaction screens</h2>
 <p>Residual PCA is a follow-up layer after the main fit screen.</p>
-<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>diag_pca <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit, <span class="at">residual_pca =</span> <span class="st">&quot;both&quot;</span>, <span class="at">pca_max_factors =</span> <span class="dv">4</span>)</span>
-<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>pca <span class="ot">&lt;-</span> <span class="fu">analyze_residual_pca</span>(diag_pca, <span class="at">mode =</span> <span class="st">&quot;both&quot;</span>)</span>
-<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a><span class="fu">plot_residual_pca</span>(pca, <span class="at">mode =</span> <span class="st">&quot;overall&quot;</span>, <span class="at">plot_type =</span> <span class="st">&quot;scree&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a>diag_pca <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit, <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>)</span>
+<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a>pca <span class="ot">&lt;-</span> <span class="fu">analyze_residual_pca</span>(diag_pca, <span class="at">mode =</span> <span class="st">&quot;both&quot;</span>, <span class="at">pca_max_factors =</span> <span class="dv">4</span>)</span>
+<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a><span class="fu">summary</span>(pca)</span>
+<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">nrow</span>(pca<span class="sc">$</span>overall_table) <span class="sc">&gt;</span> <span class="dv">0</span><span class="dt">L</span>) {</span>
+<span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a>  <span class="fu">plot</span>(pca, <span class="at">type =</span> <span class="st">&quot;residual_pca&quot;</span>, <span class="at">mode =</span> <span class="st">&quot;overall&quot;</span>, <span class="at">view =</span> <span class="st">&quot;scree&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span>
+<span id="cb20-6"><a href="#cb20-6" tabindex="-1"></a>}</span></code></pre></div>
+<p>The incomplete rating design in this example leaves some pairs
+without enough shared Persons to compute their residual correlation, so
+the overall PCA is unavailable. The summary retains the reason and any
+available facet-specific results. Inspect shared-Person counts and
+residual variation; do not replace missing correlations with zero or
+interpret the absence of a scree plot as evidence for one dimension. A
+facet-specific PCA describes its own residual matrix and cannot replace
+the unavailable overall analysis.</p>
 <p>Interpretation:</p>
 <ul>
 <li>Early components with noticeably larger eigenvalues deserve
@@ -570,34 +1175,384 @@ follow-up.</li>
 <li>Scree review should usually be paired with loading review for the
 component of interest.</li>
 </ul>
+<div id="checking-one-substantive-dimension-without-fitting-a-multidimensional-model" class="section level3">
+<h3>Checking one substantive dimension without fitting a
+multidimensional model</h3>
+<p>A single intended construct is a substantive hypothesis, not a result
+of choosing a one-dimensional estimator. Ask whether one ability
+provides a useful account of the ratings for the intended score and
+decision. Also ask whether remaining associations arise from common
+tasks, performances, assessors or category use. Several slopes do not
+create several abilities, and one ability plus a testlet effect is not
+the same hypothesis as two substantive abilities.</p>
+<p>Current diagnostic entry points are available, but there is no
+dedicated API that certifies unidimensionality or selects a latent
+dimension count:</p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Question</th>
+<th>Current mfrmr route</th>
+<th>Interpretation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Is there organized residual variation?</td>
+<td><code>analyze_residual_pca()</code> and <code>plot()</code>;
+optionally <code>parallel = TRUE</code>.</td>
+<td>Exploratory PCA of standardized residuals. The default reference
+permutes residual columns.
+<code>parallel_method = &quot;model_bootstrap&quot;</code> generates ratings and
+refits supported RSM/PCM MML models; it is not yet a calibrated
+dimensionality test.</td>
+</tr>
+<tr class="even">
+<td>Which levels have associated residuals?</td>
+<td><code>q3_statistic(fit, facet = &quot;Criterion&quot;)</code> and
+<code>plot(fit, type = &quot;local_dependence&quot;, facet = &quot;Criterion&quot;)</code>;
+use your intended facet.</td>
+<td>Standardized residuals are averaged within Person/level cells and
+correlated across shared persons. This differs from original
+raw-residual Yen Q3. Default facet Rater asks about raters, not
+automatically about rubric dimensions.</td>
+</tr>
+<tr class="odd">
+<td>Which category or rating-context margins are poorly reproduced?</td>
+<td><code>diagnose_mfrm(..., diagnostic_mode = &quot;both&quot;)</code>, then
+<code>plot(diag, type = &quot;marginal_fit&quot;)</code> or
+<code>plot(diag, type = &quot;marginal_pairwise&quot;)</code>.</td>
+<td>Descriptive marginal screens. Their scales omit parts of
+joint/calibration uncertainty; they are not a calibrated M2/C2 omnibus
+test.</td>
+</tr>
+<tr class="even">
+<td>Is a substantive two-dimensional model preferable?</td>
+<td>No native multidimensional GMFRM fitting/comparison route yet.</td>
+<td>Requires a specified alternative and comparable likelihood or
+predictive targets; PCA does not supply that comparison.</td>
+</tr>
+</tbody>
+</table>
+<p>A supported first-pass workflow, with the paired facet chosen to
+match the question, is:</p>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a>diag <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit, <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>, <span class="at">diagnostic_mode =</span> <span class="st">&quot;both&quot;</span>)</span>
+<span id="cb21-2"><a href="#cb21-2" tabindex="-1"></a>pca <span class="ot">&lt;-</span> <span class="fu">analyze_residual_pca</span>(diag, <span class="at">mode =</span> <span class="st">&quot;both&quot;</span>, <span class="at">parallel =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb21-3"><a href="#cb21-3" tabindex="-1"></a>                           <span class="at">parallel_reps =</span> <span class="dv">200</span>, <span class="at">seed =</span> <span class="dv">9028</span>)</span>
+<span id="cb21-4"><a href="#cb21-4" tabindex="-1"></a><span class="fu">summary</span>(pca)</span>
+<span id="cb21-5"><a href="#cb21-5" tabindex="-1"></a><span class="co"># Replace Criterion with the fitted facet relevant to the question.</span></span>
+<span id="cb21-6"><a href="#cb21-6" tabindex="-1"></a>q3 <span class="ot">&lt;-</span> <span class="fu">q3_statistic</span>(fit, <span class="at">diagnostics =</span> diag, <span class="at">facet =</span> <span class="st">&quot;Criterion&quot;</span>)</span>
+<span id="cb21-7"><a href="#cb21-7" tabindex="-1"></a>q3<span class="sc">$</span>pairs</span>
+<span id="cb21-8"><a href="#cb21-8" tabindex="-1"></a>q3<span class="sc">$</span>notes</span></code></pre></div>
+<p><code>plot(pca, type = &quot;scree&quot;)</code> draws the saved overall PCA;
+<code>plot(pca, type = &quot;loadings&quot;, mode = &quot;facet&quot;, facet = &quot;Criterion&quot;)</code>
+uses its saved facet analysis. Preserve the full <code>pca</code> result
+with <code>saveRDS()</code> so its reference, unavailable scopes and
+warnings accompany the figure. There is no dedicated
+<code>plot(q3)</code> method: obtain the companion heatmap from
+<code>fit</code> with the same <code>diagnostics</code>,
+<code>facet</code> and <code>min_pairs</code>, and save its draw-free
+payload. <code>as_ggplot()</code> can then convert that payload without
+recalculating residuals; <code>plot_data(p, &quot;notes&quot;)</code> retains the
+qualifications outside the figure.</p>
+<p>Two hundred permutations are an example setting, not a qualification
+threshold. Check missing comparisons, overlap counts, aggregation and
+the reported reference method before interpreting a cutoff. A small
+first component or few flags can reflect low power or restricted
+exposure. A large component does not identify its cause. Neither
+counting eigenvalues above one/two nor adding one to the number of
+residual components estimates the number of substantive abilities. The
+extended testlet/shared-rater models use their own posterior response
+diagnostics; the ordinary residual-PCA/Q3 contract is not inherited.</p>
+<p>For a supported RSM/PCM MML fit, a second reference asks:
+<strong>would similar residual structure arise when this fitted
+one-ability model generates the ratings and is estimated again?</strong>
+The Person’s generated ability is shared across their rating rows; it is
+not redrawn separately for every rating.</p>
+<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a><span class="co"># fit must be an RSM/PCM MML fit with fixed standard-normal population,</span></span>
+<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a><span class="co"># fixed quadrature, additive facets, unit weights, and no anchors or shrinkage.</span></span>
+<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a>reference <span class="ot">&lt;-</span> <span class="fu">analyze_residual_pca</span>(</span>
+<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a>  fit, <span class="at">mode =</span> <span class="st">&quot;both&quot;</span>, <span class="at">parallel =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb22-5"><a href="#cb22-5" tabindex="-1"></a>  <span class="at">parallel_method =</span> <span class="st">&quot;model_bootstrap&quot;</span>, <span class="at">parallel_reps =</span> <span class="dv">200</span>, <span class="at">seed =</span> <span class="dv">9028</span></span>
+<span id="cb22-6"><a href="#cb22-6" tabindex="-1"></a>)</span>
+<span id="cb22-7"><a href="#cb22-7" tabindex="-1"></a>reference<span class="sc">$</span>bootstrap_settings</span>
+<span id="cb22-8"><a href="#cb22-8" tabindex="-1"></a>reference<span class="sc">$</span>bootstrap_trials       <span class="co"># All attempts, including failures and warnings</span></span>
+<span id="cb22-9"><a href="#cb22-9" tabindex="-1"></a>reference<span class="sc">$</span>parallel_status        <span class="co"># Availability separately for each PCA scope</span></span>
+<span id="cb22-10"><a href="#cb22-10" tabindex="-1"></a><span class="fu">plot</span>(reference, <span class="at">type =</span> <span class="st">&quot;overall_parallel_scree&quot;</span>)</span>
+<span id="cb22-11"><a href="#cb22-11" tabindex="-1"></a><span class="co"># If the reference is available:</span></span>
+<span id="cb22-12"><a href="#cb22-12" tabindex="-1"></a><span class="co"># as_ggplot(plot(reference, type = &quot;overall_parallel_scree&quot;, draw = FALSE))</span></span></code></pre></div>
+<p>This is more expensive than permuting residuals: 200 replicates mean
+200 model refits, shared across the requested overall/facet analyses. It
+is an example, not a universal recommended budget or an error-rate
+guarantee. The method currently excludes GPCM, JML, estimated population
+models, adaptive quadrature, anchors and extended testlet/shared-rater
+fits. Generating parameters are fitted point estimates; refitting
+propagates their sampling variation under that null.</p>
+<p>The existing analyzed assignment is held fixed. Missing scores and
+unassigned ratings are not filled, so this does not test or correct a
+missingness mechanism. All source/replicate fits must pass numerical
+convergence checks. Every planned replicate is recorded; if a scope
+cannot be calculated in any replicate, its reference cutoff is withheld.
+Inspect the recorded reason instead of dropping failed replicates.
+Undefined or indefinite sparse correlation matrices remain unavailable.
+Increasing the replicate count does not repair them.</p>
+<p>The plotted cutoff is a <strong>componentwise exploratory
+reference</strong>, not a multiplicity-adjusted decision across
+components or facets. A component above it motivates investigating task
+dependence, rater effects, assignment and substantive dimensions; it
+does not identify which explanation is correct. The first component and
+an any-component rule answer different questions: one can miss a
+departure that the other flags. Choosing whichever rule looks most
+striking after viewing the results changes the decision procedure.
+General false-flag rates and sensitivity across those scenarios still
+require qualification. Q3 and residual-network references are not
+supplied by this PCA option.</p>
+<div id="shared-persons-sparse-assignment-and-the-choice-of-pca-columns" class="section level4">
+<h4>Shared Persons, sparse assignment and the choice of PCA columns</h4>
+<p>A <strong>shared Person</strong> rated by several assessors connects
+observations. A <strong>fixed parameter anchor</strong> constrains a
+parameter to a supplied numerical value. These are different uses of the
+word anchor: the model-bootstrap route supports the former through the
+retained assignment, but currently excludes the latter. No generated
+Person ability is fixed to an observed estimate.</p>
+<p>Consider four assessors. Rotating pairs R1/R2, R2/R3, R3/R4 and R4/R1
+connect all assessors, but R1/R3 and R2/R4 have no Persons in common. An
+estimable MFRM can therefore have an unavailable residual PCA across
+assessors or across combined assessor/criterion columns. A few Persons
+rated by everyone define those pairs, yet correlations based on
+different small overlaps can still produce a matrix that is not positive
+semidefinite. Neither connectedness nor one shared Person certifies that
+a residual-correlation matrix is usable.</p>
+<p>If the question concerns rubric criteria and every Person has all
+criteria, a Person-by-Criterion matrix may remain available. It averages
+residuals over the available assessors; it answers a different question
+and may conceal assessor-specific structure. Choose this aggregation for
+its scientific target, not after another analysis happens to fail:</p>
+<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a>reference<span class="sc">$</span>parallel_status</span>
+<span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a><span class="co"># For a prespecified criterion-level question, if that reference is available:</span></span>
+<span id="cb23-3"><a href="#cb23-3" tabindex="-1"></a><span class="fu">plot</span>(reference, <span class="at">type =</span> <span class="st">&quot;facet_parallel_scree&quot;</span>, <span class="at">facet =</span> <span class="st">&quot;Criterion&quot;</span>)</span></code></pre></div>
+</div>
+<div id="a-residual-block-is-not-automatically-another-substantive-ability" class="section level4">
+<h4>A residual block is not automatically another substantive
+ability</h4>
+<p>The same response distribution can sometimes have both a testlet and
+a multiple-trait interpretation. For example, with independent
+standard-normal variables, set</p>
+<p><span class="math display">\[
+z_b = \sqrt{\rho}\,\theta + \sqrt{1-\rho}\,u_b,
+\qquad b=1,2,\quad 0&lt;\rho&lt;1.
+\]</span></p>
+<p>Each block predictor has variance one and their correlation is <span class="math inline">\(\rho\)</span>. Using <span class="math inline">\(z_b\)</span> for the criteria in block <span class="math inline">\(b\)</span> gives either a shared component plus
+Person-by-block effects, or two correlated block traits with the same
+response probabilities. This equality holds for this specified
+structure; it does not equate all testlet and multidimensional models.
+The broader relationships are discussed by <a href="https://doi.org/10.1111/j.1745-3984.2010.00118.x">Rijmen
+(2010)</a>.</p>
+<p>Consequently, even an excellent residual screen cannot decide from
+these ratings alone whether the blocks represent two intended
+constructs, common performance effects or another shared influence. Task
+design, theory, external variables and additional measurements
+distinguish interpretations. A positive residual flag is evidence to
+investigate the fitted model; a small or absent flag can also reflect
+limited sensitivity. Fitting a multidimensional model is useful for a
+specified alternative, but does not automatically resolve this
+interpretation problem.</p>
+<p>Other approaches address different parts of this question:</p>
+<ul>
+<li><strong>Model-generated reference checks:</strong> simulate complete
+person response patterns under the fitted one-dimensional model,
+preserve the declared assignment/observation pattern, refit and
+recompute a prespecified residual statistic. This can assess whether the
+residual structure exceeds that expected after estimation. A
+design-specific calibrated workflow is not yet provided by the
+residual-PCA/Q3 API; more residual permutations cannot replace it. <a href="https://doi.org/10.1177/0146621616677520">Christensen, Makransky
+and Horton (2017)</a> demonstrate why a universal Q3 cutoff is
+unsuitable and discuss parametric bootstrap references. Their
+raw-residual statistic is not mfrmr’s adaptation.</li>
+<li><strong>Limited-information fit:</strong> tests such as M2/M2*/C2
+compare fitted low-order margins with observed margins. They can
+challenge a one-dimensional model without fitting a multidimensional
+alternative, but rejection is not a diagnosis of multidimensionality.
+See the <a href="https://philchalmers.github.io/mirt/docs/reference/M2.html">mirt
+M2 documentation</a> for model/category-specific availability. A valid
+many-facet adaptation must address repeated ratings, sparse opportunity
+counts and parameter uncertainty.</li>
+<li><strong>Prespecified subdomain and external-variable
+checks:</strong> examine whether person ordering, score precision or
+substantive conclusions change across theoretically defined
+task/criterion subsets. Put scores on a justified common scale and
+account for their dependence and unequal precision. A naive t-test on
+separately estimated EAPs, especially after selecting subsets from the
+same residuals, is not a calibrated dimensionality test.</li>
+<li><strong>Explicit alternative models:</strong> ordinal factor
+analysis or multidimensional IRT can compare theoretically justified
+loading structures. They require a defensible response unit and
+treatment of rater/testlet dependence. TAM or mirt can be used for
+matched structures externally; a generic factor model of averaged scores
+is not automatically an alternative fit to the same many-facet
+likelihood. Native multidimensional GMFRM is a later extension.</li>
+</ul>
+<p>Thus a multidimensional fitter is needed to estimate and compare that
+specific alternative, but <strong>it is not a prerequisite for checking
+the adequacy of the one-dimensional model</strong>. Even after fitting
+alternatives, do not assume an ordinary parameter-count chi-square test:
+a one-dimensional reduction can put a latent correlation at one or leave
+added loadings unidentified. Match scales, response events, populations
+and numerical integration, and separate exploratory model discovery from
+confirmation on new data or held-out complete units.</p>
+</div>
+</div>
+<div id="residual-networks-ega-and-the-assignment-graph-answer-different-questions" class="section level3">
+<h3>Residual networks, EGA and the assignment graph answer different
+questions</h3>
+<p>A graph consists of nodes and edges, but their meanings must be
+specified. The assignment graph records who rated what; its connectivity
+concerns linking. A score-correlation graph describes observed
+associations. A residual graph instead describes associations left after
+a fitted response model. A residual Pearson correlation edge and a
+partial-correlation edge conditional on all other residual variables are
+different estimands. None is automatically causal.</p>
+<p><a href="https://doi.org/10.1371/journal.pone.0174035">Exploratory
+Graph Analysis (EGA; Golino and Epskamp, 2017)</a> uses estimated
+networks and community detection to explore dimension structure.
+Applying the idea to fitted residuals asks about <em>remaining</em>
+structure and is not the same procedure as EGA on the original item
+responses. The existing <code>mfrm_network_analysis()</code>,
+<code>rater_network_analysis()</code> and
+<code>rater_halo_network_analysis()</code> do not implement a residual
+EGA procedure. <code>mfrm_residual_network()</code> now supplies a
+native <strong>signed correlation network</strong> and optional
+hierarchical clustering, using standardized residual means per Person
+and facet level. It is not EGA, which uses a different network and
+community estimation procedure.</p>
+<div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a><span class="co"># Reuse a fitted model and its matching diagnostics.</span></span>
+<span id="cb24-2"><a href="#cb24-2" tabindex="-1"></a>net <span class="ot">&lt;-</span> <span class="fu">mfrm_residual_network</span>(fit, <span class="at">diagnostics =</span> diag, <span class="at">facet =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
+<span id="cb24-3"><a href="#cb24-3" tabindex="-1"></a>  <span class="at">missing =</span> <span class="st">&quot;complete&quot;</span>, <span class="at">clusters =</span> <span class="dv">2</span>, <span class="at">min_abs =</span> .<span class="dv">2</span>)</span>
+<span id="cb24-4"><a href="#cb24-4" tabindex="-1"></a>net<span class="sc">$</span>settings</span>
+<span id="cb24-5"><a href="#cb24-5" tabindex="-1"></a>net<span class="sc">$</span>pairs                    <span class="co"># include unavailable pairs and shared-person N</span></span>
+<span id="cb24-6"><a href="#cb24-6" tabindex="-1"></a>net<span class="sc">$</span>person_usage             <span class="co"># complete-person inclusion, not rating-row N</span></span>
+<span id="cb24-7"><a href="#cb24-7" tabindex="-1"></a><span class="fu">plot</span>(net, <span class="at">type =</span> <span class="st">&quot;network&quot;</span>)  <span class="co"># sign/strength; circular layout is not a distance</span></span>
+<span id="cb24-8"><a href="#cb24-8" tabindex="-1"></a><span class="fu">plot</span>(net, <span class="at">type =</span> <span class="st">&quot;matrix&quot;</span>)   <span class="co"># all correlations, before the display threshold</span></span>
+<span id="cb24-9"><a href="#cb24-9" tabindex="-1"></a><span class="cf">if</span> (net<span class="sc">$</span>clustering<span class="sc">$</span>status <span class="sc">==</span> <span class="st">&quot;available&quot;</span>) <span class="fu">plot</span>(net, <span class="at">type =</span> <span class="st">&quot;dendrogram&quot;</span>)</span>
+<span id="cb24-10"><a href="#cb24-10" tabindex="-1"></a>report <span class="ot">&lt;-</span> <span class="fu">mfrm_report</span>(net)</span>
+<span id="cb24-11"><a href="#cb24-11" tabindex="-1"></a><span class="fu">export_summary_appendix</span>(report, <span class="at">output_dir =</span> <span class="st">&quot;residual-review&quot;</span>)</span>
+<span id="cb24-12"><a href="#cb24-12" tabindex="-1"></a><span class="fu">saveRDS</span>(net, <span class="st">&quot;residual-review/network.rds&quot;</span>)</span></code></pre></div>
+<p>Clustering uses <code>sqrt(2*(1-r))</code> distances between centered
+unit-length residual profiles on a common complete-person sample.
+Average or complete linkage and the supplied number of groups define an
+exploratory partition. Strong negative correlations are dissimilarity,
+not similarity by absolute value. The display threshold never changes
+the groups. Without a common usable sample or variation at every level,
+clustering is unavailable; the network retains that reason. Use
+<code>missing = &quot;pairwise&quot;</code> without clustering when pair-specific
+overlap is the intended descriptive analysis. Neither route estimates
+group stability.</p>
+<p>Random forests belong to a separately designed prediction stage. <a href="https://doi.org/10.1111/jedm.12227">Wesolowski (2019)</a> formed
+rater groups by k-means on differential-rater-functioning indices and
+then predicted those labels with random forests. Predicting exploratory
+labels does not validate latent classes. The <a href="../reference/mfrm_residual_network.html">function help</a>
+explains unsupervised learning, supervised prediction, leakage,
+resampling and why out-of-bag accuracy alone cannot validate labels
+discovered on all data.</p>
+<p>For example, residual associations among accuracy criteria across
+different tasks and assessors may motivate a second substantive-domain
+hypothesis. Associations confined to one performance may instead
+motivate a testlet model. Associations organized by assessor or
+assignment panel require review of those effects. These patterns guide
+follow-up; the graph alone cannot distinguish all competing
+explanations. Communities, centrality and edge density are not proof of
+dimensions, rater quality or an omitted causal mechanism. No edges can
+also reflect regularization or weak data rather than independence.</p>
+<p>For any residual-network workflow, specify nodes (criterion,
+task-by-criterion, or another justified unit), residual type,
+aggregation and pairwise person counts. Sparse pairwise correlations may
+be undefined or form an invalid correlation matrix. Do not encode
+unassigned cells as zero, treat a missing edge as a zero association, or
+silently repair a matrix and then claim the same estimand. Record
+regularization and community choices; examine edge and community
+stability with resampling appropriate to the shared effects. A single
+nominal sample size can misrepresent strongly unequal pair overlap.</p>
+<p><a href="https://r-ega.net/reference/bootEGA.html">bootEGA</a> offers
+network/dimension stability analyses, but applying it to a fixed
+residual matrix does not propagate uncertainty from fitting the MFRM.
+Its empirical-correlation bootstrap is not a one-dimensional MFRM null
+simulation. Finally, <a href="https://doi.org/10.1007/s11336-017-9557-x">residual network
+modeling (Epskamp, Rhemtulla and Borsboom, 2017)</a> models residual
+dependencies jointly with latent variables. Drawing a graph from fitted
+residuals does not fit such a joint model or produce its likelihood. A
+future mfrmr network view should reuse the checked residual/overlap
+outputs and provide a signed heatmap/table alongside the network, with
+the same edge values and uncertainty. It should remain exploratory until
+its statistical reference is qualified.</p>
 <p>For interaction screening, use the packaged bias example.</p>
-<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>bias_df <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_bias&quot;</span>)</span>
-<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a></span>
-<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>fit_bias <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
-<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>  bias_df,</span>
-<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
-<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
-<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
-<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
-<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">7</span></span>
-<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a>)</span>
-<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a></span>
-<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a>diag_bias <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit_bias, <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>)</span>
-<span id="cb12-14"><a href="#cb12-14" tabindex="-1"></a>bias <span class="ot">&lt;-</span> <span class="fu">estimate_bias</span>(fit_bias, diag_bias, <span class="at">facet_a =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">facet_b =</span> <span class="st">&quot;Criterion&quot;</span>)</span>
-<span id="cb12-15"><a href="#cb12-15" tabindex="-1"></a></span>
-<span id="cb12-16"><a href="#cb12-16" tabindex="-1"></a><span class="fu">plot_bias_interaction</span>(</span>
-<span id="cb12-17"><a href="#cb12-17" tabindex="-1"></a>  bias,</span>
-<span id="cb12-18"><a href="#cb12-18" tabindex="-1"></a>  <span class="at">plot =</span> <span class="st">&quot;facet_profile&quot;</span>,</span>
-<span id="cb12-19"><a href="#cb12-19" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
-<span id="cb12-20"><a href="#cb12-20" tabindex="-1"></a>)</span></code></pre></div>
+<p>Here <strong>bias</strong> means an additional departure for a
+particular combination, such as one judge scoring Content, after
+accounting for the fitted baseline. It is distinct from overall rater
+severity or proof of unfairness. A positive <code>Bias Size</code>
+increases expected coded scores; with high-is-good scoring this favors
+the combination, whereas a positive default Rater severity reduces
+scores. Reverse-coded rubrics reverse that substantive interpretation.
+The profile below uses mean <strong>absolute</strong> bias, so it
+describes magnitude; inspect signed rows in <code>bias$table</code> to
+see direction. Its uncertainty holds the baseline calibration fixed.</p>
+<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" tabindex="-1"></a>bias_df <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_bias&quot;</span>)</span>
+<span id="cb25-2"><a href="#cb25-2" tabindex="-1"></a></span>
+<span id="cb25-3"><a href="#cb25-3" tabindex="-1"></a>fit_bias <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb25-4"><a href="#cb25-4" tabindex="-1"></a>  bias_df,</span>
+<span id="cb25-5"><a href="#cb25-5" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb25-6"><a href="#cb25-6" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb25-7"><a href="#cb25-7" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb25-8"><a href="#cb25-8" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
+<span id="cb25-9"><a href="#cb25-9" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
+<span id="cb25-10"><a href="#cb25-10" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">7</span></span>
+<span id="cb25-11"><a href="#cb25-11" tabindex="-1"></a>)</span>
+<span id="cb25-12"><a href="#cb25-12" tabindex="-1"></a></span>
+<span id="cb25-13"><a href="#cb25-13" tabindex="-1"></a>diag_bias <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit_bias, <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>)</span>
+<span id="cb25-14"><a href="#cb25-14" tabindex="-1"></a>bias <span class="ot">&lt;-</span> <span class="fu">estimate_bias</span>(fit_bias, diag_bias, <span class="at">facet_a =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">facet_b =</span> <span class="st">&quot;Criterion&quot;</span>)</span>
+<span id="cb25-15"><a href="#cb25-15" tabindex="-1"></a></span>
+<span id="cb25-16"><a href="#cb25-16" tabindex="-1"></a>bias_figure <span class="ot">&lt;-</span> <span class="fu">plot</span>(bias, <span class="at">type =</span> <span class="st">&quot;bias&quot;</span>, <span class="at">view =</span> <span class="st">&quot;facet_profile&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
+<p>The definition, sign, magnitude-only profile and uncertainty
+qualifications are retained in
+<code>plot_data(bias_figure, &quot;notes&quot;)</code> and shown by
+<code>print(bias_figure)</code>.</p>
 <p>Interpretation:</p>
 <ul>
 <li>Facet profiles are useful for seeing whether a small number of
 levels drives most flagged interaction cells.</li>
-<li>Treat these plots as screening evidence; confirm with the
-corresponding tables and narrative reports.</li>
+<li>Treat these plots as screening evidence and inspect the
+corresponding tables, cell counts and calibration limitations. Several
+views of the same estimates are not independent confirmation of
+bias.</li>
 </ul>
+<p>For repeat plotting, save
+<code>bias_interaction_report(bias, ...)</code> after choosing the
+review thresholds. <code>plot(result, type = &quot;scatter&quot;)</code> compares
+the observed-minus-expected score average with conditional bias in
+logits; <code>type = &quot;ranked&quot;</code> shows saved interaction estimates.
+These two views support <code>as_ggplot()</code>, including conditional
+bounds when <code>show_ci = TRUE</code>. They hold calibration fixed.
+The other bias views use base or custom graphics.</p>
+<p>Rater centrality and halo have different targets.
+<code>rater_centrality_table()</code> returns indirect indices in a
+plain list; save the list and review source status and unavailable-index
+reasons alongside its data frames.
+<code>rater_halo_network_analysis()</code> returns observed-score
+profile correlations. Its <code>edge_distribution</code>, selected
+<code>halo_summary</code> metric and retained-edge <code>matrix</code>
+views support <code>as_ggplot()</code>; use base graphics for the
+network. Save the whole halo result to retain its pair counts, edge
+filters and caveats. Neither result is automatically added to an
+aggregate <code>mfrm_report()</code>. These views do not distinguish
+halo from horn effects: a negative impression can lower several
+criterion ratings together without creating a negative correlation. For
+a beginner explanation of severity, centrality, halo/horn and local
+dependence, see <code>help(&quot;mfrmr_methods_reference&quot;)</code>.</p>
+</div>
 </div>
 <div id="custom-figures-without-losing-the-evidence-boundary" class="section level2">
 <h2>5. Custom figures without losing the evidence boundary</h2>
@@ -607,29 +1562,150 @@ or print workflow needs grayscale output. For journal figures, teaching
 material, dashboards, or lab-specific styles, use
 <code>draw = FALSE</code> and the plot-data accessors instead of editing
 screenshots.</p>
-<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="fu">plot</span>(fit, <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;monochrome&quot;</span>)</span>
-<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a></span>
-<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>wright_payload <span class="ot">&lt;-</span> <span class="fu">plot</span>(fit, <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>, <span class="at">draw =</span> <span class="cn">FALSE</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span>
-<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a><span class="fu">plot_data_components</span>(wright_payload)</span>
-<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a></span>
-<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a>locations <span class="ot">&lt;-</span> <span class="fu">plot_data</span>(wright_payload, <span class="at">component =</span> <span class="st">&quot;locations&quot;</span>)</span>
-<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a><span class="fu">head</span>(locations)</span>
-<span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a></span>
-<span id="cb13-9"><a href="#cb13-9" tabindex="-1"></a>pathway_long <span class="ot">&lt;-</span> <span class="fu">plot_data</span>(</span>
-<span id="cb13-10"><a href="#cb13-10" tabindex="-1"></a>  fit,</span>
-<span id="cb13-11"><a href="#cb13-11" tabindex="-1"></a>  <span class="at">type =</span> <span class="st">&quot;pathway&quot;</span>,</span>
-<span id="cb13-12"><a href="#cb13-12" tabindex="-1"></a>  <span class="at">component =</span> <span class="st">&quot;pathway_long&quot;</span>,</span>
-<span id="cb13-13"><a href="#cb13-13" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
-<span id="cb13-14"><a href="#cb13-14" tabindex="-1"></a>)</span>
-<span id="cb13-15"><a href="#cb13-15" tabindex="-1"></a><span class="fu">head</span>(pathway_long[, <span class="fu">c</span>(<span class="st">&quot;Layer&quot;</span>, <span class="st">&quot;CurveGroup&quot;</span>, <span class="st">&quot;Theta&quot;</span>, <span class="st">&quot;Value&quot;</span>)])</span></code></pre></div>
+<div class="sourceCode" id="cb26"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" tabindex="-1"></a><span class="fu">plot</span>(fit, <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;monochrome&quot;</span>)</span>
+<span id="cb26-2"><a href="#cb26-2" tabindex="-1"></a></span>
+<span id="cb26-3"><a href="#cb26-3" tabindex="-1"></a>wright_payload <span class="ot">&lt;-</span> <span class="fu">plot</span>(fit, <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>, <span class="at">draw =</span> <span class="cn">FALSE</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span>
+<span id="cb26-4"><a href="#cb26-4" tabindex="-1"></a><span class="fu">plot_data_components</span>(wright_payload)</span>
+<span id="cb26-5"><a href="#cb26-5" tabindex="-1"></a></span>
+<span id="cb26-6"><a href="#cb26-6" tabindex="-1"></a>locations <span class="ot">&lt;-</span> <span class="fu">plot_data</span>(wright_payload, <span class="at">component =</span> <span class="st">&quot;locations&quot;</span>)</span>
+<span id="cb26-7"><a href="#cb26-7" tabindex="-1"></a><span class="fu">head</span>(locations)</span>
+<span id="cb26-8"><a href="#cb26-8" tabindex="-1"></a></span>
+<span id="cb26-9"><a href="#cb26-9" tabindex="-1"></a>pathway_long <span class="ot">&lt;-</span> <span class="fu">plot_data</span>(</span>
+<span id="cb26-10"><a href="#cb26-10" tabindex="-1"></a>  fit,</span>
+<span id="cb26-11"><a href="#cb26-11" tabindex="-1"></a>  <span class="at">type =</span> <span class="st">&quot;pathway&quot;</span>,</span>
+<span id="cb26-12"><a href="#cb26-12" tabindex="-1"></a>  <span class="at">component =</span> <span class="st">&quot;pathway_long&quot;</span>,</span>
+<span id="cb26-13"><a href="#cb26-13" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
+<span id="cb26-14"><a href="#cb26-14" tabindex="-1"></a>)</span>
+<span id="cb26-15"><a href="#cb26-15" tabindex="-1"></a><span class="fu">head</span>(pathway_long[, <span class="fu">c</span>(<span class="st">&quot;Layer&quot;</span>, <span class="st">&quot;CurveGroup&quot;</span>, <span class="st">&quot;Theta&quot;</span>, <span class="st">&quot;Value&quot;</span>)])</span></code></pre></div>
 <p>When you build a custom figure, keep the helper’s guidance tables
 with the plot data:</p>
-<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="fu">names</span>(wright_payload<span class="sc">$</span>data)</span>
-<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>wright_payload<span class="sc">$</span>data<span class="sc">$</span>reference_lines</span></code></pre></div>
+<div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" tabindex="-1"></a><span class="fu">names</span>(wright_payload<span class="sc">$</span>data)</span>
+<span id="cb27-2"><a href="#cb27-2" tabindex="-1"></a>wright_payload<span class="sc">$</span>data<span class="sc">$</span>reference_lines</span></code></pre></div>
 <p>Those metadata are the guardrails for captions and interpretation.
 They let you change colors, labels, panels, or rendering technology
 while preserving the same measurement scale, reference lines, caveats,
 and reporting role used by the package-native plot.</p>
+<div id="save-a-figure-with-its-values-and-notes" class="section level3">
+<h3>Save a figure with its values and notes</h3>
+<p>Saving only a PNG loses the underlying values and interpretation
+notes. Save the complete returned object as well. This example uses a
+temporary filename; choose a project filename to keep it beyond this R
+session. Keep the rubric alongside the plot: the labels below are the
+illustrative labels used earlier, not wording that mfrmr inferred from
+the scores. Use your actual rubric wording.</p>
+<div class="sourceCode" id="cb28"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" tabindex="-1"></a>figure_file <span class="ot">&lt;-</span> <span class="fu">tempfile</span>(<span class="at">fileext =</span> <span class="st">&quot;.rds&quot;</span>)</span>
+<span id="cb28-2"><a href="#cb28-2" tabindex="-1"></a>figure_record <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">plot =</span> wright,</span>
+<span id="cb28-3"><a href="#cb28-3" tabindex="-1"></a>  <span class="at">rubric =</span> <span class="fu">c</span>(<span class="st">`</span><span class="at">1</span><span class="st">`</span> <span class="ot">=</span> <span class="st">&quot;Beginning&quot;</span>, <span class="st">`</span><span class="at">2</span><span class="st">`</span> <span class="ot">=</span> <span class="st">&quot;Developing&quot;</span>, <span class="st">`</span><span class="at">3</span><span class="st">`</span> <span class="ot">=</span> <span class="st">&quot;Secure&quot;</span>, <span class="st">`</span><span class="at">4</span><span class="st">`</span> <span class="ot">=</span> <span class="st">&quot;Advanced&quot;</span>))</span>
+<span id="cb28-4"><a href="#cb28-4" tabindex="-1"></a><span class="fu">saveRDS</span>(figure_record, figure_file)</span>
+<span id="cb28-5"><a href="#cb28-5" tabindex="-1"></a>saved_record <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(figure_file)</span>
+<span id="cb28-6"><a href="#cb28-6" tabindex="-1"></a>saved_figure <span class="ot">&lt;-</span> saved_record<span class="sc">$</span>plot</span>
+<span id="cb28-7"><a href="#cb28-7" tabindex="-1"></a>saved_record<span class="sc">$</span>rubric</span>
+<span id="cb28-8"><a href="#cb28-8" tabindex="-1"></a><span class="fu">print</span>(saved_figure)</span>
+<span id="cb28-9"><a href="#cb28-9" tabindex="-1"></a><span class="fu">identical</span>(<span class="fu">plot_data</span>(saved_figure, <span class="st">&quot;locations&quot;</span>), <span class="fu">plot_data</span>(wright, <span class="st">&quot;locations&quot;</span>))</span></code></pre></div>
+<p>For the supported Wright-map conversion, redraw the saved values
+without refitting or recalculating uncertainty:</p>
+<div class="sourceCode" id="cb29"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" tabindex="-1"></a><span class="fu">as_ggplot</span>(saved_figure)</span></code></pre></div>
+<p><code>as_ggplot()</code> requires the optional ggplot2 package. Save
+the fit and matching diagnostics too if you want to choose a different
+analysis view later. The plot guide above distinguishes dedicated
+conversions, different table-based views and plots without automatic
+conversion. This example does not promise the same layout for every
+renderer or conversion of every plot family.</p>
+</div>
+<div id="set-an-appearance-once-for-several-plots" class="section level3">
+<h3>Set an appearance once for several plots</h3>
+<p>Use <code>options(mfrmr.plot_preset = &quot;monochrome&quot;)</code> to set a
+common default in the development version. This example restores the
+previous option when it ends:</p>
+<div class="sourceCode" id="cb30"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" tabindex="-1"></a><span class="fu">local</span>({</span>
+<span id="cb30-2"><a href="#cb30-2" tabindex="-1"></a>  old <span class="ot">&lt;-</span> <span class="fu">options</span>(<span class="at">mfrmr.plot_preset =</span> <span class="st">&quot;monochrome&quot;</span>)</span>
+<span id="cb30-3"><a href="#cb30-3" tabindex="-1"></a>  <span class="fu">on.exit</span>(<span class="fu">options</span>(old))</span>
+<span id="cb30-4"><a href="#cb30-4" tabindex="-1"></a>  saved <span class="ot">&lt;-</span> <span class="fu">plot</span>(fit, <span class="at">type =</span> <span class="st">&quot;ccc&quot;</span>, <span class="at">draw =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb30-5"><a href="#cb30-5" tabindex="-1"></a>  special <span class="ot">&lt;-</span> <span class="fu">plot</span>(fit, <span class="at">type =</span> <span class="st">&quot;ccc&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>, <span class="at">draw =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb30-6"><a href="#cb30-6" tabindex="-1"></a>  <span class="fu">c</span>(<span class="at">session_default =</span> saved<span class="sc">$</span>data<span class="sc">$</span>preset, <span class="at">explicit_override =</span> special<span class="sc">$</span>data<span class="sc">$</span>preset)</span>
+<span id="cb30-7"><a href="#cb30-7" tabindex="-1"></a>})</span></code></pre></div>
+<p>The choices are <code>&quot;standard&quot;</code>, <code>&quot;publication&quot;</code>,
+<code>&quot;compact&quot;</code> and <code>&quot;monochrome&quot;</code>. Explicit
+<code>preset</code> wins over the option; omitting both retains
+<code>&quot;standard&quot;</code>. Explicit <code>preset = NULL</code> also
+selects the package default. Remove the session setting with
+<code>options(mfrmr.plot_preset = NULL)</code>.</p>
+<p>A supported <code>as_ggplot(saved)</code> conversion uses the saved
+preset, whereas a new <code>plot(fit, ...)</code> call uses the current
+option. Set the option in a script or use explicit arguments to
+reproduce its appearance in another session. This applies to the common
+preset controls, including category, coverage and network report plots.
+Extended-model plots with separate <code>palette</code> controls retain
+their own settings. It does not change estimates, confidence levels,
+screening thresholds or the user’s global ggplot theme.</p>
+</div>
+<div id="use-a-common-title-argument" class="section level3">
+<h3>Use a common title argument</h3>
+<p>In the development version, eight existing helpers accept
+<code>title</code>: <code>plot()</code>, <code>plot()</code>,
+<code>plot()</code>, <code>plot()</code>, <code>plot()</code>,
+<code>plot()</code>, <code>plot()</code> and <code>plot()</code>.</p>
+<div class="sourceCode" id="cb31"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" tabindex="-1"></a>plain <span class="ot">&lt;-</span> <span class="fu">plot</span>(fit, <span class="at">type =</span> <span class="st">&quot;bubble&quot;</span>, <span class="at">diagnostics =</span> diag, <span class="at">view =</span> <span class="st">&quot;infit_outfit&quot;</span>, <span class="at">title =</span> <span class="cn">NULL</span>, <span class="at">preset =</span> <span class="st">&quot;monochrome&quot;</span>, <span class="at">draw =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb31-2"><a href="#cb31-2" tabindex="-1"></a><span class="fu">as_ggplot</span>(plain)</span>
+<span id="cb31-3"><a href="#cb31-3" tabindex="-1"></a><span class="co"># Reuse the saved values, screening references and interval settings.</span></span>
+<span id="cb31-4"><a href="#cb31-4" tabindex="-1"></a>plain<span class="sc">$</span>data<span class="sc">$</span>reference_lines</span></code></pre></div>
+<p>Omit <code>title</code> for the default heading, supply
+<code>title = &quot;Scoring patterns&quot;</code> to replace it, or use
+<code>title = NULL</code> (or <code>&quot;&quot;</code>) to hide it. This does not
+remove subtitles, legends, screening settings or interpretation notes.
+The dashboard method also accepts
+<code>plot(dashboard, title = NULL)</code>. Keep review-only limitations
+in the figure caption or accompanying report if its heading is
+hidden.</p>
+<p>Existing <code>main</code> calls and positional arguments still work
+without deprecation warnings. <code>main = NULL</code> retains its
+earlier meaning of “use the default heading”. Do not supply both
+<code>main</code> and <code>title</code>, even with the same value.
+These aliases do not imply that every plot has an
+<code>as_ggplot()</code> converter; consult
+<code>mfrmr_output_guide(&quot;plots&quot;)</code> for the supported route.</p>
+</div>
+<div id="fair-scores-and-annotations-outside-the-figure" class="section level3">
+<h3>Fair Scores and annotations outside the figure</h3>
+<p>Use <code>view = &quot;measure&quot;</code> to relate measures to fair scores,
+<code>&quot;scatter&quot;</code> to compare observed and fair scores, or
+<code>&quot;difference&quot;</code> to rank their gaps. FairM uses mean reference
+measures; FairZ uses zero reference measures. FairZ is an expected score
+on the internal score scale, not a z-score. Observed-minus-fair gaps
+also reflect assignment and person mix, so they do not by themselves
+establish rater bias.</p>
+<div class="sourceCode" id="cb32"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" tabindex="-1"></a>p_fair <span class="ot">&lt;-</span> <span class="fu">plot</span>(fit, <span class="at">type =</span> <span class="st">&quot;fair_average&quot;</span>, <span class="at">diagnostics =</span> diag, <span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">metric =</span> <span class="st">&quot;FairZ&quot;</span>, <span class="at">view =</span> <span class="st">&quot;measure&quot;</span>, <span class="at">show_ci =</span> <span class="cn">TRUE</span>, <span class="at">preset =</span> <span class="st">&quot;monochrome&quot;</span>, <span class="at">show_title =</span> <span class="cn">FALSE</span>, <span class="at">show_notes =</span> <span class="cn">FALSE</span>, <span class="at">draw =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb32-2"><a href="#cb32-2" tabindex="-1"></a>p_fair<span class="sc">$</span>data<span class="sc">$</span>notes</span>
+<span id="cb32-3"><a href="#cb32-3" tabindex="-1"></a>p_fair<span class="sc">$</span>data<span class="sc">$</span>plot_data</span>
+<span id="cb32-4"><a href="#cb32-4" tabindex="-1"></a>p_fair<span class="sc">$</span>data<span class="sc">$</span>excluded</span>
+<span id="cb32-5"><a href="#cb32-5" tabindex="-1"></a><span class="co"># Requires ggplot2:</span></span>
+<span id="cb32-6"><a href="#cb32-6" tabindex="-1"></a>g_fair <span class="ot">&lt;-</span> <span class="fu">as_ggplot</span>(p_fair)</span>
+<span id="cb32-7"><a href="#cb32-7" tabindex="-1"></a>g_fair</span>
+<span id="cb32-8"><a href="#cb32-8" tabindex="-1"></a><span class="fu">attr</span>(g_fair, <span class="st">&quot;mfrmr_notes&quot;</span>)</span></code></pre></div>
+<p>Use <code>draw = TRUE</code> to draw the base-R version. Titles and
+notes remain in the returned object when hidden in the figure. The same
+annotation controls apply to Wright, expected-score pathway, and CCC
+plots; they do not change readiness or interval eligibility. Keep the
+applicable notes in the surrounding caption or report. Other plotting
+helpers have their own documented options.</p>
+<p>Fair-score intervals remain diagnostic-only
+(<code>CI_Eligible = FALSE</code>), with full-refit coverage unverified.
+RSM/PCM plots propagate only the focal measure SE, holding thresholds
+and reference measures fixed; they require a fitted model, not just a
+stored fair-average bundle. GPCM-MML plots use available structural
+delta-method SEs for non-Person rows, conditioning on Person
+EAP/reference means. The table option <code>fair_se = TRUE</code>
+supplies the GPCM route, not RSM/PCM fair-score SEs. Historical table
+<code>SE</code> columns describe measures. Difference-view whiskers hold
+observed means fixed and are not confidence intervals for the
+observed-minus-fair gap.</p>
+<p>Expected-score and CCC curves use six line types: solid, dashed,
+dotted, dotdash, longdash, and twodash. Fair-score plots use six point
+shapes. These encodings repeat for larger sets; select facets or use
+panels to keep a grayscale figure readable. Check labels and line
+separation at the intended output size rather than relying on color or
+gray levels alone.</p>
+</div>
 </div>
 <div id="secondary-visual-layer" class="section level2">
 <h2>6. Secondary visual layer</h2>
@@ -637,33 +1713,56 @@ and reporting role used by the package-native plot.</p>
 diagnostic follow-up. These helpers are not default reporting figures;
 use them after the main screens above.</p>
 <ul>
-<li><code>plot_guttman_scalogram(fit, diagnostics)</code> renders a
-person x facet-level response matrix with an unexpected-response
-overlay, for teaching-oriented scalogram intuition and local
-triage.</li>
-<li><code>plot_residual_qq(fit, diagnostics)</code> plots a Normal Q-Q
-of person-level standardized residual aggregates as exploratory
-follow-up on residual tail behavior.</li>
-<li><code>plot_rater_trajectory(list(T1 = fit_a, T2 = fit_b))</code>
+<li><code>plot(fit, type = &quot;guttman&quot;, diagnostics = diagnostics)</code>
+renders a person x facet-level response matrix with an
+unexpected-response overlay, for teaching-oriented scalogram intuition
+and local triage.</li>
+<li><code>plot(fit, type = &quot;residual_qq&quot;, diagnostics = diagnostics)</code>
+plots a Normal Q-Q of person-level standardized residual aggregates as
+exploratory follow-up on residual tail behavior.</li>
+<li><code>plot(fit_a, type = &quot;trajectory&quot;, comparison = list(T2 = fit_b), labels = c(&quot;T1&quot;, &quot;T2&quot;))</code>
 tracks rater severity across named waves. The helper does not perform
 linking; supply waves that have already been placed on a common anchored
 scale (see <code>vignette(&quot;mfrmr-linking-and-dff&quot;)</code>) before
 interpreting movement as rater drift.</li>
-<li><code>plot_rater_agreement_heatmap(fit, diagnostics)</code> renders
-a compact pairwise rater x rater agreement matrix; pass
+<li><code>plot(fit, type = &quot;agreement&quot;, view = &quot;heatmap&quot;, diagnostics = diagnostics)</code>
+renders a compact pairwise rater x rater agreement matrix; pass
 <code>metric = &quot;correlation&quot;</code> to colour by the Pearson-style
 <code>Corr</code> column instead of exact agreement.</li>
 <li><code>response_time_review(data, person, facets, time)</code>
 summarizes response-time metadata by person, facet, and score category.
-Pair it with <code>plot_response_time_review()</code> for distribution
-and grouped timing plots. This is a descriptive QC layer, not a joint
-speed-accuracy model.</li>
-<li><code>plot_shrinkage_funnel(fit_eb, show_ci = TRUE)</code> draws raw
-and empirical-Bayes shrunken facet estimates on the same row, with
-optional confidence whiskers for both estimates. Use this only after
-<code>apply_empirical_bayes_shrinkage()</code> or
+Pair it with <code>plot()</code> for distribution and grouped timing
+plots. This is a descriptive QC layer, not a joint speed-accuracy
+model.</li>
+<li><code>plot(fit_eb, type = &quot;shrinkage&quot;, view = &quot;funnel&quot;, show_ci = TRUE)</code>
+draws raw and empirical-Bayes shrunken facet estimates on the same row,
+with optional confidence whiskers for both estimates. Use this only
+after <code>apply_empirical_bayes_shrinkage()</code> or
 <code>fit_mfrm(..., facet_shrinkage = &quot;empirical_bayes&quot;)</code>.</li>
 </ul>
+<div id="save-the-agreement-result-and-its-review-rules" class="section level3">
+<h3>Save the agreement result and its review rules</h3>
+<p>Keep the agreement table when drawing several views. Its
+matched-context counts and saved thresholds explain the figure;
+correlation describes score ordering, while exact agreement describes
+equal scores. Neither supplies an automatic rater-quality decision.
+Model-expected agreement is a fitted-model baseline, not chance
+agreement.</p>
+<div class="sourceCode" id="cb33"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" tabindex="-1"></a>agreement <span class="ot">&lt;-</span> <span class="fu">interrater_agreement_table</span>(fit, <span class="at">diagnostics =</span> diag, <span class="at">rater_facet =</span> <span class="st">&quot;Rater&quot;</span>)</span>
+<span id="cb33-2"><a href="#cb33-2" tabindex="-1"></a>p_agreement <span class="ot">&lt;-</span> <span class="fu">plot</span>(agreement)</span>
+<span id="cb33-3"><a href="#cb33-3" tabindex="-1"></a><span class="co"># Alternative saved view: plot(agreement, type = &quot;agreement&quot;, metric = &quot;correlation&quot;)</span></span>
+<span id="cb33-4"><a href="#cb33-4" tabindex="-1"></a><span class="co"># Optional ggplot conversion: as_ggplot(p_agreement)</span></span></code></pre></div>
+<p>Save <code>agreement</code> with <code>saveRDS()</code> to choose
+another pair view after reopening, or save <code>p_agreement</code> to
+retain the selected view and its appearance. Inspect
+<code>plot_data(p_agreement, &quot;notes&quot;)</code> for the qualifications
+outside the figure. Bar colors follow the combined exact/correlation
+flag, so a bar above its displayed threshold can still be flagged by the
+other rule. To change the rules, recreate <code>agreement</code> from
+the existing fit with explicit <code>exact_warn</code> and
+<code>corr_warn</code>; changing a reference line alone would contradict
+the flags.</p>
+</div>
 <div id="response-time-qc-context" class="section level3">
 <h3>Response-time QC context</h3>
 <p>If your rating-event data include response times, review them
@@ -671,25 +1770,25 @@ separately from the MFRM likelihood. Rapid and slow response-time flags
 are descriptive quality-control prompts; they do not change measures and
 should not be treated as proof of disengagement, cheating, or
 speededness.</p>
-<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>toy_rt <span class="ot">&lt;-</span> toy</span>
-<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>toy_rt<span class="sc">$</span>ResponseTime <span class="ot">&lt;-</span> <span class="dv">12</span> <span class="sc">+</span> (<span class="fu">seq_len</span>(<span class="fu">nrow</span>(toy_rt)) <span class="sc">%%</span> <span class="dv">7</span>) <span class="sc">+</span></span>
-<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a>  <span class="fu">as.numeric</span>(toy_rt<span class="sc">$</span>Score)</span>
-<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a>toy_rt<span class="sc">$</span>ResponseTime[<span class="dv">1</span>] <span class="ot">&lt;-</span> <span class="dv">2</span></span>
-<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a>toy_rt<span class="sc">$</span>ResponseTime[<span class="dv">2</span>] <span class="ot">&lt;-</span> <span class="dv">38</span></span>
-<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a></span>
-<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a>rt <span class="ot">&lt;-</span> <span class="fu">response_time_review</span>(</span>
-<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a>  toy_rt,</span>
-<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
-<span id="cb15-10"><a href="#cb15-10" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
-<span id="cb15-11"><a href="#cb15-11" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb15-12"><a href="#cb15-12" tabindex="-1"></a>  <span class="at">time =</span> <span class="st">&quot;ResponseTime&quot;</span>,</span>
-<span id="cb15-13"><a href="#cb15-13" tabindex="-1"></a>  <span class="at">rapid_quantile =</span> <span class="fl">0.10</span>,</span>
-<span id="cb15-14"><a href="#cb15-14" tabindex="-1"></a>  <span class="at">slow_quantile =</span> <span class="fl">0.90</span></span>
-<span id="cb15-15"><a href="#cb15-15" tabindex="-1"></a>)</span>
-<span id="cb15-16"><a href="#cb15-16" tabindex="-1"></a></span>
-<span id="cb15-17"><a href="#cb15-17" tabindex="-1"></a><span class="fu">summary</span>(rt)</span>
-<span id="cb15-18"><a href="#cb15-18" tabindex="-1"></a><span class="fu">plot_response_time_review</span>(rt, <span class="at">type =</span> <span class="st">&quot;distribution&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span>
-<span id="cb15-19"><a href="#cb15-19" tabindex="-1"></a><span class="fu">plot_response_time_review</span>(rt, <span class="at">type =</span> <span class="st">&quot;person&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb34"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" tabindex="-1"></a>toy_rt <span class="ot">&lt;-</span> toy</span>
+<span id="cb34-2"><a href="#cb34-2" tabindex="-1"></a>toy_rt<span class="sc">$</span>ResponseTime <span class="ot">&lt;-</span> <span class="dv">12</span> <span class="sc">+</span> (<span class="fu">seq_len</span>(<span class="fu">nrow</span>(toy_rt)) <span class="sc">%%</span> <span class="dv">7</span>) <span class="sc">+</span></span>
+<span id="cb34-3"><a href="#cb34-3" tabindex="-1"></a>  <span class="fu">as.numeric</span>(toy_rt<span class="sc">$</span>Score)</span>
+<span id="cb34-4"><a href="#cb34-4" tabindex="-1"></a>toy_rt<span class="sc">$</span>ResponseTime[<span class="dv">1</span>] <span class="ot">&lt;-</span> <span class="dv">2</span></span>
+<span id="cb34-5"><a href="#cb34-5" tabindex="-1"></a>toy_rt<span class="sc">$</span>ResponseTime[<span class="dv">2</span>] <span class="ot">&lt;-</span> <span class="dv">38</span></span>
+<span id="cb34-6"><a href="#cb34-6" tabindex="-1"></a></span>
+<span id="cb34-7"><a href="#cb34-7" tabindex="-1"></a>rt <span class="ot">&lt;-</span> <span class="fu">response_time_review</span>(</span>
+<span id="cb34-8"><a href="#cb34-8" tabindex="-1"></a>  toy_rt,</span>
+<span id="cb34-9"><a href="#cb34-9" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb34-10"><a href="#cb34-10" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb34-11"><a href="#cb34-11" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb34-12"><a href="#cb34-12" tabindex="-1"></a>  <span class="at">time =</span> <span class="st">&quot;ResponseTime&quot;</span>,</span>
+<span id="cb34-13"><a href="#cb34-13" tabindex="-1"></a>  <span class="at">rapid_quantile =</span> <span class="fl">0.10</span>,</span>
+<span id="cb34-14"><a href="#cb34-14" tabindex="-1"></a>  <span class="at">slow_quantile =</span> <span class="fl">0.90</span></span>
+<span id="cb34-15"><a href="#cb34-15" tabindex="-1"></a>)</span>
+<span id="cb34-16"><a href="#cb34-16" tabindex="-1"></a></span>
+<span id="cb34-17"><a href="#cb34-17" tabindex="-1"></a><span class="fu">summary</span>(rt)</span>
+<span id="cb34-18"><a href="#cb34-18" tabindex="-1"></a><span class="fu">plot</span>(rt, <span class="at">type =</span> <span class="st">&quot;distribution&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span>
+<span id="cb34-19"><a href="#cb34-19" tabindex="-1"></a><span class="fu">plot</span>(rt, <span class="at">type =</span> <span class="st">&quot;person&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
 <p>Interpretation:</p>
 <ul>
 <li>Start with the distribution plot to see whether the rapid/slow
@@ -708,28 +1807,17 @@ large raw severity estimate can be a noisy estimate rather than a stable
 facet signal. The shrinkage funnel shows how far empirical-Bayes pooling
 moved each level toward the facet mean and whether the uncertainty
 remains wide after pooling.</p>
-<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>fit_eb <span class="ot">&lt;-</span> <span class="fu">apply_empirical_bayes_shrinkage</span>(fit)</span>
-<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a></span>
-<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a>shrink <span class="ot">&lt;-</span> <span class="fu">plot_shrinkage_funnel</span>(</span>
-<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a>  fit_eb,</span>
-<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a>  <span class="at">show_ci =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a>  <span class="at">ci_level =</span> <span class="fl">0.95</span>,</span>
-<span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>,</span>
-<span id="cb16-8"><a href="#cb16-8" tabindex="-1"></a>  <span class="at">draw =</span> <span class="cn">FALSE</span></span>
-<span id="cb16-9"><a href="#cb16-9" tabindex="-1"></a>)</span>
-<span id="cb16-10"><a href="#cb16-10" tabindex="-1"></a></span>
-<span id="cb16-11"><a href="#cb16-11" tabindex="-1"></a><span class="fu">head</span>(shrink<span class="sc">$</span>data<span class="sc">$</span>table[, <span class="fu">c</span>(</span>
-<span id="cb16-12"><a href="#cb16-12" tabindex="-1"></a>  <span class="st">&quot;Facet&quot;</span>, <span class="st">&quot;Level&quot;</span>, <span class="st">&quot;RawEstimate&quot;</span>, <span class="st">&quot;RawCI_Lower&quot;</span>, <span class="st">&quot;RawCI_Upper&quot;</span>,</span>
-<span id="cb16-13"><a href="#cb16-13" tabindex="-1"></a>  <span class="st">&quot;ShrunkEstimate&quot;</span>, <span class="st">&quot;ShrunkCI_Lower&quot;</span>, <span class="st">&quot;ShrunkCI_Upper&quot;</span>,</span>
-<span id="cb16-14"><a href="#cb16-14" tabindex="-1"></a>  <span class="st">&quot;ShrinkageFactor&quot;</span></span>
-<span id="cb16-15"><a href="#cb16-15" tabindex="-1"></a>)])</span>
-<span id="cb16-16"><a href="#cb16-16" tabindex="-1"></a></span>
-<span id="cb16-17"><a href="#cb16-17" tabindex="-1"></a><span class="fu">plot_shrinkage_funnel</span>(</span>
-<span id="cb16-18"><a href="#cb16-18" tabindex="-1"></a>  fit_eb,</span>
-<span id="cb16-19"><a href="#cb16-19" tabindex="-1"></a>  <span class="at">show_ci =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb16-20"><a href="#cb16-20" tabindex="-1"></a>  <span class="at">ci_level =</span> <span class="fl">0.95</span>,</span>
-<span id="cb16-21"><a href="#cb16-21" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
-<span id="cb16-22"><a href="#cb16-22" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb35"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" tabindex="-1"></a>fit_eb <span class="ot">&lt;-</span> <span class="fu">apply_empirical_bayes_shrinkage</span>(fit)</span>
+<span id="cb35-2"><a href="#cb35-2" tabindex="-1"></a></span>
+<span id="cb35-3"><a href="#cb35-3" tabindex="-1"></a>shrink <span class="ot">&lt;-</span> <span class="fu">plot</span>(fit_eb, <span class="at">type =</span> <span class="st">&quot;shrinkage&quot;</span>, <span class="at">view =</span> <span class="st">&quot;funnel&quot;</span>, <span class="at">show_ci =</span> <span class="cn">TRUE</span>, <span class="at">ci_level =</span> <span class="fl">0.95</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>, <span class="at">draw =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb35-4"><a href="#cb35-4" tabindex="-1"></a></span>
+<span id="cb35-5"><a href="#cb35-5" tabindex="-1"></a><span class="fu">head</span>(shrink<span class="sc">$</span>data<span class="sc">$</span>table[, <span class="fu">c</span>(</span>
+<span id="cb35-6"><a href="#cb35-6" tabindex="-1"></a>  <span class="st">&quot;Facet&quot;</span>, <span class="st">&quot;Level&quot;</span>, <span class="st">&quot;RawEstimate&quot;</span>, <span class="st">&quot;RawCI_Lower&quot;</span>, <span class="st">&quot;RawCI_Upper&quot;</span>,</span>
+<span id="cb35-7"><a href="#cb35-7" tabindex="-1"></a>  <span class="st">&quot;ShrunkEstimate&quot;</span>, <span class="st">&quot;ShrunkCI_Lower&quot;</span>, <span class="st">&quot;ShrunkCI_Upper&quot;</span>,</span>
+<span id="cb35-8"><a href="#cb35-8" tabindex="-1"></a>  <span class="st">&quot;ShrinkageFactor&quot;</span></span>
+<span id="cb35-9"><a href="#cb35-9" tabindex="-1"></a>)])</span>
+<span id="cb35-10"><a href="#cb35-10" tabindex="-1"></a></span>
+<span id="cb35-11"><a href="#cb35-11" tabindex="-1"></a><span class="fu">plot</span>(fit_eb, <span class="at">type =</span> <span class="st">&quot;shrinkage&quot;</span>, <span class="at">view =</span> <span class="st">&quot;funnel&quot;</span>, <span class="at">show_ci =</span> <span class="cn">TRUE</span>, <span class="at">ci_level =</span> <span class="fl">0.95</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
 <p>Interpretation:</p>
 <ul>
 <li>Long raw-to-shrunken segments identify levels most affected by the
@@ -741,31 +1829,145 @@ bias, fit, or validity claims.</li>
 </ul>
 </div>
 </div>
+<div id="attributes-and-assessment-planning" class="section level2">
+<h2>7. Attributes and assessment planning</h2>
+<div id="figure-feature-hierarchy" class="section level3">
+<h3>External-feature hierarchy</h3>
+<p>A hierarchy can summarize raters’ backgrounds before discussing
+training. These eight fictional raters illustrate the mechanics; their
+groups are not estimates of severity, ability or rater quality. Choose
+attributes and their coding for the substantive question before
+interpreting a tree.</p>
+<div class="sourceCode" id="cb36"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" tabindex="-1"></a>backgrounds <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb36-2"><a href="#cb36-2" tabindex="-1"></a>  <span class="at">Rater =</span> <span class="fu">paste0</span>(<span class="st">&quot;R&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">8</span>),</span>
+<span id="cb36-3"><a href="#cb36-3" tabindex="-1"></a>  <span class="at">Years =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">4</span>, <span class="dv">6</span>, <span class="dv">8</span>, <span class="dv">10</span>, <span class="dv">12</span>, <span class="dv">15</span>),</span>
+<span id="cb36-4"><a href="#cb36-4" tabindex="-1"></a>  <span class="at">Training =</span> <span class="fu">ordered</span>(<span class="fu">c</span>(<span class="st">&quot;Basic&quot;</span>, <span class="st">&quot;Basic&quot;</span>, <span class="st">&quot;Advanced&quot;</span>, <span class="st">&quot;Basic&quot;</span>,</span>
+<span id="cb36-5"><a href="#cb36-5" tabindex="-1"></a>    <span class="st">&quot;Advanced&quot;</span>, <span class="st">&quot;Advanced&quot;</span>, <span class="st">&quot;Specialist&quot;</span>, <span class="st">&quot;Specialist&quot;</span>),</span>
+<span id="cb36-6"><a href="#cb36-6" tabindex="-1"></a>    <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">&quot;Basic&quot;</span>, <span class="st">&quot;Advanced&quot;</span>, <span class="st">&quot;Specialist&quot;</span>)))</span>
+<span id="cb36-7"><a href="#cb36-7" tabindex="-1"></a>features <span class="ot">&lt;-</span> <span class="fu">mfrm_features</span>(backgrounds, <span class="st">&quot;Rater&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Years&quot;</span>, <span class="st">&quot;Training&quot;</span>))</span>
+<span id="cb36-8"><a href="#cb36-8" tabindex="-1"></a>hierarchy <span class="ot">&lt;-</span> <span class="fu">mfrm_cluster_hierarchical</span>(features, <span class="at">k =</span> <span class="dv">3</span>, <span class="at">linkage =</span> <span class="st">&quot;average&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb37"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1" tabindex="-1"></a>hierarchy_plot <span class="ot">&lt;-</span> <span class="fu">plot</span>(hierarchy, <span class="at">preset =</span> <span class="st">&quot;monochrome&quot;</span>)</span></code></pre></div>
+<p>Three groups were requested; the diagram does not select that number
+or establish that the groups are real. Feature weights, coding and
+linkage can change the branches. The full tree and memberships in leaf
+order are available for inspection. The development version supports
+both the base plot and a dedicated ggplot conversion of this saved
+tree.</p>
+<div class="sourceCode" id="cb38"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" tabindex="-1"></a><span class="fu">plot_data</span>(hierarchy_plot, <span class="at">component =</span> <span class="st">&quot;table&quot;</span>)</span>
+<span id="cb38-2"><a href="#cb38-2" tabindex="-1"></a>tree <span class="ot">&lt;-</span> <span class="fu">plot_data</span>(hierarchy_plot, <span class="at">component =</span> <span class="st">&quot;tree&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb39"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb39-1"><a href="#cb39-1" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">requireNamespace</span>(<span class="st">&quot;ggplot2&quot;</span>, <span class="at">quietly =</span> <span class="cn">TRUE</span>)) {</span>
+<span id="cb39-2"><a href="#cb39-2" tabindex="-1"></a>  hierarchy_figure <span class="ot">&lt;-</span> <span class="fu">as_ggplot</span>(hierarchy_plot, <span class="at">component =</span> <span class="st">&quot;tree&quot;</span>) <span class="sc">+</span></span>
+<span id="cb39-3"><a href="#cb39-3" tabindex="-1"></a>    ggplot2<span class="sc">::</span><span class="fu">labs</span>(<span class="at">title =</span> <span class="cn">NULL</span>, <span class="at">subtitle =</span> <span class="cn">NULL</span>)</span>
+<span id="cb39-4"><a href="#cb39-4" tabindex="-1"></a>  <span class="fu">print</span>(hierarchy_figure)</span>
+<span id="cb39-5"><a href="#cb39-5" tabindex="-1"></a>}</span></code></pre></div>
+<p>The conversion keeps the saved label setting and preset. Use
+<code>labels = FALSE</code> when creating a crowded tree to hide IDs
+without removing leaves. Where heights tie, boxes follow the stored
+merge-order groups; they need not correspond to a unique horizontal
+height cut. Removing titles or captions with
+<code>ggplot2::labs()</code> leaves the tree and memberships in
+<code>plot_data()</code>.</p>
+<p>For imputed features, group comparisons and PCA, continue with <a href="mfrmr-external-features.html">Exploring person, rater, and task
+attributes</a>.</p>
+</div>
+<div id="figure-d-study-planning" class="section level3">
+<h3>D-study planning</h3>
+<p>For data preparation, interpretation of plan differences and saved
+reopening, start with <a href="mfrmr-gtheory.html">Plan an assessment
+with G theory</a>. For several score criteria in a single panel, use
+<code>plot(d, score = c(&quot;V&quot;, &quot;W&quot;), metric = &quot;Phi&quot;)</code>, with names
+from your result. Select named composites with
+<code>composite = c(&quot;Equal&quot;, &quot;Difference&quot;)</code>. For two-facet
+results, add <code>x_var = &quot;Tasks&quot;, panel_by = &quot;Raters&quot;, ncol = 2</code>
+to separate the rater counts into panels with shared axes and score
+colors; reverse <code>x_var</code> and <code>panel_by</code> to separate
+task counts. <code>as_ggplot()</code> retains this layout using
+<code>facet_wrap()</code>. Panels retain unavailable results and nested
+count labels such as “Raters per Task”. Add <code>reference = 0.8</code>
+only if that is your chosen criterion; guides are not universal adequacy
+rules. Both plot families omit reference lines by default;
+<code>plot(main_effects_d, reference = c(0.7, 0.8))</code> restores its
+earlier guides.</p>
+<p>Use three complementary views: <code>plot(g, weights = ...)</code>
+shows the G-study’s raw sources of score variation; <code>plot(d)</code>
+and <code>plot(d, type = &quot;sem&quot;)</code> show future plan projections;
+<code>plot(comparison, view = &quot;differences&quot;)</code> shows the eligible
+paired differences with uncertainty. Raw components are in squared score
+units and retain negative estimates. They are not percentages or
+future-plan error contributions. G-study component and D-study
+projection plots support <code>as_ggplot()</code> for editing; retrieve
+cautions with <code>plot_data(p, &quot;notes&quot;)</code> and preserve them
+outside the figure.</p>
+<p>A D-study asks how a specified measurement design would perform if we
+changed facet counts. The packaged MGENOVA manual example has two
+scores, V and W, observed for Persons crossed with Tasks. Here the
+target is their equal-weight composite. There is no rater facet in this
+example.</p>
+<div class="sourceCode" id="cb40"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" tabindex="-1"></a>tasks <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">system.file</span>(<span class="st">&quot;extdata&quot;</span>, <span class="st">&quot;mgenova-table12.csv&quot;</span>, <span class="at">package =</span> <span class="st">&quot;mfrmr&quot;</span>))</span>
+<span id="cb40-2"><a href="#cb40-2" tabindex="-1"></a>gstudy <span class="ot">&lt;-</span> <span class="fu">mfrm_g_study</span>(tasks, <span class="fu">c</span>(<span class="st">&quot;V&quot;</span>, <span class="st">&quot;W&quot;</span>), <span class="at">rater =</span> <span class="cn">NULL</span>)</span>
+<span id="cb40-3"><a href="#cb40-3" tabindex="-1"></a>planned <span class="ot">&lt;-</span> <span class="fu">mfrm_d_study</span>(gstudy,</span>
+<span id="cb40-4"><a href="#cb40-4" tabindex="-1"></a>  <span class="fu">data.frame</span>(<span class="at">Tasks =</span> <span class="fu">c</span>(<span class="dv">3</span>, <span class="dv">6</span>, <span class="dv">12</span>)), <span class="at">weights =</span> <span class="fu">c</span>(<span class="at">V =</span> <span class="fl">0.5</span>, <span class="at">W =</span> <span class="fl">0.5</span>))</span></code></pre></div>
+<div class="sourceCode" id="cb41"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb41-1"><a href="#cb41-1" tabindex="-1"></a>planning_plot <span class="ot">&lt;-</span> <span class="fu">plot</span>(planned, <span class="at">type =</span> <span class="st">&quot;coefficients&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;monochrome&quot;</span>)</span></code></pre></div>
+<p>G concerns relative comparisons among Persons; Phi concerns absolute
+score interpretation. More tasks reduce the modeled task-related error
+while holding the estimated covariance components and composite weights
+fixed. These are observed-score projections, not MFRM ability
+reliability or a guarantee for a new task population. Uncertainty in the
+estimated components is omitted.</p>
+<div class="sourceCode" id="cb42"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" tabindex="-1"></a><span class="fu">plot_data</span>(planning_plot, <span class="at">component =</span> <span class="st">&quot;table&quot;</span>)</span>
+<span id="cb42-2"><a href="#cb42-2" tabindex="-1"></a><span class="co"># Customizable conversion of this selected score/composite:</span></span>
+<span id="cb42-3"><a href="#cb42-3" tabindex="-1"></a><span class="co"># as_ggplot(planning_plot)</span></span>
+<span id="cb42-4"><a href="#cb42-4" tabindex="-1"></a><span class="co"># Error in score units is a different view:</span></span>
+<span id="cb42-5"><a href="#cb42-5" tabindex="-1"></a><span class="co"># plot(planned, type = &quot;sem&quot;)</span></span></code></pre></div>
+<p>Use <code>?mfrm_d_study</code> for score/composite selection and
+supported crossed or nested designs. An ordinary
+<code>mfrm_d_study</code> object has its own base plot; its automatic
+ggplot conversion is currently unavailable.</p>
+</div>
+</div>
+<div id="portable-score-batch-review" class="section level2">
+<h2>Portable score-batch review</h2>
+<p>A batch returned by <code>score_mfrm_calibration()</code> is not a
+fitted-model diagnostic object. Review it through its own methods:</p>
+<div class="sourceCode" id="cb43"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb43-1"><a href="#cb43-1" tabindex="-1"></a><span class="fu">summary</span>(scores)</span>
+<span id="cb43-2"><a href="#cb43-2" tabindex="-1"></a><span class="fu">plot</span>(scores, <span class="at">type =</span> <span class="st">&quot;interval&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span>
+<span id="cb43-3"><a href="#cb43-3" tabindex="-1"></a><span class="fu">plot</span>(scores, <span class="at">type =</span> <span class="st">&quot;precision&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span>
+<span id="cb43-4"><a href="#cb43-4" tabindex="-1"></a><span class="fu">plot</span>(scores, <span class="at">type =</span> <span class="st">&quot;edge_mass&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
+<p>The interval view highlights <code>scored_review</code> Persons. The
+precision view shows valid response rows against posterior SD, and the
+edge-mass view compares outer-node posterior mass with the artifact’s
+recorded review threshold. Persons with no valid responses remain in the
+summary and draw-free plot payload rather than being assigned an
+artificial coordinate. These displays do not replace source-fit
+diagnostics, and their uncertainty is conditional on the frozen point
+calibration. See
+<code>vignette(&quot;mfrmr-portable-calibration&quot;, package = &quot;mfrmr&quot;)</code>
+for the complete fresh-session workflow.</p>
+</div>
 <div id="recommended-sequence" class="section level2">
 <h2>Recommended sequence</h2>
 <p>For a compact visual workflow:</p>
 <ol style="list-style-type: decimal">
 <li><code>reporting_checklist()</code> when you want the package to
 route which figures are already supported.</li>
-<li><code>plot_qc_dashboard()</code> for one-page triage.</li>
-<li><code>plot_unexpected()</code>, <code>plot_displacement()</code>,
-<code>plot_marginal_fit()</code>, and
-<code>plot_interrater_agreement()</code> for local follow-up.</li>
+<li><code>plot()</code> for one-page triage.</li>
+<li><code>plot()</code>, <code>plot()</code>, <code>plot()</code>, and
+<code>plot()</code> for local follow-up.</li>
 <li><code>plot(fit, type = &quot;wright&quot;)</code> and
 <code>plot(fit, type = &quot;pathway&quot;)</code> for targeting and scale
 interpretation.</li>
-<li><code>plot_residual_pca()</code>,
-<code>plot_bias_interaction()</code>, and
-<code>plot_information()</code> for deeper structural review.</li>
-<li><code>response_time_review()</code> and
-<code>plot_response_time_review()</code> when response-time metadata are
-available.</li>
-<li><code>plot_shrinkage_funnel(show_ci = TRUE)</code> when
-empirical-Bayes shrinkage was applied.</li>
-<li><code>plot_guttman_scalogram()</code>,
-<code>plot_residual_qq()</code>, <code>plot_rater_trajectory()</code>,
-and <code>plot_rater_agreement_heatmap()</code> as the teaching / drift
-/ agreement-heatmap follow-up layer.</li>
+<li><code>plot()</code>, <code>plot()</code>, and <code>plot()</code>
+for deeper structural review.</li>
+<li><code>response_time_review()</code> and <code>plot()</code> when
+response-time metadata are available.</li>
+<li><code>plot(show_ci = TRUE, type = &quot;shrinkage&quot;, view = &quot;funnel&quot;)</code>
+when empirical-Bayes shrinkage was applied.</li>
+<li><code>summary(scores)</code> and <code>plot(scores)</code> for a
+separately created portable score batch; do not use these as source-fit
+diagnostics.</li>
+<li><code>plot()</code>, <code>plot()</code>, <code>plot()</code>, and
+<code>plot()</code> as the teaching / drift / agreement-heatmap
+follow-up layer.</li>
 </ol>
 </div>
 <div id="related-help" class="section level2">

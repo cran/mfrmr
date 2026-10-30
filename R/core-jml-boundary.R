@@ -8,10 +8,6 @@
 # interactions requires a recession-direction audit and is not inferred from a
 # response-constant level alone.
 
-mfrmr_boundary_contract_version <- function() {
-  mfrmr_readiness_contract_version()
-}
-
 mfrmr_person_constraint_rows <- function(config, persons) {
   spec <- config$theta_spec
   persons <- as.character(persons)
@@ -165,7 +161,7 @@ audit_mfrm_person_boundary <- function(person_table, config, prep) {
     paste0("Person:", tbl$Person)
   }
   parameter_status <- data.frame(
-    ReadinessContractVersion = mfrmr_boundary_contract_version(),
+    ReadinessContractVersion = mfrmr_readiness_contract_version(),
     ReadinessScope = "parameter",
     ParameterId = parameter_id,
     ParameterClass = "Person",
@@ -199,7 +195,7 @@ audit_mfrm_person_boundary <- function(person_table, config, prep) {
   fit_reason_rows <- unbounded | coupled_review
   fit_reasons <- unique(reason[fit_reason_rows & nzchar(reason)])
   readiness <- data.frame(
-    ReadinessContractVersion = mfrmr_boundary_contract_version(),
+    ReadinessContractVersion = mfrmr_readiness_contract_version(),
     ReadinessScope = "fit",
     BoundaryState = boundary_state,
     ReasonCodes = paste(fit_reasons, collapse = ";"),
@@ -216,7 +212,7 @@ audit_mfrm_person_boundary <- function(person_table, config, prep) {
   )
 
   list(
-    contract_version = mfrmr_boundary_contract_version(),
+    contract_version = mfrmr_readiness_contract_version(),
     method = method,
     model = as.character(config$model %||% NA_character_),
     scope = "Person",

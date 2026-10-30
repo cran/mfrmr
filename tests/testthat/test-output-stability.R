@@ -149,7 +149,7 @@ test_that("GPCM summaries expose slope overview and diagnostics are now availabl
     dx$fair_average$direct_route,
     "fair_average_table(fit, diagnostics = diagnostics)"
   )
-  expect_true(grepl("disabled for bounded `GPCM`", dx$fair_average$reason, fixed = TRUE))
+  expect_true(grepl("disabled for `GPCM`", dx$fair_average$reason, fixed = TRUE))
   expect_true(grepl("slope-aware", dx$fair_average$reason, fixed = TRUE))
   expect_true(isFALSE(qc$data$fair_average$available))
   expect_identical(qc$data$fair_average$status, "available_direct_only")
@@ -414,12 +414,15 @@ test_that("interrater_agreement_table returns pairs + summary", {
 })
 
 test_that("ExpectedExact uses fitted category probabilities rather than marginal chance", {
-  res <- interrater_agreement_table(.stab_fit, diagnostics = .stab_dx,
+  fit <- readRDS(test_path("fixtures", "ordinary-score-integration.rds"))$fits[["PCM-MML-fixed"]]
+  diagnostics <- diagnose_mfrm(fit, residual_pca = "none")
+  res <- interrater_agreement_table(fit, diagnostics = diagnostics,
     rater_facet = "Rater")
   pair <- res$pairs[1, , drop = FALSE]
-  probs <- mfrmr:::compute_prob_matrix(.stab_fit)
-  obs <- .stab_dx$obs
-  context_cols <- c("Person", "Task", "Criterion")
+  expect_identical(pair$ExpectedReason, "available")
+  probs <- mfrmr:::compute_prob_matrix(fit)
+  obs <- diagnostics$obs
+  context_cols <- c("Person", setdiff(fit$config$facet_names, "Rater"))
   context_key <- do.call(paste, c(lapply(obs[context_cols], as.character), sep = "|"))
   idx1 <- which(as.character(obs$Rater) == as.character(pair$Rater1))
   idx2 <- which(as.character(obs$Rater) == as.character(pair$Rater2))

@@ -372,7 +372,9 @@ test_that("explicit rating range preserves unused boundary categories", {
   expect_true(isTRUE(rs$category_table$ZeroCount[rs$category_table$Category == 1]))
   expect_equal(rs$category_table$UnusedCategoryType[rs$category_table$Category == 1], "boundary")
   expect_true(any(rs$threshold_table$WeaklyIdentified, na.rm = TRUE))
-  expect_true(any(grepl("zero-count boundary", rs$threshold_table$ThresholdCaveat, fixed = TRUE)))
+  unsupported <- rs$threshold_table$OwnerSupportStatus == "zero_count_adjacent_category"
+  expect_true(any(unsupported))
+  expect_true(all(grepl("zero weighted count", rs$threshold_table$ThresholdCaveat[unsupported], fixed = TRUE)))
   expect_true(any(grepl("Unused boundary score", rs$caveats$Message, fixed = TRUE)))
   expect_true(rs$category_table$Percent[rs$category_table$Category == 2] > 0)
   expect_gt(sum(rs$category_table$ExpectedPercent, na.rm = TRUE), 99)

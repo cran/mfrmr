@@ -7,10 +7,10 @@
 unexpected_response_table(
   fit,
   diagnostics = NULL,
-  abs_z_min = 2,
+  abs_z_min = 3,
   prob_max = 0.3,
   top_n = 100,
-  rule = c("either", "both")
+  rule = c("residual", "either", "both")
 )
 }
 \arguments{
@@ -22,9 +22,11 @@ unexpected_response_table(
 
 \item{prob_max}{Maximum observed-category probability cutoff.}
 
-\item{top_n}{Maximum number of rows to return.}
+\item{top_n}{Maximum number of ranked rows to return in \code{table}.
+Summary counts and percentages always use all flagged observations.}
 
-\item{rule}{Flagging rule: \code{"either"} (default) or \code{"both"}.}
+\item{rule}{\code{"residual"} (default) uses only the absolute residual cutoff;
+\code{"either"} and \code{"both"} also use the category-probability cutoff.}
 }
 \value{
 A named list with:
@@ -38,11 +40,18 @@ A named list with:
 Build an unexpected-response screening report
 }
 \details{
+The default is the FACETS Table 4 absolute residual rule, with cutoff 3.
 A response is flagged as unexpected when:
 \itemize{
+\item \code{rule = "residual"}: \verb{|StdResidual| >= abs_z_min}.
 \item \code{rule = "either"}: \verb{|StdResidual| >= abs_z_min} OR \code{ObsProb <= prob_max}
 \item \code{rule = "both"}: both conditions must be met.
 }
+
+Missing inputs preserve an unavailable rule outcome unless the other
+condition determines the result (for example, a true condition suffices
+for \code{either}). Summaries retain evaluated and unavailable counts; the
+full-sample percentage is withheld if any outcome is unavailable.
 
 The table includes row-level observed/expected values, residuals,
 observed-category probability, most-likely category, and a composite
@@ -51,7 +60,8 @@ severity score for sorting.
 \section{Interpreting output}{
 
 \itemize{
-\item \code{summary}: prevalence of unexpected responses under current thresholds.
+\item \code{summary}: prevalence of unexpected responses under current thresholds,
+before limiting the displayed rows with \code{top_n}.
 \item \code{table}: ranked row-level diagnostics for case review.
 \item \code{thresholds}: active cutoffs and flagging rule.
 }
@@ -63,9 +73,10 @@ conservative your screening should be.
 \section{Typical workflow}{
 
 \enumerate{
-\item Start with \code{rule = "either"} for broad screening.
+\item Start with the default residual screen. Category probability is an optional
+case-review aid, not a tail probability or calibrated false-alarm rate.
 \item Re-run with \code{rule = "both"} for strict subset.
-\item Inspect top rows and visualize with \code{\link[=plot_unexpected]{plot_unexpected()}}.
+\item Inspect top rows and visualize with \link[=plot.mfrm_fit]{plot(x, type = "unexpected")}.
 }
 }
 
@@ -87,7 +98,8 @@ The \code{table} data.frame contains:
 \item{Residual, StdResidual}{Raw and standardized residuals.}
 \item{ObsProb}{Probability of the observed category under the model.}
 \item{MostLikely, MostLikelyProb}{Most probable category and its
-probability.}
+probability. Tied modes give \code{MostLikely = NA}; \code{MostLikelyCount}
+records their number, and CategoryGap uses the nearest tied mode.}
 \item{Severity}{Composite severity index (higher = more unexpected).}
 \item{Direction}{"Higher than expected" or "Lower than expected".}
 \item{FlagLowProbability, FlagLargeResidual}{Logical flags for each
@@ -97,24 +109,41 @@ criterion.}
 The \code{summary} data.frame contains:
 \describe{
 \item{TotalObservations}{Total observations analyzed.}
-\item{UnexpectedN, UnexpectedPercent}{Count and share of flagged rows.}
+\item{UnexpectedN, UnexpectedPercent}{Known flagged count and full-sample
+percentage. The percentage is unavailable when any rule outcome is
+unknown; the count is unavailable when no response can be evaluated.}
+\item{EvaluatedObservations, UnavailableObservations}{Responses whose
+rule outcome is determined or unavailable.}
 \item{AbsZThreshold, ProbThreshold}{Applied cutoff values.}
 \item{Rule}{"either" or "both".}
 }
 }
 
+\section{Saved-result reuse}{
+
+The returned \code{fit_identity} records the fitted analysis for reuse with
+reports and exports. Recreate older results from the saved fit and matching
+diagnostics using the original screening options; no model refit is needed.
+See \link{mfrmr_compatibility_layer} for migration instructions.
+}
+
 \examples{
-\donttest{
-toy_full <- load_mfrmr_data("example_core")
-toy_people <- unique(toy_full$Person)[1:12]
-toy <- toy_full[toy_full$Person \%in\% toy_people, , drop = FALSE]
-fit <- suppressWarnings(
-  fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("unexpected_response_table", run.dontrun = TRUE)
+\dontrun{
+library(mfrmr)
+# Saved synthetic MML/RSM analysis of example_operational.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "operational-mml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+diagnostics <- example_fit$diagnostics
+unexpected <- unexpected_response_table(
+  fit, diagnostics = diagnostics, abs_z_min = 1.5, prob_max = 0.4, top_n = 5
 )
-t4 <- unexpected_response_table(fit, abs_z_min = 1.5, prob_max = 0.4, top_n = 5)
-summary(t4)
-p_t4 <- plot(t4, draw = FALSE)
-p_t4$data$plot
+unexpected$summary # Counts and percentages for all flagged observations
+unexpected$table   # Only the five highest-ranked cases
+plot(unexpected)
+# The rule is exploratory: inspect the scoring context before changing a rating
 }
 }
 \seealso{

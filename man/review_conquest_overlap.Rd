@@ -15,7 +15,8 @@ review_conquest_overlap(
   conquest_item_estimate = "auto",
   item_id_source = c("auto", "response_var", "level"),
   conquest_case_person = "auto",
-  conquest_case_estimate = "auto"
+  conquest_case_estimate = "auto",
+  conquest_location_shift = NULL
 )
 }
 \arguments{
@@ -48,8 +49,8 @@ item identifier. This may be the exported response variable (for example
 \code{ResponseVar}, \code{ItemID}, \code{Item}, and \code{Label}.}
 
 \item{conquest_item_estimate}{Column in \code{conquest_item_estimates} that stores
-the item estimate. \code{"auto"} tries aliases such as \code{Estimate}, \code{Est}, and
-\code{Facility}.}
+the item estimate. \code{"auto"} tries \code{Estimate} and \code{Est}. Other columns must
+be specified explicitly and converted to difficulty logits before review.}
 
 \item{item_id_source}{How \code{conquest_item_id} should be matched. \code{"auto"}
 chooses the larger overlap between exported response variables and original
@@ -62,6 +63,12 @@ IDs. \code{"auto"} tries conservative aliases such as \code{Person}, \code{PID},
 \item{conquest_case_estimate}{Column in \code{conquest_case_eap} that stores case
 EAP estimates. \code{"auto"} tries conservative aliases such as \code{Estimate},
 \code{EAP_1}, and \code{EAP}.}
+
+\item{conquest_location_shift}{Known additive location offset, ConQuest
+minus mfrmr. Use \code{0} only after confirming a common origin. \code{NULL} uses
+zero when the supplied generated report confirms the common ITEMS
+constraint; otherwise aligned EAP/intercept comparisons are unavailable.
+This argument does not change scale units or reverse the item sign.}
 }
 \value{
 A named list with class \code{mfrm_conquest_overlap_review}.
@@ -97,7 +104,8 @@ The intended workflow is:
 \code{\link[=build_conquest_overlap_bundle]{build_conquest_overlap_bundle()}};
 \item run the narrow matching case in ConQuest;
 \item normalize the four comparison CSV files with
-\code{normalize_conquest_overlap_exports()};
+\code{normalize_conquest_overlap_exports()}, supplying the generated review
+text as \code{report_file} for stopping/model metadata;
 \item pass those tables here to inspect direct differences, centered item
 agreement, and case-level EAP agreement.
 }
@@ -124,9 +132,26 @@ attention-item counts and worst-row labels
 supplied-table review, not raw ConQuest text parsing or a software-
 equivalence claim.
 \item Population slopes and \code{sigma2} are intended for direct comparison.
-\item Item estimates should be interpreted after centering.
-\item Case estimates should be interpreted as posterior EAP summaries under the
-fitted population model.
+\item Both item tables are centered using the same matched finite items.
+\code{MfrmrCentered} is this comparison coordinate; \code{CenteredEstimate} retains
+the native bundle's original full-set coordinate. \code{ItemCenteringRows}
+records the reference-set size. At least two items are needed; otherwise
+centered differences and summary metrics are unavailable. Missing items
+remain flagged, and partial-set agreement does not imply full-set agreement.
+Recompute older reviews from the saved bundle and external tables to apply
+this common reference set; printing an old review does not change its values.
+\item Case estimates are posterior EAP summaries under the fitted population
+model. \code{Difference} retains the raw external-minus-native value;
+\code{AlignedDifference} subtracts the declared location shift. \code{CaseMae} and
+\code{CaseMaxAbsDifference} use aligned differences and are unavailable when
+the origin is unknown. \code{CaseRawMae} and \code{CaseRawMaxAbsDifference} remain
+descriptive. Do not infer a common origin from partial centered items.
+\item Population summary errors cover slopes and variance; the intercept has
+separate \code{InterceptCompared} and \code{InterceptAlignedDifference} fields.
+\item \code{ExternalEstimationStatus} is unknown without a supplied report.
+\code{criterion_met} does not certify precision; \code{ExternalPrecisionStatus}
+remains \code{not_assessed}. Failed stopping and surplus external IDs are
+attention items. Recreate old reviews to apply these rules.
 \item The \code{overall} table reports both mean and maximum absolute differences for
 compared population, centered item, and case rows. The
 \code{PopulationMaxAbsParameter}, \code{ItemCenteredMaxAbsItem}, and
@@ -134,6 +159,14 @@ compared population, centered item, and case rows. The
 difference occurs.
 \item Missing or non-numeric rows in \code{attention_items} indicate that the external
 tables do not align cleanly with the exported overlap bundle.
+Non-finite estimates also use the existing \code{NonNumericInConQuest} status
+and are excluded from comparison metrics.
+\item This review does not compare MnSq, ZSTD, threshold crossings or full
+parameter covariance. Native MML row residuals evaluated at EAP are not
+ConQuest parameter-fit statistics: those aggregate through the response
+design and average over posterior distributions. Adjacent step parameters
+are not ConQuest cumulative-probability (Thurstonian) thresholds.
+See the \href{https://conquestmanual.acer.org/s3-00.html}{ConQuest technical manual}.
 }
 }
 
@@ -145,7 +178,8 @@ normalized <- normalize_conquest_overlap_exports(
   parameter_file = "conquest_overlap_conquest_parameters.csv",
   regression_file = "conquest_overlap_conquest_reg_coefficients.csv",
   covariance_file = "conquest_overlap_conquest_covariance.csv",
-  case_file = "conquest_overlap_conquest_cases_eap.csv"
+  case_file = "conquest_overlap_conquest_cases_eap.csv",
+  report_file = "conquest_overlap_conquest_parameters_review.txt"
 )
 review <- review_conquest_overlap(bundle, normalized)
 summary(review)$summary

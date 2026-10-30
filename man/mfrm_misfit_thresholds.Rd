@@ -22,6 +22,11 @@ heuristic mean-square (Infit / Outfit MnSq) review band when flagging
 element-level misfit. Defaults use the published 0.5-1.5 interval as a
 screening convention; both ends can be overridden via R options. The
 interval is not a universal acceptance rule or an automatic exclusion rule.
+Low mean squares describe low residual variability rather than poor rater
+quality. \code{\link[=fit_measures_table]{fit_measures_table()}} uses this mean-square screen by default;
+ZSTD-only evidence is separate unless its combined rule is requested.
+Compare declared bands against known simulation truth with
+\code{\link[=mfrm_screening_sensitivity]{mfrm_screening_sensitivity()}}.
 }
 \details{
 Helpers that consume the band include

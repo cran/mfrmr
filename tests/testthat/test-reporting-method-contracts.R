@@ -38,6 +38,163 @@ local({
 # build_visual_warning_map
 # ============================================================================
 
+test_that("regularized facet SEs remain diagnostic across reports and saved inputs", {
+  covariance <- mfrmr:::compute_mml_parameter_covariance(.fit_mml)
+  expect_identical(covariance$status, "ok")
+  covariance$status <- "regularized"
+  covariance$regularized <- TRUE
+  local_mocked_bindings(
+    compute_mml_parameter_covariance = function(...) covariance,
+    .package = "mfrmr"
+  )
+  diag <- diagnose_mfrm(.fit_mml, residual_pca = "none", diagnostic_mode = "both")
+  facet <- diag$measures$Facet != "Person"
+  expect_true(any(is.finite(diag$measures$SE[facet])))
+  expect_false(any(diag$measures$CIEligible[facet]))
+  expect_false(any(diag$measures$SupportsFormalInference[facet]))
+  expect_true(all(grepl("regularized Hessian", diag$measures$SE_Method[facet])))
+  expect_true(diag$precision_profile$HasRegularizedSE)
+  expect_false(diag$precision_profile$SupportsFormalInference)
+  expect_equal(diag$measures$SE, .diag_mml$measures$SE, tolerance = 0)
+  expect_equal(diag$measures$CI_Lower, .diag_mml$measures$CI_Lower, tolerance = 0)
+  expect_equal(diag$measures$CI_Upper, .diag_mml$measures$CI_Upper, tolerance = 0)
+  expect_error(analyze_facet_equivalence(.fit_mml), "unregularized", fixed = TRUE)
+  report <- precision_review_report(.fit_mml, diag)
+  text <- paste(capture.output(print(summary(report))), collapse = " ")
+  expect_match(text, "regularized Hessian", fixed = TRUE)
+  expect_match(text, "diagnostic only", fixed = TRUE)
+  expect_false(grepl("PrecisionTier|SupportsFormalInference|validation-use", text))
+
+  older <- diag
+  older$measures$SupportsFormalInference[facet] <- TRUE
+  older$measures$CIEligible[facet] <- TRUE
+  expect_error(summary(older), "Recompute diagnose_mfrm(fit)", fixed = TRUE)
+  expect_error(precision_review(older), "Recompute diagnose_mfrm(fit)", fixed = TRUE)
+  expect_error(precision_review_report(.fit_mml, older), "Recompute diagnose_mfrm(fit)", fixed = TRUE)
+  expect_error(build_apa_outputs(.fit_mml, older), "Recompute diagnose_mfrm(fit)", fixed = TRUE)
+
+  older_report <- report
+  older_report$profile$HasRegularizedSE <- NULL
+  expect_error(summary(older_report), "Recreate it with precision_review_report", fixed = TRUE)
+  older_summary <- summary(report)
+  older_summary$profile$HasRegularizedSE <- NULL
+  expect_error(print(older_summary), "Recreate it with precision_review_report", fixed = TRUE)
+  older_normal <- .diag_mml
+  older_normal$precision_profile$HasRegularizedSE <- NULL
+  expect_error(summary(older_normal), "Recompute diagnose_mfrm(fit)", fixed = TRUE)
+})
+
+test_that("unavailable model-based SEs cannot promote observation-table fallbacks", {
+  model_se <- mfrmr:::compute_mml_facet_model_se(.fit_mml)
+  model_se$table$ModelSE[1] <- NA_real_
+  local_mocked_bindings(compute_mml_facet_model_se = function(...) model_se,
+                        .package = "mfrmr")
+  se <- mfrmr:::build_measure_se_table(
+    .fit_mml, .diag_mml$obs, .fit_mml$config$facet_names, .diag_mml$fit
+  )
+  row <- se$Facet == model_se$table$Facet[1] & se$Level == model_se$table$Level[1]
+  expect_true(is.finite(se$SE[row]))
+  expect_identical(unname(se$SE_Method[row]), "Fallback observation-table information")
+  expect_false(se$SupportsFormalInference[row])
+  expect_identical(se$CIUse[row], "review_before_reporting")
+})
+
+test_that("precision reporting separates numerical convergence from uncertainty", {
+  fit <- .fit_mml
+  fit$readiness$fit$InferenceReady <- FALSE
+  fit$readiness$fit$FitReadiness <- "review"
+  fit$readiness$fit$EstimabilityState <- "not_evaluated"
+  fit$readiness$fit$ReasonCodes <- "design_rank_not_evaluated"
+  profile <- mfrmr:::build_precision_profile(
+    fit, .diag_mml$measures, .diag_mml$reliability, .diag_mml$facet_precision
+  )
+  checks <- mfrmr:::audit_precision_outputs(
+    fit, .diag_mml$measures, .diag_mml$reliability, .diag_mml$facet_precision, profile
+  )
+  expect_identical(checks$Status[checks$Check == "Optimizer convergence"], "pass")
+  expect_identical(checks$Status[checks$Check == "Precision tier"], "review")
+  expect_match(profile$RecommendedUse, "does not support ordinary SE/CI inference", fixed = TRUE)
+  expect_match(checks$Detail[checks$Check == "Optimizer convergence"],
+               "does not establish valid SEs", fixed = TRUE)
+  jml <- precision_review_report(.fit, .diag)
+  expect_false(jml$profile$SupportsFormalInference)
+  expect_match(jml$profile$RecommendedUse, "Changing to MML does not by itself", fixed = TRUE)
+})
+
+test_that("APA design prose uses each facet's own level count", {
+  apa <- build_apa_outputs(.fit, .diag)
+  text <- gsub("[[:space:]]+", " ", apa$report_text)
+  counts <- lengths(.fit$config$facet_levels)
+  expect_gt(length(unique(counts)), 1L)
+  for (facet in names(counts)) {
+    expect_match(text, paste0(facet, " (n = ", counts[[facet]], ")"), fixed = TRUE)
+  }
+})
+
+test_that("weighted reports distinguish observed rows from the weight sum", {
+  dat <- load_mfrmr_data("example_operational")
+  dat$Weight <- rep(c(1, 0.5, 2, 1, 0), length.out = nrow(dat))
+  fit <- suppressWarnings(fit_mfrm(dat, "Person", c("Rater", "Criterion"),
+                                   "Score", weight = "Weight", method = "MML"))
+  diag <- diagnose_mfrm(fit, residual_pca = "none")
+  apa <- build_apa_outputs(fit, diag)
+  rows <- nrow(diag$obs)
+  weights <- sum(diag$obs$Weight)
+  expect_equal(apa$contract$metadata$n_obs, rows)
+  expect_equal(apa$contract$metadata$weight_sum, weights)
+  expect_match(gsub("[[:space:]]+", " ", apa$report_text),
+               paste0("was fit to ", rows, " observations"), fixed = TRUE)
+  expect_match(apa$report_text, "sum of observation weights", fixed = TRUE)
+  text <- gsub("[[:space:]]+", " ", apa$report_text)
+  expect_match(text, "multiplied row-level ordered-category log-likelihood contributions", fixed = TRUE)
+  expect_match(text, "Person distribution was integrated once per Person", fixed = TRUE)
+  expect_match(text, "not interpreted as replicated independent Person response patterns", fixed = TRUE)
+  expect_false(grepl("applied as frequency counts", text, fixed = TRUE))
+  smap <- mfrmr:::build_visual_summary_map(fit, diag)
+  expect_true(any(grepl(paste0("Observations: N = ", rows), smap$wright_map, fixed = TRUE)))
+  wmap <- mfrmr:::build_visual_warning_map(fit, diag,
+                                          thresholds = list(n_obs_min = mean(c(rows, weights))))
+  expect_true(any(grepl("Small number of observations", wmap$wright_map, fixed = TRUE)))
+})
+
+test_that("reporting uses only stored residual PCA analyses", {
+  calls <- 0L
+  unexpected_pca <- function(...) {
+    calls <<- calls + 1L
+    stop("Reporting must not compute residual PCA")
+  }
+  local_mocked_bindings(
+    compute_pca_overall = unexpected_pca,
+    compute_pca_by_facet = unexpected_pca,
+    .package = "mfrmr"
+  )
+  for (mode in c("none", "overall", "facet", "both")) {
+    diag <- .diag
+    diag$residual_pca_mode <- mode
+    has_overall <- mode %in% c("overall", "both")
+    has_facet <- mode %in% c("facet", "both")
+    if (!has_overall) diag$residual_pca_overall <- NULL
+    if (!has_facet) diag$residual_pca_by_facet <- NULL
+
+    apa <- build_apa_outputs(.fit, diag)
+    text <- gsub("[[:space:]]+", " ", apa$report_text)
+    expect_identical(apa$contract$availability$has_pca_overall, has_overall)
+    expect_identical(apa$contract$availability$has_pca_by_facet, has_facet)
+    expect_identical(grepl("overall standardized residual matrix", text), has_overall)
+    expect_identical(grepl("Facet-specific exploratory residual PCA showed", text), has_facet)
+    if (mode == "none") expect_false(grepl("PCA", text))
+
+    smap <- mfrmr:::build_visual_summary_map(.fit, diag)
+    wmap <- mfrmr:::build_visual_warning_map(.fit, diag)
+    expect_identical(any(grepl("Overall residual PCA PC1:", smap$residual_pca_overall)), has_overall)
+    expect_identical(any(grepl("Top facet PC1", wmap$residual_pca_by_facet)), has_facet)
+    pca <- mfrmr:::safe_residual_pca(diag)
+    if (has_overall) expect_identical(pca$overall, .diag$residual_pca_overall)
+    if (has_facet) expect_identical(pca$by_facet, .diag$residual_pca_by_facet)
+  }
+  expect_identical(calls, 0L)
+})
+
 test_that("build_visual_warning_map returns all expected visual keys", {
   wmap <- mfrmr:::build_visual_warning_map(.fit, .diag)
   expected_keys <- c(
@@ -93,9 +250,9 @@ test_that("build_visual_summary_map returns summary text for all keys", {
 
 test_that("build_visual_summary_map includes strict marginal routes for MML diagnostics", {
   smap_mml <- mfrmr:::build_visual_summary_map(.fit_mml, .diag_mml)
-  expect_true(any(grepl("latent-integrated first-order category screen", smap_mml$strict_marginal_fit, fixed = TRUE)))
-  expect_true(any(grepl("plot_marginal_fit()", smap_mml$strict_marginal_fit, fixed = TRUE)))
-  expect_true(any(grepl("plot_marginal_pairwise()", smap_mml$strict_pairwise_local_dependence, fixed = TRUE)))
+  expect_true(any(grepl("Expected counts condition on the same responses", smap_mml$strict_marginal_fit, fixed = TRUE)))
+  expect_true(any(grepl('plot(x, type = "marginal_fit")', smap_mml$strict_marginal_fit, fixed = TRUE)))
+  expect_true(any(grepl('plot(x, type = "marginal_pairwise")', smap_mml$strict_pairwise_local_dependence, fixed = TRUE)))
 })
 
 test_that("build_visual_warning_map explains when strict marginal diagnostics were not requested", {
@@ -126,7 +283,7 @@ test_that("build_visual_summary_map with NULL inputs returns empty map", {
 # ============================================================================
 
 test_that("build_apa_report_text produces Method and Results sections", {
-  text <- mfrmr:::build_apa_report_text(.fit, .diag)
+  text <- mfrmr:::build_apa_reporting_contract(.fit, .diag)$report_text
   expect_true(grepl("Method", text))
   expect_true(grepl("Results", text))
   expect_true(grepl("many-facet .*Rasch", text, ignore.case = TRUE))
@@ -141,7 +298,7 @@ test_that("build_apa_report_text with context supplies assessment/setting text",
     scale_desc = "a 5-point holistic rubric",
     line_width = 80L
   )
-  text <- mfrmr:::build_apa_report_text(.fit, .diag, context = ctx)
+  text <- mfrmr:::build_apa_reporting_contract(.fit, .diag, context = ctx)$report_text
   expect_true(grepl("writing proficiency", text))
   expect_true(grepl("university", text))
   expect_true(grepl("calibration", text))
@@ -149,25 +306,13 @@ test_that("build_apa_report_text with context supplies assessment/setting text",
 })
 
 test_that("build_apa_report_text with bias_results includes bias summary", {
-  text <- mfrmr:::build_apa_report_text(.fit, .diag, bias_results = .bias)
+  text <- mfrmr:::build_apa_reporting_contract(.fit, .diag, bias_results = .bias)$report_text
   expect_true(grepl("Bias", text, ignore.case = TRUE) || grepl("bias", text))
 })
 
 test_that("build_apa_report_text without bias mentions no bias data", {
-  text <- mfrmr:::build_apa_report_text(.fit, .diag, bias_results = NULL)
+  text <- mfrmr:::build_apa_reporting_contract(.fit, .diag, bias_results = NULL)$report_text
   expect_true(nchar(text) > 0)
-})
-
-test_that("APA draft describes row weights without treating MML rows as persons", {
-  fit_weighted <- .fit_mml
-  fit_weighted$config$weight_col <- "CaseWeight"
-  text <- mfrmr:::build_apa_report_text(fit_weighted, .diag_mml)
-  text <- gsub("\\s+", " ", text)
-
-  expect_match(text, "multiplied row-level ordered-category log-likelihood contributions", fixed = TRUE)
-  expect_match(text, "Person distribution was integrated once per Person", fixed = TRUE)
-  expect_match(text, "not interpreted as replicated independent Person response patterns", fixed = TRUE)
-  expect_false(grepl("applied as frequency counts", text, fixed = TRUE))
 })
 
 test_that("build_apa_outputs surfaces latent-regression population-model wording", {
@@ -249,7 +394,7 @@ test_that("build_apa_outputs validates fit, diagnostics, context, and bias input
 test_that("apa_table uses the same APA contract validation when contract metadata is needed", {
   expect_error(
     mfrmr::apa_table(.fit, which = "summary", diagnostics = list()),
-    "requires `diagnostics` to be an `mfrm_diagnostics` object",
+    "`diagnostics` must be an mfrm_diagnostics object",
     fixed = TRUE
   )
   expect_error(
@@ -264,30 +409,30 @@ test_that("apa_table uses the same APA contract validation when contract metadat
 # ============================================================================
 
 test_that("build_apa_table_figure_notes produces note text", {
-  notes <- mfrmr:::build_apa_table_figure_notes(.fit, .diag)
+  notes <- mfrmr:::build_apa_reporting_contract(.fit, .diag)$note_text
   expect_true(is.character(notes))
   expect_true(nchar(notes) > 0)
 })
 
 test_that("build_apa_table_figure_notes with bias_results includes bias notes", {
-  notes <- mfrmr:::build_apa_table_figure_notes(.fit, .diag, bias_results = .bias)
+  notes <- mfrmr:::build_apa_reporting_contract(.fit, .diag, bias_results = .bias)$note_text
   expect_true(nchar(notes) > 0)
 })
 
 test_that("build_apa_table_figure_captions produces caption text", {
-  captions <- mfrmr:::build_apa_table_figure_captions(.fit, .diag)
+  captions <- mfrmr:::build_apa_reporting_contract(.fit, .diag, whexact = FALSE)$caption_text
   expect_true(is.character(captions))
   expect_true(grepl("Table 1", captions))
 })
 
 test_that("build_apa_table_figure_captions with context adds assessment phrase", {
   ctx <- list(assessment = "oral proficiency")
-  captions <- mfrmr:::build_apa_table_figure_captions(.fit, .diag, context = ctx)
+  captions <- mfrmr:::build_apa_reporting_contract(.fit, .diag, context = ctx, whexact = FALSE)$caption_text
   expect_true(grepl("oral proficiency", captions))
 })
 
 test_that("build_apa_table_figure_captions with bias includes interaction label", {
-  captions <- mfrmr:::build_apa_table_figure_captions(.fit, .diag, bias_results = .bias)
+  captions <- mfrmr:::build_apa_reporting_contract(.fit, .diag, bias_results = .bias, whexact = FALSE)$caption_text
   expect_true(grepl("Table 4", captions))
 })
 
@@ -393,6 +538,29 @@ test_that("summarize_convergence_metrics produces text from summary row", {
     text <- mfrmr:::summarize_convergence_metrics(summary_row[1, , drop = FALSE])
     expect_true(is.character(text))
   }
+})
+
+test_that("convergence prose separates numerical checks from inference readiness", {
+  row <- data.frame(
+    Converged = TRUE, ConvergenceSeverity = "pass",
+    ConvergenceStatus = "converged", InferenceReady = FALSE,
+    ReadinessContractVersion = mfrmr:::mfrmr_readiness_contract_version(),
+    FitReadiness = "review", Method = "MML"
+  )
+  expect_false(mfrmr:::mfrm_convergence_state(row)$inference_ready)
+  expect_match(mfrmr:::summarize_convergence_metrics(row),
+               "met the numerical convergence checks", fixed = TRUE)
+  row$ConvergenceSeverity <- "review"
+  row$ConvergenceStatus <- "converged_gradient_review"
+  expect_match(mfrmr:::summarize_convergence_metrics(row),
+               "terminal gradient requires review", fixed = TRUE)
+  row$ConvergenceStatus <- "reviewable_warning"
+  expect_match(mfrmr:::summarize_convergence_metrics(row),
+               "reviewable optimizer warning", fixed = TRUE)
+  row$Converged <- FALSE
+  row$ConvergenceStatus <- "not_converged"
+  expect_match(mfrmr:::summarize_convergence_metrics(row),
+               "did not meet the package convergence checks", fixed = TRUE)
 })
 
 # ============================================================================
@@ -562,12 +730,12 @@ test_that("PCA extraction functions handle NULL input", {
 # ============================================================================
 
 test_that("build_apa_table_figure_note_map returns a named list", {
-  note_map <- mfrmr:::build_apa_table_figure_note_map(.fit, .diag)
+  note_map <- mfrmr:::build_apa_reporting_contract(.fit, .diag)$note_map
   expect_true(is.list(note_map))
   expect_true(length(note_map) > 0)
 })
 
 test_that("build_apa_table_figure_note_map with bias_results includes table4", {
-  note_map <- mfrmr:::build_apa_table_figure_note_map(.fit, .diag, bias_results = .bias)
+  note_map <- mfrmr:::build_apa_reporting_contract(.fit, .diag, bias_results = .bias)$note_map
   expect_true("table4" %in% names(note_map))
 })

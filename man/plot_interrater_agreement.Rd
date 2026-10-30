@@ -17,7 +17,8 @@ plot_interrater_agreement(
   palette = NULL,
   label_angle = 45,
   preset = c("standard", "publication", "compact", "monochrome"),
-  draw = TRUE
+  draw = TRUE,
+  title = NULL
 )
 }
 \arguments{
@@ -29,15 +30,20 @@ plot_interrater_agreement(
 
 \item{context_facets}{Optional context facets when \code{x} is \code{mfrm_fit}.}
 
-\item{exact_warn}{Warning threshold for exact agreement.}
+\item{exact_warn}{Warning threshold for exact agreement when \code{x} is a fit.
+Saved agreement results use their own thresholds; conflicting overrides
+are rejected. Recreate the agreement result to change its flag rules.}
 
-\item{corr_warn}{Warning threshold for pairwise correlation.}
+\item{corr_warn}{Warning threshold for pairwise correlation when \code{x} is a fit.
+Saved agreement results use their own threshold.}
 
 \item{plot_type}{\code{"exact"}, \code{"corr"}, or \code{"difference"}.}
 
 \item{top_n}{Maximum pairs displayed for bar-style plots.}
 
-\item{main}{Optional custom plot title.}
+\item{main}{Compatibility title argument. Omitted or \code{NULL} keeps the default
+title. Existing calls remain supported without a deprecation warning.
+For new code, prefer \code{title}; do not supply both arguments.}
 
 \item{palette}{Optional named color overrides (\code{ok}, \code{flag}, \code{expected}).}
 
@@ -46,31 +52,44 @@ plot_interrater_agreement(
 \item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, \code{"compact"}, or \code{"monochrome"}).}
 
 \item{draw}{If \code{TRUE}, draw with base graphics.}
+
+\item{title}{Plot title. Omit it to keep the default, supply one character
+string to replace it, or use \code{NULL} (or \code{""}) to suppress it. This changes
+only the heading; numerical results, reference lines, subtitles and
+interpretation notes remain. Both \code{main} and \code{title} explicitly supplied
+is an error, even if equal or \code{NULL}. Positional legacy arguments retain
+their order; use the exact name \code{title}.}
 }
 \value{
-A plotting-data object of class \code{mfrm_plot_data}.
+A plotting-data object of class \code{mfrm_plot_data}. \code{\link[=as_ggplot]{as_ggplot()}}
+preserves the selected metric, pair order, model-expected values,
+unavailable comparisons and saved review thresholds. Notes remain in
+\code{plot_data(p, "notes")}, outside the default figure. \code{top_n} limits the
+two bar views; the difference view uses all pairs in the input bundle.
 }
 \description{
 Plot inter-rater agreement diagnostics using base R
 }
 \details{
-Inter-rater agreement plots summarize pairwise consistency for a chosen
-rater facet.  Agreement statistics are computed over observations that
-share the same person and context-facet levels, ensuring that
-comparisons reflect identical rating targets.
+Inter-rater agreement plots describe matched scores for a chosen rater
+facet. The default matches Person and all other non-rater facets; custom
+\code{context_facets} change the comparison unit. Inspect the saved settings
+before interpreting agreement. Repeated ratings within a rater/context
+cell are averaged as described in \code{\link[=interrater_agreement_table]{interrater_agreement_table()}}.
 
 \strong{Exact agreement} is the proportion of matched observations where
 both raters assigned the same category score.  The \strong{expected
-agreement} line shows the proportion expected by chance given each
-rater's marginal category distribution, providing a baseline.
+agreement} line shows the proportion expected under the fitted model,
+averaging products of category probabilities over matched rating contexts.
+It is a model-based baseline, not a chance-corrected agreement coefficient.
 
 \strong{Pairwise correlation} is the Pearson correlation between scores
 assigned by each rater pair on matched observations.
 
-The \strong{difference plot} decomposes disagreement into systematic bias
-(mean signed difference on x-axis: positive = Rater 1 more severe)
+The \strong{difference plot} describes directional score differences
+(mean signed difference on x-axis: positive = Rater 1 assigned higher scores)
 and total inconsistency (mean absolute difference on y-axis).  Points
-near the origin indicate both low bias and low inconsistency.
+near the origin indicate both small mean differences and low inconsistency.
 
 The \code{context_facets} parameter specifies which facets define "the
 same rating target" (e.g., Criterion).  When \code{NULL}, all non-rater
@@ -81,15 +100,16 @@ facets are used as context.
 \describe{
 \item{\code{"exact"} (default)}{Bar chart of exact agreement proportion by
 rater pair.  Expected agreement overlaid as connected circles.
-Horizontal reference line at \code{exact_warn}.  Bars colored red when
-observed agreement falls below the warning threshold.}
+Horizontal reference line at the saved \code{exact_warn}. Bar colors follow
+the combined exact/correlation flag, not only the displayed metric.}
 \item{\code{"corr"}}{Bar chart of pairwise Pearson correlation by rater
 pair.  Reference line at \code{corr_warn}.  Ordered by correlation
 (lowest first).  Low correlations suggest inconsistent rank
 ordering of persons between raters.}
 \item{\code{"difference"}}{Scatter plot.  X-axis: mean signed score
 difference (Rater 1 \eqn{-} Rater 2); positive values indicate
-Rater 1 is more severe.  Y-axis: mean absolute difference
+Rater 1 assigned higher scores. This observed-score contrast is distinct
+from the fitted rater-severity parameter. Y-axis: mean absolute difference
 (overall disagreement magnitude).  Points colored red when
 flagged.  Vertical reference at 0.}
 }
@@ -97,9 +117,11 @@ flagged.  Vertical reference at 0.}
 
 \section{Interpreting output}{
 
-Pairs below \code{exact_warn} and/or \code{corr_warn} should be prioritized for
-rater calibration review.  On the difference plot, points far from the
-origin along the x-axis indicate systematic bias; points high on the
+Colors retain the saved combined flag: either known cutoff crossing flags
+a pair; an incomplete decision is neutral. These are descriptive review
+rules, not automatic rater-quality or training-priority decisions.
+On the difference plot, points far from the
+origin along the x-axis indicate directional score differences; points high on the
 y-axis indicate large inconsistency regardless of direction.
 }
 
@@ -119,26 +141,65 @@ For a plot-selection guide and a longer walkthrough, see
 \code{vignette("mfrmr-visual-diagnostics", package = "mfrmr")}.
 }
 
-\examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
-p <- plot_interrater_agreement(fit, rater_facet = "Rater", draw = FALSE)
-if (interactive()) {
-  plot_interrater_agreement(
-    fit,
-    rater_facet = "Rater",
-    draw = TRUE,
-    plot_type = "exact",
-    main = "Inter-rater Agreement (Customized)",
-    palette = c(ok = "#2b8cbe", flag = "#cb181d"),
-    label_angle = 45,
-    preset = "publication"
-  )
+\section{Migration in 0.2.4}{
+
+This renderer is internal. Use the corresponding \code{plot()} route in
+\link{mfrmr_plot_migration}; the former exported name is no longer available.
 }
+
+\section{Session plot defaults}{
+
+Set \code{options(mfrmr.plot_preset = "publication")} to choose a session default
+for plotting functions that expose the common \code{preset} argument. The
+supported values are \code{"standard"}, \code{"publication"}, \code{"compact"} and
+\code{"monochrome"}. Precedence is an explicit call argument, then the session
+option, then \code{"standard"}. For example, \code{preset = "standard"} overrides
+a session set to \code{"monochrome"}. Explicit \code{preset = NULL} retains the
+earlier package-default behavior; it does not read the session option.
+Invalid session values cause an error only when that option is needed.
+
+The category-curve, data-quality, fit-review, connectivity and network
+routes of \code{plot()} for report bundles use the same option through \code{...}.
+Plots without a common \code{preset} argument, including extended-model plots
+with their own \code{palette} controls, keep their own settings. This option
+selects a preset, not a universal theme or a guarantee that all renderers
+implement every appearance control identically.
+
+New plot payloads retain the resolved preset for supported saved-data
+rendering. Converting an existing payload with \code{\link[=as_ggplot]{as_ggplot()}} uses its saved
+appearance, even after the session option changes. A call that creates a
+new plot from a fit or statistical result uses the current default.
+For a reproducible script, supply \code{preset} explicitly or set the option in
+that script. Saving only the fitted model does not save a session option.
+No global ggplot theme is changed.
+
+Restore previous settings with \code{old <- options(mfrmr.plot_preset = "monochrome")} followed by \code{options(old)}. Use
+\code{options(mfrmr.plot_preset = NULL)} to remove the option. The preset changes
+appearance, not estimates, confidence levels or diagnostic thresholds.
+}
+
+\examples{
+# Long-running workflow; run explicitly when needed.
+# example("plot_interrater_agreement", run.dontrun = TRUE)
+\dontrun{
+library(mfrmr)
+
+# Saved synthetic MML/RSM analysis of example_operational.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "operational-mml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+
+# Compare observed exact agreement with its model-expected baseline
+plot(fit, type = "agreement", rater_facet = "Rater")
+# Bars show observed agreement; connected circles show model-expected agreement
+
+# Optional: compare the direction and magnitude of observed-score differences
+plot(fit, type = "agreement", rater_facet = "Rater", metric = "difference")
+# Positive horizontal values mean Rater1 assigned higher scores than Rater2
 }
 }
 \seealso{
-\code{\link[=interrater_agreement_table]{interrater_agreement_table()}}, \code{\link[=plot_facets_chisq]{plot_facets_chisq()}},
-\code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}}, \link{mfrmr_visual_diagnostics}
+\code{\link[=interrater_agreement_table]{interrater_agreement_table()}}, \link[=plot.mfrm_fit]{plot(x, type = "facets_chisq")},
+\link[=plot.mfrm_fit]{plot(x, type = "qc")}, \link{mfrmr_visual_diagnostics}
 }
+\keyword{internal}

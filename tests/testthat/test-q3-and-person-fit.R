@@ -4,7 +4,7 @@
 
 local({
   .toy <<- load_mfrmr_data("example_core")
-  .fit <<- make_toy_fit()
+  .fit <<- make_toy_fit(maxit = 150)
   .diag <<- make_toy_diagnostics(.fit)
 })
 
@@ -190,7 +190,10 @@ test_that("lz_star uses Snijders weight projection for JML-style estimates", {
   score_sum <- slope_item1 * r1[3] + slope_item2 * r2[4]
   expected_lz_star <- (centered_loglik - c_n * score_sum) / sqrt(corrected_var)
 
-  pf <- compute_person_fit_indices(fake_diag, fit = fake_fit)
+  pf <- compute_person_fit_indices(fake_diag)
+  correction <- compute_snijders_lz_star(fake_obs, "p1", fit = fake_fit)
+  pf[names(correction)] <- correction
+  pf <- add_person_fit_reporting_columns(pf)
   expect_equal(pf$lz_star, expected_lz_star, tolerance = 1e-12)
   expect_equal(pf$lz_star_c, c_n, tolerance = 1e-12)
   expect_equal(pf$lz_star_variance, corrected_var, tolerance = 1e-12)
@@ -206,7 +209,7 @@ test_that("lz_star is not applied to MML/EAP person scores", {
   expect_true(all(is.na(pf$lz_star)))
   expect_true(all(pf$lz_star_status == "not_applicable_eap"))
   expect_true(all(pf$ReportIndex %in% c("lz", "none")))
-  expect_true(all(grepl("not_applicable_eap", pf$ReportCaveat, fixed = TRUE)))
+  expect_true(all(grepl("MML/EAP", pf$ReportCaveat, fixed = TRUE)))
 })
 
 test_that("lz_star falls back with explicit status when Snijders information is degenerate", {
@@ -232,11 +235,14 @@ test_that("lz_star falls back with explicit status when Snijders information is 
          summary = data.frame(Method = "JML")),
     class = "mfrm_fit"
   )
-  pf <- compute_person_fit_indices(list(obs = fake_obs), fit = fake_fit)
+  pf <- compute_person_fit_indices(list(obs = fake_obs))
+  correction <- compute_snijders_lz_star(fake_obs, "p1", fit = fake_fit)
+  pf[names(correction)] <- correction
+  pf <- add_person_fit_reporting_columns(pf)
   expect_true(is.na(pf$lz_star))
   expect_identical(pf$lz_star_status, "insufficient_information")
   expect_identical(pf$ReportIndex, "lz")
-  expect_true(grepl("insufficient_information", pf$ReportCaveat, fixed = TRUE))
+  expect_true(grepl("insufficient information", pf$ReportCaveat, fixed = TRUE))
 })
 
 # --- mfrm_generalizability -----------------------------------------------
@@ -253,8 +259,9 @@ test_that("mfrm_generalizability returns variance components and G/Phi", {
                   %in% names(gt$coefficients)))
   expect_true(all(c(
     "identification_status", "identification_note", "boundary_fit",
-    "singular_fit", "lmer_messages"
+    "singular_fit", "lmer_messages", "estimand_scale"
   ) %in% names(gt$design)))
+  expect_identical(gt$design$estimand_scale, "observed_numeric_score")
 })
 
 test_that("mfrm_generalizability records singular boundary fits", {
@@ -312,6 +319,7 @@ test_that("mfrm_d_study downgrades coefficients when G-study identification is c
         object_facet = "Person",
         random_facets = c("Rater", "Criterion"),
         observed_levels = c(Person = 6L, Rater = 2L, Criterion = 2L),
+        calculation_version = 2L,
         identification_status = "boundary_or_singular_fit",
         identification_note = "Boundary fit used as identification warning.",
         boundary_fit = TRUE
@@ -352,8 +360,11 @@ test_that("mfrm_d_study projects G and Phi across planned counts", {
   ) %in% names(ds)))
   expect_equal(nrow(ds), 6L)
   expect_true(all(c("highest_order", "single_condition", "none") %in% ds$ResidualScaling))
+  expect_identical(attr(ds, "estimand_scale"), "observed_numeric_score")
   expect_true(all(is.na(ds$G) | (ds$G >= 0 & ds$G <= 1)))
   expect_true(all(is.na(ds$Phi) | (ds$Phi >= 0 & ds$Phi <= 1)))
+  expect_true(all(is.na(ds$G) | is.na(ds$Phi) |
+                    ds$Phi <= ds$G + 1e-8))
 
   highest <- ds[ds$ResidualScaling == "highest_order", , drop = FALSE]
   if (all(is.finite(highest$G))) {
@@ -421,4 +432,71 @@ test_that("mfrm_d_study projects G and Phi across planned counts", {
   default_ds <- mfrm_d_study(gt)
   expect_equal(nrow(default_ds), 1L)
   expect_identical(default_ds$ResidualScaling, "highest_order")
+})
+
+test_that("G-study retains variance precision and fitted-row counts", {
+  skip_if_not_installed("lme4")
+  data <- as.data.frame(.fit$prep$data)
+  regular <- mfrm_generalizability(.fit, data = data)
+  data$Score <- data$Score * 1e-4
+  scaled <- mfrm_generalizability(.fit, data = data)
+  expect_equal(scaled$coefficients[c("G", "Phi")], regular$coefficients[c("G", "Phi")], tolerance = 1e-4)
+  expect_equal(scaled$variance_components$Variance * 1e8, regular$variance_components$Variance, tolerance = 1e-5)
+  expect_gt(sum(scaled$variance_components$Variance), 0)
+  data$Person <- as.character(data$Person)
+  data$Rater <- as.character(data$Rater)
+  dropped <- data[1, ]; dropped$Person <- "OnlyMissing"; dropped$Rater <- NA_character_
+  complete <- mfrm_generalizability(.fit, data = rbind(data, dropped), missing = "omit")
+  expect_equal(complete$design$observed_levels, scaled$design$observed_levels)
+  stale <- regular; stale$design$calculation_version <- NULL
+  expect_error(mfrm_d_study(stale), "Recreate mfrm_generalizability", fixed = TRUE)
+  expect_error(print(stale), "Recreate mfrm_generalizability", fixed = TRUE)
+})
+
+test_that("D-study does not replace missing variance by zero or guess identification", {
+  gt <- structure(list(
+    variance_components = data.frame(Source = c("Person", "Rater", "Criterion", "Residual"), Variance = c(1, .4, .2, .8)),
+    design = list(object_facet = "Person", random_facets = c("Rater", "Criterion"),
+                  calculation_version = 2L, identification_status = "identified")
+  ), class = c("mfrm_generalizability", "list"))
+  grid <- data.frame(Rater = c(2, 4), Criterion = 4)
+  ds <- mfrm_d_study(gt, grid)
+  expect_equal(ds$RelativeErrorVariance, c(.1, .05))
+  expect_equal(ds$AbsoluteErrorVariance, c(.35, .2))
+  columns <- c("n_Rater", "n_Criterion", "G", "Phi", "GStatus", "PhiStatus",
+               "IdentificationStatus")
+  selected <- ds[, columns]
+  expect_equal(lapply(selected, identity), lapply(ds, identity)[columns])
+  expect_identical(attr(selected, "calculation_version"), 2L)
+  expect_identical(attr(selected, "residual_scaling"), attr(ds, "residual_scaling"))
+  expect_output(print(selected), "Observed-score planning projections", fixed = TRUE)
+  expect_equal(ds[, "G"], ds$G)
+  expect_identical(attr(ds[1L, , drop = FALSE], "calculation_version"), 2L)
+  factor_grid <- grid; factor_grid$Rater <- factor(grid$Rater)
+  expect_equal(mfrm_d_study(gt, factor_grid)$G, ds$G)
+  expect_error(mfrm_d_study(gt, data.frame(Rater = 2.5, Criterion = 4)), "positive finite integers")
+  missing <- gt; missing$variance_components$Variance[4] <- NA_real_
+  expect_true(all(is.na(mfrm_d_study(missing, grid)$G)))
+  missing <- gt; missing$variance_components <- missing$variance_components[-2, ]
+  partial <- mfrm_d_study(missing, grid)
+  expect_equal(partial$G, ds$G)
+  expect_true(all(is.na(partial$Phi)))
+  invalid <- gt; invalid$variance_components$Variance[4] <- -1
+  expect_true(all(is.na(mfrm_d_study(invalid, grid)$G)))
+  unknown <- gt; unknown$design$identification_status <- NULL
+  expect_true(all(mfrm_d_study(unknown, grid)$GStatus == "identification_warning"))
+  stale <- ds; attr(stale, "calculation_version") <- NULL
+  expect_error(print(stale), "Recreate mfrm_generalizability", fixed = TRUE)
+  expect_error(plot(stale, draw = FALSE), "Recreate mfrm_generalizability", fixed = TRUE)
+  expect_error(print(stale[, columns]), "Recreate mfrm_generalizability", fixed = TRUE)
+  printed <- paste(capture.output(print(ds)), collapse = "\n")
+  expect_false(grepl("at_or_above_|highest_order|identified", printed))
+})
+
+test_that("G-study numerical warnings cannot become identified coefficient bands", {
+  skip_if_not_installed("lme4")
+  mixed <- lme4::lmer(Reaction ~ 1 + (1 | Subject), lme4::sleepstudy)
+  status <- mfrmr:::mfrmr_gt_boundary_status(mixed, lmer_warnings = "Model failed to converge")
+  expect_identical(status$identification_status, "convergence_review")
+  expect_identical(mfrmr:::mfrmr_gt_classify_coef(.99, status$identification_status), "identification_warning")
 })

@@ -2,6 +2,7 @@
 % Please edit documentation in R/api-reporting-checklist.R
 \name{reporting_checklist}
 \alias{reporting_checklist}
+\alias{summary.mfrm_reporting_checklist}
 \title{Build an auto-filled MFRM reporting checklist}
 \usage{
 reporting_checklist(
@@ -11,6 +12,8 @@ reporting_checklist(
   hierarchical_structure = NULL,
   include_references = TRUE
 )
+
+\method{summary}{mfrm_reporting_checklist}(object, top_n = 10, ...)
 }
 \arguments{
 \item{fit}{Output from \code{\link[=fit_mfrm]{fit_mfrm()}}.}
@@ -22,18 +25,40 @@ diagnostics are computed with \code{residual_pca = "none"}.}
 such outputs.}
 
 \item{hierarchical_structure}{Optional output from
-\code{\link[=analyze_hierarchical_structure]{analyze_hierarchical_structure()}}. When supplied, the
-"Hierarchical structure review" checklist item is flipped to
-\code{DraftReady = TRUE} and its \code{Detail} column surfaces the number
-of nested / crossed facet pairs and whether the ICC table is
-available.}
+\code{\link[=analyze_hierarchical_structure]{analyze_hierarchical_structure()}} for matching retained rating rows.
+The reviewed facets may be a subset of the fitted facets. After checking
+the data identity, the "Hierarchical structure review" item is marked
+\code{DraftReady = TRUE}; \code{Detail} names the reviewed columns, row count,
+nested / crossed pairs and ICC availability. This indicates available
+material within that scope, not a complete design assessment.}
 
 \item{include_references}{If \code{TRUE}, include a compact reference table in the
 returned bundle.}
+
+\item{object}{Output from \code{\link[=reporting_checklist]{reporting_checklist()}}.}
+
+\item{top_n}{Maximum number of draft-action rows shown in the compact action
+table.}
+
+\item{...}{Reserved for generic compatibility.}
 }
 \value{
 A named list with checklist tables. Class:
 \code{mfrm_reporting_checklist}.
+
+For \code{summary()}: An object of class \code{summary.mfrm_reporting_checklist} with:
+\itemize{
+\item \code{overview}: run-level counts of available and draft-ready items
+\item \code{section_summary}: section-level checklist coverage
+\item \code{software_scope}: external-software relationship summary
+\item \code{facets_positioning}: report-ready FACETS relationship wording
+\item \code{visual_scope}: available plots and data for custom rendering, including
+the main \code{InterpretationCheck} caveat for each type of plot
+\item \code{priority_summary}: counts by priority/severity
+\item \code{action_items}: highest-priority rows that still need draft work
+\item \code{settings}: checklist settings rendered as a compact table
+\item \code{notes}: interpretation notes
+}
 }
 \description{
 Build an auto-filled MFRM reporting checklist
@@ -62,6 +87,8 @@ wording, and ConQuest scope wording.
 
 The output is designed for manuscript preparation, reproducibility records, and
 reproducible reporting workflows.
+
+\code{summary()} method: Summarize a reporting-checklist bundle for manuscript work
 }
 \section{What this checklist means}{
 
@@ -79,6 +106,12 @@ backward-compatible alias.
 \item \code{DraftReady = TRUE} / \code{ReadyForAPA = TRUE} does not certify formal
 inferential adequacy.
 \item Missing bias rows may simply mean \code{bias_results} were not supplied.
+\item Study questions, recruitment, rater training, the assignment process,
+missingness reasons, ethics, and substantive interpretation require the
+author's study record. Available output does not verify those facts.
+The "Manuscript coverage map" in
+\code{vignette("mfrmr-reporting-and-apa", package = "mfrmr")} pairs reporting
+topics with numerical evidence and information to supply manually.
 }
 }
 
@@ -90,8 +123,9 @@ inferential adequacy.
 package's documented caveats. \code{ReadyForAPA} is a backward-compatible alias
 of the same flag; neither field certifies formal inferential adequacy.
 \item \code{fit_readiness}, \code{fit_readiness_components}, and
-\code{fit_readiness_parameters}: exact source-fit v3 readiness provenance;
-these fields are not re-derived from checklist completeness.
+\code{fit_readiness_parameters}: the fitted model's recorded numerical checks
+and restrictions on inference, overall and by component or parameter.
+Checklist completeness does not change these records.
 \item \code{section_summary}: available items by section.
 \item The Global Fit section includes a "Fit/separation reporting boundary"
 row that points to \code{\link[=precision_review_report]{precision_review_report()}}, \code{\link[=fit_measures_table]{fit_measures_table()}},
@@ -102,10 +136,13 @@ FACETS, ConQuest, and SPSS-style tabular handoffs.
 \item \code{facets_positioning}: report-ready wording that states \code{mfrmr} is not a
 FACETS numerical clone and separates native estimation from FACETS-style
 handoff or external-table review.
-\item \code{visual_scope}: plotting-route summary that separates report-default
-2D figures from exploratory surface/3D-ready data handoffs, including a
-short \code{InterpretationCheck} for the main user-facing caveat.
-\item \code{references}: core background references when requested.
+\item \code{visual_scope}: available plots and their interpretation limits. It
+distinguishes 2D figures from category-surface data for custom rendering;
+data availability does not mean an interactive 3D renderer is provided.
+\code{InterpretationCheck} gives the main caveat for each type of plot.
+\item \code{references}: abbreviated background citations and topics when requested,
+not a complete bibliography. Verify full records for the methods used;
+use \code{citation("mfrmr")} for the installed software's citation.
 }
 }
 
@@ -151,38 +188,57 @@ available from the current analysis objects.
 }
 }
 
-\examples{
-\donttest{
-# Minimal checklist example using a JML fit and lightweight diagnostics.
-toy <- load_mfrmr_data("example_core")
-# A balanced slice retains every Rater and Criterion while running quickly.
-toy <- toy[toy$Person \%in\% unique(toy$Person)[1:12], , drop = FALSE]
-fit_quick <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                      method = "JML", maxit = 30)
-diag_quick <- diagnose_mfrm(fit_quick, residual_pca = "none",
-                             diagnostic_mode = "legacy")
-chk_quick <- reporting_checklist(fit_quick, diagnostics = diag_quick)
-head(chk_quick$checklist[, c("Section", "Item", "DraftReady")])
+\section{Saved-result reuse}{
 
+Supplied screening results must describe this fitted analysis. Results from
+another fit or older results without identity metadata are refused. See
+\link{mfrmr_compatibility_layer} to recreate them from the saved fit and matching
+diagnostics without refitting the model.
+Structural reviews are checked against the reviewed data, not the model's
+estimates. Row order and unused columns do not affect this match. Reviews
+of additional input rows or unrecorded grouping columns remain standalone
+analyses; they cannot establish availability for this fit's checklist.
+}
+
+\examples{
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("reporting_checklist", run.dontrun = TRUE)
+\dontrun{
+library(mfrmr)
+
+# Saved synthetic MML/RSM analysis of example_operational.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "operational-mml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+
+# Use the diagnostics saved with this fit
+diagnostics <- example_fit$diagnostics
+
+# Which reporting items still need evidence or explanation?
+checklist <- reporting_checklist(fit, diagnostics = diagnostics)
+checklist$section_summary
+
+# Review the missing items and their suggested next actions
+subset(checklist$checklist, !DraftReady,
+       c("Section", "Item", "DraftReady", "NextAction"))
+# DraftReady is TRUE/FALSE; TRUE means draft material is available with caveats
+# Choose follow-up analyses for your question, not merely to make every row TRUE
+}
+# Long-running workflow; run explicitly when needed.
+# example("summary.mfrm_reporting_checklist", run.dontrun = TRUE)
+\dontrun{
+toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                 method = "MML", quad_points = 7, maxit = 30)
 diag <- diagnose_mfrm(fit, residual_pca = "both", diagnostic_mode = "both")
 chk <- reporting_checklist(fit, diagnostics = diag)
 summary(chk)
-# Look for: a high `Ready` / `Total` ratio in the summary block.
-#   Sections with `Ready = 0` need follow-up before submitting
-#   (typically diagnostic_mode = "both" or a residual-PCA pass).
-apa <- build_apa_outputs(fit, diag)
-head(chk$checklist[, c("Section", "Item", "DraftReady", "NextAction")])
-# Look for: every row where `DraftReady = "yes"` is ready to paste
-#   into the manuscript. `"no"` rows include a concrete `NextAction`
-#   step (e.g. "run plot_qc_dashboard()") so the gap can be closed
-#   without re-reading the methodology guide.
-nchar(apa$report_text)
 }
 }
 \seealso{
 \code{\link[=build_apa_outputs]{build_apa_outputs()}}, \code{\link[=build_visual_summaries]{build_visual_summaries()}},
 \code{\link[=specifications_report]{specifications_report()}}, \code{\link[=data_quality_report]{data_quality_report()}},
 \code{\link[=build_misfit_casebook]{build_misfit_casebook()}}, \code{\link[=build_linking_review]{build_linking_review()}}
+
+\code{\link[=reporting_checklist]{reporting_checklist()}}, \link{summary.mfrm_apa_outputs}
 }

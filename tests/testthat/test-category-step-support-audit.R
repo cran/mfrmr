@@ -65,7 +65,7 @@ test_that("balanced PCM records the complete category and step contract", {
 
   expect_identical(
     audit$contract_version,
-    "mfrmr-readiness-0.2.3-v3"
+    mfrmr:::mfrmr_readiness_contract_version()
   )
   expect_identical(audit$readiness$CategoryState, "adequate")
   expect_true(all(required %in% names(audit$support_table)))
@@ -210,7 +210,7 @@ test_that("unsupported contrast suppresses only its missing internal category", 
   expect_gt(log_likelihood(20), log_likelihood(7))
 })
 
-test_that("bounded GPCM inherits the PCM unsupported-step gate", {
+test_that("GPCM inherits the PCM unsupported-step gate", {
   audit <- .category_support_audit(
     .category_support_data(c2_categories = c(0L, 2L, 3L)),
     model = "GPCM"

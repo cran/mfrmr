@@ -2,14 +2,15 @@
 % Please edit documentation in R/datasets.R
 \name{list_mfrmr_data}
 \alias{list_mfrmr_data}
-\title{List packaged simulation datasets}
+\title{List packaged ordered-response MFRM datasets}
 \usage{
 list_mfrmr_data(details = FALSE)
 }
 \arguments{
 \item{details}{If \code{FALSE} (default), return the backward-compatible
 character vector of dataset keys. If \code{TRUE}, return a catalog describing
-the intended teaching role and design of every dataset.}
+the intended teaching role and design of each dataset accepted by
+\code{\link[=load_mfrmr_data]{load_mfrmr_data()}}.}
 }
 \value{
 A character vector of dataset keys accepted by \code{\link[=load_mfrmr_data]{load_mfrmr_data()}},
@@ -18,11 +19,14 @@ or, when \code{details = TRUE}, a data.frame with \code{Key}, \code{Rows}, \code
 \code{Empirical}.
 }
 \description{
-List packaged simulation datasets
+List packaged ordered-response MFRM datasets
 }
 \details{
 Use this helper when you want to select packaged data programmatically
 (e.g., inside scripts, loops, or interactive-application wrappers).
+For the separately packaged G-theory and agreement tables loaded with
+\code{data()}, see \link{mfrmr_gtheory_data} and \link{mfrmr_agreement_data}. These use
+different input structures and are not keys for \code{\link[=load_mfrmr_data]{load_mfrmr_data()}}.
 
 Typical pattern:
 \enumerate{
@@ -51,13 +55,18 @@ Every bundled dataset is synthetic rather than empirical.
 }
 
 \examples{
-keys <- list_mfrmr_data()
-keys
-list_mfrmr_data(details = TRUE)[, c(
-  "Key", "PrimaryUse", "Design", "CountBasis"
-)]
-d <- load_mfrmr_data("example_operational")
-head(d)
+library(mfrmr)
+
+# See the names accepted by load_mfrmr_data()
+list_mfrmr_data()
+
+# Compare the purpose and design of the available datasets
+catalog <- list_mfrmr_data(details = TRUE)
+catalog[, c("Key", "PrimaryUse", "Design")]
+
+# Choose one dataset
+ratings <- load_mfrmr_data("example_operational")
+head(ratings)
 }
 \seealso{
 \code{\link[=load_mfrmr_data]{load_mfrmr_data()}}, \link{ej2021_data}

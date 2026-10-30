@@ -98,11 +98,17 @@ test_that("JMLE input resolves immediately to canonical JML state", {
 
 test_that("legacy JMLE labels are canonicalized on public output surfaces", {
   legacy <- make_toy_fit(method = "JML", maxit = 30)
+  current <- legacy
   legacy$summary$Method <- "JMLE"
   legacy$summary$MethodUsed <- "JMLE"
   legacy$config$method <- "JMLE"
   legacy$config$method_input <- "JMLE"
   legacy$config$replay_inputs$method <- "JMLE"
+  before <- serialize(legacy, NULL)
+  current_diagnostics <- diagnose_mfrm(current)
+  legacy_diagnostics <- diagnose_mfrm(legacy)
+  expect_identical(legacy_diagnostics$obs, current_diagnostics$obs)
+  expect_identical(legacy_diagnostics$measures, current_diagnostics$measures)
 
   fit_summary <- summary(legacy, profile = "fit", detail = "brief")
   expect_identical(as.character(fit_summary$overview$Method[[1]]), "JML")
@@ -123,4 +129,5 @@ test_that("legacy JMLE labels are canonicalized on public output surfaces", {
   expect_match(replay$script, "Method: JML", fixed = TRUE)
   expect_match(replay$script, 'method = "JML"', fixed = TRUE)
   expect_false(grepl('method = "JMLE"', replay$script, fixed = TRUE))
+  expect_identical(serialize(legacy, NULL), before)
 })

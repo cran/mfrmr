@@ -1,0 +1,309 @@
+---
+title: "Many-facet GPCM: measurement and rating agreement"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+params:
+  ratings_csv: null
+  rating_min: 1
+  rating_max: 4
+  output_dir: "gpcm-report-files"
+---
+
+```{r setup, include=FALSE}
+library(mfrmr)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, fig.width = 7.5, fig.height = 5)
+example_run <- is.null(params$ratings_csv)
+if (example_run) {
+  ratings <- load_mfrmr_data("example_operational")
+} else {
+  ratings <- read.csv(params$ratings_csv, colClasses = "character", check.names = FALSE)
+  stopifnot(all(c("Person", "Rater", "Criterion", "Score") %in% names(ratings)))
+  score <- suppressWarnings(as.numeric(ratings$Score))
+  if (any(!is.na(ratings$Score) & is.na(score)))
+    stop("Score must contain numeric rubric values or NA. Recode documented missing markers first.")
+  ratings$Score <- score
+}
+rubric <- seq.int(params$rating_min, params$rating_max)
+if (anyDuplicated(ratings[c("Person", "Rater", "Criterion")]))
+  stop("This template expects one rating per Person/Rater/Criterion. For repeated occasions, define the measurement unit and agreement keys explicitly.")
+
+fit <- fit_mfrm(
+  ratings, person = "Person", facets = c("Rater", "Criterion"), score = "Score",
+  rating_min = params$rating_min, rating_max = params$rating_max,
+  category_policy = "preserve", method = "MML", model = "GPCM",
+  step_facet = "Criterion", slope_facet = "Criterion"
+)
+diagnostics <- diagnose_mfrm(fit, diagnostic_mode = "both", residual_pca = "none")
+results <- mfrm_results(fit, diagnostics = diagnostics, include = "publication")
+study_context <- c(
+  rating_unit = "One Person by Rater by Criterion rating",
+  score_direction = "Specify what higher coded scores mean in this study",
+  rubric = paste("Permitted scores", params$rating_min, "to", params$rating_max),
+  transformation = "No recoding in this template; document any prior transformation"
+)
+report <- mfrm_report(results, style = "apa", study_context = study_context)
+fit_summary <- summary(fit)
+alpha <- krippendorff_alpha_table(
+  ratings, rater = "Rater", unit = c("Person", "Criterion"), score = "Score",
+  level = "ordinal", categories = rubric
+)
+curves <- category_curves_report(fit, digits = 15)
+out <- params$output_dir
+dir.create(out, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Relate this report to the assessment question
+
+When combining measurement and G/D studies, report each analysis's input unit,
+retained sample, score scale, facets, aggregation, weights and uncertainty
+separately. Explain what MFRM reveals about specific facet effects and what
+G/D reveals about reproducibility of the defined observed score and future
+plans. Do not treat Rasch-adjusted estimates as interchangeable with raw G-study
+scores. The package's `mfrmr-networks-and-reporting` vignette shows published
+speaking/writing examples and a FACETS/ConQuest reporting crosswalk. Select
+linking, bias and model-comparison modules from `mfrmr-reporting-and-apa` when
+they address the question; this template does not run every possible analysis.
+
+## Read this report
+
+`r if (example_run) "**Synthetic example:** this report illustrates the workflow; its numbers are not findings about a real assessment." else "**Study draft:** complete the context and interpretation prompts before using this report in a manuscript."`
+
+This report separates three questions: how persons and raters differ on the
+measurement scale, how closely ratings follow the model, and how much raters
+agree on observed scores. It includes the tables, two figures and underlying
+files needed to develop a Methods and Results section.
+
+**Current analysis:** `r report$decision$Interpretation[1]`.
+**Formal-inference status:** `r report$decision$FormalInference[1]`.
+This status is retained in the saved analysis. A review status does not turn
+the descriptive tables into confirmatory evidence.
+
+## Study question and rating design
+
+**Complete for your study:** state the assessment purpose and intended score
+use, participants and recruitment, rater selection/training, assignment and
+overlap, and the substantive meaning of each rubric category. Explain why
+criterion-specific thresholds and discriminations address the question.
+Record both endpoint labels and which direction answers the substantive
+question. Comprehensibility can mean ease or difficulty; the column name
+does not determine that direction. Retain any recoding rule and the original
+scores, and ensure anchors use the same coding and scale.
+
+```{r design}
+design <- data.frame(
+  Quantity = c("Input rating rows", "Retained model rows", "Retained persons",
+    "Retained raters", "Retained criteria", "Input missing scores"),
+  Value = c(nrow(ratings), nrow(fit$prep$data),
+    length(unique(fit$prep$data$Person)), length(unique(fit$prep$data$Rater)),
+    length(unique(fit$prep$data$Criterion)), sum(is.na(ratings$Score)))
+)
+knitr::kable(design, caption = "Analysis units and data retention")
+```
+
+Rows are repeated ratings, not independent participants. Describe missing or
+excluded ratings and their reasons from the study records; absent planned
+assignments require an assignment roster to identify.
+
+## Model and estimation
+
+A one-family many-facet GPCM was fitted by marginal maximum likelihood (MML),
+with criterion-specific category steps and discriminations, fixed rater and
+criterion effects, and an estimated normal person-population mean and SD.
+Relative criterion slopes have geometric mean one. Facet locations are
+centered within each facet. Higher Person locations predict higher coded
+scores; higher default Rater locations predict lower coded scores, meaning
+stricter scoring only when higher scores are more favorable. The permitted score scale was
+`r params$rating_min`–`r params$rating_max`, including unused permitted categories.
+
+```{r fit-settings}
+knitr::kable(fit_summary$overview[, intersect(c("Model", "Method", "Persons",
+  "Converged", "LogLik"), names(fit_summary$overview)), drop = FALSE], digits = 3)
+knitr::kable(fit_summary$settings_overview[, intersect(c("QuadPoints",
+  "RatingMin", "RatingMax"), names(fit_summary$settings_overview)), drop = FALSE])
+population <- fit_summary$population_overview
+population_coefficients <- fit_summary$population_coefficients
+knitr::kable(population[, c("Formula", "IdentificationRole", "ResidualVariance",
+  "InferenceReady")], digits = 3, caption = "Recorded population model and variance")
+knitr::kable(population_coefficients, digits = 3,
+  caption = "Estimated population mean (intercept); no interval is supplied here")
+```
+
+Retain the numerical review below. If an interval or close model comparison is
+central to the conclusion, perform and report its target-specific checks.
+Changing the model, prior, anchors, weights or estimator requires updating this
+Methods description as well as the code.
+
+## Estimates and discrimination
+
+```{r estimates}
+measures <- as.data.frame(diagnostics$measures)
+slopes <- as.data.frame(fit$slopes)
+knitr::kable(subset(measures, Facet != "Person", select = c(
+  Facet, Level, Estimate, SE, SEUse)), digits = 3,
+  caption = "Rater and criterion locations, with the recorded SE-use status")
+knitr::kable(slopes[, c("SlopeFacet", "Estimate", "ParameterStatus", "CIEligible")],
+  digits = 3, caption = "Criterion discrimination estimates and interval eligibility")
+```
+
+The slope describes sensitivity to ability on the declared scale. It is not
+a scoring weight or a ranking of criterion quality. No slope intervals are
+computed by this template; request and review `confint(fit, parm = "slopes")`
+separately when they answer the study question. Step estimates and all Person
+measures are retained in the exported tables.
+
+## Separation, Strata and reliability
+
+```{r precision}
+precision <- as.data.frame(diagnostics$reliability)
+knitr::kable(precision[, c("Facet", "Levels", "Separation", "Strata",
+  "Reliability", "RealReliability", "ReliabilityUse")], digits = 3,
+  caption = "Separation-based precision summaries by facet")
+```
+
+Person separation concerns distinguishable abilities; rater separation
+concerns distinguishable severities. High rater separation reliability does
+not mean high agreement. Strata is a transformation of separation, not an
+observed number of groups. Model and fit-adjusted reliability use different
+error bases; the GPCM summaries here use approximate marginal-SE variance
+subtraction without propagating covariance. Retain their recorded use status.
+
+**Results prompt:** explain which facet matters for the research question,
+the magnitude of its differences and whether the available precision supports
+the intended interpretation. Do not label every coefficient simply “reliability.”
+
+## Model fit
+
+```{r fit-statistics}
+fit_table <- as.data.frame(diagnostics$fit)
+knitr::kable(subset(fit_table, Facet != "Person", select = c(
+  Facet, Level, N, Infit, Outfit, InfitZSTD, OutfitZSTD, FitStatus)), digits = 3,
+  caption = "Rater and criterion fit; all Person rows are retained in the CSV")
+```
+
+These Infit/Outfit statistics use native MML EAP plug-in diagnostics. They are
+not numerically interchangeable with posterior-averaged TAM/ConQuest fit.
+MnSq has reference value 1; any screening cutoff needs a stated purpose and
+source. Review flags prompt investigation rather than automatic exclusions.
+
+## Wright map
+
+```{r wright-map, fig.cap="Person EAPs, rater/criterion locations and category steps for this GPCM. This point-estimate map does not display confidence intervals."}
+png(file.path(out, "wright.png"), width = 1800, height = 1200, res = 200)
+tryCatch(wright <- plot(fit, type = "wright", diagnostics = diagnostics,
+  show_ci = FALSE, top_n = Inf, preset = "publication"), finally = dev.off())
+knitr::include_graphics(file.path(out, "wright.png"))
+```
+
+**Results prompt:** describe targeting and the size of relevant facet
+differences. This map does not establish unidimensionality or test every
+rater contrast.
+
+## Category-probability curves
+
+```{r probability-curves, fig.cap="Category probabilities conditional on ability for the fitted criterion profiles. Additive facet locations are fixed at the reference value zero; these are point curves, not confidence bands."}
+png(file.path(out, "ccc.png"), width = 1800, height = 1200, res = 200)
+tryCatch(ccc <- plot(fit, type = "ccc", preset = "publication"), finally = dev.off())
+knitr::include_graphics(file.path(out, "ccc.png"))
+```
+
+The curves show where each permitted score is most probable. Their owners and
+reference settings are retained below and with the exported coordinates.
+Use `category_curves_report(fit, newdata = ...)` for specified full rating
+contexts rather than interpreting a reference profile as an average rating.
+
+```{r curve-profiles}
+knitr::kable(curves$curve_profiles, caption = "Category-curve profiles")
+```
+
+## Observed rating agreement
+
+```{r agreement}
+knitr::kable(alpha$table[, c("Alpha", "Level", "Status", "Raters", "Units",
+  "PairableUnits", "PairableRatings")], digits = 3,
+  caption = "Ordinal Krippendorff's alpha on matched Person × Criterion units")
+```
+
+Alpha is calculated from observed ratings, separately from the GPCM. Report
+the ordinal distance definition, pairable units and ratings, and how missing
+ratings were handled. Units with fewer than two nonmissing ratings do not
+contribute to alpha. This output provides no confidence interval. Alpha is
+neither Cronbach's alpha nor the separation reliability above.
+
+**Results prompt:** explain the observed agreement and its practical relevance
+alongside the model-adjusted severity differences; neither alone establishes
+validity or individual rater accuracy.
+
+### Optional: agreement for specified rater pairs
+
+The example above asks about the panel. If your question concerns particular
+pairs, use Cohen's kappa with an explicitly chosen weighting. This code is
+provided for adaptation and is not run automatically:
+
+```{r pairwise-agreement, eval=FALSE, echo=TRUE}
+kappa <- pairwise_kappa_table(
+  ratings, rater = "Rater", unit = c("Person", "Criterion"), score = "Score",
+  categories = rubric, weights = "quadratic"
+)
+kappa$table[, c("Rater1", "Rater2", "N", "Kappa", "Status")]
+write.csv(kappa$table, file.path(out, "pairwise_kappa.csv"), row.names = FALSE)
+saveRDS(kappa, file.path(out, "pairwise_kappa.rds"))
+```
+
+Choose unweighted, linear or quadratic weights from the category meaning.
+`N` counts shared complete units for each pair; pairs without overlap retain
+unavailable values. Do not average pairwise kappas into a panel coefficient
+or choose pairs/weights after seeing which coefficients are largest. For
+different criteria or occasions, decide whether separate analyses are needed.
+Separation, Strata and Reliability above describe a different question and
+remain part of the measurement report.
+
+## Interpretation, review and manuscript assembly
+
+**Complete for your study:** answer the original question in words, then state
+the effect size, uncertainty, design limitations and implications. Explain
+which additional analyses were planned; an optional unrequested analysis is
+not automatically a gap. The generated report is a draft, not a completed paper.
+
+<details>
+<summary>Numerical review and claim-specific checks</summary>
+
+```{r review}
+knitr::kable(report$decision)
+knitr::kable(report$first_screen[, c("Area", "Status", "MainIssue", "NextAction")])
+```
+
+</details>
+
+The full draft and table/figure wording are saved with the analysis. Review
+them against the study context rather than copying every generated sentence.
+Use `reporting_checklist()` for the manuscript coverage map and
+`visual_reporting_template()` for figure-caption starters.
+
+## Files and references
+
+```{r save-files}
+tables <- list(study_context = report$study_context, design = design, measures = measures, slopes = slopes,
+  population = population, population_coefficients = population_coefficients,
+  steps = as.data.frame(fit$steps), precision = precision, fit = fit_table,
+  ordinal_alpha = alpha$table, alpha_units = alpha$unit_summary,
+  curve_profiles = curves$curve_profiles, curve_coordinates = curves$probabilities)
+for (name in names(tables))
+  write.csv(tables[[name]], file.path(out, paste0(name, ".csv")), row.names = FALSE)
+writeLines(report$markdown, file.path(out, "report-draft.md"))
+saveRDS(list(results = results, report = report, agreement = alpha, curves = curves,
+  plots = list(wright = wright, ccc = ccc)), file.path(out, "analysis.rds"))
+writeLines(capture.output(sessionInfo()), file.path(out, "session-info.txt"))
+knitr::kable(data.frame(File = list.files(out)), caption = "Saved analysis files")
+```
+
+The CSVs retain the returned values; displayed tables are rounded. The RDS retains
+the fit, diagnostics, agreement audits and report with declared score meaning.
+Review identifiers before sharing.
+Add the model and agreement-method references relevant to your actual analysis;
+see `?fit_mfrm`, `?krippendorff_alpha_table` and `?mfrmr_methods_reference`.
+
+```{r citation}
+citation("mfrmr")
+```

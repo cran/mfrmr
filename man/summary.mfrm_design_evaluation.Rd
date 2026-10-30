@@ -9,7 +9,8 @@
 \arguments{
 \item{object}{Output from \code{\link[=evaluate_mfrm_design]{evaluate_mfrm_design()}}.}
 
-\item{digits}{Number of digits used in the returned numeric summaries.}
+\item{digits}{Number of digits used when printing the summary. Returned
+numeric tables retain full precision for plotting and design decisions.}
 
 \item{...}{Reserved for generic compatibility.}
 }
@@ -46,18 +47,45 @@ design planning, especially:
 \item severity recovery RMSE
 \item mean misfit rate
 }
+
+\code{Reps}, \code{ConvergenceRate}, and \code{McseConvergenceRate} use all recorded
+replications for each design, including fit and diagnostic failures.
+Only a recorded \code{Converged = TRUE} counts as converged. \code{AvailableReps}
+counts the replications with returned results for that facet; performance
+means still use the available metric values. Designs with no returned
+facet results have no performance-summary rows and cannot be recommended.
+To update an older saved summary, call \code{summary()} again on the original
+evaluation object; no simulation or refitting is needed. Rebuilding also
+restores full precision when an older summary stored rounded metrics.
+It also withholds legacy PCM/GPCM recovery metrics whose step-location truth
+coordinates were not verified; those require a new evaluation for corrected
+recovery, while other diagnostic metrics remain. \code{RecoveryAvailableReps}
+reports the number of finite trial RMSEs. Mean-aligned bias is zero by
+construction; see \code{\link[=evaluate_mfrm_design]{evaluate_mfrm_design()}} for the comparison target.
+
+\code{MaxRatings} and \code{MaxRatingsPerRater} are the largest total rating count
+and individual rater workload across all recorded replications, including
+failed runs. A rating is one generated person-rater-criterion row; weights
+do not multiply workload. A maximum is \code{NA} when any replication lacks
+that count, including older evaluations without per-rater workload records.
+
+\code{MaxRaterComponents} and \code{MaxCriterionComponents} give the largest
+Person-facet component count across all recorded assignments; a missing
+count makes its maximum \code{NA}. \code{DisconnectedReps} counts replications with
+a recorded disconnection in either graph. Zero known disconnections does
+not establish connectedness when records are missing. Sparse-design
+summaries also use all run records, including failures.
 }
 \examples{
-\donttest{
-sim_eval <- suppressWarnings(evaluate_mfrm_design(
-  n_person = c(8, 12),
-  n_rater = 2,
-  n_criterion = 2,
-  raters_per_person = 2,
-  reps = 1,
-  maxit = 30,
-  seed = 123
-))
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("summary.mfrm_design_evaluation", run.dontrun = TRUE)
+\dontrun{
+# One saved replication illustrates output structure, not precise rates.
+# Regeneration recipe: examples/simulation-results.R in the package.
+saved <- readRDS(system.file("examples", "simulation-design.rds",
+  package = "mfrmr", mustWork = TRUE))
+# Inspect saved$generation_warnings and the result's run/status tables.
+sim_eval <- saved$result
 s <- summary(sim_eval)
 s$overview
 head(s$design_summary)

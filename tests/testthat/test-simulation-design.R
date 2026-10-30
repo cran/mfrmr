@@ -458,7 +458,6 @@ test_that("structural design review grid bundle can be materialized and viewed f
   )
 
   materialize_bundle <- getFromNamespace("simulation_materialize_structural_design_grid_bundle", "mfrmr")
-  grid_view <- getFromNamespace("simulation_structural_design_grid_view", "mfrmr")
 
   from_spec <- materialize_bundle(spec)
   expect_identical(from_spec$bundle_contract, "arbitrary_facet_design_grid_bundle")
@@ -476,13 +475,13 @@ test_that("structural design review grid bundle can be materialized and viewed f
   expect_equal(sort(unique(from_schema$canonical$n_person)), c(12, 14))
 
   expect_identical(
-    names(grid_view(spec$planning_schema, view = "design")),
+    names(materialize_bundle(spec$planning_schema)$design),
     c("design_id", "person", "judge", "task", "assignment")
   )
   expect_true(all(
     c("design_id", "n_person", "n_rater", "n_criterion", "raters_per_person",
       "n_judge", "n_task", "judge_per_person") %in%
-      names(grid_view(spec$planning_schema, view = "public"))
+      names(materialize_bundle(spec$planning_schema)$public)
   ))
 })
 
@@ -583,12 +582,13 @@ test_that("structural design review table and plot payload expose deterministic 
   grid_table <- getFromNamespace("simulation_structural_design_grid_table", "mfrmr")
   grid_plot <- getFromNamespace("simulation_structural_design_grid_plot_payload", "mfrmr")
 
-  table_obj <- grid_table(
+  recommendation <- getFromNamespace("simulation_structural_design_grid_recommendation", "mfrmr")
+  selected <- recommendation(
     spec$planning_schema,
     design = list(facets = list(person = c(12, 14), judge = 3, task = c(2, 4)), assignment = c(1, 2)),
-    prefer = c("assignment", "task", "person"),
-    view = "public"
+    prefer = c("assignment", "task", "person")
   )
+  table_obj <- grid_table(selected, view = "public")
   expect_identical(table_obj$table_contract, "arbitrary_facet_design_grid_table")
   expect_true(table_obj$grid_available)
   expect_true(is.data.frame(table_obj$table))
@@ -596,11 +596,9 @@ test_that("structural design review table and plot payload expose deterministic 
   expect_identical(sum(table_obj$table$recommended), 1L)
 
   plot_obj <- grid_plot(
-    spec$planning_schema,
-    design = list(facets = list(person = c(12, 14), judge = 3, task = c(2, 4)), assignment = c(1, 2)),
+    selected,
     x_var = "assignment",
     group_var = "task",
-    prefer = c("assignment", "task", "person"),
     view = "design"
   )
   expect_s3_class(plot_obj, "mfrm_plot_data")
@@ -614,7 +612,7 @@ test_that("structural design review table and plot payload expose deterministic 
   expect_identical(sum(plot_obj$data$data$recommended), 1L)
 
   branch <- getFromNamespace("simulation_structural_design_schema", "mfrmr")(facet_names = c("Judge", "Task"))
-  unavailable_plot <- grid_plot(branch)
+  unavailable_plot <- grid_plot(recommendation(branch))
   expect_s3_class(unavailable_plot, "mfrm_plot_data")
   expect_false(unavailable_plot$data$plot_available)
   expect_equal(nrow(unavailable_plot$data$data), 0)
@@ -2133,15 +2131,15 @@ test_that("structural design review grid can be materialized from live planning 
     assignment = "rotating"
   )
 
-  materialize_branch_grid <- getFromNamespace("simulation_materialize_structural_design_grid", "mfrmr")
+  materialize_grid_bundle <- getFromNamespace("simulation_materialize_structural_design_grid_bundle", "mfrmr")
 
-  from_spec <- materialize_branch_grid(spec)
+  from_spec <- materialize_grid_bundle(spec)
   expect_identical(
     from_spec$canonical,
     spec$planning_schema$structural_design_grid_contract$canonical
   )
 
-  from_schema <- materialize_branch_grid(
+  from_schema <- materialize_grid_bundle(
     spec$planning_schema,
     design = list(facets = list(person = 16, judge = 4, task = 2), assignment = 3)
   )
@@ -2152,7 +2150,7 @@ test_that("structural design review grid can be materialized from live planning 
   expect_true(is.list(from_schema$grid_contract))
 
   wrapped <- list(settings = list(planning_schema = spec$planning_schema))
-  from_wrapped <- materialize_branch_grid(wrapped)
+  from_wrapped <- materialize_grid_bundle(wrapped)
   expect_identical(
     from_wrapped$design,
     spec$planning_schema$structural_design_grid_contract$design
@@ -2697,7 +2695,7 @@ test_that("extract_mfrm_sim_spec captures fitted threshold and assignment metada
   expect_true(is.data.frame(spec$threshold_table))
 })
 
-test_that("extract_mfrm_sim_spec captures bounded GPCM slope metadata", {
+test_that("extract_mfrm_sim_spec captures GPCM slope metadata", {
   toy <- load_mfrmr_data("example_core")
   keep_people <- unique(toy$Person)[1:14]
   toy <- toy[toy$Person %in% keep_people, , drop = FALSE]
@@ -3551,6 +3549,81 @@ test_that("evaluate_mfrm_design returns usable summary and plot data", {
   expect_equal(p$metric_col, "MeanSeparation")
 })
 
+test_that("evaluate_mfrm_design future route matches serial stochastic inputs", {
+  skip_if_not_installed("future")
+  skip_if_not_installed("future.apply")
+
+  old_plan <- future::plan()
+  on.exit(future::plan(old_plan), add = TRUE)
+  future::plan(future::sequential)
+
+  old_rng_kind <- RNGkind()
+  had_seed <- exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+  if (had_seed) {
+    old_seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+  }
+  on.exit({
+    do.call(RNGkind, as.list(old_rng_kind))
+    if (had_seed) {
+      assign(".Random.seed", old_seed, envir = .GlobalEnv)
+    } else if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
+      rm(".Random.seed", envir = .GlobalEnv)
+    }
+  }, add = TRUE)
+
+  RNGkind(kind = "L'Ecuyer-CMRG")
+  set.seed(90210)
+  ambient_seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+  args <- list(
+    n_person = 12,
+    n_rater = 2,
+    n_criterion = 2,
+    raters_per_person = 2,
+    reps = 2,
+    maxit = 5,
+    seed = 17,
+    progress = FALSE
+  )
+
+  serial <- suppressWarnings(
+    do.call(evaluate_mfrm_design, c(args, list(parallel = "no")))
+  )
+  expect_identical(
+    get(".Random.seed", envir = .GlobalEnv, inherits = FALSE),
+    ambient_seed
+  )
+
+  expect_message(
+    future_result <- suppressWarnings(
+      do.call(evaluate_mfrm_design, c(args, list(parallel = "future")))
+    ),
+    "dispatches replications"
+  )
+  expect_identical(
+    get(".Random.seed", envir = .GlobalEnv, inherits = FALSE),
+    ambient_seed
+  )
+
+  without_elapsed <- function(x) {
+    x[, setdiff(names(x), "ElapsedSec"), drop = FALSE]
+  }
+  expect_identical(serial$design_grid, future_result$design_grid)
+  expect_equal(
+    without_elapsed(serial$results),
+    without_elapsed(future_result$results)
+  )
+  expect_equal(
+    without_elapsed(serial$rep_overview),
+    without_elapsed(future_result$rep_overview)
+  )
+  expect_identical(future_result$settings$parallel, "future")
+  expect_identical(
+    future_result$settings$parallel_seed_policy,
+    "preallocated_design_rep_cell_v1"
+  )
+  expect_identical(future_result$settings$parallel_rng_kind, RNGkind())
+})
+
 test_that("recommend_mfrm_design returns threshold tables", {
   sim_eval <- suppressWarnings(
     evaluate_mfrm_design(
@@ -3880,7 +3953,14 @@ test_that("evaluate_mfrm_signal_detection returns usable detection summaries", {
   expect_true(is.data.frame(p_sig$data))
   expect_equal(p_sig$metric_col, "DIFPower")
   expect_equal(p_sig$display_metric, "DIF target-flag rate")
-  expect_match(p_sig$interpretation_note, "DIF-side rates summarize target/non-target flagging behavior", fixed = TRUE)
+  expect_match(p_sig$interpretation_note, "DIF detection rates are unavailable", fixed = TRUE)
+  expect_true(all(is.na(p_sig$data$y)))
+  expect_error(plot(sig_eval, signal = "dif", metric = "power"), "Selected metric is unavailable")
+  old <- sig_eval
+  old$results$DIFDetected <- TRUE
+  old$results$DIFClassDetected <- TRUE
+  old$results$DIFFalsePositiveRate <- 0
+  expect_true(all(is.na(summary(old)$detection_summary$DIFPower)))
 
   p_sig_bias <- plot(sig_eval, signal = "bias", metric = "power", x_var = "n_person", draw = FALSE)
   expect_equal(p_sig_bias$metric_col, "BiasScreenRate")
@@ -3890,7 +3970,11 @@ test_that("evaluate_mfrm_signal_detection returns usable detection summaries", {
   expect_equal(p_sig_bias_screen$metric_col, "BiasScreenRate")
   expect_equal(p_sig_bias_screen$display_metric, "Bias screening hit rate")
 
-  expect_true(any(sig_eval$results$DIFDetected, na.rm = TRUE))
+  expect_true(all(is.na(sig_eval$results$DIFDetected)))
+  expect_true(all(is.na(sig_eval$results$DIFClassDetected)))
+  expect_true(all(is.na(s_sig$detection_summary$DIFPower)))
+  expect_true(all(is.na(s_sig$detection_summary$DIFFalsePositiveRate)))
+  expect_true(any(grepl("DIF detection rates are unavailable", s_sig$notes)))
   expect_true(all(is.finite(s_sig$detection_summary$BiasScreenMetricAvailabilityRate)))
   expect_true(any(grepl("Bias-side rates are screening summaries", s_sig$notes, fixed = TRUE)))
 })

@@ -15,12 +15,12 @@ page, so the checklist can act as a plot-readiness router rather than just a
 manuscript checklist.
 
 This guide is primarily written for diagnostics-based \code{RSM} / \code{PCM}
-workflows. \code{GPCM} fits also use the residual-based diagnostics stack
-through \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=plot_unexpected]{plot_unexpected()}}, \code{\link[=plot_displacement]{plot_displacement()}},
-\code{\link[=plot_interrater_agreement]{plot_interrater_agreement()}}, \code{\link[=plot_facets_chisq]{plot_facets_chisq()}},
-\code{\link[=plot_residual_pca]{plot_residual_pca()}}, and \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}}, plus the
+workflows. Ordinary one-family \code{GPCM} fits also use the residual-based diagnostics stack
+through \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \link[=plot.mfrm_fit]{plot(x, type = "unexpected")}, \link[=plot.mfrm_fit]{plot(x, type = "displacement")},
+\link[=plot.mfrm_fit]{plot(x, type = "agreement")}, \link[=plot.mfrm_fit]{plot(x, type = "facets_chisq")},
+\link[=plot.mfrm_fit]{plot(x, type = "residual_pca")}, and \link[=plot.mfrm_fit]{plot(x, type = "qc")}, plus the
 posterior-scoring, design-weighted-information path via
-\code{\link[=compute_information]{compute_information()}} / \code{\link[=plot_information]{plot_information()}}, and the Wright /
+\code{\link[=compute_information]{compute_information()}} / \link[=plot.mfrm_information]{plot(x)}, and the Wright /
 pathway / CCC fit plots. Two \code{GPCM}-specific caveats apply when
 interpreting these residual-based screens:
 \itemize{
@@ -31,78 +31,279 @@ merit closer inspection rather than as Rasch-style violations of
 strict invariance.
 \item FACETS-style fair averages are a Rasch-family measure-to-score
 transformation. Under \code{GPCM} the fair-average panel of
-\code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}} therefore renders with an explicit
+\link[=plot.mfrm_fit]{plot(x, type = "qc")} therefore renders with an explicit
 "unavailable" status, and the broader compatibility-export helpers
 stay outside the documented \code{GPCM} boundary.
 }
 
 Use \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}} for the formal per-helper boundary
 before choosing a \code{GPCM} follow-up plot route.
+Two-family GPCM and corrected JML use their separate
+\code{\link[=mfrm_response_diagnostics]{mfrm_response_diagnostics()}} routes; the shared \code{mfrm_fit} class does not
+authorize the ordinary diagnostics or Wright/Pathway displays above.
+
+Portable fixed-calibration score batches have a separate review route.
+Use \code{summary(scores)} and \code{plot(scores)} as described in
+\link{mfrm_calibration_score_methods}. Those displays review returned scores;
+they do not replace source-fit diagnostics or establish calibration fit.
 }
+\section{Session plot defaults}{
+
+Set \code{options(mfrmr.plot_preset = "publication")} to choose a session default
+for plotting functions that expose the common \code{preset} argument. The
+supported values are \code{"standard"}, \code{"publication"}, \code{"compact"} and
+\code{"monochrome"}. Precedence is an explicit call argument, then the session
+option, then \code{"standard"}. For example, \code{preset = "standard"} overrides
+a session set to \code{"monochrome"}. Explicit \code{preset = NULL} retains the
+earlier package-default behavior; it does not read the session option.
+Invalid session values cause an error only when that option is needed.
+
+The category-curve, data-quality, fit-review, connectivity and network
+routes of \code{plot()} for report bundles use the same option through \code{...}.
+Plots without a common \code{preset} argument, including extended-model plots
+with their own \code{palette} controls, keep their own settings. This option
+selects a preset, not a universal theme or a guarantee that all renderers
+implement every appearance control identically.
+
+New plot payloads retain the resolved preset for supported saved-data
+rendering. Converting an existing payload with \code{\link[=as_ggplot]{as_ggplot()}} uses its saved
+appearance, even after the session option changes. A call that creates a
+new plot from a fit or statistical result uses the current default.
+For a reproducible script, supply \code{preset} explicitly or set the option in
+that script. Saving only the fitted model does not save a session option.
+No global ggplot theme is changed.
+
+Restore previous settings with \code{old <- options(mfrmr.plot_preset = "monochrome")} followed by \code{options(old)}. Use
+\code{options(mfrmr.plot_preset = NULL)} to remove the option. The preset changes
+appearance, not estimates, confidence levels or diagnostic thresholds.
+}
+
+\section{Titles and compatibility}{
+
+The development version adds \code{title} to \link[=plot.mfrm_fit]{plot(x, type = "marginal_fit")},
+\link[=plot.mfrm_fit]{plot(x, type = "marginal_pairwise")}, \link[=plot.mfrm_fit]{plot(x, type = "unexpected")},
+\link[=plot.mfrm_fit]{plot(x, type = "agreement")}, \link[=plot.mfrm_fit]{plot(x, type = "facets_chisq")}, \link[=plot.mfrm_fit]{plot(x, type = "bubble")},
+\link[=plot.mfrm_fit]{plot(x, type = "bias")} and \link[=plot.mfrm_fit]{plot(x, type = "facet_dashboard")}. Omission
+retains default title metadata; \code{title = "Scoring patterns"} replaces it;
+\code{title = NULL} or \code{title = ""} suppresses that metadata. Titles and explanatory
+notes are returned outside the figure by default; display controls below
+govern explicit drawing. The dashboard's S3 \code{plot()}
+method forwards these controls. Use exact argument names.
+
+Legacy \code{main} remains supported without warnings, and \code{main = NULL} keeps
+its original meaning: use the default heading. Supplying both \code{main} and
+\code{title} is an error, even when they are equal or both \code{NULL}. Existing
+positional calls retain their argument order. This is a compatible new
+spelling, not removal or deprecation of \code{main}.
+
+A title change does not alter the data, interval level, screening settings,
+reference lines, subtitles or interpretation notes. In stored plot payloads,
+an omitted heading is represented by an empty string. When hiding the
+heading of a review-only dashboard, retain its limitations in the figure
+caption or accompanying report. Use the plot guide to check ggplot support;
+accepting \code{title} does not add a converter for an unsupported plot.
+}
+
+\section{Fitted plots and saved intervals}{
+
+For ordinary fitted-model plots, \code{plot(fit, level = 0.90)} is an alternative
+to \code{ci_level = 0.90}; use only one spelling. The same control is forwarded
+by ordinary fit-based routes of \code{plot(res, ...)} and \code{as_ggplot(fit, ...)}.
+It changes the normal intervals where \code{show_ci = TRUE}, without refitting
+the model. The default remains 0.95. Specialist helpers that document
+only \code{ci_level} retain that argument; this is not a package-wide rename.
+
+A saved inferential result has already chosen its method and level. For
+example, create \code{ci <- mfrm_facet_intervals(fit, "Rater", level = 0.90)}
+before \code{plot(ci)}; passing \code{level} to that plotting method is an error.
+The attached route \code{plot(res, type = "facet_raters")} uses those saved
+endpoints and does not inherit the Wright map's interval settings.
+
+A saved plot payload also retains its rendering choices. With
+\code{p <- plot(fit, level = 0.90, show_title = FALSE, draw = FALSE)},
+\code{as_ggplot(p)} keeps that selection. To change it, make a new plot from
+\code{fit}; extra settings such as \code{as_ggplot(p, level = 0.80)} are rejected.
+To change labels on the converted ggplot, use
+\code{as_ggplot(p) + ggplot2::labs(title = NULL)}.
+
+Figures omit titles, subtitles and explanatory footnotes by default.
+Keep the returned object: \code{p <- plot(fit)}, then use
+\code{plot_data(p, "title")} and \code{plot_data(p, "notes")} to prepare the title
+and notes separately in a manuscript. Printing a returned \code{mfrm_plot_data}
+object also displays notes in the console. The same notes accessor works
+for mfrmr ggplots and after saving and reloading the returned object.
+Axis labels, legends, panel identifiers and data/status symbols remain.
+\code{title}, \code{main}, \code{subtitle} and \code{caption} now supply metadata by default.
+Entry points with \code{show_title} and \code{show_notes} allow explicit opt-in
+display; both switches default to \code{FALSE}. For ggplot customization, use
+\code{ggplot2::labs(title = "...")}. Numerical warnings and saved diagnostics
+remain available regardless of these presentation choices.
+}
+
+\section{Read score direction and diagnostic terms first}{
+
+A logit is a model coordinate, not a label for good or bad performance.
+Record the wording of both ends of the rubric before interpreting a plot.
+In the ordinary positive-discrimination models, a higher Person location
+predicts higher \strong{coded scores}, holding other effects fixed:\tabular{ll}{
+   Comprehensibility coding \tab Meaning of a higher Person location \cr
+   1 = difficult to understand; 4 = easy to understand \tab Easier to understand \cr
+   1 = easy to understand; 4 = difficult to understand \tab More difficult to understand \cr
+}
+
+
+For a default negatively oriented Rater facet, a higher Rater location
+instead predicts \strong{lower} coded scores. This is more severe under the
+first rubric, but more favorable under the second. A facet declared in
+\code{positive_facets} has the opposite parameter orientation. That argument
+does not reverse the outcome categories or make a Person score mean
+"better". Relabeling categories or flipping a graphical axis also does not
+recode the fitted model. To reverse a numeric 1--4 rubric, recode as
+\code{5 - Score} before fitting, retaining the original data and consistent
+category meanings across criteria. Existing anchors must use the same
+coding and scale; changing coding is not just editing a figure.
+
+The fitted-model plotting notes state recorded facet directions without
+guessing the rubric meaning. Use \code{p <- plot(fit, type = "wright")},
+\code{print(p)} and \code{plot_data(p, "notes")}; keep the rubric wording with the
+analysis when saving it. The package does not infer that a column called
+Comprehensibility measures ease rather than difficulty. An older saved
+plot retains its original notes; regenerate the plot from its saved fit to
+obtain new guidance. An imported model requires its source orientation.
+
+\strong{Overfit and underfit.} Infit and Outfit mean squares compare squared
+residuals with the variation expected under the selected model. Their
+reference is 1: smaller values describe less residual variation (overfit),
+larger values more variation (underfit). Infit weights observations by
+information; Outfit is more sensitive to unexpected responses far from
+the person's fitted location. ZSTD uses a different, zero-centered
+reference. Displayed bands are review limits, not universal acceptability
+rules, and a tiny deviation from 1 is not automatically flagged.
+
+In a speech contest, trained judges can have similar severity estimates
+or high agreement while their fit is near 1. Those features alone do not
+imply overfit. If low mean squares occur, review actual residuals, category
+use, shared performances and whether judgments were made independently.
+Training is one contextual explanation to investigate, not a demonstrated
+cause or a reason to dismiss the result. Joint discussion/copying can
+introduce dependence; consistent independent application of a rubric is
+a different process. Overfit is not the machine-learning meaning of fitting
+too many parameters. Neither overfit nor underfit alone identifies halo,
+unfairness, judge incompetence or a rule for deleting ratings.
+
+\strong{Bias in a bias plot.} \code{\link[=estimate_bias]{estimate_bias()}} estimates an additional shift
+for a combination, such as Judge A scoring Content, after holding the
+baseline Person/facet/step/slope estimates fixed. It concerns a conditional
+interaction departure, not the judge's overall severity, statistical bias
+of an estimator, or proof of prejudice or unfairness. In mfrmr, positive
+\verb{Bias Size} increases expected coded scores and negative values decrease
+them. Under a high-is-good rubric, positive bias thus favors that cell,
+whereas positive default Rater severity reduces its score. FACETS output
+can use different configured bias directions; compare definitions before
+comparing signs. The facet-profile plot averages \strong{absolute} bias and
+cannot show which cells are favored. Read signed cell rows, exposure,
+uncertainty and the scoring context. Conditional intervals omit calibration
+uncertainty and the flags remain screening evidence.
+
+\strong{Step.} A Step is an adjacent-category transition parameter: a 1--4
+rubric has transitions 1 to 2, 2 to 3 and 3 to 4. In the default unit-slope
+RSM, \eqn{\log\{P(Y=k)/P(Y=k-1)\}=\theta-\delta-\beta-\tau_k}.
+At \eqn{\theta=\delta+\beta+\tau_k}, the two adjacent categories have equal
+probability. Other categories may also occur, so neither probability need
+be 0.5. A Step is not a learning stage, the mean Person location observed
+in that category, a cumulative 50-percent threshold, or a pass/fail cut.
+Stored \eqn{\tau_k} offsets differ from full ability-axis crossings when
+facet effects are nonzero. The ordinary CCC/Wright step reference fixes
+other additive effects at zero; \link{plot.mfrm_fit} documents that profile.
+RSM shares steps; PCM/GPCM assigns them to a selected owner. Check the
+owner's counts and curves before interpreting disorder or merging categories.
+See \code{\link[=rating_scale_table]{rating_scale_table()}} and \link{mfrmr_methods_reference} for calculations
+and the Andrich/Masters references.
+
+These distinctions follow the official FACETS
+\href{https://winsteps.com/facetman64/positive.htm}{facet orientation},
+\href{https://winsteps.com/facetman64/table7.htm}{fit report} and
+\href{https://winsteps.com/facetman64/table13.htm}{bias report} descriptions,
+and the Winsteps
+\href{https://www.winsteps.com/winman/table2_4.htm}{adjacent-category threshold explanation}.
+mfrmr's specific sign, reference-profile and uncertainty rules remain those
+documented in its own function help.
+}
+
 \section{Start with the question}{
 
 \itemize{
 \item "Do persons and facet levels overlap on the same logit scale?"
-Use \code{plot(fit, type = "wright")} or \code{\link[=plot_wright_unified]{plot_wright_unified()}}.
+Use \code{plot(fit, type = "wright")} or \link[=plot.mfrm_fit]{plot(x, type = "wright", view = "unified")}.
 \item "Where do score categories transition across theta?"
 Use \code{plot(fit, type = "pathway")} and \code{plot(fit, type = "ccc")}.
+\item "How do measures and observed scores relate to Fair Scores?"
+Use \link[=plot.mfrm_fit]{plot(x, type = "fair_average")} with \code{view = "measure"}, \code{"scatter"}, or
+\code{"difference"}. FairZ is a zero-reference expected score, not a z-score.
 \item "Is the design linked well enough across subsets or administrations?"
 Use \code{plot(subset_connectivity_report(...), type = "design_matrix")},
 \code{\link[=mfrm_network_analysis]{mfrm_network_analysis()}}, \code{\link[=build_mfrm_network_review]{build_mfrm_network_review()}},
-\code{plot(..., type = "network")}, and \code{\link[=plot_anchor_drift]{plot_anchor_drift()}}.
+\code{plot(..., type = "network")}, and \link[=plot.mfrm_anchor_drift]{plot(x)}.
 \item "Which responses or levels look locally problematic?"
-Use \code{\link[=plot_unexpected]{plot_unexpected()}} and \code{\link[=plot_displacement]{plot_displacement()}}.
+Use \link[=plot.mfrm_fit]{plot(x, type = "unexpected")} and \link[=plot.mfrm_fit]{plot(x, type = "displacement")}.
 \item "Which facet/category cells drive strict marginal misfit?"
-Use \code{\link[=plot_marginal_fit]{plot_marginal_fit()}}.
+Use \link[=plot.mfrm_fit]{plot(x, type = "marginal_fit")}.
 \item "Which level pairs drive strict local-dependence follow-up?"
-Use \code{\link[=plot_marginal_pairwise]{plot_marginal_pairwise()}}.
-\item "Do raters agree and do facets separate meaningfully?"
-Use \code{\link[=plot_interrater_agreement]{plot_interrater_agreement()}}, \code{\link[=rater_network_analysis]{rater_network_analysis()}}, and
-\code{\link[=plot_facets_chisq]{plot_facets_chisq()}}.
+Use \link[=plot.mfrm_fit]{plot(x, type = "marginal_pairwise")}.
+\item "Do raters agree within observed shared scoring contexts?"
+Use \link[=plot.mfrm_fit]{plot(x, type = "agreement")} and \code{\link[=rater_network_analysis]{rater_network_analysis()}}.
+\item "Do facet levels separate meaningfully?"
+Use \link[=plot.mfrm_fit]{plot(x, type = "facets_chisq")}.
 \item "Do criteria within the same rater move together in a halo-like way?"
 Use \code{\link[=rater_halo_network_analysis]{rater_halo_network_analysis()}} and
 \code{plot(..., type = "edge_distribution")}.
 \item "Is there notable residual structure after the main Rasch dimension?"
-Use \code{\link[=plot_residual_pca]{plot_residual_pca()}}.
+Use \link[=plot.mfrm_fit]{plot(x, type = "residual_pca")}.
 \item "Which interaction cells or facet levels drive bias screening results?"
-Use \code{\link[=plot_bias_interaction]{plot_bias_interaction()}}.
+Use \link[=plot.mfrm_fit]{plot(x, type = "bias")}.
 \item "Which group-by-facet contrasts drive DFF / DIF screening results?"
-Use \code{\link[=plot_dif_heatmap]{plot_dif_heatmap()}} and \code{\link[=plot_dif_summary]{plot_dif_summary()}} after
+Use \link[=plot.mfrm_dif]{plot(x, type = "heatmap")} and \link[=plot.mfrm_dif]{plot(x, type = "summary")} after
 \code{\link[=analyze_dff]{analyze_dff()}}.
 \item "Do person response rows follow the expected Guttman-style
 ordering once persons and items are sorted on the logit scale?"
-Use \code{\link[=plot_guttman_scalogram]{plot_guttman_scalogram()}} as a teaching-oriented screen.
+Use \link[=plot.mfrm_fit]{plot(x, type = "guttman")} as a teaching-oriented screen.
 \item "Do person-level standardized residuals look Gaussian, or are
 there heavy tails that warrant follow-up?"
-Use \code{\link[=plot_residual_qq]{plot_residual_qq()}}.
+Use \link[=plot.mfrm_fit]{plot(x, type = "residual_qq")}.
 \item "Is rater severity drifting across waves or training sessions
 (assuming the waves are already on a common anchored scale)?"
-Use \code{\link[=plot_rater_trajectory]{plot_rater_trajectory()}} together with \code{\link[=plot_anchor_drift]{plot_anchor_drift()}}
+Use \code{plot(fits[[1L]], type = "trajectory", comparison = fits[-1L], labels = names(fits))} (see \code{\link[=plot.mfrm_fit]{plot.mfrm_fit()}}) together with \link[=plot.mfrm_anchor_drift]{plot(x)}
 for the linking-scale review.
 \item "I have many raters and want a compact pairwise agreement / correlation
 overview instead of the bar chart?"
-Use \code{\link[=plot_rater_agreement_heatmap]{plot_rater_agreement_heatmap()}}.
+Use \link[=plot.mfrm_fit]{plot(x, type = "agreement", view = "heatmap")}.
 \item "Do response times suggest rapid responding, slow responding, or timing
 patterns by person, facet, or score category?"
-Use \code{\link[=response_time_review]{response_time_review()}} and \code{\link[=plot_response_time_review]{plot_response_time_review()}} as a
+Use \code{\link[=response_time_review]{response_time_review()}} and \link[=plot.mfrm_response_time_review]{plot(x)} as a
 descriptive QC layer outside the MFRM likelihood.
 \item "Are there pairs of facet levels whose residuals co-move beyond the
 main-effects MFRM? (Q3-style local-dependence screen)"
-Use \code{\link[=plot_local_dependence_heatmap]{plot_local_dependence_heatmap()}}.
+Use \link[=plot.mfrm_fit]{plot(x, type = "local_dependence")}.
 \item "How distinguishable is each facet on a single page (separation,
 strata, reliability)?"
-Use \code{\link[=plot_reliability_snapshot]{plot_reliability_snapshot()}}.
+Use \link[=plot.mfrm_fit]{plot(x, type = "reliability")}.
 \item "Where do persons with the largest residual aggregates accumulate
 across facet levels?"
-Use \code{\link[=plot_residual_matrix]{plot_residual_matrix()}}.
+Use \link[=plot.mfrm_fit]{plot(x, type = "residual_matrix")}.
 \item "How much did empirical-Bayes shrinkage move each facet level?"
-Use \code{\link[=plot_shrinkage_funnel]{plot_shrinkage_funnel()}} on a fit augmented via
+Use \link[=plot.mfrm_fit]{plot(x, type = "shrinkage", view = "funnel")} on a fit augmented via
 \code{\link[=apply_empirical_bayes_shrinkage]{apply_empirical_bayes_shrinkage()}}.
 \item "I need one compact triage screen first."
-Use \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}} for \code{RSM} / \code{PCM}. The bounded \code{GPCM}
-branch can also call \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}}, but its fair-average
+Use \link[=plot.mfrm_fit]{plot(x, type = "qc")} for \code{RSM} / \code{PCM}. The \code{GPCM}
+branch can also call \link[=plot.mfrm_fit]{plot(x, type = "qc")}, but its fair-average
 panel reports an explicit unavailability indicator because that
 panel's score-metric semantics are limited to the Rasch-family branch.
+\item "I scored new Persons from a frozen portable calibration; which scores
+require review and how wide are their conditional intervals?"
+Use \code{summary(scores)} followed by
+\code{plot(scores, type = "interval")}. Continue with \code{type = "precision"}
+or \code{type = "edge_mass"} when response-count precision or quadrature-edge
+behavior needs follow-up.
 \item "Which figures are already supported by my current run?"
 Use \code{\link[=reporting_checklist]{reporting_checklist()}} and review the \code{"Visual Displays"} rows before
 choosing the next plot.
@@ -117,24 +318,40 @@ default reporting figures.
 }
 }
 
+\section{Keep the network questions separate}{
+
+\code{\link[=mfrm_network_analysis]{mfrm_network_analysis()}} describes the assignment/co-observation graph and
+is the relevant network route for disconnected measurement subsets.
+\code{\link[=rater_network_analysis]{rater_network_analysis()}} describes pairwise score agreement,
+disagreement, or severity direction, while \code{\link[=rater_halo_network_analysis]{rater_halo_network_analysis()}}
+describes rater-by-criterion score-profile correlations. The latter two do
+not establish assignment connectedness or a common scale. In all three,
+degree, strength, betweenness, and closeness are graph-theoretic quantities;
+they are not rating-scale central tendency, MFRM severity logits, or causal
+halo evidence.
+}
+
 \section{Recommended visual route}{
 
 \enumerate{
 \item If you are drafting a report, run \code{\link[=reporting_checklist]{reporting_checklist()}} first and read
 the \code{"Visual Displays"} rows as the plot-readiness layer.
-\item Start with \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}} for one-page triage.
-\item Move to \code{\link[=plot_unexpected]{plot_unexpected()}}, \code{\link[=plot_displacement]{plot_displacement()}},
-\code{\link[=plot_marginal_fit]{plot_marginal_fit()}}, \code{\link[=plot_marginal_pairwise]{plot_marginal_pairwise()}}, and
-\code{\link[=plot_interrater_agreement]{plot_interrater_agreement()}} for flagged local issues.
+\item Start with \link[=plot.mfrm_fit]{plot(x, type = "qc")} for one-page triage.
+\item Move to \link[=plot.mfrm_fit]{plot(x, type = "unexpected")}, \link[=plot.mfrm_fit]{plot(x, type = "displacement")},
+\link[=plot.mfrm_fit]{plot(x, type = "marginal_fit")}, \link[=plot.mfrm_fit]{plot(x, type = "marginal_pairwise")}, and
+\link[=plot.mfrm_fit]{plot(x, type = "agreement")} for flagged local issues.
 \item Use \code{plot(fit, type = "wright")}, \code{plot(fit, type = "pathway")},
-and \code{plot_residual_pca()} for structural interpretation.
-\item Use \code{\link[=plot_bias_interaction]{plot_bias_interaction()}}, \code{\link[=plot_dif_heatmap]{plot_dif_heatmap()}},
-\code{\link[=plot_dif_summary]{plot_dif_summary()}}, \code{\link[=plot_anchor_drift]{plot_anchor_drift()}}, and
-\code{\link[=plot_information]{plot_information()}} when the checklist or dashboard points to
+and \code{plot(fit, type = "wright", view = "unified")} for structural interpretation.
+\item Use \link[=plot.mfrm_fit]{plot(x, type = "bias")}, \link[=plot.mfrm_dif]{plot(x, type = "heatmap")},
+\link[=plot.mfrm_dif]{plot(x, type = "summary")}, \link[=plot.mfrm_anchor_drift]{plot(x)}, and
+\link[=plot.mfrm_information]{plot(x)} when the checklist or dashboard points to
 interaction, differential-functioning, linking, or precision
 follow-up.
 \item Use \code{plot(..., draw = FALSE)} when you want reusable plot data instead
 of immediate graphics.
+\item For an artifact-scored batch, use \code{summary(scores)} and \code{plot(scores)};
+keep its conditional-uncertainty note with the figure and inspect every
+\code{scored_review} or \code{not_scored} disposition.
 \item Use \code{plot(fit, type = "ccc_surface", draw = FALSE)} only when you need
 3D-ready category-probability data; \code{mfrmr} intentionally does not add a
 package-native plotly/rgl renderer for this route.
@@ -169,23 +386,27 @@ The plotting layer supports the following public follow-up roles when the
 fitted object contains the required data:
 \itemize{
 \item First-pass triage:
-\code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}} or the \code{"Visual Displays"} rows from
+\link[=plot.mfrm_fit]{plot(x, type = "qc")} or the \code{"Visual Displays"} rows from
 \code{\link[=reporting_checklist]{reporting_checklist()}}.
 \item Structural interpretation:
 \code{plot(fit, type = "wright")}, \code{plot(fit, type = "pathway")},
-\code{plot(fit, type = "ccc")}, and \code{\link[=plot_residual_pca]{plot_residual_pca()}}.
+\code{plot(fit, type = "ccc")}, and \link[=plot.mfrm_fit]{plot(x, type = "residual_pca")}.
 \item Local issue follow-up:
-\code{\link[=plot_unexpected]{plot_unexpected()}}, \code{\link[=plot_displacement]{plot_displacement()}},
-\code{\link[=plot_interrater_agreement]{plot_interrater_agreement()}}, \code{\link[=plot_bias_interaction]{plot_bias_interaction()}},
-\code{\link[=plot_dif_heatmap]{plot_dif_heatmap()}}, and \code{\link[=plot_dif_summary]{plot_dif_summary()}}.
+\link[=plot.mfrm_fit]{plot(x, type = "unexpected")}, \link[=plot.mfrm_fit]{plot(x, type = "displacement")},
+\link[=plot.mfrm_fit]{plot(x, type = "agreement")}, \link[=plot.mfrm_fit]{plot(x, type = "bias")},
+\link[=plot.mfrm_dif]{plot(x, type = "heatmap")}, and \link[=plot.mfrm_dif]{plot(x, type = "summary")}.
 \item Strict marginal follow-up:
-\code{\link[=plot_marginal_fit]{plot_marginal_fit()}} and \code{\link[=plot_marginal_pairwise]{plot_marginal_pairwise()}} for
+\link[=plot.mfrm_fit]{plot(x, type = "marginal_fit")} and \link[=plot.mfrm_fit]{plot(x, type = "marginal_pairwise")} for
 \code{diagnostic_mode = "both"}.
 \item Reporting/export handoff:
 \code{\link[=build_visual_summaries]{build_visual_summaries()}} and \code{draw = FALSE} routes that return reusable
 \code{mfrm_plot_data} objects for downstream review and export. When step
 estimates are available, \code{build_visual_summaries()} also exposes
 \verb{$plot_payloads$category_probability_surface}.
+\item Portable score-batch review:
+\code{plot(scores, type = "interval")}, \code{"precision"}, or \code{"edge_mass"}
+after \code{\link[=score_mfrm_calibration]{score_mfrm_calibration()}}. These views retain selection accounting,
+review dispositions, and Persons that could not be scored.
 \item 3D-ready exploratory handoff:
 \code{plot(fit, type = "ccc_surface", draw = FALSE)} returns a
 theta-by-category-by-probability \code{mfrm_plot_data} object. This is not a
@@ -221,66 +442,70 @@ levels, and step thresholds. Best for targeting and spread.}
 dominant-category strips. Best for scale progression.}
 \item{\code{plot(fit, type = "ccc")}}{Category probability curves. Best for
 checking whether categories peak in sequence.}
-\item{\code{plot_unexpected()}}{Observation-level surprises. Best for case
+\item{\code{plot()}}{Observation-level surprises. Best for case
 review and local misfit triage.}
-\item{\code{plot_displacement()}}{Level-wise anchor movement. Best for anchor
+\item{\code{plot()}}{Level-wise anchor movement. Best for anchor
 robustness and residual calibration tension.}
-\item{\code{plot_marginal_fit()}}{Posterior-integrated first-order category
+\item{\code{plot()}}{Posterior-integrated first-order category
 residuals. Best for seeing which facet/category cells drive strict
 marginal flags.}
-\item{\code{plot_marginal_pairwise()}}{Posterior-integrated exact/adjacent
+\item{\code{plot()}}{Posterior-integrated exact/adjacent
 agreement residuals. Best for exploratory local-dependence follow-up after
 strict marginal flags.}
-\item{\code{plot_interrater_agreement()}}{Exact agreement, expected agreement,
+\item{\code{plot()}}{Exact agreement, expected agreement,
 pairwise correlation, and agreement gaps. Best for rater consistency.}
-\item{\code{plot_facets_chisq()}}{Facet variability and chi-square summaries.
+\item{\code{plot()}}{Facet variability and chi-square summaries.
 Best for checking whether a facet contributes meaningful spread.}
-\item{\code{plot_residual_pca()}}{Residual structure after the Rasch dimension
+\item{\code{plot()}}{Residual structure after the Rasch dimension
 is removed. Best for exploratory residual-structure review, not as a
 standalone unidimensionality test.}
-\item{\code{plot_bias_interaction()}}{Interaction-bias screening views for
+\item{\code{plot()}}{Interaction-bias screening views for
 cells and facet profiles. Best for systematic departure from the
 additive main-effects model.}
-\item{\code{plot_dif_heatmap()} / \code{plot_dif_summary()}}{DFF / DIF
+\item{\code{plot()} / \code{plot()}}{DFF / DIF
 screening views for facet-level x group contrasts. Best for showing
 which facet and group pair is involved before writing substantive
 interpretations.}
-\item{\code{plot_anchor_drift()}}{Anchor drift and screened linking-chain visuals.
+\item{\code{plot()}}{Anchor drift and screened linking-chain visuals.
 Best for multi-form or multi-wave linking review after checking retained
 common-element support.}
-\item{\code{plot_guttman_scalogram()}}{Person x facet-level response matrix with
+\item{\code{plot()}}{Person x facet-level response matrix with
 unexpected-response overlay. Best for teaching-oriented scalogram intuition
 and visual triage of where the data depart from the expected ordering.}
-\item{\code{plot_residual_qq()}}{Normal Q-Q plot of person-level standardized
+\item{\code{plot()}}{Normal Q-Q plot of person-level standardized
 residual aggregates. Best for checking the tail behavior of residuals as
 exploratory follow-up after a fit screen.}
-\item{\code{plot_rater_trajectory()}}{Per-rater severity trajectory across
+\item{\code{plot()}}{Per-rater severity trajectory across
 named waves / occasions. Best for rater-training or drift feedback when
 the supplied fits have already been placed on a common anchored scale;
 the helper itself does not perform linking.}
-\item{\code{plot_rater_agreement_heatmap()}}{Compact pairwise rater x rater
+\item{\code{plot()}}{Compact pairwise rater x rater
 heatmap of exact agreement (default) or Pearson-style correlation. Best
 when the rater count makes the bar-chart form of
-\code{\link[=plot_interrater_agreement]{plot_interrater_agreement()}} too busy.}
-\item{\code{response_time_review()} / \code{plot_response_time_review()}}{Descriptive
+\link[=plot.mfrm_fit]{plot(x, type = "agreement")} too busy.}
+\item{\code{response_time_review()} / \code{plot()}}{Descriptive
 response-time screening by person, facet, and score category. Best for
 reviewing rapid/slow response patterns alongside MFRM diagnostics; it is
 not a joint speed-accuracy model and does not change fitted measures.}
-\item{\code{plot_local_dependence_heatmap()}}{Yen Q3-style heatmap of
+\item{\code{plot()}}{Standardized, aggregated-residual Q3-style heatmap of
 pairwise residual correlations between facet levels. Best for
 exploratory local-dependence screening; pairs with very strong
 off-diagonal residual correlation merit content-level review.}
-\item{\code{plot_reliability_snapshot()}}{One-figure facet x reliability /
+\item{\code{plot()}}{One-figure facet x reliability /
 separation / strata bar overview built from \code{diagnostics$reliability}.
 Best as a single small figure for "which facets are statistically
 distinguishable?".}
-\item{\code{plot_residual_matrix()}}{Person x facet-level standardized
-residual heatmap. Best as a follow-up to \code{\link[=plot_guttman_scalogram]{plot_guttman_scalogram()}} when
+\item{\code{plot()}}{Person x facet-level standardized
+residual heatmap. Best as a follow-up to \link[=plot.mfrm_fit]{plot(x, type = "guttman")} when
 the residual sign and magnitude matter, not just the response code.}
-\item{\code{plot_shrinkage_funnel()}}{Empirical-Bayes shrinkage caterpillar /
+\item{\code{plot()}}{Empirical-Bayes shrinkage caterpillar /
 funnel showing raw versus shrunken facet estimates. Best on fits
 produced via \code{\link[=apply_empirical_bayes_shrinkage]{apply_empirical_bayes_shrinkage()}} for reviewing how
 much each level moved under the prior.}
+\item{\code{plot(scores, type = "interval")}}{Posterior EAP intervals for a
+portable fixed-calibration score batch, with review dispositions
+highlighted. The intervals are conditional on the frozen point
+calibration and exclude calibration-parameter uncertainty.}
 }
 }
 
@@ -292,31 +517,31 @@ below. The mapping is approximate; mfrmr is designed for many-facet
 workflows, so column subsets and column names differ.
 \describe{
 \item{Wright (variable) map}{\code{plot(fit, type = "wright")} and
-\code{\link[=plot_wright_unified]{plot_wright_unified()}} correspond to FACETS Table 6 / Winsteps
+\link[=plot.mfrm_fit]{plot(x, type = "wright", view = "unified")} correspond to FACETS Table 6 / Winsteps
 "Person-Item map".}
 \item{Pathway / probability curves}{\code{plot(fit, type = "pathway")}
 and \code{plot(fit, type = "ccc")} correspond to Winsteps Table 21
 ("Probability category curves") and FACETS category-probability
 curves.}
 \item{Test / item information}{\code{\link[=compute_information]{compute_information()}} +
-\code{\link[=plot_information]{plot_information()}} correspond to Winsteps Table 17 ("Test
+\link[=plot.mfrm_information]{plot(x)} correspond to Winsteps Table 17 ("Test
 characteristic curve, test information function").}
 \item{Misfit / Infit / Outfit}{\code{\link[=diagnose_mfrm]{diagnose_mfrm()}} and the Largest
 |ZSTD| / MnSq misfit blocks of \code{summary(diag)} correspond to
 Winsteps Table 10/13/14 (Misfit order) and FACETS Tables 7/8.}
 \item{Bias / interaction}{\code{\link[=estimate_bias]{estimate_bias()}} +
-\code{\link[=plot_bias_interaction]{plot_bias_interaction()}} correspond to FACETS Table 14
+\link[=plot.mfrm_fit]{plot(x, type = "bias")} correspond to FACETS Table 14
 ("Bias / Interaction calibration report").}
 \item{Differential rater / item functioning}{\code{\link[=analyze_dff]{analyze_dff()}} /
-\code{\link[=analyze_dif]{analyze_dif()}} + \code{\link[=plot_dif_heatmap]{plot_dif_heatmap()}} / \code{\link[=plot_dif_summary]{plot_dif_summary()}}
+\code{\link[=analyze_dif]{analyze_dif()}} + \link[=plot.mfrm_dif]{plot(x, type = "heatmap")} / \link[=plot.mfrm_dif]{plot(x, type = "summary")}
 cover the FACETS DIF / bias-by-group route and the Winsteps DIF
 (Table 30 group differences) report.}
 \item{Inter-rater agreement}{\code{\link[=interrater_agreement_table]{interrater_agreement_table()}} +
-\code{\link[=plot_interrater_agreement]{plot_interrater_agreement()}} / \code{\link[=plot_rater_agreement_heatmap]{plot_rater_agreement_heatmap()}}
+\link[=plot.mfrm_fit]{plot(x, type = "agreement")} / \link[=plot.mfrm_fit]{plot(x, type = "agreement", view = "heatmap")}
 correspond to FACETS Table 7-style observed-vs-expected agreement
 reports.}
-\item{Anchoring / linking}{\code{\link[=plot_anchor_drift]{plot_anchor_drift()}} and
-\code{\link[=plot_information]{plot_information()}} cover the FACETS / Winsteps anchored-run
+\item{Anchoring / linking}{\link[=plot.mfrm_anchor_drift]{plot(x)} and
+\link[=plot.mfrm_information]{plot(x)} cover the FACETS / Winsteps anchored-run
 review route; full equating-chain helpers are exposed via
 \code{\link[=build_equating_chain]{build_equating_chain()}}.}
 }
@@ -344,6 +569,10 @@ agreement concerns scoring consistency, whereas variability concerns
 whether facet elements are statistically distinguishable.
 \item Residual PCA and bias plots should be interpreted as follow-up layers
 after the main fit screen, not as first-pass diagnostics.
+\item Portable score plots review returned score batches only. Inspect the
+source calibration separately, retain \code{not_scored} Persons in the audit
+trail, and do not interpret conditional intervals as including
+calibration-parameter uncertainty.
 \item DFF residual- and refit-method plots are screening visuals. Current refit
 rows do not receive ETS A/B/C labels because their plug-in uncertainty
 omits baseline-anchor uncertainty and cross-refit covariance.
@@ -357,26 +586,66 @@ omits baseline-anchor uncertainty and cross-refit covariance.
 \code{\link[=fit_mfrm]{fit_mfrm()}} -> \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} -> \code{\link[=reporting_checklist]{reporting_checklist()}} ->
 inspect \code{"Visual Displays"} rows -> chosen public plot helper.
 \item Quick screening:
-\code{\link[=fit_mfrm]{fit_mfrm()}} -> \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} -> \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}}.
+\code{\link[=fit_mfrm]{fit_mfrm()}} -> \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} -> \link[=plot.mfrm_fit]{plot(x, type = "qc")}.
 \item Strict marginal follow-up:
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} with \code{diagnostic_mode = "both"} ->
-\code{\link[=plot_marginal_fit]{plot_marginal_fit()}} ->
-\code{\link[=plot_marginal_pairwise]{plot_marginal_pairwise()}}.
+\link[=plot.mfrm_fit]{plot(x, type = "marginal_fit")} ->
+\link[=plot.mfrm_fit]{plot(x, type = "marginal_pairwise")}.
 \item Scale and targeting review:
 \code{plot(fit, type = "wright")} -> \code{plot(fit, type = "pathway")} ->
 \code{plot(fit, type = "ccc")}.
 \item Linking review:
 \code{\link[=subset_connectivity_report]{subset_connectivity_report()}} -> \code{plot(..., type = "design_matrix")} /
 \code{\link[=mfrm_network_analysis]{mfrm_network_analysis()}} / \code{\link[=build_mfrm_network_review]{build_mfrm_network_review()}} /
-\code{plot(..., type = "network")} -> \code{\link[=plot_anchor_drift]{plot_anchor_drift()}}.
+\code{plot(..., type = "network")} -> \link[=plot.mfrm_anchor_drift]{plot(x)}.
 \item Interaction review:
-\code{\link[=estimate_bias]{estimate_bias()}} -> \code{\link[=plot_bias_interaction]{plot_bias_interaction()}} ->
+\code{\link[=estimate_bias]{estimate_bias()}} -> \link[=plot.mfrm_fit]{plot(x, type = "bias")} ->
 \code{\link[=reporting_checklist]{reporting_checklist()}}.
 \item DFF / DIF review:
-\code{\link[=analyze_dff]{analyze_dff()}} -> \code{\link[=plot_dif_heatmap]{plot_dif_heatmap()}} / \code{\link[=plot_dif_summary]{plot_dif_summary()}} ->
+\code{\link[=analyze_dff]{analyze_dff()}} -> \link[=plot.mfrm_dif]{plot(x, type = "heatmap")} / \link[=plot.mfrm_dif]{plot(x, type = "summary")} ->
 inspect the explicit facet, level, and group-pair columns before
 writing interpretation.
 }
+}
+
+\section{Figures with separate titles and interpretation}{
+
+Wright, expected-score pathway, CCC, and \link[=plot.mfrm_fit]{plot(x, type = "fair_average")} displays
+accept \code{show_title = FALSE} and \code{show_notes = FALSE}. These options hide
+figure annotations while retaining axes, legends, structural panel labels,
+and the original title and notes in the returned \code{mfrm_plot_data} object.
+With \code{p <- plot(fit, type = "ccc", draw = FALSE, show_title = FALSE, show_notes = FALSE)}, inspect \code{p$data$notes} before writing a caption.
+\code{\link[=as_ggplot]{as_ggplot()}} respects the display options and retains notes in
+\code{attr(as_ggplot(p), "mfrmr_notes")}. Hiding annotations does not change
+readiness or interval eligibility.
+
+Use \code{preset = "monochrome"} for grayscale. Expected-score and CCC curves
+have six line types: solid, dashed, dotted, dotdash, longdash, and twodash.
+Fair-score plots have six point shapes. Encodings repeat beyond six series;
+use panels or select a facet instead of relying on gray levels alone.
+These controls are documented for the named routes, not every plotting
+helper in the package. Check the individual help page for other plots.
+
+Fair-score intervals remain diagnostic-only with full-refit coverage
+unverified. RSM/PCM plots propagate the focal measure SE while holding
+thresholds and reference measures fixed. GPCM-MML plots can use structural
+table SEs for non-Person rows, conditioning on Person EAP/reference means.
+\code{fair_average_table(fair_se = TRUE)} does not provide RSM/PCM fair-score
+SEs. See \code{\link[=mfrmr_interval_guide]{mfrmr_interval_guide()}} and \link[=plot.mfrm_fit]{plot(x, type = "fair_average")} for the status
+columns and the observed-minus-fair gap caveat.
+}
+
+\section{Non-Latin and long labels}{
+
+Select an installed font that contains the characters in your labels before
+drawing. For example, on macOS, open a PNG device and set
+\code{par(family = "Hiragino Sans")} before \code{plot(fit)}. Use an appropriate
+installed font on other systems. A successful plot call alone does not
+confirm that the device rendered every character; inspect the saved figure.
+Long labels also require enough space. Use a wider device for rater-severity
+profiles. For crowded FACETS-style maps, use a taller or wider device,
+increase \code{rows_per_logit}, or switch to \code{renderer = "native"}.
+Full labels remain in the tables returned with \code{draw = FALSE}.
 }
 
 \section{Companion vignette}{
@@ -386,57 +655,54 @@ For a longer, plot-first walkthrough, run
 }
 
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-# A balanced slice retains every Rater and Criterion while running quickly.
-toy <- toy[toy$Person \%in\% unique(toy$Person)[1:12], , drop = FALSE]
+# Long-running workflow; run explicitly when needed.
+# example("mfrmr_visual_diagnostics", run.dontrun = TRUE)
+\dontrun{
+# Load the package and example ratings
+library(mfrmr)
+toy <- load_mfrmr_data("example_operational")
+
+# Fit the model
 fit <- fit_mfrm(
-  toy,
+  data = toy,
   person = "Person",
   facets = c("Rater", "Criterion"),
   score = "Score",
   method = "MML",
-  quad_points = 7,
-  maxit = 30
-)
-diag <- diagnose_mfrm(fit, residual_pca = "none", diagnostic_mode = "both")
-checklist <- reporting_checklist(fit, diagnostics = diag)
-visual_reporting_template("manuscript")
-subset(
-  checklist$checklist,
-  Section == "Visual Displays" & Item \%in\% c("QC / facet dashboard", "Strict marginal visuals"),
-  c("Item", "Available", "NextAction")
+  model = "RSM"
 )
 
-qc <- plot_qc_dashboard(fit, diagnostics = diag, draw = FALSE, preset = "publication")
-qc$data$plot
+# Start with the shared-scale view; run plot commands one at a time
+plot(fit)
 
-p_marg <- plot_marginal_fit(diag, draw = FALSE, preset = "publication")
-p_marg$data$preset
+# Compute diagnostics once and check their interpretation status
+diagnostics <- diagnose_mfrm(fit)
+review <- summary(diagnostics)
+review$decision
 
-wright <- plot(fit, type = "wright", draw = FALSE, preset = "publication")
-wright$data$preset
+# Inspect an overview of model-fit issues
+plot(fit, type = "qc", diagnostics = diagnostics)
 
-pca <- analyze_residual_pca(diag, mode = "overall")
-scree <- plot_residual_pca(pca, plot_type = "scree", draw = FALSE, preset = "publication")
-scree$data$preset
+# Follow up on observed versus model-expected category frequencies
+plot(diagnostics, type = "marginal_fit")
 }
-
 }
 \seealso{
 \link{mfrmr_workflow_methods}, \link{mfrmr_reports_and_tables},
 \link{mfrmr_reporting_and_apa}, \link{mfrmr_linking_and_dff},
 \link{gpcm_capability_matrix}, \code{\link[=visual_reporting_template]{visual_reporting_template()}},
 \code{\link[=mfrmr_interval_guide]{mfrmr_interval_guide()}},
-\code{\link[=plot.mfrm_fit]{plot.mfrm_fit()}}, \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}},
-\code{\link[=plot_unexpected]{plot_unexpected()}}, \code{\link[=plot_displacement]{plot_displacement()}}, \code{\link[=plot_marginal_fit]{plot_marginal_fit()}},
-\code{\link[=plot_marginal_pairwise]{plot_marginal_pairwise()}}, \code{\link[=plot_interrater_agreement]{plot_interrater_agreement()}},
-\code{\link[=plot_facets_chisq]{plot_facets_chisq()}}, \code{\link[=plot_residual_pca]{plot_residual_pca()}}, \code{\link[=plot_bias_interaction]{plot_bias_interaction()}},
-\code{\link[=plot_dif_heatmap]{plot_dif_heatmap()}}, \code{\link[=plot_dif_summary]{plot_dif_summary()}}, \code{\link[=plot_anchor_drift]{plot_anchor_drift()}},
-\code{\link[=plot_guttman_scalogram]{plot_guttman_scalogram()}},
-\code{\link[=plot_residual_qq]{plot_residual_qq()}}, \code{\link[=plot_rater_trajectory]{plot_rater_trajectory()}},
-\code{\link[=plot_rater_agreement_heatmap]{plot_rater_agreement_heatmap()}}, \code{\link[=response_time_review]{response_time_review()}},
-\code{\link[=plot_response_time_review]{plot_response_time_review()}}
+\link[=plot.mfrm_fit]{plot(x, type = "guttman")}, \link[=plot.mfrm_fit]{plot(x, type = "qc")},
+\link[=plot.mfrm_fit]{plot(x, type = "unexpected")}, \link[=plot.mfrm_fit]{plot(x, type = "displacement")}, \link[=plot.mfrm_fit]{plot(x, type = "marginal_fit")},
+\link[=plot.mfrm_fit]{plot(x, type = "marginal_pairwise")}, \link[=plot.mfrm_fit]{plot(x, type = "agreement")},
+\link[=plot.mfrm_fit]{plot(x, type = "facets_chisq")}, \link[=plot.mfrm_fit]{plot(x, type = "residual_pca")}, \link[=plot.mfrm_fit]{plot(x, type = "bias")},
+\link[=plot.mfrm_dif]{plot(x, type = "heatmap")}, \link[=plot.mfrm_dif]{plot(x, type = "summary")}, \link[=plot.mfrm_anchor_drift]{plot(x)},
+\code{\link[=plot.mfrm_fit]{plot.mfrm_fit()}},
+\link[=plot.mfrm_fit]{plot(x, type = "residual_qq")}, \code{plot(fits[[1L]], type = "trajectory", comparison = fits[-1L], labels = names(fits))} (see \code{\link[=plot.mfrm_fit]{plot.mfrm_fit()}}),
+\link[=plot.mfrm_fit]{plot(x, type = "agreement", view = "heatmap")}, \code{\link[=response_time_review]{response_time_review()}},
+\link[=plot.mfrm_response_time_review]{plot(x)}
+
+\link{mfrmr_plot_migration}
 }
 \concept{GPCM boundaries}
 \concept{confidence intervals}

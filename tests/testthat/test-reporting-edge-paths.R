@@ -110,8 +110,8 @@ test_that("summarize_anchor_constraints handles missing columns", {
 
 test_that("summarize_step_estimates handles NULL step table", {
   sse <- mfrmr:::summarize_step_estimates
-  expect_equal(sse(NULL), "Step/threshold estimates were not available.")
-  expect_equal(sse(data.frame()), "Step/threshold estimates were not available.")
+  expect_equal(sse(NULL), "Step/threshold estimates and ordering comparisons were not available.")
+  expect_equal(sse(data.frame()), "Step/threshold estimates and ordering comparisons were not available.")
 })
 
 # ---- summarize_top_misfit_levels edge cases (lines 539-559) ----
@@ -156,9 +156,9 @@ test_that("build_apa_table_figure_note_map produces note map", {
   )
   diag <- diagnose_mfrm(fit)
 
-  note_map <- mfrmr:::build_apa_table_figure_note_map(
+  note_map <- mfrmr:::build_apa_reporting_contract(
     res = fit, diagnostics = diag, bias_results = NULL
-  )
+  )$note_map
   expect_true(is.list(note_map))
   expect_true("table1" %in% names(note_map))
   expect_true("table2" %in% names(note_map))
@@ -276,9 +276,9 @@ test_that("build_apa_table_figure_note_map includes bias note when provided", {
   diag <- diagnose_mfrm(fit)
   bias <- estimate_bias(fit, diag, facet_a = "Rater", facet_b = "Task")
 
-  note_map <- mfrmr:::build_apa_table_figure_note_map(
+  note_map <- mfrmr:::build_apa_reporting_contract(
     res = fit, diagnostics = diag, bias_results = bias
-  )
+  )$note_map
   expect_true(grepl("Bias", note_map$table4))
 })
 

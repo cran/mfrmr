@@ -1,0 +1,205 @@
+---
+title: "Assessment planning: G-study and D-study report"
+output:
+  html_document:
+    toc: true
+params:
+  ratings_csv: null
+  output_dir: "gtheory-report-files"
+---
+
+```{r setup, include=FALSE}
+library(mfrmr)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, fig.width = 7.5, fig.height = 5)
+example_run <- is.null(params$ratings_csv)
+if (example_run) {
+  data("mfrmr_example_gtheory_crossed", package = "mfrmr")
+  ratings <- mfrmr_example_gtheory_crossed
+} else {
+  ratings <- read.csv(params$ratings_csv, check.names = FALSE)
+}
+# Edit these choices before examining results. No automatic weight selection.
+scores <- c("Content", "Organization")
+weights <- c(Content = .5, Organization = .5)
+plans <- expand.grid(Raters = c(2, 4), Tasks = c(3, 6))
+g <- mfrm_g_study(ratings, scores = scores, person = "Person",
+  rater = "Rater", task = "Task")
+d <- mfrm_d_study(g, plans, weights = weights)
+component_ci <- confint(g, weights = weights, assumption = "normal")
+intervals <- setNames(lapply(c("G", "Phi", "RelativeSEM", "AbsoluteSEM"),
+  function(metric) confint(d, parm = metric, composite = "Composite",
+    assumption = "normal", method = if (metric %in% c("G", "Phi")) "delta" else "auto")),
+  c("G", "Phi", "RelativeSEM", "AbsoluteSEM"))
+comparison <- mfrm_multivariate_d_compare(d, reference = 1,
+  composite = "Composite", assumption = "normal")
+study_context <- c(
+  question = "Compare prespecified rater/task counts for the fixed Content-Organization composite",
+  rating_unit = "One Person by Rater by Task row with two fixed score components",
+  score_direction = "Specify separately what higher Content and Organization values mean",
+  transformation = "Raw numeric components; no normalization; supplied composite weights"
+)
+g_report <- mfrm_report(g, intervals = component_ci, style = "apa", study_context = study_context)
+report <- mfrm_report(d, intervals = intervals, style = "apa", study_context = study_context)
+comparison_report <- mfrm_report(comparison, style = "apa", study_context = study_context)
+composite <- d$coefficients[d$coefficients$Kind == "Composite", ]
+out <- params$output_dir
+dir.create(out, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Relate this report to the assessment question
+
+When combining measurement and G/D studies, report each analysis's input unit,
+retained sample, score scale, facets, aggregation, weights and uncertainty
+separately. Explain what MFRM reveals about specific facet effects and what
+G/D reveals about reproducibility of the defined observed score and future
+plans. Do not treat Rasch-adjusted estimates as interchangeable with raw G-study
+scores. The package's `mfrmr-networks-and-reporting` vignette shows published
+speaking/writing examples and a FACETS/ConQuest reporting crosswalk. Select
+linking, bias and model-comparison modules from `mfrmr-reporting-and-apa` when
+they address the question; this template does not run every possible analysis.
+
+## Question and score meaning
+
+`r if (example_run) "**Synthetic teaching example:** these are continuous scores generated from independent normal random effects, not empirical speaking-assessment findings." else "**Study draft:** complete the context and interpretation below before manuscript use."`
+
+Would adding raters or tasks improve the dependability and precision of a
+prespecified Content–Organization composite? This report connects the source
+of error to the practical choice of rating plan. Its tables include both
+relative ranking and absolute-score decisions; emphasize the target actually
+used in your study.
+
+**Complete for your study:** define participants and recruitment, the assessment
+purpose, rater/task populations and sampling, assignment, training and missing
+ratings. Give each score's units, endpoint labels, coding and direction.
+For Comprehensibility, explicitly state whether higher means easier or harder
+to understand. Explain any reversal before defining the composite. G theory
+does not establish that ordinal categories are an interval scale.
+
+The present template treats Content and Organization as **fixed score
+components**, with weights `r paste(names(weights), weights, sep = " = ", collapse = ", ")`.
+They are not random criteria or separate latent abilities. Weights are used
+as supplied; adapt this template's prose as well as its code if that target
+changes.
+
+## Source design and estimation
+
+A complete crossed Person × Rater × Task G-study was estimated by balanced
+multivariate ANOVA. Persons are the differentiation target. Raters and tasks
+are random sampling facets; the numeric score columns are fixed components.
+Each source has a variance–covariance matrix across those scores. The
+composite's source variance is the quadratic form of that matrix and the
+fixed weights. The default raw-component policy preserves signed estimates.
+
+```{r design}
+knitr::kable(report$tables$source_counts, caption = "Observed source levels")
+knitr::kable(report$tables$source_rows, caption = "Source row accounting")
+knitr::kable(report$tables$component_diagnostics, digits = 4,
+  caption = "Component admissibility; inspect before interpreting projections")
+```
+
+If your design is incomplete or nested, change the G-study specification,
+interval methods and this Methods section together. Do not fill missing
+ratings with zero or count unassigned ratings as missing scores. One
+observation per Person–Rater–Task cell means the residual combines the
+three-way interaction and within-cell error. A random-facet interpretation
+requires a defensible sampling universe; the software does not establish it.
+
+## Which sources contribute variation?
+
+```{r components}
+knitr::kable(g_report$tables$intervals[, c("Source", "Estimate", "SE", "Lower", "Upper", "Status")],
+  digits = 3, caption = "Composite source variances and component intervals")
+component_plot <- plot(g, weights = weights)
+```
+
+The figure shows the original composite component estimates. Variances have
+squared score units. The table adds approximate normal-model component
+intervals (with the residual's chi-square reference); signed points and
+unavailable intervals remain visible. Component SE is sampling uncertainty
+in a variance, distinct from measurement SEM. Cross-score covariances and
+all source matrices are retained in the exported report.
+
+## Compare the prespecified future plans
+
+Future counts describe complete balanced ratings from the same populations,
+assuming invariant source components. Larger future counts do not enlarge
+the source sample or make its estimates more certain.
+
+```{r plans}
+knitr::kable(composite[, c("Scenario", "Raters", "Tasks", "UniverseVariance",
+  "RelativeErrorVariance", "AbsoluteErrorVariance", "G", "Phi", "RelativeSEM", "AbsoluteSEM", "Status")],
+  digits = 3, caption = "Composite dependability, error variances and measurement SEM")
+planning_plot <- plot(d, composite = "Composite", metric = "G", x_var = "Tasks",
+  panel_by = "Raters", intervals = intervals$G)
+sem_plot <- plot(d, type = "sem", composite = "Composite", metric = "AbsoluteSEM",
+  x_var = "Tasks", panel_by = "Raters", intervals = intervals$AbsoluteSEM)
+```
+
+G describes relative decisions, whereas Phi includes sources relevant to
+absolute decisions. Neither is inter-rater agreement. Both depend on the
+Person universe variance as well as error; report SEM and error variances
+alongside the coefficients (Brennan, 2003). SEM is expressed in the composite's
+score units, not logits or a Person posterior SD.
+
+```{r uncertainty}
+knitr::kable(report$tables$intervals[, c("Scenario", "Metric", "Estimate", "Lower", "Upper", "Level", "Method", "Status")],
+  digits = 3, caption = "Prespecified composite targets: uncertainty and availability")
+```
+
+The coefficient intervals here explicitly use the normal-theory delta
+approximation; SEM uses the recorded MLS/chi-square rule. These are
+method-specific, pointwise intervals under independent normal random effects.
+They are not distribution-robust, simultaneous or adjusted for selecting a
+plan. Jiang et al. (2022) motivate attention to coefficient uncertainty,
+especially in small designs; that study does not establish coverage for all
+methods used here. Keep any unavailable result and its reason.
+
+## Paired comparison and practical answer
+
+```{r paired}
+knitr::kable(comparison$comparisons[, c("Reference", "Scenario", "Metric",
+  "Difference", "SE", "Lower", "Upper", "Status")], digits = 3,
+  caption = "Plan minus reference plan: shared-source normal-theory delta approximation")
+```
+
+All plans use the same estimated source, so these comparisons retain their
+shared sampling covariance. Positive coefficient differences and negative
+SEM differences favor the comparison plan on those metrics. The calculation
+does not rank costs or guarantee classification accuracy at a cut score.
+
+**Complete the answer:** "For [score and population], changing [raters/tasks]
+from [reference] to [plan] changed projected [metric] by [estimate], with
+[method and level] interval [limits]. Relative to [practical precision target],
+this [supports/does not resolve] the change because [magnitude, uncertainty,
+cost and burden]." State the time/cost per task and per rating, feasibility,
+and consequences of errors. Use a threshold chosen for the intended decision,
+not a universal coefficient cutoff or the best-looking plan.
+
+## Saved evidence and references
+
+```{r exports, include=FALSE}
+export_summary_appendix(g_report, output_dir = out, prefix = "gstudy", overwrite = TRUE)
+export_summary_appendix(report, output_dir = out, prefix = "dstudy", overwrite = TRUE)
+export_summary_appendix(comparison_report, output_dir = out, prefix = "comparison", overwrite = TRUE)
+figures <- list(components = component_plot, planning = planning_plot, sem = sem_plot)
+for (name in names(figures)) {
+  ggplot2::ggsave(file.path(out, paste0(name, ".png")),
+    as_ggplot(figures[[name]]), width = 7.5, height = 5, dpi = 180)
+}
+saveRDS(list(g = g, d = d, component_intervals = component_ci, intervals = intervals,
+  comparison = comparison, reports = list(g = g_report, d = report, comparison = comparison_report),
+  figures = figures, session = sessionInfo()), file.path(out, "gtheory-analysis.rds"))
+```
+
+The `r out` directory contains full CSV/HTML tables, figure PNGs and the
+reloadable analysis, including weights, source/plan context, method notes and
+unavailable states. Source archives may include participant identifiers;
+review them before sharing. Rendering this editable template reruns its
+analysis; reopening the saved reports or plots does not refit it.
+
+- Brennan, R. L. (2003). *Coefficients and indices in generalizability theory*.
+  CASMA Research Report No. 1, University of Iowa.
+- Jiang, Z., Raymond, M., DiStefano, C., Shi, D., Liu, R., & Sun, J. (2022).
+  A Monte Carlo study of confidence interval methods for generalizability
+  coefficient. *Educational and Psychological Measurement, 82*, 705–718.
+  [doi:10.1177/00131644211033899](https://doi.org/10.1177/00131644211033899).

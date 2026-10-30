@@ -9,17 +9,11 @@
 # console default. Callers that want the raw list can still use
 # `unclass(x)` or direct subsetting.
 
-#' @export
-print.mfrm_apa_outputs <- function(x, ...) {
-  print(summary(x), ...)
-  invisible(x)
-}
+#' @rawNamespace S3method(print,mfrm_apa_outputs,print.mfrm_bundle)
+NULL
 
-#' @export
-print.mfrm_bias <- function(x, ...) {
-  print(summary(x), ...)
-  invisible(x)
-}
+#' @rawNamespace S3method(print,mfrm_bias,print.mfrm_bundle)
+NULL
 
 #' @export
 print.mfrm_bundle <- function(x, ...) {
@@ -27,62 +21,32 @@ print.mfrm_bundle <- function(x, ...) {
   invisible(x)
 }
 
-#' @export
-print.mfrm_design_evaluation <- function(x, ...) {
-  print(summary(x), ...)
-  invisible(x)
-}
+#' @rawNamespace S3method(print,mfrm_design_evaluation,print.mfrm_bundle)
+NULL
 
-#' @export
-print.mfrm_diagnostics <- function(x, ...) {
-  print(summary(x), ...)
-  invisible(x)
-}
+#' @rawNamespace S3method(print,mfrm_diagnostics,print.mfrm_bundle)
+NULL
 
-#' @export
-print.mfrm_facet_dashboard <- function(x, ...) {
-  print(summary(x), ...)
-  invisible(x)
-}
+#' @rawNamespace S3method(print,mfrm_facet_dashboard,print.mfrm_bundle)
+NULL
 
-#' @export
-print.mfrm_structural_design_review <- function(x, ...) {
-  print(summary(x), ...)
-  invisible(x)
-}
+#' @rawNamespace S3method(print,mfrm_structural_design_review,print.mfrm_bundle)
+NULL
 
-#' @export
-print.mfrm_plausible_values <- function(x, ...) {
-  print(summary(x), ...)
-  invisible(x)
-}
+#' @rawNamespace S3method(print,mfrm_plausible_values,print.mfrm_bundle)
+NULL
 
-#' @export
-print.mfrm_population_prediction <- function(x, ...) {
-  print(summary(x), ...)
-  invisible(x)
-}
+#' @rawNamespace S3method(print,mfrm_population_prediction,print.mfrm_bundle)
+NULL
 
-#' @export
-print.mfrm_reporting_checklist <- function(x, ...) {
-  print(summary(x), ...)
-  invisible(x)
-}
+#' @rawNamespace S3method(print,mfrm_reporting_checklist,print.mfrm_bundle)
+NULL
 
-#' @export
-print.mfrm_signal_detection <- function(x, ...) {
-  print(summary(x), ...)
-  invisible(x)
-}
+#' @rawNamespace S3method(print,mfrm_signal_detection,print.mfrm_bundle)
+NULL
 
-#' @export
-print.mfrm_threshold_profiles <- function(x, ...) {
-  print(summary(x), ...)
-  invisible(x)
-}
+#' @rawNamespace S3method(print,mfrm_threshold_profiles,print.mfrm_bundle)
+NULL
 
-#' @export
-print.mfrm_unit_prediction <- function(x, ...) {
-  print(summary(x), ...)
-  invisible(x)
-}
+#' @rawNamespace S3method(print,mfrm_unit_prediction,print.mfrm_bundle)
+NULL

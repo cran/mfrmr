@@ -347,150 +347,1730 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 scale</li>
 <li>exporting anchor candidates from an existing fit</li>
 <li>screening differential facet functioning (DFF)</li>
-<li>deciding when subgroup contrasts are descriptive versus formally
-comparable</li>
+<li>deciding whether subgroup contrasts are linked and available for
+screening</li>
 </ul>
 <p>For a broader workflow guide, see
 <code>vignette(&quot;mfrmr-workflow&quot;, package = &quot;mfrmr&quot;)</code>. For the
 shorter help-page map, see
 <code>help(&quot;mfrmr_linking_and_dff&quot;, package = &quot;mfrmr&quot;)</code>.</p>
-<div id="minimal-setup" class="section level2">
-<h2>Minimal setup</h2>
+<div id="first-example-reuse-selected-criterion-locations" class="section level2">
+<h2>First example: reuse selected criterion locations</h2>
+<p>An <strong>anchor</strong> is a parameter value held fixed during
+estimation. A shared Person, rater or task is an observed link; sharing
+an identity does not require fixing its value. For example, a direct
+Rater anchor at 0.35 logits holds that rater’s location at 0.35, whereas
+a group anchor at 0.20 for two raters fixes their sum at 0.40 and lets
+their individual values differ.</p>
+<p>Start by loading the packaged synthetic teaching ratings. Each row is
+one Person’s score from one Rater on one Criterion, on a 1–4 rubric. We
+split the 48 Persons into two teaching cohorts with the same four raters
+and four criteria. This illustrates reuse of known identities; it is not
+empirical evidence that a real rater or criterion stays invariant over
+time.</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
-<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a></span>
-<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>bias_df <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_bias&quot;</span>)</span>
-<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a></span>
-<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="co"># The vignette uses compact quadrature so optional local execution stays fast.</span></span>
-<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="co"># For final DFF or linking evidence, refit with the package default or a higher</span></span>
-<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a><span class="co"># quadrature setting and record that setting in the analysis log.</span></span>
-<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
-<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>  bias_df,</span>
-<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
-<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
-<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
-<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
-<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">31</span></span>
-<span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a>)</span>
-<span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a></span>
-<span id="cb1-18"><a href="#cb1-18" tabindex="-1"></a>diag <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit, <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>)</span></code></pre></div>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>ratings <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_core&quot;</span>)</span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="fu">head</span>(ratings[, <span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>, <span class="st">&quot;Score&quot;</span>)])</span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>people <span class="ot">&lt;-</span> <span class="fu">unique</span>(ratings<span class="sc">$</span>Person)</span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>baseline_data <span class="ot">&lt;-</span> ratings[ratings<span class="sc">$</span>Person <span class="sc">%in%</span> people[<span class="dv">1</span><span class="sc">:</span><span class="dv">24</span>], , drop <span class="ot">=</span> <span class="cn">FALSE</span>]</span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>new_data <span class="ot">&lt;-</span> ratings[ratings<span class="sc">$</span>Person <span class="sc">%in%</span> people[<span class="dv">25</span><span class="sc">:</span><span class="dv">48</span>], , drop <span class="ot">=</span> <span class="cn">FALSE</span>]</span></code></pre></div>
+<p>Fit the reference and select its Criterion locations.
+<code>make_anchor_table()</code> requires a numerically eligible source,
+but does not establish substantive invariance. If it refuses a source,
+inspect that model’s diagnostics; exporting with
+<code>readiness_policy = &quot;review&quot;</code> is for inspection, not for
+bypassing the requirement in a new calibration.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>baseline <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>  baseline_data, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>, <span class="at">rating_min =</span> <span class="dv">1</span>, <span class="at">rating_max =</span> <span class="dv">4</span>,</span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>  <span class="at">category_policy =</span> <span class="st">&quot;preserve&quot;</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>)</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>anchors <span class="ot">&lt;-</span> <span class="fu">make_anchor_table</span>(baseline, <span class="at">facets =</span> <span class="st">&quot;Criterion&quot;</span>)</span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>anchors</span></code></pre></div>
+<p>The columns name the facet, its exact level ID, and its fixed
+location in internal logit coordinates. They do not contain thresholds,
+slopes or source standard errors. Values transformed for display with
+<code>Umean</code>/<code>Uscale</code> must not be copied into this
+table as though they were internal logits. The default
+<code>digits = NULL</code> preserves fitted values for reuse. Rounding
+each row can break a whole-facet zero sum, so round a display copy
+rather than the anchor input.</p>
+<p>Review the intended constraints against the
+<strong>receiving</strong> data before fitting. Unknown IDs, duplicate
+rows and incompatible targets need resolution; keeping the last
+duplicate row mechanically does not decide which value is justified.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>anchor_review <span class="ot">&lt;-</span> <span class="fu">review_mfrm_anchors</span>(</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>  new_data, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="st">&quot;Score&quot;</span>, <span class="at">anchors =</span> anchors,</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>  <span class="at">rating_min =</span> <span class="dv">1</span>, <span class="at">rating_max =</span> <span class="dv">4</span>, <span class="at">category_policy =</span> <span class="st">&quot;preserve&quot;</span></span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>)</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>anchor_review<span class="sc">$</span>issue_counts</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>anchor_review<span class="sc">$</span>anchors</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>anchor_review<span class="sc">$</span>recommendations</span></code></pre></div>
+<p>The recommendation about five anchors is a configurable count screen,
+not a universal minimum or proof that a design is linked.
+<code>FreeLevels</code> counts levels outside direct/group constraints,
+not independent parameters: group members can vary subject to their
+mean, while centering removes a degree of freedom.</p>
+<p>Now fit the new cohort. This example fixes <strong>all four</strong>
+Criterion locations, so that facet has no unanchored remainder. Rater
+locations and category thresholds are estimated again. The same rubric
+is specified explicitly in both fits.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>linked <span class="ot">&lt;-</span> <span class="fu">anchor_to_baseline</span>(</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>  new_data, baseline, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  <span class="at">anchor_facets =</span> <span class="st">&quot;Criterion&quot;</span>, <span class="at">anchor_policy =</span> <span class="st">&quot;error&quot;</span>,</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  <span class="at">rating_min =</span> <span class="dv">1</span>, <span class="at">rating_max =</span> <span class="dv">4</span>, <span class="at">category_policy =</span> <span class="st">&quot;preserve&quot;</span></span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>)</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="fu">summary</span>(linked)</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>linked<span class="sc">$</span>fit<span class="sc">$</span>facets<span class="sc">$</span>others</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>linked<span class="sc">$</span>drift[, <span class="fu">c</span>(<span class="st">&quot;Facet&quot;</span>, <span class="st">&quot;Level&quot;</span>, <span class="st">&quot;Baseline&quot;</span>, <span class="st">&quot;New&quot;</span>, <span class="st">&quot;Drift&quot;</span>)]</span></code></pre></div>
+<p>Read <code>linked$fit$facets$others</code> for the fitted facet
+locations. <code>linked$drift</code> compares only retained
+<strong>fixed non-Person anchors</strong>: its zero differences are
+expected by construction and do not test stability. For independent
+screening, fit waves separately and use
+<code>detect_anchor_drift()</code>, retaining its offset, common-element
+and uncertainty limitations. Keep the full <code>linked</code> object
+when saving the analysis, so its fitted model and supplied anchors stay
+together.</p>
+<div id="limits-that-matter-before-using-real-data" class="section level3">
+<h3>Limits that matter before using real data</h3>
+<ul>
+<li><strong>Whole-facet centering includes anchors.</strong> Unless a
+facet is <code>noncenter_facet</code>,
+<code>centering_scope = &quot;facet&quot;</code> makes all its levels sum to zero.
+With R01 = 0.70, the other ungrouped raters sum to -0.70; a single
+remaining rater is fixed at -0.70. Group totals also contribute.
+Incompatible totals stop before fitting, even when
+<code>anchor_policy = &quot;silent&quot;</code>.
+<code>centering_scope = &quot;remainder&quot;</code> reproduces the earlier
+restriction that the ungrouped, unanchored levels sum to zero. Saved
+results are not converted by reloading them; fitting under a different
+convention requires re-estimation. For ordinary additive RSM/PCM JML,
+<code>centering_scope = &quot;anchor_origin&quot;</code> instead lets direct or
+group anchors replace their facet’s centering, as FACETS does. Choose an
+unanchored, active noncenter facet and repeat the same arithmetic mean
+target for each group member. This does not change the default or
+account for estimated-anchor error.</li>
+<li><strong>The helper does not copy every setting.</strong> The model,
+estimation method, centering convention and MML integration mode are
+inherited automatically. Older baselines without convention metadata
+retain <code>&quot;remainder&quot;</code>. Repeat the intended category policy,
+rubric, orientation, PCM/GPCM roles, uncentered facet and population
+model. RSM/PCM MML without a population model fixes ability to a
+standard-normal distribution; it does not estimate a changed cohort
+mean/variance. An explicitly requested
+<code>population_formula = ~ 1</code> estimates normal-population
+moments and needs <code>person_data</code>; see
+<code>help(&quot;fit_mfrm&quot;)</code> for its assumptions.</li>
+<li><strong>Person anchors require JML.</strong> Current MML integrates
+ability and rejects fixed Person values or Person group means. Common
+Persons can be present in the design without being anchored. Choosing
+JML changes the estimator and should follow the analysis question, not
+merely avoid an error.</li>
+<li><strong>Anchor uncertainty is conditional.</strong> The new fit
+treats supplied values as exact. It does not propagate their source
+estimation error; an unavailable SE for a fixed value does not mean its
+source was perfectly known. Compare defensible anchor sets when
+conclusions depend on that choice.</li>
+<li><strong>Locations are not the entire calibration.</strong> To hold
+thresholds and other supported calibration components fixed while
+scoring, use <code>extract_mfrm_calibration()</code>, validate and
+freeze the saved calibration, then call
+<code>score_mfrm_calibration()</code>. See
+<code>help(&quot;mfrm_calibration_workflow&quot;)</code> for its supported models
+and required checks.</li>
+</ul>
+<p>The <a href="https://www.winsteps.com/facetman/centerfacet.htm">FACETS
+centering rules</a> help distinguish an origin constraint from a fixed
+external value, but are not mfrmr’s partial-anchor convention. <a href="https://doi.org/10.3758/s13428-020-01498-x">Uto (2021,
+pp. 1442–1444)</a> explains common-rater/task linking and its design
+dependence. That simulation fixes generated common parameters and
+removes a redundant rater constraint; its Bayesian estimation does not
+validate mfrmr’s different constraints or supply uncertainty propagation
+for estimated anchors.</p>
+</div>
+</div>
+<div id="annual-speech-contests-with-common-recordings" class="section level2">
+<h2>Annual speech contests with common recordings</h2>
+<p>Suppose each year’s contestants give a three-minute English speech.
+Most judges return and use the same rubric. Before the contest, they
+rate a set of recorded speeches used in previous years. You want to know
+whether judges became more severe, whether the whole panel changed its
+standard, and whether the new contestant group performed differently on
+a common scale.</p>
+<p>The common recordings offer a link: the performance in a fixed
+recording does not improve from one year to the next. Its interpretation
+must still be comparable under the rubric and viewing conditions. An
+unchanged time limit or criterion name alone does not establish this.
+Because contestants change, a difference between annual groups is not
+individual growth.</p>
+<p>This section explains the design and the limits of current functions.
+A complete recording-based annual analysis, including formal
+year-difference intervals, is not yet verified in mfrmr. The teaching
+cohorts in the first example above do not contain annual reratings of
+common recordings.</p>
+<div id="identify-the-performance-judge-and-rating-occasion" class="section level3">
+<h3>Identify the performance, judge and rating occasion</h3>
+<p>Keep one row per individual rating on one criterion. The following
+IDs illustrate identities to preserve; they are not supplied example
+data.</p>
+<table>
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Observation</th>
+<th>Performance ID</th>
+<th>Judge ID</th>
+<th>Rating year</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Judge A rates reference video V01 in 2025</td>
+<td>V01</td>
+<td>A</td>
+<td>2025</td>
+</tr>
+<tr class="even">
+<td>Judge A rates that same video in 2026</td>
+<td>V01</td>
+<td>A</td>
+<td>2026</td>
+</tr>
+<tr class="odd">
+<td>Judge A rates a new 2026 contestant’s speech</td>
+<td>Speech_2026_01</td>
+<td>A</td>
+<td>2026</td>
+</tr>
+</tbody>
+</table>
+<p>Also retain criterion, score, session, training phase and video/live
+mode. The same speaker giving a new speech needs a new performance ID
+when the measurement target is that speech. Preserve individual ratings
+before discussion or disclosure of reference scores. Consensus scores
+alone cannot recover differences among judges. Include performances
+spanning relevant levels and criterion profiles; there is no universal
+adequate recording count. The five-common-element helper warning is not
+such a rule.</p>
+</div>
+<div id="choose-what-is-shared-and-what-is-allowed-to-change" class="section level3">
+<h3>Choose what is shared and what is allowed to change</h3>
+<p>In <strong>joint calibration</strong>, analyze years together,
+sharing an unknown measure for each common recording while allowing
+judges’ severities to vary by year. A judge-year effect represents a
+particular judge in a particular year; retain the original judge ID so
+these effects can later be compared. The recording measures can be
+estimated rather than supplied as numerical anchors.</p>
+<p>In <strong>fixed-reference calibration</strong>, use previously
+estimated recording measures as fixed values for a later year and
+estimate that year’s judge effects. This preserves a chosen reference
+scale but conditions on its estimated values. When the recordings take
+the Person role, current mfrmr requires JML for direct Person anchors;
+MML rejects them. Sharing unknown performance measures is a different
+design and does not require these anchors. Formal JML structural
+intervals remain unqualified.</p>
+<p>Returning judges should not automatically be fixed to their previous
+severities when their changes are the question. A panel mean fixed
+separately in every year also prevents estimating a common shift. For
+example, centering away a +0.40-logit increase for all judges would
+leave no panel-wide increase to report. FACETS describes group anchoring
+as an assumption about average severity, not proof that the panel stayed
+stable (<a href="https://www.winsteps.com/a/ftutorial4.pdf">Linacre,
+2012, p. 9</a>).</p>
+<p>Specify scale constraints, criterion/category stability and
+ability-population assumptions together. Unrestricted year effects and
+judge-year effects would overlap; freely changing criteria can also
+absorb a common scoring shift. Separate fixed-standard-normal MML fits
+do not estimate changing cohort means. In a joint model, do not assign
+conflicting Person-level year covariates to a common recording rated in
+several years. Its rating occasion is not a different underlying
+performance.</p>
+</div>
+<div id="read-the-existing-helper-results-for-their-stated-purpose" class="section level3">
+<h3>Read the existing helper results for their stated purpose</h3>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Output</th>
+<th>What it shows</th>
+<th>What it does not establish</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>linked$fit$facets$others</code> from
+<code>anchor_to_baseline()</code></td>
+<td>Facet locations under the chosen constraints</td>
+<td>A formal annual comparison without compatible scales and an
+appropriate contrast analysis</td>
+</tr>
+<tr class="even">
+<td><code>linked$drift</code></td>
+<td>Whether retained fixed non-Person anchors equal the supplied
+values</td>
+<td>Stability of those elements, or a drift estimate for the reference
+recordings</td>
+</tr>
+<tr class="odd">
+<td><code>drift$drift_table</code> from
+<code>detect_anchor_drift()</code></td>
+<td>Common-element differences after removing
+<code>LinkOffset</code></td>
+<td>Absolute panel change, or calibrated significance of the SE
+ratio</td>
+</tr>
+<tr class="even">
+<td><code>chain$cumulative</code> from
+<code>build_equating_chain()</code></td>
+<td>Accumulated screened adjacent-wave offsets</td>
+<td>Propagated uncertainty or proof of annual scale comparability</td>
+</tr>
+</tbody>
+</table>
+<p>When judges are the linking set, <code>detect_anchor_drift()</code>
+subtracts their common shift. If all selected differences are +0.40
+logits, <code>LinkOffset</code> is +0.40 and every residual
+<code>Drift</code> is zero. This describes relative alignment, not
+evidence that the panel was stable. Interpreting <code>LinkOffset</code>
+itself as panel change is also unjustified without a separate scale
+reference.</p>
+<p>Agreement after training, operational stability and correctness
+against an expert benchmark are different outcomes. Check familiar-score
+memory, for example with additional recordings not used to teach the
+reference scores. If the contest is rated live but the calibration uses
+video, paired live/video ratings of some performances can help assess
+whether the estimated severity transfers. Repeated ratings can be
+dependent even when their IDs are correct.</p>
+<p>Annual-difference uncertainty needs the covariance between the
+relevant estimates, or propagation of reference-calibration uncertainty
+where applicable. Adding two squared SEs assumes away covariance;
+marginal interval overlap is not a test of change. Report the reference,
+assumptions, number of common performances and unavailable results
+alongside any point comparisons.</p>
+</div>
+</div>
+<div id="which-uncertainty-is-available-with-anchors" class="section level2">
+<h2>Which uncertainty is available with anchors?</h2>
+<p>An anchor does not make every interval unavailable. For ordinary
+unit-weight RSM/PCM MML with a fixed standard-normal population and
+fixed-grid integration, <code>mfrm_facet_intervals()</code> can supply
+model-information or cluster-sandwich intervals for free facet locations
+and contrasts, subject to its checks. They condition on the supplied
+anchors. A fixed target has SE zero and no inferential bounds; this does
+not describe the uncertainty of its original calibration.</p>
+<p>If the population mean and variance are also estimated, anchored
+point estimation is supported, but the native location and population
+interval helpers currently exclude anchors and group constraints.
+Inspect <code>fit$readiness$fit</code>:
+<code>EstimabilityState = &quot;not_evaluated&quot;</code> means the
+identification review is incomplete, not that numerical optimization
+failed or the model was proved unidentified. The separate
+<code>fit$data_review$estimability$nonlinear_local_estimability</code>
+can pass its local-rank check while overall readiness remains under
+review. That local result alone does not authorize intervals or
+exporting anchors for reuse. Choose the population assumption for the
+assessment question, not simply because one configuration supplies
+intervals.</p>
+<p>For <strong>one-family GPCM</strong>, model-information and
+cluster-sandwich slope and curve intervals can include fixed facet
+anchors or group means when their own numerical checks pass. Use
+<code>confint(fit, parm = &quot;slopes&quot;)</code> for relative slopes and
+<code>mfrm_curve_intervals(fit, newdata)</code> for curves at specified
+ability values and rating contexts. Their returned explanations state
+that source-anchor uncertainty is excluded. Fixing a rater’s location
+does not fix its slope, category thresholds or entire response curve. A
+group mean does not fix each member.</p>
+<p>The restrictions differ by output. Anchored one-family GPCM currently
+has no native-location or profile-slope interval route, and no
+portable-calibration export. Fitted-object scoring with
+<code>predict_mfrm_units()</code> has separate source and scoring
+checks. An available slope interval does not certify that source for
+scoring: its finer-grid integration check may still fail. Explicit
+<code>readiness_policy = &quot;review&quot;</code> retains review-only values and
+does not make them operational scores. These distinctions also apply
+after saving results.</p>
+<div id="reusing-an-analysis-saved-before-the-centering-change" class="section level3">
+<h3>Reusing an analysis saved before the centering change</h3>
+<p>Start with what you want to preserve or change. Saving a new copy
+does not convert the statistical model.</p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Intended task</th>
+<th>Required action</th>
+<th>What changes?</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Reopen the original fit</td>
+<td><code>readRDS()</code>; inspect
+<code>summary(fit, compute = &quot;never&quot;)</code> and
+<code>specifications_report(fit)</code></td>
+<td>No estimates or constraints. A native fit lacking convention
+metadata retains legacy remainder centering.</td>
+</tr>
+<tr class="even">
+<td>Repeat the original estimation</td>
+<td>Generate <code>build_mfrm_replay_script()</code> and run it with the
+original data</td>
+<td>A new fit under the original convention, with newly evaluated
+readiness.</td>
+</tr>
+<tr class="odd">
+<td>Adopt whole-facet centering</td>
+<td>Refit with <code>centering_scope = &quot;facet&quot;</code>, preserving the
+intended other settings</td>
+<td>The anchored constraints and potentially estimates, SEs and
+conclusions.</td>
+</tr>
+<tr class="even">
+<td>Update interval explanations or fixed-contrast derivatives</td>
+<td>Recompute the interval object from its unchanged source fit</td>
+<td>Derived output; no model refit is needed solely for this
+update.</td>
+</tr>
+<tr class="odd">
+<td>Repair earlier anchored subgroup DFF</td>
+<td>Rerun <code>analyze_dff()</code> from the baseline</td>
+<td>Subgroup models are refitted; reading the old DFF object does not
+repair them.</td>
+</tr>
+<tr class="even">
+<td>Describe an old portable calibration more precisely</td>
+<td>Re-extract from its source fit with the required checks, then
+validate and freeze a new artifact</td>
+<td>Explicit constraint labels; this alone does not change its
+coefficients or convention.</td>
+</tr>
+</tbody>
+</table>
+<p>For a runnable illustration, create an analysis with the legacy
+convention using the packaged ratings already loaded above. If you
+already have an old fit file, start by reading that file instead. The
+example fixes a Rater location, uses RSM with a fixed standard-normal
+population and keeps Person as the uncentered facet. These choices
+illustrate migration; choose the population assumption for your
+assessment question.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>migration_anchor <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">Facet =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">Level =</span> <span class="st">&quot;R01&quot;</span>, <span class="at">Anchor =</span> <span class="fl">0.70</span>)</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>legacy_fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  ratings, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>, <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>, <span class="at">anchors =</span> migration_anchor,</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>  <span class="at">noncenter_facet =</span> <span class="st">&quot;Person&quot;</span>, <span class="at">centering_scope =</span> <span class="st">&quot;remainder&quot;</span>,</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>  <span class="at">rating_min =</span> <span class="dv">1</span>, <span class="at">rating_max =</span> <span class="dv">4</span>, <span class="at">category_policy =</span> <span class="st">&quot;preserve&quot;</span>,</span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">31</span>, <span class="at">maxit =</span> <span class="dv">400</span>, <span class="at">reltol =</span> <span class="fl">1e-9</span></span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>)</span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>fit_file <span class="ot">&lt;-</span> <span class="fu">tempfile</span>(<span class="at">fileext =</span> <span class="st">&quot;.rds&quot;</span>)</span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="fu">saveRDS</span>(legacy_fit, fit_file)</span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a>restored_fit <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(fit_file)</span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a><span class="fu">unlink</span>(fit_file)</span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a>spec <span class="ot">&lt;-</span> <span class="fu">specifications_report</span>(restored_fit)<span class="sc">$</span>data_spec</span>
+<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a>spec[spec<span class="sc">$</span>Setting <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;NonCenteredFacet&quot;</span>, <span class="st">&quot;CenteringScope&quot;</span>), ]</span></code></pre></div>
+<p><code>CenteringScope = &quot;remainder&quot;</code> describes the fitted
+constraint, including for native files saved before this field existed.
+It is not changed to the new default merely because a newer package
+reads the file. Do not assign a new value to
+<code>fit$config$centering_scope</code> or recenter its coefficient
+table: the likelihood, parameter mapping and uncertainty still belong to
+the original fit.</p>
+<p>To change the convention, fit a <strong>separate model</strong> from
+the original responses. Here only the declared centering changes.
+Inspect its numerical and design status; the number of quadrature points
+is not an accuracy guarantee.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>updated_fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  ratings, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>, <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>, <span class="at">anchors =</span> migration_anchor,</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="at">noncenter_facet =</span> <span class="st">&quot;Person&quot;</span>, <span class="at">centering_scope =</span> <span class="st">&quot;facet&quot;</span>,</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  <span class="at">rating_min =</span> <span class="dv">1</span>, <span class="at">rating_max =</span> <span class="dv">4</span>, <span class="at">category_policy =</span> <span class="st">&quot;preserve&quot;</span>,</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">31</span>, <span class="at">maxit =</span> <span class="dv">400</span>, <span class="at">reltol =</span> <span class="fl">1e-9</span></span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>)</span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a><span class="fu">summary</span>(updated_fit, <span class="at">compute =</span> <span class="st">&quot;never&quot;</span>, <span class="at">detail =</span> <span class="st">&quot;brief&quot;</span>)</span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>old_raters <span class="ot">&lt;-</span> <span class="fu">subset</span>(restored_fit<span class="sc">$</span>facets<span class="sc">$</span>others, Facet <span class="sc">==</span> <span class="st">&quot;Rater&quot;</span>)</span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a>new_raters <span class="ot">&lt;-</span> <span class="fu">subset</span>(updated_fit<span class="sc">$</span>facets<span class="sc">$</span>others, Facet <span class="sc">==</span> <span class="st">&quot;Rater&quot;</span>)</span>
+<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a><span class="fu">data.frame</span>(</span>
+<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a>  <span class="at">Convention =</span> <span class="fu">c</span>(<span class="st">&quot;remainder&quot;</span>, <span class="st">&quot;facet&quot;</span>),</span>
+<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a>  <span class="at">FixedR01 =</span> <span class="fu">c</span>(old_raters<span class="sc">$</span>Estimate[old_raters<span class="sc">$</span>Level <span class="sc">==</span> <span class="st">&quot;R01&quot;</span>],</span>
+<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a>               new_raters<span class="sc">$</span>Estimate[new_raters<span class="sc">$</span>Level <span class="sc">==</span> <span class="st">&quot;R01&quot;</span>]),</span>
+<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a>  <span class="at">OtherRaterSum =</span> <span class="fu">c</span>(<span class="fu">sum</span>(old_raters<span class="sc">$</span>Estimate[old_raters<span class="sc">$</span>Level <span class="sc">!=</span> <span class="st">&quot;R01&quot;</span>]),</span>
+<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a>                    <span class="fu">sum</span>(new_raters<span class="sc">$</span>Estimate[new_raters<span class="sc">$</span>Level <span class="sc">!=</span> <span class="st">&quot;R01&quot;</span>]))</span>
+<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a>)</span></code></pre></div>
+<p>Both fits keep R01 at 0.70. The remaining raters sum to zero in the
+legacy fit and -0.70 in the whole-facet fit. This changes R01’s
+comparison with the other raters; it is not just a renamed column.
+Retain the two analyses under different filenames, and report the
+convention with the other model settings. Complete facet anchors can
+also become incompatible with a whole-facet zero sum. Resolve that model
+specification explicitly rather than rounding anchors or silently
+switching the population model.</p>
+<p>For more complex analyses,
+<code>build_mfrm_replay_script(restored_fit, data_file = &quot;ratings.csv&quot;)</code>
+provides a recipe with stored anchors, group means and the original
+convention. It requires the original analysis data at the specified
+path. Review its generated <code>fit_mfrm()</code> call before
+deliberately changing the convention; preserve population covariates,
+category handling, orientation, uncentered facets and PCM/GPCM owners.
+This recipe <strong>refits</strong>. By contrast, the replay written by
+<code>export_mfrm_results()</code> reopens its saved results bundle
+without reconstructing the model.</p>
+<p>If only a frozen calibration survives, retain its original scoring
+meaning. Generic old identification labels are insufficient to infer its
+centering convention. See
+<code>vignette(&quot;mfrmr-portable-calibration&quot;, package = &quot;mfrmr&quot;)</code>
+for re-extraction and validation; changing a label is not recalibration.
+Earlier MML fits containing Person anchors require special review
+because those values were ignored. Current fitting rejects them;
+choosing <code>centering_scope = &quot;remainder&quot;</code> does not repair that
+earlier analysis.</p>
+</div>
+<div id="comparing-an-anchor-with-tam-or-conquest" class="section level3">
+<h3>Comparing an anchor with TAM or ConQuest</h3>
+<p>An anchor is a fixed value in all three programs, but <strong>the
+surrounding constraints determine what that value means</strong>.
+Copying a number from another program is insufficient when its
+parameterization or population model differs.</p>
+<table>
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Question</th>
+<th>mfrmr</th>
+<th>TAM</th>
+<th>ConQuest</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>What is fixed?</td>
+<td>A named facet location in <code>anchors</code></td>
+<td>Indexed response-design coefficients in <code>xsi.fixed</code></td>
+<td>Response-design coefficients imported with
+<code>anchor_parameters</code> / <code>anchor_xsi</code></td>
+</tr>
+<tr class="even">
+<td>Are steps and slopes included automatically?</td>
+<td>No; the location-anchor table omits them</td>
+<td>Check the response and scoring designs; slope controls are
+separate</td>
+<td>Check the response design and scoring parameters;
+<code>anchor_tau</code> is separate</td>
+</tr>
+<tr class="odd">
+<td>How is the population specified?</td>
+<td>Ordinary RSM/PCM MML defaults to fixed standard-normal ability;
+population modeling is explicit</td>
+<td>Specify <code>beta.fixed</code>, <code>variance.fixed</code> and the
+selected fitting function’s other controls</td>
+<td>Specify population anchors and location/scale constraints
+explicitly</td>
+</tr>
+<tr class="even">
+<td>Can Person values be fixed?</td>
+<td>Supported in JML; rejected in MML</td>
+<td><code>tam.jml()</code> documents <code>theta.fixed</code> for
+<code>version = 1</code></td>
+<td>The manual states that <code>anchor_theta</code> is ignored in
+MML</td>
+</tr>
+</tbody>
+</table>
+<p>The <a href="https://alexanderrobitzsch.github.io/TAM/reference/tam.mml.html">TAM
+MML documentation</a>, <a href="https://alexanderrobitzsch.github.io/TAM/reference/tam.jml.html">TAM
+JML documentation</a> and <a href="https://conquestmanual.acer.org/s4-00.html">ConQuest command
+reference</a> describe these controls. For ConQuest, read
+<code>import</code> together with <code>set</code>; importing anchors
+alone does not specify all location and scale constraints. Parameter
+indices must be checked against the actual model design and retained
+levels. A changed index can fix the wrong coefficient without a syntax
+error.</p>
+<p>For example, let four rater severities be <span class="math inline">\(\gamma_1,\ldots,\gamma_4\)</span>, with R01 fixed
+at <span class="math inline">\(\gamma_1=0.70\)</span>, and no group
+constraints:</p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Constraint choice</th>
+<th>Remaining raters</th>
+<th>R01 minus the mean of the remaining raters</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>mfrmr legacy <code>centering_scope = &quot;remainder&quot;</code></td>
+<td><span class="math inline">\(\gamma_2+\gamma_3+\gamma_4=0\)</span></td>
+<td>0.70</td>
+</tr>
+<tr class="even">
+<td>mfrmr default <code>centering_scope = &quot;facet&quot;</code></td>
+<td><span class="math inline">\(\gamma_1+\gamma_2+\gamma_3+\gamma_4=0\)</span>,
+hence the remaining sum is -0.70</td>
+<td><span class="math inline">\(0.70-(-0.70/3)\)</span>, approximately
+0.933</td>
+</tr>
+</tbody>
+</table>
+<p>The second row applies, for example, to TAM’s
+<code>tam.mml.mfr(formulaA = ~ item + rater + step, constraint = &quot;cases&quot;)</code>
+and ConQuest’s <code>model task+rater+step</code> with
+<code>lconstraints=cases</code>. Those settings also leave the first
+task term uncentered, unlike mfrmr’s default. These are specific model
+configurations, not universal software conventions. The different rater
+contrasts show why applying the same anchor and then shifting the final
+locations is not generally an equivalent analysis. Group-mean anchors
+need corresponding linear constraints; fixing every member to the group
+mean would impose a different model.</p>
+<p>For unit-slope RSM/PCM with all facet locations centered and an
+estimated population mean <span class="math inline">\(\mu\)</span>,
+another equivalent origin uses a zero population mean and uncentered
+task locations: set <span class="math inline">\(\theta&#39;=\theta-\mu\)</span> and <span class="math inline">\(b&#39;_{task}=b_{task}-\mu\)</span>. Rater
+severities, centered step ladders and population variance stay the same,
+so every response probability is unchanged. This mapping applies to the
+configuration with Rater anchors above. If a task value is also
+anchored, its constraint must be transformed with it. In particular,
+estimating population variance and fixing it to one are different
+models; moving the origin does not reconcile that difference. Checking
+this mapping is distinct from running and comparing both programs’
+optimizers.</p>
+<p>To compare programs, first match the ratings, category coding,
+response probabilities, free and fixed parameters, and population
+assumptions. A coordinate transformation must carry the anchors and
+population parameters with it. Then check numerical integration and
+optimization. Finally compare SEs for the same parameter or contrast,
+transforming the covariance matrix when coordinates differ. A
+point-estimate match alone does not validate an uncertainty method or
+include source-anchor uncertainty.</p>
+<p>A bounded check using all 48 Persons, four raters and four criteria
+in <code>example_core</code> illustrates both outcomes. Under the
+whole-rater constraint above, TAM 4.3.25 and ConQuest 5.47.5 agreed to
+within <span class="math inline">\(3.1\times10^{-6}\)</span> in their
+free response-design coefficients. A separate explicit TAM design
+representing mfrmr’s legacy remainder constraints agreed with that mode
+to within <span class="math inline">\(1.8\times10^{-7}\)</span>, when
+mfrmr used 81-point Gauss–Hermite integration. Both comparisons fixed
+ability to <span class="math inline">\(N(0,1)\)</span>. For the latter
+comparison, 31-point integration in that legacy mode left a maximum
+coefficient difference of about 0.00067; increasing integration
+precision resolved it. Equal node counts across programs do not
+guarantee equal quadrature rules or accuracy.</p>
+<p>This checks one RSM configuration and its point estimates, not
+general compatibility for PCM, GPCM, group constraints, JML or SEs. It
+does not make 81 points a universal requirement. More importantly, being
+able to reproduce mfrmr’s restricted model in another program does not
+establish that its partial-anchor constraints answer a particular
+linking question. Decide which locations and population moments should
+remain free before choosing the model.</p>
+</div>
+</div>
+<div id="fit-and-diagnose-the-observed-ratings" class="section level2">
+<h2>Fit and diagnose the observed ratings</h2>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a></span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>bias_df <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_bias&quot;</span>)</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a></span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>  bias_df,</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a>  <span class="at">rating_min =</span> <span class="dv">1</span>, <span class="at">rating_max =</span> <span class="dv">4</span>, <span class="at">category_policy =</span> <span class="st">&quot;preserve&quot;</span></span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a>)</span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a></span>
+<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a>diag <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit, <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>)</span></code></pre></div>
 </div>
 <div id="check-connectedness-first" class="section level2">
 <h2>1. Check connectedness first</h2>
 <p>Use <code>subset_connectivity_report()</code> before interpreting
 subgroup or cross-form contrasts.</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>sc <span class="ot">&lt;-</span> <span class="fu">subset_connectivity_report</span>(fit, <span class="at">diagnostics =</span> diag)</span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a></span>
-<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>sc<span class="sc">$</span>summary[, <span class="fu">c</span>(<span class="st">&quot;Subset&quot;</span>, <span class="st">&quot;Observations&quot;</span>, <span class="st">&quot;ObservationPercent&quot;</span>)]</span>
-<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="fu">plot</span>(sc, <span class="at">type =</span> <span class="st">&quot;design_matrix&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>sc <span class="ot">&lt;-</span> <span class="fu">subset_connectivity_report</span>(fit, <span class="at">diagnostics =</span> diag)</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a></span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>sc<span class="sc">$</span>summary[, <span class="fu">c</span>(<span class="st">&quot;Subset&quot;</span>, <span class="st">&quot;Observations&quot;</span>, <span class="st">&quot;ObservationPercent&quot;</span>)]</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="fu">plot</span>(sc, <span class="at">type =</span> <span class="st">&quot;design_matrix&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
 <p>Interpretation:</p>
 <ul>
 <li>Sparse rows or columns indicate weaker design coverage.</li>
 <li>Weak coverage should lower confidence in subgroup comparisons.</li>
+<li>Use the co-observation design graph, not rater agreement,
+severity-direction, or halo response networks, to assess empirical
+connectedness. Response-network correlations do not create a common
+scale.</li>
 </ul>
 </div>
 <div id="export-anchor-candidates" class="section level2">
 <h2>2. Export anchor candidates</h2>
-<p><code>make_anchor_table()</code> is the shortest route when you need
-reusable anchor elements from an existing calibration.</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>anchors <span class="ot">&lt;-</span> <span class="fu">make_anchor_table</span>(fit, <span class="at">facets =</span> <span class="st">&quot;Criterion&quot;</span>)</span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="fu">head</span>(anchors)</span></code></pre></div>
-<p>Use <code>review_mfrm_anchors()</code> when you want a stricter
-review of anchor quality.</p>
+<p><code>make_anchor_table()</code> mechanically exports fitted values
+in the direct-anchor schema. Its output is a candidate table, not a
+validated anchor set.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>anchors <span class="ot">&lt;-</span> <span class="fu">make_anchor_table</span>(fit, <span class="at">facets =</span> <span class="st">&quot;Criterion&quot;</span>)</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="fu">head</span>(anchors)</span></code></pre></div>
+<p>By default, <code>make_anchor_table()</code> refuses a source whose
+current readiness record does not have
+<code>InferenceReady = TRUE</code>. Use
+<code>readiness_policy = &quot;review&quot;</code> only to inspect review-only
+candidate values, not to reuse them as anchors. For a ready reference
+fit, also document cross-run element identity and invariance and confirm
+compatible model, score, orientation, and population conventions. Then
+use <code>review_mfrm_anchors()</code> to check table syntax and
+receiving-data support. That review does not certify the substantive
+link.</p>
+<p>Keep the roles distinct: common ratings or common elements supply
+observed design overlap; <code>anchors</code> fix individual parameters;
+<code>group_anchors</code> constrain a group mean under an externally
+justified target or equal-mean assumption. Neither constraint type
+manufactures empirical overlap.</p>
+<div id="design-the-link-not-only-the-percentage" class="section level3">
+<h3>Design the link, not only the percentage</h3>
+<p>No anchor percentage or count is universally adequate. In sparse
+designs, link quality also depends on coverage, the distribution and
+redundancy of the links, whether one articulation point or critical edge
+holds the network together, the location and model fit of the linking
+set, and the intended use of ranks or classifications. Inspect both
+Rater-centered and Person/task- centered assignment graphs rather than
+treating a minimum count as proof of a common scale. This distinction is
+consistent with work on sparse linking networks by <a href="https://doi.org/10.1002/j.2333-8504.2000.tb01832.x">Myford and
+Wolfe (2000)</a>, <a href="https://doi.org/10.1177/0013164417703733">Wind and Jones
+(2018)</a>, and <a href="https://doi.org/10.3758/s13428-020-01498-x">Uto
+(2021)</a>.</p>
+<p>Fixed anchor values also carry uncertainty from their source
+calibration. Current mfrmr drift and chain summaries do not propagate
+every source-fit, offset, and cross-fit covariance component. When
+results depend on the anchor set, compare defensible alternatives and
+report that sensitivity. <a href="https://doi.org/10.3390/appliedmath4030063">Robitzsch (2024,
+pp. 1181–1182, 1187–1188)</a> examines a different source of linking
+error: random uniform DIF in fixed-item 2PL calibration. Its derivation
+neglects Person sampling error and does not provide a variance estimator
+for fitted population parameters. It supports checking invariance, not
+claiming that mfrmr propagates all linking uncertainty.</p>
 </div>
-<div id="residual-dff-as-a-screening-layer" class="section level2">
-<h2>3. Residual DFF as a screening layer</h2>
-<p>Residual DFF is the fast screening route. It is useful for triage,
-but it is not automatically a logit-scale inferential contrast.</p>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>dff_resid <span class="ot">&lt;-</span> <span class="fu">analyze_dff</span>(</span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>  fit,</span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  diag,</span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  <span class="at">facet =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
-<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>  <span class="at">group =</span> <span class="st">&quot;Group&quot;</span>,</span>
-<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>  <span class="at">data =</span> bias_df,</span>
-<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;residual&quot;</span></span>
-<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>)</span>
-<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a></span>
-<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>dff_resid<span class="sc">$</span>summary</span>
-<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a><span class="fu">head</span>(</span>
-<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>  dff_resid<span class="sc">$</span>dif_table[, <span class="fu">c</span>(<span class="st">&quot;Level&quot;</span>, <span class="st">&quot;Group1&quot;</span>, <span class="st">&quot;Group2&quot;</span>, <span class="st">&quot;Classification&quot;</span>, <span class="st">&quot;ClassificationSystem&quot;</span>)],</span>
-<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>  <span class="dv">8</span></span>
-<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a>)</span>
-<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a><span class="fu">plot_dif_heatmap</span>(dff_resid)</span></code></pre></div>
-<p>Interpretation:</p>
-<ul>
-<li>Treat <code>residual</code> output as screening evidence.</li>
-<li>Check <code>ClassificationSystem</code> to see how the current
-residual screen was labeled.</li>
-<li>Reserve <code>ScaleLinkStatus</code> and
-<code>ContrastComparable</code> for refit-based contrasts.</li>
-</ul>
+</div>
+<div id="compare-group-residuals" class="section level2">
+<h2>3. Compare group residuals</h2>
+<p>Residual comparisons describe how observed-minus-expected scores
+differ between groups. They use score units and do not test differential
+functioning.</p>
+<p>A group with higher average ability can score higher without
+differential functioning. DFF concerns a facet difference at the same
+ability. Residual screens inherit the fitted population assumptions, and
+fixed-standard-normal RSM/PCM subgroup refits do not estimate group
+ability distributions. Linking anchors alone do not address an omitted
+group difference. Review these assumptions before interpreting a
+residual difference involving a rater or criterion.</p>
+<p>Representing group ability differences is necessary for a suitable
+population model, but does not turn the current residual screen into a
+calibrated DFF test. MML residuals evaluate expected scores at EAP
+ability estimates. Because the response function is nonlinear, a no-DFF
+model can still have different mean residuals across groups. This
+concerns the null being tested as well as its standard error.</p>
+<p>The residual method therefore returns no p-values, confidence
+intervals or positive/negative classifications. For compatibility, its
+former SE and test columns contain <code>NA</code>. Recompute older
+residual results with <code>analyze_dff()</code> using the existing fit
+and original data; no model refit is needed.</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>dff_resid <span class="ot">&lt;-</span> <span class="fu">analyze_dff</span>(</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>  fit,</span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>  diag,</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>  <span class="at">facet =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>  <span class="at">group =</span> <span class="st">&quot;Group&quot;</span>,</span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>  <span class="at">data =</span> bias_df,</span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;residual&quot;</span></span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a>)</span>
+<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a></span>
+<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a>screen <span class="ot">&lt;-</span> <span class="fu">plot</span>(dff_resid, <span class="at">type =</span> <span class="st">&quot;summary&quot;</span>)</span>
+<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a>comparisons <span class="ot">&lt;-</span> <span class="fu">plot_data</span>(screen, <span class="st">&quot;pairs&quot;</span>)</span>
+<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a>comparisons[, <span class="fu">c</span>(<span class="st">&quot;Level&quot;</span>, <span class="st">&quot;Group1&quot;</span>, <span class="st">&quot;Group2&quot;</span>, <span class="st">&quot;Contrast&quot;</span>,</span>
+<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a>                <span class="st">&quot;N_Group1&quot;</span>, <span class="st">&quot;N_Group2&quot;</span>, <span class="st">&quot;PlotStatus&quot;</span>)]</span></code></pre></div>
+<p>Read the figure and this table together:</p>
+<ol style="list-style-type: decimal">
+<li>The labels follow <code>Level | Group1 | Group2</code>.
+<code>Contrast</code> subtracts the residual mean of Group2 from that of
+Group1. A positive value means higher residual scores in Group1, not
+established leniency, favoritism or unfairness.</li>
+<li><code>N_Group1</code> and <code>N_Group2</code> count retained
+ratings, not independent Persons. Repeated ratings can make these counts
+large even when few Persons contribute. The same table has
+<code>NPersons_Group1</code> and <code>NPersons_Group2</code> for
+distinct Persons.</li>
+<li><code>PlotStatus</code> separates displayed comparisons from finite
+comparisons omitted by <code>top_n</code> and comparisons with
+unavailable contrasts. None of these display states is a DFF decision.
+For an unavailable row, inspect <code>sparse</code> and the counts: the
+residual pairwise contrast requires both cells to meet
+<code>min_obs</code>. An absent group has a count of zero, not a zero
+difference.</li>
+</ol>
+<p>Check how the requested ratings matched the fitted responses. This
+matters before comparing screens from different data subsets:</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>cases <span class="ot">&lt;-</span> <span class="fu">plot_data</span>(screen, <span class="st">&quot;cases&quot;</span>)</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="fu">table</span>(cases<span class="sc">$</span>Reason)</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>cases[<span class="sc">!</span>cases<span class="sc">$</span>Included, ]</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a><span class="fu">plot_data</span>(screen, <span class="st">&quot;notes&quot;</span>)</span></code></pre></div>
+<p><code>InputRow</code> identifies a row of the supplied data;
+<code>FitRow</code> identifies its matched fitted response. Exclusion
+reasons distinguish a missing group, an invalid/missing response, and a
+response absent from the fitted data. A fully matched example has no
+excluded rows; this does not establish independence. Response exclusions
+and unavailable <em>comparisons</em> are different stages.</p>
+<p>For a grid of the same pairwise differences, use
+<code>plot(dff_resid, type = &quot;heatmap&quot;, metric = &quot;contrast&quot;)</code>. The
+default heatmap instead shows each group’s mean observed-minus-expected
+score. That cell mean can appear even below <code>min_obs</code>; read
+its saved <code>pairs$sparse</code> and counts. The scaled-residual
+(<code>metric = &quot;t&quot;</code>) and pairwise-contrast routes withhold values
+below this threshold. Missing cells/contrasts stay missing, not zero. If
+every contrast is unavailable, inspect <code>dff_resid$dif_table</code>
+or the contrast heatmap; the summary has no finite points to draw.</p>
+<p>Reserve <code>ScaleLinkStatus</code> and
+<code>ContrastComparable</code> for refit-based contrasts; their
+residual-method values do not describe a failed link.</p>
 </div>
 <div id="refit-dff-when-subgroup-comparisons-are-defensible" class="section level2">
 <h2>4. Refit DFF when subgroup comparisons are defensible</h2>
-<p>The refit route can support logit-scale contrasts only when subgroup
-linking is adequate and the precision layer supports it.</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>dff_refit <span class="ot">&lt;-</span> <span class="fu">analyze_dff</span>(</span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>  fit,</span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  diag,</span>
-<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>  <span class="at">facet =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
-<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>  <span class="at">group =</span> <span class="st">&quot;Group&quot;</span>,</span>
-<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>  <span class="at">data =</span> bias_df,</span>
-<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;refit&quot;</span></span>
-<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>)</span>
-<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a></span>
-<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a>dff_refit<span class="sc">$</span>summary</span>
-<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a><span class="fu">head</span>(</span>
-<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a>  dff_refit<span class="sc">$</span>dif_table[, <span class="fu">c</span>(<span class="st">&quot;Level&quot;</span>, <span class="st">&quot;Group1&quot;</span>, <span class="st">&quot;Group2&quot;</span>, <span class="st">&quot;Classification&quot;</span>, <span class="st">&quot;ContrastComparable&quot;</span>)],</span>
-<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a>  <span class="dv">8</span></span>
-<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a>)</span></code></pre></div>
+<p>The refit route reports logit-scale point contrasts when subgroup
+linking supports a common scale. Any available SE or test statistic
+conditions on the baseline anchors and omits their uncertainty and
+cross-refit covariance; <code>FormalInferenceEligible</code> remains
+<code>FALSE</code>, even with adequate linking. The default refit
+linking screen requires at least five anchored levels in total across
+the non-target linking facets in each subgroup. A weak link withholds
+contrast SEs and p-values. Inspect <code>LinkingAnchoredLevels</code>,
+<code>LinkingThreshold</code>, and <code>ScaleLinkStatus</code>; five is
+a local screening threshold, not a universal adequate anchor count or
+proof of invariance. It differs from the per-facet common-element screen
+called <code>LinkSupportAdequate</code> in drift and link-review
+results.</p>
+<p>Direct anchors on the target facet and JML Person anchors remain
+fixed during subgroup refits. Check <code>Fixed1</code> and
+<code>Fixed2</code>: when either is true, the row retains its estimates
+but has no contrast, SE or test. Supplying the same rater severity in
+both groups cannot establish that the rater functions equally across
+groups. Residual DFF can describe response departures under those
+constraints. To estimate a free target contrast, explicitly fit a
+baseline with the intended target constraints first. Older saved refit
+DFF objects may have dropped target or Person anchors; rerun
+<code>analyze_dff()</code> from the baseline fit to obtain subgroup
+estimates under the corrected rule. Loading an old result does not
+change it.</p>
+<p>Check <code>ComparisonStatus</code> and <code>ComparisonReason</code>
+before interpreting a number. A failed or skipped subgroup fit has no
+subgroup estimate; the baseline value is not a replacement. An absent
+target level remains in the comparison table with a missing contrast.
+<code>N_Group1</code> / <code>N_Group2</code> count retained responses
+for that target level, while <code>N_Subgroup1</code> /
+<code>N_Subgroup2</code> count all retained responses in the subgroup.
+Failed fits have unknown retained counts, not zero; their input counts
+remain in <code>$group_fits[[group]]$N_Input</code>.</p>
+<p>Sparse cells, missing SEs and Persons shared across the two subgroup
+fits withhold the independent-subgroup screen. Actual point estimates
+remain available, and <code>ConditionalScreenReason</code> explains
+missing uncertainty. Disjoint Person IDs alone do not establish
+independence or valid matching. The Welch degrees of freedom use
+response counts and are only a screening approximation. Older refit
+objects must be recomputed from the baseline and original data before
+using current summary, report or plotting methods; regenerate their
+exported tables and figures as well.</p>
+<p>Bias screening answers a different question:
+<code>estimate_bias()</code> estimates an additional shift for each cell
+while holding the calibration fixed. A positive <code>Bias Size</code>
+raises the expected score. An anchored rater can still have a nonzero
+cell shift and a conditional SE for that shift. This SE does not include
+uncertainty in the fitted calibration or the supplied anchors, and it is
+not a joint-interaction confidence interval.
+<code>Obs-Exp Average</code> is the observed-minus-expected average
+under the baseline calibration, before fitting the shift.
+<code>AfterBiasObsExpAverage</code> records the remaining discrepancy
+with that shift included. Both are on the score scale;
+<code>Bias Size</code> is in logits.</p>
+<p>Refits currently refuse baselines with user-specified active
+population models, fitted facet interactions, or group-anchor
+constraints because those structures cannot yet be replayed and linked
+completely within subgroups. The default GPCM-MML identification
+intercept is handled separately. Residual DFF remains a screening
+alternative; see <code>?analyze_dff</code> for the exact scope.</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>dff_refit <span class="ot">&lt;-</span> <span class="fu">analyze_dff</span>(</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>  fit,</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>  diag,</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>  <span class="at">facet =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>  <span class="at">group =</span> <span class="st">&quot;Group&quot;</span>,</span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>  <span class="at">data =</span> bias_df,</span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;refit&quot;</span></span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>)</span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a></span>
+<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a>dff_refit<span class="sc">$</span>summary</span>
+<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a>dff_refit<span class="sc">$</span>dif_table[, <span class="fu">c</span>(<span class="st">&quot;Level&quot;</span>, <span class="st">&quot;Group1&quot;</span>, <span class="st">&quot;Group2&quot;</span>, <span class="st">&quot;Contrast&quot;</span>,</span>
+<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a>                       <span class="st">&quot;ScaleLinkStatus&quot;</span>, <span class="st">&quot;Fixed1&quot;</span>, <span class="st">&quot;Fixed2&quot;</span>)]</span>
+<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a>dff_refit<span class="sc">$</span>dif_table[, <span class="fu">c</span>(<span class="st">&quot;Level&quot;</span>, <span class="st">&quot;LinkingAnchoredLevels1&quot;</span>,</span>
+<span id="cb12-14"><a href="#cb12-14" tabindex="-1"></a>                       <span class="st">&quot;LinkingAnchoredLevels2&quot;</span>, <span class="st">&quot;LinkingThreshold&quot;</span>)]</span></code></pre></div>
+<p>Here <code>Contrast</code> still means Group1 minus Group2, but its
+units are <strong>logits</strong>. A positive value means a larger facet
+location in Group1. Holding other parameters fixed, the usual
+difficulty/severity orientation lowers expected scores. Subgroup step
+ladders or slopes can also differ, so location alone does not order the
+entire response curves. <code>ContrastDirection</code> records larger,
+smaller or equal locations, including for positive-orientation facets.
+Check the model’s facet signs and score coding. Do not compare the sign
+as if it had the residual method’s meaning, or put the two methods on a
+shared effect axis. Read <code>LinkingDetail1</code> and
+<code>LinkingDetail2</code> when linking support is weak. A plotted
+finite contrast does not by itself establish a common scale; even
+<code>ScaleLinkStatus = &quot;linked&quot;</code> does not qualify formal
+inference.</p>
+<p>For schools with separate rater panels, common recordings can connect
+joint calibration while a particular rater still lacks observations in
+one school. That connection alone cannot identify that rater’s school
+contrast. Keep a common recording’s identity across ratings; do not
+duplicate it as independent school participants to manufacture a
+comparison.</p>
+<div id="review-a-particular-school-comparison-before-fitting" class="section level3">
+<h3>Review a particular school comparison before fitting</h3>
+<p>The question is whether the rating assignments identify the requested
+interaction contrast, rather than merely connect the panels. This small
+constructed assignment isolates that question: R4 rates School A only,
+while the other raters rate both origins. The scores only supply the
+declared three-category format; they are not evidence for a school
+effect, and eight performances are not a recommended sample size.</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>school_ratings <span class="ot">&lt;-</span> <span class="fu">expand.grid</span>(</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>  <span class="at">Person =</span> <span class="fu">paste0</span>(<span class="st">&quot;P&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">8</span>), <span class="at">Rater =</span> <span class="fu">paste0</span>(<span class="st">&quot;R&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>),</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>  <span class="at">Criterion =</span> <span class="fu">c</span>(<span class="st">&quot;C1&quot;</span>, <span class="st">&quot;C2&quot;</span>), <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span></span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>)</span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>school_ratings<span class="sc">$</span>School <span class="ot">&lt;-</span> <span class="fu">ifelse</span>(</span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a>  school_ratings<span class="sc">$</span>Person <span class="sc">%in%</span> <span class="fu">paste0</span>(<span class="st">&quot;P&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>), <span class="st">&quot;A&quot;</span>, <span class="st">&quot;B&quot;</span></span>
+<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a>)</span>
+<span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a>school_ratings<span class="sc">$</span>Score <span class="ot">&lt;-</span> (<span class="fu">as.integer</span>(<span class="fu">factor</span>(school_ratings<span class="sc">$</span>Person)) <span class="sc">+</span></span>
+<span id="cb13-9"><a href="#cb13-9" tabindex="-1"></a>  <span class="fu">as.integer</span>(<span class="fu">factor</span>(school_ratings<span class="sc">$</span>Rater)) <span class="sc">+</span></span>
+<span id="cb13-10"><a href="#cb13-10" tabindex="-1"></a>  <span class="fu">as.integer</span>(<span class="fu">factor</span>(school_ratings<span class="sc">$</span>Criterion))) <span class="sc">%%</span> <span class="dv">3</span></span>
+<span id="cb13-11"><a href="#cb13-11" tabindex="-1"></a>school_ratings <span class="ot">&lt;-</span> <span class="fu">subset</span>(school_ratings, <span class="sc">!</span>(Rater <span class="sc">==</span> <span class="st">&quot;R4&quot;</span> <span class="sc">&amp;</span> School <span class="sc">==</span> <span class="st">&quot;B&quot;</span>))</span>
+<span id="cb13-12"><a href="#cb13-12" tabindex="-1"></a></span>
+<span id="cb13-13"><a href="#cb13-13" tabindex="-1"></a>school_questions <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb13-14"><a href="#cb13-14" tabindex="-1"></a>  <span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">group =</span> <span class="st">&quot;School&quot;</span>, <span class="at">groups =</span> <span class="fu">c</span>(<span class="st">&quot;A&quot;</span>, <span class="st">&quot;B&quot;</span>),</span>
+<span id="cb13-15"><a href="#cb13-15" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>, <span class="at">method =</span> <span class="st">&quot;JML&quot;</span>,</span>
+<span id="cb13-16"><a href="#cb13-16" tabindex="-1"></a>  <span class="at">contrasts =</span> <span class="fu">rbind</span>(</span>
+<span id="cb13-17"><a href="#cb13-17" tabindex="-1"></a>    <span class="at">R1_vs_panel =</span> <span class="fu">c</span>(<span class="at">R1 =</span> .<span class="dv">75</span>, <span class="at">R2 =</span> <span class="sc">-</span>.<span class="dv">25</span>, <span class="at">R3 =</span> <span class="sc">-</span>.<span class="dv">25</span>, <span class="at">R4 =</span> <span class="sc">-</span>.<span class="dv">25</span>),</span>
+<span id="cb13-18"><a href="#cb13-18" tabindex="-1"></a>    <span class="at">R1_vs_R2 =</span> <span class="fu">c</span>(<span class="at">R1 =</span> <span class="dv">1</span>, <span class="at">R2 =</span> <span class="sc">-</span><span class="dv">1</span>, <span class="at">R3 =</span> <span class="dv">0</span>, <span class="at">R4 =</span> <span class="dv">0</span>)</span>
+<span id="cb13-19"><a href="#cb13-19" tabindex="-1"></a>  )</span>
+<span id="cb13-20"><a href="#cb13-20" tabindex="-1"></a>)</span>
+<span id="cb13-21"><a href="#cb13-21" tabindex="-1"></a>school_review <span class="ot">&lt;-</span> <span class="fu">describe_mfrm_data</span>(</span>
+<span id="cb13-22"><a href="#cb13-22" tabindex="-1"></a>  school_ratings, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>, <span class="st">&quot;School&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb13-23"><a href="#cb13-23" tabindex="-1"></a>  <span class="at">rating_min =</span> <span class="dv">0</span>, <span class="at">rating_max =</span> <span class="dv">2</span>, <span class="at">category_policy =</span> <span class="st">&quot;preserve&quot;</span>,</span>
+<span id="cb13-24"><a href="#cb13-24" tabindex="-1"></a>  <span class="at">include_agreement =</span> <span class="cn">FALSE</span>, <span class="at">comparisons =</span> school_questions</span>
+<span id="cb13-25"><a href="#cb13-25" tabindex="-1"></a>)</span>
+<span id="cb13-26"><a href="#cb13-26" tabindex="-1"></a>school_review<span class="sc">$</span>comparison_review<span class="sc">$</span>table[, <span class="fu">c</span>(</span>
+<span id="cb13-27"><a href="#cb13-27" tabindex="-1"></a>  <span class="st">&quot;Comparison&quot;</span>, <span class="st">&quot;Group1&quot;</span>, <span class="st">&quot;Group2&quot;</span>, <span class="st">&quot;State&quot;</span>, <span class="st">&quot;N_Group1&quot;</span>, <span class="st">&quot;N_Group2&quot;</span></span>
+<span id="cb13-28"><a href="#cb13-28" tabindex="-1"></a>)]</span>
+<span id="cb13-29"><a href="#cb13-29" tabindex="-1"></a>school_review<span class="sc">$</span>comparison_review<span class="sc">$</span>cells</span></code></pre></div>
+<p>Each row applies its weights to the raters’ <strong>A-minus-B
+interaction effects</strong>. <code>R1_vs_panel</code> subtracts the
+equal-weight average across all four raters; <code>R1_vs_R2</code>
+subtracts R2’s school difference from R1’s. The first is
+<code>target_unidentified</code>, while the second is
+<code>target_identified_only</code>. R4’s missing B ratings matter to
+the whole-panel reference. Dropping R4 and renormalizing weights would
+answer a different question.</p>
+<p>The <code>IdentificationBasis</code> column makes the role of
+assumptions explicit. For the same ratings and target weights, compare a
+common normal ability population with a normal regression allowing
+school-specific means. These reviews do not estimate either model:</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>population_reviews <span class="ot">&lt;-</span> <span class="fu">lapply</span>(</span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">common_normal =</span> <span class="sc">~</span><span class="dv">1</span>, <span class="at">school_means =</span> <span class="sc">~</span>School),</span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>  <span class="cf">function</span>(population) {</span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>    question <span class="ot">&lt;-</span> school_questions</span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>    question<span class="sc">$</span>method <span class="ot">&lt;-</span> <span class="st">&quot;MML&quot;</span></span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a>    question<span class="sc">$</span>population_formula <span class="ot">&lt;-</span> population</span>
+<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a>    <span class="fu">describe_mfrm_data</span>(</span>
+<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a>      school_ratings, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>, <span class="st">&quot;School&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb14-9"><a href="#cb14-9" tabindex="-1"></a>      <span class="at">rating_min =</span> <span class="dv">0</span>, <span class="at">rating_max =</span> <span class="dv">2</span>, <span class="at">category_policy =</span> <span class="st">&quot;preserve&quot;</span>,</span>
+<span id="cb14-10"><a href="#cb14-10" tabindex="-1"></a>      <span class="at">include_agreement =</span> <span class="cn">FALSE</span>, <span class="at">comparisons =</span> question</span>
+<span id="cb14-11"><a href="#cb14-11" tabindex="-1"></a>    )<span class="sc">$</span>comparison_review</span>
+<span id="cb14-12"><a href="#cb14-12" tabindex="-1"></a>  }</span>
+<span id="cb14-13"><a href="#cb14-13" tabindex="-1"></a>)</span>
+<span id="cb14-14"><a href="#cb14-14" tabindex="-1"></a><span class="fu">lapply</span>(population_reviews, <span class="cf">function</span>(review) review<span class="sc">$</span>table[, <span class="fu">c</span>(</span>
+<span id="cb14-15"><a href="#cb14-15" tabindex="-1"></a>  <span class="st">&quot;Comparison&quot;</span>, <span class="st">&quot;ConditionalState&quot;</span>, <span class="st">&quot;FreePersonState&quot;</span>, <span class="st">&quot;IdentificationBasis&quot;</span>, <span class="st">&quot;State&quot;</span></span>
+<span id="cb14-16"><a href="#cb14-16" tabindex="-1"></a>)])</span></code></pre></div>
+<p>For <code>R1_vs_panel</code>, the common normal model reports
+<code>population_restriction</code>: the unrestricted-Person ambiguity
+disappears only after imposing that model’s population restrictions.
+Allowing school-specific means restores the ambiguity, so the basis is
+<code>unidentified</code>. No additional rating was observed in either
+review. The common population assumption is substantive; it is not a
+harmless change of coordinates or evidence that the missing R4/B ratings
+exist.</p>
+<p>For <code>R1_vs_R2</code>, both models report
+<code>free_person_response_model</code>: the declared response map
+identifies this target even with unrestricted Person locations. That
+statement still assumes the response model, including its slope and step
+restrictions. It does not make an MML estimate distribution-free. Both
+positive MML conditional results keep
+<code>State = &quot;not_evaluated&quot;</code>, because the review does not prove
+global marginal identification. Read <code>IdentificationDetail</code>
+and the review’s <code>notes</code> before selecting a model; a more
+convenient result is not a reason to assume equal ability
+populations.</p>
+<p>The declared response model includes a zero-valued School main facet
+and a zero-margin Rater-by-School interaction, alongside free JML Person
+locations. Its settings are saved in
+<code>school_review$comparison_review$fit_arguments</code>. The review
+does not fit this rank-deficient model, estimate the identified
+contrast, or supply an interval. The ordinary full-fit guard still
+refuses the model. Identification of one target is not permission to set
+other effects to arbitrary values and report the resulting
+estimates.</p>
+<p>Adding genuinely shared recordings from both origins can supply
+missing comparisons. Keep each recording’s original Person and School
+labels across raters. Neutral recordings may connect the measurement
+scale without filling the missing A/B interaction information. PCM
+reviews also require an explicit step owner. GPCM does not currently
+support this interaction model and is reported as
+<code>unsupported</code>; its separate slope/product qualifications
+cannot be substituted for this school review.</p>
+</div>
+<div id="preserve-that-question-alongside-a-residual-screen" class="section level3">
+<h3>Preserve that question alongside a residual screen</h3>
+<p>For the bundled data used above, explicitly request an MML
+prospective Rater-by-Group review, then attach it to a residual screen
+of the same ratings. The model in this review is a prospective
+interaction model; the fitted screening model remains the earlier
+additive RSM. No interaction fit is silently added.</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>rater_levels <span class="ot">&lt;-</span> <span class="fu">sort</span>(<span class="fu">unique</span>(<span class="fu">as.character</span>(bias_df<span class="sc">$</span>Rater)))</span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>panel_weights <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="sc">-</span><span class="dv">1</span> <span class="sc">/</span> <span class="fu">length</span>(rater_levels), <span class="dv">1</span>, <span class="fu">length</span>(rater_levels),</span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a>  <span class="at">dimnames =</span> <span class="fu">list</span>(<span class="st">&quot;First rater versus panel&quot;</span>, rater_levels))</span>
+<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a>panel_weights[<span class="dv">1</span>, <span class="dv">1</span>] <span class="ot">&lt;-</span> panel_weights[<span class="dv">1</span>, <span class="dv">1</span>] <span class="sc">+</span> <span class="dv">1</span></span>
+<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a>prospective <span class="ot">&lt;-</span> <span class="fu">describe_mfrm_data</span>(</span>
+<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a>  bias_df, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>, <span class="st">&quot;Group&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a>  <span class="at">rating_min =</span> <span class="dv">1</span>, <span class="at">rating_max =</span> <span class="dv">4</span>, <span class="at">category_policy =</span> <span class="st">&quot;preserve&quot;</span>,</span>
+<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a>  <span class="at">include_agreement =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a>  <span class="at">comparisons =</span> <span class="fu">list</span>(<span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">group =</span> <span class="st">&quot;Group&quot;</span>, <span class="at">groups =</span> <span class="fu">c</span>(<span class="st">&quot;A&quot;</span>, <span class="st">&quot;B&quot;</span>),</span>
+<span id="cb15-10"><a href="#cb15-10" tabindex="-1"></a>    <span class="at">contrasts =</span> panel_weights, <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>, <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>)</span>
+<span id="cb15-11"><a href="#cb15-11" tabindex="-1"></a>)</span>
+<span id="cb15-12"><a href="#cb15-12" tabindex="-1"></a>rater_screen <span class="ot">&lt;-</span> <span class="fu">analyze_dff</span>(</span>
+<span id="cb15-13"><a href="#cb15-13" tabindex="-1"></a>  fit, <span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">group =</span> <span class="st">&quot;Group&quot;</span>, <span class="at">data =</span> bias_df,</span>
+<span id="cb15-14"><a href="#cb15-14" tabindex="-1"></a>  <span class="at">comparison_review =</span> prospective</span>
+<span id="cb15-15"><a href="#cb15-15" tabindex="-1"></a>)</span>
+<span id="cb15-16"><a href="#cb15-16" tabindex="-1"></a><span class="fu">summary</span>(rater_screen)<span class="sc">$</span>comparison_review<span class="sc">$</span>table</span>
+<span id="cb15-17"><a href="#cb15-17" tabindex="-1"></a>support <span class="ot">&lt;-</span> <span class="fu">plot</span>(rater_screen, <span class="at">draw =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb15-18"><a href="#cb15-18" tabindex="-1"></a><span class="fu">plot_data</span>(support, <span class="st">&quot;comparison_review&quot;</span>)<span class="sc">$</span>weights</span>
+<span id="cb15-19"><a href="#cb15-19" tabindex="-1"></a>report <span class="ot">&lt;-</span> <span class="fu">dif_report</span>(rater_screen)</span>
+<span id="cb15-20"><a href="#cb15-20" tabindex="-1"></a>report<span class="sc">$</span>comparison_review<span class="sc">$</span>table</span>
+<span id="cb15-21"><a href="#cb15-21" tabindex="-1"></a><span class="fu">saveRDS</span>(rater_screen, <span class="fu">file.path</span>(<span class="fu">tempdir</span>(), <span class="st">&quot;rater-screen-with-review.rds&quot;</span>))</span></code></pre></div>
+<p>Positive <code>ConditionalState</code> values concern the conditional
+linear response map. Under MML, <code>State = &quot;not_evaluated&quot;</code>
+deliberately withholds a positive global marginal-identification claim;
+it does not mean the residual calculation failed. A proven
+same-conditional-law ambiguity can still produce
+<code>target_unidentified</code> after mixing.
+<code>FreePersonState</code> and <code>Basis</code> expose the
+population assumption separately. Neither rank nor a finite residual
+difference qualifies a DFF test. The attached review keeps all requested
+rows, weights, counts and limitations; it does not replace the residual
+table with structural parameter estimates. Changed rating subsets or
+origin assignments require a new review before attachment.</p>
+</div>
+<div id="estimate-the-declared-contrast-in-one-joint-calibration" class="section level3">
+<h3>Estimate the declared contrast in one joint calibration</h3>
+<p>When the assignment supports the whole model, the next question is
+the size of the specified interaction contrast in a joint fit. Use the
+bundled <code>example_bias</code> ratings from the screen above. Its
+Group labels illustrate the origin role; this synthetic example is not
+evidence about actual schools. Allow Group-specific population means
+through <code>~Group</code>, so an equal-population restriction is not
+silently used to explain the group difference. School/Group remains a
+zero main facet; the population mean and rater-by-group interaction have
+separate roles.</p>
+<p>The first comparison is the first rater’s A-minus-B interaction
+relative to the equal-weight whole panel. The second subtracts the
+second rater’s A-minus-B interaction. This compares school differences,
+not the raters’ overall severity.</p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>joint_questions <span class="ot">&lt;-</span> prospective<span class="sc">$</span>comparison_review<span class="sc">$</span>specification</span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a>joint_questions<span class="sc">$</span>population_formula <span class="ot">&lt;-</span> <span class="er">~</span>Group</span>
+<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a>pair_weights <span class="ot">&lt;-</span> <span class="fu">setNames</span>(<span class="fu">rep</span>(<span class="dv">0</span>, <span class="fu">length</span>(rater_levels)), rater_levels)</span>
+<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a>pair_weights[<span class="dv">1</span><span class="sc">:</span><span class="dv">2</span>] <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="sc">-</span><span class="dv">1</span>)</span>
+<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a>joint_questions<span class="sc">$</span>contrasts <span class="ot">&lt;-</span> <span class="fu">rbind</span>(</span>
+<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a>  panel_weights, <span class="st">&quot;First versus second rater&quot;</span> <span class="ot">=</span> pair_weights</span>
+<span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a>)</span>
+<span id="cb16-8"><a href="#cb16-8" tabindex="-1"></a>joint_review <span class="ot">&lt;-</span> <span class="fu">describe_mfrm_data</span>(</span>
+<span id="cb16-9"><a href="#cb16-9" tabindex="-1"></a>  bias_df, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>, <span class="st">&quot;Group&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb16-10"><a href="#cb16-10" tabindex="-1"></a>  <span class="at">rating_min =</span> <span class="dv">1</span>, <span class="at">rating_max =</span> <span class="dv">4</span>, <span class="at">category_policy =</span> <span class="st">&quot;preserve&quot;</span>,</span>
+<span id="cb16-11"><a href="#cb16-11" tabindex="-1"></a>  <span class="at">include_agreement =</span> <span class="cn">FALSE</span>, <span class="at">comparisons =</span> joint_questions</span>
+<span id="cb16-12"><a href="#cb16-12" tabindex="-1"></a>)</span>
+<span id="cb16-13"><a href="#cb16-13" tabindex="-1"></a>joint_fit <span class="ot">&lt;-</span> <span class="fu">do.call</span>(fit_mfrm, <span class="fu">c</span>(</span>
+<span id="cb16-14"><a href="#cb16-14" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">data =</span> bias_df, <span class="at">quad_points =</span> <span class="dv">63</span><span class="dt">L</span>),</span>
+<span id="cb16-15"><a href="#cb16-15" tabindex="-1"></a>  joint_review<span class="sc">$</span>comparison_review<span class="sc">$</span>fit_arguments</span>
+<span id="cb16-16"><a href="#cb16-16" tabindex="-1"></a>))</span>
+<span id="cb16-17"><a href="#cb16-17" tabindex="-1"></a>joint_results <span class="ot">&lt;-</span> <span class="fu">summary</span>(joint_fit, <span class="at">comparison_review =</span> joint_review)</span>
+<span id="cb16-18"><a href="#cb16-18" tabindex="-1"></a>joint_comparisons <span class="ot">&lt;-</span> joint_results<span class="sc">$</span>interaction_comparisons</span>
+<span id="cb16-19"><a href="#cb16-19" tabindex="-1"></a>joint_comparisons[, <span class="fu">c</span>(</span>
+<span id="cb16-20"><a href="#cb16-20" tabindex="-1"></a>  <span class="st">&quot;Comparison&quot;</span>, <span class="st">&quot;Group1&quot;</span>, <span class="st">&quot;Group2&quot;</span>, <span class="st">&quot;Estimate&quot;</span>, <span class="st">&quot;EstimateStatus&quot;</span>,</span>
+<span id="cb16-21"><a href="#cb16-21" tabindex="-1"></a>  <span class="st">&quot;State&quot;</span>, <span class="st">&quot;ConditionalState&quot;</span>, <span class="st">&quot;QuadratureState&quot;</span>, <span class="st">&quot;FormalInferenceEligible&quot;</span></span>
+<span id="cb16-22"><a href="#cb16-22" tabindex="-1"></a>)]</span>
+<span id="cb16-23"><a href="#cb16-23" tabindex="-1"></a><span class="fu">attr</span>(joint_comparisons, <span class="st">&quot;fit_checks&quot;</span>)<span class="sc">$</span>numerical</span>
+<span id="cb16-24"><a href="#cb16-24" tabindex="-1"></a><span class="fu">attr</span>(joint_comparisons, <span class="st">&quot;comparison_review&quot;</span>)<span class="sc">$</span>weights</span>
+<span id="cb16-25"><a href="#cb16-25" tabindex="-1"></a><span class="fu">saveRDS</span>(<span class="fu">list</span>(<span class="at">fit =</span> joint_fit, <span class="at">review =</span> joint_review, <span class="at">results =</span> joint_results),</span>
+<span id="cb16-26"><a href="#cb16-26" tabindex="-1"></a>  <span class="fu">file.path</span>(<span class="fu">tempdir</span>(), <span class="st">&quot;joint-school-comparisons.rds&quot;</span>))</span></code></pre></div>
+<p>The two fitted contrasts are approximately <strong>0.58</strong> and
+<strong>0.92 logits</strong>. A positive value indicates the weighted
+relative shift toward higher coded scores for A versus B under this
+model. It is not an absolute advantage for School A, a comparison of
+population means, or proof of unfairness. The values differ from the
+earlier residual-screen statistic because that statistic asks a
+different question.</p>
+<p><code>interaction_effect_table(joint_fit, comparison_review = joint_review)</code>
+returns the same comparison table directly. Without
+<code>comparison_review</code>, it continues to return individual
+interaction cells. The numerical checks reevaluate the saved joint
+likelihood and full gradient without optimization. For this example,
+31-node fixed quadrature did not meet the finer-grid check; 63 nodes
+were selected after checking agreement with 127. This order is not a
+universal accuracy recommendation.
+<code>QuadratureState = &quot;stable_at_retained_point&quot;</code> means the
+retained point passed the specified integration check, not that the
+model or its uncertainty has been validated.</p>
+<p><code>EstimateStatus = &quot;descriptive_only&quot;</code> keeps the fitted
+value separate from identification and inference. Positive conditional
+MML ranks still retain <code>State = &quot;not_evaluated&quot;</code>; this
+example does not prove global marginal identification. Inspect
+<code>FitReadiness</code>, <code>BoundaryState</code>,
+<code>NumericalState</code>, <code>EstimateReason</code> and the saved
+checks. A failed check leaves <code>Estimate</code> missing;
+<code>OptimizerEstimate</code> is then only a numerical trace. This
+extraction table supplies no SEs, confidence limits or formal tests. The
+separate interval example below uses
+<code>mfrm_facet_intervals(comparison_review = ...)</code> with
+additional joint-information and finer-grid checks. Keep the full saved
+object to preserve weights, empty cells, population assumptions and
+checks; a CSV does not retain these attributes.</p>
+</div>
+<div id="estimate-an-identified-comparison-when-the-full-model-is-deficient" class="section level3">
+<h3>Estimate an identified comparison when the full model is
+deficient</h3>
+<p>Suppose the last rater has no ratings from Group B. The
+first-versus-second rater comparison can still be identified, but the
+comparison with the whole panel includes an unobserved rater/group cell.
+An ordinary full fit correctly refuses this deficient design. Explicit
+comparison-only estimation can retain the observed likelihood and
+estimate its invariant targets without reporting arbitrary values for
+the unidentifiable interaction cells.</p>
+<p>This example uses <strong>JML with free Person locations</strong>. It
+does not assume equal normal populations across groups. It uses the same
+declared interaction target as before, on the reduced assignment, but
+changes the estimator and the observed ratings; its numerical value is
+therefore not a replication of the preceding full-design MML value.</p>
+<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a>incomplete_ratings <span class="ot">&lt;-</span> bias_df[<span class="sc">!</span>(bias_df<span class="sc">$</span>Rater <span class="sc">==</span> <span class="fu">tail</span>(rater_levels, <span class="dv">1</span>) <span class="sc">&amp;</span></span>
+<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a>                                bias_df<span class="sc">$</span>Group <span class="sc">==</span> <span class="st">&quot;B&quot;</span>), ]</span>
+<span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a>partial_questions <span class="ot">&lt;-</span> joint_questions</span>
+<span id="cb17-4"><a href="#cb17-4" tabindex="-1"></a>partial_questions<span class="sc">$</span>method <span class="ot">&lt;-</span> <span class="st">&quot;JML&quot;</span></span>
+<span id="cb17-5"><a href="#cb17-5" tabindex="-1"></a>partial_questions<span class="sc">$</span>population_formula <span class="ot">&lt;-</span> <span class="cn">NULL</span></span>
+<span id="cb17-6"><a href="#cb17-6" tabindex="-1"></a>partial_review <span class="ot">&lt;-</span> <span class="fu">describe_mfrm_data</span>(</span>
+<span id="cb17-7"><a href="#cb17-7" tabindex="-1"></a>  incomplete_ratings, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>, <span class="st">&quot;Group&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb17-8"><a href="#cb17-8" tabindex="-1"></a>  <span class="at">rating_min =</span> <span class="dv">1</span>, <span class="at">rating_max =</span> <span class="dv">4</span>, <span class="at">category_policy =</span> <span class="st">&quot;preserve&quot;</span>,</span>
+<span id="cb17-9"><a href="#cb17-9" tabindex="-1"></a>  <span class="at">include_agreement =</span> <span class="cn">FALSE</span>, <span class="at">comparisons =</span> partial_questions</span>
+<span id="cb17-10"><a href="#cb17-10" tabindex="-1"></a>)</span>
+<span id="cb17-11"><a href="#cb17-11" tabindex="-1"></a>partial_fit <span class="ot">&lt;-</span> <span class="fu">do.call</span>(fit_mfrm, <span class="fu">c</span>(</span>
+<span id="cb17-12"><a href="#cb17-12" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">data =</span> incomplete_ratings, <span class="at">fit_scope =</span> <span class="st">&quot;comparisons&quot;</span>,</span>
+<span id="cb17-13"><a href="#cb17-13" tabindex="-1"></a>       <span class="at">comparison_review =</span> partial_review, <span class="at">interaction_policy =</span> <span class="st">&quot;silent&quot;</span>),</span>
+<span id="cb17-14"><a href="#cb17-14" tabindex="-1"></a>  partial_review<span class="sc">$</span>comparison_review<span class="sc">$</span>fit_arguments</span>
+<span id="cb17-15"><a href="#cb17-15" tabindex="-1"></a>))</span>
+<span id="cb17-16"><a href="#cb17-16" tabindex="-1"></a>partial_comparisons <span class="ot">&lt;-</span> <span class="fu">interaction_effect_table</span>(partial_fit)</span>
+<span id="cb17-17"><a href="#cb17-17" tabindex="-1"></a>partial_comparisons[, <span class="fu">c</span>(</span>
+<span id="cb17-18"><a href="#cb17-18" tabindex="-1"></a>  <span class="st">&quot;Comparison&quot;</span>, <span class="st">&quot;ConditionalState&quot;</span>, <span class="st">&quot;Estimate&quot;</span>, <span class="st">&quot;EstimateStatus&quot;</span>,</span>
+<span id="cb17-19"><a href="#cb17-19" tabindex="-1"></a>  <span class="st">&quot;BoundaryState&quot;</span>, <span class="st">&quot;NumericalState&quot;</span>, <span class="st">&quot;EstimateReason&quot;</span></span>
+<span id="cb17-20"><a href="#cb17-20" tabindex="-1"></a>)]</span>
+<span id="cb17-21"><a href="#cb17-21" tabindex="-1"></a>partial_fit<span class="sc">$</span>checks<span class="sc">$</span>numerical</span>
+<span id="cb17-22"><a href="#cb17-22" tabindex="-1"></a><span class="fu">saveRDS</span>(partial_fit, <span class="fu">file.path</span>(<span class="fu">tempdir</span>(), <span class="st">&quot;partial-school-comparisons.rds&quot;</span>))</span></code></pre></div>
+<p>The whole-panel comparison remains <strong>missing</strong>; the
+first-versus-second rater contrast is approximately <strong>1.08
+logits</strong>, with <code>target_identified_only</code> and
+<code>descriptive_only</code>. This is an A-minus-B difference between
+those two raters’ interaction effects. It does not recover the missing
+last-rater/B effect. <code>summary(partial_fit)</code> returns the same
+table. This dedicated result cannot be used as an ordinary full model
+for Person scoring or individual-cell inference.</p>
+<p>Identifiability alone is insufficient. For JML, the comparison route
+uses <code>lpSolve</code> to check whether any parameter direction can
+increase the likelihood without reaching a finite maximum. A detected or
+unchecked recession withholds all estimates, even if some contrasts
+might have limits in an extended model; that extension is outside this
+route. Failed convergence, insufficient reduced curvature or unsupported
+categories also retain missing values and reasons.</p>
+<p>For MML, declare its population model in the review before fitting.
+The same coordinate reduction preserves every conditional probability
+and the marginal likelihood. Multiple starting variances and finer
+quadrature assess numerical adequacy; they do not prove global marginal
+identification or a unique global maximum. Positive conditional results
+still keep <code>State = &quot;not_evaluated&quot;</code>. Neither route supplies
+SEs, confidence intervals or formal DFF tests. The saved
+<code>representation</code> and <code>optimization</code> are audit
+coordinates, not reportable cell parameters. See <code>?fit_mfrm</code>
+for the supported scope and acceptance criteria.</p>
+</div>
+<div id="obtain-cml-uncertainty-for-the-identified-comparison" class="section level3">
+<h3>Obtain CML uncertainty for the identified comparison</h3>
+<p>For the same incomplete assignment, CML conditions on each Person’s
+total score. It needs no ability distribution and avoids estimating one
+incidental ability parameter per Person. The inferential target remains
+the declared rater-by-origin interaction contrast. Start with the
+bundled synthetic ratings and specify the two comparisons
+explicitly:</p>
+<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a>cml_data <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_bias&quot;</span>)</span>
+<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a>cml_raters <span class="ot">&lt;-</span> <span class="fu">sort</span>(<span class="fu">unique</span>(<span class="fu">as.character</span>(cml_data<span class="sc">$</span>Rater)))</span>
+<span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a>cml_ratings <span class="ot">&lt;-</span> cml_data[<span class="sc">!</span>(cml_data<span class="sc">$</span>Rater <span class="sc">==</span> <span class="fu">tail</span>(cml_raters, <span class="dv">1</span>) <span class="sc">&amp;</span></span>
+<span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a>                          cml_data<span class="sc">$</span>Group <span class="sc">==</span> <span class="st">&quot;B&quot;</span>), ]</span>
+<span id="cb18-5"><a href="#cb18-5" tabindex="-1"></a>cml_weights <span class="ot">&lt;-</span> <span class="fu">rbind</span>(</span>
+<span id="cb18-6"><a href="#cb18-6" tabindex="-1"></a>  <span class="at">panel =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="fu">rep</span>(<span class="dv">0</span>, <span class="fu">length</span>(cml_raters) <span class="sc">-</span> <span class="dv">1</span>)) <span class="sc">-</span> <span class="dv">1</span> <span class="sc">/</span> <span class="fu">length</span>(cml_raters),</span>
+<span id="cb18-7"><a href="#cb18-7" tabindex="-1"></a>  <span class="at">pair =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="sc">-</span><span class="dv">1</span>, <span class="fu">rep</span>(<span class="dv">0</span>, <span class="fu">length</span>(cml_raters) <span class="sc">-</span> <span class="dv">2</span>))</span>
+<span id="cb18-8"><a href="#cb18-8" tabindex="-1"></a>)</span>
+<span id="cb18-9"><a href="#cb18-9" tabindex="-1"></a><span class="fu">colnames</span>(cml_weights) <span class="ot">&lt;-</span> cml_raters</span>
+<span id="cb18-10"><a href="#cb18-10" tabindex="-1"></a>cml_review <span class="ot">&lt;-</span> <span class="fu">describe_mfrm_data</span>(</span>
+<span id="cb18-11"><a href="#cb18-11" tabindex="-1"></a>  cml_ratings, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>, <span class="st">&quot;Group&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb18-12"><a href="#cb18-12" tabindex="-1"></a>  <span class="at">rating_min =</span> <span class="dv">1</span>, <span class="at">rating_max =</span> <span class="dv">4</span>, <span class="at">category_policy =</span> <span class="st">&quot;preserve&quot;</span>,</span>
+<span id="cb18-13"><a href="#cb18-13" tabindex="-1"></a>  <span class="at">include_agreement =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb18-14"><a href="#cb18-14" tabindex="-1"></a>  <span class="at">comparisons =</span> <span class="fu">list</span>(<span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">group =</span> <span class="st">&quot;Group&quot;</span>, <span class="at">groups =</span> <span class="fu">c</span>(<span class="st">&quot;A&quot;</span>, <span class="st">&quot;B&quot;</span>),</span>
+<span id="cb18-15"><a href="#cb18-15" tabindex="-1"></a>                     <span class="at">contrasts =</span> cml_weights, <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>, <span class="at">method =</span> <span class="st">&quot;CML&quot;</span>)</span>
+<span id="cb18-16"><a href="#cb18-16" tabindex="-1"></a>)</span>
+<span id="cb18-17"><a href="#cb18-17" tabindex="-1"></a>cml_fit <span class="ot">&lt;-</span> <span class="fu">do.call</span>(fit_mfrm, <span class="fu">c</span>(</span>
+<span id="cb18-18"><a href="#cb18-18" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">data =</span> cml_ratings, <span class="at">fit_scope =</span> <span class="st">&quot;comparisons&quot;</span>,</span>
+<span id="cb18-19"><a href="#cb18-19" tabindex="-1"></a>       <span class="at">comparison_review =</span> cml_review, <span class="at">interaction_policy =</span> <span class="st">&quot;silent&quot;</span>),</span>
+<span id="cb18-20"><a href="#cb18-20" tabindex="-1"></a>  cml_review<span class="sc">$</span>comparison_review<span class="sc">$</span>fit_arguments</span>
+<span id="cb18-21"><a href="#cb18-21" tabindex="-1"></a>))</span>
+<span id="cb18-22"><a href="#cb18-22" tabindex="-1"></a>cml_table <span class="ot">&lt;-</span> <span class="fu">interaction_effect_table</span>(cml_fit)</span>
+<span id="cb18-23"><a href="#cb18-23" tabindex="-1"></a>cml_table[, <span class="fu">c</span>(<span class="st">&quot;Comparison&quot;</span>, <span class="st">&quot;ConditionalState&quot;</span>, <span class="st">&quot;Estimate&quot;</span>, <span class="st">&quot;SE&quot;</span>, <span class="st">&quot;Lower&quot;</span>,</span>
+<span id="cb18-24"><a href="#cb18-24" tabindex="-1"></a>              <span class="st">&quot;Upper&quot;</span>, <span class="st">&quot;FormalInferenceEligible&quot;</span>, <span class="st">&quot;EstimateReason&quot;</span>)]</span>
+<span id="cb18-25"><a href="#cb18-25" tabindex="-1"></a>cml_fit<span class="sc">$</span>covariance</span>
+<span id="cb18-26"><a href="#cb18-26" tabindex="-1"></a><span class="fu">saveRDS</span>(cml_fit, <span class="fu">file.path</span>(<span class="fu">tempdir</span>(), <span class="st">&quot;cml-school-comparisons.rds&quot;</span>))</span></code></pre></div>
+<p>Read the <code>pair</code> row: the estimated contrast is
+approximately <strong>0.925 logits</strong>, SE <strong>0.518</strong>,
+with a pointwise 95% Wald interval of <strong>−0.090 to 1.939</strong>.
+It is the first rater’s A-minus-B interaction minus the second rater’s
+A-minus-B interaction. The interval includes zero. The
+<code>panel</code> estimate, SE and limits remain <code>NA</code>,
+because its weights involve the missing last-rater/B cell. Zero-filling
+that row would change the inferential claim. The full contrast
+covariance is retained in <code>cml_fit$covariance</code>, including
+missing entries for unavailable targets; <code>summary(cml_fit)</code>
+returns the same table.</p>
+<p>Reuse that fit through the same interval interface used for full
+models. No estimation or information calculation is repeated. The
+missing <code>panel</code> comparison stays in the display as “not
+estimated”, with no point or interval:</p>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a>cml_intervals <span class="ot">&lt;-</span> <span class="fu">mfrm_facet_intervals</span>(cml_fit)</span>
+<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a><span class="fu">plot</span>(cml_intervals)</span>
+<span id="cb19-3"><a href="#cb19-3" tabindex="-1"></a><span class="fu">apa_table</span>(cml_intervals, <span class="at">which =</span> <span class="st">&quot;intervals&quot;</span>)<span class="sc">$</span>table</span>
+<span id="cb19-4"><a href="#cb19-4" tabindex="-1"></a><span class="fu">saveRDS</span>(cml_intervals, <span class="fu">file.path</span>(<span class="fu">tempdir</span>(), <span class="st">&quot;cml-school-intervals.rds&quot;</span>))</span></code></pre></div>
+<p>Use <code>mfrm_facet_intervals(cml_fit, level = .90)</code> for
+pointwise 90% limits; only the normal critical value changes. The saved
+<code>comparison_review</code> retains the group order, weights and
+empty cells, and <code>fit_checks</code> retains the numerical
+qualification.
+<code>apa_table(cml_intervals, which = &quot;comparison_cells&quot;)</code> shows
+which crossings were observed. These dedicated CML objects are not
+ordinary <code>mfrm_results()</code> fits and do not enable Person
+scoring or full-model diagnostics.</p>
+<p>CML identification uses all possible patterns at the <strong>observed
+totals</strong>, not just the unconditional response design.
+Extreme-total Persons contribute no information. The fit removes
+unidentified directions only from its internal coordinates, then checks
+finite-MLE existence, convergence and the full conditional information
+in the identified subspace. A recession or failed check withholds
+inference with a reason. For PCM, declare <code>model = &quot;PCM&quot;</code> and
+its <code>step_facet</code> in the review before fitting.</p>
+<p>The intervals are asymptotic under a correct response model,
+independent Persons, fixed structural dimension and increasing
+information. Numerical agreement with independent calculations is not a
+finite-sample coverage study for every school design. These estimates do
+not establish a calibrated DFF classification or recover Person
+abilities or between-group ability means. CML estimates <strong>no
+population SD</strong>, so it cannot supply a contrast divided by that
+fit’s estimated ability SD. The separate MML standardization uses its
+joint delta method, including uncertainty and cross-covariance for the
+fitted SD. Save the whole CML object as RDS to retain weights, checks
+and missing-cell information; CSV exports only the displayed
+columns.</p>
+</div>
+<div id="standardize-an-mml-interaction-contrast-by-that-fits-population-sd" class="section level3">
+<h3>Standardize an MML interaction contrast by that fit’s population
+SD</h3>
+<p>A contrast in logits and a contrast in ability-population SD units
+answer different questions. For the latter, define the denominator using
+the <strong>same fit</strong> that estimates the interaction. The
+following example uses the complete <code>example_bias</code> assignment
+and explicitly assumes one common normal ability population through
+<code>population_formula = ~1</code>. This differs from the preceding
+MML example with <code>~Group</code>, which allowed group-specific
+means, and from the incomplete CML example. The change is a modeling
+assumption, not just a display option; do not replace
+<code>~Group</code> with <code>~1</code> solely to obtain a standardized
+result.</p>
+<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a>ratings <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_bias&quot;</span>)</span>
+<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a>raters <span class="ot">&lt;-</span> <span class="fu">sort</span>(<span class="fu">unique</span>(<span class="fu">as.character</span>(ratings<span class="sc">$</span>Rater)))</span>
+<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a>weights <span class="ot">&lt;-</span> <span class="fu">rbind</span>(</span>
+<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a>  <span class="at">panel =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="fu">rep</span>(<span class="dv">0</span>, <span class="fu">length</span>(raters) <span class="sc">-</span> <span class="dv">1</span>)) <span class="sc">-</span> <span class="dv">1</span> <span class="sc">/</span> <span class="fu">length</span>(raters),</span>
+<span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a>  <span class="at">pair =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="sc">-</span><span class="dv">1</span>, <span class="fu">rep</span>(<span class="dv">0</span>, <span class="fu">length</span>(raters) <span class="sc">-</span> <span class="dv">2</span>))</span>
+<span id="cb20-6"><a href="#cb20-6" tabindex="-1"></a>)</span>
+<span id="cb20-7"><a href="#cb20-7" tabindex="-1"></a><span class="fu">colnames</span>(weights) <span class="ot">&lt;-</span> raters</span>
+<span id="cb20-8"><a href="#cb20-8" tabindex="-1"></a>sd_review <span class="ot">&lt;-</span> <span class="fu">describe_mfrm_data</span>(</span>
+<span id="cb20-9"><a href="#cb20-9" tabindex="-1"></a>  ratings, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>, <span class="st">&quot;Group&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb20-10"><a href="#cb20-10" tabindex="-1"></a>  <span class="at">rating_min =</span> <span class="dv">1</span>, <span class="at">rating_max =</span> <span class="dv">4</span>, <span class="at">category_policy =</span> <span class="st">&quot;preserve&quot;</span>,</span>
+<span id="cb20-11"><a href="#cb20-11" tabindex="-1"></a>  <span class="at">include_agreement =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb20-12"><a href="#cb20-12" tabindex="-1"></a>  <span class="at">comparisons =</span> <span class="fu">list</span>(<span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">group =</span> <span class="st">&quot;Group&quot;</span>, <span class="at">groups =</span> <span class="fu">c</span>(<span class="st">&quot;A&quot;</span>, <span class="st">&quot;B&quot;</span>),</span>
+<span id="cb20-13"><a href="#cb20-13" tabindex="-1"></a>    <span class="at">contrasts =</span> weights, <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>, <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>, <span class="at">population_formula =</span> <span class="sc">~</span><span class="dv">1</span>)</span>
+<span id="cb20-14"><a href="#cb20-14" tabindex="-1"></a>)</span>
+<span id="cb20-15"><a href="#cb20-15" tabindex="-1"></a>sd_fit <span class="ot">&lt;-</span> <span class="fu">do.call</span>(fit_mfrm, <span class="fu">c</span>(</span>
+<span id="cb20-16"><a href="#cb20-16" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">data =</span> ratings, <span class="at">quad_points =</span> <span class="dv">63</span>, <span class="at">interaction_policy =</span> <span class="st">&quot;silent&quot;</span>),</span>
+<span id="cb20-17"><a href="#cb20-17" tabindex="-1"></a>  sd_review<span class="sc">$</span>comparison_review<span class="sc">$</span>fit_arguments</span>
+<span id="cb20-18"><a href="#cb20-18" tabindex="-1"></a>))</span>
+<span id="cb20-19"><a href="#cb20-19" tabindex="-1"></a>sd_intervals <span class="ot">&lt;-</span> <span class="fu">mfrm_facet_intervals</span>(</span>
+<span id="cb20-20"><a href="#cb20-20" tabindex="-1"></a>  sd_fit, <span class="at">comparison_review =</span> sd_review, <span class="at">scale =</span> <span class="st">&quot;standardized&quot;</span></span>
+<span id="cb20-21"><a href="#cb20-21" tabindex="-1"></a>)</span>
+<span id="cb20-22"><a href="#cb20-22" tabindex="-1"></a>sd_intervals<span class="sc">$</span>settings<span class="sc">$</span>population_sd</span>
+<span id="cb20-23"><a href="#cb20-23" tabindex="-1"></a><span class="fu">summary</span>(sd_intervals)[, <span class="fu">c</span>(<span class="st">&quot;Target&quot;</span>, <span class="st">&quot;NativeEstimate&quot;</span>, <span class="st">&quot;Estimate&quot;</span>, <span class="st">&quot;SE&quot;</span>, <span class="st">&quot;Lower&quot;</span>, <span class="st">&quot;Upper&quot;</span>)]</span>
+<span id="cb20-24"><a href="#cb20-24" tabindex="-1"></a><span class="fu">saveRDS</span>(sd_intervals, <span class="fu">file.path</span>(<span class="fu">tempdir</span>(), <span class="st">&quot;standardized-school-intervals.rds&quot;</span>))</span></code></pre></div>
+<p>Here the fitted SD is approximately <strong>0.976</strong>. The
+first-minus-second rater’s A-minus-B interaction is <strong>0.927
+logits</strong>, or <strong>0.950 population SD units</strong>, with SE
+<strong>0.494</strong> and a pointwise 95% interval of <strong>−0.018 to
+1.918</strong>. The interval includes zero. <code>NativeEstimate</code>
+keeps the original scale alongside the standardized result, and
+<code>covariance</code> retains covariance between the two requested
+contrasts. The pointwise intervals do not adjust for selecting or
+examining multiple contrasts.</p>
+<p>For contrast <span class="math inline">\(d\)</span> and log
+population variance <span class="math inline">\(\lambda=\log(\sigma^2)\)</span>, <span class="math inline">\(t=d/\sigma\)</span> has derivatives <span class="math inline">\(J_d/\sigma\)</span> and <span class="math inline">\(-t/2\)</span>. The implemented variance is</p>
+<p><span class="math display">\[
+\operatorname{Var}(\hat t)\approx
+\frac{\operatorname{Var}(\hat d)
++\hat d^2\operatorname{Var}(\hat\lambda)/4
+-\hat d\operatorname{Cov}(\hat d,\hat\lambda)}{\hat\sigma^2}.
+\]</span></p>
+<p>It uses the full joint marginal-information inverse. Dividing the
+native SE or interval endpoints by <span class="math inline">\(\hat\sigma\)</span> leaves out denominator
+uncertainty and its covariance with the contrast. The ratio can be
+unstable when the fitted SD is near zero; standardization does not cure
+weak information.</p>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a><span class="fu">plot</span>(sd_intervals)</span></code></pre></div>
+<p>The usual saved-results path carries the same targets, scale, checks
+and review into plots, reports and table exports, without fitting
+again:</p>
+<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>sd_results <span class="ot">&lt;-</span> <span class="fu">mfrm_results</span>(</span>
+<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a>  sd_fit, <span class="at">intervals =</span> <span class="fu">list</span>(<span class="at">school =</span> sd_intervals),</span>
+<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a>  <span class="at">include =</span> <span class="fu">c</span>(<span class="st">&quot;fit&quot;</span>, <span class="st">&quot;plots&quot;</span>), <span class="at">compute =</span> <span class="st">&quot;never&quot;</span></span>
+<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a>)</span>
+<span id="cb22-5"><a href="#cb22-5" tabindex="-1"></a>sd_results<span class="sc">$</span>tables<span class="sc">$</span>facet_school_intervals[, <span class="fu">c</span>(<span class="st">&quot;Target&quot;</span>, <span class="st">&quot;Estimate&quot;</span>, <span class="st">&quot;ScaleReference&quot;</span>)]</span>
+<span id="cb22-6"><a href="#cb22-6" tabindex="-1"></a><span class="fu">saveRDS</span>(sd_results, <span class="fu">file.path</span>(<span class="fu">tempdir</span>(), <span class="st">&quot;standardized-school-results.rds&quot;</span>))</span></code></pre></div>
+<p>For a supported full MML fit with <code>~Group</code>, request
+<code>scale = &quot;native&quot;</code> instead; its fitted residual SD is not
+substituted for a marginal population SD. The fixed N(0,1) case uses
+known SD one. CML estimates no such SD, and this MML consumer does not
+extend inference to partial MML fits or GPCM interactions. Numerical
+eligibility means that source, information and finer-grid checks passed.
+<code>CoverageQualified = FALSE</code> and the retained
+marginal-identification state keep finite-sample performance and global
+identification separate from those checks. These intervals require the
+declared response/population model and independent Persons; they are not
+a calibrated DFF classification.</p>
+</div>
+<div id="comparing-with-mh-or-ordinal-logistic-dif" class="section level3">
+<h3>Comparing with MH or ordinal logistic DIF</h3>
+<p><code>mantel_haenszel_table()</code> now supplies a separate binary
+MH comparison with explicit matching strata and one response per Person
+and target. Its default conditional exact inference uses
+<code>stats::mantelhaen.test()</code>; an asymptotic option is also
+available. <code>analyze_dff()</code> retains its residual and refit
+routes. <code>ordinal_logistic_table()</code> supplies the
+independent-Person cumulative-logit comparison through the optional
+<code>ordinal</code> package. Pooled repeated-rating comparisons remain
+planned work. First specify what each result describes:</p>
+<table>
+<colgroup>
+<col width="50%" />
+<col width="50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Procedure</th>
+<th>Quantity being compared</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Residual DFF</td>
+<td>Group difference in mean observed-minus-expected score;
+descriptive</td>
+</tr>
+<tr class="even">
+<td>Linked refit DFF</td>
+<td>Group difference in a facet parameter, conditional on baseline
+anchors</td>
+</tr>
+<tr class="odd">
+<td>Binary Mantel–Haenszel (MH)</td>
+<td>A common group odds ratio conditional on declared matching
+strata</td>
+</tr>
+<tr class="even">
+<td>Cumulative ordinal logistic</td>
+<td>Group and matching-by-group terms in a proportional-odds response
+model</td>
+</tr>
+</tbody>
+</table>
+<p>First declare the intended response roster and rating plan before
+running the methods. Passing that roster through residual
+<code>analyze_dff(data = ...)</code> now selects the fitted observations
+by Person, all facets, score, weight and repeated-response multiplicity.
+It uses the original fitted expectations, without recalibrating on the
+selected subset. The same contract applies to
+<code>dif_interaction_table()</code>.</p>
+<p>Inspect <code>$cases</code> in each result: residual output maps
+<code>InputRow</code> in the supplied data to <code>FitRow</code> in
+<code>fit$prep$data</code>; MH/ordinal output identifies input rows with
+<code>Row</code>. Missing groups, invalid responses and responses absent
+from the fit cannot silently acquire another observation’s residual.
+Requesting more copies than the fit contains is rejected. Identical
+fitted copies can be exchanged for this descriptive calculation only
+when their model moments agree; their <code>FitRow</code> assignment
+does not recover an occasion identity.</p>
+<p>Residual <code>N</code> counts response rows, while
+<code>NPersons</code> counts distinct Persons. For example, 12 Persons
+with three criteria give 36 rows for a rater, not 36 independent
+Persons. Descriptive residual summaries can retain those rows; ordinary
+MH/ordinal inference cannot treat them as independent target responses.
+Earlier saved residual summaries must be recomputed from the saved fit
+and source data to obtain this matching audit; a model refit is
+unnecessary.</p>
+<p>Method-specific exclusions can still differ: MH removes uninformative
+strata, whereas ordinal models may retain their observations. Report
+these differences and the matching rule; do not automatically intersect
+outcome-dependent inclusion masks and treat that as a prespecified
+common cohort. Matching rows is necessary for understanding a
+comparison, but does not make the methods’ quantities or null hypotheses
+identical.</p>
+<p>The MH result keeps the MH point estimate separately from the
+conditional maximum-likelihood estimate used by exact inference. Its
+<code>strata</code> and <code>cases</code> tables retain group/category
+counts, opposing effects, missing responses and strata without overlap.
+Supply multiple matching columns, such as total and rating plan, through
+<code>strata</code>; continuous values are not silently binned. The
+function rejects duplicate Person-target cells. Pointwise intervals are
+not simultaneous across targets; Holm adjustment applies to p-values
+only. Exact probability-ordered two-sided p-values need not invert
+equal-tail confidence intervals. See <code>?mantel_haenszel_table</code>
+for a runnable example.</p>
+<p>The ordinal result fits matching-only (M1), matching plus group (M2),
+and matching plus group and their interaction (M3) to identical complete
+rows. Its <code>table</code> separates uniform (M2/M1), nonuniform
+(M3/M2) and joint (M3/M1) likelihood-ratio tests, with Holm adjustment
+across all three tests and targets. <code>DeltaNagelkerkeR2</code> names
+the pseudo-R-squared definition explicitly. The <code>contrasts</code>
+table reports M3’s reference/focal upper-tail odds ratios at the
+endpoints and midpoint of the overlapping matching ranges; values above
+one favor higher reference scores. Fits use all complete responses. An
+interaction means this odds ratio changes with matching, so one constant
+group coefficient does not summarize the full difference.</p>
+<p>The separate <code>proportional_odds</code> table tests whether
+slopes can differ across category cuts, using a global nonproportional
+alternative. This diagnostic has its own multiplicity family and does
+not select which group tests are run. For binary responses it is not
+applicable. <code>models</code>, <code>matching</code> and
+<code>cases</code> preserve convergence information, group ranges and
+row exclusions. Empty declared categories, absent range overlap and
+numerical failures remain unavailable; repeated rows are rejected. See
+<code>?ordinal_logistic_table</code> for a runnable example and the
+exact numerical checks. All reported p-values are asymptotic:
+convergence or a nonsignificant diagnostic does not establish adequate
+small-sample inference or proportional odds.</p>
+<p>A bounded known-model check illustrates this limit. With three
+categories, balanced groups, a fixed matching grid and total N=40, all
+1,000 simulated data sets had computable group tests. Under no group
+difference and true proportional odds, the unadjusted joint test
+rejected in 65/1,000 cases (6.5%; 95% Monte Carlo Wilson interval
+5.1%–8.2%). The proportional-odds diagnostic was unavailable in 42 cases
+and rejected in 114/958 available cases (11.9%; interval 10.0%–14.1%),
+at nominal 5%. Treating its numerical availability as assurance of a
+valid 5% test would therefore be misleading. For the default
+Holm-adjusted family of three group tests, at least one rejection
+occurred in 52/1,000 cases (5.2%; interval 4.0%–6.8%). This family is
+separate from the proportional-odds diagnostic and does not repair it.
+At N=200 and N=1,000 under the same mechanism, joint rejection was 4.7%
+and 4.6%, and diagnostic rejection was 5.8% and 4.5%, with all results
+available. These particular conditions do not establish a universal
+sample-size rule. The function offers asymptotic comparisons, not
+qualified small-sample tests. No significance cutoff or numerical
+tolerance was changed in response to these results; the diagnostic does
+not determine whether group comparisons are run.</p>
+<p>Matching is a substantive choice. In the binary Rasch case with a
+common item set and invariant other items, conditioning on the
+<strong>total including the studied item</strong> removes the group
+ability distribution from that item’s conditional response. Removing the
+studied item can leave group differences even without IRT DIF (<a href="https://doi.org/10.1002/j.2330-8516.1986.tb00186.x">Holland and
+Thayer, 1986, pp. 14–18</a>). This is not a general endorsement of any
+total score. Contamination by other DIF items, missing responses and
+different rater/task plans require separate attention. In a many-facet
+assignment, two persons with the same total may have faced different
+raters or tasks. Specify common exposure or an explicit plan adjustment
+with overlap before treating their totals as comparable.</p>
+<p>For each target, retain the persons, group coding, category order,
+matching definition, exclusions and rating plan. Repeated ratings from a
+Person are not independent new persons in ordinary MH tables or logistic
+likelihoods. A comparison must account for that dependence; silently
+averaging ratings changes the response being analyzed. Connectedness
+alone does not resolve either problem.</p>
+<p>MH can miss effects that reverse direction across matching strata.
+Rogers and Swaminathan’s study also used different purification
+procedures for MH and logistic regression, so its comparison is not
+solely a change of test statistic (<a href="https://doi.org/10.1177/014662169301700201">1993,
+pp. 111–115</a>). Report uniform and nonuniform terms separately when
+fitting a logistic comparison. In Zumbo’s three-model sequence, add the
+group term to the matching-only model, then add the matching-by-group
+interaction; the joint test compares the last model with the first
+(1999, pp. 23–27).</p>
+<p>The cumulative proportional-odds assumption in that ordinal model is
+different from the adjacent-category structure of RSM/PCM and is not
+generally satisfied by it. Check the matching-response relationship and
+model adequacy before interpreting a difference between procedures as
+DFF. Pseudo-R-squared definitions and their changes must be named: the
+historical <code>.130</code> screen in Zumbo’s application is not a
+universal cutoff or a default for mfrmr. A nonsignificant result is not
+evidence that differential functioning is absent, and statistical DIF
+alone does not establish bias.</p>
+<p>Zumbo, B. D. (1999). <em>A handbook on the theory and methods of
+differential item functioning (DIF): Logistic regression modeling as a
+unitary framework for binary and Likert-type (ordinal) item scores</em>.
+Ottawa, ON: Directorate of Human Resources Research and Evaluation,
+Department of National Defense.</p>
+</div>
+<div id="compare-an-explicitly-shared-response-roster" class="section level3">
+<h3>Compare an explicitly shared response roster</h3>
+<p>The following self-contained example puts the three procedures beside
+each other. It requires the optional <code>ordinal</code> package. The
+binary Rasch design has 240 independent Persons answering the same eight
+items once each. Both groups have the same item difficulties, but
+different ability distributions. These synthetic data illustrate how to
+assemble and audit a comparison; this one sample is not a validation
+study or a recommended sample size.</p>
+<p>Here <code>Total</code> includes the studied item and is computed
+only after checking the complete common item roster. MH conditions on
+each total separately; the logistic models instead assume a linear
+relationship with total on the logit scale. Even in this Rasch example,
+those are different matching models. The residual calculation uses the
+fitted Person and item parameters.</p>
+<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
+<span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">241010</span>)</span>
+<span id="cb23-3"><a href="#cb23-3" tabindex="-1"></a>group_order <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;Reference&quot;</span>, <span class="st">&quot;Focal&quot;</span>)</span>
+<span id="cb23-4"><a href="#cb23-4" tabindex="-1"></a>person_group <span class="ot">&lt;-</span> <span class="fu">rep</span>(group_order, <span class="at">each =</span> <span class="dv">120</span>)</span>
+<span id="cb23-5"><a href="#cb23-5" tabindex="-1"></a>ability <span class="ot">&lt;-</span> <span class="fu">rnorm</span>(<span class="dv">240</span>, <span class="at">mean =</span> <span class="fu">ifelse</span>(person_group <span class="sc">==</span> <span class="st">&quot;Focal&quot;</span>, <span class="fl">0.5</span>, <span class="sc">-</span><span class="fl">0.5</span>))</span>
+<span id="cb23-6"><a href="#cb23-6" tabindex="-1"></a>shared <span class="ot">&lt;-</span> <span class="fu">expand.grid</span>(<span class="at">Person =</span> <span class="fu">seq_len</span>(<span class="dv">240</span>), <span class="at">Item =</span> <span class="fu">paste0</span>(<span class="st">&quot;I&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">8</span>),</span>
+<span id="cb23-7"><a href="#cb23-7" tabindex="-1"></a>                      <span class="at">KEEP.OUT.ATTRS =</span> <span class="cn">FALSE</span>, <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb23-8"><a href="#cb23-8" tabindex="-1"></a>shared<span class="sc">$</span>Group <span class="ot">&lt;-</span> person_group[shared<span class="sc">$</span>Person]</span>
+<span id="cb23-9"><a href="#cb23-9" tabindex="-1"></a>difficulty <span class="ot">&lt;-</span> <span class="fu">setNames</span>(<span class="fu">seq</span>(<span class="sc">-</span><span class="dv">1</span>, <span class="dv">1</span>, <span class="at">length.out =</span> <span class="dv">8</span>), <span class="fu">paste0</span>(<span class="st">&quot;I&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">8</span>))</span>
+<span id="cb23-10"><a href="#cb23-10" tabindex="-1"></a>shared<span class="sc">$</span>Score <span class="ot">&lt;-</span> <span class="fu">rbinom</span>(<span class="fu">nrow</span>(shared), <span class="dv">1</span>,</span>
+<span id="cb23-11"><a href="#cb23-11" tabindex="-1"></a>  <span class="fu">plogis</span>(ability[shared<span class="sc">$</span>Person] <span class="sc">-</span> difficulty[shared<span class="sc">$</span>Item]))</span>
+<span id="cb23-12"><a href="#cb23-12" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="sc">!</span><span class="fu">anyNA</span>(shared), <span class="fu">all</span>(<span class="fu">table</span>(shared<span class="sc">$</span>Person, shared<span class="sc">$</span>Item) <span class="sc">==</span> <span class="dv">1</span><span class="dt">L</span>))</span>
+<span id="cb23-13"><a href="#cb23-13" tabindex="-1"></a>shared<span class="sc">$</span>Total <span class="ot">&lt;-</span> <span class="fu">ave</span>(shared<span class="sc">$</span>Score, shared<span class="sc">$</span>Person, <span class="at">FUN =</span> sum)</span>
+<span id="cb23-14"><a href="#cb23-14" tabindex="-1"></a></span>
+<span id="cb23-15"><a href="#cb23-15" tabindex="-1"></a>shared_fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(shared, <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>, <span class="at">facets =</span> <span class="st">&quot;Item&quot;</span>,</span>
+<span id="cb23-16"><a href="#cb23-16" tabindex="-1"></a>                       <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>, <span class="at">method =</span> <span class="st">&quot;JML&quot;</span>, <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>)</span>
+<span id="cb23-17"><a href="#cb23-17" tabindex="-1"></a>residual <span class="ot">&lt;-</span> <span class="fu">analyze_dff</span>(shared_fit, <span class="at">facet =</span> <span class="st">&quot;Item&quot;</span>, <span class="at">group =</span> <span class="st">&quot;Group&quot;</span>,</span>
+<span id="cb23-18"><a href="#cb23-18" tabindex="-1"></a>  <span class="at">data =</span> shared, <span class="at">focal =</span> group_order[<span class="dv">2</span>], <span class="at">method =</span> <span class="st">&quot;residual&quot;</span>)</span>
+<span id="cb23-19"><a href="#cb23-19" tabindex="-1"></a>mh <span class="ot">&lt;-</span> <span class="fu">mantel_haenszel_table</span>(shared, <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>, <span class="at">target =</span> <span class="st">&quot;Item&quot;</span>,</span>
+<span id="cb23-20"><a href="#cb23-20" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>, <span class="at">group =</span> <span class="st">&quot;Group&quot;</span>, <span class="at">strata =</span> <span class="st">&quot;Total&quot;</span>, <span class="at">groups =</span> group_order)</span>
+<span id="cb23-21"><a href="#cb23-21" tabindex="-1"></a>ologit <span class="ot">&lt;-</span> <span class="fu">ordinal_logistic_table</span>(shared, <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>, <span class="at">target =</span> <span class="st">&quot;Item&quot;</span>,</span>
+<span id="cb23-22"><a href="#cb23-22" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>, <span class="at">group =</span> <span class="st">&quot;Group&quot;</span>, <span class="at">matching =</span> <span class="st">&quot;Total&quot;</span>,</span>
+<span id="cb23-23"><a href="#cb23-23" tabindex="-1"></a>  <span class="at">groups =</span> group_order, <span class="at">categories =</span> <span class="dv">0</span><span class="sc">:</span><span class="dv">1</span>)</span></code></pre></div>
+<p>First retain each method’s response audit. The join below uses
+original row numbers from the <strong>same</strong> <code>shared</code>
+data, not the position of a row in a result table. It retains exclusions
+rather than choosing the intersection of the methods’ retained rows.
+With one response per Person-item, the counts below are also
+distinct-Person counts within each item and group.</p>
+<div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a>case_audit <span class="ot">&lt;-</span> <span class="fu">rbind</span>(</span>
+<span id="cb24-2"><a href="#cb24-2" tabindex="-1"></a>  <span class="fu">data.frame</span>(<span class="at">Method =</span> <span class="st">&quot;Residual&quot;</span>, <span class="at">Row =</span> residual<span class="sc">$</span>cases<span class="sc">$</span>InputRow,</span>
+<span id="cb24-3"><a href="#cb24-3" tabindex="-1"></a>    <span class="at">Included =</span> residual<span class="sc">$</span>cases<span class="sc">$</span>Included, <span class="at">Reason =</span> residual<span class="sc">$</span>cases<span class="sc">$</span>Reason),</span>
+<span id="cb24-4"><a href="#cb24-4" tabindex="-1"></a>  <span class="fu">data.frame</span>(<span class="at">Method =</span> <span class="st">&quot;MH&quot;</span>, mh<span class="sc">$</span>cases[<span class="fu">c</span>(<span class="st">&quot;Row&quot;</span>, <span class="st">&quot;Included&quot;</span>, <span class="st">&quot;Reason&quot;</span>)]),</span>
+<span id="cb24-5"><a href="#cb24-5" tabindex="-1"></a>  <span class="fu">data.frame</span>(<span class="at">Method =</span> <span class="st">&quot;Logistic&quot;</span>, ologit<span class="sc">$</span>cases[<span class="fu">c</span>(<span class="st">&quot;Row&quot;</span>, <span class="st">&quot;Included&quot;</span>, <span class="st">&quot;Reason&quot;</span>)])</span>
+<span id="cb24-6"><a href="#cb24-6" tabindex="-1"></a>)</span>
+<span id="cb24-7"><a href="#cb24-7" tabindex="-1"></a>case_audit<span class="sc">$</span>Target <span class="ot">&lt;-</span> shared<span class="sc">$</span>Item[case_audit<span class="sc">$</span>Row]</span>
+<span id="cb24-8"><a href="#cb24-8" tabindex="-1"></a>case_audit<span class="sc">$</span>Person <span class="ot">&lt;-</span> shared<span class="sc">$</span>Person[case_audit<span class="sc">$</span>Row]</span>
+<span id="cb24-9"><a href="#cb24-9" tabindex="-1"></a>case_audit<span class="sc">$</span>Group <span class="ot">&lt;-</span> shared<span class="sc">$</span>Group[case_audit<span class="sc">$</span>Row]</span>
+<span id="cb24-10"><a href="#cb24-10" tabindex="-1"></a>case_audit<span class="sc">$</span>Count <span class="ot">&lt;-</span> <span class="dv">1</span><span class="dt">L</span></span>
+<span id="cb24-11"><a href="#cb24-11" tabindex="-1"></a>case_counts <span class="ot">&lt;-</span> <span class="fu">aggregate</span>(Count <span class="sc">~</span> Target <span class="sc">+</span> Method <span class="sc">+</span> Group <span class="sc">+</span> Included <span class="sc">+</span> Reason,</span>
+<span id="cb24-12"><a href="#cb24-12" tabindex="-1"></a>                         <span class="at">data =</span> case_audit, <span class="at">FUN =</span> sum)</span>
+<span id="cb24-13"><a href="#cb24-13" tabindex="-1"></a>case_counts[case_counts<span class="sc">$</span>Target <span class="sc">==</span> <span class="st">&quot;I2&quot;</span>, ]</span></code></pre></div>
+<p>Next align effect direction explicitly. <code>focal</code> above
+makes the residual contrast Reference minus Focal. All odds ratios below
+are Reference/Focal odds of a higher score. Thus a positive residual
+difference and an odds ratio above one point in the same score
+direction, but <strong>their magnitudes cannot be compared</strong>. The
+MH column uses the conditional maximum-likelihood estimate from the
+default exact analysis; the distinct MH estimator remains in
+<code>mh$table$MHOddsRatio</code>. Logistic values come from M3 and can
+change direction over total scores. Keep their matching values and
+numerical status visible.</p>
+<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" tabindex="-1"></a>r <span class="ot">&lt;-</span> residual<span class="sc">$</span>dif_table</span>
+<span id="cb25-2"><a href="#cb25-2" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">all</span>(r<span class="sc">$</span>Group1 <span class="sc">==</span> group_order[<span class="dv">1</span>]), <span class="fu">all</span>(r<span class="sc">$</span>Group2 <span class="sc">==</span> group_order[<span class="dv">2</span>]))</span>
+<span id="cb25-3"><a href="#cb25-3" tabindex="-1"></a>effects <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">Target =</span> r<span class="sc">$</span>Level, <span class="at">ResidualDifference =</span> r<span class="sc">$</span>Contrast,</span>
+<span id="cb25-4"><a href="#cb25-4" tabindex="-1"></a>  <span class="at">ResidualStatus =</span> <span class="fu">ifelse</span>(<span class="fu">is.finite</span>(r<span class="sc">$</span>Contrast), <span class="st">&quot;descriptive&quot;</span>, <span class="st">&quot;unavailable&quot;</span>))</span>
+<span id="cb25-5"><a href="#cb25-5" tabindex="-1"></a>m <span class="ot">&lt;-</span> mh<span class="sc">$</span>table[<span class="fu">c</span>(<span class="st">&quot;Target&quot;</span>, <span class="st">&quot;OddsRatio&quot;</span>, <span class="st">&quot;Status&quot;</span>)]</span>
+<span id="cb25-6"><a href="#cb25-6" tabindex="-1"></a><span class="fu">names</span>(m)[<span class="dv">2</span><span class="sc">:</span><span class="dv">3</span>] <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;MH_ExactOR&quot;</span>, <span class="st">&quot;MH_Status&quot;</span>)</span>
+<span id="cb25-7"><a href="#cb25-7" tabindex="-1"></a>effects <span class="ot">&lt;-</span> <span class="fu">merge</span>(effects, m, <span class="at">by =</span> <span class="st">&quot;Target&quot;</span>, <span class="at">all =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb25-8"><a href="#cb25-8" tabindex="-1"></a>mid <span class="ot">&lt;-</span> <span class="fu">subset</span>(ologit<span class="sc">$</span>contrasts, Position <span class="sc">==</span> <span class="st">&quot;OverlapMid&quot;</span>,</span>
+<span id="cb25-9"><a href="#cb25-9" tabindex="-1"></a>              <span class="at">select =</span> <span class="fu">c</span>(Target, Matching, OddsRatio, Status))</span>
+<span id="cb25-10"><a href="#cb25-10" tabindex="-1"></a><span class="fu">names</span>(mid)[<span class="dv">2</span><span class="sc">:</span><span class="dv">4</span>] <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;TotalAtMidpoint&quot;</span>, <span class="st">&quot;Logistic_MidOR&quot;</span>, <span class="st">&quot;Logistic_Status&quot;</span>)</span>
+<span id="cb25-11"><a href="#cb25-11" tabindex="-1"></a>effects <span class="ot">&lt;-</span> <span class="fu">merge</span>(effects, mid, <span class="at">by =</span> <span class="st">&quot;Target&quot;</span>, <span class="at">all =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb25-12"><a href="#cb25-12" tabindex="-1"></a>effects[effects<span class="sc">$</span>Target <span class="sc">==</span> <span class="st">&quot;I2&quot;</span>, ]</span>
+<span id="cb25-13"><a href="#cb25-13" tabindex="-1"></a></span>
+<span id="cb25-14"><a href="#cb25-14" tabindex="-1"></a><span class="co"># Preserve endpoint effects; a midpoint alone can conceal a crossing effect.</span></span>
+<span id="cb25-15"><a href="#cb25-15" tabindex="-1"></a><span class="fu">subset</span>(ologit<span class="sc">$</span>contrasts, Target <span class="sc">==</span> <span class="st">&quot;I2&quot;</span>)</span>
+<span id="cb25-16"><a href="#cb25-16" tabindex="-1"></a><span class="fu">subset</span>(mh<span class="sc">$</span>table, Target <span class="sc">==</span> <span class="st">&quot;I2&quot;</span>, <span class="at">select =</span> <span class="fu">c</span>(Target, NReference, NFocal,</span>
+<span id="cb25-17"><a href="#cb25-17" tabindex="-1"></a>  Lower, Upper, PValue, PAdjusted, Status, IntervalStatus))</span>
+<span id="cb25-18"><a href="#cb25-18" tabindex="-1"></a><span class="fu">subset</span>(ologit<span class="sc">$</span>table, Target <span class="sc">==</span> <span class="st">&quot;I2&quot;</span>, <span class="at">select =</span> <span class="fu">c</span>(Target, Comparison,</span>
+<span id="cb25-19"><a href="#cb25-19" tabindex="-1"></a>  DeltaNagelkerkeR2, PValue, PAdjusted, Status))</span></code></pre></div>
+<p>In the displayed sample, residual and logistic calculations use 120
+Persons per group for I2. MH uses 96 Reference and 97 Focal Persons; its
+audit accounts for the other 47 responses in constant-response strata.
+This is a difference in usable conditional information, not an unnoticed
+change of the input roster. At total 0 or 8, the item response is
+determined by the total itself. Logistic endpoint odds ratios are
+predictions from its smooth response model; they are not empirical odds
+ratios in those degenerate strata. Overlapping matching ranges alone do
+not establish response support or a correct linear logit relationship. A
+binary proportional-odds diagnostic cannot check that relationship.</p>
+<p>All eight items were analyzed before displaying I2, chosen in advance
+as the example target. MH adjusts across eight item tests; logistic
+adjusts across 24 item-by-comparison tests. These are separate families,
+not an adjustment for selecting among methods. Residual differences have
+no p-values. MH’s intervals are pointwise; logistic contrasts here have
+no intervals. For these binary data the proportional-odds diagnostic is
+<code>not_applicable_binary</code>, not evidence that proportional odds
+holds for a future ordinal analysis.</p>
+<p>Read the case counts before interpreting different results: MH can
+omit constant-response or single-group strata that logistic retains.
+Logistic <code>Included = TRUE</code> means a row was supplied to a
+model, not that estimation succeeded; inspect the effect/test statuses
+and <code>ologit$models</code>. A missing effect stays <code>NA</code>,
+with its reason, rather than being replaced by zero or removed from the
+comparison. The descriptive JML residuals do not acquire inferential
+validity from the other methods’ p-values.</p>
+<p>To retain this analysis, save the input, matching definition,
+calibration and complete results together. Later displays can be rebuilt
+from this object without rerunning the models.</p>
+<div class="sourceCode" id="cb26"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" tabindex="-1"></a>comparison <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">data =</span> shared, <span class="at">groups =</span> group_order, <span class="at">categories =</span> <span class="dv">0</span><span class="sc">:</span><span class="dv">1</span>,</span>
+<span id="cb26-2"><a href="#cb26-2" tabindex="-1"></a>  <span class="at">matching_rule =</span> <span class="st">&quot;Complete common eight-item total, including the target&quot;</span>,</span>
+<span id="cb26-3"><a href="#cb26-3" tabindex="-1"></a>  <span class="at">fit =</span> shared_fit, <span class="at">residual =</span> residual, <span class="at">mh =</span> mh, <span class="at">ordinal =</span> ologit,</span>
+<span id="cb26-4"><a href="#cb26-4" tabindex="-1"></a>  <span class="at">effects =</span> effects, <span class="at">case_audit =</span> case_audit, <span class="at">case_counts =</span> case_counts,</span>
+<span id="cb26-5"><a href="#cb26-5" tabindex="-1"></a>  <span class="at">session =</span> <span class="fu">sessionInfo</span>())</span>
+<span id="cb26-6"><a href="#cb26-6" tabindex="-1"></a><span class="fu">saveRDS</span>(comparison, <span class="st">&quot;dff-comparison.rds&quot;</span>)</span></code></pre></div>
+<p>For actual ordinal scores, retain the declared categories and omit
+ordinary binary MH; do not dichotomize merely to fill this table. For a
+Rater target with several Criteria per Person, the repeated rows do not
+satisfy this example’s independence contract. Differing rater/task plans
+also require justified adjustment. Those extensions remain open.
+Agreement of signs or nonsignificant tests in this display is not a
+robustness, invariance or fairness classification.</p>
+</div>
 </div>
 <div id="cell-level-follow-up" class="section level2">
 <h2>5. Cell-level follow-up</h2>
 <p>If the level-wise screen points to a specific facet, follow up with
 the interaction table and narrative report.</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>dit <span class="ot">&lt;-</span> <span class="fu">dif_interaction_table</span>(</span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  fit,</span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  diag,</span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="at">facet =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  <span class="at">group =</span> <span class="st">&quot;Group&quot;</span>,</span>
-<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>  <span class="at">data =</span> bias_df</span>
-<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>)</span>
-<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a></span>
-<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a><span class="fu">head</span>(dit<span class="sc">$</span>table)</span>
-<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a></span>
-<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a>dr <span class="ot">&lt;-</span> <span class="fu">dif_report</span>(dff_resid)</span>
-<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a><span class="fu">cat</span>(dr<span class="sc">$</span>narrative)</span></code></pre></div>
+<div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" tabindex="-1"></a>dit <span class="ot">&lt;-</span> <span class="fu">dif_interaction_table</span>(</span>
+<span id="cb27-2"><a href="#cb27-2" tabindex="-1"></a>  fit,</span>
+<span id="cb27-3"><a href="#cb27-3" tabindex="-1"></a>  diag,</span>
+<span id="cb27-4"><a href="#cb27-4" tabindex="-1"></a>  <span class="at">facet =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
+<span id="cb27-5"><a href="#cb27-5" tabindex="-1"></a>  <span class="at">group =</span> <span class="st">&quot;Group&quot;</span>,</span>
+<span id="cb27-6"><a href="#cb27-6" tabindex="-1"></a>  <span class="at">data =</span> bias_df</span>
+<span id="cb27-7"><a href="#cb27-7" tabindex="-1"></a>)</span>
+<span id="cb27-8"><a href="#cb27-8" tabindex="-1"></a></span>
+<span id="cb27-9"><a href="#cb27-9" tabindex="-1"></a><span class="fu">head</span>(dit<span class="sc">$</span>table)</span>
+<span id="cb27-10"><a href="#cb27-10" tabindex="-1"></a></span>
+<span id="cb27-11"><a href="#cb27-11" tabindex="-1"></a>dr <span class="ot">&lt;-</span> <span class="fu">dif_report</span>(dff_resid)</span>
+<span id="cb27-12"><a href="#cb27-12" tabindex="-1"></a><span class="fu">cat</span>(dr<span class="sc">$</span>narrative)</span></code></pre></div>
 </div>
 <div id="model-estimated-facet-interactions" class="section level2">
 <h2>6. Model-estimated facet interactions</h2>
 <p>Residual bias and DFF tools screen for unusual cells after fitting
-the additive model. When the interaction hypothesis is specified in
-advance, use <code>facet_interactions</code> to estimate the named
-two-way non-person facet interaction in the model likelihood.</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>fit_add <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>  bias_df,</span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
-<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
-<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">7</span></span>
-<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>)</span>
-<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a></span>
-<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>fit_interaction <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
-<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a>  bias_df,</span>
-<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
-<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
-<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb7-16"><a href="#cb7-16" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
-<span id="cb7-17"><a href="#cb7-17" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
-<span id="cb7-18"><a href="#cb7-18" tabindex="-1"></a>  <span class="at">facet_interactions =</span> <span class="st">&quot;Rater:Criterion&quot;</span>,</span>
-<span id="cb7-19"><a href="#cb7-19" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">31</span></span>
-<span id="cb7-20"><a href="#cb7-20" tabindex="-1"></a>)</span>
-<span id="cb7-21"><a href="#cb7-21" tabindex="-1"></a></span>
-<span id="cb7-22"><a href="#cb7-22" tabindex="-1"></a><span class="fu">interaction_effect_table</span>(fit_interaction)</span>
-<span id="cb7-23"><a href="#cb7-23" tabindex="-1"></a><span class="fu">compare_mfrm</span>(<span class="at">Additive =</span> fit_add, <span class="at">Interaction =</span> fit_interaction, <span class="at">nested =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+the additive model. For example, ask whether a rater scores particular
+criteria unexpectedly high or low after accounting for the main facet
+effects. <code>estimate_all_bias()</code> screens all non-Person facet
+pairs by default; specify <code>pairs</code> to limit the search. It
+holds the calibration and Person estimates fixed, so these cell shifts
+differ from jointly estimated interaction effects.</p>
+<div class="sourceCode" id="cb28"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" tabindex="-1"></a>ratings <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_bias&quot;</span>)</span>
+<span id="cb28-2"><a href="#cb28-2" tabindex="-1"></a>fit_add <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb28-3"><a href="#cb28-3" tabindex="-1"></a>  ratings, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb28-4"><a href="#cb28-4" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>, <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>, <span class="at">quad_points =</span> <span class="dv">31</span></span>
+<span id="cb28-5"><a href="#cb28-5" tabindex="-1"></a>)</span>
+<span id="cb28-6"><a href="#cb28-6" tabindex="-1"></a>screens <span class="ot">&lt;-</span> <span class="fu">estimate_all_bias</span>(fit_add)</span>
+<span id="cb28-7"><a href="#cb28-7" tabindex="-1"></a>report <span class="ot">&lt;-</span> <span class="fu">mfrm_report</span>(screens, <span class="at">study_context =</span> <span class="fu">c</span>(</span>
+<span id="cb28-8"><a href="#cb28-8" tabindex="-1"></a>  <span class="at">question =</span> <span class="st">&quot;Which rater-criterion cells need substantive review?&quot;</span>,</span>
+<span id="cb28-9"><a href="#cb28-9" tabindex="-1"></a>  <span class="at">score_direction =</span> <span class="st">&quot;Higher coded scores indicate better performance&quot;</span></span>
+<span id="cb28-10"><a href="#cb28-10" tabindex="-1"></a>))</span>
+<span id="cb28-11"><a href="#cb28-11" tabindex="-1"></a>report<span class="sc">$</span>tables<span class="sc">$</span>overview</span>
+<span id="cb28-12"><a href="#cb28-12" tabindex="-1"></a><span class="fu">head</span>(report<span class="sc">$</span>tables<span class="sc">$</span>bias_cells)</span>
+<span id="cb28-13"><a href="#cb28-13" tabindex="-1"></a><span class="fu">plot</span>(screens)</span>
+<span id="cb28-14"><a href="#cb28-14" tabindex="-1"></a><span class="co"># Keep complete tables, including failed pairs and unavailable cells.</span></span>
+<span id="cb28-15"><a href="#cb28-15" tabindex="-1"></a><span class="fu">export_summary_appendix</span>(report, <span class="at">output_dir =</span> <span class="st">&quot;bias-review&quot;</span>)</span></code></pre></div>
+<p>The signed <code>Bias Size</code> describes a shift in expected
+<strong>coded</strong> scores; positive does not necessarily mean
+favorable. Replace the declared direction with your rubric’s actual
+meaning. Report the searched interactions, exclusions, cell counts and
+unavailable results, rather than only flagged cells. The screening
+statistics omit calibration and Person uncertainty and have no
+collection-wide multiplicity control. Different pairs reuse
+observations; their cell counts must not be summed as the study sample
+size. This is a FACETS-like conditional exploration workflow, not a
+claim of identical algorithms, probabilities or calibration conventions.
+See the <a href="https://winsteps.com/facetman/biasestimation.htm">FACETS
+bias-estimation description</a>.</p>
+<p>When the interaction hypothesis is specified in advance, use
+<code>facet_interactions</code> to estimate the named two-way non-person
+facet interaction in the model likelihood. An interaction selected after
+inspecting these screens can also be fitted, but its same-data
+comparison remains exploratory: the LRT p-value does not account for
+that selection.</p>
+<div class="sourceCode" id="cb29"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" tabindex="-1"></a><span class="co"># Continue with ratings and fit_add from the preceding block.</span></span>
+<span id="cb29-2"><a href="#cb29-2" tabindex="-1"></a>fit_interaction <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb29-3"><a href="#cb29-3" tabindex="-1"></a>  ratings,</span>
+<span id="cb29-4"><a href="#cb29-4" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb29-5"><a href="#cb29-5" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb29-6"><a href="#cb29-6" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb29-7"><a href="#cb29-7" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
+<span id="cb29-8"><a href="#cb29-8" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
+<span id="cb29-9"><a href="#cb29-9" tabindex="-1"></a>  <span class="at">facet_interactions =</span> <span class="st">&quot;Rater:Criterion&quot;</span>,</span>
+<span id="cb29-10"><a href="#cb29-10" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">31</span></span>
+<span id="cb29-11"><a href="#cb29-11" tabindex="-1"></a>)</span>
+<span id="cb29-12"><a href="#cb29-12" tabindex="-1"></a></span>
+<span id="cb29-13"><a href="#cb29-13" tabindex="-1"></a><span class="fu">interaction_effect_table</span>(fit_interaction)</span>
+<span id="cb29-14"><a href="#cb29-14" tabindex="-1"></a>comparison <span class="ot">&lt;-</span> <span class="fu">compare_mfrm</span>(<span class="at">Additive =</span> fit_add, <span class="at">Interaction =</span> fit_interaction,</span>
+<span id="cb29-15"><a href="#cb29-15" tabindex="-1"></a>  <span class="at">labels =</span> <span class="fu">c</span>(<span class="st">&quot;Additive&quot;</span>, <span class="st">&quot;Interaction&quot;</span>), <span class="at">nested =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb29-16"><a href="#cb29-16" tabindex="-1"></a>comparison</span>
+<span id="cb29-17"><a href="#cb29-17" tabindex="-1"></a>model_report <span class="ot">&lt;-</span> <span class="fu">mfrm_report</span>(<span class="fu">build_model_choice_review</span>(</span>
+<span id="cb29-18"><a href="#cb29-18" tabindex="-1"></a>  <span class="at">Additive =</span> fit_add, <span class="at">Interaction =</span> fit_interaction</span>
+<span id="cb29-19"><a href="#cb29-19" tabindex="-1"></a>))</span>
+<span id="cb29-20"><a href="#cb29-20" tabindex="-1"></a>model_report<span class="sc">$</span>tables<span class="sc">$</span>comparison_table</span>
+<span id="cb29-21"><a href="#cb29-21" tabindex="-1"></a><span class="co"># The nested LRT remains in comparison$lrt; the review above reports ICs.</span></span></code></pre></div>
 <p>Interpretation:</p>
 <ul>
 <li>Name the facet pair explicitly before fitting.</li>
@@ -500,6 +2080,27 @@ additive MFRM under zero marginal-sum constraints.</li>
 claims.</li>
 <li>Keep this route separate from residual screening with
 <code>estimate_bias()</code>.</li>
+<li>Match observations, score coding, constraints, population
+specification and integration settings. Both example fits use 31 points;
+that is the minimum comparison gate, not proof of sufficient integration
+accuracy. Check stability of likelihood differences and conclusions with
+a finer common grid when needed.</li>
+<li>AIC, BIC and SABIC compare eligible candidate models; BIC uses the
+number of Persons, not rating rows. Ranking and nested-LRT eligibility
+are separate. ConQuest also reports information criteria, but
+cross-software comparisons require matching likelihoods and parameter
+counts, not just table labels. See <a href="https://conquestmanual.acer.org/s4-00.html">ConQuest
+commands</a>.</li>
+<li>Joint RSM/PCM interactions use direct optimization by default. With
+a fixed standard-normal population and fixed quadrature,
+<code>mml_engine = &quot;hybrid&quot;</code> initializes the fit with EM before
+direct finishing; <code>&quot;em&quot;</code> retains the EM solution with its
+common terminal-gradient review. Use <code>mml_starts</code> to examine
+specified initial values, and inspect
+<code>summary(fit)$starting_values</code> and fit readiness before
+comparing models. EM can be slower and does not resolve sparse-design
+identification or insufficient quadrature. The conditional cell screen
+itself is not EM.</li>
 </ul>
 </div>
 <div id="multi-wave-anchor-review" class="section level2">
@@ -513,28 +2114,54 @@ levels have documented cross-wave identity and unchanged meaning.</p>
 <code>ej2021_study2</code> here. They are independent legacy synthetic
 studies; reused raw labels do not identify common persons, raters, or
 anchors and do not link their scales.</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>declared_common_facets <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;Criterion&quot;</span>)</span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a></span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>fit1 <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>  wave1, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span></span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>)</span>
-<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a></span>
-<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>anchored <span class="ot">&lt;-</span> <span class="fu">anchor_to_baseline</span>(</span>
-<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a>  wave2,</span>
-<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a>  fit1,</span>
-<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
-<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
-<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a>  <span class="at">anchor_facets =</span> declared_common_facets</span>
-<span id="cb8-15"><a href="#cb8-15" tabindex="-1"></a>)</span>
-<span id="cb8-16"><a href="#cb8-16" tabindex="-1"></a></span>
-<span id="cb8-17"><a href="#cb8-17" tabindex="-1"></a>fit2 <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
-<span id="cb8-18"><a href="#cb8-18" tabindex="-1"></a>  wave2, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb8-19"><a href="#cb8-19" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span></span>
-<span id="cb8-20"><a href="#cb8-20" tabindex="-1"></a>)</span>
-<span id="cb8-21"><a href="#cb8-21" tabindex="-1"></a>drift <span class="ot">&lt;-</span> <span class="fu">detect_anchor_drift</span>(<span class="fu">list</span>(<span class="at">Wave1 =</span> fit1, <span class="at">Wave2 =</span> fit2))</span>
-<span id="cb8-22"><a href="#cb8-22" tabindex="-1"></a><span class="fu">plot_anchor_drift</span>(drift, <span class="at">type =</span> <span class="st">&quot;drift&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb30"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" tabindex="-1"></a>declared_common_facets <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;Criterion&quot;</span>)</span>
+<span id="cb30-2"><a href="#cb30-2" tabindex="-1"></a></span>
+<span id="cb30-3"><a href="#cb30-3" tabindex="-1"></a>fit1 <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb30-4"><a href="#cb30-4" tabindex="-1"></a>  wave1, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb30-5"><a href="#cb30-5" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span></span>
+<span id="cb30-6"><a href="#cb30-6" tabindex="-1"></a>)</span>
+<span id="cb30-7"><a href="#cb30-7" tabindex="-1"></a></span>
+<span id="cb30-8"><a href="#cb30-8" tabindex="-1"></a>anchored <span class="ot">&lt;-</span> <span class="fu">anchor_to_baseline</span>(</span>
+<span id="cb30-9"><a href="#cb30-9" tabindex="-1"></a>  wave2,</span>
+<span id="cb30-10"><a href="#cb30-10" tabindex="-1"></a>  fit1,</span>
+<span id="cb30-11"><a href="#cb30-11" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb30-12"><a href="#cb30-12" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb30-13"><a href="#cb30-13" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb30-14"><a href="#cb30-14" tabindex="-1"></a>  <span class="at">anchor_facets =</span> declared_common_facets</span>
+<span id="cb30-15"><a href="#cb30-15" tabindex="-1"></a>)</span>
+<span id="cb30-16"><a href="#cb30-16" tabindex="-1"></a></span>
+<span id="cb30-17"><a href="#cb30-17" tabindex="-1"></a>fit2 <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb30-18"><a href="#cb30-18" tabindex="-1"></a>  wave2, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb30-19"><a href="#cb30-19" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span></span>
+<span id="cb30-20"><a href="#cb30-20" tabindex="-1"></a>)</span>
+<span id="cb30-21"><a href="#cb30-21" tabindex="-1"></a>drift <span class="ot">&lt;-</span> <span class="fu">detect_anchor_drift</span>(<span class="fu">list</span>(<span class="at">Wave1 =</span> fit1, <span class="at">Wave2 =</span> fit2),</span>
+<span id="cb30-22"><a href="#cb30-22" tabindex="-1"></a>                           <span class="at">facets =</span> declared_common_facets)</span>
+<span id="cb30-23"><a href="#cb30-23" tabindex="-1"></a><span class="fu">plot</span>(drift, <span class="at">type =</span> <span class="st">&quot;drift&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
+<p>The current drift and chain helpers estimate one pooled offset across
+every selected common element and facet. Their SE ratios do not include
+uncertainty from estimating that offset or cross-fit covariance, and
+cumulative chain offsets have no propagated SE. <code>Offset_SD</code>
+is residual spread rather than an offset standard error. Use one
+coherent linking facet unless a common shift across facet blocks is
+defensible, and treat flags and support counts as review screens rather
+than formal tests or proof of scale equivalence.</p>
+<p>Read <code>OffsetStatus</code> and <code>OffsetReason</code> when an
+offset is missing, and <code>ScreeningFallback</code> to see whether
+preliminary screening rejected every element and the calculation
+reverted to all finite differences. <code>Contributing</code> and
+<code>N_Contributing</code> distinguish elements actually used in the
+offset from those merely retained: when some rows have usable paired
+SEs, retained rows without them do not enter the weighted average. A
+singleton retained set has an undefined sample SD, so
+<code>Offset_SD</code> is missing and <code>OffsetSDStatus</code>
+explains why. Missing flags are reported separately from known flagged
+elements. These states preserve usable point estimates without
+representing unavailable precision as zero.</p>
+<p>Subtracting an estimated offset also changes the residual covariance.
+The displayed SE ratio is therefore not guaranteed to be conservative.
+Consult <code>SERatioStatus</code> and <code>FlagBasis</code>: a
+magnitude-only <code>Flag = FALSE</code> does not mean the element
+passed an SE-ratio check.</p>
 </div>
 <div id="recommended-sequence" class="section level2">
 <h2>Recommended sequence</h2>
@@ -546,7 +2173,7 @@ anchors and do not link their scales.</p>
 <li><code>make_anchor_table()</code> or
 <code>review_mfrm_anchors()</code></li>
 <li><code>analyze_dff()</code></li>
-<li><code>dif_report()</code> and <code>plot_dif_heatmap()</code></li>
+<li><code>dif_report()</code> and <code>plot()</code></li>
 <li><code>interaction_effect_table()</code> after a confirmatory
 <code>facet_interactions</code> fit</li>
 <li><code>anchor_to_baseline()</code> /
@@ -562,6 +2189,82 @@ anchors and do not link their scales.</p>
 <li><code>help(&quot;interaction_effect_table&quot;, package = &quot;mfrmr&quot;)</code></li>
 <li><code>help(&quot;detect_anchor_drift&quot;, package = &quot;mfrmr&quot;)</code></li>
 </ul>
+</div>
+<div id="references" class="section level2">
+<h2>References</h2>
+<ul>
+<li>Myford, C. M., &amp; Wolfe, E. W. (2000). Strengthening the ties
+that bind: Improving the linking network in sparsely connected rating
+designs. <em>ETS Research Report Series</em>, 2000(1).</li>
+<li>Robitzsch, A. (2024). Bias and linking error in fixed item parameter
+calibration. <em>AppliedMath</em>, 4(3), 1181–1191.</li>
+<li>Uto, M. (2021). Accuracy of performance-test linking based on a
+many-facet Rasch model. <em>Behavior Research Methods</em>, 53(4),
+1440–1454.</li>
+<li>Wind, S. A., &amp; Jones, E. (2018). The stabilizing influences of
+linking set size and model–data fit in sparse rater-mediated assessment
+networks. <em>Educational and Psychological Measurement</em>, 78(4),
+679–707.</li>
+</ul>
+</div>
+<div id="optional-explore-rating-assignments" class="section level2">
+<h2>Optional: explore rating assignments</h2>
+<p>There are two different meanings of an anchor. A <strong>common
+person</strong> supplies ratings that connect raters; their ability can
+remain unknown and estimated. A <strong>fixed anchor</strong> supplies a
+known parameter value to <code>fit_mfrm(anchors = ...)</code>. The
+latter is not needed merely because several raters score the same
+person.</p>
+<p>For example, the following existing simulation routes describe three
+practical assignments. Four common persons and eight raters illustrate
+the syntax; they are not recommended minimum counts. The common-person
+example uses more rating rows than the other examples, so this is not an
+equal-budget precision comparison.</p>
+<div class="sourceCode" id="cb31"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
+<span id="cb31-2"><a href="#cb31-2" tabindex="-1"></a></span>
+<span id="cb31-3"><a href="#cb31-3" tabindex="-1"></a>common <span class="ot">&lt;-</span> <span class="fu">build_mfrm_sim_spec</span>(</span>
+<span id="cb31-4"><a href="#cb31-4" tabindex="-1"></a>  <span class="at">n_person =</span> <span class="dv">40</span>, <span class="at">n_rater =</span> <span class="dv">8</span>, <span class="at">n_criterion =</span> <span class="dv">3</span>, <span class="at">raters_per_person =</span> <span class="dv">2</span>,</span>
+<span id="cb31-5"><a href="#cb31-5" tabindex="-1"></a>  <span class="at">assignment =</span> <span class="st">&quot;sparse_linked&quot;</span>,</span>
+<span id="cb31-6"><a href="#cb31-6" tabindex="-1"></a>  <span class="at">sparse_controls =</span> <span class="fu">list</span>(<span class="at">link_persons =</span> <span class="dv">4</span>, <span class="at">link_raters_per_person =</span> <span class="dv">8</span>,</span>
+<span id="cb31-7"><a href="#cb31-7" tabindex="-1"></a>                         <span class="at">assignment_mode =</span> <span class="st">&quot;balanced&quot;</span>)</span>
+<span id="cb31-8"><a href="#cb31-8" tabindex="-1"></a>)</span>
+<span id="cb31-9"><a href="#cb31-9" tabindex="-1"></a>rotating <span class="ot">&lt;-</span> <span class="fu">build_mfrm_sim_spec</span>(</span>
+<span id="cb31-10"><a href="#cb31-10" tabindex="-1"></a>  <span class="at">n_person =</span> <span class="dv">40</span>, <span class="at">n_rater =</span> <span class="dv">8</span>, <span class="at">n_criterion =</span> <span class="dv">3</span>, <span class="at">raters_per_person =</span> <span class="dv">2</span>,</span>
+<span id="cb31-11"><a href="#cb31-11" tabindex="-1"></a>  <span class="at">assignment =</span> <span class="st">&quot;rotating&quot;</span></span>
+<span id="cb31-12"><a href="#cb31-12" tabindex="-1"></a>)</span>
+<span id="cb31-13"><a href="#cb31-13" tabindex="-1"></a>random <span class="ot">&lt;-</span> <span class="fu">build_mfrm_sim_spec</span>(</span>
+<span id="cb31-14"><a href="#cb31-14" tabindex="-1"></a>  <span class="at">n_person =</span> <span class="dv">40</span>, <span class="at">n_rater =</span> <span class="dv">8</span>, <span class="at">n_criterion =</span> <span class="dv">3</span>, <span class="at">raters_per_person =</span> <span class="dv">2</span>,</span>
+<span id="cb31-15"><a href="#cb31-15" tabindex="-1"></a>  <span class="at">assignment =</span> <span class="st">&quot;sparse_linked&quot;</span>,</span>
+<span id="cb31-16"><a href="#cb31-16" tabindex="-1"></a>  <span class="at">sparse_controls =</span> <span class="fu">list</span>(<span class="at">link_persons =</span> <span class="dv">0</span>, <span class="at">assignment_mode =</span> <span class="st">&quot;random&quot;</span>)</span>
+<span id="cb31-17"><a href="#cb31-17" tabindex="-1"></a>)</span>
+<span id="cb31-18"><a href="#cb31-18" tabindex="-1"></a></span>
+<span id="cb31-19"><a href="#cb31-19" tabindex="-1"></a><span class="co"># Use common, rotating, or random here to inspect the chosen assignment.</span></span>
+<span id="cb31-20"><a href="#cb31-20" tabindex="-1"></a>ratings <span class="ot">&lt;-</span> <span class="fu">simulate_mfrm_data</span>(<span class="at">sim_spec =</span> common, <span class="at">seed =</span> <span class="dv">27309</span>)</span>
+<span id="cb31-21"><a href="#cb31-21" tabindex="-1"></a>data_review <span class="ot">&lt;-</span> <span class="fu">describe_mfrm_data</span>(</span>
+<span id="cb31-22"><a href="#cb31-22" tabindex="-1"></a>  ratings, <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>, <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb31-23"><a href="#cb31-23" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>, <span class="at">include_agreement =</span> <span class="cn">FALSE</span></span>
+<span id="cb31-24"><a href="#cb31-24" tabindex="-1"></a>)</span>
+<span id="cb31-25"><a href="#cb31-25" tabindex="-1"></a>data_review<span class="sc">$</span>design_connectivity</span></code></pre></div>
+<p>The common-person design gives four persons all eight raters and the
+other 36 persons two raters each. The rotating and random designs give
+each person two raters. A random draw does not guarantee that all raters
+are connected or equally busy. For actual data, supply the planned
+assignment to <code>describe_mfrm_data(expected_design = ...)</code> to
+distinguish missing assigned ratings from cells that were never
+assigned.</p>
+<p>Eckes’s discussion of rating designs distinguishes distributed
+overlap, a single common examinee, disconnected groups and task-nested
+spiral assignments (2023 edition, Section 9.1, Table 9.1, pp. 151–155).
+The rotating generator here uses the selected raters on all generated
+criteria. Use an explicit <code>design_skeleton</code> for task-specific
+assignments; do not equate ordinary rotation with every spiral design.
+Check model identification as well as graph connections, especially when
+raters are nested within tasks.</p>
+<p>Connectedness means paths exist, not that those paths carry enough
+information. Review reliance on a small linking set, its composition,
+and sensitivity to loss of a linking person or rater. The ability to
+generate a sparse design is not a guarantee that a particular estimator
+or its intervals work well for it.</p>
 </div>
 
 

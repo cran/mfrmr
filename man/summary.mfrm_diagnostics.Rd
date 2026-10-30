@@ -53,13 +53,19 @@ sample- and population-basis modes (paired with \code{precision_profile})
 screen across non-person facets
 \item \code{interrater}: inter-rater agreement / pairwise correlation / rater
 separation overview when a Rater facet is present
-\item \code{misfit_flagged}: rows flagged by the Infit / Outfit / ZSTD
-misfit thresholds active for this fit
+\item \code{misfit_flagged}: rows flagged by the Infit / Outfit mean-square band
+\item \code{fit_screening}: counts of all, classified and unclassified elements for
+the mean-square band and each ZSTD cutoff. Either available statistic
+crossing a cutoff flags the element; otherwise a missing statistic leaves
+it unclassified. Rates require every element to be classified. Nonfinite
+statistics and negative mean squares are unavailable, not passing values.
 \item \code{misfit_thresholds}: named numeric vector with the misfit
 \code{lower} / \code{upper} thresholds used to populate \code{misfit_flagged}
 \item \code{category_usage}: per-category response-frequency summary used
 to flag empty / collapsed categories
-\item \code{top_fit}: top \verb{|ZSTD|} rows
+\item \code{top_fit}: top maximum \verb{|ZSTD|} rows with both statistics available
+\item \code{marginal_coverage}: classified, unclassified and flagged category cells,
+groups and level pairs; counts of available flags do not describe missing results
 \item \code{marginal_fit}: optional strict marginal-fit overview when requested
 \item \code{top_marginal_cells}: largest strict marginal residual cells when requested
 \item \code{marginal_pairwise}: optional strict pairwise local-dependence overview
@@ -100,6 +106,10 @@ what each path means statistically.
 real bounds when available.
 \item \code{top_fit}: highest \verb{|ZSTD|} elements for immediate inspection.
 \item \code{flags}: compact counts for key warning domains.
+\item \code{fit_screening}: available classifications and unclassified elements for
+each mean-square/ZSTD rule. A known threshold crossing remains flagged
+even if the other statistic is missing. Recreate older summaries and
+reports from existing diagnostics; no MFRM refit is required.
 }
 }
 
@@ -115,23 +125,23 @@ before comparing legacy and strict outputs.
 }
 
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-toy <- toy[toy$Person \%in\% unique(toy$Person)[1:4], ]
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
-diag <- diagnose_mfrm(fit, residual_pca = "none")
-s <- summary(diag, top_n = 3)
-s$key_warnings
-# Look for: lines beginning with "MnSq misfit:" name the worst
-#   element + Infit / Outfit values; "Unexpected responses flagged"
-#   counts how many cell-level surprises the screen returned.
-s$top_fit
-# Large absolute standardized values identify rows for follow-up; they do
-# not create a universal accept/reject rule.
-s$facets_chisq
-# Read the fixed-effect chi-square as a heterogeneity screen in the context
-# of the design and intended score use.
-}
+library(mfrmr)
+
+# Saved synthetic MML/RSM analysis of example_operational.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "operational-mml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+
+# Check model fit and the support for standard errors and intervals
+diagnostics <- example_fit$diagnostics
+diagnostic_summary <- summary(diagnostics)
+diagnostic_summary$decision
+
+diagnostic_summary$key_warnings # Issues to investigate, if present
+diagnostic_summary$top_fit      # Most unusual residual-based fit statistics
+
+# Distinguish residual-based checks from marginal model checks
+diagnostic_summary$diagnostic_basis[, c("DiagnosticPath", "Status", "Basis")]
 }
 \seealso{
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=summary.mfrm_fit]{summary.mfrm_fit()}}

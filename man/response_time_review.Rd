@@ -2,6 +2,8 @@
 % Please edit documentation in R/api-response-time.R
 \name{response_time_review}
 \alias{response_time_review}
+\alias{summary.mfrm_response_time_review}
+\alias{plot.mfrm_response_time_review}
 \title{Review response-time patterns outside the MFRM likelihood}
 \usage{
 response_time_review(
@@ -20,6 +22,10 @@ response_time_review(
   slow_rate_warn = 0.25,
   min_n_flag = 3L
 )
+
+\method{summary}{mfrm_response_time_review}(object, top_n = 10L, ...)
+
+\method{plot}{mfrm_response_time_review}(x, type = c("distribution", "person", "facet", "score"), ...)
 }
 \arguments{
 \item{data}{A data.frame in long format with one row per observed rating
@@ -57,11 +63,28 @@ descriptive flag; default 0.25.}
 
 \item{min_n_flag}{Minimum group size before rapid/slow rates are flagged;
 default 3.}
+
+\item{object}{An object returned by \code{\link[=response_time_review]{response_time_review()}}.}
+
+\item{top_n}{Number of top groups to retain in summary previews.}
+
+\item{...}{For \code{plot()}: View-specific controls from \code{\link[=plot_response_time_review]{plot_response_time_review()}}.
+
+For \code{summary()}: Unused.}
+
+\item{x}{A \code{mfrm_response_time_review} object.}
+
+\item{type}{Plot type: \code{"distribution"}, \code{"person"}, \code{"facet"}, or
+\code{"score"}.}
 }
 \value{
 An object of class \code{mfrm_response_time_review}, a list with
 \code{overview}, \code{thresholds}, \code{observations}, \code{person_summary},
 \code{facet_summary}, \code{score_summary}, \code{flags}, and \code{notes}.
+
+For \code{summary()}: A list of class \code{summary.mfrm_response_time_review}.
+
+For \code{plot()}: The existing response-time plot payload. These are descriptive timing summaries.
 }
 \description{
 Build a descriptive response-time review table from the same long-format
@@ -70,6 +93,27 @@ response-time model and does not change MFRM estimates. It summarizes
 response-time distributions, distributional rapid/slow flags, and person /
 facet / score-level response-time patterns for screening and reporting
 context.
+}
+\details{
+Supply one row per timed event. A respondent's production time must not be
+repeated for every rater or criterion that scores that response; rater
+scoring time is a different observation. This helper does not model repeated
+events, censoring or a speed-accuracy relationship.
+
+Numeric factor labels are interpreted as times, not factor codes. Group
+summaries retain \code{InputRows}, valid timed rows (\code{N}) and \code{ExcludedRows}.
+Rates describe valid rows only; groups with no valid times remain present
+with unavailable statistics. Missing facet or score labels are omitted from
+that grouping. Sample quantiles and user-specified cutoffs are descriptive;
+they do not diagnose rapid guessing, effort or rater quality. Equal cutoffs
+can flag the same event in both tails when times are tied. \code{FlaggedGroups}
+counts distinct groups, while \code{Flags} counts rapid/slow rule crossings.
+Recreate older reviews from the original timing data before summary or
+plotting; no MFRM refit is needed.
+
+\code{summary()} method: Summarize a response-time review
+
+\code{plot()} method: Plot a saved response-time review
 }
 \examples{
 toy <- load_mfrmr_data("example_core")
@@ -83,11 +127,13 @@ rt <- response_time_review(
   time = "ResponseTime"
 )
 summary(rt)
-plot_response_time_review(rt, draw = FALSE)
+plot(rt, draw = FALSE)
 }
 \seealso{
-\code{\link[=plot_response_time_review]{plot_response_time_review()}}, \code{\link[=fit_mfrm]{fit_mfrm()}},
+\link[=plot.mfrm_response_time_review]{plot(x)}, \code{\link[=fit_mfrm]{fit_mfrm()}},
 \link{mfrmr_visual_diagnostics}, \code{\link[=mfrmr_output_guide]{mfrmr_output_guide()}}
+
+\code{\link[=response_time_review]{response_time_review()}}, \link{mfrmr_plot_migration}
 }
 \concept{quality control}
 \concept{response time}

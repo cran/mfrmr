@@ -123,6 +123,91 @@ test_that("fit_measures_table preserves df/ZSTD and CI formulas", {
   expect_equal(facets_tbl$OutfitZSTD, facets_tbl$OutfitZSTD_FACETS, tolerance = 1e-12)
 })
 
+test_that("measure uncertainty meaning survives reports, plots and table exports", {
+  for (method in c("JML", "MML")) {
+    fit <- make_toy_fit(method = method, maxit = 200)
+    dx <- make_toy_diagnostics(fit)
+    fm <- fit_measures_table(fit, diagnostics = dx, sort_by = "level", ci_level = .9)
+    key <- paste(fm$table$Facet, fm$table$Level)
+    ix <- match(key, paste(dx$measures$Facet, dx$measures$Level))
+    for (nm in c("SE_Method", "PrecisionTier", "SupportsFormalInference", "SEUse",
+      "CIBasis", "CIUse", "CIEligible", "CILabel", "CI_Method")) {
+      expect_identical(fm$table[[nm]], dx$measures[[nm]][ix])
+    }
+    expect_identical(fm$facets_table$`Interval interpretation`, fm$table$CILabel)
+    expect_identical(fm$facets_table$`SE basis`, fm$table$SE_Method)
+    if (method == "JML") {
+      expect_false(any(fm$table$CIEligible))
+      expect_true(all(fm$table$CIUse == "screening_only"))
+      expect_true(any(grepl("screening only", summary(fm)$notes)))
+    } else expect_true(all(fm$table$CIEligible))
+    partial <- dx; partial$measures$CILabel <- NULL
+    incomplete <- fit_measures_table(partial)
+    expect_false(any(incomplete$table$CIEligible | incomplete$table$SupportsFormalInference))
+    expect_true(all(incomplete$table$PrecisionTier == "unknown"))
+
+    saved <- tempfile(fileext = ".rds"); saveRDS(fm, saved)
+    restored <- readRDS(saved); unlink(saved)
+    p <- plot(restored, type = "measure_ci", ci_level = .8, draw = FALSE)
+    expect_identical(p$data$table$CILabel, fm$table$CILabel)
+    expect_identical(p$data$table$CIEligible, fm$table$CIEligible)
+    expect_equal(p$data$table$CI_Level, rep(.8, nrow(fm$table)))
+    expect_match(p$data$title, "normal bands")
+    expect_identical(p$data$caption, fit_measure_interval_note(fm$table))
+    silent <- plot(restored, type = "measure_ci", show_notes = FALSE, main = "", draw = FALSE)
+    expect_identical(silent$data$title, "")
+    expect_false(silent$data$display$show_notes)
+    expect_identical(silent$data$caption, p$data$caption)
+    expect_error(plot(restored, type = "measure_ci", show_notes = NA, draw = FALSE), "show_notes")
+    tables <- build_summary_table_bundle(restored, which = c("table", "facets_table", "notes"))
+    expect_identical(tables$tables$table$CIUse, fm$table$CIUse)
+    csv <- tempfile(fileext = ".csv")
+    utils::write.csv(tables$tables$table, csv, row.names = FALSE)
+    expect_identical(utils::read.csv(csv)$CILabel, fm$table$CILabel)
+    unlink(csv)
+    if (method == "JML") {
+      directory <- tempfile("interval-export-")
+      exported <- export_summary_appendix(tables, output_dir = directory)
+      files <- exported$written_files
+      table_file <- files$Path[grepl("mfrm_fit_measures_table\\.csv$", files$Path)]
+      expect_length(table_file, 1L)
+      expect_identical(utils::read.csv(table_file)$CIUse, fm$table$CIUse)
+      html <- readLines(files$Path[files$Format == "html"], warn = FALSE)
+      expect_true(any(grepl("screening only", html, fixed = TRUE)))
+      unlink(directory, recursive = TRUE)
+    }
+  }
+})
+
+test_that("unknown interval provenance is not promoted and finite fixed values remain visible", {
+  fit <- make_toy_fit(maxit = 200)
+  dx <- make_toy_diagnostics(fit)
+  dx$measures[c("SE_Method", "PrecisionTier", "SupportsFormalInference", "SEUse",
+    "CIBasis", "CIUse", "CIEligible", "CILabel", "CI_Method")] <- NULL
+  fm <- fit_measures_table(dx)
+  expect_false(any(fm$table$CIEligible))
+  expect_true(all(fm$table$PrecisionTier == "unknown"))
+  expect_true(any(grepl("not recorded", summary(fm)$notes)))
+  expect_match(plot(fm, type = "measure_ci", draw = FALSE)$data$caption, "not recorded")
+  fm$table$SE[1] <- NA_real_
+  missing <- plot(fm, type = "measure_ci", draw = FALSE)
+  expect_match(missing$data$caption, "Crosses: no interval")
+  expect_equal(missing$data$table$Measure, fm$table$Measure)
+
+  # Older or externally assembled tables may retain zero SEs for constants.
+  fm$table$Fixed <- TRUE; fm$table$SE <- 0
+  fm$table$CILabel <- "Fixed value; no sampling interval"
+  p <- plot(fm, type = "measure_ci", draw = FALSE)
+  expect_equal(nrow(p$data$table), nrow(fm$table))
+  expect_true(all(is.na(p$data$table$CI_Lower) & is.na(p$data$table$CI_Upper)))
+  expect_match(p$data$caption, "Open diamonds")
+  path <- tempfile(fileext = ".pdf"); grDevices::pdf(path)
+  old <- graphics::par("mar")
+  plot(fm, type = "measure_ci")
+  expect_equal(graphics::par("mar"), old)
+  grDevices::dev.off(); expect_gt(file.info(path)$size, 0); unlink(path)
+})
+
 test_that("fit status, subsets, and threshold-profile rates are self-consistent", {
   fit <- make_toy_fit(maxit = 12)
   diag <- diagnose_mfrm(fit, residual_pca = "none", fit_df_method = "both")
@@ -132,6 +217,7 @@ test_that("fit status, subsets, and threshold-profile rates are self-consistent"
     include_person = FALSE,
     fit_df_method = "both",
     threshold_profiles = "all",
+    flag_basis = "mnsq_or_zstd",
     top_n = Inf
   )
   tbl <- as.data.frame(fm$table, stringsAsFactors = FALSE)

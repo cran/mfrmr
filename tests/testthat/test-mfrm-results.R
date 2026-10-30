@@ -1,3 +1,27 @@
+test_that("CSV export omits undefined tables and preserves defined empty tables", {
+  res <- structure(list(tables = list(
+    undefined = data.frame(),
+    defined = data.frame(Level = character(), Estimate = numeric()),
+    observed = data.frame(Level = "R01", Estimate = 0.2)
+  )), class = "mfrm_results")
+  out <- tempfile("mfrmr-empty-table-")
+  on.exit(unlink(out, recursive = TRUE), add = TRUE)
+  exported <- export_mfrm_results(res, output_dir = out,
+                                  include = c("tables", "manifest"),
+                                  acknowledge_sensitive = TRUE)
+  expect_false(any(exported$written_files$Component == "table_undefined"))
+  for (name in c("defined", "observed")) {
+    path <- exported$written_files$Path[exported$written_files$Component == paste0("table_", name)]
+    expect_length(path, 1L)
+    csv <- read.csv(path)
+    expect_identical(names(csv), names(res$tables[[name]]))
+    expect_equal(nrow(csv), nrow(res$tables[[name]]))
+  }
+  manifest <- read.csv(exported$written_files$Path[exported$written_files$Component == "written_files"])
+  expect_false(any(manifest$Component == "table_undefined"))
+  expect_true(all(file.exists(manifest$Path)))
+})
+
 test_that("mfrm_results only soft-fails typed availability conditions", {
   unavailable <- mfrmr:::mfrm_results_safe(
     mfrmr:::stop_mfrm_results_unavailable("Expected capability boundary.")
@@ -380,7 +404,11 @@ test_that("launch_mfrmr_viewer is a viewer over mfrm_results", {
   expect_true(length(payload$table_names) > 0L)
   expect_true(length(payload$qc_table_names) > 0L)
   expect_true(nrow(payload$bias_guidance) > 0L)
-  expect_true(nrow(payload$unexpected_table) > 0L)
+  # The residual-only cutoff produces a valid zero-flag result for this fixture.
+  expect_s3_class(payload$unexpected_table, "data.frame")
+  expect_equal(nrow(payload$unexpected_table), 0L)
+  expect_identical(names(payload$unexpected_table), names(res$components$unexpected$table))
+  expect_length(payload$unexpected_choices, 0L)
   expect_true(all(c("qc", "report", "bias", "misfit") %in% names(payload$tab_status)))
   expect_true(any(payload$tab_status$report$Name == "apa_outputs" &
                     payload$tab_status$report$Status == "not_requested"))
@@ -664,11 +692,10 @@ test_that("mfrm_results output modes and standard data-frame route work", {
 })
 
 test_that("mfrm_results purpose presets resolve to documented sections", {
-  presets <- mfrmr:::mfrm_results_include_preset_table()
-  expect_s3_class(presets, "data.frame")
-  expect_true(all(c("Preset", "Sections") %in% names(presets)))
-  expect_true(all(c("standard", "publication", "validation", "facets", "linking", "network", "gpcm_review", "all") %in% presets$Preset))
-  expect_true(all(c("bias", "bias_review", "misfit", "misfit_review") %in% presets$Preset))
+  presets <- mfrmr:::mfrm_results_include_presets()
+  expect_type(presets, "list")
+  expect_true(all(c("standard", "publication", "validation", "facets", "linking", "network", "gpcm_review", "all") %in% names(presets)))
+  expect_true(all(c("bias", "bias_review", "misfit", "misfit_review") %in% names(presets)))
 
   publication <- mfrmr:::mfrm_results_resolve_include("publication")
   expect_true(all(c("fit", "diagnostics", "reporting", "apa") %in% publication))

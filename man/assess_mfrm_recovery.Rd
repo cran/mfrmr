@@ -32,7 +32,7 @@ assess_mfrm_recovery(
 }
 \arguments{
 \item{x}{For \code{assess_mfrm_recovery()}, output from
-\code{\link[=evaluate_mfrm_recovery]{evaluate_mfrm_recovery()}}. For \code{plot.mfrm_recovery_assessment()}, output
+\code{\link[=simulate_mfrm_recovery]{simulate_mfrm_recovery()}}. For \code{plot.mfrm_recovery_assessment()}, output
 from \code{assess_mfrm_recovery()}.}
 
 \item{min_reps}{Minimum replication count expected before treating the
@@ -44,8 +44,10 @@ generated data and produced a fitted model.}
 \item{min_convergence_rate}{Minimum acceptable proportion of replications
 whose fitted model reported convergence.}
 
-\item{min_se_available}{Minimum acceptable proportion of recovery rows with
-standard errors in each parameter group. Set to \code{NULL} to skip this check.}
+\item{min_se_available}{Minimum acceptable proportion of all expected targets
+with matching structural standard errors in each parameter group, including
+targets in failed fits. Unknown target counts give \code{not_available}.
+Set to \code{NULL} to skip this check.}
 
 \item{coverage_target}{Nominal coverage target, usually \code{0.95}.}
 
@@ -59,13 +61,16 @@ groups or a named vector/list with names such as \code{"facet"}, \code{"step"},
 \code{"slope"}, \code{"Rater"}, or \code{"facet:Rater:logit"}.}
 
 \item{max_abs_bias}{Optional practical absolute-bias limit. Naming follows
-\code{max_rmse}.}
+\code{max_rmse}. Mean-aligned location groups and complete identified log-slope
+blocks have zero average bias by construction and remain \code{not_assessed}.}
 
 \item{top_n}{Number of next-action lines retained in the compact output.}
 
 \item{digits}{Digits used by the print method.}
 
-\item{...}{Reserved for generic compatibility.}
+\item{...}{For \code{assess_mfrm_recovery()}, unused arguments must be empty;
+unknown assessment options are rejected rather than silently ignored.
+For the plot method, reserved for S3 generic compatibility.}
 
 \item{y}{Reserved for S3 generic compatibility.}
 
@@ -84,17 +89,18 @@ An object of class \code{mfrm_recovery_assessment} with:
 \itemize{
 \item \code{overview}: compact run-level status.
 \item \code{checklist}: reviewer-facing adequacy checks.
-\item \code{condition_review}: generator-condition metadata, including bounded
+\item \code{condition_review}: generator-condition metadata, including
 \code{GPCM} slope-regime interpretation and generated score-category support
 when available.
 \item \code{condition_reporting_notes}: reporter-facing generator-condition caveats
 separated from parameter-recovery conclusions.
 \item \code{diagnostic_reporting_notes}: reporter-facing fit/separation caveats
-retained as diagnostic context rather than recovery gates.
+retained as diagnostic context rather than recovery criteria.
 \item \code{diagnostic_review}: optional fit/separation operating-characteristic
-context when retained by \code{\link[=evaluate_mfrm_recovery]{evaluate_mfrm_recovery()}}.
+context when retained by \code{\link[=simulate_mfrm_recovery]{simulate_mfrm_recovery()}}.
 \item \code{metric_review}: parameter-group metric checks.
-\item \code{uncertainty_review}: compact coverage / SE availability interpretation.
+\item \code{uncertainty_review}: coverage / SE availability interpretation with
+expected/available counts, coverage MCSE and unavailable reasons.
 \item \code{reading_order}: recommended first-read order for the summary, condition,
 plot, and row-level recovery outputs.
 \item \code{next_actions}: short action list sorted by severity.
@@ -102,13 +108,15 @@ plot, and row-level recovery outputs.
 }
 }
 \description{
-Converts the numerical output from \code{\link[=evaluate_mfrm_recovery]{evaluate_mfrm_recovery()}} into a
+Converts the numerical output from \code{\link[=simulate_mfrm_recovery]{simulate_mfrm_recovery()}} into a
 reviewer-facing adequacy checklist. The goal is not to impose one universal
 pass/fail rule; it is to make the main user questions explicit: Did the runs
 finish? Did the fitted models converge? Are uncertainty summaries available?
 Are coverage and Monte Carlo precision plausible? If practical RMSE or bias
-limits are supplied, which parameter groups need follow-up? For bounded
+limits are supplied, which parameter groups need follow-up? For
 \code{GPCM}, which slope-regime generator condition frames the recovery evidence?
+This only reads an existing simulation result. It does not generate data,
+refit models, add replications or repair unavailable uncertainty estimates.
 }
 \details{
 RMSE and bias adequacy depends on the substantive scale and the use case, so
@@ -116,9 +124,21 @@ the function does not mark them as failed unless the user supplies
 \code{max_rmse} or \code{max_abs_bias}. Without those limits, the corresponding rows are
 marked \code{not_assessed} and the next action asks the user to set practical
 thresholds when a decision depends on the metric.
+\code{BiasBasis} explains groups whose mean bias is fixed at zero by identification;
+even a supplied bias limit cannot turn that identity into recovery evidence.
+Threshold names are matched from the most specific group to its type or
+\code{default}; see \code{max_rmse} for examples.
+
+Metrics are recomputed from row-level evidence. Coverage is conditional on
+the available centered facet intervals, not all planned targets.
+\code{uncertainty_review} retains counts, \code{CoverageAvailabilityRate},
+\code{McseCoverage95} and \code{CIReasons} alongside its descriptive checklist.
+See \code{\link[=simulate_mfrm_recovery]{simulate_mfrm_recovery()}} for the estimands, independent-trial MCSE,
+unsupported interval groups and handling of legacy saved results. Checklist
+tolerances do not replace the Monte Carlo uncertainty or qualify an estimator.
 
 The \code{condition_review} table is generator metadata for interpreting the
-recovery run. For bounded \code{GPCM}, \code{GPCMSlopeRegime}, \code{StressLevel}, and
+recovery run. For \code{GPCM}, \code{GPCMSlopeRegime}, \code{StressLevel}, and
 generated score-category support describe the data-generating condition;
 they are not model-fit tests and they are not literature-derived adequacy
 cut points. \code{condition_reporting_notes} turns those generator conditions
@@ -126,13 +146,13 @@ into reporter-facing caveats, such as high-dispersion slope stress or sparse
 generated score support.
 
 The optional \code{diagnostic_review} table is available when
-\code{\link[=evaluate_mfrm_recovery]{evaluate_mfrm_recovery()}} was called with \code{include_diagnostics = TRUE}.
+\code{\link[=simulate_mfrm_recovery]{simulate_mfrm_recovery()}} was called with \code{include_diagnostics = TRUE}.
 It summarizes fit and separation operating characteristics as diagnostic
 context only. Its availability fields do not mean that fit or separation
 values are adequate, and those rows do not enter the recovery adequacy
 status. \code{diagnostic_reporting_notes} should be read first when drafting
 fit/separation language because it separates zero separation/reliability,
-absolute fit-ZSTD flags, and df-sensitive ZSTD flags from recovery gates.
+absolute fit-ZSTD flags, and df-sensitive ZSTD flags from recovery criteria.
 
 \code{plot.mfrm_recovery_assessment()} is a user-facing review aid. Use
 \code{type = "status"} first to see where checklist attention is needed, then
@@ -148,8 +168,10 @@ user-facing plot tables such as \code{section_status} for status plots and
 \code{metric_review} for metric plots.
 }
 \examples{
-\donttest{
-rec <- evaluate_mfrm_recovery(
+# Long-running workflow; run explicitly when needed.
+# example("assess_mfrm_recovery", run.dontrun = TRUE)
+\dontrun{
+rec <- simulate_mfrm_recovery(
   n_person = 12,
   n_rater = 2,
   n_criterion = 2,
@@ -159,7 +181,7 @@ rec <- evaluate_mfrm_recovery(
 )
 assess_mfrm_recovery(rec, min_reps = 1, max_rmse = 1)
 
-# Read the bounded-GPCM generator condition separately from recovery adequacy.
+# Read the GPCM generator condition separately from recovery adequacy.
 gpcm_spec <- build_mfrm_sim_spec(
   n_person = 14,
   n_rater = 2,
@@ -171,7 +193,7 @@ gpcm_spec <- build_mfrm_sim_spec(
   slopes = c(0.85, 1.15),
   assignment = "crossed"
 )
-gpcm_rec <- suppressWarnings(evaluate_mfrm_recovery(
+gpcm_rec <- suppressWarnings(simulate_mfrm_recovery(
   sim_spec = gpcm_spec,
   reps = 1,
   fit_method = "MML",
@@ -202,5 +224,5 @@ summary(gpcm_review)$reading_order
 }
 }
 \seealso{
-\code{\link[=evaluate_mfrm_recovery]{evaluate_mfrm_recovery()}}, \code{\link[=plot.mfrm_recovery_simulation]{plot.mfrm_recovery_simulation()}}
+\code{\link[=simulate_mfrm_recovery]{simulate_mfrm_recovery()}}, \code{\link[=plot.mfrm_recovery_simulation]{plot.mfrm_recovery_simulation()}}
 }

@@ -4,13 +4,12 @@
 
 # ---- Minimal viable data ----
 
-test_that("fit_mfrm succeeds with minimal viable data", {
-  # Minimum data guard (0.1.6 polish) requires >= 10 observations.
-  # Original test used 8 obs; extend to 10 (5 persons x 2 raters).
+test_that("fit_mfrm succeeds with eight informative ratings", {
+  # Eight rows have a finite paired-binary JML solution.
   d <- data.frame(
-    Person = rep(c("P1", "P2", "P3", "P4", "P5"), each = 2),
-    Rater = rep(c("R1", "R2"), 5),
-    Score = c(0, 1, 1, 0, 0, 1, 1, 0, 0, 1)
+    Person = rep(c("P1", "P2", "P3", "P4"), each = 2),
+    Rater = rep(c("R1", "R2"), 4),
+    Score = c(1, 0, 1, 0, 1, 0, 0, 1)
   )
   fit <- suppressWarnings(
     fit_mfrm(d, "Person", "Rater", "Score", method = "JML", maxit = 30)
@@ -18,13 +17,13 @@ test_that("fit_mfrm succeeds with minimal viable data", {
   expect_s3_class(fit, "mfrm_fit")
   expect_true(is.data.frame(fit$summary))
   expect_true("Estimate" %in% names(fit$facets$others))
+  expect_equal(unname(fit$facets$others$Estimate), c(-log(3), log(3)), tolerance = 1e-6)
 })
 
 # ---- NA values dropped gracefully ----
 
 test_that("fit_mfrm drops NA rows and still fits", {
-  # Extended to clear the >= 10 observation guard introduced in 0.1.6
-  # while still exercising NA-row dropping.
+  # Preserve the incomplete response roster while dropping unusable rows.
   d <- data.frame(
     Person = c("P1", "P2", "P3", "P4", NA, "P5", "P6",
                "P1", "P2", "P3", "P4", "P5", "P6"),
@@ -148,8 +147,7 @@ test_that("diagnose_mfrm with PCA produces eigenvalue output", {
 # ---- describe_mfrm_data ----
 
 test_that("describe_mfrm_data works with minimal data", {
-  # Extended to clear the >= 10 observation guard from 0.1.6 while
-  # keeping the "minimal" spirit of the original test.
+  # Both raters use all three categories in this small descriptive example.
   d <- data.frame(
     Person = rep(c("P1", "P2", "P3", "P4", "P5"), 2),
     Rater = rep(c("R1", "R2"), each = 5),

@@ -51,7 +51,7 @@ test_that("visual_reporting_template returns beginner-oriented figure guidance",
   expect_true("Response-time review" %in% tbl$FigureFamily)
   expect_match(
     tbl$PrimaryHelper[tbl$FigureFamily == "Response-time review"][1],
-    "plot_response_time_review",
+    "plot(timing",
     fixed = TRUE
   )
   expect_match(
@@ -101,7 +101,7 @@ test_that("mfrmr_interval_guide maps CI-capable routes and filters scopes", {
     "GPCMStatus", "Notes"
   ) %in% names(guide)))
   expect_true(nrow(guide) >= 15L)
-  expect_true(all(guide$DefaultLevel == 0.95))
+  expect_true(all(guide$DefaultLevel[!is.na(guide$DefaultLevel)] == 0.95))
   expect_true(any(grepl("show_ci = TRUE", guide$PrimaryHelper, fixed = TRUE)))
   expect_true(any(grepl("ci_level = 0.95", guide$PrimaryHelper, fixed = TRUE)))
   expect_true(any(grepl("delta-method", guide$Basis, fixed = TRUE)))
@@ -110,7 +110,7 @@ test_that("mfrmr_interval_guide maps CI-capable routes and filters scopes", {
                         guide$InterpretationBoundary,
                         fixed = TRUE)))
   guide_text <- paste(unlist(guide, use.names = FALSE), collapse = "\n")
-  expect_true(grepl("plot_shrinkage_funnel(..., show_ci = TRUE, ci_level = 0.95)",
+  expect_true(grepl("plot(..., type = \"shrinkage\", view = \"funnel\", show_ci = TRUE, ci_level = 0.95)",
                     guide_text, fixed = TRUE))
   expect_true(grepl("plot(fit, type = \"shrinkage\", show_ci = TRUE, ci_level = 0.95)",
                     guide_text, fixed = TRUE))
@@ -120,16 +120,16 @@ test_that("mfrmr_interval_guide maps CI-capable routes and filters scopes", {
     "compute_facet_icc",
     "fair_average_table",
     "fit_measures_table",
-    "plot_anchor_drift",
-    "plot_apa_figure_one",
-    "plot_bias_interaction",
-    "plot_dif_summary",
-    "plot_displacement",
-    "plot_fair_average",
-    "plot_shrinkage_funnel",
-    "plot_rater_severity_profile",
-    "plot_rater_trajectory",
-    "plot_wright_unified"
+    "plot(drift, type = \"forest\"",
+    "type = \"apa_summary\"",
+    "type = \"bias\"",
+    "type = \"summary\"",
+    "type = \"displacement\"",
+    "type = \"fair_average\"",
+    "view = \"funnel\"",
+    "type = \"rater_severity\"",
+    "type = \"trajectory\"",
+    "view = \"unified\""
   )
   for (helper in ci_public_helpers) {
     expect_true(grepl(helper, guide_text, fixed = TRUE), info = helper)
@@ -146,12 +146,31 @@ test_that("mfrmr_interval_guide maps CI-capable routes and filters scopes", {
   gpcm <- mfrmr_interval_guide("gpcm")
   expect_true(nrow(gpcm) > 0L)
   expect_true(all(grepl("(^|,)gpcm(,|$)", gpcm$Scope)))
-  expect_true(any(grepl("bounded GPCM", gpcm$Notes, fixed = TRUE)))
-  expect_true(any(gpcm$Route == "DFF / DIF contrast summary" &
+  expect_true(any(grepl("GPCM", gpcm$Notes, fixed = TRUE)))
+  expect_true(any(gpcm$Route == "Group contrast summary" &
                     gpcm$GPCMStatus == "supported_with_caveat"))
   expect_true(any(gpcm$Route == "Anchor drift forest plot" &
                     grepl("linking synthesis supported_with_caveat",
                           gpcm$GPCMStatus, fixed = TRUE)))
   expect_true(any(grepl("screening evidence", gpcm$InterpretationBoundary,
                         fixed = TRUE)))
+})
+
+test_that("the interval guide separates GPCM targets and uncertainty-only output", {
+  guide <- mfrmr_interval_guide("gpcm")
+  routes <- c("Fixed-facet model/sandwich intervals", "GPCM relative-slope intervals",
+    "GMFRM component-slope intervals", "GPCM slope profile intervals",
+    "Corrected-JML local root uncertainty")
+  expect_true(all(routes %in% guide$Route))
+  expect_false(anyDuplicated(guide$Route) > 0L)
+  selected <- guide[match(routes, guide$Route), ]
+  expect_match(selected$GPCMStatus[1], "supported_with_caveat one-family MML locations")
+  expect_match(selected$GPCMStatus[1], "experimental two-family")
+  expect_match(selected$GPCMStatus[2], "one-family GPCM MML only")
+  expect_match(selected$IntervalColumns[3], "CoverageQualified")
+  expect_match(selected$PrimaryHelper[4], 'method = "profile"', fixed = TRUE)
+  expect_match(selected$InterpretationBoundary[4], "unresolved side")
+  expect_true(is.na(selected$DefaultLevel[5]))
+  expect_match(selected$IntervalColumns[5], "no structural Lower or Upper")
+  expect_false(routes[5] %in% mfrmr_interval_guide("visual")$Route)
 })

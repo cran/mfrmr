@@ -20,6 +20,6 @@ from the native uncertainty-aware Wright map.
 facets_visual_contract()
 }
 \seealso{
-\code{\link[=plot_wright_unified]{plot_wright_unified()}}, \code{\link[=plot_data]{plot_data()}}, \code{\link[=facets_term_crosswalk]{facets_term_crosswalk()}},
+\link[=plot.mfrm_fit]{plot(x, type = "wright", view = "unified")}, \code{\link[=plot_data]{plot_data()}}, \code{\link[=facets_term_crosswalk]{facets_term_crosswalk()}},
 \code{\link[=facets_feature_coverage]{facets_feature_coverage()}}
 }

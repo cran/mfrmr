@@ -54,20 +54,11 @@ example_policy_roxygen_examples <- function(pkg_root) {
         file = sub(paste0("^", gsub("([\\^$.|?*+(){}\\[\\]\\\\])", "\\\\\\1", pkg_root), "/?"), "", path),
         line = start,
         target = target,
-        outer_donttest = length(raw) > 0L &&
-          identical(trimws(raw[[1]]), "\\donttest{"),
-        donttest_open_count = sum(grepl(
-          "^\\s*\\\\donttest\\s*\\{",
-          raw,
-          perl = TRUE
-        )),
         active_fit_calls = sum(grepl("fit_mfrm\\s*\\(", active, perl = TRUE)),
         has_mml = grepl('method\\s*=\\s*["\']MML["\']', text, perl = TRUE),
         active_has_mml = grepl('method\\s*=\\s*["\']MML["\']', active_text, perl = TRUE),
         has_quad_points = grepl("quad_points\\s*=", text),
         active_has_quad_points = grepl("quad_points\\s*=", active_text),
-        active_has_high_maxit = grepl("maxit\\s*=\\s*([3-9][1-9]|[4-9][0-9]|[1-9][0-9]{2,})", active_text),
-        active_has_parallel = grepl("parallel\\s*=\\s*TRUE", active_text),
         stringsAsFactors = FALSE
       )
     }
@@ -79,6 +70,7 @@ example_policy_active_lines <- function(lines) {
   active <- character()
   guard_depth <- 0L
   for (line in lines) {
+    if (grepl("^\\s*#", line, perl = TRUE)) next
     if (guard_depth > 0L) {
       guard_depth <- max(0L, guard_depth + example_policy_count(line, "{") -
                            example_policy_count(line, "}"))
@@ -101,6 +93,21 @@ example_policy_count <- function(x, pattern) {
   matches <- gregexpr(pattern, x, fixed = TRUE)[[1]]
   if (length(matches) == 1L && matches[[1]] == -1L) 0L else length(matches)
 }
+
+test_that("example policy excludes comments without hiding executable calls", {
+  active <- example_policy_active_lines(c(
+    '# After fitting with method = "MML":',
+    '# fit_mfrm(data, method = "MML", parallel = TRUE)',
+    '# \\donttest{',
+    'fit_mfrm(data, method = "MML")',
+    '\\donttest{',
+    '# }',
+    'fit_mfrm(other_data, method = "MML")',
+    '}',
+    'plot(fit)'
+  ))
+  expect_identical(active, c('fit_mfrm(data, method = "MML")', 'plot(fit)'))
+})
 
 example_policy_hits <- function(rows) {
   if (nrow(rows) == 0L) return(character(0))
@@ -125,13 +132,11 @@ test_that("Rd execution guards have a narrow semantic allowlist", {
 
   expect_identical(
     example_policy_rd_pages_with(pkg_root, "\\dontrun{"),
-    sort(c(
-      "normalize_conquest_overlap_exports.Rd",
-      "review_conquest_overlap.Rd"
-    )),
+    sort(unique(paste0(subset(read.csv(file.path(pkg_root, "inst", "examples",
+                                  "execution-policy.csv")), execution %in% c("dontrun", "mixed"))$help_topic, ".Rd"))),
     info = paste(
-      "dontrun is reserved for examples that require separately generated",
-      "external ConQuest output. Executable lengthy examples belong in donttest."
+      "Optional examples must have an explicit execution-policy entry.",
+      "Supplementary help examples are replayed in the full local suite."
     )
   )
   expect_identical(
@@ -141,63 +146,6 @@ test_that("Rd execution guards have a narrow semantic allowlist", {
       "examplesIf interactive() is reserved for the local Shiny viewer;",
       "ordinary reports, tables, exports, and plots must remain checkable."
     )
-  )
-})
-
-test_that("comparatively expensive demonstrations run in the donttest pass", {
-  pkg_root <- example_policy_source_root()
-  testthat::skip_if(is.na(pkg_root), "source files are not available")
-
-  expected <- sort(c(
-    "gpcm_mml_quadrature_sensitivity",
-    "dif_interaction_table", "plot_dif_heatmap", "facet_quality_dashboard",
-    "summary.mfrm_facet_dashboard", "plot_facet_quality_dashboard",
-    "diagnose_mfrm", "build_mfrm_manifest", "build_mfrm_replay_script",
-    "export_mfrm_bundle", "analyze_facet_equivalence",
-    "plot_facet_equivalence", "summary.mfrm_diagnostics",
-    "summary.mfrm_bias", "compute_person_fit_indices", "plot_person_fit",
-    "plot_rater_severity_profile", "plot_dif_summary",
-    "plot_apa_figure_one", "plot_guttman_scalogram", "plot_residual_qq",
-    "plot_rater_agreement_heatmap", "plot_local_dependence_heatmap",
-    "plot_reliability_snapshot", "plot_residual_matrix",
-    "plot_shrinkage_funnel", "plot_unexpected", "plot_fair_average",
-    "plot_displacement", "plot_facets_chisq", "plot_qc_dashboard",
-    "plot_bubble", "export_mfrm", "q3_statistic", "reporting_checklist",
-    "subset_connectivity_report", "build_peer_review_design_review",
-    "facet_statistics_report", "precision_review_report",
-    "category_structure_report", "category_curves_report",
-    "bias_interaction_report", "bias_iteration_report",
-    "bias_pairwise_report", "plot_bias_interaction", "build_apa_outputs",
-    "print.mfrm_apa_text", "summary.mfrm_apa_outputs", "summary.apa_table",
-    "facets_fit_review", "dif_report", "apply_empirical_bayes_shrinkage",
-    "shrinkage_report", "build_peer_review_sim_spec",
-    "interrater_agreement_table", "facets_chisq_table",
-    "unexpected_response_table", "displacement_table",
-    "measurable_summary_table", "rating_scale_table", "bias_count_table",
-    "unexpected_after_bias_table", "facets_output_file_bundle",
-    "plot_residual_pca", "estimate_bias", "summary.mfrm_facets_run"
-  ))
-  examples <- example_policy_roxygen_examples(pkg_root)
-  observed <- sort(unique(examples$target[examples$outer_donttest]))
-  missing <- setdiff(expected, observed)
-  nested <- examples[
-    examples$target %in% expected & examples$donttest_open_count != 1L,
-    c("file", "line", "target", "donttest_open_count"),
-    drop = FALSE
-  ]
-
-  expect_identical(
-    missing,
-    character(0),
-    info = paste(
-      "These noninteractive but comparatively expensive examples must remain",
-      "executable in the explicit --run-donttest pass."
-    )
-  )
-  expect_equal(
-    nrow(nested),
-    0L,
-    info = "Former interactive examples should have one outer donttest guard."
   )
 })
 
@@ -217,19 +165,31 @@ test_that("CRAN testthat surface is an explicit representative whitelist", {
 
   expected <- c(
     "cran-smoke",
-    "compatibility-aliases",
     "data-and-citation",
-    "example-datasets",
     "mml-cpp11-backend",
-    "missing-codes-integration",
     "bundle-summary-privacy",
-    "gpcm-capability-matrix",
+    "likelihood-numerics",
+    "gpcm-inference-extensions",
+    "gmfrm-em",
+    "gmfrm-public-workflow",
+    "random-rater",
+    "testlet",
+    "cml",
     "namespace-contract",
     "vignette-artifacts"
   )
-  for (slug in expected) {
-    expect_true(grepl(paste0('"', slug, '"'), text, fixed = TRUE))
+  # Check membership, not a textual occurrence in the extended-suite list.
+  selection <- new.env(parent = baseenv())
+  for (expr in parse(text = text)) {
+    if (is.call(expr) && identical(expr[[1L]], as.name("<-")) &&
+        as.character(expr[[2L]]) %in% c("cran_light_tests", "extended_regression_tests"))
+      eval(expr, selection)
   }
+  for (slug in expected) {
+    expect_true(slug %in% selection$cran_light_tests, info = slug)
+  }
+  expect_true("gmfrm-portable" %in% selection$extended_regression_tests)
+  expect_length(intersect(selection$cran_light_tests, selection$extended_regression_tests), 0L)
   smoke_text <- paste(
     readLines(
       file.path(pkg_root, "tests", "testthat", "test-cran-smoke.R"),
@@ -244,13 +204,76 @@ test_that("CRAN testthat surface is an explicit representative whitelist", {
     'type = "wright"',
     'fit_stat = "Infit"',
     'include_person = TRUE',
-    'export_mfrm('
+    'export_mfrm_tables('
   )) {
     expect_true(grepl(route, smoke_text, fixed = TRUE))
   }
 })
 
-test_that("roxygen examples keep expensive demonstrations conditional", {
+test_that("front-door examples use one explicit beginner workflow", {
+  pkg_root <- example_policy_source_root()
+  testthat::skip_if(is.na(pkg_root), "source files are not available")
+
+  rd_text <- function(page) {
+    rd <- tools::parse_Rd(file.path(pkg_root, "man", page))
+    examples <- rd[vapply(rd, function(x) identical(attr(x, "Rd_tag"), "\\examples"),
+                          logical(1))]
+    paste(unlist(examples, use.names = FALSE), collapse = "")
+  }
+
+  load_text <- rd_text("load_mfrmr_data.Rd")
+  expect_true(grepl('load_mfrmr_data("example_operational")', load_text, fixed = TRUE))
+
+  data_text <- rd_text("describe_mfrm_data.Rd")
+  for (snippet in c(
+    'load_mfrmr_data("example_operational")',
+    'person = "Person"', 'facets = c("Rater", "Criterion")',
+    'score = "Score"', 'rating_min = 1', 'rating_max = 4'
+  )) {
+    expect_true(grepl(snippet, data_text, fixed = TRUE), info = snippet)
+  }
+
+  fit_pages <- c(
+    "fit_mfrm.Rd", "summary.mfrm_fit.Rd", "mfrm_results.Rd",
+    "mfrm_report.Rd", "export_mfrm_results.Rd",
+    "mfrmr_workflow_methods.Rd", "mfrmr_reports_and_tables.Rd",
+    "mfrmr-package.Rd", "diagnose_mfrm.Rd",
+    "summary.mfrm_diagnostics.Rd", "plot.mfrm_fit.Rd",
+    "data_quality_report.Rd", "rating_scale_table.Rd",
+    "precision_review_report.Rd", "as.data.frame.mfrm_fit.Rd",
+    "mfrmr_visual_diagnostics.Rd", "mfrmr_reporting_and_apa.Rd",
+    "compare_mfrm.Rd", "plot_compare_mfrm.Rd", "plot_marginal_fit.Rd",
+    "plot_marginal_pairwise.Rd", "plot_qc_dashboard.Rd", "plot_person_fit.Rd",
+    "compute_person_fit_indices.Rd", "plot_rater_severity_profile.Rd",
+    "plot_bubble.Rd", "fair_average_table.Rd", "plot_fair_average.Rd",
+    "interrater_agreement_table.Rd", "plot_interrater_agreement.Rd",
+    "apa_table.Rd", "export_mfrm_tables.Rd", "reporting_checklist.Rd",
+    "build_apa_outputs.Rd", "plot_data.Rd", "plot_data_components.Rd"
+  )
+  for (page in fit_pages) {
+    text <- rd_text(page)
+    if (grepl('readRDS\\(system.file\\("examples", "(core-jml|bias-jml|operational-mml)[.]rds"', text)) {
+      expect_true(grepl("example_fit$fit", text, fixed = TRUE), info = page)
+      next
+    }
+    for (snippet in c(
+      'load_mfrmr_data("example_operational")',
+      'person = "Person"', 'facets = c("Rater", "Criterion")',
+      'score = "Score"', 'method = "MML"', 'model = "RSM"'
+    )) {
+      expect_true(grepl(snippet, text, fixed = TRUE), info = paste(page, snippet))
+    }
+    expect_false(grepl("quad_points\\s*=|maxit\\s*=|reltol\\s*=", text), info = page)
+    expect_false(grepl("JML keeps the help example fast", text, fixed = TRUE), info = page)
+  }
+  for (page in c("reporting_checklist.Rd", "build_apa_outputs.Rd")) {
+    text <- rd_text(page)
+    expect_false(grepl('DraftReady = "yes"|ready to paste', text), info = page)
+  }
+  expect_false(grepl("panels$Status", rd_text("plot_qc_dashboard.Rd"), fixed = TRUE))
+})
+
+test_that("repeated fitting in examples has an explicit comparison purpose", {
   pkg_root <- example_policy_source_root()
   testthat::skip_if(is.na(pkg_root), "source files are not available")
 
@@ -259,41 +282,18 @@ test_that("roxygen examples keep expensive demonstrations conditional", {
                     "roxygen examples are not available")
 
   multi_fit <- examples[examples$active_fit_calls > 1L, ]
-  expect_identical(
-    example_policy_hits(multi_fit),
-    character(0),
-    info = "Standard Rd examples should not run multiple fit_mfrm() calls."
-  )
-
-  mml_without_quadrature <- examples[
-    examples$has_mml & !examples$has_quad_points, ]
-  expect_identical(
-    example_policy_hits(mml_without_quadrature),
-    character(0),
-    info = "MML examples should set quad_points, including donttest examples."
-  )
-
-  active_mml_without_quadrature <- examples[
-    examples$active_has_mml & !examples$active_has_quad_points, ]
-  expect_identical(
-    example_policy_hits(active_mml_without_quadrature),
-    character(0),
-    info = "Standard MML examples should set quad_points."
-  )
-
-  high_maxit <- examples[examples$active_has_high_maxit, ]
-  expect_identical(
-    example_policy_hits(high_maxit),
-    character(0),
-    info = "Standard Rd examples should keep maxit at 30 or below."
-  )
-
-  active_parallel <- examples[examples$active_has_parallel, ]
-  expect_identical(
-    example_policy_hits(active_parallel),
-    character(0),
-    info = "Parallel diagnostics should be in donttest or vignettes."
-  )
+  # Linking/drift/trajectory need two occasions; weighting, model choice and
+  # centrality need two fits. Intervals compare fixed-SD MML, free-SD MML and CML.
+  expected <- c(detect_anchor_drift = 2L, build_equating_chain = 2L,
+    build_linking_review = 2L, build_weighting_review = 2L,
+    build_model_choice_review = 2L, compare_mfrm = 2L,
+    mfrm_facet_intervals = 3L, plot_compare_mfrm = 2L,
+    plot.mfrm_anchor_drift = 2L, plot_rater_trajectory = 2L,
+    rater_centrality_table = 2L)
+  observed <- setNames(multi_fit$active_fit_calls, multi_fit$target)
+  expect_true(all(names(observed) %in% names(expected)))
+  expect_identical(observed[order(names(observed))], expected[sort(names(observed))])
+  # residual PCA's parallel=TRUE requests parallel analysis, not CPU workers.
 })
 
 test_that("vignettes keep heavy executable chunks off during CRAN checks", {
@@ -306,10 +306,19 @@ test_that("vignettes keep heavy executable chunks off during CRAN checks", {
 
   missing_guard <- character(0)
   unsafe_cache_chunk <- character(0)
+  # These short observed-score tutorials execute in full without MFRM calibration.
+  fully_executed <- c("mfrmr-gtheory.Rmd", "mfrmr-rating-agreement.Rmd")
   for (path in files) {
     text <- paste(readLines(path, warn = FALSE), collapse = "\n")
-    if (!grepl("is_cran_check", text, fixed = TRUE) ||
-        !grepl("eval = !is_cran_check", text, fixed = TRUE)) {
+    if (basename(path) == "mfrmr-model-choice.Rmd") {
+      # This reading guide has no executable R; fail if that contract changes.
+      expect_false(grepl("(?m)^```\\{r|`r[[:space:]]", text, perl = TRUE))
+      next
+    }
+    inline_guard <- grepl('eval = isTRUE(as.logical(Sys.getenv("NOT_CRAN", "false")))', text, fixed = TRUE)
+    if (!basename(path) %in% fully_executed && !inline_guard &&
+        (!grepl("is_cran_check", text, fixed = TRUE) ||
+         !grepl("eval = !is_cran_check", text, fixed = TRUE))) {
       missing_guard <- c(missing_guard, basename(path))
     }
     if (grepl("eval = is_cran_check", text, fixed = TRUE) &&

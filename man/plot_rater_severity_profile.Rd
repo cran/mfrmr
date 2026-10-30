@@ -2,14 +2,14 @@
 % Please edit documentation in R/api-plotting-extras.R
 \name{plot_rater_severity_profile}
 \alias{plot_rater_severity_profile}
-\title{Plot per-rater severity ranking with confidence interval whiskers}
+\title{Plot facet locations with qualified normal uncertainty bands}
 \usage{
 plot_rater_severity_profile(
   fit,
   diagnostics = NULL,
   facet = "Rater",
   ci_level = 0.95,
-  show_bands = TRUE,
+  show_bands = FALSE,
   preset = c("standard", "publication", "compact", "monochrome"),
   draw = TRUE
 )
@@ -18,55 +18,143 @@ plot_rater_severity_profile(
 \item{fit}{An \code{mfrm_fit} from \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
 \item{diagnostics}{Optional \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} output. When omitted,
-\code{diagnose_mfrm(fit, residual_pca = "none")} is run internally.}
+\code{diagnose_mfrm(fit, residual_pca = "none")} is run internally.
+Supplied diagnostics must match the fitted analysis and current precision
+contract; they are reused without covariance recomputation.}
 
 \item{facet}{Facet name to plot (default \code{"Rater"}). Any non-Person
 facet name is accepted.}
 
 \item{ci_level}{Confidence level used for the whiskers (default
-\code{0.95}). Bounds use \verb{+/- z * ModelSE}.}
+\code{0.95}). Bounds use \verb{+/- z * ModelSE} (or \code{SE} only when the
+\code{ModelSE} column is absent). A missing \code{ModelSE} is not replaced rowwise.}
 
-\item{show_bands}{Logical. When \code{TRUE} (default) draw shaded
-\verb{+/-0.5} (gentle) and \verb{+/-1.0} (strict) logit guidance bands.}
+\item{show_bands}{Logical, default \code{FALSE}. Explicit \code{TRUE} draws neutral
+gray \verb{+/-0.5} and \verb{+/-1.0} logit guides and describes them in the
+returned annotations. These distances are not equivalence bounds.}
 
 \item{preset}{Visual preset.}
 
 \item{draw}{If \code{TRUE}, draw with base graphics.}
 }
 \value{
-An \code{mfrm_plot_data} object whose \code{data} slot contains
-columns \code{Level}, \code{Estimate}, \code{SE}, \code{CI_Lower}, \code{CI_Upper},
-\code{Band}.
+An \code{mfrm_plot_data} object. Its \code{data$data} table contains
+columns \code{Level}, \code{Estimate}, \code{SE}, \code{CI_Lower}, \code{CI_Upper}, and \code{Band},
+where \code{Band} contains numerical absolute-location ranges, not judgments
+about severity or quality. The ranges remain in the table when hidden.
+Other columns include \code{Fixed}, \code{IntervalStatus}, \code{SEColumn}, \code{SE_Method},
+\code{PrecisionTier}, \code{CIUse}, \code{CIEligible}, \code{SupportsFormalInference} and
+the normal interval method/level. Source precision labels are retained;
+missing precision metadata cannot qualify an interval for inference.
+The enclosing \code{data} list retains the facet, confidence level and plot
+annotations and diagnostics identity check (\code{source_status}); keep these
+with the table when reporting the results. Fit readiness and interpretation
+notes are returned. Titles and notes are not automatically drawn.
 }
 \description{
-Ranks the levels of a chosen rater facet by estimated severity and
-draws each level as a horizontal CI whisker around the point
-estimate. Optional gentle / strict guidance bands at \verb{+/-0.5} and
-\verb{+/-1.0} logit relative to the centred mean make rater calibration
-easy to read for training feedback.
+Ranks the levels of a chosen facet by fitted location and
+draws available normal uncertainty bounds around each point
+estimate. Optional descriptive bands mark absolute distances of \code{0.5}
+and \code{1.0} logit from zero; they are display aids, not calibration rules.
 }
 \section{Interpreting output}{
 
-The vertical reference line at zero is the sum-to-zero centring
-point. Levels well within \verb{+/- 0.5 logit} (gentle band) are
-typically interchangeable in operational scoring; levels outside
-\verb{+/- 1.0 logit} (strict band) deserve targeted training or
-anchoring.
+Zero is the sum-to-zero reference for the default centered facet; describe
+any different constraints or anchors used in the fit. With the default
+negative facet orientation, higher estimates reduce expected coded scores.
+This means stricter scoring when higher scores represent better performance;
+check the rubric direction before using that substantive interpretation.
+The axis names the selected facet's location rather than assuming that
+lower coded scores are less favorable. Returned notes state its fitted sign.
+The optional guides and numerical \code{Band} ranges describe distance from zero,
+not the sign of severity, operational interchangeability, or a need for
+training. No guide bands are drawn by default. Pairwise claims require the
+uncertainty of the contrast; check the SE basis in the supplied diagnostics.
+Two locations at -0.5 and +0.5 are one logit apart despite lying in the same
+range. A changed origin can change these ranges without changing pairwise
+differences. Use \code{\link[=analyze_facet_equivalence]{analyze_facet_equivalence()}} with a justified practical
+bound for equivalence; a non-significant difference does not establish it.
+
+Here "profile" means an ordered display of facet locations, not a
+likelihood-profile confidence interval. Ordinary JML bands remain
+exploratory; MML fallback, regularized or review-only bands retain their
+restrictions. Plotting does not validate normal-approximation coverage.
+Fixed values use diamonds without sampling intervals. Crosses show finite
+points with unavailable or nonpositive SEs; unavailable estimates retain
+labeled rows. The horizontal range includes finite points even without SEs.
+\code{\link[=as_ggplot]{as_ggplot()}} preserves these states, saved endpoints, guide bands and notes
+without fitting a model or recomputing an interval. Older saved plot payloads
+can reproduce their stored geometry but cannot acquire missing source or
+uncertainty qualifications through conversion.
+Older saved plots retain their original colored guides and \code{Band} labels
+(\code{gentle}, \code{moderate}, \code{strict}). Those labels never established equivalence.
+Regenerate the plot from the saved fit and matching diagnostics to obtain
+the neutral display; this does not require a new fit.
+}
+
+\section{Migration in 0.2.4}{
+
+This renderer is internal. Use the corresponding \code{plot()} route in
+\link{mfrmr_plot_migration}; the former exported name is no longer available.
+}
+
+\section{Session plot defaults}{
+
+Set \code{options(mfrmr.plot_preset = "publication")} to choose a session default
+for plotting functions that expose the common \code{preset} argument. The
+supported values are \code{"standard"}, \code{"publication"}, \code{"compact"} and
+\code{"monochrome"}. Precedence is an explicit call argument, then the session
+option, then \code{"standard"}. For example, \code{preset = "standard"} overrides
+a session set to \code{"monochrome"}. Explicit \code{preset = NULL} retains the
+earlier package-default behavior; it does not read the session option.
+Invalid session values cause an error only when that option is needed.
+
+The category-curve, data-quality, fit-review, connectivity and network
+routes of \code{plot()} for report bundles use the same option through \code{...}.
+Plots without a common \code{preset} argument, including extended-model plots
+with their own \code{palette} controls, keep their own settings. This option
+selects a preset, not a universal theme or a guarantee that all renderers
+implement every appearance control identically.
+
+New plot payloads retain the resolved preset for supported saved-data
+rendering. Converting an existing payload with \code{\link[=as_ggplot]{as_ggplot()}} uses its saved
+appearance, even after the session option changes. A call that creates a
+new plot from a fit or statistical result uses the current default.
+For a reproducible script, supply \code{preset} explicitly or set the option in
+that script. Saving only the fitted model does not save a session option.
+No global ggplot theme is changed.
+
+Restore previous settings with \code{old <- options(mfrmr.plot_preset = "monochrome")} followed by \code{options(old)}. Use
+\code{options(mfrmr.plot_preset = NULL)} to remove the option. The preset changes
+appearance, not estimates, confidence levels or diagnostic thresholds.
 }
 
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 30)
-p <- plot_rater_severity_profile(fit, draw = FALSE)
-head(p$data$data)
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("plot_rater_severity_profile", run.dontrun = TRUE)
+\dontrun{
+library(mfrmr)
+
+# Saved synthetic MML/RSM analysis of example_operational.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "operational-mml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+
+# Use the diagnostics saved with this fit
+diagnostics <- example_fit$diagnostics
+
+# Compare signed severity estimates and their intervals
+severity <- plot(fit, type = "rater_severity", diagnostics = diagnostics, show_bands = FALSE)
+severity$data$data[, c("Level", "Estimate", "SE", "CI_Lower", "CI_Upper")]
+# Higher estimates mean stricter ratings with this example's default orientation
+# The optional magnitude bands are omitted from this first comparison
 }
 }
 \seealso{
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=analyze_facet_equivalence]{analyze_facet_equivalence()}},
-\code{\link[=plot_facet_equivalence]{plot_facet_equivalence()}}.
+\link[=plot.mfrm_fit]{plot(x, type = "facet_equivalence")}.
 }
 \concept{confidence intervals}
 \concept{rater severity}
 \concept{visual diagnostics}
+\keyword{internal}

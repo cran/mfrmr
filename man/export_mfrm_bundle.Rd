@@ -31,7 +31,9 @@ export_mfrm_bundle(
 \item{diagnostics}{Optional output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}. When \code{NULL},
 diagnostics are reused from \code{run_mfrm_facets()} when available, otherwise
 computed with \code{residual_pca = "none"} (or \code{"both"} when visual summaries
-are requested).}
+are requested).
+Must match this fitted analysis; see \link{mfrmr_compatibility_layer} for
+migration of saved diagnostics.}
 
 \item{bias_results}{Optional output from \code{\link[=estimate_bias]{estimate_bias()}} or a named list of
 bias bundles.}
@@ -59,7 +61,9 @@ export bundle.}
 \item{include}{Components to export. Supported values are
 \code{"core_tables"}, \code{"checklist"}, \code{"dashboard"}, \code{"apa"}, \code{"anchors"},
 \code{"manifest"}, \code{"visual_summaries"}, \code{"predictions"}, \code{"summary_tables"},
-\code{"script"}, and \code{"html"}.}
+\code{"script"}, and \code{"html"}. By default, export all listed components
+except predictions when no prediction or plausible-value object is supplied.
+Explicitly requesting \code{"predictions"} requires at least one such object.}
 
 \item{facet}{Optional facet for \code{\link[=facet_quality_dashboard]{facet_quality_dashboard()}}.}
 
@@ -95,13 +99,24 @@ Export a fit-level analysis archive
 }
 \details{
 This function is the one-call fit-level archive and HTML route. It reuses
-existing \code{mfrmr} helpers instead of reimplementing estimation or diagnostics.
+\code{mfrmr} functions for estimation and diagnostics.
 When \code{diagnostics = NULL},
 the exporter computes the diagnostics it needs, then writes the requested
 CSV/text/replay artifacts and a lightweight HTML page from the fitted object.
 Use \code{\link[=mfrm_results]{mfrm_results()}} and \code{\link[=mfrm_report]{mfrm_report()}} first when you want to inspect a
 results object before writing files; use \code{export_mfrm_bundle()} when the
 goal is a project-folder bundle from \code{fit}.
+For only the core CSV tables without automatic diagnostics, use
+\code{\link[=export_mfrm_tables]{export_mfrm_tables()}}. For a complete saved R result that reloads without
+refitting, use \code{\link[=export_mfrm_results]{export_mfrm_results()}}. The optional \code{"script"} component
+here is a refitting recipe, not a copy of the fitted R object.
+
+The returned \code{written_files} and optional ZIP include only files written
+by this call. With \code{overwrite = TRUE}, the ZIP is built afresh and checked
+before replacing an existing archive; obsolete members are not retained.
+If ZIP creation fails, any older ZIP remains in place but is not counted
+as a new output: \code{summary$ZipWritten} is zero and \code{notes} explains the failure.
+Unrequested loose files in the folder are left in place.
 
 Every bundle is an analysis archive, not a deidentified or automatically
 shareable package. Core tables, anchors, predictions, replay sidecars,
@@ -141,9 +156,11 @@ Common starting points are:
 
 Depending on \code{include}, the exporter can write:
 \itemize{
-\item core CSV tables via \code{\link[=export_mfrm]{export_mfrm()}}
+\item core CSV tables via \code{\link[=export_mfrm_tables]{export_mfrm_tables()}}
 \item checklist CSVs via \code{\link[=reporting_checklist]{reporting_checklist()}}
-\item facet-dashboard CSVs via \code{\link[=facet_quality_dashboard]{facet_quality_dashboard()}}
+\item facet-dashboard CSVs and interpretation notes via \code{\link[=facet_quality_dashboard]{facet_quality_dashboard()}},
+including screening settings in CSV and HTML; HTML tables show every
+level's estimates and unavailable diagnostics, while CSVs retain full detail
 \item APA text files via \code{\link[=build_apa_outputs]{build_apa_outputs()}}
 \item manuscript-summary CSVs via \code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}}
 \item anchor CSV via \code{\link[=make_anchor_table]{make_anchor_table()}}
@@ -171,10 +188,10 @@ from scenario-level population predictions are not flattened into
 \verb{*_population_prediction_settings.csv} or ADeMP CSVs; the compact simulation
 specification files carry the replay-relevant settings instead.
 
-For bounded \code{GPCM}, this exporter is available as a caveated partial bundle
+For \code{GPCM}, this exporter is available as a caveated partial bundle
 over supported diagnostics, report text, visual summaries, manifests, and
 replay scripts. The returned object and manifest include \code{gpcm_boundary}.
-Package-native bounded-\code{GPCM} scorefile export is available with caveats,
+Package-native \code{GPCM} scorefile export is available with caveats,
 while full FACETS-style score-side contract review and design forecasting
 remain outside this bundle contract.
 }
@@ -198,12 +215,26 @@ replay script, and HTML summary.
 }
 }
 
+\section{Saved-result reuse}{
+
+Supplied screening results must describe this fitted analysis. Results from
+another fit or older results without identity metadata are refused. See
+\link{mfrmr_compatibility_layer} to recreate them from the saved fit and matching
+diagnostics without refitting the model.
+Supplied unit scores, plausible values and fit-derived forecasts must also
+match this calibration. A forecast created with \code{sim_spec} remains a separate
+scenario; its source is recorded without asserting a match to the fit.
+}
+
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 30)
-diag <- diagnose_mfrm(fit, residual_pca = "none")
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("export_mfrm_bundle", run.dontrun = TRUE)
+\dontrun{
+# Saved synthetic JML/RSM analysis of example_core.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "core-jml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+diag <- example_fit$diagnostics
 bundle <- export_mfrm_bundle(
   fit,
   diagnostics = diag,
@@ -214,12 +245,16 @@ bundle <- export_mfrm_bundle(
   acknowledge_sensitive = TRUE
 )
 bundle$summary[, c("FilesWritten", "HtmlWritten", "ScriptWritten")]
-head(bundle$written_files)
+head(data.frame(
+  Component = bundle$written_files$Component,
+  File = basename(bundle$written_files$Path)
+))
+# Full paths and data-handling notes remain in bundle$written_files.
 }
 }
 \seealso{
 \code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=mfrm_results]{mfrm_results()}}, \code{\link[=mfrm_report]{mfrm_report()}},
 \code{\link[=export_mfrm_results]{export_mfrm_results()}}, \code{\link[=build_mfrm_manifest]{build_mfrm_manifest()}},
-\code{\link[=build_mfrm_replay_script]{build_mfrm_replay_script()}}, \code{\link[=export_mfrm]{export_mfrm()}},
+\code{\link[=build_mfrm_replay_script]{build_mfrm_replay_script()}}, \code{\link[=export_mfrm_tables]{export_mfrm_tables()}},
 \code{\link[=reporting_checklist]{reporting_checklist()}}, \code{\link[=export_summary_appendix]{export_summary_appendix()}}
 }

@@ -10,7 +10,8 @@ category_curves_report(
   theta_points = 241,
   digits = 4,
   include_fixed = FALSE,
-  fixed_max_rows = 400
+  fixed_max_rows = 400,
+  newdata = NULL
 )
 }
 \arguments{
@@ -26,6 +27,13 @@ category_curves_report(
 block.}
 
 \item{fixed_max_rows}{Maximum rows shown in fixed-width graph tables.}
+
+\item{newdata}{Optional data frame with every non-Person facet, one row per
+rating context, using fitted level labels and no \code{Theta} column. For native
+GPCM MML, evaluates the full fitted predictor, including one or two slope
+families. \code{Theta} is reserved for the ability grid. Unknown/missing levels
+are refused; unobserved combinations of
+known levels are allowed and labelled. NULL retains reference profiles.}
 }
 \value{
 A named list with category-curve components. Class:
@@ -36,6 +44,18 @@ Build a category curve export bundle (preferred alias)
 }
 \details{
 Preferred high-level API for category-probability curve exports.
+\code{model_context} records the fitted step/slope owners. \code{curve_profiles} maps
+each \code{CurveGroup} to the owner levels, including separate-owner GPCM.
+By default, curves are conditional reference profiles with additive locations
+fixed at zero; see the retained \code{CurveBasis} and \code{PredictorOffset} columns.
+Explicit \code{newdata} enables full-context one- and two-family GPCM MML curves.
+This helper does not compute calibration SEs or confidence intervals.
+\code{plot(out)} and its selected curve views use base graphics. Automatic
+\code{\link[=as_ggplot]{as_ggplot()}} conversion of this bundle is unavailable because curve
+families have distinct targets and scales; extract \code{probabilities} and retain
+its curve-family and group columns for custom figures. For fitted CCC
+graphics, \link[=plot.mfrm_fit]{plot(fit, type = "ccc")} has a dedicated conversion;
+review its reference-profile settings before comparing curves.
 Returns tidy curve coordinates and summary metadata for quick
 plotting/report integration without calling low-level helpers directly.
 The expected-score table also carries the per-curve score variance and
@@ -54,13 +74,51 @@ convention of accumulating modeled probabilities across ordered categories
 over-interpreting boundaries outside the requested theta range or with
 multiple crossings.
 
-These are reference-profile curves. Estimated step parameters and, for
+Without \code{newdata}, these are reference-profile curves. Estimated step parameters and, for
 \code{GPCM}, each step-facet group's estimated slope are retained, while additive
 facet main effects and fitted interactions are fixed at zero. The
 \code{CurveBasis} and \code{PredictorOffset} columns, and the corresponding entries in
 \code{settings}, make that conditioning explicit. Thus the curves do not
 represent an arbitrary observed Person-by-facet cell.
 }
+\section{Explicit rating contexts}{
+
+With \code{newdata}, \code{curve_profiles} maps each curve to \code{InputRow} in the saved
+\code{newdata}. It retains the step owner/level, effective discrimination (the
+product for two families), additive \code{PredictorOffset}, and \code{ObservedContext}.
+The predictor is \code{Theta + PredictorOffset}; facet locations and interactions
+are retained. No Person posterior or population integration is involved.
+\code{Category} and expected scores retain the internal scoring scale;
+\code{CategoryLabel} and boundary label columns retain the original score labels.
+Plot series use these original labels without changing the scoring rule.
+
+\code{cumulative_boundaries} solves \code{P(X <= k) = .5}, equivalently
+\code{P(X >= k+1) = .5}, directly within \code{theta_range}. It is independent of
+\code{theta_points} and retains full numerical precision irrespective of \code{digits}.
+Binary boundaries use the analytic adjacent intersection. Other boundaries
+use bracketed root finding on a stable difference of unnormalized lower and
+upper category masses, avoiding subtraction of rounded probabilities.
+The root tolerance is 1e-10 in native ability units: the mass difference
+must change sign within that distance on either side of the reported root.
+The probability residual must also be at most 1e-8. These are numerical
+checks, not statistical
+uncertainty bounds. Out-of-range roots remain NA with \code{outside_theta_range};
+failed numerical checks remain NA with \code{numerical_failure} and a reason.
+\code{AndrichThreshold} is the centered step offset; \code{AdjacentThreshold} is the
+ability where the adjacent probabilities are equal, including the context
+offset. Neither is generally the cumulative \code{ThurstonianThreshold}.
+Positive discriminations order cumulative thresholds even when an intermediate
+category is never most probable; ordering alone does not establish category
+adequacy. \code{SE}, \code{CI_Lower}, and \code{CI_Upper} are NA and \code{CIEligible} is FALSE.
+
+Finite calculations are retained even when the source fit needs review.
+\code{fit_readiness}, \code{settings$source_converged} and the summary/plot notes retain
+that distinction. Two-family values remain provisional. Unobserved contexts
+are predictions under the fitted model, not an identification guarantee.
+Save the complete result with \code{saveRDS()}; \code{summary()}, \code{plot()} and
+\code{\link[=plot_data]{plot_data()}} replay it without fitting, diagnostics or covariance calculation.
+}
+
 \section{Interpreting output}{
 
 Use this report to inspect:
@@ -88,7 +146,7 @@ contributions are needed.
 
 Category response curves follow Andrich's rating-scale formulation,
 Masters' partial-credit model, and Muraki's generalized partial-credit
-model. The \code{Information} column for bounded \code{GPCM} uses Muraki's
+model. The \code{Information} column for \code{GPCM} uses Muraki's
 item-information result obtained from Samejima's general polytomous
 information formula.
 \itemize{
@@ -116,16 +174,19 @@ partial credit model}. Applied Psychological Measurement, 17(4),
 \code{boundary_status = "none"} when cumulative \code{.5} boundary lines should
 be suppressed. \code{plot(out, type = "category_probability")} and
 \code{plot(out, type = "conditional_probability")} are explicit aliases for
-the same category-probability curves as \code{type = "ccc"}. Use
+the same category-probability curves as \code{type = "ccc"}. The historical
+conditional alias is ordinary P(k), not the FACETS adjacent-conditional
+curve P(k)/(P(k-1)+P(k)); prefer the unambiguous \code{"ccc"} name. Use
 \code{plot_data(out, component = "plot_long")} when rebuilding the curves with
 ggplot2, plotly, or another R graphics system.
 }
 }
 
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
+# Saved synthetic JML/RSM analysis of example_core.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "core-jml.rds", package = "mfrmr"))
+fit <- example_fit$fit
 out <- category_curves_report(fit, theta_points = 101)
 summary(out)
 head(out$probabilities[, c("CurveGroup", "Theta", "Category", "Probability")])
@@ -137,6 +198,19 @@ p_info <- plot(out, type = "category_information", draw = FALSE)
 head(p_info$data$category_information)
 curve_long <- plot_data(out, component = "plot_long")
 head(curve_long[, c("PlotType", "Theta", "Series", "Value")])
+\dontrun{
+# Which cumulative boundaries apply to a specified rater and criterion?
+ratings <- load_mfrmr_data("example_core")
+gpcm_fit <- fit_mfrm(ratings, "Person", c("Rater", "Criterion"), "Score",
+  model = "GPCM", method = "MML", step_facet = "Criterion",
+  slope_facet = "Rater", rating_min = 1, rating_max = 4,
+  category_policy = "preserve", quad_points = 61)
+contexts <- unique(ratings[c("Rater", "Criterion")])[1:2, ]
+curves <- category_curves_report(gpcm_fit, newdata = contexts)
+curves$cumulative_boundaries[, c("CurveGroup", "UpperCategoryLabel",
+  "ThurstonianThreshold", "AdjacentThreshold", "BoundaryStatus")]
+summary(curves) # Inspect source readiness and interval limitations too.
+plot(curves, type = "cumulative")
 }
 }
 \seealso{

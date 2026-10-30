@@ -21,7 +21,7 @@
 # 7. End-to-end: PCM and GPCM-with-slopes-equal-to-one produce the same
 #    fair-averages when the underlying parameters are made identical
 #    (constructed from the same synthetic data).
-# 8. The internal expected-score table uses the GPCM probability bundle and
+# 8. Observation diagnostics use the GPCM probability bundle and
 #    therefore responds when fitted slopes are clamped to one.
 
 # ---- 1-5: kernel-level reduction, worked example, derivatives ----------------
@@ -157,13 +157,51 @@ test_that("fair_average_table() no longer hard-stops on GPCM fits", {
     "AdjustedAverageCI_Upper", "AdjustedAverageSEStatus"
   ) %in% names(s$preview)))
   expect_true(any(is.finite(s$preview$AdjustedAverageSE)))
-  expect_output(print(s), "FairSEAvailableRows")
+  expect_output(print(s), "Rows with SE")
 
   p <- plot_fair_average(fit, show_ci = TRUE, draw = FALSE)
   expect_true(all(c("CI_Lower", "CI_Upper", "CI_Method") %in% names(p$data$data)))
   expect_true(any(is.finite(p$data$data$CI_Lower) &
                     is.finite(p$data$data$CI_Upper)))
   expect_true(grepl("structural delta method", p$data$ci_note, fixed = TRUE))
+
+  # FairZ-only summaries and exported rows retain score-side uncertainty scope.
+  zero <- fair_average_table(fit, reference = "zero", fair_se = TRUE)
+  finite <- is.finite(zero$stacked$StandardizedAdjustedAverageSE)
+  expect_true(any(finite))
+  expect_false(any(zero$stacked$FairCIEligible))
+  expect_true(all(zero$stacked$FairCIReportingUse[finite] == "diagnostic_only"))
+  zs <- summary(zero)
+  expect_equal(zs$summary$FairSEAvailableRows, sum(finite))
+  expect_equal(zs$summary$FairMetric, "FairZ")
+  printed <- paste(capture.output(print(zs)), collapse = " ")
+  expect_false(grepl("FairCIEligible|FairSEStatus|FairSEMethod", printed))
+  expect_match(printed, "should not be used as confidence intervals for decisions", fixed = TRUE)
+  tmp <- tempfile("fair-contract-")
+  dir.create(tmp)
+  on.exit(unlink(tmp, recursive = TRUE), add = TRUE)
+  saveRDS(zero, file.path(tmp, "fair.rds"))
+  restored <- readRDS(file.path(tmp, "fair.rds"))
+  expect_identical(restored, zero)
+  # The appendix API does not accept Fair Score bundles; use their public tables.
+  expect_error(export_summary_appendix(restored, output_dir = tmp, include_html = FALSE),
+               "must be an mfrm_fit", fixed = TRUE)
+  write.csv(restored$stacked, file.path(tmp, "fair.csv"), row.names = FALSE)
+  write.csv(summary(restored)$summary, file.path(tmp, "summary.csv"), row.names = FALSE)
+  write.csv(summary(restored)$preview, file.path(tmp, "preview.csv"), row.names = FALSE)
+  csv <- lapply(list.files(tmp, pattern = "[.]csv$", full.names = TRUE),
+                read.csv, check.names = FALSE)
+  eligible_tables <- Filter(function(x) "FairCIEligible" %in% names(x), csv)
+  expect_gte(length(eligible_tables), 2L)
+  expect_true(all(vapply(eligible_tables, function(x) !any(x$FairCIEligible), logical(1))))
+  restored$stacked$FairCIEligible <- NULL  # older saved payload
+  restored$stacked$FairCIReportingUse <- NULL
+  old_plot <- plot_fair_average(restored, metric = "FairZ", show_ci = TRUE, draw = FALSE)
+  expect_false(any(old_plot$data$data$CI_Eligible))
+  expect_false(summary(restored)$summary$FairCIEligible)
+  missing <- mfrmr:::add_gpcm_fair_average_delta_se(zero$raw_by_facet, fit,
+    covariance = list(status = "not_available", cov = NULL, detail = "missing covariance"))
+  expect_true(all(vapply(missing, function(x) all(is.na(x$FairZSE)), logical(1))))
 })
 
 test_that("estimate_bias() no longer hard-stops on GPCM fits", {
@@ -197,7 +235,7 @@ test_that("estimate_bias() no longer hard-stops on GPCM fits", {
   expect_true(nrow(post_bias$gpcm_boundary) == 1L)
   expect_identical(
     post_bias$gpcm_boundary$Area[1],
-    "Residual-bias screening under bounded GPCM"
+    "Residual-bias screening under GPCM"
   )
   expect_identical(
     post_bias$gpcm_boundary$Status[1],
@@ -426,7 +464,7 @@ test_that("GPCM dispatch: clamping slopes to 1 changes Criterion-row fair-averag
   expect_gt(max(abs(crit_gpcm - crit_clamped)), 1e-4)
 })
 
-test_that("expected_score_table uses GPCM slopes", {
+test_that("observation diagnostics use GPCM slopes", {
   d <- mfrmr:::sample_mfrm_data(seed = 42)
   fit_gpcm <- suppressWarnings(suppressMessages(fit_mfrm(
     d, "Person", c("Rater", "Task", "Criterion"), "Score",
@@ -447,8 +485,8 @@ test_that("expected_score_table uses GPCM slopes", {
   fit_clamped <- fit_gpcm
   fit_clamped$opt$par[log_slope_start:log_slope_end] <- 0
 
-  exp_gpcm <- mfrmr:::expected_score_table(fit_gpcm)
-  exp_clamped <- mfrmr:::expected_score_table(fit_clamped)
+  exp_gpcm <- mfrmr:::compute_obs_table(fit_gpcm)
+  exp_clamped <- mfrmr:::compute_obs_table(fit_clamped)
 
   expect_true(all(c("Observed", "Expected") %in% names(exp_gpcm)))
   expect_equal(exp_gpcm$Observed, exp_clamped$Observed)

@@ -3,96 +3,135 @@
 #' @description
 #' `mfrmr` provides estimation, diagnostics, and reporting utilities for
 #' many-facet ordered-response measurement models: the Rasch-family `RSM` /
-#' `PCM` route and the package's bounded `GPCM` extension where explicitly
-#' documented.
+#' `PCM` route and a `GPCM` extension in which one selected facet supplies
+#' level-specific discriminations. MML permits a different facet to supply
+#' category steps; JML requires the same facet for both roles. [confint.mfrm_fit()]
+#' with `parm = "slopes"`
+#' supplies approximate relative-slope intervals for eligible MML fits; model
+#' ranking and matched PCM/GPCM tests use separate checks in [compare_mfrm()].
+#' [gpcm_capability_matrix()] explains the supported uses.
+#' An experimental two-family `GPCM` route also provides estimation and
+#' conditional scoring, with explicit uncertainty limitations.
+#' Native RSM/PCM conditional maximum likelihood (`CML`) conditions on Person
+#' totals without assuming an ability distribution. Its separate result class
+#' supplies structural contrast intervals through [mfrm_facet_intervals()],
+#' without Person abilities, a population SD or ordinary fit diagnostics.
+#' See [fit_mfrm()] for the supported conditional estimation scope.
+#'
+#' For assessment planning from observed scores, [mfrm_g_study()]
+#' and [mfrm_d_study()] separate sources of variation and project
+#' dependability for specified future rating plans. For rater feedback and
+#' assessment decisions, [mfrm_report()], [interrater_agreement_table()] and
+#' [classification_table()] provide their respective reports, agreement
+#' measures and fixed-plan classification summaries. These analyses have
+#' different assumptions and uncertainty targets; follow the linked help for
+#' the question you want to answer.
 #'
 #' @useDynLib mfrmr, .registration = TRUE
 #'
 #' @details
-#' Start with the following core workflow before branching into diagnostics,
-#' bounded `GPCM`, simulation, and planning notes:
+#' Start with the complete script in the Examples section:
 #'
-#' 1. Review long-format data and the intended score support with
-#'    [describe_mfrm_data()]. When a planned assignment roster exists, pass it
-#'    as `expected_design` so absent rows are not confused with unassigned cells
-#' 2. Fit with [fit_mfrm()] using `method = "MML"`
-#' 3. Read `summary(fit, profile = "fit")`, then request the comprehensive
-#'    FACETS-organized view with `summary(fit, profile = "facets")`
-#' 4. Create the required native Wright map with
-#'    `plot(fit, type = "wright", show_ci = TRUE)`; use the FACETS renderer
-#'    only as an optional familiar presentation
-#' 5. Continue from the summary's `results` component to [mfrm_report()] and
-#'    [export_mfrm_results()]
-#' 6. Reuse `review$results$diagnostics` for [plot_qc_dashboard()] and
-#'    [reporting_checklist()]; call [diagnose_mfrm()] again only for residual
-#'    PCA or other custom settings. For
-#'    bounded `GPCM`, read [gpcm_capability_matrix()] before interpreting
-#'    specialist helpers
+#' 1. Load the package and example ratings with [load_mfrmr_data()].
+#' 2. Fit a model with [fit_mfrm()].
+#' 3. Draw the Wright map with `plot(fit)`.
+#' 4. Save `results <- summary(fit)` and inspect `results$person_overview`
+#'    and `results$facet_overview`.
 #'
-#' Recommended workflow:
+#' Each data row is one rating event. The `person`, `facets`, and `score`
+#' arguments name columns. The example uses marginal maximum likelihood
+#' (`MML`) and a rating-scale model (`RSM`) with shared category thresholds.
+#' `head(ratings)` displays the first six rows. Only `Person`, `Rater`, `Criterion`,
+#' and `Score` are used by this model; the example's `Study` and `Group` columns
+#' are additional labels. `<-` saves an object, and `$` selects a named part:
+#' `results$person_overview` displays one table from the saved summary.
+#' The overview tables summarize distributions; `as.data.frame(fit)` returns
+#' individual person, rater, and criterion estimates.
+#' The assignment `ratings <- load_mfrmr_data("example_operational")` reads
+#' an existing synthetic dataset supplied with mfrmr. You do not need to create
+#' `ratings` first; the name on the left stores what the function returns.
 #'
-#' 1. Review the data with [describe_mfrm_data()] and fit with [fit_mfrm()]
-#' 2. For `RSM` / `PCM`, create the comprehensive summary and reuse its
-#'    diagnostics; request a separate [diagnose_mfrm()] call only for custom
-#'    settings
-#' 3. For `RSM` / `PCM`, run residual PCA with [analyze_residual_pca()] if needed
-#' 4. For `RSM` / `PCM`, or bounded `GPCM` with the documented screening
-#'    caveat, estimate interactions with [estimate_bias()]
-#' 5. For `RSM` / `PCM`, choose a downstream branch:
-#'    [reporting_checklist()] for manuscript/report preparation, or
-#'    [build_misfit_casebook()] / [build_linking_review()] for operational
-#'    misfit or anchor/drift review. After
-#'    [build_misfit_casebook()], inspect `casebook$group_view_index` before
-#'    moving to source-specific plots.
-#' 6. For `RSM` / `PCM`, build narrative/report outputs with
-#'    [build_apa_outputs()] and [build_visual_summaries()]
-#' 7. Treat bounded `GPCM`, prediction, and planning helpers as advanced scope
-#'    after the basic `RSM` / `PCM` route is working cleanly.
+#' Before interpreting or reporting estimates, read `results$decision` and
+#' follow its `NextAction`. The default summary does not compute diagnostics.
+#' For your own data, first inspect the design and score categories with
+#' [describe_mfrm_data()].
 #'
-#' Guide pages:
-#' - [mfrmr_output_guide()] for the compact purpose-to-helper map
-#' - [mfrmr_workflow_methods]
-#' - [mfrmr_visual_diagnostics]
-#' - [mfrmr_reports_and_tables]
-#' - [mfrmr_reporting_and_apa]
-#' - [mfrmr_linking_and_dff]
-#' - [gpcm_capability_matrix]
-#' - [mfrmr_compatibility_layer]
+#' @section Optional packages:
+#' The basic example below uses packages installed with mfrmr. Its base-R
+#' plots do not need ggplot2. Additional packages support particular features;
+#' you do not need to install all suggested packages to get started.
 #'
-#' Companion vignettes:
-#' - `vignette("mfrmr-workflow", package = "mfrmr")`
-#' - `vignette("mfrmr-mml-and-marginal-fit", package = "mfrmr")`
-#' - `vignette("mfrmr-visual-diagnostics", package = "mfrmr")`
-#' - `vignette("mfrmr-reporting-and-apa", package = "mfrmr")`
-#' - `vignette("mfrmr-linking-and-dff", package = "mfrmr")`
+#' - [as_ggplot()] needs ggplot2 for ggplot2 rendering.
+#' - [as_kable()] needs knitr and [as_flextable()] needs flextable for their
+#'   respective table formats.
+#' - [fit_mfrm_random_rater()] needs RTMB version 2.0 or later for shared
+#'   random-rater estimation.
+#' - Corrected JML in [fit_mfrm()], requested with `jml_correction_order`,
+#'   needs nleqslv to solve the adjusted equations.
+#' - [ordinal_logistic_table()] needs ordinal for ordinal-logistic DIF.
 #'
-#' A printable landscape cheatsheet of the public API ships at
-#' `system.file("cheatsheet", "mfrmr-cheatsheet.pdf", package = "mfrmr")`
-#' (pre-rendered) and `system.file("cheatsheet", "mfrmr-cheatsheet.Rmd",
-#' package = "mfrmr")` (source). Open the PDF directly for a printable
-#' reference card, or knit the source with `rmarkdown::render()` when
-#' you want a customised version.
+#' These are common examples; other optional analyses name their dependencies
+#' in their own help. A missing-package message identifies what to install.
+#' For example, use `install.packages("ggplot2")` if you want [as_ggplot()].
 #'
-#' @section First 5-minute route:
-#' Use this order before exploring the broader feature surface:
-#' 1. [describe_mfrm_data()] for score support, column missingness, declared
-#'    assignment coverage, and Person-facet connectivity
-#' 2. [fit_mfrm()] with `method = "MML"`
-#' 3. `summary(fit, profile = "fit")`, followed by
-#'    `summary(fit, profile = "facets")` for the comprehensive first screen
-#' 4. `plot(fit, type = "wright", show_ci = TRUE)` for the required
-#'    shared-logit figure
-#' 5. [mfrm_report()] and [export_mfrm_results()] from the summary's `results`
-#'    component for reporting and reproducible analysis handoff
-#' 6. Add [diagnose_mfrm()] with `diagnostic_mode = "both"` for deeper
-#'    `RSM` / `PCM` diagnostics; for bounded `GPCM`, keep diagnostics on the
-#'    direct exploratory route and read [gpcm_capability_matrix()]
-#' 7. Choose the next branch:
-#'    [reporting_checklist()] for reporting,
-#'    [build_weighting_review()] for Rasch-versus-`GPCM` weighting review,
-#'    [build_misfit_casebook()] for operational case review, or
-#'    [build_linking_review()] for operational linking review (`RSM` / `PCM`)
-#'    or caveated bounded-`GPCM` linking synthesis
+#' A saved [mfrm_results()] bundle can be reopened with [base::readRDS()] and
+#' passed to [mfrm_report()] without refitting or installing optional estimation
+#' packages. Reporting reuses stored results and retains unavailable diagnostics
+#' as unavailable. Updating an analysis or computing new diagnostics is a
+#' separate operation and may need the original dependencies. Save the complete
+#' bundle with [base::saveRDS()] and retain its matching package version/source;
+#' see "Updating saved analyses for 0.2.4" in [mfrmr_workflow_methods] before
+#' reusing older saved analyses.
+#'
+#' @section Measurement scale:
+#' Native response models use the logistic metric (L-metric), with scaling
+#' constant \eqn{D = 1}; no extra 1.7 normal-ogive approximation factor is used.
+#' This is distinct from choosing a normal ability distribution. See the
+#' "Logistic metric (D = 1)" section of [fit_mfrm()] for logit interpretation
+#' with fixed or varying slopes and comparison with other software.
+#'
+#' @section Where to go next:
+#' - [mfrmr_methods_reference] for the question-to-calculation map, plain-language
+#'   explanations and links to the methodological literature.
+#' - [mfrmr_workflow_methods] and `vignette("mfrmr-workflow", package = "mfrmr")`
+#'   for your own CSV, column mapping, input troubleshooting, and the full
+#'   analysis workflow. If vignettes are not installed, start with
+#'   [describe_mfrm_data()] and [recode_missing_codes()].
+#' - [mfrmr_visual_diagnostics] for choosing follow-up figures.
+#' - [mfrmr_reporting_and_apa] and [mfrmr_reports_and_tables] for reporting.
+#' - [mfrmr_linking_and_dff] for linking and differential facet functioning.
+#' - [classification_table()] for fixed-plan future classification accuracy,
+#'   consistency and conditional precision under ordinary RSM/PCM calibration.
+#' - [gpcm_capability_matrix] for the `GPCM` extension.
+#' - [mfrmr_output_guide()] for the broader purpose-to-function map.
+#'
+#' A printable reference card is available at
+#' `system.file("cheatsheet", "mfrmr-cheatsheet.pdf", package = "mfrmr")`.
+#'
+#' @section Portable fixed calibration:
+#' A saved, versioned calibration artifact can be created from an eligible
+#' one-scale `RSM` or `PCM` MML fit under the fixed standard-normal scoring
+#' basis. Use [mfrm_calibration_capabilities()] before extraction, then follow
+#' [mfrm_calibration_workflow] to review, validate, freeze, save, load, and
+#' score the artifact. Review the returned batch with
+#' [mfrm_calibration_score_methods] before using its estimates. One-family GPCM
+#' MML also supports an estimated intercept-only normal population, shared or
+#' separate slope/step owners, unit weights and no anchors/interactions, subject
+#' to conditional source and per-batch numerical scoring checks. Estimated-
+#' population RSM/PCM and latent-regression MML remain fitted-object-only.
+#' RSM/PCM JML supports portable post-hoc EAP with a standard-normal reference
+#' prior, unit weights, no anchors/interactions and passing finite identified
+#' source checks. Shared-owner GPCM JML also supports conditional portable
+#' EAP after its joint-likelihood/curvature checks, preserving incomplete global
+#' audits. Explicit corrected GPCM JML instead uses adjusted-equation checks
+#' and preserves the correction order in format 5; residual calibration bias
+#' may remain. That reference prior is not estimated by JML. Experimental
+#' two-family GPCM MML uses format 6 with both ordered slope owners and a fixed
+#' N(0,1) prior, separate source/batch checks and no prior overrides.
+#' Artifact
+#' score uncertainty is conditional on the frozen point calibration and its
+#' recorded prior; loading validates consistency but does not authenticate an
+#' untrusted file.
 #'
 #' @section Advanced scope:
 #' After the basic route above:
@@ -100,17 +139,18 @@
 #'   for ordered-response `RSM` / `PCM` models with a one-dimensional
 #'   conditional-normal population model and explicit one-row-per-person
 #'   covariates expanded through `stats::model.matrix()`
-#' - bounded `GPCM` support is summarized by [gpcm_capability_matrix()]
-#' - bounded `GPCM` supports the core fit/summary/scoring/information
+#' - `GPCM` support is summarized by [gpcm_capability_matrix()]
+#' - `GPCM` supports the core fit/summary/scoring/information
 #'   path, direct Wright/pathway/CCC plots, residual-PCA follow-up, and the
 #'   residual-based diagnostics tables/plots as exploratory tools
 #' - posterior-predictive checks and `MCMC` estimation are not available for
-#'   bounded `GPCM`; use external Bayesian software when they are required
+#'   `GPCM`; use external Bayesian software when they are required
 #' - direct `GPCM` data generation through [build_mfrm_sim_spec()],
 #'   [extract_mfrm_sim_spec()], and [simulate_mfrm_data()] is available when
-#'   the specification carries both thresholds and slopes
+#'   the specification carries both thresholds and slopes with the same owner;
+#'   general simulation/design workflows do not support separate owners
 #' - slope-aware [fair_average_table()] and [estimate_bias()] are available for
-#'   bounded `GPCM` with explicit caveats; [build_apa_outputs()],
+#'   `GPCM` with explicit caveats; [build_apa_outputs()],
 #'   [build_visual_summaries()], [run_qc_pipeline()],
 #'   [build_mfrm_manifest()], [build_mfrm_replay_script()], and
 #'   [export_mfrm_bundle()] are available as caveated partial reporting/export
@@ -127,14 +167,14 @@
 #'   local-dependence, and rater-drift diagnostics as screening layers rather
 #'   than as mixture-model substitutes
 #'
-#' @section Equal weighting versus bounded GPCM:
+#' @section Equal weighting versus GPCM:
 #' The package's operational reference route is the Rasch-family
 #' `RSM` / `PCM` branch. That route enforces fixed discrimination and therefore
 #' preserves an equal-weighting scoring interpretation across observed ratings.
 #'
-#' Bounded `GPCM` is supported because some users want a slope-aware model-
+#' `GPCM` is supported because some users want a slope-aware model-
 #' comparison or sensitivity layer inside the same many-facet workflow. However,
-#' the package does not treat bounded `GPCM` as a universal replacement for the
+#' the package does not treat `GPCM` as a universal replacement for the
 #' Rasch-family route. A better fit under `GPCM` should be read as evidence
 #' about discrimination-based reweighting, not as an automatic reason to
 #' discard the equal-weighting model.
@@ -154,48 +194,50 @@
 #' - Model fitting: [fit_mfrm()], [summary.mfrm_fit()], [plot.mfrm_fit()]
 #' - Legacy-compatible workflow wrapper: [run_mfrm_facets()], [mfrmRFacets()]
 #' - Diagnostics: [diagnose_mfrm()], `summary(diag)`,
-#'   [analyze_residual_pca()], [plot_residual_pca()]
+#'   [analyze_residual_pca()], [plot(x, type = "residual_pca")][plot.mfrm_fit]
 #' - Bias and interaction: [estimate_bias()], [estimate_all_bias()],
-#'   `summary(bias)`, [bias_interaction_report()], [plot_bias_interaction()]
+#'   `summary(bias)`, [bias_interaction_report()], [plot(x, type = "bias")][plot.mfrm_fit]
 #' - Differential functioning: [analyze_dff()], [analyze_dif()],
-#'   [dif_interaction_table()], [plot_dif_heatmap()], [dif_report()]
+#'   [mantel_haenszel_table()] for separately matched binary responses,
+#'   [ordinal_logistic_table()] for matched cumulative-logit comparisons,
+#'   [dif_interaction_table()], [plot(x, type = "heatmap")][plot.mfrm_dif], [dif_report()]
 #' - Design simulation: [build_mfrm_sim_spec()], [extract_mfrm_sim_spec()],
-#'   [simulate_mfrm_data()], [evaluate_mfrm_recovery()],
+#'   [simulate_mfrm_data()], [simulate_mfrm_recovery()],
 #'   [assess_mfrm_recovery()], [evaluate_mfrm_design()],
 #'   [evaluate_mfrm_signal_detection()], [predict_mfrm_population()],
 #'   [predict_mfrm_units()], [sample_mfrm_plausible_values()] (including
 #'   fit-derived empirical / resampled / skeleton-based simulation
-#'   specifications; fixed-calibration unit scoring supports `MML` fits
+#'   specifications; fitted-object posterior scoring supports `MML` fits
 #'   directly, latent-regression `MML` fits through the fitted population
 #'   model when scored units also provide one-row-per-person background data,
 #'   and `JML` fits through a post hoc reference-prior EAP layer;
-#'   fit-derived simulation specifications also support direct bounded
+#'   fit-derived simulation specifications also support direct
 #'   `GPCM` data generation, recovery checks, role-based design evaluation,
 #'   population forecasting, diagnostic-screening, and signal-detection
 #'   helpers with documented caveats; curve reports, graph-only exports,
-#'   fair-average tables, and bias screening are also available for bounded
+#'   fair-average tables, and bias screening are also available for
 #'   `GPCM` with documented caveats)
 #' - Reporting: [build_apa_outputs()], [build_visual_summaries()],
 #'   [reporting_checklist()], [apa_table()] for the full `RSM` / `PCM` route;
-#'   bounded `GPCM` uses these as caveated partial surfaces and retains direct
+#'   `GPCM` uses these as caveated partial surfaces and retains direct
 #'   table, plot, checklist, and summary-appendix routes
 #' - Weighting review: [compare_mfrm()], [build_weighting_review()],
-#'   [build_model_choice_review()], [compute_information()], [plot_information()]
-#' - Case review: [build_misfit_casebook()], [plot_unexpected()],
-#'   [plot_displacement()], [plot_marginal_fit()], [plot_marginal_pairwise()]
+#'   [build_model_choice_review()], [compute_information()], [plot(x)][plot.mfrm_information]
+#' - Case review: [build_misfit_casebook()], [plot(x, type = "unexpected")][plot.mfrm_fit],
+#'   [plot(x, type = "displacement")][plot.mfrm_fit], [plot(x, type = "marginal_fit")][plot.mfrm_fit], [plot(x, type = "marginal_pairwise")][plot.mfrm_fit]
 #' - Linking and scale maintenance: [review_mfrm_anchors()],
 #'   [detect_anchor_drift()], [build_equating_chain()],
-#'   [build_linking_review()], [plot_anchor_drift()]
-#' - Dashboards: [facet_quality_dashboard()], [plot_facet_quality_dashboard()]
+#'   [build_linking_review()], [plot(x)][plot.mfrm_anchor_drift]
+#' - Dashboards: [facet_quality_dashboard()], [plot(x, type = "facet_dashboard")][plot.mfrm_fit]
 #' - Export / reproducibility: [build_mfrm_manifest()], [build_mfrm_replay_script()],
 #'   [build_conquest_overlap_bundle()], `normalize_conquest_overlap_exports()`,
 #'   [normalize_conquest_overlap_files()],
 #'   [normalize_conquest_overlap_tables()],
 #'   [review_conquest_overlap()],
 #'   [export_mfrm_bundle()] for the diagnostics-compatible Rasch-family route;
-#'   bounded `GPCM` supports caveated partial manifest, replay, and bundle
+#'   `GPCM` supports caveated partial manifest, replay, and bundle
 #'   output as well as [export_summary_appendix()]
-#' - Equivalence: [analyze_facet_equivalence()], [plot_facet_equivalence()]
+#' - Equivalence: [analyze_facet_equivalence()], [plot(x, type = "facet_equivalence")][plot.mfrm_fit]
 #' - Data and anchors: [describe_mfrm_data()], [review_mfrm_anchors()],
 #'   [make_anchor_table()], [load_mfrmr_data()]
 #'
@@ -223,6 +265,10 @@
 #'   structured rows into printed `Caveats` and `$caveats`, with `Key warnings`
 #'   as a short triage subset. Summary-table exports route those rows through
 #'   `score_category_caveats` or `analysis_caveats`.
+#' - A category can be observed globally but unused by one rater or other facet
+#'   level. Review that local pattern with [data_quality_report()] rather than
+#'   treating it as a globally missing step or an automatic reason to select
+#'   `GPCM`.
 #' - Optional columns such as `Subset`, `Weight`, and `Group` support linking,
 #'   weighted analysis, and fairness-focused follow-up workflows.
 #' - Packaged synthetic data is available via [load_mfrmr_data()] or `data()`.
@@ -250,13 +296,13 @@
 #' 3. For `RSM` / `PCM`, diagnose with [diagnose_mfrm()] and prefer
 #'    `diagnostic_mode = "both"` for final `MML` runs.
 #' 4. For `RSM` / `PCM`, run [analyze_dff()] or [estimate_bias()] when
-#'    fairness or interaction questions matter; bounded `GPCM` also supports
+#'    fairness or interaction questions matter; `GPCM` also supports
 #'    [estimate_bias()] as a conditional screening review.
 #' 5. For `RSM` / `PCM`, report with [build_apa_outputs()] and
 #'    [build_visual_summaries()].
 #' 6. For design planning, move to [build_mfrm_sim_spec()],
 #'    [evaluate_mfrm_design()], [mfrm_generalizability()], [mfrm_d_study()],
-#'    and [predict_mfrm_population()]. Bounded
+#'    and [predict_mfrm_population()].
 #'    `GPCM` also supports direct simulation via
 #'    [extract_mfrm_sim_spec()] / [simulate_mfrm_data()] and caveated role-based
 #'    [evaluate_mfrm_design()] / [predict_mfrm_population()] routes. Those
@@ -273,13 +319,13 @@
 #' 7. For future-unit scoring, retain an `MML` calibration when you want the
 #'    fitted marginal model directly, use an active latent-regression `MML`
 #'    fit when scored units also provide one-row-per-person background data, or
-#'    use a `JML` calibration when a post hoc fixed-calibration EAP layer is
+#'    use a `JML` calibration when a post hoc fitted-object EAP layer is
 #'    acceptable; then score with
 #'    [predict_mfrm_units()] or [sample_mfrm_plausible_values()].
-#' 8. For bounded `GPCM`, use [summary.mfrm_fit()],
+#' 8. For `GPCM`, use [summary.mfrm_fit()],
 #'    [diagnose_mfrm()], [analyze_residual_pca()],
 #'    [predict_mfrm_units()], [sample_mfrm_plausible_values()],
-#'    [compute_information()], [plot_qc_dashboard()], [plot.mfrm_fit()],
+#'    [compute_information()], [plot(x, type = "qc")][plot.mfrm_fit], [plot.mfrm_fit()],
 #'    [category_structure_report()], [category_curves_report()],
 #'    graph-only [facets_output_file_bundle()], direct simulation-spec
 #'    generation/data generation, recovery checks, [fair_average_table()],
@@ -288,7 +334,7 @@
 #'    linking review plus role-based design evaluation, population
 #'    forecasting, diagnostic-screening, and signal-detection helpers are
 #'    available, while full score-side FACETS review, posterior-predictive
-#'    checks, and `MCMC` estimation are not available for bounded `GPCM`. Use
+#'    checks, and `MCMC` estimation are not available for `GPCM`. Use
 #'    [gpcm_capability_matrix()] as the formal boundary statement.
 #'
 #' @section Model formulation:
@@ -330,24 +376,36 @@
 #' level, but the fitted score range is defined by one global category
 #' set taken from the observed data.
 #'
-#' **Bounded Generalized Partial Credit Model (GPCM)**
+#' **Generalized Partial Credit Model (GPCM)**
 #'
-#' Under bounded `GPCM` (Muraki, 1992), the same adjacent-category partial-credit
+#' With one slope family under `GPCM` (Muraki, 1992), the adjacent-category partial-credit
 #' kernel is multiplied by a positive slope \eqn{\alpha_g} for the designated
 #' slope-facet level \eqn{g}:
 #'
 #' \deqn{\ln\frac{P(X_{nij} = k)}{P(X_{nij} = k-1)} =
-#'   \alpha_g(\theta_n - \delta_j - \beta_i - \tau_{gk}).}
+#'   \alpha_g(\theta_n - \delta_j - \beta_i - \tau_{hk}).}
 #'
-#' The current implementation requires `slope_facet == step_facet` and
-#' identifies slopes on the log scale with geometric mean 1. This makes bounded
+#' MML allows a slope owner \eqn{g} distinct from the step owner \eqn{h};
+#' JML requires `slope_facet == step_facet`. Slopes are identified on the log
+#' scale with geometric mean 1. This makes
 #' `GPCM` a slope-aware sensitivity/extension route, not a replacement for the
 #' equal-weighting `RSM`/`PCM` interpretation.
-#' It is an aligned single-owner many-facet GPCM rather than the broader
-#' Uto--Ueno generalized MFRM: it does not jointly estimate multiplicative task
-#' and rater slope blocks or allow a distinct step owner. Unit slopes reduce to
-#' the equal-discrimination PCM kernel.
-#' Under default MML, an intercept-only person distribution
+#' A separate provisional two-family MML route fits the multiplicative
+#' Uto--Ueno equation with explicit fixed-N(0,1) identification, exactly two
+#' facets and second-owner steps. The first family's slopes have geometric mean
+#' one and the second family's slopes are free. Fixed-grid EM and adaptive
+#' direct MML supply summaries and conditional fitted curves without intervals.
+#' Both support separately checked experimental component log-Wald and
+#' location/contrast intervals and descriptive posterior residuals; component
+#' profiles preserve the fitted fixed-grid or adaptive integration and require
+#' separate numerical checks. [predict_mfrm_units()] and the portable
+#' calibration workflow supply experimental conditional new-Person EAP and
+#' posterior intervals, excluding calibration uncertainty. Coverage and
+#' population transport remain unqualified. The one-family diagnostic and
+#' inference routes below do not apply to it. See the
+#' Two slope families section of [fit_mfrm()]. Unit slopes reduce to the
+#' equal-discrimination PCM kernel.
+#' Under default one-family MML, an intercept-only person distribution
 #' \eqn{N(\beta_0,\sigma^2)} is estimated. The geometric-mean-one slopes are
 #' relative discriminations and \eqn{\sigma\alpha_g} are their equivalent
 #' fixed-latent-standard-deviation values, so the conventional common
@@ -356,8 +414,9 @@
 #' \eqn{\sigma=1} and the slope geometric mean to one and is therefore a
 #' narrower relative-discrimination model. Under JML, geometric-mean-one is
 #' required to resolve the scale of jointly estimated person coordinates.
-#' "Bounded" refers to this deliberately limited model/workflow scope, not to
-#' finite optimizer box constraints. The GPCM JML objective is unpenalized.
+#' The former "bounded" label described limited model/workflow scope, not
+#' finite optimizer box constraints. Use GPCM with explicit scope restrictions.
+#' The GPCM JML objective is unpenalized.
 #' Certified extreme-person or facet recession is reported through typed
 #' primary boundary results; a finite optimizer iterate is retained only as a
 #' numerical trace and is not a finite JML maximum.
@@ -368,8 +427,8 @@
 #' Binary responses are the \eqn{K = 1} special case of the same formulation,
 #' so they are handled through the ordinary ordered-score interface. This means
 #' `mfrmr` supports ordered binary and ordered polytomous data under `RSM` and
-#' `PCM`, plus a narrow bounded `GPCM` branch with one designated
-#' `slope_facet` that currently must equal `step_facet`. Unordered
+#' `PCM`, plus `GPCM` with one designated `slope_facet` and, under MML,
+#' a possibly different `step_facet`. Unordered
 #' nominal/multinomial response models are outside the documented model scope,
 #' as are Poisson, negative-binomial, and grouped binomial-trial count-response
 #' families. A positive observation `weight` weights the conditional
@@ -417,6 +476,18 @@
 #' because the target is the polytomous Rasch family rather than B&A's
 #' 2PL probit model.
 #'
+#' **Conditional Maximum Likelihood (CML)**
+#'
+#' For supported RSM/PCM models, CML conditions on each Person's total and
+#' observed assignments, removing ability parameters without specifying their
+#' population distribution. A generalized elementary-symmetric-function
+#' recursion evaluates the conditional likelihood and information. Identification
+#' and finite-MLE checks precede structural contrast intervals; their Wald
+#' interpretation is asymptotic, not a general finite-sample coverage guarantee.
+#' The separate `mfrm_cml_fit` and comparison-only results supply no Person
+#' abilities or population SD. Use [mfrm_facet_intervals()] for their
+#' native-scale intervals. CML does not support GPCM or ordinary diagnostics.
+#'
 #' **Joint Maximum Likelihood (JML)**
 #'
 #' JML estimates all person and facet parameters simultaneously as fixed
@@ -431,7 +502,9 @@
 #' The package still accepts `"JMLE"` as a backward-compatible alias, but
 #' user-facing summaries and documentation use `"JML"` as the public label.
 #'
-#' See [fit_mfrm()] for practical guidance on choosing between the two.
+#' See [fit_mfrm()] for practical guidance on choosing an estimator. General
+#' GPCM inference uses MML; JML remains useful for descriptive point estimates
+#' and FACETS comparisons.
 #'
 #' @section Strict marginal diagnostics:
 #' For `RSM` / `PCM`, `diagnose_mfrm(..., diagnostic_mode = "both")`
@@ -495,10 +568,11 @@
 #' see also Wilson & Hilferty, 1931), not calibrated 5\% and 1\% hypothesis
 #' tests. Parameter estimation, sparse cells, the selected df convention, and
 #' repeated screening across elements all affect that interpretation.
-#' ZSTD is reported alongside every Infit and Outfit value. ZSTD is
-#' withheld (`NA`) when the applicable df falls below 1, where the
-#' Wilson-Hilferty transformation is numerically unstable; FACETS/Winsteps
-#' under `WHEXACT` can continue with a linear approximation on such cells.
+#' Diagnostics default to FACETS fourth-moment df, admitting df > 0 and
+#' capping ZSTD at +/-9. The explicit engine convention withholds df < 1.
+#' `whexact = FALSE` uses the expression above (FACETS YES); `TRUE` removes
+#' its additive q/3 term (FACETS NO). Both use a cube root. The former linear
+#' TRUE transformation is available only as `whexact = "legacy_linear"`.
 #'
 #' **Residual basis under MML vs JMLE engines**
 #'
@@ -542,6 +616,17 @@
 #' `RealReliability` gives the conservative companion based on `RealSE`. For
 #' `MML`, these are anchored to observed-information `ModelSE`
 #' estimates for non-person facets; `JML` keeps them as exploratory summaries.
+#'
+#' The facet's role determines the interpretation. High Person separation
+#' reliability indicates distinguishable abilities. High rater separation
+#' reliability indicates distinguishable severities, **not agreement** between
+#' raters. When raters are intended to be interchangeable, reliable severity
+#' differences merit review rather than a high-reliability quality label.
+#' Low rater separation reliability can also result from imprecise estimates;
+#' it does not establish agreement or equivalence. The index neither tests
+#' every rater pair nor quantifies the practical size of severity differences.
+#' Its Person interpretation is analogous to test reliability, but it is not
+#' numerically identical to Cronbach's alpha.
 #'
 #' For the person facet under `MML`, the same \eqn{G} and \eqn{R} formulas
 #' are applied to EAP person measures with posterior SDs in the error slot.
@@ -611,7 +696,7 @@
 #'   item information identity \eqn{I_j(\theta) = D^2 a_j^2
 #'   \mathrm{Var}(T \mid \theta)} via Samejima's (1974) polytomous
 #'   information formula. This is the canonical reference for
-#'   `compute_information()` under bounded `GPCM`.)
+#'   `compute_information()` under `GPCM`.)
 #' - Samejima, F. (1974). Normal ogive model on the continuous response
 #'   level in the multidimensional latent space. *Psychometrika*, 39,
 #'   111--121. (General polytomous information formula that Muraki
@@ -661,7 +746,7 @@
 #' support across the fitted data, so it should not be described as a fully
 #' mixed-category model with arbitrary item-specific category counts.
 #'
-#' **MML vs JML**
+#' **MML, CML and JML**
 #'
 #' Marginal Maximum Likelihood (MML) integrates over the person ability
 #' distribution using Gauss-Hermite quadrature and does not directly estimate
@@ -677,6 +762,9 @@
 #' computationally, but structural-parameter bias can persist as the number of
 #' persons increases when the number of ratings or items per person remains
 #' fixed. Sample size alone therefore does not determine the preferred route.
+#' For supported RSM/PCM structural contrasts, CML instead conditions out Person
+#' ability without a population model. It estimates neither abilities nor a
+#' population SD; same-fit population-SD standardization requires MML.
 #'
 #' See [fit_mfrm()] for usage.
 #'
@@ -708,40 +796,49 @@
 #' incomplete, or arbitrary imported designs.
 #'
 #' @examples
-#' mfrm_threshold_profiles()
-#' list_mfrmr_data(details = TRUE)
+#' # Load the package
+#' library(mfrmr)
 #'
-#' \donttest{
-#' toy <- load_mfrmr_data("example_operational")
+#' # Load example ratings and look at the first six rows
+#' ratings <- load_mfrmr_data("example_operational")
+#' head(ratings)
+#'
+#' # Fit the model
 #' fit <- fit_mfrm(
-#'   toy,
+#'   data = ratings,
 #'   person = "Person",
 #'   facets = c("Rater", "Criterion"),
 #'   score = "Score",
+#'   rating_min = 1, rating_max = 4, category_policy = "preserve",
 #'   method = "MML",
-#'   model = "RSM",
-#'   quad_points = 7
+#'   model = "RSM"
 #' )
-#' diag <- diagnose_mfrm(fit, diagnostic_mode = "both", residual_pca = "none")
-#' summary(diag)
-#' }
 #'
+#' # Plot the results (Wright map)
+#' plot(fit)
+#'
+#' # Save the summary, then display its tables
+#' results <- summary(fit)
+#' results$person_overview # One row summarizing person ability estimates
+#' results$facet_overview  # One row per facet: number of levels, mean, SD, range
+#'
+#' # Check the interpretation status and recommended next step
+#' results$decision
 #' @importFrom dplyr across all_of any_of arrange bind_cols bind_rows
 #' @importFrom dplyr case_when coalesce count desc distinct everything filter group_by
 #' @importFrom dplyr if_all inner_join lag last left_join mutate n n_distinct pull rename
 #' @importFrom dplyr row_number rowwise select slice slice_head slice_tail summarise
-#' @importFrom dplyr summarize transmute ungroup
+#' @importFrom dplyr starts_with summarize transmute ungroup
 #' @importFrom tidyr drop_na expand_grid pivot_wider replace_na unite
 #' @importFrom tibble as_tibble column_to_rownames tibble
-#' @importFrom purrr map map_dbl map_dfr pmap_chr
-#' @importFrom stringr regex str_count str_detect str_extract str_pad
-#' @importFrom stringr str_replace str_replace_all str_trunc
-#' @importFrom psych cor.smooth describe principal
 #' @importFrom utils combn data globalVariables head modifyList packageVersion
 #' @importFrom utils read.csv tail write.csv
-#' @importFrom lifecycle deprecate_soft
+#' @importFrom graphics abline arrows axis barplot dotchart hist image legend lines mtext plot plot.new points rect segments text title
+#' @importFrom stats cutree hclust kmeans nlminb optim optimHess optimize qt
+#' @importFrom utils zip
+#' @importFrom cli cli_progress_bar cli_progress_done cli_progress_update
 #' @importFrom rlang .data
-#' @importFrom stats na.omit optim p.adjust pchisq pt rnorm sd setNames uniroot
+#' @importFrom stats ave confint na.omit optim p.adjust pchisq predict pt qnorm rnorm sd setNames uniroot
 #'
 #' @name mfrmr-package
 "_PACKAGE"

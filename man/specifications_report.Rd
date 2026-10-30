@@ -41,6 +41,11 @@ Build a specification summary report (preferred alias)
 
 \itemize{
 \item \code{header} / \code{data_spec}: run identity and model settings.
+\code{CenteringScope} is \code{"facet"} for whole-facet centering or \code{"remainder"}
+for the legacy constraint on ungrouped, unanchored levels. It applies
+only to centered facets; \code{NonCenteredFacet} remains separate. Older
+native fits without convention metadata retain \code{"remainder"}; an input
+without a stored constraint specification is \code{"not_recorded"}.
 \item \code{facet_labels}: facet sizes and labels.
 \item \code{convergence_control}: optimizer configuration and status.
 }
@@ -56,6 +61,9 @@ Build a specification summary report (preferred alias)
 }
 
 \examples{
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("specifications_report", run.dontrun = TRUE)
+\dontrun{
 toy <- load_mfrmr_data("example_operational")
 fit <- fit_mfrm(
   toy, "Person", c("Rater", "Criterion"), "Score",
@@ -65,6 +73,7 @@ out <- specifications_report(fit, title = "Toy run")
 summary(out)
 p_spec <- plot(out, draw = FALSE)
 p_spec$data$plot
+}
 }
 \seealso{
 \code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=data_quality_report]{data_quality_report()}}, \code{\link[=estimation_iteration_report]{estimation_iteration_report()}},

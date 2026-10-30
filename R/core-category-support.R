@@ -1,6 +1,22 @@
 # ==============================================================================
 # Category and step-support audit
 # ==============================================================================
+
+mfrm_category_settings <- function(prep, config = list()) {
+  keep <- prep$keep_original %||% config$keep_original %||%
+    config$replay_inputs$keep_original
+  policy <- if (identical(keep, TRUE)) "preserve" else
+    if (identical(keep, FALSE)) "collapse" else "not_recorded"
+  map <- prep$score_map %||% config$score_map
+  recoded <- NA
+  if (is.data.frame(map) && nrow(map) > 0L &&
+      all(c("OriginalScore", "InternalScore") %in% names(map)) &&
+      is.numeric(map$OriginalScore) && is.numeric(map$InternalScore) &&
+      all(is.finite(map$OriginalScore)) && all(is.finite(map$InternalScore))) {
+    recoded <- any(map$OriginalScore != map$InternalScore)
+  }
+  list(CategoryPolicy = policy, ScoreRecoded = recoded)
+}
 #
 # The current package fits one observed score scale at a time.  This audit uses
 # an explicit internal scale key so that the one-scale reduction does not bake
@@ -12,11 +28,9 @@
 # category probability then tends to zero while every other category exponent
 # is unchanged.  Boundary-category absence does not create this step-contrast
 # direction and remains review evidence for the later element-boundary audit.
-# Threshold anchors are not part of the 0.2.3 model.
-
-mfrmr_category_contract_version <- function() {
-  mfrmr_readiness_contract_version()
-}
+# Public 0.2.3 fits use the unanchored reduction. The internal 0.2.4 typed
+# route additionally marks fixed transitions so missing-category evidence is
+# charged only to optimizer coordinates that remain free.
 
 mfrmr_category_values_text <- function(x) {
   x <- as.character(x)
@@ -166,7 +180,7 @@ audit_mfrm_category_support <- function(prep, config, sizes) {
   declared <- seq.int(as.integer(prep$rating_min), as.integer(prep$rating_max))
   n_categories <- length(declared)
   n_steps <- max(n_categories - 1L, 0L)
-  free_per_scope <- sum_zero_param_count(n_steps)
+  step_specs <- mfrmr_step_specs(config)
   if (n_categories < 2L || n_steps < 1L) {
     stop("Category support audit requires at least two declared categories.",
          call. = FALSE)
@@ -188,6 +202,17 @@ audit_mfrm_category_support <- function(prep, config, sizes) {
 
   for (scope_index in seq_along(scope_specs)) {
     scope <- scope_specs[[scope_index]]
+    step_spec <- step_specs[[scope_index]]
+    estimated_transitions <- if (length(step_spec$free_index) <= 1L) {
+      integer(0)
+    } else {
+      step_spec$free_index[-length(step_spec$free_index)]
+    }
+    free_per_scope <- as.integer(step_spec$n_params)
+    fixed_transitions <- which(is.finite(step_spec$anchors))
+    derived_transitions <- setdiff(seq_len(n_steps), c(
+      fixed_transitions, estimated_transitions
+    ))
     mask <- as.logical(scope$row_mask)
     scope_score <- score[mask]
     scope_weight <- weight[mask]
@@ -238,9 +263,14 @@ audit_mfrm_category_support <- function(prep, config, sizes) {
         unsupported_category_indices %in% adjacent_indices
       )
 
-      is_free_component <- transition <= free_per_scope
+      is_free_component <- transition %in% estimated_transitions
       optimizer_index <- if (is_free_component) {
-        offset <- (scope_index - 1L) * free_per_scope + transition
+        prior_free <- if (scope_index <= 1L) 0L else {
+          sum(vapply(step_specs[seq_len(scope_index - 1L)], function(spec) {
+            as.integer(spec$n_params)
+          }, integer(1)))
+        }
+        offset <- prior_free + match(transition, estimated_transitions)
         if (offset <= length(step_slice)) as.integer(step_slice[offset]) else NA_integer_
       } else {
         NA_integer_
@@ -250,7 +280,9 @@ audit_mfrm_category_support <- function(prep, config, sizes) {
       } else {
         paste0(config$step_facet, ":", scope$level)
       }
-      status <- if (free_per_scope == 0L) {
+      status <- if (transition %in% fixed_transitions) {
+        "fixed"
+      } else if (free_per_scope == 0L) {
         "not_estimated"
       } else if (unsupported_contrast) {
         "unsupported"
@@ -285,13 +317,15 @@ audit_mfrm_category_support <- function(prep, config, sizes) {
         LowerCategory = declared[transition],
         UpperCategory = declared[transition + 1L],
         RetainedForFit = TRUE,
-        Fixed = FALSE,
-        ConstraintRole = if (free_per_scope == 0L) {
+        Fixed = transition %in% fixed_transitions,
+        ConstraintRole = if (transition %in% fixed_transitions) {
+          "fixed_anchor"
+        } else if (free_per_scope == 0L) {
           "derived_constraint_only"
         } else if (is_free_component) {
           "free_coordinate_component"
         } else {
-          "sum_zero_reference_component"
+          "sum_constraint_reference_component"
         },
         OptimizerIndex = optimizer_index,
         LowerCount = lower_count,
@@ -313,7 +347,7 @@ audit_mfrm_category_support <- function(prep, config, sizes) {
       upper_step <- category_index
       affected_free <- intersect(
         c(lower_step, upper_step),
-        seq_len(free_per_scope)
+        estimated_transitions
       )
       data.frame(
         ReadinessScope = "parameter",
@@ -393,10 +427,10 @@ audit_mfrm_category_support <- function(prep, config, sizes) {
       ObservedWithinScope = mfrmr_category_values_text(observed),
       RetainedForFit = mfrmr_category_values_text(declared),
       FreeStepCount = free_per_scope,
-      FixedStepCount = 0L,
-      DerivedStepCount = n_steps - free_per_scope,
+      FixedStepCount = length(fixed_transitions),
+      DerivedStepCount = length(derived_transitions),
       UnsupportedFreeStepCount = sum(
-        seq_len(free_per_scope) %in% unsupported_index
+        estimated_transitions %in% unsupported_index
       ),
       UnsupportedCategory = mfrmr_category_values_text(
         declared[unsupported_category_indices]
@@ -497,7 +531,7 @@ audit_mfrm_category_support <- function(prep, config, sizes) {
   ]
 
   readiness <- data.frame(
-    ReadinessContractVersion = mfrmr_category_contract_version(),
+    ReadinessContractVersion = mfrmr_readiness_contract_version(),
     ReadinessScope = "fit",
     CategoryState = state,
     ReasonCodes = paste(audit_reasons, collapse = ";"),
@@ -515,7 +549,7 @@ audit_mfrm_category_support <- function(prep, config, sizes) {
   )
 
   list(
-    contract_version = mfrmr_category_contract_version(),
+    contract_version = mfrmr_readiness_contract_version(),
     model = as.character(config$model),
     method = as.character(config$method),
     scale_scope = "single_observed_scale",
@@ -586,8 +620,7 @@ mfrmr_stop_unsupported_category <- function(audit) {
     "sum-zero step parameterization. Optimization was not run. Collect ",
     "observations in every affected internal category, revise the score ",
     "support or response model, or separate the fitted ladder; threshold ",
-    "anchoring is not available ",
-    "in mfrmr 0.2.3."
+    "anchoring is not currently available."
   )
   stop(mfrmr_category_condition(message, audit, type = "error"))
 }

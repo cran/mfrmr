@@ -22,9 +22,10 @@ on demand when omitted.}
 \item{facet}{Facet whose levels are placed on both axes (default
 \code{"Rater"}).}
 
-\item{min_pairs}{Minimum number of shared response opportunities
-required to retain a pair. Pairs below the threshold are shown
-as \code{NA}.}
+\item{min_pairs}{Minimum number of persons with finite aggregated residuals
+at both levels; an integer of at least three. Unavailable pairs remain
+in the table with their overlap count and reason, and appear as \code{NA}
+in the matrix.}
 
 \item{preset}{Visual preset.}
 
@@ -32,37 +33,80 @@ as \code{NA}.}
 }
 \value{
 An \code{mfrm_plot_data} whose \code{data} slot bundles the symmetric
-residual \code{matrix}, the long-form \code{pairs} table, and the threshold
-used.
+residual \code{matrix}, one row per unordered pair in \code{pairs}, and the
+minimum overlap \code{min_pairs}. Interpretation notes are available through
+\code{plot_data(p, "notes")}. Save the complete payload with \code{\link[base:saveRDS]{base::saveRDS()}};
+\code{\link[=as_ggplot]{as_ggplot()}} converts its saved matrix without recalculating residuals.
 }
 \description{
 Builds an N x N heatmap of pairwise standardized residuals between
 facet levels, computed from the diagnostics observation table.
 Cells with large absolute values flag pairs of facet elements (e.g.
 two raters, two items) whose residuals co-move more than the
-main-effects MFRM expects, which is the standard Yen Q3-style
-indicator of local response dependence.
+main-effects MFRM expects. Residuals are averaged within each Person
+and facet level before correlation. This is a Q3-style screen, distinct
+from raw-residual Yen Q3; no fixed correlation cutoff establishes local
+independence for this standardized, aggregated index.
 }
 \details{
-This helper complements \code{\link[=plot_marginal_pairwise]{plot_marginal_pairwise()}}: the marginal
+This helper complements \link[=plot.mfrm_fit]{plot(x, type = "marginal_pairwise")}: the marginal
 version uses posterior-integrated agreement residuals on a
 top-N pair list, while this view shows every pair on a shared color
 scale so an analyst can scan for diagonal blocks or hotspots.
 }
+\section{Migration in 0.2.4}{
+
+This renderer is internal. Use the corresponding \code{plot()} route in
+\link{mfrmr_plot_migration}; the former exported name is no longer available.
+}
+
+\section{Session plot defaults}{
+
+Set \code{options(mfrmr.plot_preset = "publication")} to choose a session default
+for plotting functions that expose the common \code{preset} argument. The
+supported values are \code{"standard"}, \code{"publication"}, \code{"compact"} and
+\code{"monochrome"}. Precedence is an explicit call argument, then the session
+option, then \code{"standard"}. For example, \code{preset = "standard"} overrides
+a session set to \code{"monochrome"}. Explicit \code{preset = NULL} retains the
+earlier package-default behavior; it does not read the session option.
+Invalid session values cause an error only when that option is needed.
+
+The category-curve, data-quality, fit-review, connectivity and network
+routes of \code{plot()} for report bundles use the same option through \code{...}.
+Plots without a common \code{preset} argument, including extended-model plots
+with their own \code{palette} controls, keep their own settings. This option
+selects a preset, not a universal theme or a guarantee that all renderers
+implement every appearance control identically.
+
+New plot payloads retain the resolved preset for supported saved-data
+rendering. Converting an existing payload with \code{\link[=as_ggplot]{as_ggplot()}} uses its saved
+appearance, even after the session option changes. A call that creates a
+new plot from a fit or statistical result uses the current default.
+For a reproducible script, supply \code{preset} explicitly or set the option in
+that script. Saving only the fitted model does not save a session option.
+No global ggplot theme is changed.
+
+Restore previous settings with \code{old <- options(mfrmr.plot_preset = "monochrome")} followed by \code{options(old)}. Use
+\code{options(mfrmr.plot_preset = NULL)} to remove the option. The preset changes
+appearance, not estimates, confidence levels or diagnostic thresholds.
+}
+
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                 method = "JML", maxit = 30)
-p <- plot_local_dependence_heatmap(fit, draw = FALSE)
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("plot_local_dependence_heatmap", run.dontrun = TRUE)
+\dontrun{
+# Saved synthetic JML/RSM analysis of example_core.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "core-jml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+p <- plot(fit, type = "local_dependence", draw = FALSE)
 dim(p$data$matrix)
-# Look for: |off-diagonal correlation| < 0.2 is the typical
-#   acceptable regime; values >= 0.3 (Yen 1984 / Marais 2013
-#   guideline) flag pairs that may share dependence beyond the
-#   main-effects MFRM. Inspect those cells in `diag$obs`.
+# Inspect large absolute correlations alongside shared-person counts.
+# Unavailable pairs are not evidence of local independence.
 }
 }
 \seealso{
-\code{\link[=plot_marginal_pairwise]{plot_marginal_pairwise()}}, \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}},
+\link[=plot.mfrm_fit]{plot(x, type = "marginal_pairwise")}, \link[=plot.mfrm_fit]{plot(x, type = "qc")},
 \link{mfrmr_visual_diagnostics}
 }
+\keyword{internal}

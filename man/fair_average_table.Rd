@@ -17,22 +17,27 @@ fair_average_table(
   omit_unobserved = FALSE,
   xtreme = 0,
   fair_se = FALSE,
-  ci_level = 0.95
+  ci_level = 0.95,
+  xtreme_method = c("display", "facets"),
+  reference_plan = NULL
 )
 }
 \arguments{
 \item{fit}{Output from \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
-\item{diagnostics}{Optional output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.}
+\item{diagnostics}{Optional output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} for this \code{fit}.
+Matching saved diagnostics are reusable; recompute them after refitting.}
 
 \item{facets}{Optional subset of facets.}
 
 \item{totalscore}{Include all observations for score totals (\code{TRUE}) or apply
-legacy extreme-row exclusion (\code{FALSE}).}
+extreme-row exclusion (\code{FALSE}). In ordinary additive RSM/PCM JML,
+finite direct anchors remain eligible even with all-minimum/all-maximum
+responses, under both \code{xtreme_method} conventions.}
 
-\item{umean}{Additive score-to-report origin shift.}
+\item{umean}{Additive origin shift for Measure (not fair-score values).}
 
-\item{uscale}{Multiplicative score-to-report scale.}
+\item{uscale}{Multiplicative scale for Measure and measure SEs (not fair scores).}
 
 \item{udecimals}{Rounding digits used in formatted output.}
 
@@ -44,9 +49,12 @@ legacy extreme-row exclusion (\code{FALSE}).}
 
 \item{omit_unobserved}{If \code{TRUE}, remove unobserved levels.}
 
-\item{xtreme}{Extreme-score adjustment amount.}
+\item{xtreme}{Nonnegative correction smaller than the score range for
+all-minimum/all-maximum rows. Default \code{0} leaves measures unchanged.
+Its units depend on \code{xtreme_method}; no responses or primary estimates
+are changed, and this does not correct JML bias.}
 
-\item{fair_se}{Logical. When \code{TRUE} and \code{fit} is an MML bounded-\code{GPCM}
+\item{fair_se}{Logical. When \code{TRUE} and \code{fit} is an MML \code{GPCM}
 fit, add structural delta-method standard errors and confidence limits
 for \code{Fair(M)} / \code{AdjustedAverage} and \code{Fair(Z)} /
 \code{StandardizedAdjustedAverage}. Person rows remain \code{NA} because MML
@@ -56,6 +64,27 @@ unavailable.}
 
 \item{ci_level}{Confidence level used when \code{fair_se = TRUE}; default
 \code{0.95}.}
+
+\item{xtreme_method}{\code{"display"} (default) retains the historical
+average-score display adjustment. \code{"facets"} uses conditional total-score
+extrapolation for ordinary additive RSM/PCM JML, without group-mean anchors.
+Supply \code{xtreme = .3} explicitly to use the usual FACETS main correction.}
+
+\item{reference_plan}{Optional data frame of non-Person facet columns,
+using the fitted facet names, and an optional positive \code{Weight} column.
+For ordinary additive RSM/PCM JML, adds \code{reference_scores}: each Person's
+expected average on this same plan, using its fitted facet locations and
+scale profiles. Weights are normalized to sum to one. This distinct target
+does not replace FairM/FairZ or their administered PCM scale mixture.
+Primary estimates are used, irrespective of display/extrapolation settings.
+Scores use internal score units, unaffected by \code{umean} or \code{uscale}.
+The result retains the fit for \code{\link[=confint.mfrm_fair_average]{confint.mfrm_fair_average()}}.
+For an explicit \code{mfrm_jeffreys_fit}, this argument is required and the
+result contains only common-plan \code{reference_scores}, the plan, fit and
+estimator identity. Other arguments beyond \code{fit} and \code{reference_plan}
+are refused: ordinary FairM/FairZ diagnostics do not apply. Inspect
+\code{summary(result)}; use \code{plot(confint(result, ...))} for supported interval
+plots. Direct FairM/FairZ plotting is unavailable for this result.}
 }
 \value{
 A named list with:
@@ -77,29 +106,77 @@ package-native aliases such as \code{AdjustedAverage},
 \code{StandardizedAdjustedAverage}, \code{ModelBasedSE}, and \code{FitAdjustedSE} are
 appended to the formatted outputs.
 
-For the Rasch-family \code{RSM} / \code{PCM} branch, these tables follow the
-standard FACETS Linacre construction: fair averages are
-Rasch-measure-to-score transformations evaluated in a standardized
-mean/zero-facet environment.
+\code{RSM} fair scores use the shared scale. \code{PCM} retains each observation's
+step profile, converts the reference predictor to an expected score, then
+averages with rating weights. Averaging thresholds before conversion is
+not equivalent. FairM replaces other element locations by their means;
+FairZ replaces them by zero. The PCM scale exposure is retained, so fair
+scores can still depend on which scales were administered.
+The Person reference excludes nonfinite primary estimates and records
+eligible/excluded counts. With no finite Person reference, non-Person
+FairM is unavailable. FairZ does not need a Person mean. Neither target
+integrates over Person ability; these are expected scores, not z-scores.
 
-Bounded \code{GPCM} fits are supported under a slope-aware
+With \code{xtreme > 0}, \code{PrimaryMeasure} retains the fitted measure, including
+infinite JML estimates and fixed anchors, on the requested reporting scale.
+Fixed anchors retain their measure in both columns. With
+\code{xtreme_method = "display"}, an expected average that is \code{xtreme} from the
+endpoint is inverted. Measure SEs are unavailable on replaced rows and
+fair-score calculations do not use that replacement.
+For ordinary additive RSM/PCM JML, a directly anchored element is not
+classified as an unanchored extreme for row exclusion. Its observations
+remain eligible when \code{totalscore = FALSE}, unless another unanchored extreme
+element requires their exclusion. This rule also preserves the PCM scale
+mixture used in fair scores and does not depend on the display adjustment.
+Recreate older affected fair-score tables and plots from the saved fit and
+matching diagnostics; refitting the calibration is unnecessary.
+
+With \code{xtreme_method = "facets"}, the weighted total is moved inward by
+\code{xtreme} times the smallest positive weight among that element's eligible
+observations. Responses involving another unanchored extreme element are
+excluded. The resulting weighted score equation is solved using the actual
+administered calibration and PCM scales. Its reciprocal square-root
+conditional information supplies the reporting SE. The replacement enters
+that element's FairM/FairZ, while reference locations retain their original
+basis. \code{ExtremeAdjustment} records a weighted-total correction in this mode,
+versus an average-score correction in \code{"display"} mode. \code{MeasureBasis} and
+\code{MeasureSEBasis} identify the reported quantities. These are finite reporting
+values and conditional SEs at an adjusted total, not finite MLEs or SEs for
+the original extreme response pattern. Fair-score intervals remain
+unavailable when \code{xtreme > 0}.
+
+Binary unit/replication-weight examples and a fixed-scale PCM kernel were
+checked against FACETS 4.5.0. This is not whole-program equivalence: partial
+anchor examples can leave native score residuals and shifted final measures,
+which this conditional calculation does not reproduce. Group-mean anchors,
+fitted interactions, corrected JML, MML and GPCM are outside this route.
+Recompute older diagnostics and recreate saved tables from the existing
+fit before summarizing or plotting them; no model refit is needed.
+With an extreme fixed Person plus an informative interior Person anchor,
+matched RSM/PCM examples also agree for conditional fair scores at the
+reported native calibration. Main estimates can still differ and native
+iteration limits or nonzero free-element score residuals must not be
+interpreted as calibration agreement.
+
+\code{GPCM} fits are supported under a slope-aware
 element-conditional construction. For each slope-facet element
 \eqn{j^\star} the per-row fair-average is the GPCM expected score
 \deqn{\mathrm{FA}_{p, j^\star} = \sum_k k \cdot P_{GPCM}(X = k \mid \theta_p, a_{j^\star}, \boldsymbol{\delta}_{j^\star})}
 computed at that element's own discrimination \eqn{a_{j^\star}}
 and threshold structure. Rows for non-slope facets (Person, Rater,
 \ldots) use the geometric-mean-one slope by the GPCM
-identification convention, so those rows remain continuous with
-the standard PCM Linacre fair-average and reduce to it exactly
-when all slopes equal one.
+identification convention and average the threshold profiles before score
+conversion. At unit slope the conversion reduces to the PCM kernel, but
+this aggregation need not equal PCM's average of administered-scale
+expectations for non-step-facet rows.
 This is an identification-based reporting convention for the package's
-bounded \code{GPCM} route, not a unique free-discrimination score-side analogue
+\code{GPCM} route, not a unique free-discrimination score-side analogue
 to FACETS fair averages. Do not report it as FACETS score-side equivalence
 or as an operational scoring rule unless that convention is substantively
 justified.
 
 Standard errors on the fair-average value itself are opt-in for MML
-bounded \code{GPCM} fits via \code{fair_se = TRUE}. The original \code{SE},
+\code{GPCM} fits via \code{fair_se = TRUE}. The
 \verb{Model S.E.}, \code{ModelBasedSE}, \verb{Real S.E.}, and \code{FitAdjustedSE} columns
 retain the same meaning as for PCM (scaled facet-measure SEs); fair-average
 uncertainty is reported under distinct columns such as \verb{Fair(M) S.E.},
@@ -110,12 +187,17 @@ uncertainty is reported under distinct columns such as \verb{Fair(M) S.E.},
 \itemize{
 \item \code{stacked}: cross-facet table for global comparison.
 \item \code{by_facet}: per-facet formatted tables for reporting.
-\item \code{raw_by_facet}: unformatted values for custom analyses/plots.
+\item \code{raw_by_facet}: unformatted values for custom analyses/plots; identifiers
+use the column \code{Level}.
 \item \code{settings}: scoring-transformation and filtering options used.
 }
 
-Larger observed-vs-fair gaps can indicate systematic scoring tendencies by
-specific facet levels.
+Observed-vs-fair gaps also reflect person mix and assignment. They are
+descriptive follow-up prompts, not standalone evidence of rater bias.
+Ordinary additive RSM/PCM JML tables also retain \code{PTMEAExpected} and its
+availability metadata when present in the matching diagnostics. This is a
+conditional reference for observed \verb{PtMea Corr}, not an inferential cutoff;
+see \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} for its finite-count correction and weighting basis.
 }
 
 \section{Typical workflow}{
@@ -123,24 +205,28 @@ specific facet levels.
 \enumerate{
 \item Run \code{fair_average_table(fit, ...)}.
 \item Inspect \code{summary(t12)} and \code{t12$stacked}.
-\item Visualize with \code{\link[=plot_fair_average]{plot_fair_average()}}.
+\item Visualize with \link[=plot.mfrm_fit]{plot(x, type = "fair_average")}.
 }
 }
 
 \section{Output columns}{
 
-The \code{stacked} data.frame contains:
+The \code{stacked} data.frame contains the following columns, selected by
+\code{reference}, \code{label_style}, and \code{fair_se}:
 \describe{
 \item{Facet}{Facet name for this row.}
-\item{Level}{Element label within the facet.}
+\item{Element}{Element label within the facet.}
 \item{Obsvd Average}{Observed raw-score average.}
 \item{Fair(M) Average}{Model-adjusted reference average on the reported score scale.}
-\item{Fair(Z) Average}{Standardized adjusted reference average.}
+\item{Fair(Z) Average}{Expected score at a zero reference environment, not a z-score.}
 \item{ObservedAverage, AdjustedAverage, StandardizedAdjustedAverage}{Package-native aliases for the three average columns above.}
 \item{AdjustedAverageSE, AdjustedAverageCI_Lower, AdjustedAverageCI_Upper}{Optional structural delta-method uncertainty for \code{AdjustedAverage} when \code{fair_se = TRUE} and available.}
 \item{StandardizedAdjustedAverageSE, StandardizedAdjustedAverageCI_Lower, StandardizedAdjustedAverageCI_Upper}{Optional structural delta-method uncertainty for \code{StandardizedAdjustedAverage} when \code{fair_se = TRUE} and available.}
-\item{Measure}{Estimated logit measure for this level.}
-\item{SE}{Compatibility alias for the model-based standard error.}
+\item{Measure}{Displayed facet measure, transformed by \code{umean} and \code{uscale}; may be replaced when \code{xtreme > 0}.}
+\item{PrimaryMeasure}{Original fitted measure on the same reporting scale, including infinite JML estimates.}
+\item{MeasureBasis, ExtremeAdjustment}{Whether the displayed measure was replaced and the replacement amount in score units.}
+\item{MeasureSEBasis}{In \code{raw_by_facet}, distinguishes conditional information at a corrected total from fitted-measure uncertainty.}
+\item{FairMReference}{The mean reference used for FairM, or why that reference is unavailable.}
 \item{ModelBasedSE, FitAdjustedSE}{Package-native aliases for \verb{Model S.E.} and \verb{Real S.E.}.}
 \item{Infit MnSq, Outfit MnSq}{Fit statistics for this level.}
 }
@@ -148,12 +234,10 @@ The \code{stacked} data.frame contains:
 
 \section{Standard-error caveat (read before quoting CIs)}{
 
-The \code{SE}, \verb{Model S.E.}, \code{ModelBasedSE}, \verb{Real S.E.}, and \code{FitAdjustedSE}
+The \verb{Model S.E.}, \code{ModelBasedSE}, \verb{Real S.E.}, and \code{FitAdjustedSE}
 columns in this table are the \strong{measure-level} standard errors of the
-underlying facet element (the same SE that would appear in
-\code{summary(fit)$facets}), rescaled by the fair-average score scale factor
-so the units line up with the reported \verb{Fair(M) Average} / \verb{Fair(Z) Average}
-columns. They are \strong{not} delta-method standard errors of the fair-average
+underlying facet element, rescaled by \code{abs(uscale)} to the reported Measure units.
+Fair scores remain on the fitted internal score scale. They are \strong{not} delta-method standard errors of the fair-average
 values themselves. When \code{fair_se = TRUE}, the distinct \verb{Fair(M) S.E.} /
 \verb{Fair(Z) S.E.} columns are computed by
 propagating the joint covariance of the relevant facet element, the
@@ -161,9 +245,19 @@ threshold parameters, and the slope parameters through the gradient of
 \eqn{\mathrm{E}[X \mid \theta_p, j^\star]}. This is a structural
 covariance calculation: MML person EAP estimates are conditioned on rather
 than included in the Hessian, so person rows receive unavailable fair-average
-SEs. \strong{Do not use the measure-level \code{SE} / \verb{Model S.E.} columns as
+SEs. \strong{Do not use the measure-level \code{ModelBasedSE} / \verb{Model S.E.} columns as
 \eqn{\pm 1.96 \cdot \mathrm{SE}} confidence-interval bounds on the
 fair-average value.}
+\code{FairCIEligible} is \code{FALSE} for these diagnostic intervals; numerical
+availability (\code{ok} or \code{regularized}) does not establish inferential validity.
+\code{FairCIReportingUse} distinguishes diagnostic-only and unavailable rows.
+Full-refit coverage remains unverified. For RSM/PCM, this table does not
+supply fair-score SEs; \link[=plot.mfrm_fit]{plot(x, type = "fair_average")} can compute a conditional
+interval from a fitted model by propagating only the focal measure SE.
+Summaries identify \code{FairMetric}: FairM for mean/both reference tables, FairZ
+for zero-reference tables, with matching score/SE column names.
+Export \code{stacked} or the summary's \code{summary} / \code{preview} data.frames with
+\code{\link[utils:write.csv]{utils::write.csv()}}. \code{\link[=export_summary_appendix]{export_summary_appendix()}} does not accept this bundle.
 }
 
 \section{References}{
@@ -174,9 +268,9 @@ fair-average value.}
 MESA Press.
 \item Linacre, J. M. (2026). \emph{A user's guide to FACETS, version 4.5.0}.
 Winsteps.com.
-(FACETS Table 12 corresponds to the fair-average
+(FACETS Table 7 corresponds to the fair-average
 construction implemented here for \code{RSM} / \code{PCM} fits; the
-slope-aware element-conditional construction for bounded \code{GPCM}
+slope-aware element-conditional construction for \code{GPCM}
 is documented in this help page.)
 \item Andrich, D. (1978). A rating formulation for ordered response
 categories. \emph{Psychometrika, 43}(4), 561-573.
@@ -185,22 +279,40 @@ categories. \emph{Psychometrika, 43}(4), 561-573.
 \emph{Psychometrika, 47}(2), 149-174. \doi{10.1007/BF02296272}
 \item Muraki, E. (1992). A generalized partial credit model:
 Application of an EM algorithm. \emph{Applied Psychological
-Measurement, 16}(2), 159-176. (Cited for the bounded \code{GPCM}
+Measurement, 16}(2), 159-176. (Cited for the \code{GPCM}
 slope-aware extension.)
 }
 }
 
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
-t12 <- fair_average_table(fit, udecimals = 2)
-t12_native <- fair_average_table(fit, reference = "mean", label_style = "native")
-summary(t12)
-p_t12 <- plot(t12, draw = FALSE)
-p_t12$data$plot
-}
+# Long-running workflow; run explicitly when needed.
+# example("fair_average_table", run.dontrun = TRUE)
+\dontrun{
+library(mfrmr)
 
+# Saved synthetic MML/RSM analysis of example_operational.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "operational-mml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+
+# Use the diagnostics saved with this fit
+diagnostics <- example_fit$diagnostics
+
+# Compare observed person means with model-based scores on a common reference
+fair <- fair_average_table(fit, diagnostics = diagnostics, facets = "Person",
+                           reference = "mean", label_style = "native")
+head(fair$raw_by_facet$Person[, c("Level", "ObservedAverage", "FairM")])
+# FairM uses the mean reference for the other facets; it is in score units
+# It is a conditional model prediction, not a guarantee of fairness
+
+# Fit the same synthetic ratings by JML to illustrate total-score extrapolation
+toy <- load_mfrmr_data(example_fit$dataset)
+jml <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML")
+extreme_report <- fair_average_table(jml, xtreme = .3, xtreme_method = "facets")
+head(extreme_report$raw_by_facet$Person[, c("Level", "PrimaryMeasure",
+     "Measure", "MeasureBasis", "ModelSE", "MeasureSEBasis")])
+# ModelSE describes the adjusted total when MeasureBasis says extrapolation
+}
 }
 \seealso{
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=unexpected_response_table]{unexpected_response_table()}}, \code{\link[=displacement_table]{displacement_table()}}

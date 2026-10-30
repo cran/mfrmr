@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Uncertainty in rater estimates and differences</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Uncertainty in rater estimates and
+differences</h1>
+
+
+
+<p>An assessment team wants to discuss a difference in severity between
+two raters. The point estimate answers how large the fitted difference
+is. Its interval describes uncertainty under specified sampling and
+model assumptions. Neither a difference nor an interval excluding zero
+establishes that a rater is scoring incorrectly.</p>
+<p>This guide first compares two covariance methods for <strong>the same
+fitted estimates</strong>. The ordinary method uses the fitted model’s
+observed information. The sandwich method also uses the variation in
+likelihood contributions between independent persons, or between
+explicitly declared larger clusters. It can change interval widths
+without correcting biased estimates. It then introduces CML, which
+changes the estimator by conditioning out Person parameters, and
+distinguishes native contrasts from contrasts standardized by a fitted
+population SD. The examples use fictional ratings.</p>
+<div id="fit-the-model-and-identify-the-comparison" class="section level2">
+<h2>Fit the model and identify the comparison</h2>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>ratings <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_core&quot;</span>)</span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(ratings, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>                <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>, <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>)</span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>ordinary <span class="ot">&lt;-</span> <span class="fu">mfrm_facet_intervals</span>(fit, <span class="st">&quot;Rater&quot;</span>)</span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="fu">summary</span>(ordinary)</span></code></pre></div>
+<p>These are RSM marginal maximum likelihood estimates with a fixed
+standard-normal person distribution. The interval helper also supports
+PCM in this scope, with unit observation weights and fixed quadrature.
+It checks the source fit’s inference readiness. When an eligible fit has
+unavailable, nonpositive or regularized joint information, the returned
+table retains finite points with
+<code>Status = &quot;information_unavailable&quot;</code>,
+<code>CIEligible = FALSE</code> and missing uncertainty.
+<code>InferenceReview</code> explains the failure, including any
+information memory limit. Both model and sandwich intervals need the
+inverse information, so switching to sandwich does not resolve this
+failure. Weak information can also limit confidence in the point’s
+numerical accuracy. Constraint-fixed targets retain zero SE and no
+inferential interval. Invalid inputs and ineligible source fits still
+produce errors. For <code>method = &quot;model&quot;</code>, RSM/PCM
+singleton-category fits can pass a separate review of the actual joint
+information, convergence and finer quadrature while retaining
+<code>InferenceReady = FALSE</code> in the source fit. Read the interval
+object’s <code>CIEligible</code>, <code>checks</code> and
+<code>InferenceCaution</code>. This supplies an asymptotic approximation
+with a small-sample caution; it does not establish coverage or make
+other analyses available. Empty categories and identification/numerical
+failures are not waived. There is no ten-rating-row minimum; precision
+and identification depend on the model and response patterns, not a row
+count alone.</p>
+<p>Full RSM/PCM calibration also admits one Person for JML, CML and
+fixed-population MML when the applicable checks pass. A single Person
+with informative independent rating events can have finite structural
+estimates. This does not establish small-sample coverage: returned
+interval tables retain <code>CoverageQualified = FALSE</code> and a
+single-Person <code>InferenceCaution</code>. One Person cannot provide
+independent- Person sandwich uncertainty or empirical between-Person
+variation. JML remains a point-estimation route. Repeated ratings need a
+justified independence declaration; duplicating records or relabeling
+ratings as Persons is not a remedy.</p>
+<p>The default output lists each rater. With the default sum-to-zero
+constraint, zero is the fitted reference across these raters; a positive
+value means stricter ratings. To compare R01 with R02, request their
+<strong>difference</strong>. Subtracting two estimates requires their
+covariance. Looking for overlap between their separate intervals does
+not calculate an interval for that difference.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>contrast <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fu">c</span>(<span class="dv">1</span>, <span class="sc">-</span><span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">0</span>), <span class="at">nrow =</span> <span class="dv">1</span>,</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>  <span class="at">dimnames =</span> <span class="fu">list</span>(<span class="st">&quot;R01 minus R02&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;R01&quot;</span>, <span class="st">&quot;R02&quot;</span>, <span class="st">&quot;R03&quot;</span>, <span class="st">&quot;R04&quot;</span>)))</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>difference <span class="ot">&lt;-</span> <span class="fu">mfrm_facet_intervals</span>(fit, <span class="st">&quot;Rater&quot;</span>, <span class="at">contrasts =</span> contrast,</span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>                                  <span class="at">method =</span> <span class="st">&quot;sandwich&quot;</span>)</span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="fu">summary</span>(difference)</span></code></pre></div>
+<p>Positive values mean that R01 is stricter than R02 on this fitted
+scale, in logits. The named coefficients also support other prespecified
+linear comparisons. All facet levels must appear as columns, including
+those with zero coefficients. Columns are matched by name.</p>
+<p><code>Estimate</code> is common to both methods. <code>SE</code>,
+<code>Lower</code> and <code>Upper</code> describe the selected method;
+<code>ModelSE</code>, <code>ModelLower</code> and
+<code>ModelUpper</code> retain the ordinary comparison.
+<code>Status</code> reports whether the selected interval is available.
+These are pointwise normal intervals, not simultaneous protection for a
+set of comparisons. Choosing whichever method gives a preferred
+conclusion is not a valid analysis strategy.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">plot</span>(difference)</span></code></pre></div>
+<p>The slight vertical offset distinguishes the methods. Both points
+have the same horizontal coordinate. The zero line denotes no
+difference; it is not a threshold of practical importance or a
+rater-quality rule. Use the size of the difference, interval, rubric and
+shared rating examples together when giving feedback.</p>
+</div>
+<div id="estimate-a-rater-difference-without-an-ability-population-model" class="section level2">
+<h2>Estimate a rater difference without an ability population model</h2>
+<p>Suppose the target is a fixed rater-severity difference, and a normal
+ability population would be a questionable assumption. For RSM/PCM,
+conditional maximum likelihood (CML) conditions on each person’s total
+across their observed ratings. The ability parameter then cancels from
+the likelihood. This changes the estimator, so its estimates need not
+equal the MML estimates above.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">requireNamespace</span>(<span class="st">&quot;lpSolve&quot;</span>, <span class="at">quietly =</span> <span class="cn">TRUE</span>)) {</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>  cml_ratings <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_core&quot;</span>)</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  cml_fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(cml_ratings, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>    <span class="at">method =</span> <span class="st">&quot;CML&quot;</span>, <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>, <span class="at">rating_min =</span> <span class="dv">1</span>, <span class="at">rating_max =</span> <span class="dv">4</span>,</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>    <span class="at">category_policy =</span> <span class="st">&quot;preserve&quot;</span>)</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>  cml_contrast <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fu">c</span>(<span class="dv">1</span>, <span class="sc">-</span><span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">0</span>), <span class="at">nrow =</span> <span class="dv">1</span>,</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>    <span class="at">dimnames =</span> <span class="fu">list</span>(<span class="st">&quot;R01 minus R02&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;R01&quot;</span>, <span class="st">&quot;R02&quot;</span>, <span class="st">&quot;R03&quot;</span>, <span class="st">&quot;R04&quot;</span>)))</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>  cml_interval <span class="ot">&lt;-</span> <span class="fu">mfrm_facet_intervals</span>(cml_fit, <span class="st">&quot;Rater&quot;</span>, cml_contrast)</span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>  <span class="fu">print</span>(<span class="fu">summary</span>(cml_interval))</span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>  <span class="fu">print</span>(<span class="fu">summary</span>(cml_fit)<span class="sc">$</span>steps)</span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>  cml_fit<span class="sc">$</span>checks</span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>}</span></code></pre></div>
+<p>The comparison’s <code>Estimate</code>, <code>SE</code>,
+<code>Lower</code> and <code>Upper</code> answer the same native-scale
+rater-difference question. Its covariance comes from the <strong>full
+conditional information</strong>, including jointly estimated criterion
+effects and steps. <code>summary(cml_fit)$locations</code> lists the
+centered facet estimates. Use
+<code>model = &quot;PCM&quot;, step_facet = &quot;Criterion&quot;</code> when criteria own
+separate steps. The package computes conditional normalizing constants
+with a generalized ESF recursion and checks identification, finite-MLE
+existence and numerical convergence. The optional <code>lpSolve</code>
+package is needed for the finite-MLE check.</p>
+<p>If those checks pass but conditional information cannot be evaluated
+or safely inverted, the fit retains its finite numerical point estimates
+with a warning. Read <code>cml_fit$checks$information_status</code> and
+<code>cml_fit$checks$information_reason</code>. Summaries and facet
+intervals keep the points, with missing SE/bounds,
+<code>CIEligible = FALSE</code> and a reason in
+<code>InferenceReview</code>; <code>vcov()</code> returns an
+<code>NA</code> matrix and default <code>confint()</code> retains
+missing bounds with diagnostic reasons. A small score residual alone
+does not ensure point accuracy along weak directions. Retention allows
+the result to be inspected and saved; it does not qualify formal
+inference. Identification, boundary and stationarity failures remain
+separate restrictions.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">requireNamespace</span>(<span class="st">&quot;lpSolve&quot;</span>, <span class="at">quietly =</span> <span class="cn">TRUE</span>)) <span class="fu">plot</span>(cml_interval, <span class="at">comparison =</span> <span class="cn">FALSE</span>)</span></code></pre></div>
+<p>Save <code>cml_fit</code> and <code>cml_interval</code> with
+<code>saveRDS()</code> to retain the covariance, contrast and checks.
+The dedicated <code>mfrm_cml_fit</code> has no Person estimates or
+population distribution. Ordinary fit diagnostics and consolidated
+<code>mfrm_results()</code> reports are outside this initial route; the
+interval object’s own summary and plot are available.</p>
+<p>CML can remain consistent when the number of Persons grows with a
+fixed number of ratings per Person, under a correct conditional response
+model, independent Persons, fixed structural dimension and information
+growing in every identified direction. Adding only extreme-total Persons
+does not improve precision, and a contrast supported by only a few
+Persons can remain imprecise even in a large dataset. The conditional
+model must hold for the actual rating roster; response-dependent
+assignment, stopping or missingness needs separate justification. This
+does not guarantee nominal Wald coverage in a small sample. See
+<code>help(&quot;fit_mfrm&quot;)</code> for a sufficient regular regime and the
+covariance calculation for an identified subspace. A facet constant
+within each Person, such as school membership, disappears on
+conditioning: its main effect cannot be estimated by CML. The full-model
+route refuses a deficient parameterization. For identifiable interaction
+contrasts despite other aliased directions, use the explicit
+<code>fit_scope = &quot;comparisons&quot;</code> route demonstrated in
+<code>vignette(&quot;mfrmr-linking-and-dff&quot;)</code>; unavailable targets
+remain missing.</p>
+<p>A bounded check reused the earlier MML comparison’s data-generation
+settings and seeds: RSM/PCM, 80/320 Persons, and either six ratings
+under a normal ability distribution or three ratings under a
+standardized-lognormal ability distribution with two sparse rosters. All
+1,600 CML fits returned the four prespecified native contrasts. In the
+combined skewed/sparse conditions, truth coverage was 93.0–98.0%,
+compared with the earlier MML sandwich range of 87.0–95.5% on the same
+datasets. Across all conditions CML coverage ranged from 92.5 to 98.5%.
+Each condition has 200 replications, giving MCSE about 1.54 percentage
+points near 95%. These ranges describe particular conditions and
+dependent contrasts; they do not establish nominal coverage for every
+design. Because population shape and roster sparsity changed together,
+this comparison does not isolate their separate effects.</p>
+</div>
+<div id="standardize-by-the-same-fits-estimated-ability-sd" class="section level2">
+<h2>Standardize by the same fit’s estimated ability SD</h2>
+<p>For an MML fit with <code>population_formula = ~1</code>,
+<code>mfrm_facet_intervals(fit, &quot;Rater&quot;, contrasts = contrast, scale = &quot;standardized&quot;)</code>
+divides the contrast by that fit’s estimated ability population SD. The
+contrast must have coefficients summing to zero. It uses the joint delta
+method, including the covariance between the contrast and the estimated
+SD; simply dividing an existing interval by the fitted SD omits that
+uncertainty.</p>
+<p>If the native contrast is <span class="math inline">\(\delta\)</span>, <span class="math inline">\(\lambda=\log\sigma^2\)</span>, and <span class="math inline">\(d=\delta\exp(-\lambda/2)\)</span>, its derivative
+with respect to <span class="math inline">\((\delta,\lambda)\)</span> is
+<span class="math inline">\((1/\sigma,-d/2)\)</span>. The full fitted
+covariance is transformed by this derivative:</p>
+<p><span class="math display">\[
+\widehat{\mathrm{Var}}(\widehat d)=
+\frac{\widehat{\mathrm{Var}}(\widehat\delta)
++\widehat\delta^2\widehat{\mathrm{Var}}(\widehat\lambda)/4
+-\widehat\delta\widehat{\mathrm{Cov}}(\widehat\delta,\widehat\lambda)}
+{\widehat\sigma^2}.
+\]</span></p>
+<p>Because of the covariance term, accounting for estimated SD does not
+always increase the SE. Even a zero estimated contrast can have positive
+uncertainty. This is an effect-size contrast, not the Wald statistic
+obtained by dividing by the contrast’s SE.</p>
+<p>The regular delta method requires a fixed true SD strictly above zero
+and a correctly specified, identified marginal model with an interior
+solution and sufficient information. A positive fitted SD alone does not
+establish these conditions. At zero SD the target is undefined; near
+zero the ratio and its normal approximation can be unstable. There is no
+universal SD cutoff that certifies validity. Population assumptions must
+hold for the actual rating assignments and covariates; an overall normal
+distribution need not remain the same within rosters selected according
+to ability.</p>
+<p>MML also approximates a continuous integral. A fixed number of
+integration points can leave numerical error as the sample grows and
+sampling SEs shrink. Comparing quadrature orders is a useful sensitivity
+check, but agreement does not prove that numerical error is negligible.
+Standardization repairs neither integration error nor a misspecified
+ability distribution. See the MML assumptions in
+<code>?mfrm_facet_intervals</code> before interpreting these normal
+intervals.</p>
+<p>CML estimates no population SD, so this particular standardized
+contrast is unavailable from a CML fit alone. A standard deviation of
+estimated Person scores is not a substitute. Fixed-standard-normal MML
+uses a fixed SD of one; it should not be described as estimating the
+standardizer. Conditional-normal latent regression has a residual SD,
+which is a different estimand and is not accepted by this population-SD
+transformation.</p>
+</div>
+<div id="read-fixed-values-and-group-constraints-correctly" class="section level2">
+<h2>Read fixed values and group constraints correctly</h2>
+<p>In the ordinary fixed-population RSM/PCM route, supplied anchors and
+group means are treated as exact. Their source calibration error is not
+included. <code>Status = &quot;fixed&quot;</code>, SE zero and missing bounds mean
+that the requested value cannot vary under the declared constraints,
+rather than that it was estimated with perfect precision.</p>
+<p>This can happen even without a direct anchor for that level. With
+four raters centered across the whole facet, fixing the first three
+raters’ mean at 0.10 also fixes the fourth at -0.30. The first three can
+still differ; their individual intervals may be available while an
+interval for their mean is not. A difference between an anchored and a
+free rater can also remain uncertain.</p>
+<p>The calculation carries the full joint covariance through the fitted
+constraints and your comparison coefficients. It retains the uncertainty
+due to estimating other facets and thresholds. Adding printed SEs, or
+calculating information only for the selected rater, cannot replace that
+calculation. For cross-software comparisons, note that <a href="https://alexanderrobitzsch.github.io/TAM/reference/tam.se.html">TAM’s
+<code>tam.se()</code> documentation</a> explicitly describes ignoring
+covariances between parameter estimates. Match the uncertainty
+calculation as well as the response model.</p>
+<p>Anchored models with an estimated population have a separate
+limitation: their point estimates are supported, but the native
+location/population interval helpers currently exclude anchors and group
+constraints. See the <a href="mfrmr-linking-and-dff.html">linking
+guide</a> for the distinction.</p>
+</div>
+<div id="prepare-a-sheet-for-one-rater" class="section level2">
+<h2>Prepare a sheet for one rater</h2>
+<p>The functions below answer different practical questions. You can
+make a figure or a report directly from saved results; neither is
+required before saving the analysis.</p>
+<table>
+<colgroup>
+<col width="50%" />
+<col width="50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>What do you need?</th>
+<th>Function and returned object</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Retain the fit, diagnostics and chosen intervals together</td>
+<td><code>mfrm_results()</code> returns the analysis object.</td>
+</tr>
+<tr class="even">
+<td>Show a saved interval</td>
+<td><code>plot()</code> draws it; <code>as_ggplot()</code> returns a
+supported ggplot view.</td>
+</tr>
+<tr class="odd">
+<td>Read an analyst report</td>
+<td><code>mfrm_report()</code> returns a quality-control report by
+default.</td>
+</tr>
+<tr class="even">
+<td>Prepare one recipient’s sheet</td>
+<td><code>mfrm_report(..., style = &quot;rater&quot;, output = &quot;html&quot;)</code>
+returns a temporary file path and its content.</td>
+</tr>
+<tr class="odd">
+<td>Save the complete analysis for later work</td>
+<td><code>saveRDS()</code> writes one R object;
+<code>export_mfrm_results()</code> writes a folder of selected
+outputs.</td>
+</tr>
+</tbody>
+</table>
+<p>The development version can summarize one rater’s saved results for a
+feedback conversation. An individual interval and a difference between
+raters answer different questions: attach <code>ordinary</code> here
+because it contains each rater’s coefficient. A saved contrast alone
+cannot become an individual interval.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>diagnostics <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit, <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>feedback_results <span class="ot">&lt;-</span> <span class="fu">mfrm_results</span>(fit, <span class="at">diagnostics =</span> diagnostics,</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="at">intervals =</span> <span class="fu">list</span>(<span class="at">raters =</span> ordinary), <span class="at">compute =</span> <span class="st">&quot;never&quot;</span>)</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>sheet <span class="ot">&lt;-</span> <span class="fu">mfrm_report</span>(feedback_results, <span class="at">style =</span> <span class="st">&quot;rater&quot;</span>, <span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span>,</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  <span class="at">rater =</span> <span class="st">&quot;R01&quot;</span>, <span class="at">interval =</span> <span class="st">&quot;raters&quot;</span>, <span class="at">output =</span> <span class="st">&quot;html&quot;</span>, <span class="at">max_cases =</span> <span class="dv">5</span>)</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>sheet<span class="sc">$</span>report<span class="sc">$</span>tables<span class="sc">$</span>severity</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>sheet<span class="sc">$</span>report<span class="sc">$</span>tables<span class="sc">$</span>uncertainty</span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a><span class="co"># Open sheet$path in a browser. Review before copying the HTML file for sharing.</span></span></code></pre></div>
+<p>The file contains scoring tendency, its saved interval, exposure,
+ordinary Infit/Outfit, category use and selected unexpected ratings. It
+has category-use bars, numerical tables, print styling and no external
+resources. Set <code>audience = &quot;researcher&quot;</code> for technical
+guidance, or <code>max_cases = 0</code> to omit individual cases. Page
+count depends on the content and print settings.</p>
+<p>Choose <code>style</code> for the report’s purpose and
+<code>output</code> for its format. Omitting <code>style</code> produces
+an analyst report, and omitting <code>output</code> returns an R object
+without creating an HTML file. Neither
+<code>audience = &quot;researcher&quot;</code> nor <code>output = &quot;html&quot;</code>
+selects a different interval method or confidence level: those choices
+belong to the earlier <code>mfrm_facet_intervals()</code> call. The
+default sheet includes up to five unexpected ratings; set
+<code>max_cases = 0</code> explicitly if the conversation only needs
+aggregate summaries.</p>
+<p>The default label is “Selected rater”. Other raters’ identities,
+Person identifiers, task labels and original row numbers are omitted
+from the sheet and its report object. An explicit <code>label</code>
+will be displayed. Scores or small groups may still be recognizable, so
+review the content before sharing. Distribute this standalone HTML file,
+not the comprehensive results bundle.</p>
+<p>The sheet does not refit, recalculate uncertainty, select a warning
+threshold or decide whether a rater is good or bad. Inspect the full
+saved interval result and its numerical cautions before preparing the
+sheet. Missing inputs are explained. If multiple attached interval
+results contain the selected individual coefficient, choose one
+explicitly with <code>interval = &quot;raters&quot;</code>. The supported contents
+depend on the fitted model:</p>
+<table>
+<colgroup>
+<col width="50%" />
+<col width="50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Fitted model</th>
+<th>Individual sheet</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Additive RSM/PCM, MML</td>
+<td>Severity, supplied fixed-facet intervals, ordinary diagnostics and
+category use as illustrated here.</td>
+</tr>
+<tr class="even">
+<td>Additive RSM/PCM, ordinary JML</td>
+<td>Descriptive severity, supplied diagnostics and category use; no
+formal fixed-facet interval is added.</td>
+</tr>
+<tr class="odd">
+<td>Two-family GPCM, MML</td>
+<td>Experimental location, component slope, category use and supplied
+posterior residuals. Only saved component-slope intervals appear in this
+sheet.</td>
+</tr>
+<tr class="even">
+<td>One-family GPCM, corrected JML, fitted interactions, imported fits,
+testlet or shared-random-rater models</td>
+<td>Individual sheets are unavailable; use the model-specific analyst
+results and reports.</td>
+</tr>
+</tbody>
+</table>
+<p>For the two-family route, see the <a href="mfrmr-gpcm-scope.html">GPCM guide</a>. Its locations, slopes and
+residuals have different meanings from the ordinary-model quantities
+above. A successful sheet export does not establish interval coverage or
+rater competence.</p>
+<div id="save-the-analysis-and-keep-a-copy-of-the-sheet" class="section level3">
+<h3>Save the analysis and keep a copy of the sheet</h3>
+<p>The HTML path is temporary. To keep the sheet after the R session
+ends, copy the reviewed file to a location you choose. Save the complete
+analysis separately if you need to prepare another sheet later. The
+following example uses temporary paths; replace them with your own
+analysis and recipient-file paths for continuing work.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>analysis_file <span class="ot">&lt;-</span> <span class="fu">tempfile</span>(<span class="at">fileext =</span> <span class="st">&quot;.rds&quot;</span>)</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="fu">saveRDS</span>(feedback_results, analysis_file)</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>saved_results <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(analysis_file)</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a></span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="co"># Reuse the saved diagnostics and intervals for this recipient.</span></span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>saved_sheet <span class="ot">&lt;-</span> <span class="fu">mfrm_report</span>(saved_results, <span class="at">style =</span> <span class="st">&quot;rater&quot;</span>, <span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span>,</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>  <span class="at">rater =</span> <span class="st">&quot;R01&quot;</span>, <span class="at">interval =</span> <span class="st">&quot;raters&quot;</span>, <span class="at">output =</span> <span class="st">&quot;html&quot;</span>, <span class="at">max_cases =</span> <span class="dv">5</span>)</span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>recipient_file <span class="ot">&lt;-</span> <span class="fu">tempfile</span>(<span class="at">fileext =</span> <span class="st">&quot;.html&quot;</span>)</span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">file.copy</span>(saved_sheet<span class="sc">$</span>path, recipient_file, <span class="at">overwrite =</span> <span class="cn">FALSE</span>))</span></code></pre></div>
+<p>The RDS file retains the fitted data and identifiers for the analyst.
+The recipient HTML contains the selected summaries described above.
+Copying the HTML does not require sending the RDS file. Reading the
+saved analysis and preparing another sheet does not rerun estimation or
+diagnostics; it also does not update an earlier analysis to reflect new
+ratings.</p>
+</div>
+<div id="keep-interpretation-with-exported-tables" class="section level3">
+<h3>Keep interpretation with exported tables</h3>
+<p>For a table-based handoff, request the recipient’s tables rather than
+using the full analyst export. Retain <code>interpretation_notes</code>
+alongside the numbers: it explains the overall review status, the
+audience and each section, including missing inputs. The HTML and
+Markdown formats already show these explanations beside their
+sections.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>sheet_tables <span class="ot">&lt;-</span> <span class="fu">mfrm_report</span>(saved_results, <span class="at">style =</span> <span class="st">&quot;rater&quot;</span>, <span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span>,</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>  <span class="at">rater =</span> <span class="st">&quot;R01&quot;</span>, <span class="at">interval =</span> <span class="st">&quot;raters&quot;</span>, <span class="at">output =</span> <span class="st">&quot;tables&quot;</span>, <span class="at">max_cases =</span> <span class="dv">5</span>)</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>sheet_tables<span class="sc">$</span>interpretation_notes</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>table_dir <span class="ot">&lt;-</span> <span class="fu">tempfile</span>(<span class="st">&quot;rater-tables-&quot;</span>)</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="fu">dir.create</span>(table_dir)</span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a><span class="cf">for</span> (name <span class="cf">in</span> <span class="fu">names</span>(sheet_tables)) {</span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">ncol</span>(sheet_tables[[name]]) <span class="sc">&gt;</span> <span class="dv">0</span>) {</span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>    <span class="fu">write.csv</span>(sheet_tables[[name]], <span class="fu">file.path</span>(table_dir, <span class="fu">paste0</span>(name, <span class="st">&quot;.csv&quot;</span>)),</span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a>      <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a>  }</span>
+<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a>}</span></code></pre></div>
+<p>Choose a permanent folder instead of <code>tempfile()</code> for
+continuing work. Sections with no supplied table are explained in
+<code>interpretation_notes</code>; their absence is not evidence of a
+satisfactory result. These CSV files do not contain the fitted analysis
+and cannot be used to reconstruct it. Review the selected rating
+examples before sharing, even though source identifiers are omitted. Use
+<code>max_cases = 0</code> to exclude those examples.</p>
+</div>
+</div>
+<div id="carry-the-same-intervals-into-figures-and-reports" class="section level2">
+<h2>Carry the same intervals into figures and reports</h2>
+<p>Suppose the assessment team has chosen a rater difference and its
+interval method. The figure, table and report should describe that same
+choice. Attach the saved result instead of calculating a new interval
+during reporting:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>results <span class="ot">&lt;-</span> <span class="fu">mfrm_results</span>(fit, <span class="at">intervals =</span> <span class="fu">list</span>(<span class="at">difference =</span> difference),</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>                        <span class="at">include =</span> <span class="fu">c</span>(<span class="st">&quot;fit&quot;</span>, <span class="st">&quot;plots&quot;</span>), <span class="at">compute =</span> <span class="st">&quot;never&quot;</span>)</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="fu">apa_table</span>(difference)</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a><span class="fu">plot_data</span>(results, <span class="at">type =</span> <span class="st">&quot;facet_difference&quot;</span>, <span class="at">component =</span> <span class="st">&quot;table&quot;</span>)</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>report <span class="ot">&lt;-</span> <span class="fu">mfrm_report</span>(results)</span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>report<span class="sc">$</span>tables<span class="sc">$</span>facet_difference_intervals</span></code></pre></div>
+<p>The name <code>difference</code> becomes the plot route
+<code>facet_difference</code>. A single unnamed result,
+<code>intervals = difference</code>, uses <code>facet_inference</code>.
+Several named results can retain different facets, confidence levels or
+prespecified contrasts. They must all come from the same fitted
+analysis. A mismatch in data, fitted parameters, constraints, population
+or integration settings is rejected. An ordinary comparison interval
+remains separate from the selected sandwich interval, including when the
+latter is unavailable.</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="fu">as_ggplot</span>(results, <span class="at">type =</span> <span class="st">&quot;facet_difference&quot;</span>, <span class="at">title =</span> <span class="cn">NULL</span>, <span class="at">subtitle =</span> <span class="cn">NULL</span>,</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>          <span class="at">preset =</span> <span class="st">&quot;monochrome&quot;</span>)</span></code></pre></div>
+<p><code>plot(results, type = &quot;facet_difference&quot;)</code> uses base
+graphics; <code>as_ggplot()</code> supports further ggplot
+customization. Both use the saved values. <code>title = NULL</code>,
+<code>subtitle = NULL</code>, <code>caption = NULL</code>,
+<code>reference = NULL</code> and <code>show_legend = FALSE</code> omit
+the corresponding display parts without changing the stored interval
+method, level or status. Keep those details in the figure legend or
+accompanying text when publishing a minimal figure. Shape cues retain
+unavailable and fixed targets.</p>
+<p><code>summary(results)$reproducible_code</code> shows how to save the
+complete result and reload it later. In that code, <code>res</code>
+denotes your result object: use <code>res &lt;- results</code> for this
+example and choose the file path before saving. Reloading preserves the
+attached intervals; reconstructing results from <code>fit</code> alone
+would omit them.</p>
+<p><code>export_mfrm_results(results, ...)</code> includes the selected
+tables and figures. With <code>preset = &quot;starter&quot;</code>, its
+<code>index.html</code> also links the saved interval figures and
+describes their methods and confidence levels. When replay is requested,
+it also saves the RDS and a script that reloads it; replay does not
+refit the model or recalculate covariance. The settings, contrast
+coefficients and cluster mapping are retained alongside the interval
+table. These saved objects contain fitted data and participant
+identifiers; follow the export function’s data-handling guidance before
+sharing them.</p>
+<p>For an analyst archive with tables, a report and reload instructions,
+select the components explicitly. <code>include</code> controls files
+written by the exporter; it does not compute missing analysis
+components. The folder below retains participant data, which is why this
+example explicitly acknowledges it.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>archive <span class="ot">&lt;-</span> <span class="fu">export_mfrm_results</span>(feedback_results,</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>  <span class="at">output_dir =</span> <span class="fu">tempfile</span>(<span class="st">&quot;rater-analysis-&quot;</span>),</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>  <span class="at">include =</span> <span class="fu">c</span>(<span class="st">&quot;tables&quot;</span>, <span class="st">&quot;report&quot;</span>, <span class="st">&quot;replay&quot;</span>, <span class="st">&quot;manifest&quot;</span>),</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>  <span class="at">acknowledge_sensitive =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a><span class="co"># Count files by format; inspect archive$written_files for the full index.</span></span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a><span class="fu">table</span>(archive<span class="sc">$</span>written_files<span class="sc">$</span>Format)</span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>archive<span class="sc">$</span>plot_errors</span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>saved_file <span class="ot">&lt;-</span> archive<span class="sc">$</span>written_files<span class="sc">$</span>Path[</span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>  archive<span class="sc">$</span>written_files<span class="sc">$</span>Component <span class="sc">==</span> <span class="st">&quot;results_rds&quot;</span>]</span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>reopened <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(saved_file)</span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">identical</span>(reopened<span class="sc">$</span>facet_intervals, feedback_results<span class="sc">$</span>facet_intervals))</span></code></pre></div>
+<p>Requesting replay also writes the complete RDS. The script reloads it
+without requiring the original session’s fit, diagnostics or interval
+variables. No plots are requested in this example. Add
+<code>&quot;plots&quot;</code> to export available figures, or use
+<code>preset = &quot;starter&quot;</code> for the fuller archive. This export
+<code>preset</code> selects file contents; a plotting
+<code>preset</code> such as <code>&quot;monochrome&quot;</code> selects
+appearance. An empty <code>plot_errors</code> table only confirms that
+no requested plot failed, not that a figure was requested or that the
+statistical analysis is valid. The report in this archive is the analyst
+report; use the standalone recipient file created above for the feedback
+conversation.</p>
+<p>This route also works for PCM, whose step structure is declared when
+fitting:</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>fit_pcm <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(ratings, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>                    <span class="at">model =</span> <span class="st">&quot;PCM&quot;</span>, <span class="at">step_facet =</span> <span class="st">&quot;Criterion&quot;</span>, <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>)</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>pcm_difference <span class="ot">&lt;-</span> <span class="fu">mfrm_facet_intervals</span>(fit_pcm, <span class="st">&quot;Rater&quot;</span>, <span class="at">contrasts =</span> contrast,</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>                                      <span class="at">method =</span> <span class="st">&quot;sandwich&quot;</span>, <span class="at">level =</span> <span class="fl">0.90</span>)</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>pcm_results <span class="ot">&lt;-</span> <span class="fu">mfrm_results</span>(fit_pcm, <span class="at">intervals =</span> <span class="fu">list</span>(<span class="at">difference =</span> pcm_difference),</span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>                            <span class="at">include =</span> <span class="fu">c</span>(<span class="st">&quot;fit&quot;</span>, <span class="st">&quot;plots&quot;</span>), <span class="at">compute =</span> <span class="st">&quot;never&quot;</span>)</span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a><span class="fu">apa_table</span>(pcm_difference)</span></code></pre></div>
+<p>RSM and PCM estimate facet locations while holding discrimination
+fixed; GPCM slope intervals concern a different target. Attaching a
+fixed-facet interval does not replace the uncertainty in an ordinary
+Wright map, alter Infit/Outfit, or provide uncertainty for individual
+Person scores. Use the <code>facet_</code> route when you want to
+display the attached covariance method.</p>
+</div>
+<div id="declare-what-can-be-treated-as-independent" class="section level2">
+<h2>Declare what can be treated as independent</h2>
+<p>By default, all responses from one person form one sampling unit. A
+person rated many times does not provide that many independent units.
+The software first sums their likelihood contributions, then forms the
+sandwich covariance. Repeated performances by the same person should not
+be treated as independent merely because they were entered under
+different IDs.</p>
+<p>If persons share a school, clinic or other source of dependence, and
+those larger clusters can reasonably be treated as independent of one
+another, supply a person-to-cluster mapping. This fictional mapping only
+demonstrates the syntax: it is not evidence that the example contains
+actual schools.</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>persons <span class="ot">&lt;-</span> <span class="fu">sort</span>(<span class="fu">unique</span>(ratings<span class="sc">$</span>Person))</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>schools <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">Person =</span> persons,</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>  <span class="at">Cluster =</span> <span class="fu">rep</span>(<span class="fu">sprintf</span>(<span class="st">&quot;School%02d&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">16</span>), <span class="at">each =</span> <span class="dv">3</span>))</span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>school_difference <span class="ot">&lt;-</span> <span class="fu">mfrm_facet_intervals</span>(</span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>  fit, <span class="st">&quot;Rater&quot;</span>, <span class="at">contrasts =</span> contrast, <span class="at">method =</span> <span class="st">&quot;sandwich&quot;</span>, <span class="at">clusters =</span> schools</span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a>)</span>
+<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a>school_difference<span class="sc">$</span>settings[<span class="fu">c</span>(<span class="st">&quot;persons&quot;</span>, <span class="st">&quot;clusters&quot;</span>, <span class="st">&quot;cluster_score_rank&quot;</span>)]</span>
+<span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a><span class="fu">summary</span>(school_difference)</span></code></pre></div>
+<p>Every fitted person must appear exactly once. Use the column names
+<code>Person</code> and <code>Cluster</code> in this mapping even if the
+original data use different names. The number of independent clusters,
+rather than the number of rating rows, governs the large-sample
+approximation. Sixteen schools in this illustration are not a
+recommendation or a demonstrated sufficient sample size.</p>
+<p><code>adjust = TRUE</code> multiplies the covariance by
+<code>G/(G-1)</code>, where <code>G</code> is the number of independent
+clusters. This simple scaling does not supply a small-sample guarantee
+or change the normal reference distribution. It is off by default. The
+user must justify the independence assumption; supplying a mapping does
+not establish it.</p>
+</div>
+<div id="keep-unavailable-results-visible" class="section level2">
+<h2>Keep unavailable results visible</h2>
+<p>When cluster likelihood scores do not span the free-parameter space,
+the selected sandwich interval is unavailable. The estimate and ordinary
+comparison remain visible. A fixed anchor has an exact supplied value
+and no inferential interval; its uncertainty is outside this
+calculation.</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>two_groups <span class="ot">&lt;-</span> schools</span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>two_groups<span class="sc">$</span>Cluster <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="fu">c</span>(<span class="st">&quot;A&quot;</span>, <span class="st">&quot;B&quot;</span>), <span class="at">each =</span> <span class="dv">24</span>)</span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>unavailable <span class="ot">&lt;-</span> <span class="fu">mfrm_facet_intervals</span>(</span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>  fit, <span class="st">&quot;Rater&quot;</span>, <span class="at">contrasts =</span> contrast, <span class="at">method =</span> <span class="st">&quot;sandwich&quot;</span>, <span class="at">clusters =</span> two_groups</span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>)</span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a><span class="fu">summary</span>(unavailable)[, <span class="fu">c</span>(<span class="st">&quot;Target&quot;</span>, <span class="st">&quot;Estimate&quot;</span>, <span class="st">&quot;Lower&quot;</span>, <span class="st">&quot;Upper&quot;</span>, <span class="st">&quot;Status&quot;</span>)]</span></code></pre></div>
+<p>Increasing the cluster count until this numerical restriction
+disappears does not establish coverage. A small number of clusters can
+still yield poor intervals. In plots, a cross marks an unavailable
+selected interval and an open diamond marks a fixed target. An ordinary
+comparison interval is never used to replace a missing sandwich
+interval.</p>
+</div>
+<div id="understand-what-the-sandwich-can-and-cannot-address" class="section level2">
+<h2>Understand what the sandwich can and cannot address</h2>
+<p>With many independent units and the required regularity, a sandwich
+covariance describes variation around the parameter targeted by the
+fitted working model. If that model is misspecified, this
+<em>pseudo-true parameter</em> can differ from the generating rater
+severity. For example, a strongly skewed ability distribution can change
+the limiting rater difference when the fit insists on a standard normal
+distribution. Altering the standard error does not remove that
+shift.</p>
+<p>Sparse assignment also needs substantive review. An unassigned rating
+is not a missing score to fill in; selective assignment can confound
+rater differences with population differences. Nonresponse depending on
+an unobserved score is another modeling problem. None of these problems
+is solved solely by selecting <code>method = &quot;sandwich&quot;</code>.</p>
+<p>The intervals condition on the observed <strong>fixed</strong> raters
+and other facets. They do not describe replacing raters with new draws
+from a rater population. If shared random rater or task effects span the
+declared clusters, this one-way independence assumption is
+inappropriate. The method is not a multiway crossed-cluster estimator.
+G/D-study planning, variance-component boundaries, EAP person-score
+uncertainty and multiple-imputation pooling require their own methods.
+In particular, <code>pool_mfrm_imputed()</code> continues to use its
+documented within-imputation model covariance; this helper does not
+change that workflow.</p>
+<p>Review quadrature sensitivity separately. The interval helper reuses
+the fitted integration grid and does not refit the model.</p>
+</div>
+<div id="what-the-bounded-simulation-showed" class="section level2">
+<h2>What the bounded simulation showed</h2>
+<p>A comparison used RSM and PCM, 80 or 320 independent persons, three
+fixed raters, two criteria and scores from 0 to 2. Each of the eight
+conditions had 200 independently generated datasets. One scenario used
+standard-normal ability and six ratings per person. The other combined
+standardized lognormal ability with three ratings per person; assignment
+was independent of ability and responses. Thus the second scenario
+challenges both distribution and design together, without isolating
+their separate effects.</p>
+<p>The comparison evaluated three rater differences and one criterion
+difference on each same fitted dataset. All 1,600 datasets returned both
+interval methods. The entries below are <strong>ranges across conditions
+and contrasts</strong>, not pooled coverage estimates or confidence
+bounds. All intervals had a nominal 95% level.</p>
+<table>
+<colgroup>
+<col width="27%" />
+<col width="36%" />
+<col width="36%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Scenario and reference target</th>
+<th align="right">Observed information</th>
+<th align="right">Sandwich</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Matched normal model: generating truth</td>
+<td align="right">92.0–98.0%</td>
+<td align="right">92.5–98.0%</td>
+</tr>
+<tr class="even">
+<td>Skewed ability and sparse assignment: generating truth</td>
+<td align="right">84.5–95.0%</td>
+<td align="right">87.0–95.5%</td>
+</tr>
+<tr class="odd">
+<td>Skewed ability and sparse assignment: working-model target</td>
+<td align="right">90.0–97.5%</td>
+<td align="right">93.0–97.5%</td>
+</tr>
+</tbody>
+</table>
+<p>For example, in the 320-person RSM scenario with skewed ability and
+sparse assignment, the sandwich covered the generating criterion
+difference in 87.0% of datasets (95% Monte Carlo interval: 81.5–91.3%).
+Coverage of the independently calculated working-model target was 96.0%
+(92.3–98.3%). The same estimates and intervals produced these different
+answers because the two target values differ. For the R1–R3 difference
+in the corresponding 320-person PCM scenario, generating-truth coverage
+was 90.0% (85.0–93.8%). Rater comparisons are therefore subject to this
+limitation too.</p>
+<p>With 200 datasets per condition, Monte Carlo standard error near 95%
+coverage is about 1.54 percentage points. These results do not
+demonstrate uniform improvement or a guarantee of nominal coverage.
+Schools, few independent clusters, shared random raters, informative
+assignment and nonresponse were not evaluated by this simulation.</p>
+</div>
+<div id="save-the-analysis-and-use-the-plotted-data" class="section level2">
+<h2>Save the analysis and use the plotted data</h2>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>saved <span class="ot">&lt;-</span> <span class="fu">tempfile</span>(<span class="at">fileext =</span> <span class="st">&quot;.rds&quot;</span>)</span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a><span class="fu">saveRDS</span>(difference, saved)</span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a>restored <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(saved)</span>
+<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a><span class="fu">summary</span>(restored)</span>
+<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a>plotted <span class="ot">&lt;-</span> <span class="fu">plot</span>(restored, <span class="at">draw =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a><span class="fu">plot_data</span>(plotted)<span class="sc">$</span>table</span></code></pre></div>
+<p>The saved result retains the estimates, covariance matrices,
+likelihood scores, cluster mapping, contrasts, settings and source fit.
+Printing or plotting it does not fit the model again. Use
+<code>write.csv(result$table, &quot;intervals.csv&quot;, row.names = FALSE)</code>
+to export a table, and keep the RDS result for its context. Use
+<code>plot_data()</code> for custom graphics; automatic
+<code>as_ggplot()</code> conversion is not provided for these method
+comparisons.</p>
+</div>
+<div id="references" class="section level2">
+<h2>References</h2>
+<p>The sandwich construction follows the estimating-function framework
+described by <a href="https://doi.org/10.18637/jss.v016.i09">Zeileis
+(2006)</a>. <a href="https://doi.org/10.18637/jss.v095.i01">Zeileis,
+Koell and Graham (2020)</a> discuss clustered covariance estimators and
+their distinctions. These references support the covariance framework;
+they do not establish finite-sample accuracy for every MFRM design.</p>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

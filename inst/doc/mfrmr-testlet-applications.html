@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Tasks, rubric criteria and testlet dependence</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Tasks, rubric criteria and testlet
+dependence</h1>
+
+
+
+<p>Should an assessment add another task or another criterion to the
+same task? What changes when one task has five criteria and another has
+two? A testlet model makes the <strong>sharing of evidence</strong>
+explicit: several scores from one performance can reflect the same
+Person-by-task effect as well as general ability. More scores need not
+provide proportionally more independent evidence.</p>
+<p>In a language assessment, the criteria might concern fluency,
+accuracy, coherence, range and pronunciation. In music they might
+concern timing, intonation and expression; in a clinical assessment,
+several indicators can refer to the same station. These substantive
+dimensions are not automatically interchangeable or manifestations of
+one ability. Choose the measurement purpose and grouping before fitting.
+The <a href="mfrmr-testlets.html">testlet workflow</a> explains
+membership, calibration, scoring and saved results. Its simulation
+comparison also shows why planning precision and actual scoring accuracy
+must be distinguished: accounting for dependence improved interval
+coverage, but increased point-score error in two balanced conditions.
+The planning calculations below hold calibration fixed and do not
+propagate uncertainty in estimated ability or local variance.</p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Decision</th>
+<th>What the current model can contribute</th>
+<th>What it does not establish</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Add tasks or criteria</td>
+<td>Compare conditional precision under specified candidate assignments
+and a fixed fitted model.</td>
+<td>A universal advantage of tasks, an optimal cost allocation or
+frequentist interval coverage.</td>
+</tr>
+<tr class="even">
+<td>Review possible halo</td>
+<td>Describe residual dependence within the declared rating episode and
+compare its consequences.</td>
+<td>The cause of dependence, criterion separability or a diagnosis of
+rater error.</td>
+</tr>
+<tr class="odd">
+<td>Compare task-specific dependence</td>
+<td>Estimate one common local variance across all tasks.</td>
+<td>Separate variances or a ranking of tasks by dependence.</td>
+</tr>
+<tr class="even">
+<td>Handle unequal numbers of criteria</td>
+<td>Integrate the shared effect for all rows in each block.</td>
+<td>Equal task weights, removal of every bias or a correction for
+informative assignment.</td>
+</tr>
+</tbody>
+</table>
+<div id="a-reproducible-assessment-with-parallel-criteria" class="section level2">
+<h2>A reproducible assessment with parallel criteria</h2>
+<p>To isolate grouping, this example deliberately gives five
+hypothetical criteria identical response functions, categories 0–2 and
+equal row weights. It does <strong>not</strong> assume that real fluency
+and accuracy criteria have identical difficulty or measure the same
+construct. In an applied fit, include defensible fixed facets and review
+their response functions. The small enumeration later in this article is
+specific to these parallel criteria, not a general planner.</p>
+<p>Eighty Persons each complete three tasks. Scores share an additional
+effect within each Person/task. The simulation creates new assigned
+scores; it does not duplicate observed scores or fill unassigned
+combinations.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">92327001</span>)</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>ratings <span class="ot">&lt;-</span> <span class="fu">expand.grid</span>(</span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>  <span class="at">Criterion =</span> <span class="fu">paste0</span>(<span class="st">&quot;C&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>), <span class="at">Task =</span> <span class="fu">paste0</span>(<span class="st">&quot;T&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>),</span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>  <span class="at">Person =</span> <span class="fu">sprintf</span>(<span class="st">&quot;P%03d&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">80</span>), <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span></span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>)</span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>ability <span class="ot">&lt;-</span> <span class="fu">rnorm</span>(<span class="dv">80</span>)</span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a>local_effect <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fu">rnorm</span>(<span class="dv">80</span> <span class="sc">*</span> <span class="dv">3</span>, <span class="at">sd =</span> <span class="fu">sqrt</span>(.<span class="dv">8</span>)), <span class="dv">80</span>, <span class="dv">3</span>)</span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a>p <span class="ot">&lt;-</span> <span class="fu">match</span>(ratings<span class="sc">$</span>Person, <span class="fu">sprintf</span>(<span class="st">&quot;P%03d&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">80</span>))</span>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>t <span class="ot">&lt;-</span> <span class="fu">match</span>(ratings<span class="sc">$</span>Task, <span class="fu">paste0</span>(<span class="st">&quot;T&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>))</span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>eta <span class="ot">&lt;-</span> ability[p] <span class="sc">+</span> local_effect[<span class="fu">cbind</span>(p, t)]</span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>w <span class="ot">&lt;-</span> <span class="fu">exp</span>(<span class="fu">cbind</span>(<span class="dv">0</span>, eta <span class="sc">+</span> .<span class="dv">6</span>, <span class="dv">2</span> <span class="sc">*</span> eta))</span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>probability <span class="ot">&lt;-</span> w <span class="sc">/</span> <span class="fu">rowSums</span>(w)</span>
+<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a>u <span class="ot">&lt;-</span> <span class="fu">runif</span>(<span class="fu">nrow</span>(ratings))</span>
+<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a>ratings<span class="sc">$</span>Score <span class="ot">&lt;-</span> <span class="fu">as.integer</span>(u <span class="sc">&gt;</span> probability[, <span class="dv">1</span>]) <span class="sc">+</span></span>
+<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a>  <span class="fu">as.integer</span>(u <span class="sc">&gt;</span> <span class="fu">rowSums</span>(probability[, <span class="dv">1</span><span class="sc">:</span><span class="dv">2</span>]))</span></code></pre></div>
+<p>Fit the common-variance testlet model and its locally independent
+submodel. <code>testlet_variance = 0</code> gives the ordinary RSM
+without local effects through this same API. Both fits estimate normal
+ability variance. They need not estimate identical ability distributions
+or category steps.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>testlet_fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm_testlet</span>(</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>  ratings, <span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Score&quot;</span>, <span class="st">&quot;Task&quot;</span>, <span class="at">score_levels =</span> <span class="dv">0</span><span class="sc">:</span><span class="dv">2</span>,</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">61</span></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>)</span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>independent_fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm_testlet</span>(</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>  ratings, <span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Score&quot;</span>, <span class="st">&quot;Task&quot;</span>, <span class="at">score_levels =</span> <span class="dv">0</span><span class="sc">:</span><span class="dv">2</span>,</span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>  <span class="at">testlet_variance =</span> <span class="dv">0</span>, <span class="at">quad_points =</span> <span class="dv">121</span></span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>)</span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a><span class="cf">for</span> (fit <span class="cf">in</span> <span class="fu">list</span>(testlet_fit, independent_fit)) {</span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a>  <span class="fu">stopifnot</span>(fit<span class="sc">$</span>checks<span class="sc">$</span>NumericalReady, fit<span class="sc">$</span>checks<span class="sc">$</span>InformationPositive)</span>
+<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a>}</span>
+<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a><span class="fu">data.frame</span>(</span>
+<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a>  <span class="at">Model =</span> <span class="fu">c</span>(<span class="st">&quot;Testlet&quot;</span>, <span class="st">&quot;Independent&quot;</span>),</span>
+<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a>  <span class="at">AbilityVariance =</span> <span class="fu">c</span>(testlet_fit<span class="sc">$</span>calibration<span class="sc">$</span>person_variance,</span>
+<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a>                     independent_fit<span class="sc">$</span>calibration<span class="sc">$</span>person_variance),</span>
+<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a>  <span class="at">LocalVariance =</span> <span class="fu">c</span>(testlet_fit<span class="sc">$</span>calibration<span class="sc">$</span>variance, <span class="dv">0</span>)</span>
+<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a>)</span></code></pre></div>
+<p>The independent fit requires the higher order for this example: its
+61-point calculation does not pass the numerical checks. An optimizer
+convergence code alone is insufficient. No quadrature order is
+universally adequate. An estimated variance at zero is also different
+from fixing it to zero in advance.</p>
+</div>
+<div id="use-a-fixed-rating-budget-to-compare-task-allocation" class="section level2">
+<h2>Use a fixed rating budget to compare task allocation</h2>
+<p>Each candidate plan has four ratings: one task with four parallel
+criteria, two tasks with two criteria each, or four tasks with one
+criterion each. All 81 possible score patterns are scored using
+<code>predict()</code>. Their probabilities under the corresponding
+fitted model provide the averaging weights. This avoids selecting a few
+convenient observed response patterns to represent future assessments.
+The one-task plan uses the already fitted multi-task calibration; it
+cannot separately estimate ability and local variances from one-task
+data alone.</p>
+<p>The mean conditional posterior variance is <span class="math inline">\(V_D=\sum_y P(y\mid D)\operatorname{Var}(\theta\mid
+y,D)\)</span>. Its square root is the <strong>root mean posterior
+variance</strong>, in logits. A smaller value means greater average
+precision under the stated model. Also report <span class="math inline">\(R_D=1-V_D/\sigma_\theta^2\)</span>, the
+model-implied marginal EAP reliability. By total variance it equals
+<span class="math inline">\(\operatorname{Var}_Y\{E(\theta\mid
+Y,D)\}/\sigma_\theta^2\)</span>. This population definition is related
+to Wang and Wilson’s (2005) EAP reliability in Equation 35, p. 145. It
+is neither a G/Phi coefficient nor a 95% coverage result.</p>
+<p>Calibration is treated as known at its fitted value. The calculation
+assumes independent normal task effects, assignment independent of
+ability and complete observed scores. It excludes uncertainty in
+estimated steps and variances, content coverage, task setup time and the
+possibility of informative missingness. Compare allocations
+<strong>within a model</strong>; comparing the two models’ own
+reliability numbers is not a recovery study or evidence that one model
+is more accurate.</p>
+<p>The short calculation functions are shown in the appendix. They are
+example code, not a new exported design-optimization API.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>plans <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>  <span class="st">&quot;1 task x 4 criteria&quot;</span> <span class="ot">=</span> <span class="fu">rep</span>(<span class="st">&quot;T1&quot;</span>, <span class="dv">4</span>),</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>  <span class="st">&quot;2 tasks x 2 criteria&quot;</span> <span class="ot">=</span> <span class="fu">rep</span>(<span class="fu">c</span>(<span class="st">&quot;T1&quot;</span>, <span class="st">&quot;T2&quot;</span>), <span class="at">each =</span> <span class="dv">2</span>),</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  <span class="st">&quot;4 tasks x 1 criterion&quot;</span> <span class="ot">=</span> <span class="fu">paste0</span>(<span class="st">&quot;T&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>)</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>)</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>fits <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">Testlet =</span> testlet_fit, <span class="at">Independent =</span> independent_fit)</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>plan_results <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="cf">for</span> (model <span class="cf">in</span> <span class="fu">names</span>(fits)) <span class="cf">for</span> (plan <span class="cf">in</span> <span class="fu">names</span>(plans)) {</span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>  key <span class="ot">&lt;-</span> <span class="fu">paste</span>(model, plan, <span class="at">sep =</span> <span class="st">&quot;: &quot;</span>)</span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>  plan_results[[key]] <span class="ot">&lt;-</span> <span class="fu">evaluate_parallel_plan</span>(fits[[model]], plans[[plan]])</span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a>  plan_results[[key]]<span class="sc">$</span>summary<span class="sc">$</span>Model <span class="ot">&lt;-</span> model</span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a>  plan_results[[key]]<span class="sc">$</span>summary<span class="sc">$</span>Plan <span class="ot">&lt;-</span> plan</span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a>}</span>
+<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a>plan_summary <span class="ot">&lt;-</span> <span class="fu">do.call</span>(rbind, <span class="fu">lapply</span>(plan_results, <span class="st">`</span><span class="at">[[</span><span class="st">`</span>, <span class="st">&quot;summary&quot;</span>))</span>
+<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a><span class="fu">rownames</span>(plan_summary) <span class="ot">&lt;-</span> <span class="cn">NULL</span></span>
+<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(plan_summary[<span class="fu">c</span>(<span class="st">&quot;Model&quot;</span>, <span class="st">&quot;Plan&quot;</span>, <span class="st">&quot;RMSPosteriorSD&quot;</span>,</span>
+<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a>                           <span class="st">&quot;ModelImpliedEAPReliability&quot;</span>)], <span class="at">digits =</span> <span class="dv">3</span>)</span></code></pre></div>
+<p>In this example the testlet-model reliability increases from about
+.479 to .552 and .598 as the same four ratings are spread across
+independent tasks; root mean posterior variance falls from .834 to .773
+and .732 logits. The independent submodel gives the same value across
+all three allocations because the four response functions are held
+identical and it ignores task membership. Ordinary MFRM does
+<strong>not</strong> generally assign identical information to arbitrary
+added criteria or tasks: difficulty, targeting and response functions
+matter. If the local variance is zero, grouping alone provides no gain
+in this comparison.</p>
+<p>These results support a conditional planning comparison, not a rule
+to always add tasks. A new criterion can add essential content that
+these parallel indicators intentionally omit. A practical decision needs
+comparable content, plausible difficulty, task costs and several
+plausible dependence assumptions. A longer assessment is not qualified
+by extrapolating these four-rating numbers.</p>
+</div>
+<div id="unequal-blocks-five-criteria-versus-two" class="section level2">
+<h2>Unequal blocks: five criteria versus two</h2>
+<p>Consider a new Person with score 1 on all seven criteria. Compare two
+hypothetical changes: increase one score in the five-criterion task, or
+increase one in the two-criterion task. Both changes add exactly one
+raw-score point. We rescore the <strong>complete</strong> seven-row
+roster for each profile; we do not append responses to a cached score or
+duplicate any evidence.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>base <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>  <span class="at">Task =</span> <span class="fu">c</span>(<span class="fu">rep</span>(<span class="st">&quot;T1&quot;</span>, <span class="dv">5</span>), <span class="fu">rep</span>(<span class="st">&quot;T2&quot;</span>, <span class="dv">2</span>)), <span class="at">Score =</span> <span class="fu">rep</span>(<span class="dv">1</span><span class="dt">L</span>, <span class="dv">7</span>),</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  <span class="at">Criterion =</span> <span class="fu">c</span>(<span class="fu">paste0</span>(<span class="st">&quot;C&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>), <span class="fu">paste0</span>(<span class="st">&quot;C&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">2</span>))</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>)</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>dense <span class="ot">&lt;-</span> sparse <span class="ot">&lt;-</span> base</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>dense<span class="sc">$</span>Score[<span class="dv">1</span>] <span class="ot">&lt;-</span> <span class="dv">2</span><span class="dt">L</span></span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>sparse<span class="sc">$</span>Score[<span class="dv">6</span>] <span class="ot">&lt;-</span> <span class="dv">2</span><span class="dt">L</span></span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>profiles <span class="ot">&lt;-</span> <span class="fu">rbind</span>(</span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>  <span class="fu">transform</span>(base, <span class="at">Person =</span> <span class="st">&quot;Baseline&quot;</span>),</span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>  <span class="fu">transform</span>(dense, <span class="at">Person =</span> <span class="st">&quot;5-criterion task +1&quot;</span>),</span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>  <span class="fu">transform</span>(sparse, <span class="at">Person =</span> <span class="st">&quot;2-criterion task +1&quot;</span>)</span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>)</span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>unequal_scores <span class="ot">&lt;-</span> <span class="fu">lapply</span>(fits, predict, <span class="at">newdata =</span> profiles, <span class="at">quad_points =</span> <span class="dv">61</span>)</span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a>changes <span class="ot">&lt;-</span> <span class="fu">do.call</span>(rbind, <span class="fu">lapply</span>(<span class="fu">names</span>(unequal_scores), <span class="cf">function</span>(model) {</span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a>  tab <span class="ot">&lt;-</span> unequal_scores[[model]]<span class="sc">$</span>table</span>
+<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a>  <span class="fu">stopifnot</span>(<span class="fu">all</span>(tab<span class="sc">$</span>Status <span class="sc">==</span> <span class="st">&quot;available_conditional&quot;</span>))</span>
+<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a>  <span class="fu">data.frame</span>(<span class="at">Model =</span> model, <span class="at">Profile =</span> tab<span class="sc">$</span>Person, <span class="at">Estimate =</span> tab<span class="sc">$</span>Estimate,</span>
+<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a>    <span class="at">ChangeFromBaseline =</span> tab<span class="sc">$</span>Estimate <span class="sc">-</span> tab<span class="sc">$</span>Estimate[tab<span class="sc">$</span>Person <span class="sc">==</span> <span class="st">&quot;Baseline&quot;</span>])</span>
+<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a>}))</span>
+<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(changes, <span class="at">digits =</span> <span class="dv">3</span>)</span></code></pre></div>
+<p>Here the testlet-model EAP changes by about .174 logits for the
+additional point in the larger block and .286 in the smaller one. The
+independent submodel changes by .219 in either position. These are
+<strong>response-profile sensitivities</strong>, not estimates of task
+weights or errors against known ability. They illustrate how shared
+evidence can reduce the marginal influence of a rating from an already
+well-observed block. They do not prove equal task weighting or removal
+of bias. Real differences in task difficulty or rubric content need to
+be modeled and examined rather than attributed to row count.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">plot</span>(unequal_scores<span class="sc">$</span>Testlet, <span class="at">sort =</span> <span class="st">&quot;estimate&quot;</span>, <span class="at">palette =</span> <span class="st">&quot;mono&quot;</span>,</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>     <span class="at">title =</span> <span class="st">&quot;Where an additional point occurs matters&quot;</span>,</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>     <span class="at">reference =</span> <span class="cn">NULL</span>)</span></code></pre></div>
+<p>The figure uses the existing scoring-result method;
+<code>plot_data()</code> and <code>as_ggplot()</code> retain the table
+and interpretation. Suppress a title or caption with
+<code>show_title = FALSE</code> or <code>show_notes = FALSE</code> for a
+publication, while retaining the saved metadata. Interval overlap is not
+a test of differences between these hypothetical profiles.</p>
+<p>If an assessment policy requires equal task weights, specify that
+policy and the score to which it applies. Do not assume that a testlet
+likelihood enforces it, multiply by inverse block size without changing
+the statistical model, or duplicate short blocks. The current testlet
+API uses unit row weights. Observed-score composites and G/D studies are
+separate planning routes; their weights and reliability coefficients do
+not become latent-MFRM quantities.</p>
+</div>
+<div id="does-a-large-local-variance-diagnose-halo" class="section level2">
+<h2>Does a large local variance diagnose halo?</h2>
+<p>It identifies dependence represented by the model’s chosen group. It
+does not identify its cause. With <code>testlet = &quot;Task&quot;</code>, genuine
+Person-by-task performance, omitted content dimensions, a shared
+stimulus and rater processes can lead to similar dependence. A large
+variance cannot by itself show that fluency and accuracy are
+indistinguishable or that a rater ignored the rubric. The current model
+has one substantive ability, not separate latent abilities for each
+criterion, and has no validated halo cutoff.</p>
+<p>For a rubric review, inspect concrete responses, independent ratings
+and the assessment process. A prespecified group such as a Task-by-rater
+episode answers a different question from a task shared across raters.
+Creating that episode label does not simultaneously fit both dependence
+sources: this API allows one non-overlapping membership, not crossed
+task and rater local effects. If task performance and rater impression
+are confounded by the assignment, changing the label does not
+disentangle them.</p>
+<p>A training or rubric-revision comparison should retain comparable
+tasks, assignment and populations, with an appropriate independent or
+planned before/after design. A decrease in a fitted variance alone is
+not causal evidence of training success. The current output can motivate
+a review; it does not recommend merging criteria or excluding a rater
+automatically.</p>
+</div>
+<div id="can-each-task-have-its-own-dependence-variance" class="section level2">
+<h2>Can each task have its own dependence variance?</h2>
+<p>Not in the current API: <code>testlet_variance = NULL</code>
+estimates one common variance and a supplied numeric value fixes that
+same variance for all blocks. Changing task labels or adding a fixed
+Task facet does not produce separate variances. The fixed facet
+describes average difficulty, a different target. Wang and Wilson
+(2005), Table 6, present a model allowing different testlet variances;
+that specification is broader than this implementation.</p>
+<p>Do not fit each task separately to recover a local variance. With one
+task per Person and no other information, normal ability and the normal
+local effect enter as their sum: their variances cannot be separately
+identified. The fitting guard requires multiple observed testlets for
+some Persons. A future task-specific extension needs a joint model,
+linked multi-task data, variance-boundary handling and validation of
+uncertainty and comparisons. Even then, a larger task variance is a
+review signal, not a reason to replace valuable content automatically.
+Residual summaries grouped by Task may help describe patterns today, but
+are not estimates of task-specific local variance.</p>
+</div>
+<div id="save-the-actual-inputs-assumptions-and-scores" class="section level2">
+<h2>Save the actual inputs, assumptions and scores</h2>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>archive <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">fits =</span> fits, <span class="at">plans =</span> plans, <span class="at">plan_results =</span> plan_results,</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>                <span class="at">profiles =</span> profiles, <span class="at">unequal_scores =</span> unequal_scores)</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>path <span class="ot">&lt;-</span> <span class="fu">tempfile</span>(<span class="st">&quot;testlet-planning-&quot;</span>, <span class="at">fileext =</span> <span class="st">&quot;.rds&quot;</span>)</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="fu">saveRDS</span>(archive, path)</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>restored <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(path)</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">identical</span>(restored<span class="sc">$</span>unequal_scores<span class="sc">$</span>Testlet<span class="sc">$</span>table,</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>                    unequal_scores<span class="sc">$</span>Testlet<span class="sc">$</span>table))</span></code></pre></div>
+<p>For a standard report, attach a matching scoring result with
+<code>mfrm_results(testlet_fit, predictions = unequal_scores$Testlet)</code>,
+then use <code>mfrm_report()</code> or
+<code>export_mfrm_results()</code>. The separate
+<code>plan_summary</code> is a model-conditional calculation from this
+article; it is not automatically interpreted as a G/D-study or certified
+design recommendation by the report.</p>
+</div>
+<div id="appendix-complete-four-rating-calculation" class="section level2">
+<h2>Appendix: complete four-rating calculation</h2>
+<p>The code below enumerates every response pattern, integrates its
+probability under the fitted RSM, and uses public <code>predict()</code>
+results for posterior moments. The normal rule is constructed with base
+R; no new package is required. Comparing quadrature orders and checking
+total probability and total variance catch numerical inconsistencies.
+They do not establish that the model describes an actual assessment. No
+unavailable pattern is dropped. Run these definitions before the
+plan-comparison chunk when copying code into an R script.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>normal_rule <span class="ot">&lt;-</span> <span class="cf">function</span>(n) {</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>  jacobi <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="dv">0</span>, n, n)</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  jacobi[<span class="fu">cbind</span>(<span class="dv">1</span><span class="sc">:</span>(n <span class="sc">-</span> <span class="dv">1</span>), <span class="dv">2</span><span class="sc">:</span>n)] <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(<span class="dv">1</span><span class="sc">:</span>(n <span class="sc">-</span> <span class="dv">1</span>))</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>  e <span class="ot">&lt;-</span> <span class="fu">eigen</span>(jacobi <span class="sc">+</span> <span class="fu">t</span>(jacobi), <span class="at">symmetric =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">nodes =</span> e<span class="sc">$</span>values, <span class="at">weights =</span> e<span class="sc">$</span>vectors[<span class="dv">1</span>, ]<span class="sc">^</span><span class="dv">2</span>)</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>}</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a></span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>pattern_mass <span class="ot">&lt;-</span> <span class="cf">function</span>(fit, membership, patterns, order) {</span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>  rule <span class="ot">&lt;-</span> <span class="fu">normal_rule</span>(order)</span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>  theta <span class="ot">&lt;-</span> fit<span class="sc">$</span>calibration<span class="sc">$</span>person_sd <span class="sc">*</span> rule<span class="sc">$</span>nodes</span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>  gamma <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(fit<span class="sc">$</span>calibration<span class="sc">$</span>variance) <span class="sc">*</span> rule<span class="sc">$</span>nodes</span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a>  answer <span class="ot">&lt;-</span> <span class="fu">numeric</span>(<span class="fu">nrow</span>(patterns))</span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a>  <span class="cf">for</span> (h <span class="cf">in</span> <span class="fu">seq_along</span>(theta)) {</span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a>    logw <span class="ot">&lt;-</span> <span class="fu">outer</span>(theta[h] <span class="sc">+</span> gamma, <span class="dv">0</span><span class="sc">:</span><span class="dv">2</span>) <span class="sc">-</span></span>
+<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a>      <span class="fu">matrix</span>(<span class="fu">c</span>(<span class="dv">0</span>, <span class="fu">cumsum</span>(fit<span class="sc">$</span>calibration<span class="sc">$</span>steps)), order, <span class="dv">3</span>, <span class="at">byrow =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb7-16"><a href="#cb7-16" tabindex="-1"></a>    prob <span class="ot">&lt;-</span> <span class="fu">exp</span>(logw <span class="sc">-</span> <span class="fu">apply</span>(logw, <span class="dv">1</span>, max))</span>
+<span id="cb7-17"><a href="#cb7-17" tabindex="-1"></a>    prob <span class="ot">&lt;-</span> prob <span class="sc">/</span> <span class="fu">rowSums</span>(prob)</span>
+<span id="cb7-18"><a href="#cb7-18" tabindex="-1"></a>    conditional <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="dv">1</span>, <span class="fu">nrow</span>(patterns))</span>
+<span id="cb7-19"><a href="#cb7-19" tabindex="-1"></a>    <span class="cf">for</span> (block <span class="cf">in</span> <span class="fu">split</span>(<span class="fu">seq_along</span>(membership), membership)) {</span>
+<span id="cb7-20"><a href="#cb7-20" tabindex="-1"></a>      block_prob <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="dv">1</span>, order, <span class="fu">nrow</span>(patterns))</span>
+<span id="cb7-21"><a href="#cb7-21" tabindex="-1"></a>      <span class="cf">for</span> (j <span class="cf">in</span> block) {</span>
+<span id="cb7-22"><a href="#cb7-22" tabindex="-1"></a>        block_prob <span class="ot">&lt;-</span> block_prob <span class="sc">*</span> prob[, patterns[, j] <span class="sc">+</span> <span class="dv">1</span><span class="dt">L</span>, drop <span class="ot">=</span> <span class="cn">FALSE</span>]</span>
+<span id="cb7-23"><a href="#cb7-23" tabindex="-1"></a>      }</span>
+<span id="cb7-24"><a href="#cb7-24" tabindex="-1"></a>      conditional <span class="ot">&lt;-</span> conditional <span class="sc">*</span> <span class="fu">as.vector</span>(<span class="fu">crossprod</span>(rule<span class="sc">$</span>weights, block_prob))</span>
+<span id="cb7-25"><a href="#cb7-25" tabindex="-1"></a>    }</span>
+<span id="cb7-26"><a href="#cb7-26" tabindex="-1"></a>    answer <span class="ot">&lt;-</span> answer <span class="sc">+</span> rule<span class="sc">$</span>weights[h] <span class="sc">*</span> conditional</span>
+<span id="cb7-27"><a href="#cb7-27" tabindex="-1"></a>  }</span>
+<span id="cb7-28"><a href="#cb7-28" tabindex="-1"></a>  answer</span>
+<span id="cb7-29"><a href="#cb7-29" tabindex="-1"></a>}</span>
+<span id="cb7-30"><a href="#cb7-30" tabindex="-1"></a></span>
+<span id="cb7-31"><a href="#cb7-31" tabindex="-1"></a>evaluate_parallel_plan <span class="ot">&lt;-</span> <span class="cf">function</span>(fit, membership) {</span>
+<span id="cb7-32"><a href="#cb7-32" tabindex="-1"></a>  <span class="fu">stopifnot</span>(<span class="fu">inherits</span>(fit, <span class="st">&quot;mfrm_testlet&quot;</span>),</span>
+<span id="cb7-33"><a href="#cb7-33" tabindex="-1"></a>    <span class="fu">length</span>(fit<span class="sc">$</span>input<span class="sc">$</span>columns<span class="sc">$</span>facets) <span class="sc">==</span> <span class="dv">0</span><span class="dt">L</span>,</span>
+<span id="cb7-34"><a href="#cb7-34" tabindex="-1"></a>    <span class="fu">identical</span>(<span class="fu">as.numeric</span>(fit<span class="sc">$</span>input<span class="sc">$</span>score_levels), <span class="dv">0</span><span class="sc">:</span><span class="dv">2</span> <span class="sc">+</span> <span class="dv">0</span>),</span>
+<span id="cb7-35"><a href="#cb7-35" tabindex="-1"></a>    <span class="fu">length</span>(membership) <span class="sc">==</span> <span class="dv">4</span><span class="dt">L</span>, <span class="sc">!</span><span class="fu">anyNA</span>(membership))</span>
+<span id="cb7-36"><a href="#cb7-36" tabindex="-1"></a>  patterns <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(<span class="fu">expand.grid</span>(<span class="fu">rep</span>(<span class="fu">list</span>(<span class="dv">0</span><span class="sc">:</span><span class="dv">2</span>), <span class="dv">4</span>)))</span>
+<span id="cb7-37"><a href="#cb7-37" tabindex="-1"></a>  data <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">Person =</span> <span class="fu">rep</span>(<span class="fu">sprintf</span>(<span class="st">&quot;Y%02d&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">81</span>), <span class="at">each =</span> <span class="dv">4</span>),</span>
+<span id="cb7-38"><a href="#cb7-38" tabindex="-1"></a>    <span class="at">Task =</span> <span class="fu">rep</span>(membership, <span class="dv">81</span>), <span class="at">Score =</span> <span class="fu">as.vector</span>(<span class="fu">t</span>(patterns)))</span>
+<span id="cb7-39"><a href="#cb7-39" tabindex="-1"></a>  scores <span class="ot">&lt;-</span> <span class="fu">predict</span>(fit, data, <span class="at">quad_points =</span> <span class="dv">61</span>)</span>
+<span id="cb7-40"><a href="#cb7-40" tabindex="-1"></a>  <span class="fu">stopifnot</span>(<span class="fu">identical</span>(scores<span class="sc">$</span>table<span class="sc">$</span>Person, <span class="fu">sprintf</span>(<span class="st">&quot;Y%02d&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">81</span>)),</span>
+<span id="cb7-41"><a href="#cb7-41" tabindex="-1"></a>            <span class="fu">all</span>(scores<span class="sc">$</span>table<span class="sc">$</span>Status <span class="sc">==</span> <span class="st">&quot;available_conditional&quot;</span>))</span>
+<span id="cb7-42"><a href="#cb7-42" tabindex="-1"></a>  low <span class="ot">&lt;-</span> <span class="fu">pattern_mass</span>(fit, membership, patterns, <span class="dv">61</span>)</span>
+<span id="cb7-43"><a href="#cb7-43" tabindex="-1"></a>  probability <span class="ot">&lt;-</span> <span class="fu">pattern_mass</span>(fit, membership, patterns, <span class="dv">121</span>)</span>
+<span id="cb7-44"><a href="#cb7-44" tabindex="-1"></a>  tab <span class="ot">&lt;-</span> scores<span class="sc">$</span>table</span>
+<span id="cb7-45"><a href="#cb7-45" tabindex="-1"></a>  v <span class="ot">&lt;-</span> fit<span class="sc">$</span>calibration<span class="sc">$</span>person_variance</span>
+<span id="cb7-46"><a href="#cb7-46" tabindex="-1"></a>  expected_variance <span class="ot">&lt;-</span> <span class="fu">sum</span>(probability <span class="sc">*</span> tab<span class="sc">$</span>ConditionalSD<span class="sc">^</span><span class="dv">2</span>)</span>
+<span id="cb7-47"><a href="#cb7-47" tabindex="-1"></a>  <span class="fu">stopifnot</span>(<span class="fu">abs</span>(<span class="fu">sum</span>(probability) <span class="sc">-</span> <span class="dv">1</span>) <span class="sc">&lt;</span> <span class="fl">1e-8</span>,</span>
+<span id="cb7-48"><a href="#cb7-48" tabindex="-1"></a>    <span class="fu">max</span>(<span class="fu">abs</span>(low <span class="sc">-</span> probability)) <span class="sc">&lt;</span> <span class="fl">1e-8</span>,</span>
+<span id="cb7-49"><a href="#cb7-49" tabindex="-1"></a>    <span class="fu">abs</span>(<span class="fu">sum</span>(probability <span class="sc">*</span> tab<span class="sc">$</span>Estimate)) <span class="sc">&lt;</span> <span class="fl">1e-7</span>,</span>
+<span id="cb7-50"><a href="#cb7-50" tabindex="-1"></a>    <span class="fu">abs</span>(<span class="fu">sum</span>(probability <span class="sc">*</span> (tab<span class="sc">$</span>ConditionalSD<span class="sc">^</span><span class="dv">2</span> <span class="sc">+</span> tab<span class="sc">$</span>Estimate<span class="sc">^</span><span class="dv">2</span>)) <span class="sc">-</span> v) <span class="sc">&lt;</span> <span class="fl">1e-7</span>)</span>
+<span id="cb7-51"><a href="#cb7-51" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">scores =</span> scores, <span class="at">probability =</span> probability, <span class="at">patterns =</span> patterns,</span>
+<span id="cb7-52"><a href="#cb7-52" tabindex="-1"></a>    <span class="at">membership =</span> membership, <span class="at">summary =</span> <span class="fu">data.frame</span>(</span>
+<span id="cb7-53"><a href="#cb7-53" tabindex="-1"></a>      <span class="at">RMSPosteriorSD =</span> <span class="fu">sqrt</span>(expected_variance),</span>
+<span id="cb7-54"><a href="#cb7-54" tabindex="-1"></a>      <span class="at">ModelImpliedEAPReliability =</span> <span class="dv">1</span> <span class="sc">-</span> expected_variance <span class="sc">/</span> v))</span>
+<span id="cb7-55"><a href="#cb7-55" tabindex="-1"></a>}</span></code></pre></div>
+</div>
+<div id="references" class="section level2">
+<h2>References</h2>
+<p>Wang, W.-C., &amp; Wilson, M. (2005). The Rasch testlet model.
+<em>Applied Psychological Measurement, 29</em>, 126–149. <a href="https://doi.org/10.1177/0146621604271053">doi:10.1177/0146621604271053</a>.
+See the RSM specification (p. 129), task-specific variances (p. 142) and
+EAP reliability and interpretation (p. 145).</p>
+<p>Wang, W.-C., &amp; Wilson, M. (2005). Exploring local item dependence
+using a random-effects facet model. <em>Applied Psychological
+Measurement, 29</em>, 296–318. <a href="https://doi.org/10.1177/0146621605276281">doi:10.1177/0146621605276281</a>.
+See the distinction between fixed rater severity and Person-by-rater
+local effects (pp. 299–300) and the need to investigate causes
+(pp. 314–316).</p>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

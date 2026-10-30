@@ -14,7 +14,8 @@ analyze_dff(
   focal = NULL,
   method = c("residual", "refit"),
   min_obs = 10,
-  p_adjust = "holm"
+  p_adjust = "holm",
+  comparison_review = NULL
 )
 
 analyze_dif(...)
@@ -22,7 +23,9 @@ analyze_dif(...)
 \arguments{
 \item{fit}{Output from \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
-\item{diagnostics}{Output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.}
+\item{diagnostics}{Output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}. With \code{method = "refit"},
+it must match \code{fit}; see \link{mfrmr_compatibility_layer} for saved-diagnostic
+migration. The residual method does not use this argument.}
 
 \item{facet}{Character scalar naming the facet whose elements are tested
 for differential functioning (for example, \code{"Criterion"} or \code{"Rater"}).}
@@ -37,7 +40,9 @@ and the same person/facet/score columns used to fit the model. If
 \code{fit_mfrm()} actually modelled; if the grouping column was not
 among them (common for DIF screening), pass the original data
 frame via \verb{data = <df>} explicitly. The same applies when the
-fit object has been serialized without the prep slot.}
+fit object has been serialized without the prep slot.
+Residual analyses also require the fitted weight column when one was used.
+See the response-matching contract below for subsets and repeated rows.}
 
 \item{focal}{Optional character vector of group levels to treat as focal.
 If \code{NULL} (default), all pairwise group comparisons are performed.}
@@ -45,32 +50,43 @@ If \code{NULL} (default), all pairwise group comparisons are performed.}
 \item{method}{Analysis method: \code{"residual"} (default) uses the fitted
 model's residuals without re-estimation; \code{"refit"} re-estimates the
 model within each group subset. The residual method is faster and
-avoids convergence issues with small subsets.}
+avoids additional subgroup fits; neither method establishes adequate sample size.}
 
 \item{min_obs}{Minimum number of observations per cell (facet-level x
-group). Cells below this threshold are flagged as sparse and their
-statistics set to \code{NA}. Default \code{10}.}
+group). Cells below this threshold are flagged as sparse. Residual
+contrasts/scaled residuals and refit screening statistics are withheld;
+actual refit point estimates and contrasts remain available. Default \code{10}.}
 
-\item{p_adjust}{Method for multiple-comparison adjustment, passed to
-\code{\link[stats:p.adjust]{stats::p.adjust()}}. Default is \code{"holm"}.}
+\item{p_adjust}{Adjustment for refit screening tail areas; default \code{"holm"}.
+Retained but unused for residual comparisons, which return no p-values.}
+
+\item{comparison_review}{Optional result of
+\code{\link[=describe_mfrm_data]{describe_mfrm_data()}} with \code{comparisons} specified, or its
+\verb{$comparison_review} component. The retained response rows, origin groups,
+facet and score coding must match this request. If \code{focal} is supplied it
+must equal the review's first group. The prospective interaction states
+are retained separately; they do not classify the residual/refit contrasts
+as identified, change estimates, or permit an otherwise refused fit.}
 
 \item{...}{Passed directly to \code{\link[=analyze_dff]{analyze_dff()}}.}
 }
 \value{
 An object of class \code{mfrm_dff} (with compatibility class \code{mfrm_dif}) with:
 \itemize{
-\item \code{dif_table}: data.frame of differential-functioning contrasts.
+\item \code{dif_table}: data.frame of differential-functioning contrasts. Refit rows
+include \code{Fixed1} and \code{Fixed2}; fixed-target rows have
+\code{ReportingUse = "not_applicable_fixed_target"} and no contrast or test.
 \item \code{cell_table}: (residual method) per-cell detail table.
 \item \code{summary}: counts by method-appropriate screening classification.
 \item \code{group_fits}: (refit method) per-group facet estimates.
-\item \code{gpcm_boundary}: for bounded \code{GPCM} fits, a capability-boundary table.
+\item \code{gpcm_boundary}: for \code{GPCM} fits, a capability-boundary table.
 \item \code{config}: list with facet, group, method, min_obs, p_adjust settings.
 }
 }
 \description{
-Tests whether the difficulty of facet levels differs across a grouping
-variable (e.g., whether rater severity differs for male vs. female
-examinees, or whether item difficulty differs across rater subgroups).
+Compares observed-minus-expected scores between groups, or describes linked
+subgroup facet estimates after refitting. Residual differences do not isolate
+differential functioning and are returned without tests or classifications.
 
 \code{analyze_dif()} is retained for compatibility with earlier package versions.
 In many-facet workflows, prefer \code{\link[=analyze_dff]{analyze_dff()}} as the primary entry point.
@@ -86,6 +102,19 @@ Differential functioning is a threat to measurement fairness: if Criterion 1 is 
 for Group A than Group B at the same ability level, the measurement
 scale is no longer group-invariant.
 
+Differences between group ability distributions are not themselves DFF.
+Residual screens inherit the fitted model's ability and population
+assumptions. With fixed-standard-normal RSM/PCM MML, subgroup refits retain
+that population assumption; linking anchors do not estimate subgroup ability
+distributions. A residual difference can therefore reflect an inadequately
+represented group difference as well as differential facet functioning.
+For MML, observation expectations are evaluated at each Person's EAP
+ability, rather than integrated over the conditional ability distribution.
+This nonlinear substitution can produce different mean residuals across
+groups even under a correctly specified no-DFF model. A zero mean-residual
+contrast and absence of differential functioning are therefore distinct
+null hypotheses; correcting the SE alone does not make them equivalent.
+
 Two methods are available:
 
 \strong{Residual method} (\code{method = "residual"}): Uses the existing fitted
@@ -93,18 +122,20 @@ model's observation-level residuals.  For each facet-level \eqn{\times}
 group cell, the observed and expected score sums are aggregated and
 a standardized residual is computed as:
 \deqn{z = \frac{\sum (X_{obs} - E_{exp})}{\sqrt{\sum \mathrm{Var}}}}
-Pairwise contrasts between groups compare the mean observed-minus-expected
-difference for each facet level, with uncertainty summarized by a
-Welch/Satterthwaite approximation. This method is fast, stable with small
-subsets, and does not require re-estimation. Because the resulting contrast
-is not a logit-scale parameter difference, the residual method is treated as
-a screening procedure rather than an ETS-style classifier.
+Pairwise contrasts compare the mean observed-minus-expected score in Group1
+minus that in Group2. Positive values mean higher residual scores in Group1,
+not greater rater leniency for that group. Differences use score units.
+\code{StdResidual} is a descriptive scaling by model response variance, not a
+t-statistic. No residual-contrast SE, confidence interval, p-value or
+positive/negative classification is provided. Compatibility columns \code{SE},
+\code{t}, \code{df}, \code{p_value} and \code{p_adjusted} contain \code{NA}.
 
 \strong{Refit method} (\code{method = "refit"}): Subsets the data by group, refits
 the MFRM model within each subset, anchors all non-target facets back to
 the baseline calibration when possible, and compares the resulting
 facet-level estimates. When linking, convergence, model-based MML precision,
-and sparsity screens all pass, a conditional plug-in Welch statistic is also
+finite positive SEs, disjoint Person rosters and cell-count screens all pass,
+a conditional plug-in Welch statistic is also
 shown:
 \deqn{t = \frac{\hat{\delta}_1 - \hat{\delta}_2}
                {\sqrt{SE_1^2 + SE_2^2}}}
@@ -114,9 +145,44 @@ the baseline anchors and omits baseline-anchor uncertainty and cross-refit
 covariance. Refit statistics therefore remain screening evidence and set
 \code{FormalInferenceEligible}, \code{SupportsFormalInference},
 \code{PrimaryReportingEligible}, and \code{ETS_Eligible} to \code{FALSE}.
+The Welch degrees of freedom use a response-count approximation, not
+independently estimated degrees of freedom for model-based SEs. Disjoint
+Person IDs do not establish independence or valid matching.
+
+\code{N_Group1} / \code{N_Group2} count retained responses for the particular target
+level in each group; \code{N_Subgroup1} / \code{N_Subgroup2} count all retained subgroup
+responses. Failed or skipped fits have unknown retained counts (\code{NA}), not
+zero; \verb{$group_fits[[group]]$N_Input} retains the input count. An absent target
+in a successfully prepared subgroup has a known count of zero. All baseline
+target levels remain in the result. Failed/skipped fits and absent levels
+have missing estimates and contrasts, with \code{ComparisonStatus} and
+\code{ComparisonReason}; they never inherit the baseline estimate.
+Finite estimates from sparse cells or incomplete diagnostics are retained,
+while \code{ConditionalScreenReason} explains withheld screening uncertainty.
+\code{NPersons_Group1} / \code{NPersons_Group2} count Persons in each target cell,
+and \code{NPersons_Overlap} counts shared Persons across the entire two subgroup
+fits. Any overlap withholds the independent-subgroup screen.
+
+\code{ContrastDirection} describes the location parameter only:
+\code{larger_location_in_group1}, \code{smaller_location_in_group1}, or
+\code{equal_locations}. Translating this into higher/lower expected scores
+requires the facet orientation and the remaining response parameters.
+Subgroup step ladders or slopes can differ; a location difference alone
+does not order their entire response curves.
 The subgroup fits replay the baseline response family, resolved score range,
-step/slope facets, weighting, optimizer, MML engine, and numerical controls;
-the non-target anchors are the intentional linking change. Refit analysis
+step/slope facets, weighting, repeated-rating independence declaration,
+optimizer, MML engine, and numerical controls;
+the non-target anchors are the intentional linking change. Direct anchors
+on the target facet and JML Person anchors from the baseline are preserved.
+A target fixed by constraints in either subgroup keeps its point estimates,
+with \code{Fixed1} / \code{Fixed2} identifying the fixed values; its contrast, SE and
+screening tests are unavailable. Equal supplied anchors do not demonstrate
+absence of differential functioning. Use residual DFF to describe response
+departures, or explicitly fit a baseline with different target constraints
+before requesting free-parameter comparisons. Saved refit results created
+before this preservation rule require rerunning \code{analyze_dff()} from the
+baseline fit; loading an old result does not repair its subgroup estimates.
+Refit analysis
 fails closed when the baseline uses a user-specified active latent-regression
 population model, facet interactions, or group-anchor constraints, because
 those structures do not yet have a complete subgroup-replay and linking
@@ -132,15 +198,47 @@ Refit contrasts are not assigned ETS A/B/C labels. Even when subgroup point
 estimates share a linked logit scale, a validated joint, bootstrap, or
 replicate covariance contract is required before formal refit inference.
 
-Multiple comparisons are adjusted using Holm's step-down procedure by
-default, which controls the family-wise error rate without assuming
-independence.  Alternative methods (e.g., \code{"BH"} for false discovery
-rate) can be specified via \code{p_adjust}.
+Refit screening tail areas are adjusted using Holm's step-down procedure by
+default, jointly across the returned facet-level/group-pair rows in this
+call. Holm's family-wise error control requires valid unadjusted p-values;
+the approximate screening tail areas here have not been shown to meet that
+requirement. Adjustment therefore does not establish an error-rate guarantee
+or formal inference eligibility. Alternative adjustments can be specified
+via \code{p_adjust}; see \code{\link[stats:p.adjust]{stats::p.adjust()}} for their assumptions.
 }
+\section{Response matching for residual analyses}{
+
+\code{data} selects fitted response rows using Person, all fitted facets, the
+observed score and fitted weight. Source column names, identifier trimming,
+the saved original/internal category map and the saved missing-code policy
+are respected. A changed score does not inherit a residual from another
+response with the same Person and facets. Rows with missing groups, invalid
+responses or no fitted match are excluded with reasons in \verb{$cases}; unmatched
+complete rows also produce a message. Requesting more copies of a response
+than were fitted is an error. No requested match is an error.
+
+Repeated identical response rows are matched by their multiplicities, with
+a canonical group order. They must have identical fitted expectations and
+variances. \code{FitRow} then identifies an exchangeable fitted copy for this
+calculation, not a recovered occasion/event identity. This permits descriptive
+repeated-rating summaries without first-row group assignment or replication
+of unselected rows. It does not supply cluster-adjusted inference.
+
+\verb{$cases} contains \code{InputRow} (row of supplied data, or \code{fit$prep$data} when
+\code{data = NULL}), \code{FitRow} (row of \code{fit$prep$data}), \code{GroupValue}, \code{Included}
+and \code{Reason}. Preserve the data and fit alongside this audit. \code{N} and
+\code{N_Group1}/\code{N_Group2} count retained response rows; \code{NPersons} and
+\code{NPersons_Group1}/\code{NPersons_Group2} count distinct Persons. The same Person
+may occur in multiple groups. Neither count establishes independence.
+Aggregates remain unweighted row summaries even when fitting used weights.
+Subsetting data retains the original model's fitted expectations; it does
+not recalibrate the model on the subset.
+}
+
 \section{Choosing a method}{
 
-In most first-pass DFF screening, start with \code{method = "residual"}. It is
-faster, reuses the fitted model, and is less fragile in smaller subsets.
+Use \code{method = "residual"} to describe group differences in model residuals
+without fitting subgroup models. This does not test differential functioning.
 Use \code{method = "refit"} when you specifically want group-specific parameter
 estimates and can tolerate extra computation. Agreement between methods is
 not guaranteed by a universal per-group sample-size threshold: stability and
@@ -150,33 +248,77 @@ overlap, linking strength, slope heterogeneity, and estimator behavior.
 power, parameter stability, or sample-size adequacy.
 }
 
+\section{Comparing with MH or ordinal logistic DIF}{
+
+\code{\link[=mantel_haenszel_table]{mantel_haenszel_table()}} supplies a separate binary conditional comparison
+with explicit matching strata and one response per Person-target cell.
+\code{\link[=ordinal_logistic_table]{ordinal_logistic_table()}} supplies a separate cumulative-logit comparison
+with uniform/nonuniform terms and a proportional-odds diagnostic. Neither
+is a \code{method} of this function. A comparison needs the same persons, target
+response, group orientation and defensible matching variable. With a common
+binary Rasch item set and invariant other items, the total including the
+studied item removes the ability distribution from the conditional item
+response; a rest score generally does not. This result does not justify
+pooling different rater/task plans at the same raw total.
+
+Ordinary MH targets a common conditional odds ratio and can miss opposing
+effects across matching strata. Ordinal logistic models distinguish group
+and matching-by-group terms, but their cumulative proportional-odds
+assumption is not generally implied by RSM/PCM. Repeated ratings from one
+Person cannot be counted as independent persons for either ordinary method.
+Agreement or disagreement with these procedures does not by itself validate
+a DFF conclusion. See the linking-and-DFF vignette for the comparison scope
+and primary references.
+}
+
 \section{Interpreting output}{
 
 \itemize{
 \item \verb{$dif_table}: one row per facet-level x group-pair with contrast,
-SE, t-statistic, p-value, adjusted p-value, effect metric, and
-method-appropriate classification. Includes \code{Method}, \code{N_Group1},
+a residual mean difference or linked subgroup difference. Residual rows have
+no SE, test or binary classification. Includes \code{Method}, \code{N_Group1},
 \code{N_Group2}, \code{EffectMetric}, \code{ClassificationSystem}, \code{ContrastBasis},
 \code{SEBasis}, \code{StatisticLabel}, \code{ProbabilityMetric}, \code{DFBasis},
 \code{ReportingUse}, \code{PrimaryReportingEligible}, and \code{sparse} columns.
-\item \verb{$cell_table}: (residual method only) per-cell detail with N,
-ObsScore, ExpScore, ObsExpAvg, StdResidual.
-\item \verb{$summary}: counts by screening result (\code{method = "residual"}) or linked-
-screening and insufficient-linking rows (\code{method = "refit"}).
+\item \verb{$cell_table}: (residual method only) per-cell detail with N, NPersons,
+ObsScore, ExpScore, ObsExpAvg, StdResidual and an interpretation note.
+\item \verb{$cases}: (residual method only) requested-row matching and exclusion audit,
+also retained by \code{summary()}.
+\item \verb{$summary}: available/unavailable residual comparisons or linked-
+screening, insufficient-linking, fixed-target and unavailable rows
+(\code{method = "refit"}).
 \item \verb{$group_fits}: (refit method only) list of per-group facet estimates and
-subgroup linking diagnostics.
-\item \verb{$gpcm_boundary}: for bounded \code{GPCM} fits, a capability-boundary table
+subgroup linking diagnostics, with \code{EstimateStatus} / \code{EstimateReason}
+and cell, subgroup and input counts.
+\item \verb{$gpcm_boundary}: for \code{GPCM} fits, a capability-boundary table
 marking the DFF/DIF output as caveated screening evidence.
+\item \verb{$comparison_review}: when supplied, the separate prospective interaction
+question, weights, counts, assumptions and identification states. Preserved
+by \code{summary()}, \code{\link[=dif_report]{dif_report()}} and both DFF plot views. Its model can differ
+from the fitted screening model; read its \code{fit_arguments} and \code{notes}.
 }
 }
 
 \section{GPCM boundary}{
 
-For bounded \code{GPCM}, DFF/DIF rows are available as slope-aware screening
+For \code{GPCM}, DFF/DIF rows are available as slope-aware screening
 evidence over the fitted expected-score and residual scale. Keep
 residual-method contrasts and interaction cells in screening language.
 Refit contrasts require explicit subgroup linking and precision support for
 conditional screening, but remain in screening language.
+}
+
+\section{Saved results}{
+
+Residual results, summaries and reports saved by earlier versions must be
+recomputed with this function using the fitted model and original data.
+This does not require refitting the model. Previously exported tables and
+figures should also be regenerated.
+Refit results created before the subgroup availability/cell-count checks
+must instead be recomputed with \code{method = "refit"}. This reruns the subgroup
+fits from the saved baseline fit and original data. Reading an old result
+cannot repair borrowed estimates, dropped target levels or incorrect counts;
+summary, report and plotting methods reject these earlier refit objects.
 }
 
 \section{Typical workflow}{
@@ -188,14 +330,17 @@ conditional screening, but remain in screening language.
 \code{diagnostic_mode = "both"} so legacy and strict marginal screens remain
 visible together.
 \item Run \code{analyze_dff(fit, diagnostics, facet = "Criterion", group = "Gender", data = my_data)}.
-\item Inspect \verb{$dif_table} for flagged levels and \verb{$summary} for counts.
+\item Inspect \verb{$dif_table} for contrasts and their reporting status, and
+\verb{$summary} for method-specific counts. Residual rows have no flags.
 \item Use \code{\link[=dif_interaction_table]{dif_interaction_table()}} when you need cell-level diagnostics.
-\item Use \code{\link[=plot_dif_heatmap]{plot_dif_heatmap()}} or \code{\link[=dif_report]{dif_report()}} for communication.
+\item Use \link[=plot.mfrm_dif]{plot(x, type = "heatmap")} or \code{\link[=dif_report]{dif_report()}} for communication.
 }
 }
 
 \examples{
-\donttest{
+# Long-running workflow; run explicitly when needed.
+# example("analyze_dff", run.dontrun = TRUE)
+\dontrun{
 toy <- load_mfrmr_data("example_bias")
 
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
@@ -203,11 +348,9 @@ fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
 diag <- diagnose_mfrm(fit, residual_pca = "none", diagnostic_mode = "both")
 dff <- analyze_dff(fit, diag, facet = "Rater", group = "Group", data = toy)
 dff$summary
-# Look for: a small `FlaggedPairs` count relative to `Pairs`. Under
-#   method = "residual", `ClassificationSystem` is "screening", not
-#   ETS. "Screen positive" rows are prompts for substantive review.
+# Read the residual mean difference and the number of observations per group.
 head(dff$dif_table[, c("Level", "Group1", "Group2", "Contrast",
-                       "Classification", "ClassificationSystem")])
+                       "N_Group1", "N_Group2")])
 # The residual contrast is an observed-minus-expected average contrast
 # between groups. It is useful for screening, but it is not an ETS
 # A/B/C logit-delta classification.
@@ -230,6 +373,6 @@ if ("ScaleLinkStatus" \%in\% names(dff_refit$dif_table)) {
 }
 \seealso{
 \code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=estimate_bias]{estimate_bias()}}, \code{\link[=compare_mfrm]{compare_mfrm()}},
-\code{\link[=dif_interaction_table]{dif_interaction_table()}}, \code{\link[=plot_dif_heatmap]{plot_dif_heatmap()}}, \code{\link[=dif_report]{dif_report()}},
+\code{\link[=dif_interaction_table]{dif_interaction_table()}}, \link[=plot.mfrm_dif]{plot(x, type = "heatmap")}, \code{\link[=dif_report]{dif_report()}},
 \code{\link[=subset_connectivity_report]{subset_connectivity_report()}}, \link{mfrmr_linking_and_dff}
 }

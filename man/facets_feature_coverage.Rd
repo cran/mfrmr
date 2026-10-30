@@ -52,10 +52,12 @@ Tables 1--14, DIF/bias plots, R/Web plots, output files, and graph-menu
 curves. \code{mfrmr} intentionally prioritizes structured R tables and reusable
 plot data over exact FACETS line-printer output.
 
-The current software reference target is FACETS 64-bit 4.5.1 (July 2026).
-Bibliographic references retain the title and edition of the consulted
-manual rather than silently relabelling a 4.5.0 manual as 4.5.1. External
-numerical validation is a separate evidence contract.
+The executed comparison uses FACETS 64-bit 4.5.0. The online update history
+lists 4.5.3 (October 2026); current web help is not a version-pinned executable
+specification. In particular, Table 13 web df and executed df differ. The
+4.5.1 history replaces the gtheory interface while its help still names
+gtheory; mfrmr's independent G-study does not depend on that menu. Numerical
+comparisons require their recorded executable version, design and estimand.
 
 Status meanings:
 \itemize{
@@ -79,12 +81,40 @@ familiar visual grammar belongs only to this axis.
 \item \code{StatisticalContract} records the package-native statistical scope and
 never implies a FACETS-matched estimand.
 \item \code{ValidationEvidence} records whether this table establishes matched
-external numerical evidence. It currently does not; validation belongs to
-a separate candidate-linked evidence contract.
+external numerical evidence. It currently does not; that conclusion
+requires a separate comparison using a matched model and estimand.
 \item \code{OperationalStatus} records route availability. A package route being
 available does not make \code{mfrmr} operationally interchangeable with
 FACETS.
 }
+
+For observed-score assessment planning, \code{\link[=mfrm_g_study]{mfrm_g_study()}} and
+\code{\link[=mfrm_d_study]{mfrm_d_study()}} support their documented univariate or
+multivariate component designs. The older \code{\link[=mfrm_generalizability]{mfrm_generalizability()}} /
+\code{\link[=mfrm_d_study]{mfrm_d_study()}} pair has a different main-effects decomposition. Neither
+route reproduces the FACETS interface to the external \code{gtheory} package.
+For balanced ANOVA, \code{\link[=confint.mfrm_multivariate_gstudy]{confint.mfrm_multivariate_gstudy()}} adds component
+SEs/intervals for a score or fixed composite under normal random effects;
+two-score covariance intervals have explicit generalized and conservative
+choices with signed bounds. Explicit \code{reml_profile} variance and covariance intervals
+also accept MINQUE(0), with a separate REML center and no sampling SE;
+two-score covariance profiles fit a joint normal model and retain signed bounds.
+\code{\link[=vcov.mfrm_multivariate_gstudy]{vcov.mfrm_multivariate_gstudy()}} separately supplies component sampling
+covariance/SEs for balanced ANOVA and identifiable MINQUE sources using
+normal product moments; these describe the original estimator, not REML.
+Individual G/Phi intervals from balanced two-crossed-facet sources default
+to approximate MLS null inversion. Undefined MLS widths are conservatively
+retained and flagged; numerical availability does not guarantee coverage.
+G/Phi and SEM have an explicit experimental \code{reml_profile} option for balanced or
+identifiable incomplete sources; the separate REML fit retains original
+ANOVA/MINQUE points and does not guarantee finite-sample or boundary coverage.
+With \code{reference}, it maps one shared profile interval for one-facet plans
+or nested plans with a common future child count, including incomplete sources.
+Balanced crossed G also accepts explicit experimental \code{score} intervals,
+retaining empty-set and numerical diagnostics; Phi is not supplied by this route.
+\code{\link[=mfrm_multivariate_d_compare]{mfrm_multivariate_d_compare()}}
+supplies a separate, limited normal-theory paired-plan calculation. See
+\code{vignette("mfrmr-gtheory", package = "mfrmr")} for a runnable workflow.
 }
 \examples{
 facets_feature_coverage()

@@ -22,7 +22,8 @@ gpcm_quadrature_fixture <- local({
         fit,
         data,
         quad_points = c(5L, 7L),
-        theta_points = 41L
+        theta_points = 41L,
+        adaptive_quad_points = c(5L, 15L, 31L)
       )
       cached <<- list(data = data, fit = fit, sensitivity = sensitivity)
     }
@@ -42,13 +43,24 @@ test_that("GPCM quadrature sensitivity separates numerical evidence", {
   expect_identical(nrow(sensitivity$slopes), 8L)
   expect_identical(names(sensitivity$fits), c("q5", "q7"))
   expect_identical(sensitivity$fits$q5, fixture$fit)
+  expect_equal(nrow(sensitivity$quadrature_review), 12L * 2L * 3L)
+  expect_true(all(sensitivity$quadrature_review$Status == "computed"))
+  scored <- predict_mfrm_units(
+    fixture$fit, fixture$data, readiness_policy = "review", scoring_quad_points = 5L,
+    adaptive_quad_points = c(5L, 15L, 31L)
+  )
+  retained <- sensitivity$quadrature_review[sensitivity$quadrature_review$FixedNodes == 5L, ]
+  rownames(retained) <- NULL
+  expect_equal(scored$quadrature_review, retained, tolerance = 1e-12)
 
   reference <- sensitivity$summary$IsReference
   expect_identical(reference, c(TRUE, FALSE))
   change_columns <- c(
-    "NLLAbsChangePerPerson", "SlopeMaxAbsChange",
+    "NLLAbsChangePerPerson", "MeasurementParameterMaxAbsChange",
+    "SlopeMaxAbsChange",
     "RawSlopeSEMaxAbsChange", "PopulationSDAbsChange",
-    "RawPopulationSDSEAbsChange", "ProbabilityMaxAbsChange"
+    "RawPopulationSDSEAbsChange", "ProbabilityMaxAbsChange",
+    "EAPMaxAbsChange", "PosteriorSDMaxAbsChange"
   )
   expect_equal(
     as.numeric(sensitivity$summary[reference, change_columns]),
@@ -140,24 +152,12 @@ test_that("same-data and scope contracts fail closed", {
     "must include the reference fit's quadrature count",
     fixed = TRUE
   )
-  interaction_fit <- fit
-  interaction_fit$config$interaction_specs <- list("Rater:Criterion" = list())
-  expect_error(
-    mfrmr_gqs_validate(
-      interaction_fit, fixture$data, c(5L, 7L), c(-4, 4), 41L
-    ),
-    "facet interactions is not yet implemented",
-    fixed = TRUE
-  )
   regression_fit <- fit
   regression_fit$population$source <- "user_supplied"
-  expect_error(
-    mfrmr_gqs_validate(
-      regression_fit, fixture$data, c(5L, 7L), c(-4, 4), 41L
-    ),
-    "user-supplied latent-regression",
-    fixed = TRUE
-  )
+  expect_no_error(mfrmr_gqs_validate(regression_fit, fixture$data, c(5L, 7L), c(-4, 4), 41L))
+  regression_fit$population$person_table <- NULL
+  regression_fit$population$person_table_replay <- NULL
+  expect_error(mfrmr_gqs_refit_arguments(regression_fit, fixture$data, 7L), "person data")
 })
 
 test_that("refit conditions are retained without error suppression", {
@@ -181,6 +181,7 @@ test_that("refit conditions are retained without error suppression", {
 test_that("the public diagnostic has no machine-identity dependency", {
   namespace <- asNamespace("mfrmr")
   targets <- c(
+    "mml_quadrature_sensitivity",
     "gpcm_mml_quadrature_sensitivity",
     grep("^mfrmr_gqs_", ls(namespace, all.names = TRUE), value = TRUE),
     "as.data.frame.mfrm_quadrature_sensitivity",

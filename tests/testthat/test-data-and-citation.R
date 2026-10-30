@@ -21,3 +21,24 @@ test_that("citation metadata is available", {
   expect_true(nzchar(cit_file))
   expect_true(file.exists(cit_file))
 })
+
+test_that("all dataset keys preserve data() contents and copy-on-modify", {
+  keys <- list_mfrmr_data()
+  objects <- c("mfrmr_example_core", "mfrmr_example_bias",
+    "mfrmr_example_operational", "ej2021_study1", "ej2021_study2",
+    "ej2021_combined", "ej2021_study1_itercal", "ej2021_study2_itercal",
+    "ej2021_combined_itercal")
+  expect_length(keys, length(objects))
+  for (i in seq_along(keys)) {
+    reference <- new.env(parent = emptyenv())
+    utils::data(list = objects[i], package = "mfrmr", envir = reference)
+    expected <- reference[[objects[i]]]
+    ratings <- load_mfrmr_data(keys[i])
+    expect_identical(ratings, expected, info = keys[i])
+    expect_identical(load_mfrmr_data(toupper(keys[i])), expected)
+    ratings$Score[1] <- -99
+    names(ratings)[1] <- "changed"
+    attr(ratings, "user_note") <- "local edit"
+    expect_identical(load_mfrmr_data(keys[i]), expected, info = keys[i])
+  }
+})

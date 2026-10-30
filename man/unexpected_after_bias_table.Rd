@@ -8,10 +8,10 @@ unexpected_after_bias_table(
   fit,
   bias_results,
   diagnostics = NULL,
-  abs_z_min = 2,
+  abs_z_min = 3,
   prob_max = 0.3,
   top_n = 100,
-  rule = c("either", "both")
+  rule = c("residual", "either", "both")
 )
 }
 \arguments{
@@ -25,9 +25,12 @@ unexpected_after_bias_table(
 
 \item{prob_max}{Maximum observed-category probability cutoff.}
 
-\item{top_n}{Maximum number of rows to return.}
+\item{top_n}{Maximum number of ranked rows to return in \code{table}.
+Summary counts, percentages, and before/after comparisons use all flagged
+observations, regardless of this display limit.}
 
-\item{rule}{Flagging rule: \code{"either"} or \code{"both"}.}
+\item{rule}{\code{"residual"} (default), \code{"either"}, or \code{"both"}; see
+\code{\link[=unexpected_response_table]{unexpected_response_table()}} for the same baseline/after-bias rule.}
 }
 \value{
 A named list with:
@@ -36,7 +39,7 @@ A named list with:
 \item \code{summary}: one-row summary (includes baseline-vs-after counts)
 \item \code{thresholds}: applied thresholds
 \item \code{facets}: analyzed bias facet pair
-\item \code{gpcm_boundary}: bounded-\code{GPCM} interpretation guidance when applicable
+\item \code{gpcm_boundary}: \code{GPCM} interpretation guidance when applicable
 }
 }
 \description{
@@ -45,6 +48,10 @@ Build an unexpected-after-adjustment screening report
 \details{
 This helper recomputes expected values and residuals after interaction
 adjustments from \code{\link[=estimate_bias]{estimate_bias()}} have been introduced.
+Screening coverage is retained separately before and after adjustment.
+Reduction counts, percentages and the comparison plot are unavailable if
+either screen leaves responses unclassified. Recreate older saved results
+with the original settings; the MFRM fit does not need re-estimation.
 
 \code{summary(t10)} is supported through \code{summary()}.
 \code{plot(t10)} is dispatched through \code{plot()} for class
@@ -60,7 +67,7 @@ adjustments from \code{\link[=estimate_bias]{estimate_bias()}} have been introdu
 }
 
 Lower after-adjustment counts describe an in-sample change in flags; they do
-not show that bias has been removed or establish fairness. For bounded
+not show that bias has been removed or establish fairness. For
 \code{GPCM}, both the bias estimate and the post-adjustment comparison use the
 fitted slope-aware probability kernel while holding the other fitted
 quantities fixed. Read the returned \code{gpcm_boundary} before reporting the
@@ -99,11 +106,23 @@ The \code{summary} data.frame contains:
 }
 }
 
+\section{Saved-result reuse}{
+
+The returned \code{fit_identity} records the fitted analysis for reuse with
+reports and exports. Recreate older results from the saved fit and matching
+diagnostics using the original screening options; no model refit is needed.
+See \link{mfrmr_compatibility_layer} for migration instructions.
+}
+
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_bias")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
-diag <- diagnose_mfrm(fit, residual_pca = "none")
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("unexpected_after_bias_table", run.dontrun = TRUE)
+\dontrun{
+# Saved synthetic JML/RSM analysis of example_bias.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "bias-jml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+diag <- example_fit$diagnostics
 bias <- estimate_bias(fit, diag, facet_a = "Rater", facet_b = "Criterion", max_iter = 2)
 t10 <- unexpected_after_bias_table(fit, bias, diagnostics = diag, top_n = 20)
 summary(t10)

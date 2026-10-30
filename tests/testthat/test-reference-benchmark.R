@@ -261,6 +261,12 @@ test_that("reference_case_benchmark includes latent-regression benchmark case", 
   expect_true("synthetic_latent_regression" %in% bench$case_summary$Case)
   expect_true(any(grepl("Population:", bench$recovery_checks$Facet, fixed = TRUE)))
   expect_true(any(bench$recovery_checks$Facet == "Population:posterior_shift"))
+  shift_row <- bench$recovery_checks[
+    bench$recovery_checks$Facet == "Population:posterior_shift", , drop = FALSE
+  ]
+  expect_identical(nrow(shift_row), 1L)
+  expect_identical(as.character(shift_row$Status[1]), "Warn")
+  expect_match(shift_row$Detail[1], "was not scoring-ready", fixed = TRUE)
   expect_identical(
     as.logical(bench$fit_runs$SupportsFormalInference),
     as.logical(bench$fit_runs$Converged)
@@ -328,7 +334,8 @@ test_that("reference_case_benchmark recovers latent-regression synthetic case un
   expect_true(slope_row$MeanAbsoluteDeviation[1] < 0.35)
   expect_true(sigma_row$MeanAbsoluteDeviation[1] < 0.35)
   expect_true(crit_row$Correlation[1] > 0.95)
-  expect_identical(as.character(shift_row$Status[1]), "Pass")
+  expect_identical(as.character(shift_row$Status[1]), "Warn")
+  expect_match(shift_row$Detail[1], "was not scoring-ready", fixed = TRUE)
 })
 
 test_that("reference_case_benchmark recovers synthetic GPCM case under MML", {

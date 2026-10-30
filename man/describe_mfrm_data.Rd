@@ -2,7 +2,9 @@
 % Please edit documentation in R/api-estimation.R
 \name{describe_mfrm_data}
 \alias{describe_mfrm_data}
-\title{Summarize MFRM input data (TAM-style descriptive snapshot)}
+\alias{summary.mfrm_data_description}
+\alias{plot.mfrm_data_description}
+\title{Check rating data before fitting an MFRM}
 \usage{
 describe_mfrm_data(
   data,
@@ -20,19 +22,41 @@ describe_mfrm_data(
   context_facets = NULL,
   agreement_top_n = NULL,
   expected_design = NULL,
-  min_linking_persons = 2L
+  min_linking_persons = 2L,
+  category_policy = NULL,
+  repeated_ratings = c("review", "independent"),
+  comparisons = NULL
+)
+
+\method{summary}{mfrm_data_description}(object, digits = 3, top_n = 10, ...)
+
+\method{plot}{mfrm_data_description}(
+  x,
+  y = NULL,
+  type = c("score_distribution", "facet_levels", "missing"),
+  main = NULL,
+  palette = NULL,
+  label_angle = 45,
+  draw = TRUE,
+  ...
 )
 }
 \arguments{
-\item{data}{A data.frame in long format (one row per rating event).}
+\item{data}{A data.frame in long format (one row per rating event).
+Grouped or rowwise tibbles are treated as one table; only the selected
+model columns enter row filtering and the design review.}
 
 \item{person}{Column name for person IDs.}
 
-\item{facets}{Character vector of facet column names.}
+\item{facets}{Character vector of facet column names. The reserved data
+and parameter names listed in \code{\link[=fit_mfrm]{fit_mfrm()}} cannot name facets; rename
+such columns before analysis.}
 
-\item{score}{Column name for observed score.}
+\item{score}{Column name for observed score. The category-code and
+near-integer normalization rules are the same as in \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
-\item{weight}{Optional weight/frequency column name.}
+\item{weight}{Optional weight/frequency column name, with the numeric
+precision and finite-sum rules of \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
 \item{rating_min}{Optional minimum category value. Supply with
 \code{rating_max} to retain unused boundary categories in the intended score
@@ -44,7 +68,8 @@ support.}
 
 \item{keep_original}{Keep original category values. Use this with
 \code{rating_min} / \code{rating_max} when the intended scale has unused
-intermediate categories such as \verb{1, 2, 4, 5} on a 1-5 scale.}
+intermediate categories such as \verb{1, 2, 4, 5} on a 1-5 scale.
+New code can instead use \code{category_policy = "preserve"}.}
 
 \item{missing_codes}{Optional. \code{NULL} (default) is a no-op;
 \code{TRUE} or \code{"default"} activates the FACETS / SPSS / SAS
@@ -83,11 +108,63 @@ can be distinguished from cells that were never assigned.}
 flag. A facet level observed for fewer than this many distinct persons is
 counted in \code{linkage_summary$SparseLevels}. This is a review threshold, not
 a model-acceptance rule.}
+
+\item{category_policy}{Optional explicit category choice: \code{"collapse"}
+maps gaps in the observed categories to consecutive scores;
+\code{"preserve"} keeps the intended ladder, declared with \code{rating_min} and
+\code{rating_max}. This changes the fitted category steps, not just labels.
+\code{NULL} (default) uses \code{keep_original}, whose default is \code{FALSE}
+(\code{"collapse"}). Supplying both choices is allowed only when they agree.
+Preservation does not estimate unsupported steps: fitting stops if a
+retained internal category has no observations. Use the same policy in
+\code{\link[=describe_mfrm_data]{describe_mfrm_data()}} and \code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}}.}
+
+\item{repeated_ratings}{Treatment of repeated Person-by-facet cells.
+\code{"review"} (default) retains the duplicate-cell warning and ordinary
+MML/JML input-review state. Use \code{"independent"} only to declare that the
+rows are distinct, conditionally independent rating events under the
+specified model. Every row and its weight are retained; this argument
+does not aggregate scores, add a facet, change the likelihood or establish
+independence from the data. Other input, numerical and inference checks
+still apply. The declaration is saved in preparation notes, configuration
+and replay settings. Corrected JML already requires conditionally
+independent repeated ratings; the argument records that assumption
+explicitly there. It is not supported by the two-family GPCM route.}
+
+\item{comparisons}{Optional named specification for a prospective
+facet-by-origin interaction review. See "Comparison-specific review".
+Default \code{NULL} performs no model/target review or fitting.}
+
+\item{object}{Output from \code{\link[=describe_mfrm_data]{describe_mfrm_data()}}.}
+
+\item{digits}{Number of digits for numeric rounding.}
+
+\item{top_n}{Maximum rows shown in preview blocks.}
+
+\item{...}{Reserved for generic compatibility.}
+
+\item{x}{Output from \code{\link[=describe_mfrm_data]{describe_mfrm_data()}}.}
+
+\item{y}{Reserved for generic compatibility.}
+
+\item{type}{Plot type: \code{"score_distribution"}, \code{"facet_levels"}, or \code{"missing"}.}
+
+\item{main}{Optional title override.}
+
+\item{palette}{Optional named colors (\code{score}, \code{facet}, \code{missing}).}
+
+\item{label_angle}{X-axis label angle for bar plots.}
+
+\item{draw}{If \code{TRUE}, draw using base graphics.}
 }
 \value{
 A list of class \code{mfrm_data_description} with:
 \itemize{
 \item \code{overview}: one-row run-level summary
+including \code{CategoryPolicy} and \code{ScoreRecoded}. The former records the
+selected category handling; the latter indicates whether original score
+values actually changed. A \code{"collapse"} policy can leave a contiguous
+scale unchanged. Inspect \code{score_support$score_map} for the mapping.
 \item \code{missing_by_column}: missing counts in selected input columns
 \item \code{missing_rate_summary}: per-column missingness rate summary
 (one row per input column, with raw and proportion-of-N columns)
@@ -119,16 +196,53 @@ design conditions detected during preparation
 replaced with \code{NA} before row filtering
 \item \code{score_support}: minimal prepared score-support metadata used by
 \code{summary(ds)$caveats}
+\item \code{comparison_review}: optional prospective interaction review, including
+all requested rows and their explicit weights; also retained by \code{summary()}.
 }
+
+For \code{summary()}: An object of class \code{summary.mfrm_data_description}.
+\itemize{
+\item \code{overview}: design/sample counts
+\item \code{missing}: top columns by missingness
+\item \code{score_distribution}: compact score-usage table, including zero-count
+categories retained by the prepared score support
+\item \code{facet_overview}: facet-level coverage summary
+\item \code{structural_missingness}: declared assignment coverage summary; status is
+\code{"not_declared"} when no assignment roster was supplied
+\item \code{structural_level_coverage}: expected versus observed level counts
+\item \code{design_connectivity}: Person-facet component counts for observed and
+declared-expected designs
+\item \code{design_components}: component sizes and facet-level labels; person labels
+are suppressed unless explicitly requested in \code{\link[=describe_mfrm_data]{describe_mfrm_data()}}
+\item \code{linkage_summary}: sparse-support and shared-person counts by facet
+\item \code{duplicate_cell_summary}: aggregate duplicate-cell counts
+\item \code{agreement}: selected-facet agreement summary when available
+\item \code{agreement_settings}: selected scorer facet, matching context, and status
+\item \code{row_retention}: row counts before and after preparation filters
+\item \code{preparation_notes}: structured preparation notes retained from
+\code{\link[=describe_mfrm_data]{describe_mfrm_data()}}
+\item \code{reporting_map}: manuscript-oriented guide to what is covered here versus
+which companion outputs should be consulted
+\item \code{caveats}: structured warning/review rows for score-support issues;
+\code{print(summary(ds))} shows a compact \code{Caveats} block when rows are present
+\item \code{notes}: plain-language explanations of missingness, preparation, score
+support, and design-review findings
+}
+
+For \code{plot()}: A plotting-data object of class \code{mfrm_plot_data}.
 }
 \description{
-Summarize MFRM input data (TAM-style descriptive snapshot)
+Inspect how many rating rows can be used, how often each score category
+occurs, and whether facet levels connect through shared persons. This
+function prepares descriptive checks; it does not fit a model or change
+the data object supplied by the caller. Each row should represent one
+rating, and \code{person}, \code{facets}, and \code{score} name its columns.
 }
 \details{
-This function provides a compact descriptive bundle similar to the
-pre-fit summaries commonly checked in TAM workflows:
-sample size, score distribution, per-facet coverage, and linkage counts.
-\code{psych::describe()} is used for numeric descriptives of score and weight.
+Set \code{rating_min} and \code{rating_max} from the rubric, including categories
+nobody received. Use \code{keep_original = TRUE} to preserve its category
+structure in the review. Numeric descriptives of score and weight use
+\code{psych::describe()}.
 
 \strong{Key data-quality checks to perform before fitting:}
 \itemize{
@@ -140,19 +254,127 @@ interpretation, and category diagnostics after fitting.
 Person-facet graph. More than one component means that the levels of that
 facet are not connected through shared persons. This facet-specific check
 is conservative and does not by itself prove full model identification.
-\item \emph{Extreme scores}: persons or facet levels with all-minimum or
-all-maximum scores yield infinite logit estimates under JML;
-they are handled via Bayesian shrinkage under MML.
+\item \emph{Extreme scores}: MML uses a person distribution to obtain posterior
+person scores, including for persons with all-minimum or all-maximum
+scores. Non-person facets remain fixed effects: an extreme rater or
+criterion is not given a prior or automatically shrunk by choosing MML.
+Review the fitted boundary and precision evidence before interpretation.
+}
+
+\code{summary()} method: Summarize a data-description object
+
+Read a compact summary of the checks from \code{\link[=describe_mfrm_data]{describe_mfrm_data()}} before
+fitting a model. Save it with \code{review <- summary(data_review)} and select
+the tables you need with \code{$}, as in the example.
+
+For \code{summary()}: \code{data_review} holds the complete data checks; \code{review} holds summary tables
+and notes. Neither object contains model estimates. The default \code{top_n = 10}
+limits the missing-column and score-distribution previews; use
+\code{data_review$missing_by_column} and \code{data_review$score_distribution} to see
+the complete tables.
+
+\code{plot()} method: Plot a data-description object
+
+For \code{plot()}: This method draws quick pre-fit quality views from \code{\link[=describe_mfrm_data]{describe_mfrm_data()}}:
+\itemize{
+\item score distribution balance
+\item facet-level structure size
+\item missingness by selected columns
 }
 }
+\section{Comparison-specific review}{
+
+Use \code{comparisons = list(facet = ..., group = ..., groups = c("A", "B"), contrasts = W, model = "RSM", method = "JML")} to review explicitly
+declared interaction comparisons before estimation. Both \code{facet} and
+\code{group} must occur in \code{facets}; each Person/recording must keep one origin
+group. \code{groups} gives the subtraction order, including when additional
+neutral origins are present. Unit weights and preserved categories are
+required. \code{W} is a numeric matrix with unique comparison row names and
+every reviewed facet level as a named column, including zero weights.
+Each nonzero row must sum to zero. For four raters, weights
+\code{c(.75, -.25, -.25, -.25)} compare the first rater's A-minus-B
+interaction with the equal-weight panel; \code{c(1, -1, 0, 0)} compares the
+first two raters' A-minus-B interactions. These are different targets.
+
+The prospective model has centered measurement facets, a zero-valued
+group main facet, and the named facet-by-group interaction with zero
+marginal sums. JML has free Person locations. Choose \code{model = "PCM"}
+with an explicit \code{step_facet} for facet-owned steps. Optional
+\code{positive_facets} records the location orientation. Anchors, extra
+interactions and nonunit weights are outside this review. GPCM interaction
+requests return \code{unsupported}, not an additive-model substitute.
+
+\code{method = "MML"} uses a fixed common standard-normal population unless
+\code{population_formula} is supplied (an intercept or the origin group only).
+\code{ConditionalState} refers to the linear response map; \code{FreePersonState}
+reviews the same response structure with unrestricted Persons. A same-law
+alias remains unidentified after mixing. A positive conditional rank alone
+does not certify the marginal model: those MML rows have
+\code{State = "not_evaluated"}. No fit or numerical marginal-rank calculation
+is performed. JML rows distinguish \code{all_parameters_identified},
+\code{target_identified_only}, and \code{target_unidentified}. Numerically sensitive
+or oversized dense maps remain \code{not_evaluated}.
+
+\code{IdentificationBasis} interprets these checks for each requested target:
+\code{free_person_response_model} means the declared response map identifies
+it even with unrestricted Person locations. \code{population_restriction} means
+an unrestricted-Person alias is removed only after imposing the declared
+population restrictions in the conditional map. This does \strong{not} certify
+marginal identification, and the corresponding MML \code{State} stays
+\code{not_evaluated}. \code{conditional_support} identifies a CML target from response
+patterns at the observed totals. \code{unidentified}, \code{not_evaluated} and
+\code{unsupported} remain separate. \code{IdentificationDetail} explains the scope;
+\code{Basis} retains the broader estimator/model basis.
+
+A fixed common N(0,1) population or estimated common normal population
+(\code{~1}) restricts origin groups to the same ability distribution. This is
+substantive, not arbitrary scale coding. Origin regression relaxes only
+the means allowed by its design and retains a common residual SD. Interpret
+the zero origin main effect jointly with those restrictions. A contrast
+identified in a free-Person response map does not make its MML estimator
+distribution-free. All conclusions still depend on the declared response
+model, including equal slopes and shared/facet-owned step restrictions.
+
+\code{method = "CML"} instead reviews conditional support at the actual Person
+totals and rating rosters. A dynamic program spans differences between all
+possible patterns at those totals, so extreme scores and unavailable category
+combinations do not manufacture information. \code{State} and \code{ConditionalState}
+distinguish full identification, target-only identification and unidentified
+targets; \code{FreePersonState} is the separate unrestricted-Person response-map
+review. Person-constant main effects disappear, and no population distribution
+or SD is estimated. Population formulas are not accepted for CML.
+
+Read \verb{$comparison_review$table}, \verb{$weights}, \verb{$cells} and \verb{$notes} together.
+The table preserves group direction, model, step owner and counts; counts
+cover nonzero-weight facet levels, while \code{cells} includes empty cells.
+\verb{$fit_arguments} records the prospective structural settings; use matching
+input preparation when fitting. An identified target does not permit fitting
+a rejected full parameterization. \code{Estimate} stays missing and formal
+inference is unavailable. Save the review with its retained response rows.
+Pass it as \code{comparison_review} to \code{\link[=analyze_dff]{analyze_dff()}} to preserve this separate
+prospective question alongside residual/refit effects; it does not certify
+those different effects. See \code{vignette("mfrmr-linking-and-dff")} for a
+school-assignment example and \link{mfrmr_linking_and_dff} for interpretation.
+A matching, fully supported joint fit can return descriptive contrasts via
+\code{\link[=interaction_effect_table]{interaction_effect_table()}} or \code{summary(fit, comparison_review = review)}.
+These explicit calls add retained-point numerical checks, not partial
+estimation or formal uncertainty. To fit selected CML contrasts and obtain
+conditional-information Wald intervals, use \code{fit_mfrm(fit_scope = "comparisons", comparison_review = review)} with the CML review's \verb{$fit_arguments}; see
+the comparison-only section of \code{\link[=fit_mfrm]{fit_mfrm()}}.
+}
+
 \section{Interpreting output}{
 
 Recommended order:
 \itemize{
-\item \code{overview}: confirms sample size, facet count, and category span.
-\item \code{missing_by_column}: identifies immediate data-quality risks.
-Understand why values are missing and whether the fitted missing-data
-handling matches the study design.
+\item \code{overview}: confirms retained ratings (\code{Observations}), persons, facets,
+and category span. Use \code{row_retention} to compare input and retained
+\code{Rows}; \code{DroppedRows} counts exclusions during preparation.
+\item \code{missing_by_column}: counts \code{NA} values in the input columns. A missing
+score or required identifier excludes that rating row, not automatically
+the person's other ratings. The package does not fill missing ratings.
+When \code{missing_codes} is supplied, these counts still describe the original
+input; inspect \code{missing_recoding} and \code{preparation_notes} as well.
 \item \code{structural_missingness}: compares observed rating cells with
 \code{expected_design}, when supplied. Without a declared roster, structural
 missingness is reported as not assessed rather than assumed to be zero.
@@ -165,30 +387,189 @@ separate graph-component result.
 \item \code{agreement}: optional observed agreement summary for the selected scorer
 facet (exact agreement, correlation, and mean differences per pair).
 }
+
+\code{data_review <- describe_mfrm_data(...)} saves all these checks.
+\code{review <- summary(data_review)} provides a compact view; its missingness
+table is named \code{review$missing}, while the original full table is
+\code{data_review$missing_by_column}. Summary previews use \code{top_n = 10} by
+default. Use the original tables to inspect all rows or categories.
+
+
+For \code{summary()}:
+
+Recommended read order:
+\itemize{
+\item \code{overview}: retained ratings (\code{Observations}), persons, facets, and
+categories. Compare input and retained \code{Rows} in \code{row_retention} and
+investigate unexpected \code{DroppedRows}.
+\code{CategoryPolicy} and \code{ScoreRecoded} distinguish the selected policy from
+actual changes to score values. Older results without the policy record
+report \code{"not_recorded"}; an absent map gives \code{NA} for recoding.
+\item \code{missing}: input \code{NA} counts by column. This table is named
+\code{missing_by_column} in the original \code{data_review} object. Declared
+missing-code replacements and invalid score text can cause additional
+row loss; inspect \code{data_review$missing_recoding} and \code{preparation_notes}.
+\item \code{score_distribution}: category usage balance.
+\item \code{notes} / printed \code{Caveats}: retained zero-count score categories and
+related score-support caveats. With \code{keep_original = TRUE}, a retained
+unused internal category stops fitting; review the data and rubric first.
+\item \code{facet_overview}: coverage per facet (minimum/maximum weighted counts).
+\item \code{agreement}: observed-score agreement for the selected scorer facet (when
+available).
+\item \code{design_connectivity}: check for more than one observed component before
+comparing facet levels. \code{structural_missingness} reports planned omissions
+only when an assignment roster was supplied; \code{not_declared} does not mean
+that no ratings are missing.
+}
+
+Very low \code{MinWeightedN} in \code{facet_overview} is a practical warning for
+unstable downstream facet estimates.
+
+
+For \code{plot()}:
+\itemize{
+\item \code{"score_distribution"}: bar chart of weighted observation counts per
+score category.  Y-axis is \code{WeightedN} (sum of weights for each
+category).  Categories with very few observations (< 10) may produce
+unstable threshold estimates.  A roughly uniform or unimodal
+distribution is ideal; heavy floor/ceiling effects compress the
+measurement range.
+\item \code{"facet_levels"}: bar chart showing the number of distinct levels
+per facet.  Useful for verifying that the design structure matches
+expectations (e.g., expected number of raters or criteria).  Very
+large numbers of levels increase computation time and may require
+higher \code{maxit} in \code{\link[=fit_mfrm]{fit_mfrm()}}.
+\item \code{"missing"}: bar chart of missing-value counts per input column.
+Columns with non-zero counts should be investigated before
+fitting---rows with missing scores, persons, or facet IDs are
+dropped during estimation.
+}
+}
+
+\section{If the input needs attention}{
+
+\itemize{
+\item \strong{Column name not found:} run \code{names(ratings)} and match spelling,
+spaces, and case in \code{person}, \code{facets}, and \code{score}.
+\item \strong{Unexpected row loss:} inspect \code{row_retention}, \code{missing_by_column},
+and \code{preparation_notes}. Resolve unintended missing IDs and invalid score
+text in the input data. For documented score markers such as \code{99} or \code{.},
+use \code{\link[=recode_missing_codes]{recode_missing_codes()}} with explicit \code{columns} and \code{codes}.
+\item \strong{Repeated person-by-facet cells:} inspect \code{duplicate_cell_detail}.
+Correct accidental duplicates; declare \code{repeated_ratings = "independent"}
+for distinct conditionally independent events, or model dependence.
+Include a task or occasion facet when
+ratings represent distinct events in the design.
+\item \strong{Unused category or disconnected design:} inspect
+\code{score_distribution} and \code{design_connectivity}. Review the rubric and
+assignments before changing the model. A retained internal zero-count
+category stops fitting; extra optimizer iterations cannot supply the
+missing category information.
+}
+
+After editing or recoding ratings, rerun this review on the corrected data
+and pass that same data to \code{\link[=fit_mfrm]{fit_mfrm()}}, using the same columns, score
+bounds, and \code{keep_original} setting. If you use \code{missing_codes} within the
+review instead of recoding first, supply the same option to the fit:
+reviewing does not modify the original data. For CSV import, column mapping,
+and a complete worked example, see
+\code{vignette("mfrmr-workflow", package = "mfrmr")}.
 }
 
 \section{Typical workflow}{
 
 \enumerate{
-\item Run \code{describe_mfrm_data()} on long-format input.
-\item Review \code{summary(ds)} and \code{plot(ds, ...)}.
-\item Resolve missingness/sparsity issues before \code{\link[=fit_mfrm]{fit_mfrm()}}.
+\item Run \code{data_review <- describe_mfrm_data(...)} on the rating data.
+\item Inspect row retention, category counts, and design connectivity.
+\item Correct input issues, repeat the review, and fit the reviewed data with
+\code{\link[=fit_mfrm]{fit_mfrm()}}.
+}
+
+
+For \code{summary()}:
+\enumerate{
+\item Run \code{\link[=describe_mfrm_data]{describe_mfrm_data()}} on raw long-format data.
+\item Inspect \code{review <- summary(data_review)} before model fitting.
+\item Correct input issues and repeat the review, then pass the corrected
+rating data to \code{\link[=fit_mfrm]{fit_mfrm()}} with the same preparation settings.
+}
+
+
+For \code{plot()}:
+\enumerate{
+\item Run \code{\link[=describe_mfrm_data]{describe_mfrm_data()}} before fitting.
+\item Inspect \code{summary(ds)} and \code{plot(ds, type = "missing")}.
+\item Check category/facet balance with other plot types.
+\item Fit model after resolving obvious data issues.
 }
 }
 
 \examples{
-toy <- load_mfrmr_data("example_core")
-ds <- describe_mfrm_data(
-  data = toy,
+library(mfrmr)
+ratings <- load_mfrmr_data("example_operational")
+head(ratings)
+
+# Check the data before fitting; the intended score categories are 1 to 4
+data_review <- describe_mfrm_data(
+  data = ratings,
   person = "Person",
   facets = c("Rater", "Criterion"),
-  score = "Score"
+  score = "Score",
+  rating_min = 1,
+  rating_max = 4,
+  category_policy = "preserve"
 )
-s_ds <- summary(ds)
-s_ds$overview
-p_ds <- plot(ds, draw = FALSE)
-p_ds$data$plot
+data_review$row_retention       # Input and retained rows; check DroppedRows
+data_review$missing_by_column   # Missing input values in each model column
+data_review$score_distribution  # RawN is the number of ratings per category
+data_review$design_connectivity # Components = 1 means connected for that facet
+# Here all 282 rows are retained, and all four categories have observations
+
+# Save a compact summary when you want the overview and review notes
+review <- summary(data_review)
+review$overview
+review$notes
+# For the next fit, use data = ratings; data_review is a set of checks, not ratings
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("summary.mfrm_data_description", run.dontrun = TRUE)
+\dontrun{
+library(mfrmr)
+ratings <- load_mfrmr_data("example_operational")
+
+# Demonstrate two missing scores in a copy of the example data
+ratings$Score[1:2] <- NA
+data_review <- describe_mfrm_data(
+  data = ratings,
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  score = "Score",
+  rating_min = 1,
+  rating_max = 4,
+  category_policy = "preserve"
+)
+review <- summary(data_review)
+review$row_retention # 282 input rows, 280 retained rows
+review$missing       # Score has 2 missing input values
+review$overview      # Counts describe the retained ratings
+review$notes         # Explanations to read before fitting
+
+# The original description retains the full missingness table
+data_review$missing_by_column
+# Investigate missingness before using ratings in fit_mfrm()
+}
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("plot.mfrm_data_description", run.dontrun = TRUE)
+\dontrun{
+toy <- load_mfrmr_data("example_core")
+ds <- describe_mfrm_data(toy, "Person", c("Rater", "Criterion"), "Score")
+p <- plot(ds, draw = FALSE)
+}
 }
 \seealso{
-\code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}}
+\code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=summary.mfrm_data_description]{summary.mfrm_data_description()}},
+\code{\link[=recode_missing_codes]{recode_missing_codes()}}, \link{mfrmr_workflow_methods}, \code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}}
+
+\code{\link[=describe_mfrm_data]{describe_mfrm_data()}}, \code{\link[=summary.mfrm_fit]{summary.mfrm_fit()}}
+
+\code{\link[=describe_mfrm_data]{describe_mfrm_data()}}, \code{plot()}
 }

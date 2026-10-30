@@ -4,17 +4,26 @@
 #' severity, misfit, central-tendency screening, and optional bias counts.
 #'
 #' @param fit Output from [fit_mfrm()].
-#' @param diagnostics Optional output from [diagnose_mfrm()].
+#' @param diagnostics Optional output from [diagnose_mfrm()] for the same `fit`.
+#'   Mismatched or outdated diagnostics are rejected. Recompute diagnostics
+#'   after refitting; the model itself does not need to be fitted again.
 #' @param facet Optional facet name. When `NULL`, the function tries to infer
 #'   a rater-like facet and otherwise falls back to the first modeled facet.
 #' @param bias_results Optional output from [estimate_bias()] or a named list
 #'   of such outputs. Non-matching bundles are skipped quietly.
 #' @param severity_warn Absolute estimate cutoff used to flag severity
 #'   outliers.
-#' @param misfit_warn Mean-square cutoff used to flag misfit. Values above
-#'   this cutoff or below its reciprocal are flagged.
-#' @param central_tendency_max Absolute estimate cutoff used to flag central
-#'   tendency. Levels near zero are marked.
+#' @param misfit_warn `NULL` (default) uses both bounds returned by
+#'   [mfrm_misfit_thresholds()], including any session options. A numeric value
+#'   instead uses that upper cutoff and its reciprocal as the lower cutoff;
+#'   it does not preserve the current lower bound. For example, `1.5` selects
+#'   about 0.67--1.5, whereas the unmodified package defaults are 0.5--1.5.
+#' @param central_tendency_max Legacy opt-in absolute estimate cutoff for
+#'   marking facet estimates near the fitted origin. The default `NULL`
+#'   disables this flag because origin proximity is not evidence that a rater
+#'   avoids extreme score categories. Use [data_quality_report()] for observed
+#'   category-use screening and [rater_centrality_table()] for model-based
+#'   indirect centrality indices.
 #' @param bias_count_warn Minimum flagged-bias row count required to flag a
 #'   level.
 #' @param bias_abs_t_warn Absolute `t` cutoff used when deriving bias-row
@@ -36,21 +45,34 @@
 #'   pass `misfit_warn = 1.5` to keep the older symmetric
 #'   \eqn{[1/}\code{misfit_warn}\eqn{,\;}\code{misfit_warn}\eqn{]}
 #'   form (0.67-1.5).
-#' - **Central tendency**: elements with
-#'   \eqn{|\mathrm{Estimate}| <} `central_tendency_max` logits
-#'   are flagged.  Near-zero estimates may indicate a rater who avoids
-#'   extreme categories, producing artificially narrow score ranges.
+#' - **Reference proximity (legacy `CentralTendencyFlag` label)**: when
+#'   `central_tendency_max` is supplied, elements with
+#'   \eqn{|\mathrm{Estimate}| <} `central_tendency_max` logits are marked.
+#'   This only describes proximity to the fitted origin and must not be
+#'   interpreted as central-category use or restriction of range. Those are
+#'   response-pattern questions; see [data_quality_report()] and
+#'   [rater_centrality_table()] for their distinct descriptive indices.
 #' - **Bias**: elements involved in \eqn{\ge} `bias_count_warn`
 #'   screen-positive interaction cells (from [estimate_bias()]) are flagged.
 #'
-#' A **flag density** score counts how many of the four criteria each
-#' element triggers. Elements flagged on multiple criteria warrant priority
+#' A **flag density** score counts how many enabled criteria each element
+#' triggers. Elements flagged on multiple criteria warrant priority
 #' review and may motivate training or a documented data-quality review; the
 #' dashboard does not justify automatic row, person, or rater exclusion.
 #'
 #' Default thresholds are screening heuristics. Prespecify and justify any
 #' application-specific alternatives rather than treating them as universal
 #' validity or acceptance criteria.
+#' `MissingMetrics` lists unavailable estimate, SE, Infit or Outfit values.
+#' A severity or misfit flag is `NA` when it cannot be evaluated (an observed
+#' misfit exceedance still flags even if the other fit index is unavailable).
+#' `FlagCount` counts observed flags only; zero is not a complete pass.
+#' `IncompleteLevels` counts levels with any missing diagnostic. Bias counts
+#' describe supplied results only, not tests of absence of bias.
+#' Fit-readiness restrictions are retained in `fit_readiness`,
+#' `interpretation_status` and `notes`. Review overlap with
+#' [subset_connectivity_report()] and category use with [data_quality_report()]
+#' before interpreting between-rater differences.
 #'
 #' @return An object of class `mfrm_facet_dashboard` (also inheriting from
 #'   `mfrm_bundle` and `list`). The object summarizes one target facet:
@@ -83,9 +105,11 @@
 #' - `bias_results`: the `mfrm_bias` bundle (or list of bundles)
 #'   when `bias_results` was supplied; `NULL` otherwise
 #'
-#' @seealso [diagnose_mfrm()], [estimate_bias()], [plot_qc_dashboard()]
+#' @seealso [diagnose_mfrm()], [estimate_bias()], [plot(x, type = "qc")][plot.mfrm_fit]
 #' @examples
-#' \donttest{
+#' # Supplementary workflow: run explicitly to keep routine checks brief.
+#' # example("facet_quality_dashboard", run.dontrun = TRUE)
+#' \dontrun{
 #' toy <- load_mfrmr_data("example_core")
 #' toy <- toy[toy$Person %in% unique(toy$Person)[1:8], ]
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
@@ -93,14 +117,20 @@
 #' dash <- facet_quality_dashboard(fit, diagnostics = diag)
 #' summary(dash)
 #' }
+#' @section Saved-result reuse:
+#' Supplied screening results must describe this fitted analysis. Results from
+#' another fit or older results without identity metadata are refused. See
+#' [mfrmr_compatibility_layer] to recreate them from the saved fit and matching
+#' diagnostics without refitting the model.
 #' @export
+#' @order 1
 facet_quality_dashboard <- function(fit,
                                     diagnostics = NULL,
                                     facet = NULL,
                                     bias_results = NULL,
                                     severity_warn = 1.0,
                                     misfit_warn = NULL,
-                                    central_tendency_max = 0.25,
+                                    central_tendency_max = NULL,
                                     bias_count_warn = 1L,
                                     bias_abs_t_warn = 2,
                                     bias_abs_size_warn = 0.5,
@@ -126,6 +156,9 @@ facet_quality_dashboard <- function(fit,
   if (!is.list(diagnostics) || is.null(diagnostics$measures)) {
     stop("`diagnostics` must be output from diagnose_mfrm().", call. = FALSE)
   }
+  mfrm_results_validate_diagnostics_identity(fit, diagnostics,
+                                             helper = "facet_quality_dashboard()")
+  mfrm_validate_bias_identity(fit, bias_results, helper = "facet_quality_dashboard()")
 
   facet_names <- fit$config$facet_names
   if (is.null(facet_names)) facet_names <- fit$prep$facet_names
@@ -172,13 +205,30 @@ facet_quality_dashboard <- function(fit,
   detail$Infit <- first_existing(detail, c("Infit", "InfitMnSq", "Infit Mnsq"))
   detail$Outfit <- first_existing(detail, c("Outfit", "OutfitMnSq", "Outfit Mnsq"))
   detail$AbsEstimate <- abs(detail$Estimate)
-  detail$SeverityFlag <- is.finite(detail$AbsEstimate) & detail$AbsEstimate >= abs(severity_warn)
-  fit_hi <- pmax(detail$Infit, detail$Outfit, na.rm = TRUE)
-  fit_lo <- pmin(detail$Infit, detail$Outfit, na.rm = TRUE)
-  detail$MisfitFlag <- is.finite(fit_hi) & (
-    fit_hi >= abs(misfit_warn) | fit_lo <= misfit_lower_band
-  )
-  detail$CentralTendencyFlag <- is.finite(detail$AbsEstimate) & detail$AbsEstimate <= abs(central_tendency_max)
+  detail$MissingMetrics <- vapply(seq_len(nrow(detail)), function(i) {
+    metrics <- c("Estimate", "SE", "Infit", "Outfit")
+    paste(metrics[!is.finite(as.numeric(detail[i, metrics]))], collapse = ", ")
+  }, character(1))
+  detail$SeverityFlag <- ifelse(is.finite(detail$AbsEstimate),
+                                detail$AbsEstimate >= abs(severity_warn), NA)
+  fit_indices <- as.matrix(detail[c("Infit", "Outfit")])
+  fit_indices[!is.finite(fit_indices)] <- NA_real_
+  detail$MisfitFlag <- rowSums(
+    fit_indices >= abs(misfit_warn) | fit_indices <= misfit_lower_band,
+    na.rm = TRUE
+  ) > 0L
+  detail$MisfitFlag[!detail$MisfitFlag &
+    (!is.finite(detail$Infit) | !is.finite(detail$Outfit))] <- NA
+  central_tendency_value <- suppressWarnings(as.numeric(central_tendency_max[1]))
+  central_tendency_enabled <- length(central_tendency_value) == 1L &&
+    is.finite(central_tendency_value)
+  central_tendency_value <- if (isTRUE(central_tendency_enabled)) {
+    abs(central_tendency_value)
+  } else {
+    NA_real_
+  }
+  detail$CentralTendencyFlag <- isTRUE(central_tendency_enabled) &
+    is.finite(detail$AbsEstimate) & detail$AbsEstimate <= central_tendency_value
   detail$BiasCount <- 0L
   detail$BiasSources <- 0L
 
@@ -207,7 +257,7 @@ facet_quality_dashboard <- function(fit,
     labs <- character(0)
     if (isTRUE(detail$SeverityFlag[i])) labs <- c(labs, "severity")
     if (isTRUE(detail$MisfitFlag[i])) labs <- c(labs, "misfit")
-    if (isTRUE(detail$CentralTendencyFlag[i])) labs <- c(labs, "central")
+    if (isTRUE(detail$CentralTendencyFlag[i])) labs <- c(labs, "reference proximity")
     if (isTRUE(detail$BiasFlag[i])) labs <- c(labs, "bias")
     if (length(labs) == 0) "" else paste(labs, collapse = ", ")
   }, character(1))
@@ -233,6 +283,7 @@ facet_quality_dashboard <- function(fit,
     FacetSource = if (is.null(facet_input) || !nzchar(as.character(facet_input[1]))) "inferred" else "user",
     Levels = nrow(detail),
     FlaggedLevels = sum(detail$AnyFlag, na.rm = TRUE),
+    IncompleteLevels = sum(nzchar(detail$MissingMetrics)),
     BiasSourceBundles = nrow(bias_meta$sources[bias_meta$sources$Used %in% TRUE, , drop = FALSE]),
     stringsAsFactors = FALSE
   )
@@ -255,12 +306,13 @@ facet_quality_dashboard <- function(fit,
     stringsAsFactors = FALSE
   )
 
-  settings <- dashboard_settings_table(list(
+  settings <- bundle_settings_table(list(
     facet = facet,
     facet_source = overview$FacetSource[1],
     severity_warn = abs(severity_warn),
     misfit_warn = abs(misfit_warn),
-    central_tendency_max = abs(central_tendency_max),
+    misfit_lower = misfit_lower_band,
+    central_tendency_max = central_tendency_value,
     bias_count_warn = as.integer(bias_count_warn),
     bias_abs_t_warn = abs(bias_abs_t_warn),
     bias_abs_size_warn = abs(bias_abs_size_warn),
@@ -268,7 +320,28 @@ facet_quality_dashboard <- function(fit,
     bias_source_bundles = nrow(bias_meta$sources[bias_meta$sources$Used %in% TRUE, , drop = FALSE])
   ))
 
-  notes <- character(0)
+  readiness <- .mfrm_fit_plot_readiness(fit)
+  notes <- c(
+    "Flags are screening prompts, not evidence of invalid ratings or grounds for automatic exclusion.",
+    "Severity is relative to the fitted reference; inspect workload, category use and common ratings before comparing levels.",
+    "FlagCount counts observed flags only. MissingMetrics identifies unavailable diagnostics; zero flags does not mean all checks passed.",
+    "BiasCount counts flagged cells in supplied bias results only; zero does not establish absence of bias.",
+    readiness$detail
+  )
+  notes <- c(
+    notes,
+    if (isTRUE(central_tendency_enabled)) {
+      paste(
+        "Legacy CentralTendencyFlag is an origin-proximity marker only;",
+        "use data_quality_report() for observed category avoidance or range restriction."
+      )
+    } else {
+      paste(
+        "Legacy CentralTendencyFlag is disabled by default because origin proximity",
+        "does not diagnose observed category avoidance or range restriction."
+      )
+    }
+  )
   if (sum(detail$AnyFlag, na.rm = TRUE) == 0L) {
     notes <- c(notes, "No level-level flags were triggered under the current thresholds.")
   }
@@ -293,6 +366,8 @@ facet_quality_dashboard <- function(fit,
     flagged = flagged,
     bias_sources = bias_meta$sources,
     settings = settings,
+    fit_readiness = readiness$table,
+    interpretation_status = readiness$status,
     notes = notes,
     diagnostics = diagnostics,
     bias_results = bias_results
@@ -301,20 +376,6 @@ facet_quality_dashboard <- function(fit,
   out
 }
 
-dashboard_settings_table <- function(settings) {
-  if (is.null(settings) || !is.list(settings) || length(settings) == 0) return(data.frame())
-  keys <- names(settings)
-  if (is.null(keys) || any(!nzchar(keys))) {
-    keys <- paste0("Setting", seq_along(settings))
-  }
-  vals <- vapply(settings, function(v) {
-    if (is.null(v)) return("NULL")
-    if (is.data.frame(v)) return(paste0("<table ", nrow(v), "x", ncol(v), ">"))
-    if (is.list(v)) return(paste0("<list ", length(v), ">"))
-    paste(as.character(v), collapse = ", ")
-  }, character(1))
-  data.frame(Setting = keys, Value = vals, stringsAsFactors = FALSE)
-}
 
 dashboard_round_numeric_df <- function(df, digits = 3L) {
   if (!is.data.frame(df) || nrow(df) == 0) return(df)
@@ -523,62 +584,62 @@ dashboard_draw_plot <- function(tbl,
     cols[tbl$MisfitFlag %in% TRUE] <- unname(pal["misfit"])
     cols[tbl$SeverityFlag %in% TRUE] <- unname(pal["flag"])
     y <- rev(seq_len(nrow(tbl)))
-    graphics::plot(
+    plot(
       x = rev(tbl$Estimate),
       y = y,
       type = "n",
       yaxt = "n",
       xlab = "Estimate (logits)",
       ylab = "",
-      main = main %||% paste0("Facet quality: ", facet)
+      main = ""
     )
-    graphics::segments(0, y, rev(tbl$Estimate), y, col = "gray70")
-    graphics::points(rev(tbl$Estimate), y, pch = 16, col = rev(cols))
-    graphics::axis(side = 2, at = y, labels = rev(labels), las = 2, cex.axis = 0.75)
-    graphics::abline(v = c(-abs(thresholds$severity_warn[1]), 0, abs(thresholds$severity_warn[1])),
+    segments(0, y, rev(tbl$Estimate), y, col = "gray70")
+    points(rev(tbl$Estimate), y, pch = 16, col = rev(cols))
+    axis(side = 2, at = y, labels = rev(labels), las = 2, cex.axis = 0.75)
+    abline(v = c(-abs(thresholds$severity_warn[1]), 0, abs(thresholds$severity_warn[1])),
                      lty = c(2, 1, 2), col = c("gray45", "gray30", "gray45"))
     return(invisible(NULL))
   }
 
   tbl <- tbl[tbl$AnyFlag %in% TRUE, , drop = FALSE]
   if (nrow(tbl) == 0) {
-    graphics::plot.new()
-    graphics::title(main = main %||% paste0("Facet quality: ", facet))
-    graphics::text(0.5, 0.5, "No flagged levels")
+    plot.new()
+    text(0.5, 0.5, "No observed flags; inspect missing diagnostics and notes")
     return(invisible(NULL))
   }
-  ord <- order(tbl$FlagCount, abs(tbl$Estimate), decreasing = TRUE, na.last = NA)
+  ord <- order(tbl$FlagCount, abs(tbl$Estimate), decreasing = TRUE, na.last = TRUE)
   tbl <- tbl[ord, , drop = FALSE]
   labels <- utils::head(as.character(tbl$Level), n = nrow(tbl))
   cols <- ifelse(tbl$BiasFlag %in% TRUE, pal["bias"], pal["flag"])
-  bp <- graphics::barplot(
+  bp <- barplot(
     height = tbl$FlagCount,
     names.arg = labels,
     col = cols,
     las = if (isTRUE(label_angle >= 45)) 2 else 1,
-    main = main %||% paste0("Facet quality: ", facet),
+    main = "",
     ylab = "Flag count"
   )
-  graphics::abline(h = 0, col = "gray60")
+  abline(h = 0, col = "gray60")
   invisible(bp)
 }
 
 `%||%` <- function(x, y) if (is.null(x)) y else x
 
-#' Summarize a facet-quality dashboard
-#'
+#' @rdname facet_quality_dashboard
+#' @details `summary()` method: Summarize a facet-quality dashboard
 #' @param object Output from [facet_quality_dashboard()].
 #' @param digits Number of digits for printed numeric values.
 #' @param top_n Number of flagged levels to preview.
-#' @param ... Reserved for generic compatibility.
-#'
-#' @return An object of class `summary.mfrm_facet_dashboard`.
-#' @seealso [facet_quality_dashboard()], [plot_facet_quality_dashboard()]
-#' @examples
-#' \donttest{
-#' toy <- load_mfrmr_data("example_core")
-#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
-#' diag <- diagnose_mfrm(fit, residual_pca = "none")
+#' @return For `summary()`: An object of class `summary.mfrm_facet_dashboard`.
+#' @seealso [facet_quality_dashboard()], [plot(x, type = "facet_dashboard")][plot.mfrm_fit]
+#' @examples # Supplementary workflow: run explicitly to keep routine checks brief.
+#' # example("summary.mfrm_facet_dashboard", run.dontrun = TRUE)
+#' \dontrun{
+#' # Saved synthetic JML/RSM analysis of example_core.
+#' # For your own data, fit a model first; see ?fit_mfrm.
+#' example_fit <- readRDS(system.file("examples", "core-jml.rds", package = "mfrmr"))
+#' fit <- example_fit$fit
+#' diag <- example_fit$diagnostics
 #' summary(facet_quality_dashboard(fit, diagnostics = diag))
 #' }
 #' @export
@@ -653,8 +714,10 @@ print.summary.mfrm_facet_dashboard <- function(x, ...) {
 #' @param severity_warn Absolute estimate cutoff used to flag severity
 #'   outliers.
 #' @param misfit_warn Mean-square cutoff used to flag misfit.
-#' @param central_tendency_max Absolute estimate cutoff used to flag central
-#'   tendency.
+#' @param central_tendency_max Legacy opt-in absolute estimate cutoff for
+#'   marking facet estimates near the fitted origin. Default `NULL`; use
+#'   [data_quality_report()] for observed category-use screening or
+#'   [rater_centrality_table()] for indirect centrality indices.
 #' @param bias_count_warn Minimum flagged-bias row count required to flag a
 #'   level.
 #' @param bias_abs_t_warn Absolute `t` cutoff used when deriving bias-row
@@ -665,30 +728,42 @@ print.summary.mfrm_facet_dashboard <- function(x, ...) {
 #'   from a raw bias bundle.
 #' @param plot_type Plot type, `"severity"` or `"flags"`.
 #' @param top_n Number of rows to keep in the plot data.
-#' @param main Optional plot title.
+#' @inheritParams plot_marginal_fit
 #' @param palette Optional named color overrides.
 #' @param label_angle Label angle hint for the `"flags"` plot.
 #' @param draw If `TRUE`, draw with base graphics.
 #' @param ... Reserved for generic compatibility.
 #'
+#' @details When `x` is a dashboard, its stored screening settings define both
+#' flags and plot guides; threshold arguments apply only when `x` is a fit.
+#' Returned plot data retain those settings, interpretation notes and fit
+#' readiness. Restricted or older dashboards without readiness are labeled
+#' `REVIEW ONLY`. Zero observed flags is not a complete diagnostic pass.
 #' @return A plotting-data object of class `mfrm_plot_data`.
 #' @seealso [facet_quality_dashboard()], [summary.mfrm_facet_dashboard()]
 #' @examples
-#' \donttest{
-#' toy <- load_mfrmr_data("example_core")
-#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
-#' diag <- diagnose_mfrm(fit, residual_pca = "none")
-#' p <- plot_facet_quality_dashboard(fit, diagnostics = diag, draw = FALSE)
+#' # Supplementary workflow: run explicitly to keep routine checks brief.
+#' # example("plot_facet_quality_dashboard", run.dontrun = TRUE)
+#' \dontrun{
+#' # Saved synthetic JML/RSM analysis of example_core.
+#' # For your own data, fit a model first; see ?fit_mfrm.
+#' example_fit <- readRDS(system.file("examples", "core-jml.rds", package = "mfrmr"))
+#' fit <- example_fit$fit
+#' diag <- example_fit$diagnostics
+#' p <- plot(fit, type = "facet_dashboard", diagnostics = diag, draw = FALSE)
 #' p$data$plot
 #' }
-#' @export
+#' @keywords internal
+#' @section Migration in 0.2.4:
+#' This renderer is internal. Use the corresponding `plot()` route in
+#' [mfrmr_plot_migration]; the former exported name is no longer available.
 plot_facet_quality_dashboard <- function(x,
                                          diagnostics = NULL,
                                          facet = NULL,
                                          bias_results = NULL,
                                          severity_warn = 1.0,
-                                         misfit_warn = 1.5,
-                                         central_tendency_max = 0.25,
+                                         misfit_warn = NULL,
+                                         central_tendency_max = NULL,
                                          bias_count_warn = 1L,
                                          bias_abs_t_warn = 2,
                                          bias_abs_size_warn = 0.5,
@@ -699,7 +774,8 @@ plot_facet_quality_dashboard <- function(x,
                                          palette = NULL,
                                          label_angle = 45,
                                          draw = TRUE,
-                                         ...) {
+                                         ..., title = NULL) {
+  main <- .mfrm_plot_title_alias(main, title, missing(main), missing(title))
   plot_type <- match.arg(tolower(as.character(plot_type[1])), c("severity", "flags"))
   top_n <- max(1L, as.integer(top_n))
 
@@ -723,6 +799,20 @@ plot_facet_quality_dashboard <- function(x,
     stop("`x` must be an mfrm_fit object or a facet dashboard bundle.", call. = FALSE)
   }
 
+  # A saved dashboard's settings generated its flags and must also define its guides.
+  threshold_names <- c("severity_warn", "misfit_warn", "misfit_lower",
+                       "central_tendency_max", "bias_count_warn", "bias_abs_t_warn",
+                       "bias_abs_size_warn", "bias_p_max")
+  thresholds <- lapply(threshold_names, function(key) {
+    suppressWarnings(as.numeric(bundle$settings$Value[match(key, bundle$settings$Setting)]))
+  })
+  names(thresholds) <- threshold_names
+  plot_title <- main %||% paste0("Facet quality: ", bundle$facet)
+  if ((missing(title) || !identical(main, "")) &&
+      !identical(bundle$interpretation_status, "ready_for_diagnostic_interpretation")) {
+    plot_title <- paste("REVIEW ONLY -", plot_title)
+  }
+
   tbl <- as.data.frame(bundle$detail, stringsAsFactors = FALSE)
   if (nrow(tbl) == 0) {
     stop("Facet dashboard does not contain any level rows.", call. = FALSE)
@@ -737,27 +827,22 @@ plot_facet_quality_dashboard <- function(x,
   } else {
     tbl <- tbl[tbl$AnyFlag %in% TRUE, , drop = FALSE]
     if (nrow(tbl) > 0) {
-      ord <- order(tbl$FlagCount, abs(tbl$Estimate), decreasing = TRUE, na.last = NA)
+      ord <- order(tbl$FlagCount, abs(tbl$Estimate), decreasing = TRUE, na.last = TRUE)
       tbl <- tbl[ord, , drop = FALSE]
       if (nrow(tbl) > top_n) tbl <- tbl[seq_len(top_n), , drop = FALSE]
     }
   }
 
   if (isTRUE(draw)) {
-    opar <- graphics::par(no.readonly = TRUE)
+    opar <- graphics::par()["mar"]
     on.exit(graphics::par(opar), add = TRUE)
     graphics::par(mar = c(4.5, 8.5, 3.5, 1.5))
     dashboard_draw_plot(
       tbl = tbl,
       plot_type = plot_type,
       facet = bundle$facet %||% bundle$overview$Facet[1],
-      thresholds = list(
-        severity_warn = severity_warn,
-        misfit_warn = misfit_warn,
-        central_tendency_max = central_tendency_max,
-        bias_count_warn = bias_count_warn
-      ),
-      main = main,
+      thresholds = thresholds,
+      main = plot_title,
       palette = palette,
       label_angle = label_angle
     )
@@ -774,23 +859,33 @@ plot_facet_quality_dashboard <- function(x,
       settings = bundle$settings,
       flagged = bundle$flagged,
       ranked = bundle$ranked,
-      thresholds = list(
-        severity_warn = severity_warn,
-        misfit_warn = misfit_warn,
-        central_tendency_max = central_tendency_max,
-        bias_count_warn = bias_count_warn,
-        bias_abs_t_warn = bias_abs_t_warn,
-        bias_abs_size_warn = bias_abs_size_warn,
-        bias_p_max = bias_p_max
-      )
+      thresholds = thresholds,
+      title = plot_title,
+      notes = data.frame(Type = "Interpretation", Text = bundle$notes),
+      fit_readiness = bundle$fit_readiness,
+      interpretation_status = bundle$interpretation_status
     )
   )
   invisible(out)
 }
 
+#' @rdname facet_quality_dashboard
+#' @details `plot()` method: Plot a saved facet-quality dashboard
+#' @param x A result from [facet_quality_dashboard()].
+#' @param y Ignored; present for generic compatibility.
+#' @param type `"severity"` or `"flags"`.
+#' @param ... For `plot()`: Display controls from [plot_facet_quality_dashboard()].
+#'
+#' For `summary()`: Reserved for generic compatibility.
+#' @return For `plot()`: The existing plot payload, including screening cautions.
+#' @seealso [mfrmr_plot_migration]
 #' @export
 plot.mfrm_facet_dashboard <- function(x, y = NULL, type = c("severity", "flags"), ...) {
   args <- list(x = x, ...)
+  if (identical(type, "facet_dashboard")) {
+    type <- NULL
+    args <- .mfrm_plot_rename(args, "view", "plot_type")
+  }
   if (!is.null(type)) args$plot_type <- type
   do.call(plot_facet_quality_dashboard, args)
 }

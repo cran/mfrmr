@@ -83,7 +83,7 @@ test_that("balanced JML constrained design is full rank and invariant", {
 
   expect_identical(
     audit$contract_version,
-    "mfrmr-readiness-0.2.3-v3"
+    mfrmr:::mfrmr_readiness_contract_version()
   )
   expect_identical(audit$readiness$EstimabilityState, "identified")
   expect_true(audit$readiness$Complete)

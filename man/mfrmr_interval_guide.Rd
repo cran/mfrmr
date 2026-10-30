@@ -21,7 +21,7 @@ A data.frame with columns:
 \item \code{Scope}
 \item \code{PrimaryHelper}
 \item \code{DisplayRoute}
-\item \code{DefaultLevel}
+\item \code{DefaultLevel} (missing for an uncertainty-only route without intervals)
 \item \code{IntervalColumns}
 \item \code{Basis}
 \item \code{UseFor}
@@ -49,6 +49,106 @@ profile-like intervals when available, and some are plotting overlays around
 already-estimated quantities. The \code{Basis} and \code{InterpretationBoundary}
 columns are the important guardrails.
 }
+\section{Why an estimate or interval is missing}{
+
+A finite printed value may be a usable estimate, an optimizer value retained
+for review, a constraint-fixed value, or a prior-only score. Read the result's
+status and explanation before interpreting it. An \code{NA} bound is not an
+infinite limit, zero uncertainty, or evidence of no effect.
+\itemize{
+\item \strong{Fit and parameter readiness:} start with \code{summary(fit)$decision},
+\verb{$readiness} and \verb{$key_warnings} for ordinary fits. For CML inspect
+\code{summary(fit)$checks} and \verb{$notes}; comparison-only CML retains
+\code{EstimateStatus} and \code{EstimateReason} in \code{fit$comparisons}. Identification
+failure or absence of a finite MLE cannot be repaired merely by increasing
+optimizer iterations. A refused calculation explains the restriction in
+its error instead of returning an inferential result.
+\item \strong{Facet and population intervals:} inspect \code{ci$table$Status},
+\verb{$CIEligible} and \verb{$InferenceReview}, together with the result's checks
+and cautions. Missing SEs or bounds may coexist with a retained point;
+that does not certify the point as reliable. \code{fixed} refers to a target
+fixed by constraints, not an estimate with perfect measured precision.
+\item \strong{GPCM slope/profile intervals:} use \code{attr(ci, "diagnostics")} and
+the saved endpoint checks. They distinguish an unavailable interval from
+a partially resolved profile; \code{\link[=confint.mfrm_fit]{confint.mfrm_fit()}} describes each method.
+\item \strong{Testlet and shared-rater normal intervals:} use
+\code{attr(ci, "diagnostics")} and \code{attr(ci, "checks")}; default summary tables
+also retain \code{IntervalStatus} and \code{InferenceReview}. These distinguish intervals
+not requested, unsupported targets, failed numerical/information checks,
+and estimated zero-variance boundaries. The boundary restriction applies
+even when optimization has converged. See \code{\link[=confint.mfrm_testlet]{confint.mfrm_testlet()}} and
+\code{\link[=confint.mfrm_random_rater]{confint.mfrm_random_rater()}}.
+\item \strong{Person scores:} \code{\link[=score_mfrm_persons]{score_mfrm_persons()}} and the extension scoring
+functions retain row-level \code{Status} and \code{Reason}. \code{prior_only} means no
+observed responses: the reported mean and interval describe the assumed
+population. \code{unavailable} withholds individual estimates and intervals.
+Review the stated cause; more quadrature nodes cannot supply observations
+or remedy a zero ability-variance restriction.
+\item \strong{G/D-study intervals:} read the metric-specific \code{Status}, diagnostics
+and notes. A width below numerical resolution is a calculation limitation,
+not perfect reliability; raw log-ratio or pivot diagnostics may still be
+retained. An explicitly reported zero endpoint, a constraint boundary and
+an unresolved numerical interval have different meanings.
+}
+
+Increase integration precision or revise optimizer controls only when the
+saved diagnostics identify those numerical issues. Model assumptions,
+insufficient design information and unsupported boundary inference need
+substantive review. Numerical success alone does not resolve them.
+Keep explanations with saved results: use \code{\link[=saveRDS]{saveRDS()}} for the whole object,
+and export the status/reason table with CSV. Older saved tables do not gain
+fields merely by being read; recreate summaries or interval displays from
+their source fit where supported. Do not rewrite historical fit checks.
+}
+
+\section{Availability is not coverage}{
+
+Read the target, interval method and assumptions before interpreting bounds.
+Numerical availability, sampling coverage and public API support are separate
+questions. Where returned, \code{CIEligible} records the source and method's
+eligibility checks, which can include model, design and numerical restrictions;
+\code{CoverageQualified = FALSE} means nominal sampling coverage is not established
+for that procedure. It is not a measured coverage rate and does not erase
+computed bounds. Absence of that field is not evidence of coverage either.
+
+A partial profile retains computed endpoints and the unresolved side's
+reason. An unresolved search is not an infinite limit or a calibrated
+one-sided interval. Inspect \code{apa_table(result, which = "profile_endpoints")}
+and retain the method's notes when reporting or exporting it.
+
+Corrected-JML \code{RootSE} describes variation around an adjusted-equation root;
+residual bias can separate that root from the true structural parameter.
+It must not be turned into a structural confidence interval by multiplying
+it by 1.96. This guide includes that uncertainty-only route with no default
+confidence level. Unavailable public structural intervals do not establish
+that every interval method is mathematically impossible.
+
+Conditional Person posterior intervals hold calibration fixed. A full
+external Bayesian analysis, for example through \code{\link[=export_mfrm_model]{export_mfrm_model()}}, has
+different assumptions and returns credible intervals; export alone neither
+runs the sampler nor validates its intervals. Inspect sampler precision,
+convergence and prior sensitivity. Neither type of posterior interval is
+automatically a frequentist confidence interval with nominal coverage.
+See \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}} for estimator-specific routes and restrictions.
+For coefficients, conditional population means and residual variance in an
+estimated RSM/PCM population, use \code{\link[=mfrm_population_intervals]{mfrm_population_intervals()}}. Its
+\link[=plot.mfrm_population_intervals]{plot() method} displays coefficients or
+saved contrasts, retaining unavailable intervals and experimental status.
+Residual variance stays in the table because its units differ. This route
+is separate from Person scoring and facet-location intervals.
+
+Native RSM/PCM CML intervals use conditional information, with no estimated
+Person abilities or population SD. The guide gives a dedicated route for
+saved comparison-only targets and explains the facet argument for full CML
+results. A separate full-MML interaction route accepts \code{comparison_review}
+and optional \code{scale = "standardized"}; estimated-SD standardization includes
+the same fit's population-SD uncertainty and its covariance with the contrast.
+It requires an intercept-only normal population rather than substituting a
+regression residual SD. Neither numerical eligibility nor a positive
+conditional identification check establishes global MML identification or
+finite-sample interval coverage.
+}
+
 \examples{
 mfrmr_interval_guide()
 mfrmr_interval_guide("visual")[, c("Route", "DisplayRoute", "Basis")]
@@ -56,10 +156,13 @@ mfrmr_interval_guide("gpcm")[, c("Route", "GPCMStatus", "InterpretationBoundary"
 }
 \seealso{
 \link{mfrmr_visual_diagnostics}, \code{\link[=visual_reporting_template]{visual_reporting_template()}},
-\code{\link[=plot_fair_average]{plot_fair_average()}}, \code{\link[=plot_bias_interaction]{plot_bias_interaction()}},
-\code{\link[=plot_displacement]{plot_displacement()}}, \code{\link[=plot_wright_unified]{plot_wright_unified()}},
-\code{\link[=plot_rater_severity_profile]{plot_rater_severity_profile()}}, \code{\link[=plot_apa_figure_one]{plot_apa_figure_one()}},
-\code{\link[=fit_measures_table]{fit_measures_table()}}
+\link[=plot.mfrm_fit]{plot(x, type = "fair_average")}, \link[=plot.mfrm_fit]{plot(x, type = "bias")},
+\link[=plot.mfrm_fit]{plot(x, type = "displacement")}, \link[=plot.mfrm_fit]{plot(x, type = "wright", view = "unified")},
+\link[=plot.mfrm_fit]{plot(x, type = "rater_severity")}, \link[=plot.mfrm_fit]{plot(x, type = "apa_summary")},
+\code{\link[=fit_measures_table]{fit_measures_table()}}, \code{\link[=mfrm_facet_intervals]{mfrm_facet_intervals()}}, \code{\link[=mfrm_population_intervals]{mfrm_population_intervals()}},
+\code{\link[=pool_mfrm_imputed]{pool_mfrm_imputed()}},
+\code{\link[=mfrm_random_rater_intervals]{mfrm_random_rater_intervals()}}, \code{\link[=confint.mfrm_random_rater]{confint.mfrm_random_rater()}},
+\code{\link[=fit_mfrm_testlet]{fit_mfrm_testlet()}}, \code{\link[=predict.mfrm_testlet]{predict.mfrm_testlet()}}
 }
 \concept{confidence intervals}
 \concept{reporting workflow}

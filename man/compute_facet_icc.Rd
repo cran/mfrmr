@@ -10,12 +10,13 @@ compute_facet_icc(
   score,
   person = NULL,
   reml = TRUE,
-  ci_method = c("none", "profile", "boot"),
+  ci_method = c("none", "boot"),
   ci_level = 0.95,
   ci_boot_reps = 1000L,
   ci_boot_seed = NULL,
   ci_boot_parallel = c("no", "multicore", "snow"),
-  ci_boot_ncpus = 1L
+  ci_boot_ncpus = 1L,
+  missing = c("error", "omit")
 )
 }
 \arguments{
@@ -32,16 +33,11 @@ out.}
 \item{reml}{Logical; whether to fit with REML. Default \code{TRUE}.}
 
 \item{ci_method}{Confidence-interval method for the ICC column.
-One of \code{"none"} (default, point estimate only), \code{"profile"}
-(a \strong{first-order approximation}: marginal likelihood-profile
-bounds for each variance-component SD via
-\code{\link[lme4:confint.merMod]{lme4::confint.merMod()}} with \code{method = "profile"}, squared to
-variances, then plugged into the ICC ratio while holding the
-other components at their point estimate; fast and deterministic,
-the default recommendation for reporting), or \code{"boot"}
-(parametric bootstrap via \code{\link[lme4:bootMer]{lme4::bootMer()}}; slower but robust
-to non-normal ICC sampling distributions because each bootstrap
-replicate resamples the full variance decomposition jointly).}
+One of \code{"none"} (default, point estimate only) or \code{"boot"}
+(parametric percentile bootstrap via \code{\link[lme4:bootMer]{lme4::bootMer()}}). Each
+simulated data set is refitted and its full variance decomposition
+used to calculate the ICC ratios. The former \code{"profile"} method
+is no longer supported; see Updating saved intervals below.}
 
 \item{ci_level}{Confidence level when \code{ci_method != "none"}; default
 \code{0.95}. Koo & Li (2016) recommend banding the CI rather than the
@@ -49,40 +45,54 @@ point estimate when classifying reliability as Poor / Moderate /
 Good / Excellent.}
 
 \item{ci_boot_reps}{Number of bootstrap replicates used when
-\code{ci_method = "boot"}. Default \code{1000}.}
+\code{ci_method = "boot"}. An integer of at least 2; default \code{1000}.
+Small counts give imprecise tail quantiles; choose enough replicates
+for the precision required in the application.}
 
 \item{ci_boot_seed}{Optional integer seed for the bootstrap path
-(\code{NULL} leaves the RNG state untouched).}
+(between 0 and \code{.Machine$integer.max}). \code{NULL} uses the current
+random-number state. Bootstrap simulation advances that state.}
 
 \item{ci_boot_parallel}{Parallelisation strategy for the
 parametric-bootstrap CI path, passed through to
 \code{\link[lme4:bootMer]{lme4::bootMer()}}: \code{"no"} (default), \code{"multicore"} (POSIX
 \code{mclapply}), or \code{"snow"} (PSOCK cluster). \code{"multicore"} does
-nothing on Windows and falls back to serial; in that case use
-\code{"snow"} with \code{\link[parallel:makeCluster]{parallel::makeCluster()}} in scope.}
+nothing on Windows and falls back to serial; use \code{"snow"} there.}
 
 \item{ci_boot_ncpus}{Number of CPUs to use for the parallel
-bootstrap path (ignored when \code{ci_boot_parallel = "no"}). The
-per-replicate progress bar is suppressed under parallel
-execution because worker processes cannot push updates to the
-parent's cli console.}
+bootstrap path (ignored when \code{ci_boot_parallel = "no"}). A positive
+integer. Interactive progress is available for serial execution.}
+
+\item{missing}{How to handle missing scores or selected grouping values:
+\code{"error"} (default) or explicit complete-case omission with \code{"omit"}.
+Numeric character/factor score labels retain their numeric values.
+Nonnumeric scores, infinite values, and blank grouping labels are refused.}
 }
 \value{
 A data.frame of class \code{mfrm_facet_icc} with one row per
 variance component (including a \code{"Residual"} row) and columns:
 \itemize{
 \item \code{Facet}: the grouping factor name (or \code{"Residual"}).
-\item \code{Variance}: REML variance estimate.
+\item \code{Variance}: unrounded variance estimate (REML by default, ML if
+\code{reml = FALSE}); \code{NA} when the variance shares are undefined.
 \item \code{ICC}: variance share (\code{Variance / sum(Variance)}), in \verb{[0, 1]}.
 \item \code{Interpretation}: band label according to the facet's scale.
 \item \code{InterpretationScale}: \code{"Koo-Li reliability"} for the person
 facet, \code{"Variance share"} for others.
 \item \code{ICC_CI_Lower} / \code{ICC_CI_Upper} / \code{ICC_CI_Level} / \code{ICC_CI_Method}:
-CI bounds, level, and method (populated when \code{ci_method != "none"};
-\code{NA_real_} otherwise).
-\item \code{ICC_CI_NReps}: bootstrap replicate count when
-\code{ci_method = "boot"} (absent otherwise).
+CI bounds (unavailable bounds are \code{NA}), requested level, and method.
+\item \code{ICC_CI_Status}: whether intervals are available and, otherwise, why.
+\item \code{ICC_CI_NRequested} / \code{ICC_CI_NReps} / \code{ICC_CI_NUnavailable}: requested
+bootstrap count, number of converged refits with all ICCs finite, and
+number without such a result (absent for \code{"none"}). Counts are \code{NA} when
+the bootstrap aborts without returning its draws. Warnings can withhold
+intervals even when all draws are finite and all refits converge.
 }
+
+The \code{icc_ci} attribute retains the original fit's convergence and singularity
+diagnostics and warnings. When bootstrap results are returned, its \code{bootstrap}
+entry contains every draw, per-refit convergence and singularity indicators,
+the number of refit errors, and lme4's message/warning/error tables.
 }
 \description{
 Fits a random-effects variance-components model
@@ -92,6 +102,28 @@ observed score variance attributable to each facet. This is a
 descriptive summary complementary to the Rasch-metric rater
 separation/reliability reported elsewhere.
 }
+\section{Rows used}{
+
+Missingness is checked only in the score, facets, and optional person column.
+\code{InputRows}, \code{UsedRows}, and \code{ExcludedRows} are included in the table.
+\code{attr(x, "data_usage")} retains these counts, excluded input row positions,
+missing columns per row, and observed grouping-level counts after omission.
+\code{\link[=compute_facet_design_effect]{compute_facet_design_effect()}} uses these retained counts for its sample
+sizes. Omission does not impute scores or correct missing-data bias.
+}
+
+\section{Score units and zero variation}{
+
+A small positive variance is not treated as zero using a fixed cutoff.
+Multiplying scores by a nonzero constant leaves the variance shares
+unchanged, up to fitting precision, while variances change by its square.
+Variance estimates are retained without decimal rounding. If all retained
+scores are equal, or the fitted total variance is not positive and finite,
+variances and ICCs are unavailable (\code{NA}); numerical fitting residue is not
+interpreted as observed variation. A constant-response bootstrap refit is
+also unavailable and withholds the interval.
+}
+
 \section{Interpreting output}{
 
 The \code{Interpretation} column uses \strong{two scales} so the same numeric
@@ -117,18 +149,37 @@ two. FACETS (Linacre, 2026) reports rater separation/reliability on
 the Rasch metric instead of an ICC; mfrmr surfaces both, with the
 Rasch-metric version in \code{diagnostics$reliability} and this
 variance-share view here.
+For agreement or consistency between specific pairs on common units, use
+\code{\link[=pairwise_icc_table]{pairwise_icc_table()}} instead. A small rater variance share here does not
+establish pairwise agreement; residual disagreement can still be large.
 
-Note: Koo & Li (2016) recommend applying the reliability bands to
-the \strong{95\% confidence interval} of the ICC rather than to the point
-estimate alone. Set \code{ci_method = "profile"} (default \code{"none"}) to
-obtain likelihood-profile CI bounds alongside the point estimate,
-or \code{ci_method = "boot"} for a parametric bootstrap with
-\code{ci_boot_reps} replicates. The returned data frame gains
-\code{ICC_CI_Lower} / \code{ICC_CI_Upper} columns so downstream reporting can
-apply the band to the CI rather than the point estimate. The
-\code{Interpretation} column still uses the point estimate so
-callers who want CI-aware banding can implement it externally from
-the supplied bounds.
+Set \code{ci_method = "boot"} to request intervals alongside the point
+estimates. The \code{Interpretation} column still uses point estimates.
+The bootstrap simulates Gaussian random effects and errors from the
+fitted model; it does not correct model misspecification or missing-data
+bias. Percentile coverage can be unreliable near zero variance components
+or with few grouping levels.
+
+Intervals are withheld if the original fit has convergence problems or
+warnings, or if any requested bootstrap refit fails, has convergence
+problems or warnings, or produces an undefined ICC. Finite draws are
+retained but never silently selected to calculate an interval. Singular
+fits (zero random-effect components) are recorded separately and retained
+when they converge; they are not automatically treated as failures.
+Inspect \code{ICC_CI_Status} and \code{attr(x, "icc_ci")} before reporting intervals.
+}
+
+\section{Updating saved intervals}{
+
+The former \code{ci_method = "profile"} transformed separate standard-deviation
+intervals while holding other variance components fixed. These are not
+profile-likelihood intervals for the ICC ratio and should not be reported
+as ICC confidence intervals. Requests now stop with an explanation.
+Rerun \code{\link[=compute_facet_icc]{compute_facet_icc()}} or \code{\link[=analyze_hierarchical_structure]{analyze_hierarchical_structure()}} with the
+original data and settings, choosing \code{ci_method = "boot"} explicitly if
+intervals are needed. Saved bootstrap results from earlier versions must
+also be rerun to obtain complete failure accounting. Printing, summarizing,
+or plotting old interval results cannot correct their calculations.
 }
 
 \section{Typical workflow}{
@@ -139,12 +190,15 @@ separation/reliability.
 \item Call \code{compute_facet_icc(data, facets, score, person)} to get the
 complementary variance-share summary.
 \item Feed into \code{\link[=compute_facet_design_effect]{compute_facet_design_effect()}} to convert ICCs and
-average cluster sizes into Kish (1965) design effects.
+average cluster sizes into descriptive, per-facet design-effect
+approximations. These do not estimate the precision of the full design.
 }
 }
 
 \examples{
-\donttest{
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("compute_facet_icc", run.dontrun = TRUE)
+\dontrun{
 toy <- load_mfrmr_data("example_core")
 if (requireNamespace("lme4", quietly = TRUE)) {
   icc <- compute_facet_icc(toy, facets = c("Rater", "Criterion"),
@@ -154,7 +208,7 @@ if (requireNamespace("lme4", quietly = TRUE)) {
   # - Person ICC reads as Koo & Li (2016) reliability: < 0.5 poor,
   #   0.5-0.75 moderate, 0.75-0.9 good, > 0.9 excellent.
   # - Rater / Criterion ICC reads as variance share, NOT reliability;
-  #   here SMALL values are desirable (raters / items agree), and
+  #   small values indicate limited systematic facet differences, and
   #   shares > 0.10 hint at meaningful systematic facet differences.
   # - `Interpretation` summarises the variance-share band the helper
   #   has assigned to each row.
@@ -171,7 +225,7 @@ linear mixed-effects models using lme4. \emph{Journal of Statistical
 Software, 67}(1), 1-48.
 }
 \seealso{
-\code{\link[=compute_facet_design_effect]{compute_facet_design_effect()}},
+\code{\link[=compute_facet_design_effect]{compute_facet_design_effect()}}, \code{\link[=pairwise_icc_table]{pairwise_icc_table()}},
 \code{\link[=analyze_hierarchical_structure]{analyze_hierarchical_structure()}}, \code{\link[=detect_facet_nesting]{detect_facet_nesting()}},
 \code{\link[=facet_small_sample_review]{facet_small_sample_review()}}.
 }

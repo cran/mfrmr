@@ -60,7 +60,7 @@ test_that("simulate_mfrm_data preserves peer-review assignment metadata", {
   expect_true(isTRUE(truth$design$peer_review$active))
 })
 
-test_that("build_peer_review_design_review exposes assignment diagnostics for reporting", {
+test_that("review_peer_design exposes assignment diagnostics for reporting", {
   spec <- build_peer_review_sim_spec(
     n_submission = 12,
     n_criterion = 2,
@@ -69,7 +69,7 @@ test_that("build_peer_review_design_review exposes assignment diagnostics for re
   )
   sim <- simulate_mfrm_data(sim_spec = spec, seed = 20260526)
 
-  review <- build_peer_review_design_review(sim, top_n = 4)
+  review <- review_peer_design(sim, top_n = 4)
   expect_s3_class(review, "mfrm_bundle")
   expect_s3_class(review, "mfrm_peer_review_design_review")
   expect_true(all(c(
@@ -98,7 +98,7 @@ test_that("build_peer_review_design_review exposes assignment diagnostics for re
   )
   expect_true("peer_review_low_common_links" %in% bundle$table_index$Role)
 
-  attr_review <- build_peer_review_design_review(attr(sim, "mfrm_peer_review_design"))
+  attr_review <- review_peer_design(attr(sim, "mfrm_peer_review_design"))
   expect_s3_class(attr_review, "mfrm_peer_review_design_review")
 })
 

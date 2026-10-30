@@ -346,14 +346,16 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 <code>RSM</code>/<code>PCM</code> many-facet Rasch-family model with
 FACETS-oriented settings, generating related diagnostic and reporting
 tables, and reviewing the output-contract boundary between the two
-systems. Bounded <code>GPCM</code> can be fit in <code>mfrmr</code>, but
-its slope-aware score semantics are intentionally outside the score-side
+systems. <code>GPCM</code> can be fit in <code>mfrmr</code>, but its
+slope-aware score semantics are intentionally outside the score-side
 FACETS output-contract route.</p>
-<p>The software reference target for this migration boundary is FACETS
-64-bit 4.5.1 (July 2026). A cited manual may retain its published 4.5.0
-edition; software version and documentation edition are recorded
-separately. The coverage described here is not an external
-numerical-parity result.</p>
+<p>The local numerical comparison uses FACETS 64-bit 4.5.0. The online
+update history lists 4.5.3 (October 2026); a current web manual is not a
+version-pinned executable specification. The 4.5.1 history says the
+gtheory interface was replaced while the linked help still names
+gtheory. Keep the executable, manual edition and statistical
+decomposition distinct. The bounded executed comparisons below do not
+certify all FACETS options or versions.</p>
 <div id="mental-model" class="section level2">
 <h2>Mental model</h2>
 <p>The two stacks share the same psychometric framework but differ in
@@ -403,7 +405,7 @@ JMLE-style residual basis</td>
 <td>Multiple model statements, rating scales, partial credit, and other
 response families can coexist</td>
 <td>One response-model family per fit: <code>RSM</code>,
-<code>PCM</code>, or bounded <code>GPCM</code></td>
+<code>PCM</code>, or <code>GPCM</code></td>
 </tr>
 <tr class="odd">
 <td>Output</td>
@@ -426,15 +428,15 @@ distinguish legitimate repeats with an event/occasion facet</td>
 </tr>
 <tr class="even">
 <td>Bias / interaction</td>
-<td>Table 14</td>
+<td>Table 13 cell effects; Table 14 pairwise comparisons</td>
 <td><code>estimate_bias()</code> and
-<code>bias_interaction_report()</code></td>
+<code>bias_interaction_report()</code>; conditional screens with the
+differences below</td>
 </tr>
 <tr class="odd">
 <td>Wright map / variable map</td>
 <td>Graphic variable-map output</td>
-<td><code>plot(fit, type = &quot;wright&quot;)</code> and
-<code>plot_wright_unified()</code></td>
+<td><code>plot(fit, type = &quot;wright&quot;)</code> and <code>plot()</code></td>
 </tr>
 <tr class="even">
 <td>Fair average</td>
@@ -451,45 +453,642 @@ environment/settings</td>
 </tbody>
 </table>
 </div>
+<div id="visualize-an-existing-facets-analysis" class="section level2">
+<h2>Visualize an existing FACETS analysis</h2>
+<p><code>read_facets_results()</code> reads supported Scorefile exports
+without refitting. The included small synthetic example has one row per
+facet element, with fixed anchors and extreme scores. Inspect
+<code>summary()</code> for available measures and fit statistics; these
+counts do not assess the quality of the source analysis.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>score_directory <span class="ot">&lt;-</span> <span class="fu">system.file</span>(<span class="st">&quot;extdata&quot;</span>, <span class="st">&quot;facets-example&quot;</span>, <span class="at">package =</span> <span class="st">&quot;mfrmr&quot;</span>)</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>facets_result <span class="ot">&lt;-</span> <span class="fu">read_facets_results</span>(score_directory,</span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>  <span class="at">facet_map =</span> <span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Task&quot;</span>), <span class="at">source_version =</span> <span class="st">&quot;4.5.0&quot;</span>)</span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="fu">summary</span>(facets_result)</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>facets_result<span class="sc">$</span>table[, <span class="fu">c</span>(<span class="st">&quot;Facet&quot;</span>, <span class="st">&quot;ElementID&quot;</span>, <span class="st">&quot;Label&quot;</span>, <span class="st">&quot;Estimate&quot;</span>, <span class="st">&quot;SourceStatus&quot;</span>)]</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">plot</span>(facets_result, <span class="at">type =</span> <span class="st">&quot;measure&quot;</span>, <span class="at">facets =</span> <span class="st">&quot;Person&quot;</span>)</span></code></pre></div>
+<p>Squares identify FACETS <code>Status=1</code>, which can denote a
+direct anchor or a member of a group anchor. The import retains
+<code>SourceStatus = &quot;anchored&quot;</code>, but this does
+<strong>not</strong> establish that the individual’s measure was fixed.
+A group member may be estimated around the constrained mean.
+<code>GroupRaw</code> can also be a reporting group; its value, the
+number of imported group members and a reported SE cannot identify the
+anchor subtype. Inspect the original <code>Labels=</code> for the anchor
+mode and <a href="https://www.winsteps.com/facetman64/table7.htm">Table
+7</a> for row annotations. A Table 7 G annotation alone need not
+distinguish the G and X input modes. <code>summary()</code> therefore
+calls this count <code>AnchorFlagged</code>, replacing
+<code>Anchored</code> from earlier candidate versions. For saved
+imports, call <code>plot()</code> again to refresh the legend and notes;
+the source values and availability remain intact.</p>
+<p>Extreme members of G/X groups can carry Status -2/-3 instead of 1, so
+<code>AnchorFlagged</code> is not a count of every member of an anchored
+group. Their triangles identify the source’s extreme-score status. A
+finite reported location does not establish which adjustment produced
+it: G and X can report different locations. The import preserves these
+locations and marginal SEs, while keeping their Infit/Outfit
+placeholders unavailable for fit plots.</p>
+<p><code>type = &quot;fit&quot;</code> shows measure versus Infit or Outfit;
+<code>type = &quot;infit_outfit&quot;</code> compares the two mean squares.
+Inspect the plotted rows and unavailable reasons before interpreting
+missing points:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>fit_points <span class="ot">&lt;-</span> <span class="fu">plot_data</span>(facets_result, <span class="at">component =</span> <span class="st">&quot;plot_data&quot;</span>,</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>  <span class="at">type =</span> <span class="st">&quot;infit_outfit&quot;</span>, <span class="at">facets =</span> <span class="st">&quot;Person&quot;</span>)</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>fit_points[, <span class="fu">c</span>(<span class="st">&quot;Label&quot;</span>, <span class="st">&quot;Infit&quot;</span>, <span class="st">&quot;Outfit&quot;</span>, <span class="st">&quot;Available&quot;</span>, <span class="st">&quot;Reason&quot;</span>)]</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="fu">plot_data</span>(facets_result, <span class="at">component =</span> <span class="st">&quot;notes&quot;</span>)</span></code></pre></div>
+<p>For your own analysis, supply named comma/tab/semicolon files, a
+vector of per-facet exports, or a directory of <code>score.N.txt</code>
+files. Use the actual source encoding (for example
+<code>encoding = &quot;CP932&quot;</code> for an applicable Japanese Windows
+export). For FACETS text output, the following specifications retain the
+column headings and quoted labels needed by the reader:</p>
+<pre class="text"><code>Scorefile = score.txt
+Heading lines = Yes
+QM = Double
+CSV = Semicolons</code></pre>
+<p><code>CSV = Commas</code> or <code>CSV = Tabs</code> selects the
+other supported separators. Keep the generated facet heading line; the
+Scorefile reader finds the column header. Check that the files exist and
+that their labels are intact before importing. A successful process exit
+alone does not establish a successful export. The reader’s
+<code>encoding</code> converts an existing file; it neither changes
+FACETS input settings nor restores labels already lost in the external
+output.</p>
+<p>You can keep FACETS’ exported IDs and assign local display names in
+R. The map uses the imported <code>Facet</code> and
+<code>ElementID</code>, not row positions or source labels. Store IDs as
+text to retain any leading zeros. Here only two Persons are renamed;
+other elements retain their original labels:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>display_names <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">Facet =</span> <span class="st">&quot;Person&quot;</span>, <span class="at">ElementID =</span> <span class="fu">c</span>(<span class="st">&quot;1&quot;</span>, <span class="st">&quot;2&quot;</span>),</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  <span class="at">DisplayLabel =</span> <span class="fu">c</span>(<span class="st">&quot;受検者 甲&quot;</span>, <span class="st">&quot;受検者 乙&quot;</span>))</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>labelled <span class="ot">&lt;-</span> <span class="fu">plot</span>(facets_result, <span class="at">facets =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="at">label_map =</span> display_names, <span class="at">draw =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>labelled<span class="sc">$</span>data<span class="sc">$</span>plot_data[, <span class="fu">c</span>(<span class="st">&quot;ElementID&quot;</span>, <span class="st">&quot;Label&quot;</span>, <span class="st">&quot;DisplayLabel&quot;</span>)]</span></code></pre></div>
+<p>The original result and its labels remain unchanged;
+<code>labelled$data$label_map</code> retains the supplied
+correspondence. Unknown or repeated keys are errors. Repeated display
+names are distinguished by element key. Only measure plots draw element
+labels; other element plots keep the names in their returned data. This
+map does not apply to Graphfile category labels.</p>
+<p>Japanese text also needs a graphics device and font with the required
+glyphs. With Cairo support and Meiryo installed on Windows, save the
+plot as follows; choose an available Japanese font on another system.
+Check the saved file for missing glyphs. This does not require Japanese
+input to FACETS or change its results. See R’s <a href="https://stat.ethz.ch/R-manual/R-devel/library/grDevices/html/cairo.html">Cairo
+device documentation</a>.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="fu">png</span>(<span class="st">&quot;facets-japanese.png&quot;</span>, <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">5</span>, <span class="at">units =</span> <span class="st">&quot;in&quot;</span>, <span class="at">res =</span> <span class="dv">200</span>,</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>  <span class="at">type =</span> <span class="st">&quot;cairo&quot;</span>, <span class="at">family =</span> <span class="st">&quot;Meiryo&quot;</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="fu">plot</span>(facets_result, <span class="at">facets =</span> <span class="st">&quot;Person&quot;</span>, <span class="at">label_map =</span> display_names)</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="fu">dev.off</span>()</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a></span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="fu">cairo_pdf</span>(<span class="st">&quot;facets-japanese.pdf&quot;</span>, <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">5</span>, <span class="at">family =</span> <span class="st">&quot;Meiryo&quot;</span>)</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a><span class="fu">plot</span>(facets_result, <span class="at">facets =</span> <span class="st">&quot;Person&quot;</span>, <span class="at">label_map =</span> display_names)</span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a><span class="fu">dev.off</span>()</span></code></pre></div>
+<p>Fixed-width imports require the supported ASCII all-field layout.
+Element IDs distinguish duplicate labels. Source signs and reported
+values are preserved; no automatic recentering or sign reversal takes
+place. A point-only Wright map (<code>type = &quot;wright&quot;</code>)
+additionally requires <code>common_scale = TRUE</code> at import after
+checking compatible units and origins in the original FACETS
+specification.</p>
+<p>Extreme-score rows are flagged; their status does not identify the
+adjustment rule used by FACETS. Their fit values can be placeholders and
+are unavailable in fit plots. Source SEs are retained in the table; no
+confidence intervals are constructed. These descriptive results do not
+provide new-person scoring, threshold reconstruction or validation of
+the FACETS analysis. <code>saveRDS(facets_result, ...)</code> preserves
+the complete result; <code>as.data.frame(facets_result)</code> exports
+its element table. See <code>?read_facets_results</code> and
+<code>?plot.mfrm_facets_results</code> for the supported scope.</p>
+<p>For category-probability and expected-score curves, export a FACETS
+Graphfile with headings. This separate synthetic PCM example contains
+one coordinate row per scale and reported measure; it is a different
+analysis from the binary score example above.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>graph_path <span class="ot">&lt;-</span> <span class="fu">system.file</span>(<span class="st">&quot;extdata&quot;</span>, <span class="st">&quot;facets-graph-example&quot;</span>, <span class="st">&quot;graph.txt&quot;</span>,</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>  <span class="at">package =</span> <span class="st">&quot;mfrmr&quot;</span>)</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>facets_curves <span class="ot">&lt;-</span> <span class="fu">read_facets_results</span>(<span class="at">graph_file =</span> graph_path,</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>  <span class="at">source_version =</span> <span class="st">&quot;4.5.0&quot;</span>)</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="fu">summary</span>(facets_curves, <span class="at">component =</span> <span class="st">&quot;curves&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="fu">plot</span>(facets_curves, <span class="at">type =</span> <span class="st">&quot;ccc&quot;</span>, <span class="at">scales =</span> <span class="dv">1</span>)</span></code></pre></div>
+<p>Use <code>type = &quot;expected&quot;</code> for the exported expected-score
+curve. Inspect the actual coordinates and source-consistency checks
+with:</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>expected_points <span class="ot">&lt;-</span> <span class="fu">plot_data</span>(facets_curves, <span class="st">&quot;plot_data&quot;</span>,</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>  <span class="at">type =</span> <span class="st">&quot;expected&quot;</span>, <span class="at">scales =</span> <span class="dv">1</span>)</span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a><span class="fu">head</span>(expected_points[, <span class="fu">c</span>(<span class="st">&quot;Scale&quot;</span>, <span class="st">&quot;Measure&quot;</span>, <span class="st">&quot;Value&quot;</span>, <span class="st">&quot;Available&quot;</span>, <span class="st">&quot;Reason&quot;</span>)])</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="fu">head</span>(facets_curves<span class="sc">$</span>graph<span class="sc">$</span>diagnostics)</span></code></pre></div>
+<p>The reader preserves Graphfile scale numbers and category codes. A
+scale number identifies a Table 8 subtable; it does not automatically
+identify an item. Even binary exports may use category codes 1/2 instead
+of the original 0/1 responses. Check the source specification before
+interpreting expected scores. The graph Measure axis is separate from
+the element measure declarations; importing both files does not align
+them. When both exports belong to your analysis, supply
+<code>file = ...</code> and <code>graph_file = ...</code> in one call,
+after checking that correspondence.</p>
+<p>Missing or invalid coordinates remain in
+<code>as.data.frame(facets_curves, component = &quot;curves&quot;)</code> and
+break the plotted lines. Probability sums are checked using exported
+decimal precision, without renormalizing. These checks do not certify
+model fit; connecting segments do not calculate new model
+predictions.</p>
+</div>
+<div id="why-results-and-decisions-can-differ" class="section level2">
+<h2>Why results and decisions can differ</h2>
+<p>Match the statistical question before comparing numbers. A
+FACETS-style table name does not guarantee the same calculation. For an
+existing FACETS study, first align the response model, retained
+categories, orientation, anchors and centering, observations and
+replication weights, and extreme-score treatment. Compare unrounded
+logits before user scaling. Then compare response probabilities, mean
+squares, df and standardization separately. FACETS uses <a href="https://www.winsteps.com/facetman64/convergencecriteria.htm">score-residual
+and measure-change convergence criteria</a>; an optimizer’s success code
+alone does not establish agreement with them.</p>
+<p>The corrected candidate has a bounded executed comparison against
+FACETS 4.5.0: complete binary ordinary JML data with unit weights and
+matched signs. Locations, SEs, MnSq, PTMEA and WHEXACT YES/NO agree
+within external report precision; bias estimates, baseline expected
+scores and the zero-bias summary also agree. This is not a drop-in
+equivalence claim for other models or options.</p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Quantity</th>
+<th>Current definition</th>
+<th>Consequence for interpretation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Fit ZSTD</td>
+<td>Diagnostics default to FACETS fourth-moment df.
+<code>whexact = FALSE</code> is YES and <code>TRUE</code> is NO; both
+use the cube root.</td>
+<td>Use <code>fit_df_method = &quot;engine&quot;</code> and
+<code>whexact = &quot;legacy_linear&quot;</code> to reproduce the former
+engine/TRUE convention. <code>&quot;both&quot;</code> exposes df sensitivity.
+Cutoff decisions may change.</td>
+</tr>
+<tr class="even">
+<td>Point-measure correlation</td>
+<td>PTMEA now uses the oriented measure sum for each response, including
+Person rows.</td>
+<td>Old Person-only correlations must be recomputed.</td>
+</tr>
+<tr class="odd">
+<td>Displacement</td>
+<td>Updates now include facet orientation and the score derivative.</td>
+<td>Negative-facet released estimates now move in the correct
+coordinate; this is still a conditional one-step diagnostic.</td>
+</tr>
+<tr class="even">
+<td>Facet chi-square</td>
+<td>The statistic and df use the same finite estimates and positive
+finite SEs.</td>
+<td>Excluded levels are reported; a missing SE cannot silently
+contribute df.</td>
+</tr>
+<tr class="odd">
+<td>Expected point-measure correlation</td>
+<td>Ordinary additive RSM/PCM JML exposes <code>PTMEAExpected</code> and
+<code>PTMEAExpectedAsymptotic</code>. The former includes Linacre’s
+published <code>(N-2)/N</code> variance correction with frequency count
+<code>N</code>.</td>
+<td>Matched PCM output agrees within print precision. This is a
+conditional reporting approximation; below count two or with
+unbounded/incomplete calibration, the corrected reference remains
+unavailable. Recreate diagnostics to obtain it.</td>
+</tr>
+<tr class="even">
+<td>PCM fair averages</td>
+<td>Expectations under administered scales are averaged using response
+weights.</td>
+<td>Averaging thresholds first can give different scores and is no
+longer used.</td>
+</tr>
+<tr class="odd">
+<td>Bias cell tail area</td>
+<td>Continuous weighted count minus 1 is retained;
+<code>DFDisplay</code> separately rounds positive df for display
+comparison. FACETS 4.5.0 reports count 8 and df 7 in the executed
+example, although Table 13 says count minus 2.</td>
+<td>Checked fractional-count native tails match an integer-df finite sum
+extended outside its valid domain and can change a 0.05 screen. mfrmr
+retains the continuous Student reference and records probability
+availability; nonpositive df withhold the tail. These are conditional
+screens, not calibrated fairness tests.</td>
+</tr>
+<tr class="even">
+<td>Bias expected score</td>
+<td><code>Expctd Score</code> and <code>Obs-Exp Average</code> now refer
+to the main analysis.</td>
+<td>Separate after-bias columns show how much of that departure the
+shift explains.</td>
+</tr>
+<tr class="odd">
+<td>Bias summary chi-square</td>
+<td>Tests the cells against zero with df equal to the cell count.</td>
+<td>A common nonzero bias no longer disappears through centering.</td>
+</tr>
+<tr class="even">
+<td>Pairwise bias</td>
+<td>Uses <code>target + bias/TargetSign</code>, conditional cell SEs and
+modified Rasch-Welch df rounded down, matching FACETS 4.5.0
+unequal-count results.</td>
+<td><code>df_method = &quot;classical&quot;</code> retains the earlier continuous
+Welch reference. Missing references withhold comparisons; neither mode
+includes calibration uncertainty.</td>
+</tr>
+<tr class="odd">
+<td>Unexpected responses</td>
+<td>Defaults to <code>abs(z) &gt;= 3</code>,
+<code>rule = &quot;residual&quot;</code>.</td>
+<td>The older probability OR rule is opt-in; rankings now treat tied
+modes symmetrically.</td>
+</tr>
+</tbody>
+</table>
+<p>Definitions are given in the official <a href="https://www.winsteps.com/facetman64/whexact.htm">WHEXACT</a>, <a href="https://www.winsteps.com/facetman64/gstats.htm">point-measure</a>,
+<a href="https://www.winsteps.com/facetman64/table7.htm">Table 7</a>, <a href="https://www.winsteps.com/facetman64/fairaverage.htm">fair-average</a>,
+and <a href="https://winsteps.com/facetman64/table13.htm">Table 13</a>
+documentation. The count-minus-1 observation above describes the
+executed version and example, not a correction to the external manual or
+a claim about every FACETS version.</p>
+<p>Recompute <code>diagnose_mfrm()</code> from a saved fit, then
+recreate <code>estimate_bias()</code> and reports. Corrected native
+diagnostics and bias results carry <code>calculation_version = 2</code>;
+do not add that field manually to old values. These diagnostic changes
+do not require refitting the calibration.</p>
+<p>For a negatively oriented rater, the model predictor contains
+<code>-severity + bias</code>, so its context-specific severity is
+<code>severity - bias</code>. The <a href="https://www.winsteps.com/facetman64/table14.htm">Table 14
+examples</a> make this direction explicit. Reversing the contrast leaves
+a two-sided tail area unchanged but reverses the substantive feedback.
+Pairwise df also needs its own version specification: the current <a href="https://www.winsteps.com/facetman64/t-statistics.htm">t-statistics
+manual</a> describes a 2025 modification alongside classical Welch. The
+executed FACETS 4.5.0 unequal-count comparison confirms the modified
+formula and integer truncation for the tail area.
+<code>DFUnrounded</code> and <code>DFMethod</code> retain that choice;
+<code>df_method = &quot;classical&quot;</code> reproduces the earlier
+reference.</p>
+<p>Corrected pairwise tables carry <code>CalculationVersion = 3</code>.
+Recreate <code>build_fixed_reports()</code> and
+<code>bias_pairwise_report()</code> from the current bias bundle. First
+recreate old bias bundles from the saved fit and current diagnostics; no
+main calibration refit is needed. Historical report values are not
+automatically corrected by reloading them. Local and contrast SEs
+describe conditional cell uncertainty; calibration uncertainty and
+cross-cell covariance are not propagated. The earlier claim that these
+contrasts were generally conservative was incorrect. Check
+<code>ScreenUnavailable</code> in the pairwise summary before reading
+<code>Flagged</code>; the summary covers the full family even when
+<code>top_n</code> limits the table.</p>
+<p>The <a href="https://www.winsteps.com/facetman64/table4.htm">Table 4
+rule</a> and its <a href="https://www.winsteps.com/facetman64/unexpected.htm">default
+threshold</a> now match the native residual-only default. To retain the
+exploratory probability screen, request
+<code>abs_z_min = 2, prob_max = .30, rule = &quot;either&quot;</code>. A fixed .30
+cutoff has no universal interpretation: five equally likely categories
+each have probability .2, so it flags every response. For tied modes,
+<code>MostLikely</code> is missing, <code>MostLikelyCount</code> records
+the tie and <code>CategoryGap</code> uses the nearest mode. This ranking
+cannot decide which rater is unfair or which ratings to remove.</p>
+<p>Category reports now distinguish the observed generating-measure
+average (<code>AvgMeasure</code>), model-expected generating-measure
+average (<code>ExpectedMeasure</code>), Person-only mean and expected
+response score. Category residual MnSq is descriptive: conditioning on
+the observed category removes the universal unit baseline, so category
+ZSTD and its flags are unavailable. This does not turn a missing fit
+flag into evidence that the category functions well.</p>
+<p>In <code>category_structure_report()</code>,
+<code>MedianThreshold</code> now means a cumulative 50% boundary;
+<code>AndrichThreshold</code> retains the adjacent-category step.
+Recreate saved structure reports. Half-score crossings outside
+<code>theta_range</code> stay missing, and modal peaks describe only the
+requested grid. The random chi-square likewise cannot establish
+normality: with equal SEs and positive adjusted variance it is fixed by
+the number of eligible elements, regardless of shape. Chi-square
+summaries retain unavailable flags and use the full family before
+truncation.</p>
+<p>For external files, fixed-field import requires validated all-field
+headings and element number after the statistics; other layouts should
+use named delimited columns. Native score exports contain observations,
+not the elements in a FACETS Scorefile. Native Tables 5 and 11 omit
+parts of FACETS’ response moments and variance reports. A single
+co-observation graph component also does not prove identification;
+inspect the fitted design audit. The historical
+<code>conditional_probability</code> plotting alias is ordinary P(k),
+not FACETS’ adjacent-conditional probability; use <code>ccc</code> to
+name the native quantity clearly.</p>
+<p>Match denominators as well as cutoffs. <a href="https://www.winsteps.com/facetman64/totalscore.htm">FACETS
+Totalscore</a> defaults to <code>No</code>, while
+<code>fair_average_table()</code> defaults to
+<code>totalscore = TRUE</code>. Native raw
+<code>TotalScore</code>/<code>TotalCount</code> and weighted
+<code>WeightdScore</code>/<code>WeightdCount</code> are distinct;
+<code>ObservedAverage</code> uses the weighted values. Scores 0 and 2
+with weights 1 and 3 have raw total/count 2/2 but weighted total/count
+6/4 and average 1.5. Keeping both counts is useful for describing the
+data, provided the comparison uses the same <a href="https://www.winsteps.com/facetman64/weighting.htm">replication
+semantics</a> and extreme-row inclusion. Weights do not by themselves
+establish the independence or sampling uncertainty of repeated
+ratings.</p>
+<div id="when-a-native-definition-has-a-useful-purpose" class="section level3">
+<h3>When a native definition has a useful purpose</h3>
+<ul>
+<li><strong>JML extremes:</strong> an all-low/all-high free Person has
+an unbounded ordinary JML estimate. Keeping this status separate from a
+finite adjusted display avoids an optimizer-dependent ranking. FACETS
+also recognizes the boundary and supplies an explicitly adjusted finite
+value through <a href="https://www.winsteps.com/facetman64/xtremescore.htm">Xtreme</a>.
+The default <code>xtreme_method = &quot;display&quot;</code> retains mfrmr’s
+average-score target and leaves fair scores unchanged. For ordinary
+additive RSM/PCM JML,
+<code>fair_average_table(..., xtreme = .3, xtreme_method = &quot;facets&quot;)</code>
+instead solves a corrected weighted-total equation using actual
+administered calibration and the element’s minimum positive eligible
+weight. It updates that element’s fair scores and reports conditional
+information SEs while retaining primary estimates and fixed anchors.
+<code>estimate_bias(..., xtreme = .5)</code> separately extrapolates
+extreme cells within the specified search limits. Group-mean anchors and
+fitted interactions are unsupported. Matching origin constraints
+resolves the checked interior partial-anchor differences; broader
+extreme-score anchoring and exclusion remain unverified. Neither its
+reporting SE nor an optimizer’s finite stopping value supplies
+uncertainty for the original infinite MLE or a validated decision
+probability.</li>
+<li><strong>FairM references:</strong> non-Person FairM values use the
+mean of finite Person estimates, excluding infinite JML estimates.
+<code>FairMReferencePersons</code> and <code>FairMExcludedPersons</code>
+identify the reference, and no eligible Persons leaves the score
+unavailable. The reference describes this finite subset; it is not an
+estimate of the mean ability of an unrestricted population.</li>
+<li><strong>MML and posterior scoring:</strong> integration over a
+specified population can stabilize sparse Person scores and makes
+posterior uncertainty available. It also introduces distributional
+assumptions and shrinkage. A score near a pass/fail cut can move for
+that reason. It is not automatically preferable to JML for every
+population, assignment design or individual decision. Posterior cut
+probabilities condition on the stated calibration and scoring prior;
+they are not probabilities of passing a future administration.</li>
+<li><strong>Missing categories and unidentified comparisons:</strong>
+preserving the declared score ladder and refusing an unsupported
+contrast avoids silently changing the question. FACETS permits different
+category/identification conventions; see <a href="https://www.winsteps.com/facetman64/table8_1ratingscale.htm">Table
+8.1</a> and <a href="https://www.winsteps.com/facetman64/subset-connectedness.htm">subset
+connectedness</a>. A supported within-subset comparison can remain
+meaningful when a comparison across subsets is unidentified. Missing
+output must identify its affected target rather than imply that every
+descriptive result is unusable.</li>
+<li><strong>Uncertainty:</strong> posterior SD, conditional information
+SE, structural covariance and fit-enlarged SE answer different
+questions. The implemented
+<code>RealSE = ModelSE * sqrt(max(Infit, 1))</code> agrees with the
+FACETS <a href="https://www.winsteps.com/facetman64/standarderror.htm">enlargement
+formula</a>, but this does not make their underlying ModelSE equal or
+make RealSE a general dependence-robust SE. A supplied fixed anchor is
+not a newly estimated parameter; missing sampling SE does not establish
+that the external anchor is known without error.</li>
+</ul>
+</div>
+<div id="decisions-near-a-cutoff" class="section level3">
+<h3>Decisions near a cutoff</h3>
+<p>Record the estimand, method, scale, reference population,
+eligibility, statistic and exact comparison rule with a decision. Read
+both the magnitude of the departure and its uncertainty. A fit flag or a
+bias-screening tail area alone does not identify an unfair rater or
+justify deleting ratings.</p>
+<p>Use unrounded values for an available calculation. A FACETS token
+such as <code>2.00</code> at a ZSTD cutoff cannot reveal whether the
+unreported value was below or above 2; retain a boundary-indeterminate
+comparison. Do not choose between YES/NO, df conventions, priors or
+category recoding after seeing which one crosses a desired cutoff. A
+change of convention that changes a decision requires a stated rationale
+and sensitivity report, even if both calculations are internally valid.
+Missing uncertainty is not evidence that a criterion has been met.</p>
+<p>For pass/fail work, keep the operational cut rule separate from a
+model’s expected score or fair average.
+<code>classification_table()</code> describes its supplied calibrated
+rating plan and cut rules; posterior scoring answers a different
+conditional question. Neither automatically validates the cuts, future
+rating plan or substantive consequences.</p>
+</div>
+</div>
+<div id="ordinary-jml-corrected-jml-and-facets" class="section level2">
+<h2>Ordinary JML, corrected JML and FACETS</h2>
+<p>FACETS’ <a href="https://www.winsteps.com/facetman64/estimationconsiderations.htm">estimation
+documentation</a> states that it does not correct JMLE estimation bias.
+Accordingly, ordinary <code>method = &quot;JML&quot;</code> under matched RSM/PCM
+models, anchors and origin constraints is the relevant mfrmr comparison.
+Equal fitted values establish neither unbiased estimation nor calibrated
+intervals. More Persons alone need not remove the incidental-parameter
+bias when each Person still supplies few ratings.</p>
+<p>These operations have different targets and should be recorded
+separately:</p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Operation</th>
+<th>What it changes</th>
+<th>Relationship to mfrmr</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>FACETS ordinary JMLE</td>
+<td>Solves the joint estimation equations.</td>
+<td>Compare with ordinary RSM/PCM JML under aligned model and numerical
+controls.</td>
+</tr>
+<tr class="even">
+<td>FACETS <code>Xtreme</code></td>
+<td>Supplies finite extrapolations for extreme totals.</td>
+<td><code>xtreme_method = &quot;facets&quot;</code> implements the documented
+reporting convention within its supported scope; it is not a general
+estimation-bias correction.</td>
+</tr>
+<tr class="odd">
+<td>mfrmr <code>jml_correction_order</code></td>
+<td>Changes the profiled structural score equation.</td>
+<td>An experimental GPCM method requiring the same facet to own steps
+and slopes; it does not reproduce FACETS JMLE.</td>
+</tr>
+</tbody>
+</table>
+<p>For the corrected route,
+<code>fit_mfrm(model = &quot;GPCM&quot;, method = &quot;JML&quot;, jml_correction_order = ...)</code>
+solves the adjusted equation described in <code>?fit_mfrm</code>. This
+is an existing implementation, not an RSM/PCM correction switch. It
+currently excludes anchors and supplies local-root <code>RootSE</code>,
+not validated structural-truth confidence intervals. Its
+fixed/random-roster covariance describes repeated independent Person
+cohorts; the common-plan delta procedure instead holds each Person’s
+ability fixed across repeated responses. Passing that RootSE into the
+common-plan interval calculation would change both the estimator and the
+sampling target. Corrected JML is therefore not admitted by
+<code>confint.mfrm_fair_average()</code>.</p>
+<p>The benefit of retaining both estimators is that external
+compatibility and a possible reduction in incidental-parameter bias can
+be studied separately. The cost is a distinct mathematical, numerical
+and inference contract: correction order, remaining bias, variance and
+solver stability all require evaluation. FACETS agreement cannot select
+the correction order or qualify its uncertainty. Keep ordinary JML as
+the comparison/default route and select corrected JML explicitly within
+its documented scope. FACETS’ separate <code>Bias</code> interaction
+analysis also should not be confused with correction of an estimator’s
+bias.</p>
+</div>
+<div id="using-tam-jml-as-a-third-comparison" class="section level2">
+<h2>Using TAM JML as a third comparison</h2>
+<p>TAM’s <code>tam.jml()</code> helps check the common RSM/PCM
+likelihood, but its default corrections differ from ordinary mfrmr JML.
+Match category support, cumulative difficulties, anchors and location
+constraints first. The <a href="https://alexanderrobitzsch.github.io/TAM/reference/tam.jml.html">TAM
+documentation</a> describes its separate adjustment and bias
+arguments.</p>
+<table>
+<colgroup>
+<col width="50%" />
+<col width="50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Comparison</th>
+<th>What to align or retain</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Ordinary interior JML</td>
+<td>Use <code>bias = FALSE</code> and <code>adj = 0</code> for the TAM
+comparison. This requires finite interior solutions; it is not a recipe
+for extreme totals.</td>
+</tr>
+<tr class="even">
+<td>Category support</td>
+<td>If a Rater-Task column lacks the highest allowed category, inspect
+returned <code>A</code> and <code>B</code>. With custom full-category
+<code>A</code>, supply intended category scores in <code>B</code>; a
+generated score matrix can define a different model.</td>
+</tr>
+<tr class="odd">
+<td>Classical correction</td>
+<td>The checked TAM <code>bias = TRUE</code> multiplies free item
+coefficients by <code>(I-1)/I</code>, using response-column count. Its
+returned Person estimates and SEs are not all recomputed at the
+corrected coefficients. This is distinct from mfrmr’s profile-score
+adjustment selected by <code>jml_correction_order</code>.</td>
+</tr>
+<tr class="even">
+<td>Extreme totals</td>
+<td>TAM <code>adj</code> modifies calibration scores. mfrmr’s explicit
+<code>xtreme_method = &quot;facets&quot;</code> conditions on saved calibration
+and retains infinite primary estimates. Matched extrapolations do not
+establish matched calibration procedures.</td>
+</tr>
+<tr class="odd">
+<td>Person uncertainty</td>
+<td>Compare TAM <code>theta</code> with MLEs and retain <code>WLE</code>
+separately. <code>errorWLE</code> is not the MLE’s SE. Conditional
+information, joint sampling uncertainty and coverage are separate
+questions.</td>
+</tr>
+<tr class="even">
+<td>Fit statistics</td>
+<td><code>tam.jml.fit(trim_val = Inf)</code> exposes untrimmed residual
+fit; its default trims large squared residuals. Unit-weight untrimmed
+fit has a matched fourth-moment transform, without certifying every
+FACETS reporting field.</td>
+</tr>
+<tr class="odd">
+<td>Weights</td>
+<td>TAM normalizes Person <code>pweights</code>; these are not arbitrary
+response replication weights. With missingness and unequal weights, its
+checked item Outfit denominator also differs from normalization by
+observed weight sum.</td>
+</tr>
+<tr class="even">
+<td>Anchors</td>
+<td>Match the origin constraints as well as fixed values. FACETS ignores
+centering on anchored facets; ordinary mfrmr JML offers
+<code>centering_scope = &quot;anchor_origin&quot;</code> for direct and group
+anchors. This does not extend the executed TAM group-anchor comparison
+scope. The checked TAM version routes Person anchors through version 1;
+an all-item-fixed case with a Person anchor fails.</td>
+</tr>
+</tbody>
+</table>
+<p>Executed TAM 4.3-25 comparisons support close ordinary-JML agreement
+for matched complete/sparse RSM/PCM designs and supported partial Person
+anchors. They do not establish general coverage, every FACETS anchoring
+convention, or a new JML import route: <code>import_tam_fit()</code>
+remains MML-only. Retain unavailable uncertainty instead of substituting
+WLE SEs or conditional information for it.</p>
+<p>Inspect returned anchors too. In the checked TAM 4.3-25 version-1
+path, <code>theta.fixed</code> with <code>xsi.fixed = NULL</code> still
+recenters every Person after an update, moving a supplied Person anchor.
+A free-intercept probe did not retain the anchor and reached its
+iteration limit. An empty fixed-item matrix prevented that recentering
+in this version, but the probe still did not reach the required
+score-equation accuracy within the same limit. This is a
+version-specific diagnostic observation, not a general workaround
+recommendation. The matching reference instead uses an independently
+fitted unanchored TAM solution translated to the specified Person
+origin, preserving every response probability. Keep that algebraic
+comparison separate from a successful direct anchored TAM execution.</p>
+</div>
 <div id="a-one-shot-legacy-compatible-call" class="section level2">
 <h2>A one-shot legacy-compatible call</h2>
 <p>If the goal is to translate a FACETS-style script with minimal R-side
 plumbing, use <code>run_mfrm_facets()</code> (alias
 <code>mfrmRFacets()</code>):</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="fu">data</span>(<span class="st">&quot;mfrmr_example_operational&quot;</span>, <span class="at">package =</span> <span class="st">&quot;mfrmr&quot;</span>)</span>
-<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a></span>
-<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>run <span class="ot">&lt;-</span> <span class="fu">run_mfrm_facets</span>(</span>
-<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>  <span class="at">data =</span> mfrmr_example_operational,</span>
-<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
-<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
-<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
-<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;JML&quot;</span></span>
-<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a>)</span>
-<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a></span>
-<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a><span class="fu">names</span>(run)</span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="fu">data</span>(<span class="st">&quot;mfrmr_example_operational&quot;</span>, <span class="at">package =</span> <span class="st">&quot;mfrmr&quot;</span>)</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a></span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>run <span class="ot">&lt;-</span> <span class="fu">run_mfrm_facets</span>(</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>  <span class="at">data =</span> mfrmr_example_operational,</span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;JML&quot;</span></span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>)</span>
+<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a></span>
+<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a><span class="fu">names</span>(run)</span></code></pre></div>
 <p>The wrapper returns the same <code>fit_mfrm()</code> and
 <code>diagnose_mfrm()</code> objects that a step-by-step pipeline
 produces, plus the iteration log, fair-average table, and rating-scale
 table:</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>jml_status <span class="ot">&lt;-</span> <span class="fu">summary</span>(run<span class="sc">$</span>fit, <span class="at">profile =</span> <span class="st">&quot;fit&quot;</span>, <span class="at">detail =</span> <span class="st">&quot;brief&quot;</span>)</span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>jml_status<span class="sc">$</span>overview[, <span class="fu">c</span>(</span>
-<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>  <span class="st">&quot;Model&quot;</span>, <span class="st">&quot;Method&quot;</span>, <span class="st">&quot;Converged&quot;</span>, <span class="st">&quot;InferenceReady&quot;</span>,</span>
-<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  <span class="st">&quot;ConvergenceSeverity&quot;</span></span>
-<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>)]</span>
-<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>jml_status<span class="sc">$</span>readiness</span>
-<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a><span class="fu">head</span>(run<span class="sc">$</span>fair_average)</span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>jml_status <span class="ot">&lt;-</span> <span class="fu">summary</span>(run<span class="sc">$</span>fit, <span class="at">profile =</span> <span class="st">&quot;fit&quot;</span>, <span class="at">detail =</span> <span class="st">&quot;brief&quot;</span>)</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>jml_status<span class="sc">$</span>overview[, <span class="fu">c</span>(</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>  <span class="st">&quot;Model&quot;</span>, <span class="st">&quot;Method&quot;</span>, <span class="st">&quot;Converged&quot;</span>, <span class="st">&quot;InferenceReady&quot;</span>,</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>  <span class="st">&quot;ConvergenceSeverity&quot;</span></span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>)]</span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>jml_status<span class="sc">$</span>readiness</span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a><span class="fu">head</span>(run<span class="sc">$</span>fair_average)</span></code></pre></div>
 <p><code>method = &quot;JML&quot;</code> is shown here for a JMLE-oriented
 migration comparison. Do not infer readiness from <code>Converged</code>
-alone: require <code>InferenceReady = TRUE</code> for the numerical gate
-and review the terminal-gradient guidance when severity is
-<code>&quot;review&quot;</code> or <code>&quot;fail&quot;</code>. Numerical readiness does
-not override a Data, Design, or Stability hold; use the readiness table
-before interpreting or reporting the fit. For new analysis scripts,
-prefer <code>fit_mfrm(method = &quot;MML&quot;)</code> directly. MML integrates
-over the person distribution under an N(0, 1) prior and exposes
-per-person posterior SEs that JML cannot produce.</p>
+alone: require <code>InferenceReady = TRUE</code> for the
+numerical-readiness criteria and review the terminal-gradient guidance
+when severity is <code>&quot;review&quot;</code> or <code>&quot;fail&quot;</code>. Numerical
+readiness does not override a Data, Design, or Stability hold; use the
+readiness table before interpreting or reporting the fit. Choose the
+estimator for the intended question. The default MML route integrates
+over a fixed N(0, 1) population and exposes Person posterior SDs; other
+supported population specifications must be selected explicitly. Its
+assumptions and shrinkage must be justified for the target population. A
+posterior SD and a JML sampling SE are different quantities.</p>
 </div>
 <div id="translating-the-specification-file" class="section level2">
 <h2>Translating the specification file</h2>
@@ -510,15 +1109,15 @@ Labels =
     1 = Content
     ...</code></pre>
 <p>translates to:</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">fit_mfrm</span>(</span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>  <span class="at">data =</span> examinee_long,</span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Examinee&quot;</span>,</span>
-<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
-<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>  <span class="at">rating_min =</span> <span class="dv">1</span>,</span>
-<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>  <span class="at">rating_max =</span> <span class="dv">5</span>,</span>
-<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span></span>
-<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="fu">fit_mfrm</span>(</span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>  <span class="at">data =</span> examinee_long,</span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Examinee&quot;</span>,</span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a>  <span class="at">rating_min =</span> <span class="dv">1</span>,</span>
+<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a>  <span class="at">rating_max =</span> <span class="dv">5</span>,</span>
+<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span></span>
+<span id="cb14-9"><a href="#cb14-9" tabindex="-1"></a>)</span></code></pre></div>
 <p><code>Models = ?,?,?,R5</code> becomes <code>model = &quot;RSM&quot;</code> and
 the <code>R5</code> rating-scale declaration becomes
 <code>rating_min = 1, rating_max = 5</code>. For a partial-credit
@@ -534,63 +1133,217 @@ FACETS category-dropping behavior implicitly.</p>
 </div>
 <div id="anchoring" class="section level3">
 <h3>Anchoring</h3>
-<p>A FACETS <code>D = 2, A =</code> block:</p>
-<pre><code>D = 2
-A = 1, 0.0
-    2, 0.5</code></pre>
+<p>A FACETS <code>Labels=</code> block with direct anchoring:</p>
+<pre><code>Labels =
+2, Rater, A
+1 = R1, 0.0
+2 = R2, 0.5
+*</code></pre>
 <p>becomes an <code>anchors</code> data frame:</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>anchors <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>  <span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span>,</span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="at">level =</span> <span class="fu">c</span>(<span class="st">&quot;R1&quot;</span>, <span class="st">&quot;R2&quot;</span>),</span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>  <span class="at">estimate =</span> <span class="fu">c</span>(<span class="fl">0.0</span>, <span class="fl">0.5</span>),</span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>  <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span></span>
-<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>)</span>
-<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(..., <span class="at">anchors =</span> anchors)</span></code></pre></div>
-<p><code>review_mfrm_anchors()</code> validates and reports on the
-anchor block before the fit runs, surfacing connectivity, overlap, and
-minimum-sample issues.</p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>anchors <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a>  <span class="at">Facet =</span> <span class="st">&quot;Rater&quot;</span>,</span>
+<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a>  <span class="at">Level =</span> <span class="fu">c</span>(<span class="st">&quot;R1&quot;</span>, <span class="st">&quot;R2&quot;</span>),</span>
+<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a>  <span class="at">Anchor =</span> <span class="fu">c</span>(<span class="fl">0.0</span>, <span class="fl">0.5</span>),</span>
+<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a>  <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span></span>
+<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a>)</span>
+<span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(..., <span class="at">method =</span> <span class="st">&quot;JML&quot;</span>, <span class="at">anchors =</span> anchors,</span>
+<span id="cb16-8"><a href="#cb16-8" tabindex="-1"></a>                <span class="at">centering_scope =</span> <span class="st">&quot;anchor_origin&quot;</span>, <span class="at">anchor_policy =</span> <span class="st">&quot;error&quot;</span>)</span></code></pre></div>
+<p>Use labels that match the input data. <code>Anchor</code> is a
+recognized value column; <code>estimate</code> is not. A malformed
+nonempty anchor schema stops fitting. For migration, also use
+<code>anchor_policy = &quot;error&quot;</code> for review issues and inspect the
+normalized anchors before interpreting results. These values must be on
+mfrmr’s logit scale. Convert user-scaled FACETS measures back using the
+original origin and multiplier; copying a scaled number into a logit
+anchor changes the model.</p>
+<p>FACETS <a href="https://www.winsteps.com/facetman64/centerfacet.htm">disables
+centering on anchored facets</a>. The explicit
+<code>&quot;anchor_origin&quot;</code> option follows this rule for direct and
+group anchors in ordinary additive RSM/PCM JML. One unanchored, active
+facet must be declared <code>noncenter_facet</code>; other unanchored
+facets remain centered. Thus, a Person anchor requires a different
+noncenter facet, such as Rater. Merely adding a Person anchor while
+centering every other facet can produce FACETS overconstraint warnings
+and nonzero score residuals. Correcting that specification resolved the
+checked sparse interior RSM/PCM discrepancies. Multiple fixed values may
+impose substantive restrictions beyond the origin. Other estimators and
+fitted interactions are outside this option. An origin anchor does not
+guarantee a finite maximum. Without Person group constraints, if every
+retained response of the Person anchors is at the same declared minimum
+or maximum, free Person and noncenter-facet locations can diverge
+together while respecting the fixed values. This case stops before
+optimization, without requiring <code>lpSolve</code>. An extreme anchor
+with additional interior or opposite-boundary anchor support does not by
+itself meet this rule; other boundary diagnostics still apply.</p>
+<p>In matched sparse RSM/PCM examples, FACETS 4.5.0 retained all
+observations and the extreme Person’s fixed value. Its reported
+calibration implied an expected anchor total of about 0.299 for an
+observed total of 0, or 17.701 for 18. These values are consistent with
+the specified <code>Xtreme=0.3</code>, but the ordinary likelihood can
+still increase along a direction that preserves the anchors. The exact
+internal adjustment is not established by this comparison. mfrmr
+therefore does not reproduce these finite outputs as ordinary JML
+estimates. This is a difference in estimation behavior, not an import or
+rounding error. Other detected joint additive recession directions
+affecting calibration also stop this route; passing these checks is not
+a general finite-MLE certificate.</p>
+<p>Adding an informative interior Person anchor can restore a finite
+ordinary solution, but does not by itself establish native calibration
+agreement. In matched RSM/PCM examples with this support, FACETS
+retained the fixed extreme Person’s responses. Fair scores and
+conditional Rater-by-Task bias calculations agreed with independent
+calculations using the native reported calibration. The main estimates
+still differed from ordinary JML: free-Person score residuals remained,
+and the maximum-score examples reached the main iteration limit. These
+results separate conditional reporting agreement from calibration
+agreement; they do not identify every internal cause of the native
+behavior.</p>
+<p>For ordinary additive RSM/PCM JML,
+<code>fair_average_table(..., totalscore = FALSE)</code> now retains
+finite direct anchors under both <code>xtreme_method</code> conventions.
+An anchored element’s all-minimum/all-maximum responses do not
+themselves make it an unanchored infinite estimate. Other unanchored
+extreme elements still trigger exclusion. The PCM fair score and its
+conditional plot derivative use the same retained scale mixture.
+Recreate affected older tables and plots from the saved fit and matching
+diagnostics; no calibration refit is required.</p>
+<p><code>estimate_bias()</code> also retains directly fixed finite
+anchors in ordinary additive RSM/PCM JML, including with the default
+<code>xtreme = 0</code>. Person-by-Rater cells should not disappear
+merely because that fixed Person’s observed scores are all minimum or
+maximum. Without extrapolation, a boundary cell keeps its bounded point
+and unavailable screening SE/tail area. Recreate affected bias tables
+and collections from the saved fit and matching diagnostics.</p>
+<p>The <a href="https://www.winsteps.com/facetman64/xtremescore.htm">FACETS Xtreme
+specification</a> has separate main-effect and bias corrections. To
+match its usual bias correction use
+<code>estimate_bias(..., xtreme = .5)</code>; <code>.3</code> is the
+usual main-effect correction. Executed Person-by-Rater checks agree with
+the conditional calculation on matched main calibrations. The correction
+can even change the sign relative to the observed departure: an all-zero
+cell with expected total below 0.5 needs a positive shift to attain the
+amended total 0.5. Read <code>PrimaryBias</code>,
+<code>ExtremeAdjustment</code> and <code>Obs-Exp Average</code>
+together. This remains an extrapolated screen for expert review, not a
+fairness finding.</p>
+<p>For an executable example, each row of the bundled ratings is a
+Person’s score from one Rater on one Criterion. Treat the R01 anchor
+below as a supplied external value for illustration, not an
+independently validated calibration:</p>
+<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a>ratings <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_core&quot;</span>)</span>
+<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a>rater_anchor <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">Facet =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">Level =</span> <span class="st">&quot;R01&quot;</span>, <span class="at">Anchor =</span> <span class="fl">0.7</span>)</span>
+<span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a>anchored_fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb17-4"><a href="#cb17-4" tabindex="-1"></a>  ratings, <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>, <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb17-5"><a href="#cb17-5" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;JML&quot;</span>, <span class="at">anchors =</span> rater_anchor, <span class="at">centering_scope =</span> <span class="st">&quot;anchor_origin&quot;</span></span>
+<span id="cb17-6"><a href="#cb17-6" tabindex="-1"></a>)</span>
+<span id="cb17-7"><a href="#cb17-7" tabindex="-1"></a>anchored_fit<span class="sc">$</span>config<span class="sc">$</span>anchor_review<span class="sc">$</span>facet_summary</span></code></pre></div>
+<p>The table’s <code>Centered</code> and <code>OriginBasis</code>
+columns show which origin constraints were applied. This leaves Person
+noncentered, fixes R01, frees the other Rater locations from a zero-sum
+requirement, and centers Criterion. Existing <code>&quot;facet&quot;</code>
+(default) and <code>&quot;remainder&quot;</code> conventions remain available and
+impose different constraints with partial anchors. Refitting is required
+to change conventions. All options condition on supplied anchors; they
+do not propagate uncertainty in previously estimated anchor values.</p>
+<p>For a group origin, translate the native group total before fitting.
+In FACETS <code>Labels= ...,G</code>, contributions 0.2 and 1.0 for two
+members fix their sum at 1.2. mfrmr uses the mean 0.6, repeated for both
+rows:</p>
+<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a>ratings <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_core&quot;</span>)</span>
+<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a>group <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a>  <span class="at">Facet =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">Level =</span> <span class="fu">c</span>(<span class="st">&quot;R01&quot;</span>, <span class="st">&quot;R02&quot;</span>), <span class="at">Group =</span> <span class="st">&quot;panel&quot;</span>,</span>
+<span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a>  <span class="at">GroupValue =</span> <span class="fl">0.6</span></span>
+<span id="cb18-5"><a href="#cb18-5" tabindex="-1"></a>)</span>
+<span id="cb18-6"><a href="#cb18-6" tabindex="-1"></a>group_fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb18-7"><a href="#cb18-7" tabindex="-1"></a>  ratings, <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>, <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb18-8"><a href="#cb18-8" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;JML&quot;</span>, <span class="at">group_anchors =</span> group, <span class="at">centering_scope =</span> <span class="st">&quot;anchor_origin&quot;</span>,</span>
+<span id="cb18-9"><a href="#cb18-9" tabindex="-1"></a>  <span class="at">anchor_policy =</span> <span class="st">&quot;error&quot;</span></span>
+<span id="cb18-10"><a href="#cb18-10" tabindex="-1"></a>)</span>
+<span id="cb18-11"><a href="#cb18-11" tabindex="-1"></a>group_fit<span class="sc">$</span>config<span class="sc">$</span>anchor_review<span class="sc">$</span>facet_summary</span>
+<span id="cb18-12"><a href="#cb18-12" tabindex="-1"></a><span class="fu">subset</span>(group_fit<span class="sc">$</span>facets<span class="sc">$</span>others, Facet <span class="sc">==</span> <span class="st">&quot;Rater&quot;</span>)</span></code></pre></div>
+<p>The first table identifies the Rater origin as
+<code>group_anchors</code>. In the second, R01 and R02 average 0.6 but
+their individual measures are estimated; the other Raters need not sum
+to zero. The supplied group mean is a substantive assumption, and its
+uncertainty is not propagated. Unequal <code>GroupValue</code> rows are
+conflicting mean targets, not contributions to be averaged by the
+normalizer.</p>
+<p>FACETS <a href="https://www.winsteps.com/facetman64/elements.htm">group codes</a>
+also need translation: group 0 specifies direct anchors, so use
+<code>anchors</code>, not <code>Group = &quot;0&quot;</code>. A missing native
+contribution does not participate in the group anchor. The native
+<code>X</code> option excludes extreme elements; mfrmr retains its
+declared members and does not reproduce that option automatically.</p>
+<p>Executed interior RSM/PCM examples agree closely when the group only
+selects an origin. Adding a second, restrictive group exposed a smaller
+but real difference: FACETS 4.5.0 preserved both targets, yet a
+constraint-preserving change increased the ordinary likelihood. mfrmr
+therefore retains constrained maximum likelihood rather than emulating
+that numerical result. Matching group means does not establish identical
+estimates, SEs or interval coverage. General group-anchor extreme
+extrapolation remains unsupported.</p>
+<p><code>review_mfrm_anchors()</code> normalizes and reports on the
+constraint block before the fit runs, surfacing duplicate/direct-group
+overlap and local support-count issues. It does not evaluate assignment
+connectedness, source-fit readiness, or cross-run element invariance;
+use the design-network route and substantive identity evidence
+separately.</p>
 </div>
 <div id="bias-and-interaction" class="section level3">
 <h3>Bias and interaction</h3>
-<p>For FACETS Table 14 bias output between Rater and Criterion, the
+<p>For FACETS Table 13 cell-bias output between Rater and Criterion, the
 closest mfrmr screening route is:</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>diag <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit)</span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>bias <span class="ot">&lt;-</span> <span class="fu">estimate_bias</span>(fit, diag,</span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>                      <span class="at">facet_a =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">facet_b =</span> <span class="st">&quot;Criterion&quot;</span>)</span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="fu">summary</span>(bias)</span></code></pre></div>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a>diag <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit)</span>
+<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a>bias <span class="ot">&lt;-</span> <span class="fu">estimate_bias</span>(fit, diag,</span>
+<span id="cb19-3"><a href="#cb19-3" tabindex="-1"></a>                      <span class="at">facet_a =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">facet_b =</span> <span class="st">&quot;Criterion&quot;</span>)</span>
+<span id="cb19-4"><a href="#cb19-4" tabindex="-1"></a><span class="fu">summary</span>(bias)</span></code></pre></div>
 <p><code>estimate_all_bias()</code> enumerates every non-person facet
 pair in one call.</p>
+<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a>screens <span class="ot">&lt;-</span> <span class="fu">estimate_all_bias</span>(fit, <span class="at">diagnostics =</span> diag)</span>
+<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a><span class="fu">summary</span>(screens)                     <span class="co"># Pair counts, availability and magnitude</span></span>
+<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">summary</span>(screens)<span class="sc">$</span>cells)         <span class="co"># Signed effects, SEs and observed counts</span></span>
+<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a><span class="fu">plot</span>(screens)                       <span class="co"># All retained cells grouped by pair</span></span>
+<span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a><span class="fu">plot</span>(screens, <span class="at">pair =</span> <span class="st">&quot;Rater x Criterion&quot;</span>)  <span class="co"># Individual heatmap</span></span></code></pre></div>
+<p>These are exploratory conditional screens: baseline calibration and
+Person uncertainty are held fixed. <code>ScreenPositive</code> counts
+available statistics with absolute value at least two; it is
+<code>NA</code> when none is available. Review errors, unavailable cells
+and observed counts before interpreting zero flags. The batch does not
+supply collection-wide multiplicity control, and a flagged cell alone
+does not establish unfairness.</p>
 </div>
 <div id="wright-map-variable-map" class="section level3">
 <h3>Wright map / variable map</h3>
 <p>For a shared-logit visual display of persons, facet levels, and step
 thresholds, first create the FACETS-organized summary and retain its
 result object:</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>review <span class="ot">&lt;-</span> <span class="fu">summary</span>(fit, <span class="at">profile =</span> <span class="st">&quot;facets&quot;</span>, <span class="at">detail =</span> <span class="st">&quot;brief&quot;</span>)</span>
-<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>review<span class="sc">$</span>decision</span>
-<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>res <span class="ot">&lt;-</span> review<span class="sc">$</span>results</span>
-<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a></span>
-<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="co"># Primary final-scale figure: all locations and available facet uncertainty.</span></span>
-<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a><span class="fu">plot</span>(res, <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>, <span class="at">renderer =</span> <span class="st">&quot;native&quot;</span>, <span class="at">show_ci =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>     <span class="at">top_n =</span> <span class="cn">Inf</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a>review <span class="ot">&lt;-</span> <span class="fu">summary</span>(fit, <span class="at">profile =</span> <span class="st">&quot;facets&quot;</span>, <span class="at">detail =</span> <span class="st">&quot;brief&quot;</span>)</span>
+<span id="cb21-2"><a href="#cb21-2" tabindex="-1"></a>review<span class="sc">$</span>decision</span>
+<span id="cb21-3"><a href="#cb21-3" tabindex="-1"></a>res <span class="ot">&lt;-</span> review<span class="sc">$</span>results</span>
+<span id="cb21-4"><a href="#cb21-4" tabindex="-1"></a></span>
+<span id="cb21-5"><a href="#cb21-5" tabindex="-1"></a><span class="co"># Primary final-scale figure: all locations and available facet uncertainty.</span></span>
+<span id="cb21-6"><a href="#cb21-6" tabindex="-1"></a><span class="fu">plot</span>(res, <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>, <span class="at">renderer =</span> <span class="st">&quot;native&quot;</span>, <span class="at">show_ci =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb21-7"><a href="#cb21-7" tabindex="-1"></a>     <span class="at">top_n =</span> <span class="cn">Inf</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
 <p>Read <code>review$decision</code> before using the FACETS-organized
 tables. It reports the same stored mfrmr readiness decision shown by
 <code>print(fit)</code>; the <code>facets</code> profile changes the
 organization of the review, not the estimator and not the evidence
-threshold. <code>FormalInference = &quot;No&quot;</code> therefore remains a stop
-on substantive reporting even when a familiar FACETS-style table or plot
-is available.</p>
-<p><code>plot_wright_unified()</code> is the corresponding explicit
-helper when the Wright map is the main figure. For readers who expect
-the FACETS Table 6-style asterisk ruler and horizontal, rubric-labelled
-category transitions, define one label for every retained original
-score:</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>rubric_labels <span class="ot">&lt;-</span> <span class="fu">setNames</span>(</span>
-<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>  your_rubric_labels,</span>
-<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>  fit<span class="sc">$</span>prep<span class="sc">$</span>score_map<span class="sc">$</span>OriginalScore</span>
-<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>)</span>
-<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a><span class="fu">plot</span>(res, <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>, <span class="at">renderer =</span> <span class="st">&quot;facets&quot;</span>, <span class="at">show_ci =</span> <span class="cn">FALSE</span>,</span>
-<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>     <span class="at">category_labels =</span> rubric_labels, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
+threshold. <code>FormalInference = &quot;No&quot;</code> withholds the
+corresponding formal inferential claim even when a familiar table or
+plot is available. It does not turn every descriptive result into an
+unusable result: report a valid descriptive target with its limitation,
+and identify which comparisons or uncertainty statements are
+unavailable.</p>
+<p><code>plot()</code> is the corresponding explicit helper when the
+Wright map is the main figure. For readers who expect the FACETS Table
+6-style asterisk ruler and horizontal, rubric-labelled category
+transitions, define one label for every retained original score:</p>
+<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>rubric_labels <span class="ot">&lt;-</span> <span class="fu">setNames</span>(</span>
+<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a>  your_rubric_labels,</span>
+<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a>  fit<span class="sc">$</span>prep<span class="sc">$</span>score_map<span class="sc">$</span>OriginalScore</span>
+<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a>)</span>
+<span id="cb22-5"><a href="#cb22-5" tabindex="-1"></a><span class="fu">plot</span>(res, <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>, <span class="at">renderer =</span> <span class="st">&quot;facets&quot;</span>, <span class="at">show_ci =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb22-6"><a href="#cb22-6" tabindex="-1"></a>     <span class="at">category_labels =</span> rubric_labels, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span></code></pre></div>
 <p><code>show_ci = FALSE</code> is the closest FACETS-style visual
 grammar. Setting <code>show_ci = TRUE</code> deliberately creates a
 hybrid display: the ruler is FACETS-style, but the intervals are mfrmr
@@ -599,9 +1352,9 @@ the estimation or that the two programs are numerically equivalent.</p>
 <p>For the Bond-and-Fox-style follow-up requested by many FACETS users,
 put Infit on the horizontal axis and the measure on the vertical axis.
 Person rows remain opt-in:</p>
-<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="fu">plot</span>(res, <span class="at">type =</span> <span class="st">&quot;fit_pathway&quot;</span>, <span class="at">fit_stat =</span> <span class="st">&quot;Infit&quot;</span>,</span>
-<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>     <span class="at">include_person =</span> <span class="cn">TRUE</span>, <span class="at">top_n_person =</span> <span class="dv">12</span>,</span>
-<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>     <span class="at">person_labels =</span> <span class="st">&quot;none&quot;</span>, <span class="at">facet_labels =</span> <span class="st">&quot;flagged&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a><span class="fu">plot</span>(res, <span class="at">type =</span> <span class="st">&quot;fit_pathway&quot;</span>, <span class="at">fit_stat =</span> <span class="st">&quot;Infit&quot;</span>,</span>
+<span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a>     <span class="at">include_person =</span> <span class="cn">TRUE</span>, <span class="at">top_n_person =</span> <span class="dv">12</span>,</span>
+<span id="cb23-3"><a href="#cb23-3" tabindex="-1"></a>     <span class="at">person_labels =</span> <span class="st">&quot;none&quot;</span>, <span class="at">facet_labels =</span> <span class="st">&quot;flagged&quot;</span>)</span></code></pre></div>
 <p>Use <code>draw = FALSE</code> or
 <code>plot_data(fit, type = &quot;wright&quot;)</code> when you need the
 underlying coordinates for a custom <code>ggplot2</code>, base-R, or
@@ -613,13 +1366,13 @@ Quarto graphic.</p>
 columns. In <code>mfrmr</code>, treat MnSq as the primary fit statistic
 and use the df/ZSTD columns to explain how the same MnSq values were
 standardized. The direct review path is:</p>
-<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>diag <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit, <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>, <span class="at">fit_df_method =</span> <span class="st">&quot;both&quot;</span>)</span>
-<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>fm <span class="ot">&lt;-</span> <span class="fu">fit_measures_table</span>(fit, <span class="at">diagnostics =</span> diag,</span>
-<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>                         <span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">fit_df_method =</span> <span class="st">&quot;both&quot;</span>)</span>
-<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a></span>
-<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>fm<span class="sc">$</span>facets_table</span>
-<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>fm<span class="sc">$</span>df_sensitive</span>
-<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a><span class="fu">plot</span>(fm, <span class="at">type =</span> <span class="st">&quot;df_sensitivity&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a>diag <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit, <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>, <span class="at">fit_df_method =</span> <span class="st">&quot;both&quot;</span>)</span>
+<span id="cb24-2"><a href="#cb24-2" tabindex="-1"></a>fm <span class="ot">&lt;-</span> <span class="fu">fit_measures_table</span>(fit, <span class="at">diagnostics =</span> diag,</span>
+<span id="cb24-3"><a href="#cb24-3" tabindex="-1"></a>                         <span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">fit_df_method =</span> <span class="st">&quot;both&quot;</span>)</span>
+<span id="cb24-4"><a href="#cb24-4" tabindex="-1"></a></span>
+<span id="cb24-5"><a href="#cb24-5" tabindex="-1"></a>fm<span class="sc">$</span>facets_table</span>
+<span id="cb24-6"><a href="#cb24-6" tabindex="-1"></a>fm<span class="sc">$</span>df_sensitive</span>
+<span id="cb24-7"><a href="#cb24-7" tabindex="-1"></a><span class="fu">plot</span>(fm, <span class="at">type =</span> <span class="st">&quot;df_sensitivity&quot;</span>)</span></code></pre></div>
 <p><code>df_sensitivity</code> reports the engine-vs-FACETS-style df
 comparison row by row; <code>df_sensitive</code> keeps only rows where
 the df convention changes the |ZSTD| flag or materially changes the ZSTD
@@ -629,19 +1382,32 @@ external FACETS comparison use the same language.</p>
 </div>
 <div id="group-anchoring-and-dff" class="section level3">
 <h3>Group anchoring and DFF</h3>
-<p>FACETS <code>D = ..., G =</code> group-anchor blocks for differential
-facet functioning translate to the <code>group_anchors</code> argument
-and the <code>analyze_dff()</code> follow-up:</p>
-<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>group_anchors <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
-<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>  <span class="at">facet =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
-<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>  <span class="at">level =</span> <span class="st">&quot;Content&quot;</span>,</span>
-<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>  <span class="at">group =</span> <span class="fu">c</span>(<span class="st">&quot;Native&quot;</span>, <span class="st">&quot;Non-native&quot;</span>),</span>
-<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>  <span class="at">estimate =</span> <span class="fu">c</span>(<span class="fl">0.0</span>, <span class="fl">0.0</span>),</span>
-<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a>  <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span></span>
-<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a>)</span>
-<span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a>fit_g <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(..., <span class="at">group_anchors =</span> group_anchors)</span>
-<span id="cb13-9"><a href="#cb13-9" tabindex="-1"></a>dff <span class="ot">&lt;-</span> <span class="fu">analyze_dff</span>(fit_g, diag, <span class="at">facet =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
-<span id="cb13-10"><a href="#cb13-10" tabindex="-1"></a>                   <span class="at">group =</span> <span class="st">&quot;FirstLanguage&quot;</span>, <span class="at">method =</span> <span class="st">&quot;refit&quot;</span>)</span></code></pre></div>
+<p>FACETS <code>G</code> group anchors constrain sums over specified
+elements. mfrmr’s <code>GroupValue</code> is the mean target for the
+group. For example, the following schematic input constrains the mean of
+two Rater elements to zero; it does not define response groups for a DFF
+analysis:</p>
+<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" tabindex="-1"></a>group_anchors <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb25-2"><a href="#cb25-2" tabindex="-1"></a>  <span class="at">Facet =</span> <span class="st">&quot;Rater&quot;</span>,</span>
+<span id="cb25-3"><a href="#cb25-3" tabindex="-1"></a>  <span class="at">Level =</span> <span class="fu">c</span>(<span class="st">&quot;R1&quot;</span>, <span class="st">&quot;R2&quot;</span>),</span>
+<span id="cb25-4"><a href="#cb25-4" tabindex="-1"></a>  <span class="at">Group =</span> <span class="fu">c</span>(<span class="st">&quot;PanelA&quot;</span>, <span class="st">&quot;PanelA&quot;</span>),</span>
+<span id="cb25-5"><a href="#cb25-5" tabindex="-1"></a>  <span class="at">GroupValue =</span> <span class="fu">c</span>(<span class="fl">0.0</span>, <span class="fl">0.0</span>),</span>
+<span id="cb25-6"><a href="#cb25-6" tabindex="-1"></a>  <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span></span>
+<span id="cb25-7"><a href="#cb25-7" tabindex="-1"></a>)</span>
+<span id="cb25-8"><a href="#cb25-8" tabindex="-1"></a>fit_g <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(..., <span class="at">group_anchors =</span> group_anchors, <span class="at">anchor_policy =</span> <span class="st">&quot;error&quot;</span>)</span>
+<span id="cb25-9"><a href="#cb25-9" tabindex="-1"></a>diag_g <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit_g)</span>
+<span id="cb25-10"><a href="#cb25-10" tabindex="-1"></a>dff <span class="ot">&lt;-</span> <span class="fu">analyze_dff</span>(fit_g, diag_g, <span class="at">facet =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
+<span id="cb25-11"><a href="#cb25-11" tabindex="-1"></a>                   <span class="at">group =</span> <span class="st">&quot;FirstLanguage&quot;</span>, <span class="at">data =</span> ratings_with_language,</span>
+<span id="cb25-12"><a href="#cb25-12" tabindex="-1"></a>                   <span class="at">method =</span> <span class="st">&quot;refit&quot;</span>)</span></code></pre></div>
+<p>Replace <code>...</code> with the fitting arguments for your data and
+supply <code>ratings_with_language</code> containing the response-group
+column <code>FirstLanguage</code>. Use diagnostics from
+<code>fit_g</code>, not from a different fit. Assigning the same element
+to two different groups is not this mean-constraint construction. A
+group-anchor target is an external mean constraint, not an empirical
+link. Its use requires a defensible equal-mean or known-target
+assumption for the declared elements and does not connect otherwise
+unobserved rating subsets.</p>
 </div>
 </div>
 <div id="reviewing-output-contracts-and-fit-tables" class="section level2">
@@ -650,14 +1416,14 @@ and the <code>analyze_dff()</code> follow-up:</p>
 <code>facets_output_contract_review()</code> checks whether the
 package-generated report components satisfy the FACETS-style output
 contract encoded in the package:</p>
-<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>contract_review <span class="ot">&lt;-</span> <span class="fu">facets_output_contract_review</span>(</span>
-<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>  fit,</span>
-<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag,</span>
-<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>  <span class="at">branch =</span> <span class="st">&quot;facets&quot;</span></span>
-<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>)</span>
-<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a><span class="fu">summary</span>(contract_review)</span>
-<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a>contract_review<span class="sc">$</span>missing_preview</span>
-<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a>contract_review<span class="sc">$</span>metric_checks</span></code></pre></div>
+<div class="sourceCode" id="cb26"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" tabindex="-1"></a>contract_review <span class="ot">&lt;-</span> <span class="fu">facets_output_contract_review</span>(</span>
+<span id="cb26-2"><a href="#cb26-2" tabindex="-1"></a>  fit,</span>
+<span id="cb26-3"><a href="#cb26-3" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag,</span>
+<span id="cb26-4"><a href="#cb26-4" tabindex="-1"></a>  <span class="at">branch =</span> <span class="st">&quot;facets&quot;</span></span>
+<span id="cb26-5"><a href="#cb26-5" tabindex="-1"></a>)</span>
+<span id="cb26-6"><a href="#cb26-6" tabindex="-1"></a><span class="fu">summary</span>(contract_review)</span>
+<span id="cb26-7"><a href="#cb26-7" tabindex="-1"></a>contract_review<span class="sc">$</span>missing_preview</span>
+<span id="cb26-8"><a href="#cb26-8" tabindex="-1"></a>contract_review<span class="sc">$</span>metric_checks</span></code></pre></div>
 <p>The resulting object reviews column coverage and package-native
 metric checks. It is not a claim that <code>mfrmr</code> has reproduced
 FACETS estimates numerically. For external numerical comparison, use an
@@ -672,22 +1438,22 @@ separate df/ZSTD standardization conventions.</p>
 <p>If you already have a FACETS fit table on disk, read it first and
 then run the fit review. This does not run FACETS; it consumes an
 exported or otherwise harmonized table.</p>
-<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>facets_fit <span class="ot">&lt;-</span> <span class="fu">read_facets_fit_table</span>(</span>
-<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>  <span class="st">&quot;score.2.txt&quot;</span>,</span>
-<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a>  <span class="at">facet_map =</span> <span class="fu">c</span>(<span class="st">&quot;1&quot;</span> <span class="ot">=</span> <span class="st">&quot;Person&quot;</span>, <span class="st">&quot;2&quot;</span> <span class="ot">=</span> <span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;3&quot;</span> <span class="ot">=</span> <span class="st">&quot;Criterion&quot;</span>)</span>
-<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a>)</span>
-<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a>review <span class="ot">&lt;-</span> <span class="fu">facets_fit_review</span>(</span>
-<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a>  fit,</span>
-<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag,</span>
-<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a>  <span class="at">facets_fit =</span> facets_fit,</span>
-<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a>  <span class="at">external_zstd_tolerance =</span> <span class="fl">0.05</span></span>
-<span id="cb15-10"><a href="#cb15-10" tabindex="-1"></a>)</span>
-<span id="cb15-11"><a href="#cb15-11" tabindex="-1"></a></span>
-<span id="cb15-12"><a href="#cb15-12" tabindex="-1"></a>review<span class="sc">$</span>df_sensitivity</span>
-<span id="cb15-13"><a href="#cb15-13" tabindex="-1"></a>review<span class="sc">$</span>df_sensitive</span>
-<span id="cb15-14"><a href="#cb15-14" tabindex="-1"></a>review<span class="sc">$</span>external_table_quality</span>
-<span id="cb15-15"><a href="#cb15-15" tabindex="-1"></a>review<span class="sc">$</span>external_comparison</span>
-<span id="cb15-16"><a href="#cb15-16" tabindex="-1"></a><span class="fu">plot</span>(review, <span class="at">type =</span> <span class="st">&quot;df_sensitivity&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" tabindex="-1"></a>facets_fit <span class="ot">&lt;-</span> <span class="fu">read_facets_fit_table</span>(</span>
+<span id="cb27-2"><a href="#cb27-2" tabindex="-1"></a>  <span class="st">&quot;score.2.txt&quot;</span>,</span>
+<span id="cb27-3"><a href="#cb27-3" tabindex="-1"></a>  <span class="at">facet_map =</span> <span class="fu">c</span>(<span class="st">&quot;1&quot;</span> <span class="ot">=</span> <span class="st">&quot;Person&quot;</span>, <span class="st">&quot;2&quot;</span> <span class="ot">=</span> <span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;3&quot;</span> <span class="ot">=</span> <span class="st">&quot;Criterion&quot;</span>)</span>
+<span id="cb27-4"><a href="#cb27-4" tabindex="-1"></a>)</span>
+<span id="cb27-5"><a href="#cb27-5" tabindex="-1"></a>review <span class="ot">&lt;-</span> <span class="fu">facets_fit_review</span>(</span>
+<span id="cb27-6"><a href="#cb27-6" tabindex="-1"></a>  fit,</span>
+<span id="cb27-7"><a href="#cb27-7" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag,</span>
+<span id="cb27-8"><a href="#cb27-8" tabindex="-1"></a>  <span class="at">facets_fit =</span> facets_fit,</span>
+<span id="cb27-9"><a href="#cb27-9" tabindex="-1"></a>  <span class="at">external_zstd_tolerance =</span> <span class="fl">0.05</span></span>
+<span id="cb27-10"><a href="#cb27-10" tabindex="-1"></a>)</span>
+<span id="cb27-11"><a href="#cb27-11" tabindex="-1"></a></span>
+<span id="cb27-12"><a href="#cb27-12" tabindex="-1"></a>review<span class="sc">$</span>df_sensitivity</span>
+<span id="cb27-13"><a href="#cb27-13" tabindex="-1"></a>review<span class="sc">$</span>df_sensitive</span>
+<span id="cb27-14"><a href="#cb27-14" tabindex="-1"></a>review<span class="sc">$</span>external_table_quality</span>
+<span id="cb27-15"><a href="#cb27-15" tabindex="-1"></a>review<span class="sc">$</span>external_comparison</span>
+<span id="cb27-16"><a href="#cb27-16" tabindex="-1"></a><span class="fu">plot</span>(review, <span class="at">type =</span> <span class="st">&quot;df_sensitivity&quot;</span>)</span></code></pre></div>
 <p>Use <code>external_comparison</code> for the supplied FACETS table
 and <code>df_sensitivity</code> for the engine-vs-FACETS-style df
 convention check. This separation keeps external numerical differences
@@ -701,13 +1467,13 @@ FACETS export only contains ZStd and T.Count columns, or if duplicate
 <p>For traceability or downstream tools that expect FACETS output files,
 <code>facets_output_file_bundle()</code> writes a parallel set of
 fixed-width or CSV exports:</p>
-<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>files <span class="ot">&lt;-</span> <span class="fu">facets_output_file_bundle</span>(</span>
-<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a>  fit,</span>
-<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag,</span>
-<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a>  <span class="at">out_dir =</span> <span class="fu">tempdir</span>(),</span>
-<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a>  <span class="at">include =</span> <span class="fu">c</span>(<span class="st">&quot;graph&quot;</span>, <span class="st">&quot;score&quot;</span>)</span>
-<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a>)</span></code></pre></div>
-<p>For RSM and PCM the score-side helpers are available. Under bounded
+<div class="sourceCode" id="cb28"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" tabindex="-1"></a>files <span class="ot">&lt;-</span> <span class="fu">facets_output_file_bundle</span>(</span>
+<span id="cb28-2"><a href="#cb28-2" tabindex="-1"></a>  fit,</span>
+<span id="cb28-3"><a href="#cb28-3" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag,</span>
+<span id="cb28-4"><a href="#cb28-4" tabindex="-1"></a>  <span class="at">out_dir =</span> <span class="fu">tempdir</span>(),</span>
+<span id="cb28-5"><a href="#cb28-5" tabindex="-1"></a>  <span class="at">include =</span> <span class="fu">c</span>(<span class="st">&quot;graph&quot;</span>, <span class="st">&quot;score&quot;</span>)</span>
+<span id="cb28-6"><a href="#cb28-6" tabindex="-1"></a>)</span></code></pre></div>
+<p>For RSM and PCM the score-side helpers are available. Under
 <code>GPCM</code> the score-side bundle is intentionally restricted; see
 <code>?gpcm_capability_matrix</code> and the
 <code>mfrmr-gpcm-scope</code> vignette for the documented
@@ -715,23 +1481,178 @@ limitation.</p>
 </div>
 <div id="recommended-next-steps" class="section level2">
 <h2>Recommended next steps</h2>
+<p>For a Person comparison on the <strong>same</strong> scale exposure,
+supply <code>reference_plan</code> to <code>fair_average_table()</code>.
+Its <code>reference_scores</code> component uses each Person’s primary
+estimate with the actual fitted locations and scale profiles in that one
+weighted plan. This is a distinct expected-score target: PCM FairM/FairZ
+still retain each Person’s administered scale mixture. Score direction
+remains defined by the rubric; a higher standardized expected score is
+not automatically a judgment of better performance or fairness.</p>
+<p><code>confint(fair, parm = ..., nsim = ..., seed = ...)</code>
+provides an experimental ordinary-JML refit route for common-plan scores
+and named paired contrasts. When anchors were estimated from the same or
+overlapping samples, supply their <code>anchor_source</code>, a
+generating fit on the union of response events where needed, and
+explicit calibration/scoring row maps. The maps assert which
+observations are actually shared: equal labels alone do not establish
+event identity. Every replication re-estimates calibration and anchors
+before scoring; shared responses are generated once. Without the source
+and correspondence, estimated- anchor intervals are unavailable.
+<code>anchor_uncertainty = &quot;fixed&quot;</code> is an explicit conditional
+alternative, not a substitute for propagating estimated anchors.</p>
+<p>Explicit <code>generator_method = &quot;jeffreys&quot;</code> offers an
+experimental refit option when extreme Person estimates prevent an
+ordinary generating model. It fits a canonical information-penalized
+model on the generating data, then simulates shared events once and
+reruns the ordinary calibration/anchor/scoring estimator. The original
+ordinary-JML points remain unchanged; extreme Persons retain limiting
+expected scores. Inspect <code>attr(result, &quot;generating_model&quot;)</code>
+and <code>attr(result, &quot;generating_target&quot;)</code> to distinguish the
+generator from the reported estimate. Declare the rubric and retain its
+full coding when fitting. This option is not available for delta or
+bounded intervals, and it does not resolve infinite estimated anchors or
+unqualified structural calibration.</p>
+<p>A finite generator alone does not justify nominal coverage or
+score-bias reduction. The bias correction for canonical parameters does
+not automatically transfer to expected scores: even the binomial
+probability <code>(S + .5)/(n + 1)</code> has bias
+<code>(.5 - p)/(n + 1)</code>. The option is separate from FACETS Xtreme
+and mfrmr’s corrected-GPCM estimator; it leaves
+<code>CIEligible = FALSE</code>.</p>
+<p>An alternative is to select <code>jml_penalty = &quot;jeffreys&quot;</code>
+with <code>method = &quot;JML&quot;</code> in <strong>every</strong> original
+calibration, scoring and union fit. This changes the reported points as
+well as every replicate fit. The separate <code>mfrm_jeffreys_fit</code>
+result supplies Person, facet and step points and numerical checks; it
+does not inherit ordinary SEs or FACETS diagnostics. For its common-plan
+scores, call
+<code>fair_average_table(fit, reference_plan = plan)</code>. The
+existing <code>confint()</code> interface propagates estimated anchors
+and shared events using the same penalized estimator throughout. Its
+generating method defaults to Jeffreys, using the supplied penalized
+union fit. Mixing ordinary and penalized fits across stages is refused.
+With <code>method = &quot;delta&quot;</code>, the analytic derivative follows the
+penalized equations, including the change in the penalty when estimated
+anchors change. Shared response events contribute to both stages before
+computing covariance. This is a local model-based approximation, not
+inverse penalized curvature or a coverage guarantee. Inspect
+<code>summary(fit)$checks</code> and
+<code>attr(result, &quot;settings&quot;)$estimator</code> to record which
+procedure was used. Declared empty categories are retained; unidentified
+designs and numerical failures are still refused. Finite-sample score
+bias, coverage and global optimization remain unqualified. This option
+is separate from FACETS Xtreme and corrected GPCM, and is not a
+FACETS-compatible default.</p>
+<p>There is a concrete reason to retain the experimental label. With six
+binary responses and true success probability 0.5, exact enumeration
+gives 78.125% coverage for nominal 95% Jeffreys delta intervals. At
+probability 0.25, it is 78.4424%. The local variance formula is correct;
+the plug-in normal interval still fails to achieve its nominal coverage.
+More Persons do not necessarily provide more responses for the
+particular Person being scored. Use <code>Available</code> to check
+whether a result was computed, and <code>CIEligible</code> and the saved
+notes to assess its inferential status. Basic refit intervals also have
+counterexamples: with six responses and true probability 0.1, exact
+refit quantiles give coverage 45.2709%. An all-zero sample’s upper basic
+limit equals the fitted score 0.5/7, below the true probability. Even
+infinitely many refits do not fix this; Monte Carlo precision and
+sampling coverage are different requirements. The conservative bounded
+method retains its distinct assumptions and can be wide in sparse
+designs.</p>
+<p>Read the interval table’s <code>Status</code>,
+<code>Available</code>, <code>Unresolved</code> and
+<code>ExpectedTailDraws</code> together. Numerical availability does not
+qualify coverage: the initial method is a pointwise fitted-model
+approximation, with no correction for JML incidental-parameter bias or
+guarantee under misspecification. Unresolved trials stay in the
+denominator and can make tail limits unavailable. The four
+<code>LowerMCLower</code>/<code>LowerMCUpper</code> and
+<code>UpperMCLower</code>/<code>UpperMCUpper</code> columns separately
+enclose the Monte Carlo error of the two endpoints, at
+<code>mc_level</code> (default .95).
+<code>attr(result, &quot;monte_carlo&quot;)</code> retains the underlying binomial
+ranks. Infinite enclosures expose insufficient draws or unresolved
+refits; <code>MCFinite = TRUE</code> means finite, not necessarily
+precise enough. These diagnostics cover both endpoints for one fixed
+target under a fixed generating model and independent replications. They
+do not guarantee coverage across targets, adaptive reruns, or repeated
+samples of the original data. The plot still shows the empirical
+interval; its saved payload retains the Monte Carlo diagnostic for
+inspection. <code>summary()</code> and <code>plot()</code> reuse the
+saved result, and <code>saveRDS()</code> preserves its replications,
+checks and provenance. These intervals concern expected scores, not
+future observed ratings; they do not certify unfairness. The method’s
+help contains an executable example and the supported estimation/design
+restrictions.</p>
+<p><code>confint(fair, parm = ..., method = &quot;delta&quot;)</code> evaluates a
+deterministic local approximation through the same estimator. Supply the
+same calibration fit, union fit and event maps when anchors are
+estimated. Omit <code>nsim</code> and <code>seed</code>. The result adds
+<code>SE</code>, <code>Reason</code> and
+<code>attr(result, &quot;covariance&quot;)</code>; its
+<code>covariance_components</code> attribute separates direct scoring,
+propagation through calibration and the signed shared-event cross term.
+These terms retain the covariance needed for paired differences; a
+marginal anchor SE cannot replace them. The count columns for
+simulations are <code>NA</code> because this method does not run
+replications.</p>
+<p>Delta limits use a local normal approximation centered on the
+observed estimate. They require finite estimates and positive
+information, and do not correct JML bias or establish coverage. Missing
+bounds retain their reasons; bounds outside the score support are not
+clipped. Compare the numerical approximation and availability under the
+intended design before using either method for decisions. The help for
+<code>confint.mfrm_fair_average</code> gives the derivative, uncertainty
+basis and references. These procedures require native fitted models;
+descriptive FACETS-result imports do not provide the source model or
+joint uncertainty.</p>
+<p><code>confint(fair, parm = ..., method = &quot;bounded&quot;)</code> is a
+conservative alternative for the same true common-plan score or
+contrast. It uses scoring responses directly, so extreme Person
+estimates and the absence of an estimated-anchor covariance do not
+require a fitted generating model. Omit calibration/generator arguments
+and simulation controls for this method. Its finite-sample probability
+bound requires independent bounded responses, a fixed exogenous
+assignment, plan and contrast, and stable expected scores within each
+Person-plan cell. It is pointwise and does not justify selecting
+comparisons after seeing scores or claiming nominal coverage conditional
+on successful fitting. Declare both <code>rating_min</code> and
+<code>rating_max</code> from the rubric when fitting, and retain the
+full score coding with <code>category_policy = &quot;preserve&quot;</code>.
+Observed sample extrema and internally collapsed categories are not
+accepted as known support. The interval result saves this basis in
+<code>attr(result, &quot;settings&quot;)$score_support</code>. A retained empty
+category that prevents fitting is still a failure; changing the rubric
+to obtain an interval changes the inferential target.</p>
+<p>The tradeoff is width: every unobserved plan cell keeps its full
+score range instead of borrowing a model prediction. Inspect
+<code>Informative</code> and <code>attr(result, &quot;support&quot;)</code>; an
+available full-range bound is explicitly uninformative.
+<code>Estimate</code> retains the JML point, while
+<code>DesignEstimate</code> is a separate unbiased weighted mean only
+with complete plan support. The interval can be asymmetric around or
+exclude the JML point. It is not a bias correction, a FACETS interval
+convention, or a solution to dependent ratings. Failure to construct the
+prerequisite fitted result remains an end-to-end availability failure,
+even though the concentration inequality itself needs no fitted
+model.</p>
 <p>After a FACETS-oriented package-native fit is in hand, the
 recommended mfrmr reporting workflow extends the analysis with:</p>
 <ul>
 <li><code>review_mfrm_anchors()</code> before anchored fitting, and
-<code>detect_anchor_drift()</code> / <code>plot_anchor_drift()</code>
-when common elements define a cross-form or cross-wave link.</li>
+<code>detect_anchor_drift()</code> / <code>plot()</code> when common
+elements define a cross-form or cross-wave link.</li>
 <li><code>diagnose_mfrm(diagnostic_mode = &quot;both&quot;)</code> for the strict
 marginal screen alongside the residual stack.</li>
 <li><code>rating_scale_table()</code>,
 <code>category_structure_report()</code>, and
 <code>category_curves_report()</code> for category-functioning
 evidence.</li>
-<li><code>fair_average_table()</code> when FACETS Table 12-style
-fair-average review is needed.</li>
-<li><code>plot(fit, type = &quot;wright&quot;)</code> or
-<code>plot_wright_unified()</code> for a variable-map view of targeting
-and threshold placement.</li>
+<li><code>fair_average_table()</code> when FACETS Table 7 fair-average
+review is needed.</li>
+<li><code>plot(fit, type = &quot;wright&quot;)</code> or <code>plot()</code> for a
+variable-map view of targeting and threshold placement.</li>
 <li><code>estimate_bias()</code>,
 <code>bias_interaction_report()</code>, and
 <code>bias_pairwise_report()</code> when FACETS Table 14-style local

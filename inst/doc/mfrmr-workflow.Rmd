@@ -32,680 +32,1071 @@ knitr::opts_chunk$set(
 )
 ```
 
-This vignette outlines a reproducible workflow for:
+## Choose the result you need
 
-- loading packaged simulation data
-- fitting an MFRM with flexible facets
-- choosing a fast fit summary or an opt-in comprehensive summary
-- producing the required Wright map on the fitted shared logit scale
-- running diagnostics and residual PCA
-- generating APA and visual summary outputs
-- moving from fitted models into design simulation and fixed-calibration
-  prediction
+Start with the intended score and decision, then choose a branch. These are
+connected workflows, not a checklist requiring every analysis.
 
-For a plot-first companion guide, see the separate
-`mfrmr-visual-diagnostics` vignette.
+| Your situation | Connected route | What to carry into the report |
+| --- | --- | --- |
+| Define what was rated and whether the design links the groups | `describe_mfrm_data()` → model/design review → `subset_connectivity_report()` or `build_mfrm_network_review()` after fitting | Rubric endpoints, rating unit, assigned/missing rows, shared observations and identification checks. A connected graph alone does not establish a common scale. |
+| Estimate person measures and named rater/criterion effects | `fit_mfrm()` → `summary()` → `diagnose_mfrm()` and eligible intervals → `mfrm_results()` → `mfrm_report()` | Model, scale, estimates, uncertainty, Separation/Strata/Reliability, fit and the figures that answer the question. |
+| Decide how many raters or tasks a score needs | `mfrm_g_study()` → `mfrm_d_study()` → `plot()` / `summary()` → eligible plan comparisons | [G/D-study](mfrmr-gtheory.html) components, score weights, G/Phi/SEM, future counts and uncertainty. No MFRM fit is required. |
+| Describe observed agreement | Match the rating unit → `pairwise_kappa_table()`, `krippendorff_alpha_table()` or `pairwise_icc_table()` | [Agreement](mfrmr-rating-agreement.html) target, category distances/ICC definition, overlap and exclusions. Choose the coefficient from the question. |
+| Reuse a scale across forms or waves | Anchor review → anchored fit / linking review → drift and eligible uncertainty | [Anchor provenance and scale](mfrmr-linking-and-dff.html), invariance assumption, fixed versus propagated uncertainty. A common label is not a common calibration. |
+| Investigate an unexpected rater/criterion combination or group contrast | Diagnostics → specified `estimate_bias()` or `analyze_dff()` → signed tables and `plot()` → reporting | [Bias/DFF](mfrmr-linking-and-dff.html) target, cell counts, direction, multiplicity and conditional uncertainty; a screen does not establish unfairness. |
+| Decide whether another model changes the answer | Matched fits → `compare_mfrm()` → `build_model_choice_review()` → `build_summary_table_bundle()` | [Model comparison](mfrmr-model-choice.html), comparable likelihoods, eligible tests and changes in substantive conclusions. |
+| Investigate structure left unexplained or describe groups | Residual diagnostics / `analyze_residual_pca()` / `q3_statistic()` → `mfrm_residual_network()` → `mfrm_report()`; separately, declared entity features → clustering | [Residual exploration](mfrmr-visual-diagnostics.html#residual-networks-ega-and-the-assignment-graph-answer-different-questions) and [feature groups](mfrmr-external-features.html) have different inputs. Retain overlap, feature construction and exploratory status. |
+| Give feedback, score new responses or save evidence | Eligible rater report / `score_mfrm_persons()` or portable calibration → plots, export and RDS | Recipient-specific evidence and limitations, scoring prior/calibration version and the source of uncertainty. See the [reporting map](mfrmr-reporting-and-apa.html#choose-report-sections-by-question). |
 
-For a faster preliminary run without changing the final analysis target:
+Before any branch, record the **meaning of low and high scores**. A column
+named Comprehensibility may encode ease or difficulty. Higher Person locations
+predict higher coded categories; they do not inherently mean better performance.
+With the default Rater orientation, higher locations predict lower coded scores.
+See [score direction](mfrmr-visual-diagnostics.html#establish-what-higher-scores-mean)
+before interpreting severity, bias, plots or anchors. Changing `positive_facets`
+is not reverse-coding the outcome.
 
-- test code mechanics on a small deterministic subset or, for an MML workflow,
-  a temporary `quad_points = 7` grid; that grid is screening-only and cannot
-  support automatic IC ranking or LRT. Restore the prespecified final MML grid
-  (31 points by default) and check a denser common grid when a comparison is
-  close or consequential
-- choose `method = "JML"` only when its person-parameter treatment is
-  methodologically appropriate, not merely as a faster substitute for MML
-- use `diagnose_mfrm(..., residual_pca = "none", diagnostic_mode = "both",
-  fit_df_method = "both")` when the diagnostics will feed a comprehensive
-  summary
-- reuse the same diagnostics object in downstream reports and plots
+If Content and Organization are **separate reported scores**, start with the
+[criterion-versus-score distinction](mfrmr-gtheory.html#is-a-criterion-a-facet-or-a-score).
+A Criterion facet in one-dimensional MFRM does not estimate a separate ability
+for each criterion. Multivariate G theory estimates cross-score covariance
+components; it does not fit multidimensional IRT.
 
-## MML and Diagnostic Modes
+### Put the network at the stage its edges describe
 
-`mfrmr` treats `MML` and `JML` differently on purpose.
+| Network | Best point in the workflow | What an edge means |
+| --- | --- | --- |
+| Assignment/co-observation | Design review, before interpreting measures; return to it when planning additional links or anchors | Who shares observed ratings: `mfrm_network_analysis()` → `build_mfrm_network_review()`. Pass `data`, `person`, `facets`, `score` before fitting; use `basis = "planned"` without a score column for an assignment roster. Inspect the person-rater projection as well as the full graph. |
+| Rater score relations | After matching shared responses, alongside agreement and rater feedback | Observed score agreement/disagreement or directional differences in `rater_network_analysis()`; cross-criterion observed correlations in `rater_halo_network_analysis()`. These are not residual networks or causal halo tests. |
+| Residual associations or communities | After fitting and checking residual/overlap definitions, for a stated unexplained-structure question | Associations left after the model. `mfrm_residual_network()` supplies signed residual correlations and optional hierarchical groups. Report all pairs, overlap and missingness with `mfrm_report()`. This is descriptive exploration, not EGA or a jointly fitted network model. |
 
-- `MML` integrates over the person distribution with Gauss-Hermite quadrature.
-- `mml_engine = "direct"` (the default) optimizes the quadrature-based
-  marginal log-likelihood directly. `mml_engine = "em"` and `"hybrid"` provide
-  the documented EM and EM-warm-start routes for supported RSM/PCM fits.
-- `JML` is useful for JMLE-oriented comparisons and analyses that avoid a
-  parametric person distribution. `MML` is the package default and supports
-  marginal and fixed-calibration follow-up when its response-model and
-  population-distribution assumptions are defensible.
+An assignment graph is especially useful for explaining why adding a shared
+performance or rater might improve linking. It cannot create direct pairwise
+agreement evidence where no common responses were rated. Feature clustering
+can describe external rater backgrounds; clustering estimated bias or residual
+profiles additionally needs explicit aggregation, missingness, comparability
+and estimation-uncertainty treatment. The current feature API does not supply
+those steps automatically.
 
-For `RSM` and `PCM`, diagnostics now expose two distinct evidence paths:
+## Quick start
 
-- `diagnostic_mode = "legacy"` keeps the residual/EAP-based stack.
-- `diagnostic_mode = "marginal_fit"` adds the strict latent-integrated screen.
-- `diagnostic_mode = "both"` is the safest default when you want to inspect
-  both views side by side.
+By the end of this lesson you should be able to prepare one-rating-per-row
+data, estimate abilities and facet effects, identify results needing review,
+and save an analysis with its assumptions. Start with the synthetic example,
+then adapt the CSV lesson. Follow-up analyses are optional and should answer
+your assessment question.
 
-Strict marginal diagnostics are screening-oriented.
-Use `summary(diag)$diagnostic_basis` to separate the legacy residual evidence
-from the strict marginal evidence rather than pooling them into one decision.
+Use this reading route:
 
-## Load Data
+| What you need now | Where to go |
+| --- | --- |
+| Choose a model and estimator for your purpose | [Model and estimator choice](mfrmr-model-choice.html), including when greater complexity helps and when it does not |
+| Run and understand a first analysis | Quick start, including individual estimates and review messages below |
+| Analyze your own rating sheet | [Use your own CSV](#use-your-own-csv), including stopped checks and wide-to-long reshaping |
+| Interpret fit, precision and rater feedback | [Continue with diagnostics and reporting](#continue-with-diagnostics-and-reporting) |
+| Find the calculation and its research basis | `help("mfrmr_methods_reference")`, then the linked function's method and References sections |
 
-```{r load-data}
+This tutorial follows the ordinary fixed-facet `fit_mfrm()` workflow. To
+plan the number of tasks or raters for an observed score, use
+[Plan an assessment with G theory](mfrmr-gtheory.html); no MFRM fit is required
+for that workflow. To
+choose between fixed facets, shared random raters and Person-specific
+testlets, use `mfrmr_output_guide("models")` or
+`help("mfrmr_workflow_methods")`. The extended models have dedicated tutorials:
+`vignette("mfrmr-random-raters", package = "mfrmr")` and
+`vignette("mfrmr-testlets", package = "mfrmr")`. Their prediction targets and
+reporting support differ. The diagnostics and reports below follow ordinary
+RSM/PCM fits. Two-family GPCM and corrected JML also have class `mfrm_fit`,
+but require their model-specific result routes; sharing that class does not
+make these ordinary diagnostics available. See `gpcm_capability_matrix()` and
+`vignette("mfrmr-gpcm-scope", package = "mfrmr")` before changing model family.
+
+This example estimates person abilities while accounting for rater severity
+and criterion difficulty. A *facet* is a source of variation in scores; here,
+`Rater` and `Criterion` are facets, and individual raters and criteria are their
+*levels*. The data are synthetic, with one row per rating and scores from 1 to 4.
+
+The example data are included in the package. The loading line below creates
+`ratings`; you do not need to prepare a file or construct the scores first.
+`head(ratings)` shows the first six rows. The quoted column names in `fit_mfrm()`
+are case-sensitive; `Study` and `Group` are extra labels unused by this model.
+`MML` selects marginal maximum likelihood; `RSM` selects a rating-scale model
+with shared category thresholds (the transitions between adjacent scores).
+The rubric uses scores 1 through 4. `category_policy = "preserve"` keeps that
+category ladder; it prevents an unobserved intermediate category from being
+silently collapsed into a different scale.
+
+```{r quick-start, fig.alt = "Wright map of fitted person abilities, rater severities, criterion difficulties and shared category steps for the synthetic ratings. All locations use the same logit scale."}
+# Load the package
 library(mfrmr)
 
-list_mfrmr_data(details = TRUE)[, c("Key", "PrimaryUse", "Design", "CountBasis")]
+# Load example ratings and look at the first six rows
+ratings <- load_mfrmr_data("example_operational")
+head(ratings)
 
-data("ej2021_study1", package = "mfrmr")
-head(ej2021_study1)
+# Fit the model
+fit <- fit_mfrm(
+  data = ratings,
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  score = "Score",
+  rating_min = 1, rating_max = 4,
+  category_policy = "preserve",
+  method = "MML",
+  model = "RSM"
+)
 
-study1_alt <- load_mfrmr_data("study1")
-identical(names(ej2021_study1), names(study1_alt))
+# Plot the results (Wright map)
+plot(fit)
+
+# Save the summary, then display its tables
+results <- summary(fit)
+results$person_overview # One row summarizing person ability estimates
+results$facet_overview  # One row per facet: number of levels, mean, SD, range
+
+# Check the interpretation status and recommended next step
+results$decision
 ```
 
-## Applied Runnable Example
+`<-` saves an object without printing it. Here `ratings` holds the data, `fit`
+holds the model, and `results` holds its summary. `$` selects a named part:
+`results$person_overview` displays just that table. Enter `results` to print
+the full summary.
 
-Start with the packaged `example_operational` dataset. It is intentionally
-compact but uses a connected two-rater assignment, unequal rater workloads,
-and six planned omissions represented by absent long-format rows rather than
-`NA` or sentinel scores. This makes the main tutorial closer to an applied
-rating design without using empirical records. The same object is also
-available via `data("mfrmr_example_operational", package = "mfrmr")`. A
-separate score-free assignment roster lets the pre-fit review identify those
-six omissions without guessing which cells should have existed.
-`example_core` remains available as an idealized complete-crossing example for
-fast help-page checks.
+The Wright map displays the estimates in logits, the model's measurement units,
+rather than the original 1-to-4 scores. With this example's default orientation,
+higher person estimates mean higher ability; higher rater estimates mean
+stricter ratings, and higher criterion estimates mean greater difficulty.
 
-```{r toy-setup}
-data("mfrmr_example_operational", package = "mfrmr")
-data("mfrmr_example_operational_design", package = "mfrmr")
-toy <- mfrmr_example_operational
+The native models use the **logistic metric (L-metric), with D = 1**: there
+is no extra 1.7 or 1.702 normal-ogive approximation factor. In this RSM example,
+an ability increase of one unit raises each adjacent-category log odds by one,
+holding other parameters fixed. For GPCM, the effective discrimination
+multiplies that change. A normal ability distribution is a separate assumption
+and does not change the response link. See `?fit_mfrm` for scale conventions.
 
-data_review_toy <- describe_mfrm_data(
-  data = toy,
+The overview tables describe distributions: `person_overview` has one row for
+all 48 persons, and `facet_overview` has one row for each facet. `Mean`/`MeanEstimate`
+is the average, `SD`/`SDEstimate` is the spread, and `Min`/`Max` or
+`MinEstimate`/`MaxEstimate` give the endpoints. Rater and criterion means are
+constrained to zero here; their SDs and ranges show differences among levels.
+
+### Inspect individual estimates
+
+```{r quick-start-estimates}
+estimates <- as.data.frame(fit)
+head(subset(estimates, Facet == "Person")) # First six persons
+subset(estimates, Facet == "Rater")       # All raters
+subset(estimates, Facet == "Criterion")   # All criteria
+```
+
+`Facet` identifies the type of estimate, `Level` identifies the person, rater,
+or criterion, and `Estimate` is its value in logits.
+
+### Check what needs review
+
+Read `results$decision`, especially `Why` and `NextAction`, before interpreting
+or reporting estimates. `FormalInference = "No"` in this first summary can
+mean that precision has not yet been reviewed; it does not necessarily mean
+that fitting failed. The default summary does not compute diagnostics.
+
+```{r quick-start-diagnostics}
+diagnostics <- diagnose_mfrm(fit)
+diagnostic_summary <- summary(diagnostics)
+diagnostic_summary$decision
+```
+
+For your own data, follow [Use your own CSV](#use-your-own-csv) below.
+For reporting, `res <- mfrm_results(fit, diagnostics = diagnostics)`
+builds a comprehensive object that reuses the checks above. Pass `res` to
+`mfrm_report()` or `export_mfrm_results()`; `results` remains the basic summary.
+
+## Use your own CSV
+
+The goal here is to estimate person ability while accounting for rater severity
+and criterion difficulty in your own ratings. Start with the same row layout
+as the packaged example: **one score from one rater for one person on one
+criterion**. For example:
+
+| Person | Rater | Criterion | Score |
+| --- | --- | --- | --- |
+| 001 | R1 | Content | 3 |
+| 001 | R1 | Style | 2 |
+| 001 | R2 | Content | 4 |
+| 001 | R2 | Style | 3 |
+
+The repeated `001` is intentional: all four scores belong to the same person.
+Keep IDs consistent across rows. These four rows explain the layout; use the
+complete set of ratings for estimation. `Score` contains the ordered integer
+categories from the rubric, not totals or averages across raters. This example
+uses two non-person facets; choose facets that represent your design.
+
+### 1. Read and inspect the file
+
+You can practice the full workflow without supplying a file. This block writes
+the packaged synthetic ratings to a new temporary CSV:
+
+```{r csv-practice-file}
+library(mfrmr)
+csv_path <- tempfile(fileext = ".csv")
+write.csv(load_mfrmr_data("example_operational"), csv_path,
+          row.names = FALSE, na = "")
+```
+
+For your own data, export your rating sheet as **CSV UTF-8**, with column names
+in the first row. Skip the practice block above and select your file instead:
+
+```{r csv-select-file, eval = FALSE}
+library(mfrmr)
+csv_path <- file.choose()
+```
+
+For a reusable script, replace `file.choose()` with a quoted path such as
+`"data/ratings.csv"`, relative to the folder shown by `getwd()`.
+Both routes now use the same import and analysis code:
+
+```{r csv-read}
+ratings <- read.csv(
+  csv_path,
+  colClasses = "character",
+  na.strings = "",
+  check.names = FALSE,
+  fileEncoding = "UTF-8-BOM"
+)
+# Treat the documented missing-score marker only in the score column
+ratings <- recode_missing_codes(ratings, columns = "Score", codes = "NA")
+head(ratings)
+names(ratings)
+table(ratings$Score, useNA = "ifany")
+```
+
+Reading columns as text preserves distinct IDs such as `001`, `1`, and `NA`;
+`mfrmr` converts numeric score strings such as `"3"` for estimation.
+`check.names = FALSE` preserves the headers. Empty cells are missing in every
+column; the literal marker `NA` is recoded only in `Score`. Use the
+missing-score markers declared for your data. Zero is a score when the rubric
+includes zero, and must not be used to fill unassigned rating cells.
+
+The quoted column names in the next two steps must match `names(ratings)`,
+including capitalization and spaces. You do not have to rename your file's
+columns. For headers `Student`, `Judge`, `Task`, and `Rating`, change the
+arguments in **both** `describe_mfrm_data()` and `fit_mfrm()` as follows:
+
+| Argument | Four-column example | Your alternative headers |
+| --- | --- | --- |
+| `person` | `"Person"` | `"Student"` |
+| `facets` | `c("Rater", "Criterion")` | `c("Judge", "Task")` |
+| `score` | `"Score"` | `"Rating"` |
+
+Also use `columns = "Rating"` in the recoding call and inspect `ratings$Rating`
+instead of `ratings$Score`. Extra columns such
+as the practice file's `Study` and `Group` are unused by this model.
+
+### 2. Review the rows and the rubric
+
+Set the minimum and maximum from the **rubric**, not the observed minimum and
+maximum in this sample. The code below describes a 1-to-4 rubric. Keep the same
+values in the data review and the fit. `category_policy = "preserve"` preserves the
+intended category structure, including categories with no observations.
+
+```{r csv-data-review}
+data_review <- describe_mfrm_data(
+  data = ratings,
   person = "Person",
   facets = c("Rater", "Criterion"),
   score = "Score",
   rating_min = 1,
   rating_max = 4,
-  expected_design = mfrmr_example_operational_design
+  category_policy = "preserve"
+)
+data_review$row_retention
+data_review$missing_by_column
+data_review$score_distribution
+data_review$design_connectivity
+```
+
+Read these four tables in order:
+
+- `row_retention`: compare input and retained `Rows`; inspect any `DroppedRows`.
+  A missing score or required ID removes that rating row, not automatically
+  the person's other ratings. The package does not fill missing ratings.
+- `missing_by_column`: locate missing input values. Non-numeric score text
+  can also cause row loss; inspect warnings and `data_review$preparation_notes`
+  when the retained count is unexpected.
+- `score_distribution`: `RawN` counts the retained ratings in each category.
+  A zero count in an internal category, such as 3 on a 1-to-4 scale, prevents
+  fitting with `category_policy = "preserve"`. Review the data and rubric before
+  changing categories; increasing optimizer iterations cannot supply missing
+  category information.
+- `design_connectivity`: `Components = 1` means a facet's levels are connected
+  through shared persons. More than one component needs design review before
+  comparing levels across components. Connectivity alone does not establish
+  full model identification.
+
+For the practice CSV, all 282 input rows are retained, all four categories have
+observations, and each facet has one connected component. Six planned ratings
+are absent from the file; column missing counts cannot detect absent rows.
+If you have a planned assignment roster, pass it as `expected_design` to
+`describe_mfrm_data()` to assess these omissions. The applied example later
+in this vignette shows how. Without a roster, structural missingness is
+reported as not assessed; a complete person-by-rater-by-criterion crossing is
+not assumed.
+
+### 3. Fit and read the results
+
+After resolving the data-review findings, fit the same rows, columns, and
+rubric. This example uses an RSM with shared category thresholds; the choice
+should reflect the scoring design. Diagnostics then supply evidence for the
+interpretation decision.
+
+```{r csv-fit}
+csv_fit <- fit_mfrm(
+  data = ratings,
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  score = "Score",
+  rating_min = 1,
+  rating_max = 4,
+  category_policy = "preserve",
+  method = "MML",
+  model = "RSM"
+)
+csv_diagnostics <- diagnose_mfrm(csv_fit)
+csv_results <- summary(csv_fit, diagnostics = csv_diagnostics)
+csv_results$decision
+```
+
+Read `Why` and `NextAction` before using the estimates. A `FormalInference`
+value of `"No"` means that the stated obstacle to formal use still needs
+attention. Diagnostic plots can help investigate it. Even a supported precision
+decision does not establish the validity of the assessment or answer the
+study's substantive question.
+
+```{r csv-results, fig.alt = "Wright map for the ratings read from the example CSV. Compare person, facet and step locations on the fitted scale; the display does not establish that model assumptions hold."}
+plot(csv_fit)
+csv_estimates <- as.data.frame(csv_fit)
+head(subset(csv_estimates, Facet == "Person"))
+subset(csv_estimates, Facet == "Rater")
+subset(csv_estimates, Facet == "Criterion")
+```
+
+`Level` identifies the person, rater, or criterion; `Estimate` is the fitted
+value in logits. With these defaults, higher person values mean higher
+ability, higher rater values mean stricter ratings, and higher criterion values
+mean greater difficulty. The rater and criterion estimates are centered at
+zero within each facet. In the practice file, R06 is about +0.41 and R01 about
+-0.61: R06 is estimated to rate more strictly after accounting for person
+ability and criterion difficulty. This difference alone does not establish
+statistical significance.
+
+With custom facet names, change the `Facet` filters too, for example from
+`"Rater"` to `"Judge"`; person rows retain `Facet == "Person"` even when the
+input ID column is named `Student`. To inspect all persons, remove `head()`.
+The overview tables in `csv_results` summarize distributions; the rows in
+`csv_estimates` give individual estimates.
+
+### If a check stops you
+
+| What you see | What to check or change |
+| --- | --- |
+| The CSV is not found | Use `file.choose()` or check the quoted path relative to `getwd()`. An `.xlsx` workbook must first be exported as CSV. |
+| All fields appear in one column, or the header is garbled | Check the separator and encoding. Use `sep = ";"` for a semicolon-delimited file; re-export as CSV UTF-8 if text is unreadable. |
+| `Column(s) not found in data` | Compare `names(ratings)` with the names in `person`, `facets`, and `score`; check spelling, spaces, and case. |
+| Non-numeric or fractional scores | Check `table(ratings$Score, useNA = "ifany")`. Map rubric labels explicitly to their ordered integer codes. Do not round totals or averaged ratings to make them fit. |
+| Scores outside the supplied range, such as 99 | Check whether the value is an error or a documented missing code. Correct the value or recode the declared missing marker; keep the range tied to the rubric. |
+| Fewer retained rows than expected | Inspect `data_review$missing_by_column` and `data_review$preparation_notes`. Correct unintended missing IDs or score values, then rerun the review and fit. |
+| Duplicated person-by-facet cells | Inspect `data_review$duplicate_cell_detail`. Correct accidental duplicates. If these are distinct tasks or occasions, include the corresponding facet; do not automatically delete legitimate ratings. |
+| A category has no observations, or the design is disconnected | Review category coding and assignments. Do not invent ratings or change optimizer settings to resolve missing information. |
+
+If your data documentation defines `99` and `.` as missing **scores**, recode
+only that column before step 2. This preserves an ID such as `99`:
+
+```{r csv-missing-codes, eval = FALSE}
+ratings <- recode_missing_codes(
+  ratings, columns = "Score", codes = c("99", ".")
+)
+table(ratings$Score, useNA = "ifany")
+```
+
+Use only the codes declared for your data, and change `"Score"` if your score
+column has another name. Then repeat steps 2 and 3 with the recoded data.
+
+### If criteria occupy separate columns
+
+For a sheet with one row per person-rater pair and separate criterion scores,
+reshape the criterion columns into rating rows:
+
+```{r csv-wide-to-long}
+wide <- data.frame(
+  Person = c("001", "001"),
+  Rater = c("R1", "R2"),
+  Content = c(3, 4),
+  Style = c(2, 3)
+)
+ratings_long <- tidyr::pivot_longer(
+  wide,
+  cols = c("Content", "Style"),
+  names_to = "Criterion",
+  values_to = "Score"
+)
+ratings_long
+```
+
+The output is the four-row layout at the start of this section. For your full
+sheet, read the CSV into `wide`, select its actual criterion columns in `cols`,
+and use `ratings <- ratings_long` before step 2. Keep the complete dataset;
+these four demonstration rows are not sufficient for the intended analysis.
+
+## Continue with diagnostics and reporting
+
+The following sections ask three questions: are the estimates interpretable,
+what needs closer inspection, and what information belongs in a report?
+First select the analysis to carry through every table, figure and export.
+The default uses **Quick start**, including its known assignment roster:
+
+```{r reporting-input}
+analysis_data <- ratings
+fit_toy <- fit
+diag_toy <- diagnostics
+data("mfrmr_example_operational_design", package = "mfrmr")
+analysis_roster <- mfrmr_example_operational_design
+```
+
+**For your CSV, run this replacement block instead.** The downstream object
+names stay the same so the remaining code uses your analysis:
+
+```{r reporting-csv-input, eval = FALSE}
+analysis_data <- ratings
+fit_toy <- csv_fit
+diag_toy <- csv_diagnostics
+analysis_roster <- NULL # Replace with your own planned roster if available
+```
+
+Do not use the packaged roster for your own ratings. `NULL` means planned
+omissions cannot be assessed; it does not mean there are no missing ratings.
+The numerical examples in the prose below describe the synthetic data.
+If your headers or rubric differ, update `person`, `facets`, `score`, the
+rating limits and later `"Rater"`/`"Criterion"` selections as in the CSV lesson.
+
+### 1. Check the data and estimation record
+
+```{r ratings-setup}
+data_review_toy <- describe_mfrm_data(
+  data = analysis_data,
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  score = "Score",
+  rating_min = 1,
+  rating_max = 4,
+  category_policy = "preserve",
+  expected_design = analysis_roster
 )
 data_summary_toy <- summary(data_review_toy)
 data_summary_toy$structural_missingness
 data_summary_toy$design_connectivity
 
-fit_toy <- fit_mfrm(
-  data = toy,
-  person = "Person",
-  facets = c("Rater", "Criterion"),
-  score = "Score",
-  method = "MML",
-  model = "RSM"
-)
-diag_toy <- diagnose_mfrm(
-  fit_toy,
-  residual_pca = "none",
-  diagnostic_mode = "both",
-  fit_df_method = "both"
-)
-
-# Fast fit-only summary: this does not compute diagnostics.
-fit_summary_toy <- summary(fit_toy, profile = "fit", detail = "brief")
-
-# Comprehensive review, reusing diagnostics already computed above.
-facets_summary_toy <- summary(
-  fit_toy,
-  profile = "facets",
-  detail = "brief",
-  diagnostics = diag_toy
-)
-res_toy <- facets_summary_toy$results
-
+fit_summary_toy <- summary(fit_toy)
+fit_summary_toy$overview[, c("Model", "Method", "N", "Persons", "Converged")]
 fit_summary_toy$decision
-fit_summary_toy$overview
-fit_summary_toy$readiness
-fit_summary_toy$data_review
-summary(diag_toy)$overview
-facets_summary_toy
-
-# Required first fitted-scale figure.
-plot(res_toy, type = "wright", preset = "publication", show_ci = TRUE, top_n = Inf)
-
-# Optional FACETS-style ruler. Replace these examples with the study rubric.
-rubric_labels <- c(
-  "1" = "Level 1",
-  "2" = "Level 2",
-  "3" = "Level 3",
-  "4" = "Level 4"
-)
-plot(
-  res_toy,
-  type = "wright",
-  renderer = "facets",
-  category_labels = rubric_labels,
-  show_ci = FALSE,
-  preset = "publication"
-)
-# Setting show_ci = TRUE on this FACETS-style ruler is available as a
-# deliberate hybrid: FACETS ruler grammar plus mfrmr uncertainty intervals.
-
-# Optional follow-up: Infit on x, measure on y; persons are explicit opt-in.
-plot(
-  res_toy,
-  type = "fit_pathway",
-  fit_stat = "Infit",
-  include_person = TRUE,
-  top_n_person = 12,
-  person_labels = "none",
-  facet_labels = "flagged",
-  preset = "publication"
-)
 ```
 
-Read `$decision` before the parameter tables. The same five fields are used
-for RSM, PCM, and bounded GPCM: interpretation status, formal-inference status,
-fit readiness, the reason, and the highest-priority next action. This block
-does not add a new acceptance test. It combines the stored readiness record
-with any supplied precision evidence. A fit-only summary returns
-`FormalInference = "No"` until a matching `diagnose_mfrm()` result is supplied;
-`InferenceReady = TRUE` alone is not evidence for formal SE/CI or reliability.
-Use `summary(fit_toy, diagnostics = diag_toy)$decision` or
-`summary(diag_toy)$decision` for the precision-aware decision. When
-`FormalInference` is `"No"`, diagnostic work may continue to investigate the
-stated reason, but estimates and plots must not be reported as formal results.
+The example has 282 observed ratings from 48 persons, six raters, and three
+criteria. All observed rows are retained. Six additional ratings were planned
+but are absent; they are visible only because the roster was supplied.
+Distinguish omitted planned ratings from input rows excluded during cleaning.
+The package does not assume that every rater scored every person.
 
-Optimizer code zero is only one numerical signal. `fit_mfrm()` also checks the
-terminal gradient; when the initial direct or hybrid solution stops with a
-larger gradient and `reltol <= 1e-9`, it runs a bounded sequence of
-warm-started polishing stages and retains the best non-worsening candidate
-under the recorded selection rule. Inspect
-`fit_toy$opt$optimizer_polish$Stages` when `Numerical` is not `pass`.
+Record the estimator, model, score coding, constraints, and numerical settings.
+For this RSM, MML uses a standard-normal person distribution; reported person
+scores are EAP estimates, and non-person facets are fixed effects centered
+within facet. RSM shares category thresholds. Choose PCM with an explicit
+`step_facet` when the rubric and question call for separate thresholds.
 
-`maxit` is only a computational ceiling. It must not be increased until a
-preferred coefficient, fit statistic, or expected conclusion appears. For a
-final analysis, prespecify the estimator and controls and start from the
-package default `maxit = 400` unless the analysis protocol states otherwise.
-If a run reaches `ConvergenceStatus = "iteration_limit"`, keep it review-only
-and repeat the same data, model, method, anchors, optimizer, tolerance, and
-quadrature rule with the next ceiling in a prespecified sequence. Interpret
-only a run with `FitReadiness = ready`, `InferenceReady = TRUE`, and
-`Numerical = pass`. If two separately ready runs differ materially, investigate
-numerical stability instead of selecting the preferred result. Report the
-requested ceiling, actual evaluations, convergence reason, and terminal
-gradient.
+The default MML grid is 31 quadrature points. A comparison that could change
+the study's conclusion needs a prespecified denser common-grid sensitivity
+check with `mml_quadrature_sensitivity()`. A temporary 7-point grid is only a
+computational screening run. `maxit` is a computational ceiling, not a
+convergence criterion; inspect `ConvergenceStatus` and `Numerical` before
+increasing it. Keep the same data, model, method, and planned controls when
+investigating an iteration limit. Choose JML for its fixed-person estimand
+when appropriate, not as a faster substitute for MML.
 
-`InferenceReady` is a conservative fit-level first screen: Input,
-Estimability, Category, Boundary, and Numerical components must all pass.
-Design, Stability, Diagnostics, and Reporting remain purpose-specific workflow
-rows in `fit_summary_toy$readiness`. For example, a diagnostic or reporting
-review can remain even when the stored fit record is ready. Conversely,
-`ready_for_diagnostics_and_reporting_follow_up` means that fitting completed
-and diagnostic review is the next stage; it is neither an optimization failure
-nor a claim that the analysis is already manuscript-ready.
+`summary(fit)$numerical_review` distinguishes optimization, curvature, starting
+values and integration, with a next action for each. To preserve inputs and
+constraints, use `build_mfrm_replay_script(fit)` with the original input data
+before changing a diagnostic control. Ordinary `mml_starts` and automatic
+integration cannot be combined: review specified starts on a shared fixed grid,
+then run `mml_quadrature_sensitivity()` separately. That review retains the
+starting-value policy. Nearly equal likelihoods do not override unresolved
+gradient, information or inference checks.
 
-`expected_design` is a declared roster, not an inferred complete crossing.
-When no roster is available, the structural-missingness status is
-`"not_declared"`; the package does not label unassigned cells as missing.
-
-The `facets` profile is FACETS-style organization, not evidence that FACETS
-was run and not a numerical-equivalence claim. Its brief print is selective
-and does not print person identifiers; full tables remain in
-`facets_summary_toy$results$tables`. For a report-oriented result set, use
-`profile = "reporting"`. To inspect availability without allowing diagnostic
-computation, use `compute = "never"`; requested dependent sections are then
-recorded as `not_computed`:
-
-```{r summary-profile-controls, eval = FALSE}
-reporting_summary_toy <- summary(
-  fit_toy,
-  profile = "reporting",
-  diagnostics = diag_toy
-)
-
-availability_only <- summary(
-  fit_toy,
-  profile = "facets",
-  compute = "never"
-)
-availability_only$section_status
-```
-
-Availability and interpretability are intentionally separate. Review
-`res_toy$readiness` and the `InterpretationStatus` columns in
-`res_toy$plot_map` before treating an available plot as a final result.
-Plots remain available during a numerical, data, design, or stability review,
-but they warn and carry `REVIEW ONLY` in the returned subtitle and drawn title
-until the readiness issue is resolved.
-
-Bias/DIF, residual PCA, and anchor-drift/linking analyses are deliberately not
-auto-run by any summary profile. They require explicit contrasts, diagnostic
-settings, or multi-fit designs.
-
-```{r toy-setup-artifacts, echo = FALSE, eval = is_cran_check}
+```{r ratings-setup-artifacts, echo = FALSE, eval = is_cran_check}
 vignette_artifact("workflow_fit_decision.csv")
 vignette_artifact("workflow_fit_overview.csv")
+```
+
+### 2. Read precision and model fit before interpreting differences
+
+```{r precision-and-fit, fig.alt = "Fitted person, facet and step locations with the requested uncertainty display. Interpret precision using the accompanying table and its stated interval basis."}
+diagnostic_summary_toy <- summary(diag_toy)
+diagnostic_summary_toy$decision
+diagnostic_summary_toy$overall_fit
+
+precision_toy <- precision_review_report(fit_toy, diagnostics = diag_toy)
+precision_toy$profile[, c(
+  "PrecisionTier", "SupportsFormalInference", "PersonSEBasis", "NonPersonSEBasis"
+)]
+precision_toy$checks
+
+# View the fitted locations with their uncertainty
+plot(fit_toy, diagnostics = diag_toy, show_ci = TRUE)
+```
+
+The fit-only summary reports `FormalInference = "No"` until precision evidence
+is supplied. Read the diagnostic decision's `Why` and `NextAction` together
+with the precision checks. A `model_based` label alone does not override a
+failed fit-readiness component or justify a particular substantive claim.
+
+Infit and Outfit describe departures from the fitted response model; their
+reference value is 1. A global average near 1 can coexist with local problems.
+In this example the MML person uncertainty is posterior SD, while the
+non-person SEs use observed information. Report the basis and interval method
+when presenting uncertainty; do not call every interval a posterior quantile
+interval or treat a point difference as a significance test.
+
+```{r diagnostic-overview-artifact, echo = FALSE, eval = is_cran_check}
 vignette_artifact("workflow_diagnostic_overview.csv")
-vignette_artifact("workflow_plot_components.csv")
 ```
 
-The same fit can then move through the recommended first reporting workflow:
+### 3. Identify what needs closer inspection
 
-```{r primary-route}
-report_toy <- mfrm_report(res_toy, style = "qc")
+**Are the rating categories working as intended?** Examine category use and
+the transitions between scores on the declared rubric:
 
-summary(res_toy)$next_actions
-summary(report_toy)$overview
-
-# This is a controlled analysis archive, not a deidentified shareable export.
-export_dir <- file.path(tempdir(), "mfrmr-workflow-export")
-export_toy <- export_mfrm_results(
-  res_toy,
-  output_dir = export_dir,
-  include = c("default", "report"),
-  overwrite = TRUE,
-  acknowledge_sensitive = TRUE
-)
-export_preview <- head(export_toy$written_files)
-export_preview$Path <- basename(export_preview$Path)
-export_preview
+```{r category-review, fig.alt = "Category-use and threshold summaries for the fitted rubric. Sparse categories and transition ordering should be reviewed together with the rating design."}
+scale_toy <- rating_scale_table(fit_toy, diagnostics = diag_toy)
+scale_toy$category_table[, c("Category", "Count", "AvgMeasure", "ExpectedMeasure", "Infit", "Outfit")]
+scale_toy$model_context
+scale_toy$owner_category_table[, c(
+  "StepFacet", "CategoryLabel", "RawCount", "Count", "Percent", "UsageStatus"
+)]
+scale_toy$threshold_table[, c("StepFacet", "Step", "Estimate", "SE", "CIUse")]
+plot(scale_toy)
+scale_toy$notes
 ```
 
-The acknowledgement suppresses the warning only; it does not redact person
-identifiers, person-level results, local paths, or the complete RDS object.
-The preview above deliberately shows path basenames only; the returned export
-object retains the actual local paths needed by the current analysis session.
-Review every exported file under the study's data-handling policy before sharing.
+`AvgMeasure` is the average oriented generating measure among responses in
+each observed category; `ExpectedMeasure` is its model expectation. Category
+residual mean squares are descriptive and have no universal unit baseline.
 
-```{r primary-route-artifacts, echo = FALSE, eval = is_cran_check}
-vignette_artifact("workflow_next_actions.csv")
-vignette_artifact("workflow_report_overview.csv")
-vignette_artifact("workflow_export_files.csv")
-```
+`StepOwner` tells you which facet supplies the thresholds. This RSM has one
+`Common` family, so its owner counts describe the whole sample. With PCM,
+`step_facet = "Criterion"` gives counts and thresholds for each criterion;
+`step_facet = "Rater"` gives them for each rater. Choose the owner from the
+rubric and analysis question. Criterion-owned thresholds cannot describe
+differences in raters' threshold spread.
 
-## Diagnostics and Reporting
+`RawCount` counts rating rows; `Count` sums their weights, and `Percent` uses
+the total weight within the indicated owner level. These are not counts of
+independent persons. A category unused by one owner can be common overall.
+`UsageStatus` distinguishes unobserved categories, zero-weight observations
+and owners with no ratings; the last have unavailable percentages. An observed
+zero does not establish that a category is structurally impossible.
 
-```{r diagnostics-reporting}
-t4_toy <- unexpected_response_table(
+The threshold table reuses SEs and intervals from the supplied diagnostics.
+Check `SE_Status`, `CIUse` and `UncertaintySourceStatus` before reporting them.
+Without diagnostics, the same call returns counts and fitted threshold points
+without requesting covariance calculations; its SEs are unavailable. Notes
+remain in the returned object, outside the plot.
+
+The bars show observed category counts; the line shows fitted expected counts.
+Look for rarely used categories, changes in average person measure across
+categories, and threshold order. Explain the observed pattern in terms of the
+rubric. A warning is a reason to investigate, not an automatic instruction to
+merge categories.
+
+**Which ratings differ most from model expectations?** This example uses an
+explicit exploratory rule and shows up to ten cases:
+
+```{r diagnostics-reporting, fig.alt = "Unusual rating observations selected by the stated residual and probability thresholds. Flags support review of the underlying records, not automatic removal."}
+unexpected_toy <- unexpected_response_table(
   fit_toy,
   diagnostics = diag_toy,
   abs_z_min = 1.5,
   prob_max = 0.4,
   top_n = 10
 )
-t12_toy <- fair_average_table(fit_toy, diagnostics = diag_toy)
-t13_toy <- bias_interaction_report(
-  estimate_bias(fit_toy, diag_toy,
-                facet_a = "Rater", facet_b = "Criterion",
-                max_iter = 2),
-  top_n = 10
-)
-
-class(summary(t4_toy))
-class(summary(t12_toy))
-class(summary(t13_toy))
-
-names(plot(t4_toy, draw = FALSE))
-names(plot(t12_toy, draw = FALSE))
-names(plot(t13_toy, draw = FALSE))
-
-chk_toy <- reporting_checklist(fit_toy, diagnostics = diag_toy)
-subset(
-  chk_toy$checklist,
-  Section == "Visual Displays",
-  c("Item", "DraftReady", "NextAction")
-)
+unexpected_toy$summary
+unexpected_toy$table[, c("Person", "Rater", "Criterion", "Observed", "Expected", "StdResidual")]
+plot(unexpected_toy)
 ```
 
-```{r diagnostics-reporting-artifacts, echo = FALSE, eval = is_cran_check}
-vignette_artifact("workflow_summary_classes.csv")
-vignette_artifact("workflow_plot_object_components.csv")
-vignette_artifact("workflow_visual_checklist.csv")
+Read the rule in `$summary` with the residuals. The displayed cases are a
+selected preview; `top_n` limits the table, while the summary counts all
+flagged ratings. Here this broad rule flags 141 of 282 ratings (50%), although
+only ten cases are displayed. Report the rule with the count and percentage.
+Inspect the original work and scoring context before changing a
+rating or excluding a person. A flag does not identify its cause.
+
+The default diagnostics retain the residual/EAP path and the latent-integrated
+marginal screening path. The latter includes category and pairwise agreement
+gaps. Keep their bases separate when reporting:
+
+```{r diagnostic-bases, fig.alt = "Marginal fit display based on posterior-averaged response probabilities. Its probability basis differs from conditional residual diagnostics."}
+diagnostic_summary_toy$diagnostic_basis[, c("DiagnosticPath", "Status", "ReportingUse")]
+plot(fit_toy, type = "marginal_fit", diagnostics = diag_toy)
 ```
 
-## Fit and Diagnose with Full Data
+Follow a pairwise warning with `plot()`. Add residual PCA
+only when residual structure is relevant to the question, using
+`diagnose_mfrm(fit_toy, residual_pca = "both")`. Report the mode and limits of
+the screen; residual PCA alone does not establish unidimensionality. See
+`vignette("mfrmr-mml-and-marginal-fit", package = "mfrmr")` and
+`vignette("mfrmr-visual-diagnostics", package = "mfrmr")` for these follow-ups.
 
-For a larger sparse synthetic illustration, use the packaged Study 1 dataset:
+**What should I discuss with a rater?** Start from the coverage and category
+checks above, then view severity and its uncertainty alongside the screening
+results. Reuse the same fit and diagnostics:
 
-```{r fit-full}
-fit <- fit_mfrm(
-  data = ej2021_study1,
-  person = "Person",
-  facets = c("Rater", "Criterion"),
-  score = "Score",
-  method = "MML",
-  model = "RSM",
-  quad_points = 7
+```{r rater-feedback, fig.alt = "Rater severity estimates with 95% normal intervals on the fitted logit scale. Positive estimates indicate stricter ratings relative to the fitted reference."}
+plot(fit_toy, type = "rater_severity", diagnostics = diag_toy, facet = "Rater", show_bands = FALSE)
+rater_review <- facet_quality_dashboard(
+  fit_toy, diagnostics = diag_toy, facet = "Rater"
 )
-
-diag <- diagnose_mfrm(
-  fit,
-  residual_pca = "none",
-  diagnostic_mode = "both",
-  fit_df_method = "both"
+knitr::kable(
+  rater_review$detail[, c("Level", "N", "Estimate", "SE", "Infit", "Outfit")],
+  digits = 3, row.names = FALSE, caption = "Rater estimates and fit"
 )
-
-summary(fit, profile = "fit", detail = "brief")
-summary(diag)
-
-# Keep the final figure flow explicit: fit -> Wright map -> follow-up plots.
-s <- summary(fit, profile = "facets", diagnostics = diag)
-res <- s$results
-s
-plot(res, type = "wright", preset = "publication", show_ci = TRUE, top_n = Inf)
-
-# Optional closest FACETS-style asterisk ruler (without mfrmr CI overlays).
-plot(res, type = "wright", renderer = "facets",
-     category_labels = rubric_labels, show_ci = FALSE,
-     preset = "publication")
-
-plot(
-  res,
-  type = "fit_pathway",
-  fit_stat = "Infit",
-  include_person = TRUE,
-  top_n_person = 12,
-  person_labels = "none",
-  facet_labels = "flagged",
-  preset = "publication"
+knitr::kable(
+  rater_review$detail[, c("Level", "MissingMetrics", "SeverityFlag", "MisfitFlag")],
+  row.names = FALSE, caption = "Availability and screening flags"
 )
+rater_review$settings
+writeLines(strwrap(rater_review$notes, width = 72))
 ```
 
-This full-data figure caps the displayed person layer at 12 and suppresses
-routine point labels to keep the first screen legible. The selected person IDs
-and every retained facet row remain in
-`plot(..., draw = FALSE)$data$table`; use `person_labels = "all"` or
-`facet_labels = "all"` for a point-identification figure.
+A stricter rater is not necessarily inconsistent or incorrect. Individual
+interval overlap is not a test of the difference between two raters. Read
+`MissingMetrics` before interpreting flags: zero observed flags is not a
+complete pass when diagnostics are unavailable. A `REVIEW ONLY` label retains
+the fit's restrictions; the plot does not override them.
 
-If you need residual-structure evidence for a final report, you can add residual
-PCA after the initial diagnostic pass. Treat this as an exploratory screen, not
-as a standalone unidimensionality test or as a DIMTEST/UNIDIM substitute. In
-MFRM reporting, a cautious claim should combine global residual fit,
-element-level fit, residual PCA, and local-dependence screens, for example:
-"evidence consistent with essential unidimensionality under the specified facet
-structure."
+With the unmodified package defaults (absolute severity at least 1 logit,
+Infit or Outfit at or beyond 0.5 and 1.5), none of the six raters is flagged
+in this synthetic example. Session options can change the misfit band:
+check `rater_review$settings` before comparing your output. A numeric
+`misfit_warn = 1.5` instead selects a lower bound of about 0.67; it does not
+preserve the default 0.5. These bands prompt review, not a verdict on quality. The earlier response-level screen still
+selected 141 ratings: the two screens assess different units and use different
+rules. Neither result establishes that every rating is appropriate.
 
-```{r fit-full-pca}
-diag_pca <- diagnose_mfrm(
-  fit,
-  residual_pca = "both",
-  pca_max_factors = 6
-)
+Use the selected unexpected ratings to discuss the rubric and scoring context,
+not to automatically exclude a rater. Limited overlap may call for more shared
+ratings before comparing raters. A change after training alone does not
+establish a training effect. For your own analysis, use `csv_fit` and
+`csv_diagnostics`, and replace `"Rater"` with your actual facet name.
+Keep the whole dashboard with `saveRDS()` to retain its settings and notes;
+`export_mfrm_bundle(..., include = c("dashboard", "html"))` includes them
+with the exported tables. See `?facet_quality_dashboard` for that export route.
 
-summary(diag_pca)
+### 4. Assemble the evidence for a report
+
+```{r primary-route}
+res_toy <- mfrm_results(fit_toy, diagnostics = diag_toy, include = "publication")
+report_toy <- mfrm_report(res_toy, style = "apa")
+report_toy$first_screen[, c("Area", "Status", "MainIssue", "NextAction")]
+
+checklist_toy <- reporting_checklist(fit_toy, diagnostics = diag_toy)
+subset(checklist_toy$checklist, !DraftReady,
+       c("Section", "Item", "NextAction"))
 ```
 
-## Strict Diagnostics for RSM and PCM
+`DraftReady` describes available drafting material with caveats. An unrequested
+bias or linking analysis may be irrelevant to the question; do not run every
+helper merely to turn every flag `TRUE`. The report's gaps concern the supplied
+analysis objects. They cannot confirm recruitment, rater training, ethics,
+the study rationale, or whether the prose answers the research question.
 
-For `RSM` and `PCM`, the package can now keep the legacy residual path and the
-strict marginal path side by side:
+For a journal article, the companion
+`vignette("mfrmr-reporting-and-apa", package = "mfrmr")` provides a
+**Manuscript coverage map**: what to report, where the numerical evidence is,
+and what the author must supply. It also shows estimates with uncertainty,
+reliability and agreement with distinct interpretations, and a worked
+question-to-result explanation.
 
-```{r strict-rsm-pcm}
-fit_rsm_strict <- fit_mfrm(
-  data = toy,
-  person = "Person",
-  facets = c("Rater", "Criterion"),
-  score = "Score",
-  method = "MML",
-  model = "RSM",
-  quad_points = 7,
-  maxit = 30
-)
-diag_rsm_strict <- diagnose_mfrm(
-  fit_rsm_strict,
-  diagnostic_mode = "both",
-  residual_pca = "none"
-)
-
-fit_pcm_strict <- fit_mfrm(
-  data = toy,
-  person = "Person",
-  facets = c("Rater", "Criterion"),
-  score = "Score",
-  method = "MML",
-  model = "PCM",
-  step_facet = "Criterion",
-  quad_points = 7,
-  maxit = 30
-)
-diag_pcm_strict <- diagnose_mfrm(
-  fit_pcm_strict,
-  diagnostic_mode = "both",
-  residual_pca = "none"
-)
-
-summary(diag_rsm_strict)$diagnostic_basis[, c("DiagnosticPath", "Status", "Basis")]
-summary(diag_pcm_strict)$diagnostic_basis[, c("DiagnosticPath", "Status", "Basis")]
+```{r report-overview-artifact, echo = FALSE, eval = is_cran_check}
+vignette_artifact("workflow_next_actions.csv")
 ```
 
-When you want a compact simulation-based screening check for the strict branch,
-use `evaluate_mfrm_diagnostic_screening()` on a small design:
+### 5. Display a table and save the analysis
 
-```{r strict-screening}
-screen_rsm <- evaluate_mfrm_diagnostic_screening(
-  design = list(person = 18, rater = 3, criterion = 3, assignment = 3),
-  reps = 1,
-  scenarios = c("well_specified", "local_dependence"),
-  model = "RSM",
-  maxit = 30,
-  quad_points = 7,
-  seed = 123
+```{r report-table}
+measurements_toy <- fit_measures_table(fit_toy, diagnostics = diag_toy)
+rater_table_toy <- subset(
+  measurements_toy$table, Facet == "Rater",
+  c("Level", "N", "Measure", "SE", "CI_Lower", "CI_Upper", "Infit", "Outfit")
 )
-screen_pcm <- evaluate_mfrm_diagnostic_screening(
-  design = list(person = 18, rater = 3, criterion = 3, assignment = 3),
-  reps = 1,
-  scenarios = c("well_specified", "step_structure_misspecification"),
-  model = "PCM",
-  maxit = 30,
-  quad_points = 7,
-  seed = 123
-)
-
-screen_rsm$performance_summary[, c("Scenario", "EvaluationUse", "LegacyAnyFlagRate", "StrictAnyFlagRate")]
-screen_pcm$performance_summary[, c("Scenario", "EvaluationUse", "LegacySensitivityProxy", "StrictSensitivityProxy", "DeltaStrictMinusLegacyFlagRate")]
+apa_table(rater_table_toy, digits = 3,
+          caption = "Rater severity and fit",
+          note = "N counts rating rows. Rater effects are centered within facet and measured in logits; higher values indicate stricter ratings. Intervals are 95% normal approximations from MML observed-information SEs. Infit and Outfit have reference value 1.")
 ```
 
-The same strict branch is now reflected in the reporting router:
+Report the score scale and direction with the table. For person results,
+state the EAP/posterior-SD basis; for rater results, explain that variation in
+severity is different from inconsistent scoring. Add a sentence answering
+the study's question instead of repeating every cell of the table.
 
-```{r strict-reporting-route}
-chk_rsm_strict <- reporting_checklist(fit_rsm_strict, diagnostics = diag_rsm_strict)
-subset(
-  chk_rsm_strict$checklist,
-  Section == "Visual Displays" &
-    Item %in% c("QC / facet dashboard", "Strict marginal visuals", "Precision / information curves"),
-  c("Item", "Available", "DraftReady", "NextAction")
+```{r report-export}
+# A new temporary directory keeps this synthetic example repeatable
+export_dir <- tempfile("mfrmr-workflow-export-")
+export_toy <- export_mfrm_results(
+  res_toy,
+  output_dir = export_dir,
+  include = c("default", "report"),
+  acknowledge_sensitive = TRUE
 )
+export_preview <- head(export_toy$written_files[, c("Component", "Format", "Path")])
+export_preview$Path <- basename(export_preview$Path)
+knitr::kable(export_preview, row.names = FALSE,
+             caption = "First six exported files (filenames only)")
 ```
 
-## Residual PCA and Reporting
+This archive retains the collected results. `acknowledge_sensitive = TRUE` is used
+because the example contains synthetic data; it does not remove identifiers
+or local paths from real analyses. Review the files before sharing them.
+The table previews six filenames; `export_toy$written_files` retains the full
+list, and its `Path` column locates the generated files. Temporary
+files are for practice; choose a study directory for an archive you will keep.
+To reopen the saved analysis without fitting or computing diagnostics, locate
+the RDS in that file list:
 
-```{r residual-pca}
-pca <- analyze_residual_pca(diag_pca, mode = "both")
-plot_residual_pca(pca, mode = "overall", plot_type = "scree")
+```{r report-reload}
+results_file <- subset(export_toy$written_files, Component == "results_rds")$Path
+restored_results <- readRDS(results_file)
+summary(restored_results)$decision
 ```
 
-```{r bias-apa}
-data("mfrmr_example_bias", package = "mfrmr")
-bias_df <- mfrmr_example_bias
-fit_bias <- fit_mfrm(
-  bias_df,
-  person = "Person",
-  facets = c("Rater", "Criterion"),
-  score = "Score",
-  method = "MML",
-  model = "RSM",
-  quad_points = 7
+This restores the collected results and diagnostics. The separate dashboard
+object `rater_review` still needs its own `saveRDS()` call as described above.
+The exported replay script also reloads the complete RDS; it does not need
+`fit` or `diagnostics` from the original session. Run it with
+`source("path/to/mfrmr_results_replay.R", chdir = TRUE)`, replacing the path
+with the exported script's location. Keep your original data-to-fit script
+when you also need to reproduce estimation.
+For a fit replay including its input CSV, and for saving a manuscript table,
+figure, and their notes, follow Section 5 of
+`vignette("mfrmr-reporting-and-apa", package = "mfrmr")`.
+
+```{r export-artifact, echo = FALSE, eval = is_cran_check}
+vignette_artifact("workflow_export_files.csv")
+```
+
+### Further analyses should answer a stated question
+
+For observed rating agreement, start with the
+[rating-agreement tutorial](mfrmr-rating-agreement.html). Its small runnable
+example shows how to match person-by-task records, distinguish correlation
+from agreement, compare a score source with a reference, and audit missing
+pairs without fitting another model. It also explains why these coefficients
+answer a different question from rater severity or separation reliability.
+
+For prior sensitivity or an external Bayesian extension, use
+`export_mfrm_model()` with a unit-weight RSM/PCM or one-family GPCM MML fit
+on the fixed N(0,1) ability scale. Both Stan and brms retain supported fixed
+facet anchors and group means. This example reuses the RSM fit above:
+
+```{r model-export-example}
+# Reuse the fit above; no additional estimation or backend is needed to export.
+stan_model <- export_mfrm_model(
+  fit_toy, tempfile("stan-model-"), format = "stan",
+  acknowledge_sensitive = TRUE
 )
-diag_bias <- diagnose_mfrm(fit_bias, residual_pca = "none")
-bias <- estimate_bias(fit_bias, diag_bias, facet_a = "Rater", facet_b = "Criterion")
-fixed <- build_fixed_reports(bias)
-apa <- build_apa_outputs(fit_bias, diag_bias, bias_results = bias)
-
-mfrm_threshold_profiles()
-vis <- build_visual_summaries(fit_bias, diag_bias, threshold_profile = "standard")
-vis$warning_map$residual_pca_overall
-```
-
-The same `example_bias` dataset also carries a `Group` variable so DIF-oriented
-examples can show a non-null pattern instead of a fully clean result. It can be
-loaded either with `load_mfrmr_data("example_bias")` or
-`data("mfrmr_example_bias", package = "mfrmr")`.
-
-## Human-Readable Reporting API
-
-```{r reporting-api}
-spec <- specifications_report(fit, title = "Study run")
-data_qc <- data_quality_report(
-  fit,
-  data = ej2021_study1,
-  person = "Person",
-  facets = c("Rater", "Criterion"),
-  score = "Score"
+brms_model <- export_mfrm_model(
+  fit_toy, tempfile("brms-model-"), format = "brms",
+  acknowledge_sensitive = TRUE
 )
-iter <- estimation_iteration_report(fit, max_iter = 8)
-subset_rep <- subset_connectivity_report(fit, diagnostics = diag)
-facet_stats <- facet_statistics_report(fit, diagnostics = diag)
-cat_structure <- category_structure_report(fit, diagnostics = diag)
-cat_curves <- category_curves_report(fit, theta_points = 101)
-bias_rep <- bias_interaction_report(bias, top_n = 20)
-plot_bias_interaction(bias_rep, plot = "scatter")
+names(stan_model$files)
+model_data <- readRDS(stan_model$files[["model-data.rds"]])
+model_data$categories
+model_data$priors
 ```
 
-## Design Simulation and Prediction
+Each directory contains code, data, category/level mappings and `run.R`.
+`stan_model$output_dir` and `brms_model$output_dir` locate these practice
+bundles; replace `tempfile()` with a study directory to retain them. The
+category table maps the external model's integers back to the original rubric.
+`model_data$levels` identifies the Persons and facet levels, and
+`model_data$step_owners` identifies the shared RSM or facet-specific PCM steps.
+Set `location_prior_sd` and `step_prior_sd` in `export_mfrm_model()` when
+creating a bundle for a different prior choice; both formats use those values.
+Review its README and priors, then run the script from that directory with
+CmdStanR/CmdStan installed (and brms for the second format). Export itself
+needs neither backend. Both formats preserve adjacent-category probabilities,
+the fixed standard-normal ability scale, facet signs and constraints, and
+unordered step offsets with their original sum constraints. Their explicit structural priors make this
+a Bayesian analysis; it does not reproduce MML point estimates or qualify
+frequentist interval coverage. Two-family GMFRM also supports Stan export,
+with explicit component log-slope priors and a `slope-levels.csv` mapping; see
+the [two-family workflow](mfrmr-gpcm-scope.html). One-family GPCM uses
+`log_slope_prior_sd` in both formats, with geometric-mean-one slopes. For brms,
+the source must use `gpcm_mml_identification = "fixed_standard_normal"`.
+The default one-family GPCM estimates the population mean and variance.
+You can export its intercept-only population to Stan with
+`population_prior = list(mean = c(0, 1), log_sd = c(0, 0.5))`; each pair gives
+the location and scale of a normal prior. The mean and SD are sampled while
+relative slopes and anchors retain the native metric. brms still requires the
+fixed-population specification. Changing that setting changes the model; do not
+change it merely to enable export. Review prior predictions and sensitivity.
 
-The package also supports a separate simulation/prediction layer. The key
-distinction is:
+Anchor values are exact constraints. `levels.csv` and `steps.csv` in anchored
+or one-family bundles show the prior means, marginal SDs and fixed coordinates.
+A zero SD reflects a fixed value, not evidence that its earlier calibration
+was certain. The scope excludes JML/Person anchors, two-family brms,
+nonunit weights, population regression, interactions and shrinkage. Native
+two-family fitting still excludes anchors. Inspect
+sampler diagnostics and prior sensitivity before using the posterior. Exported
+ratings and original labels require the same sharing review as an analysis
+archive. See `?export_mfrm_model` for supported post-processing and prediction
+targets.
 
-- `evaluate_mfrm_recovery()` checks whether known generating parameters are
-  recovered under a stated simulation design. It is the first simulation check
-  to run when you are validating a model specification or a planned design.
-- `evaluate_mfrm_design()` and `predict_mfrm_population()` are
-  design-level helpers that summarize expected operating characteristics under
-  an explicit simulation specification.
-- `mfrm_generalizability()` and `mfrm_d_study()` summarize observed
-  univariate G-study components and analytic D-study projections. Read
-  `IdentificationStatus`, `GStatus`, and `PhiStatus` before reporting
-  projected coefficients; boundary or singular mixed-model fits are
-  design-identification warnings rather than high-stakes-ready reliability
-  evidence.
-- `predict_mfrm_units()` and `sample_mfrm_plausible_values()` score future or
-  partially observed persons under a fixed `MML` calibration.
+After sampling, start with `summary-decision.csv`: it states the sampling
+review and next action before presenting estimates. `sampling-review.csv`
+lists the checks and criteria. `parameter-summary.csv` keeps original labels,
+the meaning of larger values, fixed/estimated status and interval status
+beside the numbers. Fixed values have no estimated interval; finite intervals
+for estimated values can still require sampling review. Both formats support
+`Rscript run.R --summarize` to rebuild these reports from saved draws without
+sampling again. A clean sampling screen does not establish model validity.
 
-```{r gd-study-reading-order, eval=FALSE}
-if (requireNamespace("lme4", quietly = TRUE)) {
-  gt <- mfrm_generalizability(fit)
-  gt$coefficients[, c("G", "Phi", "GStatus", "PhiStatus",
-                      "IdentificationStatus")]
+Bring those summaries back into mfrmr with `read_mfrm_posterior()`. This small
+included example has short chains and intentionally retains a sampling-review
+status. It demonstrates the reporting path without fitting or requiring Stan.
 
-  ds <- mfrm_d_study(
-    gt,
-    data.frame(Rater = c(2, 3, 4), Criterion = 4),
-    residual_scaling = "sensitivity"
+```{r saved-posterior-return}
+posterior <- read_mfrm_posterior(system.file(
+  "extdata", "posterior-example", package = "mfrmr"))
+summary(posterior)
+posterior_plot <- plot(posterior, quantity = "location", draw = FALSE)
+posterior_report <- mfrm_report(posterior, style = "apa")
+```
+
+For your analysis, supply the export directory instead. Use
+`as_ggplot(posterior_plot)` for an editable figure,
+`plot_data(posterior_plot, "table")` for its long table, and
+`mfrm_report(posterior, output = "html")` for the full report. `confint(posterior)`
+retrieves saved 95% **credible** intervals, keeping fixed values and review
+flags. Other levels, contrasts, predictions and density/raincloud plots need
+the backend's joint draws; they cannot be recovered from this summary.
+
+| Question | Follow-up |
+| --- | --- |
+| How uncertain is a specified difference between two raters? | `mfrm_facet_intervals()` uses their covariance; choose the model-based or sandwich method for the sampling assumptions. Attach the result with `mfrm_results(fit, intervals = ...)`. See `mfrmr-facet-intervals`; an ordinary Wright map does not switch to sandwich intervals. |
+| Do category thresholds need to differ by criterion? | `compare_mfrm()` and `mml_quadrature_sensitivity()`; fit candidates to the same observations and review numerical sensitivity. |
+| Which facet combinations merit closer review? | `estimate_all_bias(fit)` explores all non-Person pairs. `summary(screens)$overview` shows availability and magnitude; `$cells` preserves signed shifts and counts. Use `plot(screens)` and `plot(screens, pair = "Rater x Criterion")` for overview and detail. These conditional screens have no collection-wide multiplicity control. |
+| Do prespecified rater-by-criterion or group contrasts depart from the model? | `estimate_bias()` supplies conditional screening evidence; `analyze_dff()` has its own scope. For jointly fitted interactions, see `fit_mfrm(facet_interactions = ...)` and `interaction_effect_table()`. Specify the target, supported inference route and multiplicity plan before inspecting results. See the reporting vignette and `mfrmr-linking-and-dff`. |
+| How often does a declared rater-warning rule detect a specified departure or falsely flag an unaffected rater? | `mfrm_screening_performance()` with known simulation truth and all planned trials. See `mfrmr-screening-performance` for individual/family rates, unavailable results and Monte Carlo uncertainty. |
+| Would the conclusions change under a GPCM? | `gpcm_capability_matrix()` and `mfrmr-gpcm-scope`; explain what discrimination reweighting means for the score interpretation. |
+| Are scores missing from assigned rating events? | Start with the assignment roster, then `review_mfrm_imputations()`, `fit_mfrm_imputed()` and `pool_mfrm_imputed()`. See `mfrmr-response-imputation` for an explicit imputation model; the review function does not generate scores. Do not fill unassigned combinations. |
+| Do external attributes describe different groups of persons, raters or tasks? | `mfrm_features()` with PCA/k-means for numeric features, or PAM/hierarchical clustering for mixed features. See `mfrmr-external-features` for missing attributes, group stability and links back to rating events. Groups are not ability classes or judgments of rater quality. |
+| Would more raters or tasks improve observed-score dependability? | `mfrm_g_study()` followed by `mfrm_d_study()`; declare the observed-score design, candidate plans and any composite weights. Their help explains G/Phi and SEM. These coefficients describe observed scores, not MFRM latent abilities. |
+| Are forms or waves on a comparable scale? | `mfrmr-linking-and-dff` and `mfrmr-portable-calibration`; common labels alone do not establish linking. |
+| How does a proposed rating design perform under stated assumptions? | `build_mfrm_sim_spec()`, `simulate_mfrm_recovery()`, and `assess_mfrm_recovery()`; report generating conditions, repetitions, failures, and Monte Carlo uncertainty. |
+| How should new persons be scored under an existing calibration? | `predict_mfrm_units()` and `sample_mfrm_plausible_values()`; reuse an eligible fitted calibration and report the conditioning assumptions. |
+| How certain is a person's placement relative to supplied ability cuts? | For ordinary RSM/PCM, use `cut_scores` in the eligible scoring API and inspect `$decisions`. `apa_table(..., which = "decisions")` retains probabilities, priors and review states. Check whether the scoring prior represents the target population; numerical checks do not establish that match. See `mfrmr-portable-calibration` for interpretation and saved-score reporting; calibration and estimated-prior uncertainty are excluded. |
+
+For repeated simulation work, supply `file` to `simulate_mfrm_recovery()` or
+`evaluate_mfrm_design()`. An identical call reads a finished result or resumes
+saved trials after interruption. For example, create a results directory once
+and keep this call in the analysis script:
+
+```{r simulation-file-workflow, eval=FALSE}
+dir.create("results", showWarnings = FALSE)
+recovery <- simulate_mfrm_recovery(
+  n_person = 50, n_rater = 4, n_criterion = 4,
+  reps = 100, seed = 20261021, file = "results/recovery.rds"
+)
+summary(recovery)$rep_overview  # Retains failed attempts, too.
+```
+
+The default `file_refit = "never"` rejects a file whose inputs, fitting controls,
+replication count, RNG kind or implementation/software identity differ. Use a
+new path to preserve both studies, or explicitly choose `"on_change"` to replace
+an incompatible study. `"always"` starts again even if the file matches.
+After completion, ordinary `readRDS()` also loads the result and its
+`reproducibility` metadata. Save the script and software environment with it;
+seed recording is not a guarantee of identical numerical results on every
+platform. See `?simulate_mfrm_recovery` for checkpoint boundaries and parallel
+resumption.
+
+For an injected Group-by-Criterion or Rater-by-Criterion departure,
+`evaluate_mfrm_signal_detection()` summarizes the behavior of the selected
+screen. Start with `summary(x)$detection_summary`: compare the planned and
+available counts before interpreting a rate. Non-target rates average the
+available-cell proportion within each contributing trial; they are neither
+pooled-cell rates nor the probability of any false flag. Inspect
+`x$rep_overview` for failed stages and seeds, and `x$results` for target-level
+unavailability reasons. This helper uses `saveRDS()` for saving the returned
+result, without the checkpoint arguments shown above.
+
+DIF contrasts are reference minus focal. A residual-score difference is not
+the injected latent effect; a subgroup location difference requires common-scale
+linking before its mean is reported. The bias shift is relative to the fitted
+baseline. These summaries do not establish effect recovery or calibrated
+power. Residual DIF tests remain unavailable, and refit/bias rates remain
+screening summaries. See `?evaluate_mfrm_signal_detection` for denominators,
+Monte Carlo uncertainty and interpretation of older saved results.
+
+When starting from `extract_mfrm_sim_spec(fit)`, inspect the proposed generating
+mechanism. Without a population regression, the Person spread is the SD of the
+reported estimates; shrinkage and measurement error mean it need not equal the
+latent population SD. With a population regression, the stored coefficients,
+residual variance, transformations and factor coding define Person generation.
+The generating parameters remain fixed across replications. Monte Carlo SEs
+measure the precision of the simulation averages under those assumptions;
+they do not measure uncertainty in the original fit or validate future forecasts.
+When covariates and observed assignments belong to the same template Persons,
+use `population_assignment = "matched"` (the default for newly built/extracted
+specifications). Matching `TemplatePerson` IDs preserve the association between
+covariates, groups and assignment patterns. Choose `"independent"` only when
+breaking that association is part of the intended scenario. A population
+`Group` column also defines the response group; conflicting group definitions
+are rejected. Truth metadata retain the selected source template IDs.
+
+Observed skeletons preserve repeated rows and weights. Each row generates a
+new conditionally independent rating; dependence across occasions or among
+peer reviewers requires a different generating model. Remove accidental source
+duplicates before building the specification. Weights affect fitting and do
+not create extra generated responses. Older saved specifications without
+`population_assignment` keep independent template draws; rebuild them and use
+a new study file for matched sampling.
+
+For a manual refit of generated latent-regression data, take both `person_data`
+and `population_formula` from `attr(simulated_data, "mfrm_population_data")`.
+The formula-compatible terms object retains the template's transformation basis
+and factor coding. Rewriting it as a fresh `~ scale(X)` formula would relearn
+the scaling on the new cohort. Old transformed specifications without the stored
+basis must be rebuilt from the original template or fit and saved as a new study.
+
+Read recovery results as relative parameter recovery under the declared
+generating conditions. `summary(recovery)$recovery_summary` reports RMSE and
+its Monte Carlo SE across independent trials. Mean-aligned group bias is zero
+by construction, so a small value does not establish unbiased estimation of
+each parameter. PCM/GPCM comparisons account for the facet shift induced by
+centering the generating step thresholds.
+
+For interval evidence, read `Coverage95` together with `ExpectedRows`,
+`CoverageRows`, `CoverageAvailabilityRate`, `McseCoverage95` and `FailedReps`.
+Coverage is conditional on obtaining a valid interval; failures and unavailable
+intervals remain visible separately. Non-Person MML facet coverage uses each
+level's deviation from its facet mean with the matching covariance. JML point
+recovery and Person scores remain useful, but their source uncertainty is not
+treated as that structural interval; inspect `CIReason` in `recovery$recovery`
+or `CIReasons` in the summary. Unknown target rosters produce `NA` rates, not
+zero or successful outcomes. `assess_mfrm_recovery(recovery)$uncertainty_review`
+keeps these counts and reasons with its checklist.
+
+For older saved objects, `summary()`, assessment and summary/coverage plotting
+recalculate the aggregates without fitting. They withhold legacy coverage
+when the required covariance was not saved. A new run is needed for corrected
+PCM/population truth mapping and matching interval evidence; retain the old
+file as a separate study. The help page explains which fields can be recovered.
+
+For stability against an observed-data reference, use
+`build_mfrm_resampling_spec()` and `draw_mfrm_resamples()`. They resample entire
+Person clusters within optional strata, retaining all ratings for each selected
+Person. A same-size bootstrap requires `design = "stratified_bootstrap"`,
+`sample_fraction = 1`, and `topup_preserve_facets = FALSE`; the default fraction
+is one half. Adding Persons to restore missing facet levels changes the
+sampling distribution. Read `sampling_scheme` and the base/added/final counts
+in the manifests. Person resampling holds the observed non-Person facets fixed;
+it does not reproduce sampling new raters/tasks or dependence among Persons
+in a peer-review network. Full-data estimates are uncertain references, not
+known truth, and these helpers do not qualify bootstrap confidence intervals.
+
+Missing **attributes** and missing **rating scores** need different models and
+workflows. Neither clustering nor response-score imputation is a prerequisite
+for ordinary MFRM analysis. G/D-studies start from observed scores and their
+design; do not substitute MFRM estimates or testlet variances for their input.
+For these branches, `mfrmr_output_guide("features")`,
+`mfrmr_output_guide("imputation")` and `mfrmr_output_guide("gtheory")` identify
+the supported summaries and plots. Save their full objects with `saveRDS()`;
+they have dedicated output routes and are not `mfrm_results()` inputs.
+
+Simulation examples with one or two repetitions test the computational setup;
+they do not estimate operating characteristics adequately for a paper. A
+simulation's assumptions and results also do not replace evidence from the
+observed assessment. Keep these analyses in the report only when their role
+in answering the study question is clear.
+
+## An observed writing-assessment example
+
+The optional `sirt` package supplies `data.ratings1`, observed German-writing
+ratings from a 2009 Austrian educational standards survey. Its 274 rows contain
+135 students, seven observed raters and five rubric criteria scored 0 to 3.
+The [data documentation](https://alexanderrobitzsch.r-universe.dev/sirt/doc/manual.html#data.ratings)
+describes the source. This dataset is separate from mfrmr's synthetic examples.
+
+The practical question is which differences in severity, category use or
+consistency merit discussion with a rater. The example below uses a PCM so
+criteria can have different category thresholds. It assumes a common writing
+scale and conditionally independent ratings; inspecting the output does not
+establish those assumptions. Repeated rubric ratings of one performance may
+still share influences that this model does not represent.
+
+Run this optional example after installing `sirt`. It is not run when building
+this vignette. Display aliases replace source identifiers in the example's
+tables; aliases do not make a rating archive anonymous.
+
+```{r observed-writing-example, eval = FALSE}
+library(mfrmr)
+data("data.ratings1", package = "sirt")
+wide <- data.ratings1
+persons <- match(wide$idstud, unique(wide$idstud))
+raters <- match(wide$rater, unique(wide$rater))
+writing <- do.call(rbind, lapply(paste0("k", 1:5), function(criterion) {
+  data.frame(
+    Person = sprintf("P%03d", persons), Rater = paste0("R", raters),
+    Criterion = criterion, Score = wide[[criterion]]
   )
-  ds[, c("n_Rater", "n_Criterion", "ResidualScaling",
-         "G", "Phi", "GStatus", "PhiStatus", "IdentificationStatus")]
-}
-```
-
-```{r design-prediction}
-sim_spec <- build_mfrm_sim_spec(
-  n_person = 30,
-  n_rater = 4,
-  n_criterion = 4,
-  raters_per_person = 2,
-  assignment = "rotating"
+}))
+review <- describe_mfrm_data(
+  writing, person = "Person", facets = c("Rater", "Criterion"), score = "Score",
+  rating_min = 0, rating_max = 3
 )
+review$row_retention
+review$design_connectivity
 
-recovery <- suppressWarnings(
-  evaluate_mfrm_recovery(
-    sim_spec = sim_spec,
-    reps = 2,
-    maxit = 30,
-    include_diagnostics = TRUE,
-    diagnostic_fit_df_method = "both",
-    seed = 2
-  )
+writing_fit <- fit_mfrm(
+  writing, "Person", c("Rater", "Criterion"), "Score",
+  method = "MML", model = "PCM", step_facet = "Criterion",
+  rating_min = 0, rating_max = 3, quad_points = 61, maxit = 400
 )
-
-summary(recovery)$recovery_summary[, c("ParameterType", "Facet", "RMSE", "Bias")]
-plot(recovery, type = "summary", metric = "rmse", draw = FALSE)$data$plot_table
-
-recovery_review <- assess_mfrm_recovery(
-  recovery,
-  min_reps = 2,
-  min_se_available = NULL,
-  max_mcse_rmse_ratio = NULL,
-  max_rmse = c(facet = 1, step = 1, default = 1.5),
-  max_abs_bias = c(default = 0.75)
+writing_diagnostics <- diagnose_mfrm(writing_fit, residual_pca = "none")
+feedback <- facet_quality_dashboard(
+  writing_fit, diagnostics = writing_diagnostics, facet = "Rater"
 )
-
-summary(recovery_review)$checklist[, c("Section", "Item", "Status")]
-summary(recovery_review)$reading_order
-summary(recovery_review)$condition_reporting_notes
-summary(recovery_review)$condition_review
-summary(recovery_review)$diagnostic_reporting_notes
-summary(recovery_review)$diagnostic_review
-
-status_plot <- plot(recovery_review, type = "status", draw = FALSE)
-status_plot$data$section_status
-status_plot$data$reading_order
-
-metric_plot <- plot(recovery_review, type = "metrics", metric = "rmse", draw = FALSE)
-metric_plot$data$plot_table
-metric_plot$data$guidance
-
-recovery_bundle <- build_summary_table_bundle(
-  recovery_review,
-  appendix_preset = "recommended"
-)
-recovery_bundle$table_index[, c("Table", "Rows", "Role")]
-
-pred_pop <- predict_mfrm_population(
-  sim_spec = sim_spec,
-  reps = 2,
-  maxit = 30,
-  seed = 1
-)
-
-summary(pred_pop)$forecast[, c("Facet", "MeanSeparation", "McseSeparation")]
-
-keep_people <- unique(toy$Person)[1:18]
-toy_mml <- suppressWarnings(
-  fit_mfrm(
-    toy[toy$Person %in% keep_people, , drop = FALSE],
-    person = "Person",
-    facets = c("Rater", "Criterion"),
-    score = "Score",
-    method = "MML",
-    quad_points = 5,
-    maxit = 30
-  )
-)
-
-new_units <- data.frame(
-  Person = c("NEW01", "NEW01"),
-  Rater = unique(toy$Rater)[1],
-  Criterion = unique(toy$Criterion)[1:2],
-  Score = c(2, 3)
-)
-
-pred_units <- predict_mfrm_units(toy_mml, new_units, n_draws = 0)
-pv_units <- sample_mfrm_plausible_values(toy_mml, new_units, n_draws = 2, seed = 1)
-
-summary(pred_units)$estimates[, c("Person", "Estimate", "Lower", "Upper")]
-summary(pv_units)$draw_summary[, c("Person", "Draws", "MeanValue")]
-```
-
-For a report or appendix handoff, pass the recovery objects through the same
-summary-table export route used by the rest of the package:
-
-```{r recovery-export, eval = FALSE}
-export_summary_appendix(
-  list(recovery = recovery, recovery_review = recovery_review),
-  output_dir = tempdir(),
-  prefix = "mfrmr_recovery_appendix",
-  preset = "recommended",
-  include_html = FALSE,
-  overwrite = TRUE
+feedback$detail[, c("Level", "N", "Estimate", "SE", "Infit", "Outfit", "MisfitFlag")]
+feedback$settings
+plot(writing_fit, type = "rater_severity", diagnostics = writing_diagnostics, facet = "Rater", show_bands = FALSE)
+saveRDS(feedback, "writing-feedback.rds")
+archive <- export_mfrm_bundle(
+  writing_fit, diagnostics = writing_diagnostics, facet = "Rater",
+  output_dir = "writing-analysis", data = writing, acknowledge_sensitive = TRUE
 )
 ```
 
-For an initial exploratory run, `reps = 2` or another very small value is useful
-only to check the data-generating setup and refit path. For a study report,
-increase `reps`, keep the ADEMP-style metadata in the exported tables, and set
-substantive RMSE/Bias thresholds so that `assess_mfrm_recovery()` can mark those
-rows as `ok`, `review`, or `concern` rather than `not_assessed`.
+Reshaping gives 1,370 criterion ratings; the 274 original rows are not the
+number of students. Each rater has 185 to 205 criterion ratings here. The
+example produces a low-Infit flag for R7: unusually predictable ratings also
+trigger this screen. This is a prompt to inspect rubric use and individual
+ratings, not evidence that R7 is inaccurate or should be removed. Severity
+and consistency answer different questions, and this dataset supplies no
+known true rater quality against which to validate either interpretation.
+
+The quadrature setting belongs to this example; use
+`mml_quadrature_sensitivity()` when numerical sensitivity matters to a
+comparison. Preserve the dashboard's notes, review rating-category use and
+common-person coverage, and use the actual scripts or rubric descriptors in
+feedback discussions. A different-looking result alone does not establish
+that a rater needs training or that training would improve the scores.

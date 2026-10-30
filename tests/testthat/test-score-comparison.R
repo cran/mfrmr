@@ -1,0 +1,76 @@
+test_that("generic score comparisons do not silently impose an application screen", {
+  x <- score_comparison_table(c(0, 1, 2, 2), c(0, 1, 1, 2), categories = 0:2)
+  expect_identical(x$settings$screen, "none")
+  expect_true(all(is.na(x$criteria$Threshold)))
+  expect_true(all(x$criteria$Status[x$criteria$Available] == "not_requested"))
+  expect_true(all(x$criteria$Status[!x$criteria$Available] == "unavailable"))
+  expect_false(any(grepl("Automated|Human", names(x$table))))
+  expect_equal(x$table$MeanScore, 1.25)
+  expect_equal(x$table$MeanReference, 1)
+  expect_equal(x$table$SMDReference, .25 / sd(c(0, 1, 1, 2)))
+  expect_named(x$counts, c("scores_reference", "reference2_reference"))
+  expect_named(dimnames(x$counts$scores_reference), c("Scorer", "Reference"))
+})
+
+test_that("screens are explicit, overridable and independent of computability", {
+  build <- function(...) score_comparison_table(0:3, 0:3, 0:3, categories = 0:3, ...)
+  x <- build(screen = "williamson2012")
+  expect_equal(x$criteria$Threshold, c(.70, .70, .10, .10, .15))
+  expect_true(all(x$criteria$Status == "within_threshold"))
+  expect_identical(x$settings$screen, "williamson2012")
+  y <- build(qwk_min = 1, max_abs_smd = 0)
+  expect_equal(y$criteria$Threshold, c(1, NA, NA, NA, 0))
+  expect_identical(y$settings$screen, "custom")
+  expect_equal(y$criteria$Status, c("within_threshold", rep("not_requested", 3), "within_threshold"))
+  expect_identical(y$table, x$table)
+  z <- build(screen = "williamson2012", qwk_min = .8, max_abs_smd = .1)
+  expect_equal(z$criteria$Threshold, c(.8, .7, .1, .1, .1))
+  expect_error(build(screen = "universal"), "arg")
+  expect_error(build(qwk_min = NA_real_), "threshold")
+  expect_error(build(max_degradation = -.1), "threshold")
+  constant <- score_comparison_table(rep(1, 3), rep(1, 3), categories = 0:2)
+  expect_true(all(constant$criteria$Status == "unavailable"))
+})
+
+test_that("generic names preserve baseline, missing-case and SMD meanings", {
+  scores <- c(.2, .9, 1.3, 2.1, 2.7, NA)
+  ref <- c(0, 1, 1, 2, 3, 3); ref2 <- c(0, 1, NA, 2, 2, 3)
+  cat_scores <- c(0, 1, 1, 2, 3, 3)
+  x <- score_comparison_table(scores, ref, ref2, categories = 0:3,
+    score_categories = cat_scores, smd = "reference", screen = "williamson2012")
+  old <- automated_scoring_table(scores, ref, ref2, categories = 0:3,
+    automated_categories = cat_scores, smd = "human")
+  expect_equal(x$table$QWK, old$table$QWK)
+  expect_equal(x$table$ReferenceQWK, old$table$HumanQWK)
+  expect_equal(x$table$ReferenceCorrelation, old$table$HumanCorrelation)
+  expect_equal(x$table$SMDReference, old$table$SMDHuman)
+  expect_equal(x$criteria$Status, old$criteria$Status)
+  expect_identical(x$table$SMDBasis, "reference")
+  expect_equal(x$cases$Included, c(TRUE, TRUE, FALSE, TRUE, TRUE, FALSE))
+  expect_equal(x$cases$MissingReference2, c(FALSE, FALSE, TRUE, FALSE, FALSE, FALSE))
+  expect_equal(x$cases$MissingScore, c(rep(FALSE, 5), TRUE))
+  expect_equal(x$table$QWKDegradation, x$table$ReferenceQWK - x$table$QWK)
+})
+
+test_that("generic comparisons attach the selected rater without refitting", {
+  fit <- make_toy_fit(); diagnostics <- make_toy_diagnostics(fit)
+  local_mocked_bindings(fit_mfrm = function(...) stop("Unexpected fitting"),
+    diagnose_mfrm = function(...) stop("Unexpected diagnostics"))
+  x <- score_comparison_table(0:3, 0:3, categories = 0:3, fit = fit,
+    diagnostics = diagnostics, rater_facet = "Rater", rater = "R01")
+  old <- automated_scoring_table(0:3, 0:3, categories = 0:3, fit = fit,
+    diagnostics = diagnostics, rater_facet = "Rater", automated_rater = "R01")
+  cols <- startsWith(names(x$table), "MFRM")
+  expect_identical(x$table[cols], old$table[cols])
+  expect_identical(x$mfrm, old$mfrm)
+  expect_true(all(x$criteria$Status[x$criteria$Available] == "not_requested"))
+})
+test_that("QWK retains finite coefficients when finite category spans overflow", {
+  x <- c(-1e308,0,1e308,0)
+  y <- c(-1e308,1e308,1e308,-1e308)
+  r <- mfrm_score_qwk(x,y,c(-1e308,0,1e308))
+  # Rescale to -1,0,1: observed squared disagreement .5, chance 1.5.
+  expect_equal(r$value, 2/3)
+  expect_identical(r$reason, "")
+  expect_equal(sum(r$counts), 4L)
+})

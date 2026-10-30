@@ -45,6 +45,10 @@ returned by \code{\link[=mfrm_results]{mfrm_results()}}. It is intentionally a v
 comprehensive results object, not a new estimation interface.
 }
 \details{
+Testlet and random-rater results are not supported by this viewer. Use
+\code{mfrm_report(res, output = "html")} or \code{\link[=export_mfrm_results]{export_mfrm_results()}} for their
+static results and model-specific figures.
+
 The viewer assumes that fitting, diagnostics, and section selection have
 already happened through \code{\link[=mfrm_results]{mfrm_results()}}. This keeps GUI exploration
 separate from reproducible analysis setup: the Replay tab displays the

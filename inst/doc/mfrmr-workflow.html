@@ -341,262 +341,753 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 
 
-<p>This vignette outlines a reproducible workflow for:</p>
-<ul>
-<li>loading packaged simulation data</li>
-<li>fitting an MFRM with flexible facets</li>
-<li>choosing a fast fit summary or an opt-in comprehensive summary</li>
-<li>producing the required Wright map on the fitted shared logit
-scale</li>
-<li>running diagnostics and residual PCA</li>
-<li>generating APA and visual summary outputs</li>
-<li>moving from fitted models into design simulation and
-fixed-calibration prediction</li>
-</ul>
-<p>For a plot-first companion guide, see the separate
-<code>mfrmr-visual-diagnostics</code> vignette.</p>
-<p>For a faster preliminary run without changing the final analysis
-target:</p>
-<ul>
-<li>test code mechanics on a small deterministic subset or, for an MML
-workflow, a temporary <code>quad_points = 7</code> grid; that grid is
-screening-only and cannot support automatic IC ranking or LRT. Restore
-the prespecified final MML grid (31 points by default) and check a
-denser common grid when a comparison is close or consequential</li>
-<li>choose <code>method = &quot;JML&quot;</code> only when its person-parameter
-treatment is methodologically appropriate, not merely as a faster
-substitute for MML</li>
-<li>use
-<code>diagnose_mfrm(..., residual_pca = &quot;none&quot;, diagnostic_mode = &quot;both&quot;, fit_df_method = &quot;both&quot;)</code>
-when the diagnostics will feed a comprehensive summary</li>
-<li>reuse the same diagnostics object in downstream reports and
-plots</li>
-</ul>
-<div id="mml-and-diagnostic-modes" class="section level2">
-<h2>MML and Diagnostic Modes</h2>
-<p><code>mfrmr</code> treats <code>MML</code> and <code>JML</code>
-differently on purpose.</p>
-<ul>
-<li><code>MML</code> integrates over the person distribution with
-Gauss-Hermite quadrature.</li>
-<li><code>mml_engine = &quot;direct&quot;</code> (the default) optimizes the
-quadrature-based marginal log-likelihood directly.
-<code>mml_engine = &quot;em&quot;</code> and <code>&quot;hybrid&quot;</code> provide the
-documented EM and EM-warm-start routes for supported RSM/PCM fits.</li>
-<li><code>JML</code> is useful for JMLE-oriented comparisons and
-analyses that avoid a parametric person distribution. <code>MML</code>
-is the package default and supports marginal and fixed-calibration
-follow-up when its response-model and population-distribution
-assumptions are defensible.</li>
-</ul>
-<p>For <code>RSM</code> and <code>PCM</code>, diagnostics now expose two
-distinct evidence paths:</p>
-<ul>
-<li><code>diagnostic_mode = &quot;legacy&quot;</code> keeps the residual/EAP-based
-stack.</li>
-<li><code>diagnostic_mode = &quot;marginal_fit&quot;</code> adds the strict
-latent-integrated screen.</li>
-<li><code>diagnostic_mode = &quot;both&quot;</code> is the safest default when you
-want to inspect both views side by side.</li>
-</ul>
-<p>Strict marginal diagnostics are screening-oriented. Use
-<code>summary(diag)$diagnostic_basis</code> to separate the legacy
-residual evidence from the strict marginal evidence rather than pooling
-them into one decision.</p>
+<div id="choose-the-result-you-need" class="section level2">
+<h2>Choose the result you need</h2>
+<p>Start with the intended score and decision, then choose a branch.
+These are connected workflows, not a checklist requiring every
+analysis.</p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Your situation</th>
+<th>Connected route</th>
+<th>What to carry into the report</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Define what was rated and whether the design links the groups</td>
+<td><code>describe_mfrm_data()</code> → model/design review →
+<code>subset_connectivity_report()</code> or
+<code>build_mfrm_network_review()</code> after fitting</td>
+<td>Rubric endpoints, rating unit, assigned/missing rows, shared
+observations and identification checks. A connected graph alone does not
+establish a common scale.</td>
+</tr>
+<tr class="even">
+<td>Estimate person measures and named rater/criterion effects</td>
+<td><code>fit_mfrm()</code> → <code>summary()</code> →
+<code>diagnose_mfrm()</code> and eligible intervals →
+<code>mfrm_results()</code> → <code>mfrm_report()</code></td>
+<td>Model, scale, estimates, uncertainty, Separation/Strata/Reliability,
+fit and the figures that answer the question.</td>
+</tr>
+<tr class="odd">
+<td>Decide how many raters or tasks a score needs</td>
+<td><code>mfrm_g_study()</code> → <code>mfrm_d_study()</code> →
+<code>plot()</code> / <code>summary()</code> → eligible plan
+comparisons</td>
+<td><a href="mfrmr-gtheory.html">G/D-study</a> components, score
+weights, G/Phi/SEM, future counts and uncertainty. No MFRM fit is
+required.</td>
+</tr>
+<tr class="even">
+<td>Describe observed agreement</td>
+<td>Match the rating unit → <code>pairwise_kappa_table()</code>,
+<code>krippendorff_alpha_table()</code> or
+<code>pairwise_icc_table()</code></td>
+<td><a href="mfrmr-rating-agreement.html">Agreement</a> target, category
+distances/ICC definition, overlap and exclusions. Choose the coefficient
+from the question.</td>
+</tr>
+<tr class="odd">
+<td>Reuse a scale across forms or waves</td>
+<td>Anchor review → anchored fit / linking review → drift and eligible
+uncertainty</td>
+<td><a href="mfrmr-linking-and-dff.html">Anchor provenance and
+scale</a>, invariance assumption, fixed versus propagated uncertainty. A
+common label is not a common calibration.</td>
+</tr>
+<tr class="even">
+<td>Investigate an unexpected rater/criterion combination or group
+contrast</td>
+<td>Diagnostics → specified <code>estimate_bias()</code> or
+<code>analyze_dff()</code> → signed tables and <code>plot()</code> →
+reporting</td>
+<td><a href="mfrmr-linking-and-dff.html">Bias/DFF</a> target, cell
+counts, direction, multiplicity and conditional uncertainty; a screen
+does not establish unfairness.</td>
+</tr>
+<tr class="odd">
+<td>Decide whether another model changes the answer</td>
+<td>Matched fits → <code>compare_mfrm()</code> →
+<code>build_model_choice_review()</code> →
+<code>build_summary_table_bundle()</code></td>
+<td><a href="mfrmr-model-choice.html">Model comparison</a>, comparable
+likelihoods, eligible tests and changes in substantive conclusions.</td>
+</tr>
+<tr class="even">
+<td>Investigate structure left unexplained or describe groups</td>
+<td>Residual diagnostics / <code>analyze_residual_pca()</code> /
+<code>q3_statistic()</code> → <code>mfrm_residual_network()</code> →
+<code>mfrm_report()</code>; separately, declared entity features →
+clustering</td>
+<td><a href="mfrmr-visual-diagnostics.html#residual-networks-ega-and-the-assignment-graph-answer-different-questions">Residual
+exploration</a> and <a href="mfrmr-external-features.html">feature
+groups</a> have different inputs. Retain overlap, feature construction
+and exploratory status.</td>
+</tr>
+<tr class="odd">
+<td>Give feedback, score new responses or save evidence</td>
+<td>Eligible rater report / <code>score_mfrm_persons()</code> or
+portable calibration → plots, export and RDS</td>
+<td>Recipient-specific evidence and limitations, scoring
+prior/calibration version and the source of uncertainty. See the <a href="mfrmr-reporting-and-apa.html#choose-report-sections-by-question">reporting
+map</a>.</td>
+</tr>
+</tbody>
+</table>
+<p>Before any branch, record the <strong>meaning of low and high
+scores</strong>. A column named Comprehensibility may encode ease or
+difficulty. Higher Person locations predict higher coded categories;
+they do not inherently mean better performance. With the default Rater
+orientation, higher locations predict lower coded scores. See <a href="mfrmr-visual-diagnostics.html#establish-what-higher-scores-mean">score
+direction</a> before interpreting severity, bias, plots or anchors.
+Changing <code>positive_facets</code> is not reverse-coding the
+outcome.</p>
+<p>If Content and Organization are <strong>separate reported
+scores</strong>, start with the <a href="mfrmr-gtheory.html#is-a-criterion-a-facet-or-a-score">criterion-versus-score
+distinction</a>. A Criterion facet in one-dimensional MFRM does not
+estimate a separate ability for each criterion. Multivariate G theory
+estimates cross-score covariance components; it does not fit
+multidimensional IRT.</p>
+<div id="put-the-network-at-the-stage-its-edges-describe" class="section level3">
+<h3>Put the network at the stage its edges describe</h3>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Network</th>
+<th>Best point in the workflow</th>
+<th>What an edge means</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Assignment/co-observation</td>
+<td>Design review, before interpreting measures; return to it when
+planning additional links or anchors</td>
+<td>Who shares observed ratings: <code>mfrm_network_analysis()</code> →
+<code>build_mfrm_network_review()</code>. Pass <code>data</code>,
+<code>person</code>, <code>facets</code>, <code>score</code> before
+fitting; use <code>basis = &quot;planned&quot;</code> without a score column for
+an assignment roster. Inspect the person-rater projection as well as the
+full graph.</td>
+</tr>
+<tr class="even">
+<td>Rater score relations</td>
+<td>After matching shared responses, alongside agreement and rater
+feedback</td>
+<td>Observed score agreement/disagreement or directional differences in
+<code>rater_network_analysis()</code>; cross-criterion observed
+correlations in <code>rater_halo_network_analysis()</code>. These are
+not residual networks or causal halo tests.</td>
+</tr>
+<tr class="odd">
+<td>Residual associations or communities</td>
+<td>After fitting and checking residual/overlap definitions, for a
+stated unexplained-structure question</td>
+<td>Associations left after the model.
+<code>mfrm_residual_network()</code> supplies signed residual
+correlations and optional hierarchical groups. Report all pairs, overlap
+and missingness with <code>mfrm_report()</code>. This is descriptive
+exploration, not EGA or a jointly fitted network model.</td>
+</tr>
+</tbody>
+</table>
+<p>An assignment graph is especially useful for explaining why adding a
+shared performance or rater might improve linking. It cannot create
+direct pairwise agreement evidence where no common responses were rated.
+Feature clustering can describe external rater backgrounds; clustering
+estimated bias or residual profiles additionally needs explicit
+aggregation, missingness, comparability and estimation-uncertainty
+treatment. The current feature API does not supply those steps
+automatically.</p>
 </div>
-<div id="load-data" class="section level2">
-<h2>Load Data</h2>
-<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
-<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a></span>
-<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="fu">list_mfrmr_data</span>(<span class="at">details =</span> <span class="cn">TRUE</span>)[, <span class="fu">c</span>(<span class="st">&quot;Key&quot;</span>, <span class="st">&quot;PrimaryUse&quot;</span>, <span class="st">&quot;Design&quot;</span>, <span class="st">&quot;CountBasis&quot;</span>)]</span>
-<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a></span>
-<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="fu">data</span>(<span class="st">&quot;ej2021_study1&quot;</span>, <span class="at">package =</span> <span class="st">&quot;mfrmr&quot;</span>)</span>
-<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="fu">head</span>(ej2021_study1)</span>
+</div>
+<div id="quick-start" class="section level2">
+<h2>Quick start</h2>
+<p>By the end of this lesson you should be able to prepare
+one-rating-per-row data, estimate abilities and facet effects, identify
+results needing review, and save an analysis with its assumptions. Start
+with the synthetic example, then adapt the CSV lesson. Follow-up
+analyses are optional and should answer your assessment question.</p>
+<p>Use this reading route:</p>
+<table>
+<colgroup>
+<col width="50%" />
+<col width="50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>What you need now</th>
+<th>Where to go</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Choose a model and estimator for your purpose</td>
+<td><a href="mfrmr-model-choice.html">Model and estimator choice</a>,
+including when greater complexity helps and when it does not</td>
+</tr>
+<tr class="even">
+<td>Run and understand a first analysis</td>
+<td>Quick start, including individual estimates and review messages
+below</td>
+</tr>
+<tr class="odd">
+<td>Analyze your own rating sheet</td>
+<td><a href="#use-your-own-csv">Use your own CSV</a>, including stopped
+checks and wide-to-long reshaping</td>
+</tr>
+<tr class="even">
+<td>Interpret fit, precision and rater feedback</td>
+<td><a href="#continue-with-diagnostics-and-reporting">Continue with
+diagnostics and reporting</a></td>
+</tr>
+<tr class="odd">
+<td>Find the calculation and its research basis</td>
+<td><code>help(&quot;mfrmr_methods_reference&quot;)</code>, then the linked
+function’s method and References sections</td>
+</tr>
+</tbody>
+</table>
+<p>This tutorial follows the ordinary fixed-facet
+<code>fit_mfrm()</code> workflow. To plan the number of tasks or raters
+for an observed score, use <a href="mfrmr-gtheory.html">Plan an
+assessment with G theory</a>; no MFRM fit is required for that workflow.
+To choose between fixed facets, shared random raters and Person-specific
+testlets, use <code>mfrmr_output_guide(&quot;models&quot;)</code> or
+<code>help(&quot;mfrmr_workflow_methods&quot;)</code>. The extended models have
+dedicated tutorials:
+<code>vignette(&quot;mfrmr-random-raters&quot;, package = &quot;mfrmr&quot;)</code> and
+<code>vignette(&quot;mfrmr-testlets&quot;, package = &quot;mfrmr&quot;)</code>. Their
+prediction targets and reporting support differ. The diagnostics and
+reports below follow ordinary RSM/PCM fits. Two-family GPCM and
+corrected JML also have class <code>mfrm_fit</code>, but require their
+model-specific result routes; sharing that class does not make these
+ordinary diagnostics available. See
+<code>gpcm_capability_matrix()</code> and
+<code>vignette(&quot;mfrmr-gpcm-scope&quot;, package = &quot;mfrmr&quot;)</code> before
+changing model family.</p>
+<p>This example estimates person abilities while accounting for rater
+severity and criterion difficulty. A <em>facet</em> is a source of
+variation in scores; here, <code>Rater</code> and <code>Criterion</code>
+are facets, and individual raters and criteria are their
+<em>levels</em>. The data are synthetic, with one row per rating and
+scores from 1 to 4.</p>
+<p>The example data are included in the package. The loading line below
+creates <code>ratings</code>; you do not need to prepare a file or
+construct the scores first. <code>head(ratings)</code> shows the first
+six rows. The quoted column names in <code>fit_mfrm()</code> are
+case-sensitive; <code>Study</code> and <code>Group</code> are extra
+labels unused by this model. <code>MML</code> selects marginal maximum
+likelihood; <code>RSM</code> selects a rating-scale model with shared
+category thresholds (the transitions between adjacent scores). The
+rubric uses scores 1 through 4.
+<code>category_policy = &quot;preserve&quot;</code> keeps that category ladder; it
+prevents an unobserved intermediate category from being silently
+collapsed into a different scale.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="co"># Load the package</span></span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a><span class="co"># Load example ratings and look at the first six rows</span></span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>ratings <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_operational&quot;</span>)</span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="fu">head</span>(ratings)</span>
 <span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a></span>
-<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a>study1_alt <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;study1&quot;</span>)</span>
-<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a><span class="fu">identical</span>(<span class="fu">names</span>(ej2021_study1), <span class="fu">names</span>(study1_alt))</span></code></pre></div>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a><span class="co"># Fit the model</span></span>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>  <span class="at">data =</span> ratings,</span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a>  <span class="at">rating_min =</span> <span class="dv">1</span>, <span class="at">rating_max =</span> <span class="dv">4</span>,</span>
+<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a>  <span class="at">category_policy =</span> <span class="st">&quot;preserve&quot;</span>,</span>
+<span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
+<span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span></span>
+<span id="cb1-18"><a href="#cb1-18" tabindex="-1"></a>)</span>
+<span id="cb1-19"><a href="#cb1-19" tabindex="-1"></a></span>
+<span id="cb1-20"><a href="#cb1-20" tabindex="-1"></a><span class="co"># Plot the results (Wright map)</span></span>
+<span id="cb1-21"><a href="#cb1-21" tabindex="-1"></a><span class="fu">plot</span>(fit)</span>
+<span id="cb1-22"><a href="#cb1-22" tabindex="-1"></a></span>
+<span id="cb1-23"><a href="#cb1-23" tabindex="-1"></a><span class="co"># Save the summary, then display its tables</span></span>
+<span id="cb1-24"><a href="#cb1-24" tabindex="-1"></a>results <span class="ot">&lt;-</span> <span class="fu">summary</span>(fit)</span>
+<span id="cb1-25"><a href="#cb1-25" tabindex="-1"></a>results<span class="sc">$</span>person_overview <span class="co"># One row summarizing person ability estimates</span></span>
+<span id="cb1-26"><a href="#cb1-26" tabindex="-1"></a>results<span class="sc">$</span>facet_overview  <span class="co"># One row per facet: number of levels, mean, SD, range</span></span>
+<span id="cb1-27"><a href="#cb1-27" tabindex="-1"></a></span>
+<span id="cb1-28"><a href="#cb1-28" tabindex="-1"></a><span class="co"># Check the interpretation status and recommended next step</span></span>
+<span id="cb1-29"><a href="#cb1-29" tabindex="-1"></a>results<span class="sc">$</span>decision</span></code></pre></div>
+<p><code>&lt;-</code> saves an object without printing it. Here
+<code>ratings</code> holds the data, <code>fit</code> holds the model,
+and <code>results</code> holds its summary. <code>$</code> selects a
+named part: <code>results$person_overview</code> displays just that
+table. Enter <code>results</code> to print the full summary.</p>
+<p>The Wright map displays the estimates in logits, the model’s
+measurement units, rather than the original 1-to-4 scores. With this
+example’s default orientation, higher person estimates mean higher
+ability; higher rater estimates mean stricter ratings, and higher
+criterion estimates mean greater difficulty.</p>
+<p>The native models use the <strong>logistic metric (L-metric), with D
+= 1</strong>: there is no extra 1.7 or 1.702 normal-ogive approximation
+factor. In this RSM example, an ability increase of one unit raises each
+adjacent-category log odds by one, holding other parameters fixed. For
+GPCM, the effective discrimination multiplies that change. A normal
+ability distribution is a separate assumption and does not change the
+response link. See <code>?fit_mfrm</code> for scale conventions.</p>
+<p>The overview tables describe distributions:
+<code>person_overview</code> has one row for all 48 persons, and
+<code>facet_overview</code> has one row for each facet.
+<code>Mean</code>/<code>MeanEstimate</code> is the average,
+<code>SD</code>/<code>SDEstimate</code> is the spread, and
+<code>Min</code>/<code>Max</code> or
+<code>MinEstimate</code>/<code>MaxEstimate</code> give the endpoints.
+Rater and criterion means are constrained to zero here; their SDs and
+ranges show differences among levels.</p>
+<div id="inspect-individual-estimates" class="section level3">
+<h3>Inspect individual estimates</h3>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>estimates <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(fit)</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">subset</span>(estimates, Facet <span class="sc">==</span> <span class="st">&quot;Person&quot;</span>)) <span class="co"># First six persons</span></span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="fu">subset</span>(estimates, Facet <span class="sc">==</span> <span class="st">&quot;Rater&quot;</span>)       <span class="co"># All raters</span></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="fu">subset</span>(estimates, Facet <span class="sc">==</span> <span class="st">&quot;Criterion&quot;</span>)   <span class="co"># All criteria</span></span></code></pre></div>
+<p><code>Facet</code> identifies the type of estimate,
+<code>Level</code> identifies the person, rater, or criterion, and
+<code>Estimate</code> is its value in logits.</p>
 </div>
-<div id="applied-runnable-example" class="section level2">
-<h2>Applied Runnable Example</h2>
-<p>Start with the packaged <code>example_operational</code> dataset. It
-is intentionally compact but uses a connected two-rater assignment,
-unequal rater workloads, and six planned omissions represented by absent
-long-format rows rather than <code>NA</code> or sentinel scores. This
-makes the main tutorial closer to an applied rating design without using
-empirical records. The same object is also available via
-<code>data(&quot;mfrmr_example_operational&quot;, package = &quot;mfrmr&quot;)</code>. A
-separate score-free assignment roster lets the pre-fit review identify
-those six omissions without guessing which cells should have existed.
-<code>example_core</code> remains available as an idealized
-complete-crossing example for fast help-page checks.</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">data</span>(<span class="st">&quot;mfrmr_example_operational&quot;</span>, <span class="at">package =</span> <span class="st">&quot;mfrmr&quot;</span>)</span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="fu">data</span>(<span class="st">&quot;mfrmr_example_operational_design&quot;</span>, <span class="at">package =</span> <span class="st">&quot;mfrmr&quot;</span>)</span>
-<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>toy <span class="ot">&lt;-</span> mfrmr_example_operational</span>
-<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a></span>
-<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>data_review_toy <span class="ot">&lt;-</span> <span class="fu">describe_mfrm_data</span>(</span>
-<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>  <span class="at">data =</span> toy,</span>
-<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
-<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
-<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a>  <span class="at">rating_min =</span> <span class="dv">1</span>,</span>
-<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a>  <span class="at">rating_max =</span> <span class="dv">4</span>,</span>
-<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a>  <span class="at">expected_design =</span> mfrmr_example_operational_design</span>
-<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a>)</span>
-<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a>data_summary_toy <span class="ot">&lt;-</span> <span class="fu">summary</span>(data_review_toy)</span>
-<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a>data_summary_toy<span class="sc">$</span>structural_missingness</span>
-<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a>data_summary_toy<span class="sc">$</span>design_connectivity</span>
-<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a></span>
-<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a>fit_toy <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
-<span id="cb2-19"><a href="#cb2-19" tabindex="-1"></a>  <span class="at">data =</span> toy,</span>
-<span id="cb2-20"><a href="#cb2-20" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
-<span id="cb2-21"><a href="#cb2-21" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
-<span id="cb2-22"><a href="#cb2-22" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb2-23"><a href="#cb2-23" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
-<span id="cb2-24"><a href="#cb2-24" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span></span>
-<span id="cb2-25"><a href="#cb2-25" tabindex="-1"></a>)</span>
-<span id="cb2-26"><a href="#cb2-26" tabindex="-1"></a>diag_toy <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(</span>
-<span id="cb2-27"><a href="#cb2-27" tabindex="-1"></a>  fit_toy,</span>
-<span id="cb2-28"><a href="#cb2-28" tabindex="-1"></a>  <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>,</span>
-<span id="cb2-29"><a href="#cb2-29" tabindex="-1"></a>  <span class="at">diagnostic_mode =</span> <span class="st">&quot;both&quot;</span>,</span>
-<span id="cb2-30"><a href="#cb2-30" tabindex="-1"></a>  <span class="at">fit_df_method =</span> <span class="st">&quot;both&quot;</span></span>
-<span id="cb2-31"><a href="#cb2-31" tabindex="-1"></a>)</span>
-<span id="cb2-32"><a href="#cb2-32" tabindex="-1"></a></span>
-<span id="cb2-33"><a href="#cb2-33" tabindex="-1"></a><span class="co"># Fast fit-only summary: this does not compute diagnostics.</span></span>
-<span id="cb2-34"><a href="#cb2-34" tabindex="-1"></a>fit_summary_toy <span class="ot">&lt;-</span> <span class="fu">summary</span>(fit_toy, <span class="at">profile =</span> <span class="st">&quot;fit&quot;</span>, <span class="at">detail =</span> <span class="st">&quot;brief&quot;</span>)</span>
-<span id="cb2-35"><a href="#cb2-35" tabindex="-1"></a></span>
-<span id="cb2-36"><a href="#cb2-36" tabindex="-1"></a><span class="co"># Comprehensive review, reusing diagnostics already computed above.</span></span>
-<span id="cb2-37"><a href="#cb2-37" tabindex="-1"></a>facets_summary_toy <span class="ot">&lt;-</span> <span class="fu">summary</span>(</span>
-<span id="cb2-38"><a href="#cb2-38" tabindex="-1"></a>  fit_toy,</span>
-<span id="cb2-39"><a href="#cb2-39" tabindex="-1"></a>  <span class="at">profile =</span> <span class="st">&quot;facets&quot;</span>,</span>
-<span id="cb2-40"><a href="#cb2-40" tabindex="-1"></a>  <span class="at">detail =</span> <span class="st">&quot;brief&quot;</span>,</span>
-<span id="cb2-41"><a href="#cb2-41" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag_toy</span>
-<span id="cb2-42"><a href="#cb2-42" tabindex="-1"></a>)</span>
-<span id="cb2-43"><a href="#cb2-43" tabindex="-1"></a>res_toy <span class="ot">&lt;-</span> facets_summary_toy<span class="sc">$</span>results</span>
-<span id="cb2-44"><a href="#cb2-44" tabindex="-1"></a></span>
-<span id="cb2-45"><a href="#cb2-45" tabindex="-1"></a>fit_summary_toy<span class="sc">$</span>decision</span>
-<span id="cb2-46"><a href="#cb2-46" tabindex="-1"></a>fit_summary_toy<span class="sc">$</span>overview</span>
-<span id="cb2-47"><a href="#cb2-47" tabindex="-1"></a>fit_summary_toy<span class="sc">$</span>readiness</span>
-<span id="cb2-48"><a href="#cb2-48" tabindex="-1"></a>fit_summary_toy<span class="sc">$</span>data_review</span>
-<span id="cb2-49"><a href="#cb2-49" tabindex="-1"></a><span class="fu">summary</span>(diag_toy)<span class="sc">$</span>overview</span>
-<span id="cb2-50"><a href="#cb2-50" tabindex="-1"></a>facets_summary_toy</span>
-<span id="cb2-51"><a href="#cb2-51" tabindex="-1"></a></span>
-<span id="cb2-52"><a href="#cb2-52" tabindex="-1"></a><span class="co"># Required first fitted-scale figure.</span></span>
-<span id="cb2-53"><a href="#cb2-53" tabindex="-1"></a><span class="fu">plot</span>(res_toy, <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>, <span class="at">show_ci =</span> <span class="cn">TRUE</span>, <span class="at">top_n =</span> <span class="cn">Inf</span>)</span>
-<span id="cb2-54"><a href="#cb2-54" tabindex="-1"></a></span>
-<span id="cb2-55"><a href="#cb2-55" tabindex="-1"></a><span class="co"># Optional FACETS-style ruler. Replace these examples with the study rubric.</span></span>
-<span id="cb2-56"><a href="#cb2-56" tabindex="-1"></a>rubric_labels <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
-<span id="cb2-57"><a href="#cb2-57" tabindex="-1"></a>  <span class="st">&quot;1&quot;</span> <span class="ot">=</span> <span class="st">&quot;Level 1&quot;</span>,</span>
-<span id="cb2-58"><a href="#cb2-58" tabindex="-1"></a>  <span class="st">&quot;2&quot;</span> <span class="ot">=</span> <span class="st">&quot;Level 2&quot;</span>,</span>
-<span id="cb2-59"><a href="#cb2-59" tabindex="-1"></a>  <span class="st">&quot;3&quot;</span> <span class="ot">=</span> <span class="st">&quot;Level 3&quot;</span>,</span>
-<span id="cb2-60"><a href="#cb2-60" tabindex="-1"></a>  <span class="st">&quot;4&quot;</span> <span class="ot">=</span> <span class="st">&quot;Level 4&quot;</span></span>
-<span id="cb2-61"><a href="#cb2-61" tabindex="-1"></a>)</span>
-<span id="cb2-62"><a href="#cb2-62" tabindex="-1"></a><span class="fu">plot</span>(</span>
-<span id="cb2-63"><a href="#cb2-63" tabindex="-1"></a>  res_toy,</span>
-<span id="cb2-64"><a href="#cb2-64" tabindex="-1"></a>  <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>,</span>
-<span id="cb2-65"><a href="#cb2-65" tabindex="-1"></a>  <span class="at">renderer =</span> <span class="st">&quot;facets&quot;</span>,</span>
-<span id="cb2-66"><a href="#cb2-66" tabindex="-1"></a>  <span class="at">category_labels =</span> rubric_labels,</span>
-<span id="cb2-67"><a href="#cb2-67" tabindex="-1"></a>  <span class="at">show_ci =</span> <span class="cn">FALSE</span>,</span>
-<span id="cb2-68"><a href="#cb2-68" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
-<span id="cb2-69"><a href="#cb2-69" tabindex="-1"></a>)</span>
-<span id="cb2-70"><a href="#cb2-70" tabindex="-1"></a><span class="co"># Setting show_ci = TRUE on this FACETS-style ruler is available as a</span></span>
-<span id="cb2-71"><a href="#cb2-71" tabindex="-1"></a><span class="co"># deliberate hybrid: FACETS ruler grammar plus mfrmr uncertainty intervals.</span></span>
-<span id="cb2-72"><a href="#cb2-72" tabindex="-1"></a></span>
-<span id="cb2-73"><a href="#cb2-73" tabindex="-1"></a><span class="co"># Optional follow-up: Infit on x, measure on y; persons are explicit opt-in.</span></span>
-<span id="cb2-74"><a href="#cb2-74" tabindex="-1"></a><span class="fu">plot</span>(</span>
-<span id="cb2-75"><a href="#cb2-75" tabindex="-1"></a>  res_toy,</span>
-<span id="cb2-76"><a href="#cb2-76" tabindex="-1"></a>  <span class="at">type =</span> <span class="st">&quot;fit_pathway&quot;</span>,</span>
-<span id="cb2-77"><a href="#cb2-77" tabindex="-1"></a>  <span class="at">fit_stat =</span> <span class="st">&quot;Infit&quot;</span>,</span>
-<span id="cb2-78"><a href="#cb2-78" tabindex="-1"></a>  <span class="at">include_person =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb2-79"><a href="#cb2-79" tabindex="-1"></a>  <span class="at">top_n_person =</span> <span class="dv">12</span>,</span>
-<span id="cb2-80"><a href="#cb2-80" tabindex="-1"></a>  <span class="at">person_labels =</span> <span class="st">&quot;none&quot;</span>,</span>
-<span id="cb2-81"><a href="#cb2-81" tabindex="-1"></a>  <span class="at">facet_labels =</span> <span class="st">&quot;flagged&quot;</span>,</span>
-<span id="cb2-82"><a href="#cb2-82" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
-<span id="cb2-83"><a href="#cb2-83" tabindex="-1"></a>)</span></code></pre></div>
-<p>Read <code>$decision</code> before the parameter tables. The same
-five fields are used for RSM, PCM, and bounded GPCM: interpretation
-status, formal-inference status, fit readiness, the reason, and the
-highest-priority next action. This block does not add a new acceptance
-test. It combines the stored readiness record with any supplied
-precision evidence. A fit-only summary returns
-<code>FormalInference = &quot;No&quot;</code> until a matching
-<code>diagnose_mfrm()</code> result is supplied;
-<code>InferenceReady = TRUE</code> alone is not evidence for formal
-SE/CI or reliability. Use
-<code>summary(fit_toy, diagnostics = diag_toy)$decision</code> or
-<code>summary(diag_toy)$decision</code> for the precision-aware
-decision. When <code>FormalInference</code> is <code>&quot;No&quot;</code>,
-diagnostic work may continue to investigate the stated reason, but
-estimates and plots must not be reported as formal results.</p>
-<p>Optimizer code zero is only one numerical signal.
-<code>fit_mfrm()</code> also checks the terminal gradient; when the
-initial direct or hybrid solution stops with a larger gradient and
-<code>reltol &lt;= 1e-9</code>, it runs a bounded sequence of
-warm-started polishing stages and retains the best non-worsening
-candidate under the recorded selection rule. Inspect
-<code>fit_toy$opt$optimizer_polish$Stages</code> when
-<code>Numerical</code> is not <code>pass</code>.</p>
-<p><code>maxit</code> is only a computational ceiling. It must not be
-increased until a preferred coefficient, fit statistic, or expected
-conclusion appears. For a final analysis, prespecify the estimator and
-controls and start from the package default <code>maxit = 400</code>
-unless the analysis protocol states otherwise. If a run reaches
-<code>ConvergenceStatus = &quot;iteration_limit&quot;</code>, keep it review-only
-and repeat the same data, model, method, anchors, optimizer, tolerance,
-and quadrature rule with the next ceiling in a prespecified sequence.
-Interpret only a run with <code>FitReadiness = ready</code>,
-<code>InferenceReady = TRUE</code>, and <code>Numerical = pass</code>.
-If two separately ready runs differ materially, investigate numerical
-stability instead of selecting the preferred result. Report the
-requested ceiling, actual evaluations, convergence reason, and terminal
-gradient.</p>
-<p><code>InferenceReady</code> is a conservative fit-level first screen:
-Input, Estimability, Category, Boundary, and Numerical components must
-all pass. Design, Stability, Diagnostics, and Reporting remain
-purpose-specific workflow rows in
-<code>fit_summary_toy$readiness</code>. For example, a diagnostic or
-reporting review can remain even when the stored fit record is ready.
-Conversely, <code>ready_for_diagnostics_and_reporting_follow_up</code>
-means that fitting completed and diagnostic review is the next stage; it
-is neither an optimization failure nor a claim that the analysis is
-already manuscript-ready.</p>
-<p><code>expected_design</code> is a declared roster, not an inferred
-complete crossing. When no roster is available, the
-structural-missingness status is <code>&quot;not_declared&quot;</code>; the
-package does not label unassigned cells as missing.</p>
-<p>The <code>facets</code> profile is FACETS-style organization, not
-evidence that FACETS was run and not a numerical-equivalence claim. Its
-brief print is selective and does not print person identifiers; full
-tables remain in <code>facets_summary_toy$results$tables</code>. For a
-report-oriented result set, use <code>profile = &quot;reporting&quot;</code>. To
-inspect availability without allowing diagnostic computation, use
-<code>compute = &quot;never&quot;</code>; requested dependent sections are then
-recorded as <code>not_computed</code>:</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>reporting_summary_toy <span class="ot">&lt;-</span> <span class="fu">summary</span>(</span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>  fit_toy,</span>
-<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>  <span class="at">profile =</span> <span class="st">&quot;reporting&quot;</span>,</span>
-<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag_toy</span>
-<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>)</span>
-<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a></span>
-<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>availability_only <span class="ot">&lt;-</span> <span class="fu">summary</span>(</span>
-<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>  fit_toy,</span>
-<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>  <span class="at">profile =</span> <span class="st">&quot;facets&quot;</span>,</span>
-<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>  <span class="at">compute =</span> <span class="st">&quot;never&quot;</span></span>
-<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a>)</span>
-<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a>availability_only<span class="sc">$</span>section_status</span></code></pre></div>
-<p>Availability and interpretability are intentionally separate. Review
-<code>res_toy$readiness</code> and the <code>InterpretationStatus</code>
-columns in <code>res_toy$plot_map</code> before treating an available
-plot as a final result. Plots remain available during a numerical, data,
-design, or stability review, but they warn and carry
-<code>REVIEW ONLY</code> in the returned subtitle and drawn title until
-the readiness issue is resolved.</p>
-<p>Bias/DIF, residual PCA, and anchor-drift/linking analyses are
-deliberately not auto-run by any summary profile. They require explicit
-contrasts, diagnostic settings, or multi-fit designs.</p>
-<pre><code>#&gt;                                       Interpretation FormalInference
-#&gt; 1 Fit gates passed; formal precision review required              No
-#&gt;   FitReadiness                                              Why
-#&gt; 1        ready Formal precision support has not been evaluated.
+<div id="check-what-needs-review" class="section level3">
+<h3>Check what needs review</h3>
+<p>Read <code>results$decision</code>, especially <code>Why</code> and
+<code>NextAction</code>, before interpreting or reporting estimates.
+<code>FormalInference = &quot;No&quot;</code> in this first summary can mean that
+precision has not yet been reviewed; it does not necessarily mean that
+fitting failed. The default summary does not compute diagnostics.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>diagnostics <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit)</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>diagnostic_summary <span class="ot">&lt;-</span> <span class="fu">summary</span>(diagnostics)</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>diagnostic_summary<span class="sc">$</span>decision</span></code></pre></div>
+<p>For your own data, follow <a href="#use-your-own-csv">Use your own
+CSV</a> below. For reporting,
+<code>res &lt;- mfrm_results(fit, diagnostics = diagnostics)</code>
+builds a comprehensive object that reuses the checks above. Pass
+<code>res</code> to <code>mfrm_report()</code> or
+<code>export_mfrm_results()</code>; <code>results</code> remains the
+basic summary.</p>
+</div>
+</div>
+<div id="use-your-own-csv" class="section level2">
+<h2>Use your own CSV</h2>
+<p>The goal here is to estimate person ability while accounting for
+rater severity and criterion difficulty in your own ratings. Start with
+the same row layout as the packaged example: <strong>one score from one
+rater for one person on one criterion</strong>. For example:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Person</th>
+<th>Rater</th>
+<th>Criterion</th>
+<th>Score</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>001</td>
+<td>R1</td>
+<td>Content</td>
+<td>3</td>
+</tr>
+<tr class="even">
+<td>001</td>
+<td>R1</td>
+<td>Style</td>
+<td>2</td>
+</tr>
+<tr class="odd">
+<td>001</td>
+<td>R2</td>
+<td>Content</td>
+<td>4</td>
+</tr>
+<tr class="even">
+<td>001</td>
+<td>R2</td>
+<td>Style</td>
+<td>3</td>
+</tr>
+</tbody>
+</table>
+<p>The repeated <code>001</code> is intentional: all four scores belong
+to the same person. Keep IDs consistent across rows. These four rows
+explain the layout; use the complete set of ratings for estimation.
+<code>Score</code> contains the ordered integer categories from the
+rubric, not totals or averages across raters. This example uses two
+non-person facets; choose facets that represent your design.</p>
+<div id="read-and-inspect-the-file" class="section level3">
+<h3>1. Read and inspect the file</h3>
+<p>You can practice the full workflow without supplying a file. This
+block writes the packaged synthetic ratings to a new temporary CSV:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>csv_path <span class="ot">&lt;-</span> <span class="fu">tempfile</span>(<span class="at">fileext =</span> <span class="st">&quot;.csv&quot;</span>)</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="fu">write.csv</span>(<span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_operational&quot;</span>), csv_path,</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>          <span class="at">row.names =</span> <span class="cn">FALSE</span>, <span class="at">na =</span> <span class="st">&quot;&quot;</span>)</span></code></pre></div>
+<p>For your own data, export your rating sheet as <strong>CSV
+UTF-8</strong>, with column names in the first row. Skip the practice
+block above and select your file instead:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>csv_path <span class="ot">&lt;-</span> <span class="fu">file.choose</span>()</span></code></pre></div>
+<p>For a reusable script, replace <code>file.choose()</code> with a
+quoted path such as <code>&quot;data/ratings.csv&quot;</code>, relative to the
+folder shown by <code>getwd()</code>. Both routes now use the same
+import and analysis code:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>ratings <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  csv_path,</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="at">colClasses =</span> <span class="st">&quot;character&quot;</span>,</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="at">na.strings =</span> <span class="st">&quot;&quot;</span>,</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  <span class="at">check.names =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>  <span class="at">fileEncoding =</span> <span class="st">&quot;UTF-8-BOM&quot;</span></span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>)</span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a><span class="co"># Treat the documented missing-score marker only in the score column</span></span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>ratings <span class="ot">&lt;-</span> <span class="fu">recode_missing_codes</span>(ratings, <span class="at">columns =</span> <span class="st">&quot;Score&quot;</span>, <span class="at">codes =</span> <span class="st">&quot;NA&quot;</span>)</span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a><span class="fu">head</span>(ratings)</span>
+<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a><span class="fu">names</span>(ratings)</span>
+<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a><span class="fu">table</span>(ratings<span class="sc">$</span>Score, <span class="at">useNA =</span> <span class="st">&quot;ifany&quot;</span>)</span></code></pre></div>
+<p>Reading columns as text preserves distinct IDs such as
+<code>001</code>, <code>1</code>, and <code>NA</code>;
+<code>mfrmr</code> converts numeric score strings such as
+<code>&quot;3&quot;</code> for estimation. <code>check.names = FALSE</code>
+preserves the headers. Empty cells are missing in every column; the
+literal marker <code>NA</code> is recoded only in <code>Score</code>.
+Use the missing-score markers declared for your data. Zero is a score
+when the rubric includes zero, and must not be used to fill unassigned
+rating cells.</p>
+<p>The quoted column names in the next two steps must match
+<code>names(ratings)</code>, including capitalization and spaces. You do
+not have to rename your file’s columns. For headers
+<code>Student</code>, <code>Judge</code>, <code>Task</code>, and
+<code>Rating</code>, change the arguments in <strong>both</strong>
+<code>describe_mfrm_data()</code> and <code>fit_mfrm()</code> as
+follows:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Argument</th>
+<th>Four-column example</th>
+<th>Your alternative headers</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>person</code></td>
+<td><code>&quot;Person&quot;</code></td>
+<td><code>&quot;Student&quot;</code></td>
+</tr>
+<tr class="even">
+<td><code>facets</code></td>
+<td><code>c(&quot;Rater&quot;, &quot;Criterion&quot;)</code></td>
+<td><code>c(&quot;Judge&quot;, &quot;Task&quot;)</code></td>
+</tr>
+<tr class="odd">
+<td><code>score</code></td>
+<td><code>&quot;Score&quot;</code></td>
+<td><code>&quot;Rating&quot;</code></td>
+</tr>
+</tbody>
+</table>
+<p>Also use <code>columns = &quot;Rating&quot;</code> in the recoding call and
+inspect <code>ratings$Rating</code> instead of
+<code>ratings$Score</code>. Extra columns such as the practice file’s
+<code>Study</code> and <code>Group</code> are unused by this model.</p>
+</div>
+<div id="review-the-rows-and-the-rubric" class="section level3">
+<h3>2. Review the rows and the rubric</h3>
+<p>Set the minimum and maximum from the <strong>rubric</strong>, not the
+observed minimum and maximum in this sample. The code below describes a
+1-to-4 rubric. Keep the same values in the data review and the fit.
+<code>category_policy = &quot;preserve&quot;</code> preserves the intended
+category structure, including categories with no observations.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>data_review <span class="ot">&lt;-</span> <span class="fu">describe_mfrm_data</span>(</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>  <span class="at">data =</span> ratings,</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>  <span class="at">rating_min =</span> <span class="dv">1</span>,</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>  <span class="at">rating_max =</span> <span class="dv">4</span>,</span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>  <span class="at">category_policy =</span> <span class="st">&quot;preserve&quot;</span></span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>)</span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>data_review<span class="sc">$</span>row_retention</span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>data_review<span class="sc">$</span>missing_by_column</span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a>data_review<span class="sc">$</span>score_distribution</span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a>data_review<span class="sc">$</span>design_connectivity</span></code></pre></div>
+<p>Read these four tables in order:</p>
+<ul>
+<li><code>row_retention</code>: compare input and retained
+<code>Rows</code>; inspect any <code>DroppedRows</code>. A missing score
+or required ID removes that rating row, not automatically the person’s
+other ratings. The package does not fill missing ratings.</li>
+<li><code>missing_by_column</code>: locate missing input values.
+Non-numeric score text can also cause row loss; inspect warnings and
+<code>data_review$preparation_notes</code> when the retained count is
+unexpected.</li>
+<li><code>score_distribution</code>: <code>RawN</code> counts the
+retained ratings in each category. A zero count in an internal category,
+such as 3 on a 1-to-4 scale, prevents fitting with
+<code>category_policy = &quot;preserve&quot;</code>. Review the data and rubric
+before changing categories; increasing optimizer iterations cannot
+supply missing category information.</li>
+<li><code>design_connectivity</code>: <code>Components = 1</code> means
+a facet’s levels are connected through shared persons. More than one
+component needs design review before comparing levels across components.
+Connectivity alone does not establish full model identification.</li>
+</ul>
+<p>For the practice CSV, all 282 input rows are retained, all four
+categories have observations, and each facet has one connected
+component. Six planned ratings are absent from the file; column missing
+counts cannot detect absent rows. If you have a planned assignment
+roster, pass it as <code>expected_design</code> to
+<code>describe_mfrm_data()</code> to assess these omissions. The applied
+example later in this vignette shows how. Without a roster, structural
+missingness is reported as not assessed; a complete
+person-by-rater-by-criterion crossing is not assumed.</p>
+</div>
+<div id="fit-and-read-the-results" class="section level3">
+<h3>3. Fit and read the results</h3>
+<p>After resolving the data-review findings, fit the same rows, columns,
+and rubric. This example uses an RSM with shared category thresholds;
+the choice should reflect the scoring design. Diagnostics then supply
+evidence for the interpretation decision.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>csv_fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>  <span class="at">data =</span> ratings,</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>  <span class="at">rating_min =</span> <span class="dv">1</span>,</span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>  <span class="at">rating_max =</span> <span class="dv">4</span>,</span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>  <span class="at">category_policy =</span> <span class="st">&quot;preserve&quot;</span>,</span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
+<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span></span>
+<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a>)</span>
+<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a>csv_diagnostics <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(csv_fit)</span>
+<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a>csv_results <span class="ot">&lt;-</span> <span class="fu">summary</span>(csv_fit, <span class="at">diagnostics =</span> csv_diagnostics)</span>
+<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a>csv_results<span class="sc">$</span>decision</span></code></pre></div>
+<p>Read <code>Why</code> and <code>NextAction</code> before using the
+estimates. A <code>FormalInference</code> value of <code>&quot;No&quot;</code>
+means that the stated obstacle to formal use still needs attention.
+Diagnostic plots can help investigate it. Even a supported precision
+decision does not establish the validity of the assessment or answer the
+study’s substantive question.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="fu">plot</span>(csv_fit)</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>csv_estimates <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(csv_fit)</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">subset</span>(csv_estimates, Facet <span class="sc">==</span> <span class="st">&quot;Person&quot;</span>))</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a><span class="fu">subset</span>(csv_estimates, Facet <span class="sc">==</span> <span class="st">&quot;Rater&quot;</span>)</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="fu">subset</span>(csv_estimates, Facet <span class="sc">==</span> <span class="st">&quot;Criterion&quot;</span>)</span></code></pre></div>
+<p><code>Level</code> identifies the person, rater, or criterion;
+<code>Estimate</code> is the fitted value in logits. With these
+defaults, higher person values mean higher ability, higher rater values
+mean stricter ratings, and higher criterion values mean greater
+difficulty. The rater and criterion estimates are centered at zero
+within each facet. In the practice file, R06 is about +0.41 and R01
+about -0.61: R06 is estimated to rate more strictly after accounting for
+person ability and criterion difficulty. This difference alone does not
+establish statistical significance.</p>
+<p>With custom facet names, change the <code>Facet</code> filters too,
+for example from <code>&quot;Rater&quot;</code> to <code>&quot;Judge&quot;</code>; person
+rows retain <code>Facet == &quot;Person&quot;</code> even when the input ID column
+is named <code>Student</code>. To inspect all persons, remove
+<code>head()</code>. The overview tables in <code>csv_results</code>
+summarize distributions; the rows in <code>csv_estimates</code> give
+individual estimates.</p>
+</div>
+<div id="if-a-check-stops-you" class="section level3">
+<h3>If a check stops you</h3>
+<table>
+<colgroup>
+<col width="50%" />
+<col width="50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>What you see</th>
+<th>What to check or change</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>The CSV is not found</td>
+<td>Use <code>file.choose()</code> or check the quoted path relative to
+<code>getwd()</code>. An <code>.xlsx</code> workbook must first be
+exported as CSV.</td>
+</tr>
+<tr class="even">
+<td>All fields appear in one column, or the header is garbled</td>
+<td>Check the separator and encoding. Use <code>sep = &quot;;&quot;</code> for a
+semicolon-delimited file; re-export as CSV UTF-8 if text is
+unreadable.</td>
+</tr>
+<tr class="odd">
+<td><code>Column(s) not found in data</code></td>
+<td>Compare <code>names(ratings)</code> with the names in
+<code>person</code>, <code>facets</code>, and <code>score</code>; check
+spelling, spaces, and case.</td>
+</tr>
+<tr class="even">
+<td>Non-numeric or fractional scores</td>
+<td>Check <code>table(ratings$Score, useNA = &quot;ifany&quot;)</code>. Map rubric
+labels explicitly to their ordered integer codes. Do not round totals or
+averaged ratings to make them fit.</td>
+</tr>
+<tr class="odd">
+<td>Scores outside the supplied range, such as 99</td>
+<td>Check whether the value is an error or a documented missing code.
+Correct the value or recode the declared missing marker; keep the range
+tied to the rubric.</td>
+</tr>
+<tr class="even">
+<td>Fewer retained rows than expected</td>
+<td>Inspect <code>data_review$missing_by_column</code> and
+<code>data_review$preparation_notes</code>. Correct unintended missing
+IDs or score values, then rerun the review and fit.</td>
+</tr>
+<tr class="odd">
+<td>Duplicated person-by-facet cells</td>
+<td>Inspect <code>data_review$duplicate_cell_detail</code>. Correct
+accidental duplicates. If these are distinct tasks or occasions, include
+the corresponding facet; do not automatically delete legitimate
+ratings.</td>
+</tr>
+<tr class="even">
+<td>A category has no observations, or the design is disconnected</td>
+<td>Review category coding and assignments. Do not invent ratings or
+change optimizer settings to resolve missing information.</td>
+</tr>
+</tbody>
+</table>
+<p>If your data documentation defines <code>99</code> and <code>.</code>
+as missing <strong>scores</strong>, recode only that column before step
+2. This preserves an ID such as <code>99</code>:</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>ratings <span class="ot">&lt;-</span> <span class="fu">recode_missing_codes</span>(</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>  ratings, <span class="at">columns =</span> <span class="st">&quot;Score&quot;</span>, <span class="at">codes =</span> <span class="fu">c</span>(<span class="st">&quot;99&quot;</span>, <span class="st">&quot;.&quot;</span>)</span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>)</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="fu">table</span>(ratings<span class="sc">$</span>Score, <span class="at">useNA =</span> <span class="st">&quot;ifany&quot;</span>)</span></code></pre></div>
+<p>Use only the codes declared for your data, and change
+<code>&quot;Score&quot;</code> if your score column has another name. Then repeat
+steps 2 and 3 with the recoded data.</p>
+</div>
+<div id="if-criteria-occupy-separate-columns" class="section level3">
+<h3>If criteria occupy separate columns</h3>
+<p>For a sheet with one row per person-rater pair and separate criterion
+scores, reshape the criterion columns into rating rows:</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>wide <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>  <span class="at">Person =</span> <span class="fu">c</span>(<span class="st">&quot;001&quot;</span>, <span class="st">&quot;001&quot;</span>),</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>  <span class="at">Rater =</span> <span class="fu">c</span>(<span class="st">&quot;R1&quot;</span>, <span class="st">&quot;R2&quot;</span>),</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>  <span class="at">Content =</span> <span class="fu">c</span>(<span class="dv">3</span>, <span class="dv">4</span>),</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>  <span class="at">Style =</span> <span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">3</span>)</span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>)</span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>ratings_long <span class="ot">&lt;-</span> tidyr<span class="sc">::</span><span class="fu">pivot_longer</span>(</span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>  wide,</span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>  <span class="at">cols =</span> <span class="fu">c</span>(<span class="st">&quot;Content&quot;</span>, <span class="st">&quot;Style&quot;</span>),</span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>  <span class="at">names_to =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>  <span class="at">values_to =</span> <span class="st">&quot;Score&quot;</span></span>
+<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a>)</span>
+<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a>ratings_long</span></code></pre></div>
+<p>The output is the four-row layout at the start of this section. For
+your full sheet, read the CSV into <code>wide</code>, select its actual
+criterion columns in <code>cols</code>, and use
+<code>ratings &lt;- ratings_long</code> before step 2. Keep the complete
+dataset; these four demonstration rows are not sufficient for the
+intended analysis.</p>
+</div>
+</div>
+<div id="continue-with-diagnostics-and-reporting" class="section level2">
+<h2>Continue with diagnostics and reporting</h2>
+<p>The following sections ask three questions: are the estimates
+interpretable, what needs closer inspection, and what information
+belongs in a report? First select the analysis to carry through every
+table, figure and export. The default uses <strong>Quick start</strong>,
+including its known assignment roster:</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>analysis_data <span class="ot">&lt;-</span> ratings</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>fit_toy <span class="ot">&lt;-</span> fit</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>diag_toy <span class="ot">&lt;-</span> diagnostics</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a><span class="fu">data</span>(<span class="st">&quot;mfrmr_example_operational_design&quot;</span>, <span class="at">package =</span> <span class="st">&quot;mfrmr&quot;</span>)</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>analysis_roster <span class="ot">&lt;-</span> mfrmr_example_operational_design</span></code></pre></div>
+<p><strong>For your CSV, run this replacement block instead.</strong>
+The downstream object names stay the same so the remaining code uses
+your analysis:</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>analysis_data <span class="ot">&lt;-</span> ratings</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>fit_toy <span class="ot">&lt;-</span> csv_fit</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>diag_toy <span class="ot">&lt;-</span> csv_diagnostics</span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>analysis_roster <span class="ot">&lt;-</span> <span class="cn">NULL</span> <span class="co"># Replace with your own planned roster if available</span></span></code></pre></div>
+<p>Do not use the packaged roster for your own ratings.
+<code>NULL</code> means planned omissions cannot be assessed; it does
+not mean there are no missing ratings. The numerical examples in the
+prose below describe the synthetic data. If your headers or rubric
+differ, update <code>person</code>, <code>facets</code>,
+<code>score</code>, the rating limits and later
+<code>&quot;Rater&quot;</code>/<code>&quot;Criterion&quot;</code> selections as in the CSV
+lesson.</p>
+<div id="check-the-data-and-estimation-record" class="section level3">
+<h3>1. Check the data and estimation record</h3>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>data_review_toy <span class="ot">&lt;-</span> <span class="fu">describe_mfrm_data</span>(</span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>  <span class="at">data =</span> analysis_data,</span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a>  <span class="at">rating_min =</span> <span class="dv">1</span>,</span>
+<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a>  <span class="at">rating_max =</span> <span class="dv">4</span>,</span>
+<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a>  <span class="at">category_policy =</span> <span class="st">&quot;preserve&quot;</span>,</span>
+<span id="cb14-9"><a href="#cb14-9" tabindex="-1"></a>  <span class="at">expected_design =</span> analysis_roster</span>
+<span id="cb14-10"><a href="#cb14-10" tabindex="-1"></a>)</span>
+<span id="cb14-11"><a href="#cb14-11" tabindex="-1"></a>data_summary_toy <span class="ot">&lt;-</span> <span class="fu">summary</span>(data_review_toy)</span>
+<span id="cb14-12"><a href="#cb14-12" tabindex="-1"></a>data_summary_toy<span class="sc">$</span>structural_missingness</span>
+<span id="cb14-13"><a href="#cb14-13" tabindex="-1"></a>data_summary_toy<span class="sc">$</span>design_connectivity</span>
+<span id="cb14-14"><a href="#cb14-14" tabindex="-1"></a></span>
+<span id="cb14-15"><a href="#cb14-15" tabindex="-1"></a>fit_summary_toy <span class="ot">&lt;-</span> <span class="fu">summary</span>(fit_toy)</span>
+<span id="cb14-16"><a href="#cb14-16" tabindex="-1"></a>fit_summary_toy<span class="sc">$</span>overview[, <span class="fu">c</span>(<span class="st">&quot;Model&quot;</span>, <span class="st">&quot;Method&quot;</span>, <span class="st">&quot;N&quot;</span>, <span class="st">&quot;Persons&quot;</span>, <span class="st">&quot;Converged&quot;</span>)]</span>
+<span id="cb14-17"><a href="#cb14-17" tabindex="-1"></a>fit_summary_toy<span class="sc">$</span>decision</span></code></pre></div>
+<p>The example has 282 observed ratings from 48 persons, six raters, and
+three criteria. All observed rows are retained. Six additional ratings
+were planned but are absent; they are visible only because the roster
+was supplied. Distinguish omitted planned ratings from input rows
+excluded during cleaning. The package does not assume that every rater
+scored every person.</p>
+<p>Record the estimator, model, score coding, constraints, and numerical
+settings. For this RSM, MML uses a standard-normal person distribution;
+reported person scores are EAP estimates, and non-person facets are
+fixed effects centered within facet. RSM shares category thresholds.
+Choose PCM with an explicit <code>step_facet</code> when the rubric and
+question call for separate thresholds.</p>
+<p>The default MML grid is 31 quadrature points. A comparison that could
+change the study’s conclusion needs a prespecified denser common-grid
+sensitivity check with <code>mml_quadrature_sensitivity()</code>. A
+temporary 7-point grid is only a computational screening run.
+<code>maxit</code> is a computational ceiling, not a convergence
+criterion; inspect <code>ConvergenceStatus</code> and
+<code>Numerical</code> before increasing it. Keep the same data, model,
+method, and planned controls when investigating an iteration limit.
+Choose JML for its fixed-person estimand when appropriate, not as a
+faster substitute for MML.</p>
+<p><code>summary(fit)$numerical_review</code> distinguishes
+optimization, curvature, starting values and integration, with a next
+action for each. To preserve inputs and constraints, use
+<code>build_mfrm_replay_script(fit)</code> with the original input data
+before changing a diagnostic control. Ordinary <code>mml_starts</code>
+and automatic integration cannot be combined: review specified starts on
+a shared fixed grid, then run <code>mml_quadrature_sensitivity()</code>
+separately. That review retains the starting-value policy. Nearly equal
+likelihoods do not override unresolved gradient, information or
+inference checks.</p>
+<pre><code>#&gt;                                                           Interpretation
+#&gt; 1 Fit-readiness requirements satisfied; formal precision review required
+#&gt;   FormalInference FitReadiness
+#&gt; 1              No        ready
+#&gt;                                                Why
+#&gt; 1 Formal precision support has not been evaluated.
 #&gt;                                                                                                                                                   NextAction
 #&gt; 1 Run `diagnose_mfrm()` and pass its result as `diagnostics =` to evaluate formal precision support; fit readiness alone is not a formal-inference decision.
 #&gt;   Model Method MethodUsed  ICContractVersion   N ResponseRows
@@ -615,14 +1106,14 @@ contrasts, diagnostic settings, or multi-fit designs.</p>
 #&gt; 1 sclove_n_plus_2_over_24 mfrmr_ghq_normal_v1:q=31                 31
 #&gt;   ICIntegrationTier ICIntegrationStatus ICIntegrationSelectable
 #&gt; 1    standard_start     selection_start                    TRUE
-#&gt;          LegacyAIC        LegacyBIC LegacyICSampleSize LegacyICSampleSizeBasis
-#&gt; 1 712.479607414569 745.256771053012                282               row_count
-#&gt;   Converged ReadinessContractVersion FitReadiness InferenceReady InputState
-#&gt; 1      TRUE mfrmr-readiness-0.2.3-v3        ready           TRUE       pass
-#&gt;   EstimabilityState CategoryState BoundaryState NumericalState
-#&gt; 1        identified      adequate        finite          ready
-#&gt;   ReadinessReasonCodes
-#&gt; 1                     
+#&gt;          LegacyAIC        LegacyBIC LegacyICSampleSize
+#&gt; 1 712.479607414569 745.256771053012                282
+#&gt;   LegacyICSampleSizeBasis Converged ReadinessContractVersion FitReadiness
+#&gt; 1               row_count      TRUE mfrmr-readiness-0.2.3-v3        ready
+#&gt;   InferenceReady InputState EstimabilityState CategoryState BoundaryState
+#&gt; 1           TRUE       pass        identified      adequate        finite
+#&gt;   NumericalState ReadinessReasonCodes
+#&gt; 1          ready                     
 #&gt;                                                                                      ReadinessAuditProvenance
 #&gt; 1 fit_readiness_builder_v1;contract=mfrmr-readiness-0.2.3-v3;method=MML;model=RSM;scale=single_observed_scale
 #&gt;   BoundaryReasonCodes Iterations      IterationsBasis MMLEngineRequested
@@ -648,39 +1139,186 @@ contrasts, diagnostic settings, or multi-fit designs.</p>
 #&gt;   TerminalGradientSupNorm  TerminalGradientRMS FacetSampleSizeFlag
 #&gt; 1    1.58249274520017e-05 8.46761078292423e-06            standard
 #&gt;   FacetMinLevelN FacetSparseCount ExtremeHighN ExtremeLowN
-#&gt; 1             38                0            0           0
-#&gt;   Observations Persons Facets Categories Subsets ResidualPCA DiagnosticMode
+#&gt; 1             38                0            0           0</code></pre>
+</div>
+<div id="read-precision-and-model-fit-before-interpreting-differences" class="section level3">
+<h3>2. Read precision and model fit before interpreting differences</h3>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>diagnostic_summary_toy <span class="ot">&lt;-</span> <span class="fu">summary</span>(diag_toy)</span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a>diagnostic_summary_toy<span class="sc">$</span>decision</span>
+<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a>diagnostic_summary_toy<span class="sc">$</span>overall_fit</span>
+<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a></span>
+<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a>precision_toy <span class="ot">&lt;-</span> <span class="fu">precision_review_report</span>(fit_toy, <span class="at">diagnostics =</span> diag_toy)</span>
+<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a>precision_toy<span class="sc">$</span>profile[, <span class="fu">c</span>(</span>
+<span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a>  <span class="st">&quot;PrecisionTier&quot;</span>, <span class="st">&quot;SupportsFormalInference&quot;</span>, <span class="st">&quot;PersonSEBasis&quot;</span>, <span class="st">&quot;NonPersonSEBasis&quot;</span></span>
+<span id="cb16-8"><a href="#cb16-8" tabindex="-1"></a>)]</span>
+<span id="cb16-9"><a href="#cb16-9" tabindex="-1"></a>precision_toy<span class="sc">$</span>checks</span>
+<span id="cb16-10"><a href="#cb16-10" tabindex="-1"></a></span>
+<span id="cb16-11"><a href="#cb16-11" tabindex="-1"></a><span class="co"># View the fitted locations with their uncertainty</span></span>
+<span id="cb16-12"><a href="#cb16-12" tabindex="-1"></a><span class="fu">plot</span>(fit_toy, <span class="at">diagnostics =</span> diag_toy, <span class="at">show_ci =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+<p>The fit-only summary reports <code>FormalInference = &quot;No&quot;</code>
+until precision evidence is supplied. Read the diagnostic decision’s
+<code>Why</code> and <code>NextAction</code> together with the precision
+checks. A <code>model_based</code> label alone does not override a
+failed fit-readiness component or justify a particular substantive
+claim.</p>
+<p>Infit and Outfit describe departures from the fitted response model;
+their reference value is 1. A global average near 1 can coexist with
+local problems. In this example the MML person uncertainty is posterior
+SD, while the non-person SEs use observed information. Report the basis
+and interval method when presenting uncertainty; do not call every
+interval a posterior quantile interval or treat a point difference as a
+significance test.</p>
+<pre><code>#&gt;   Observations Persons Facets Categories Subsets ResidualPCA DiagnosticMode
 #&gt; 1          282      48      2          4       1        none           both
 #&gt;   Method PrecisionTier MarginalFit        FairAverage
-#&gt; 1    MML   model_based   available embedded_available
-#&gt;   Component
-#&gt; 1      name
-#&gt; 2      data</code></pre>
-<p>The same fit can then move through the recommended first reporting
-workflow:</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>report_toy <span class="ot">&lt;-</span> <span class="fu">mfrm_report</span>(res_toy, <span class="at">style =</span> <span class="st">&quot;qc&quot;</span>)</span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a></span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="fu">summary</span>(res_toy)<span class="sc">$</span>next_actions</span>
-<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="fu">summary</span>(report_toy)<span class="sc">$</span>overview</span>
-<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a></span>
-<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="co"># This is a controlled analysis archive, not a deidentified shareable export.</span></span>
-<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>export_dir <span class="ot">&lt;-</span> <span class="fu">file.path</span>(<span class="fu">tempdir</span>(), <span class="st">&quot;mfrmr-workflow-export&quot;</span>)</span>
-<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>export_toy <span class="ot">&lt;-</span> <span class="fu">export_mfrm_results</span>(</span>
-<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>  res_toy,</span>
-<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a>  <span class="at">output_dir =</span> export_dir,</span>
-<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a>  <span class="at">include =</span> <span class="fu">c</span>(<span class="st">&quot;default&quot;</span>, <span class="st">&quot;report&quot;</span>),</span>
-<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a>  <span class="at">overwrite =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a>  <span class="at">acknowledge_sensitive =</span> <span class="cn">TRUE</span></span>
-<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a>)</span>
-<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a>export_preview <span class="ot">&lt;-</span> <span class="fu">head</span>(export_toy<span class="sc">$</span>written_files)</span>
-<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a>export_preview<span class="sc">$</span>Path <span class="ot">&lt;-</span> <span class="fu">basename</span>(export_preview<span class="sc">$</span>Path)</span>
-<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a>export_preview</span></code></pre></div>
-<p>The acknowledgement suppresses the warning only; it does not redact
-person identifiers, person-level results, local paths, or the complete
-RDS object. The preview above deliberately shows path basenames only;
-the returned export object retains the actual local paths needed by the
-current analysis session. Review every exported file under the study’s
-data-handling policy before sharing.</p>
+#&gt; 1    MML   model_based   available embedded_available</code></pre>
+</div>
+<div id="identify-what-needs-closer-inspection" class="section level3">
+<h3>3. Identify what needs closer inspection</h3>
+<p><strong>Are the rating categories working as intended?</strong>
+Examine category use and the transitions between scores on the declared
+rubric:</p>
+<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a>scale_toy <span class="ot">&lt;-</span> <span class="fu">rating_scale_table</span>(fit_toy, <span class="at">diagnostics =</span> diag_toy)</span>
+<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a>scale_toy<span class="sc">$</span>category_table[, <span class="fu">c</span>(<span class="st">&quot;Category&quot;</span>, <span class="st">&quot;Count&quot;</span>, <span class="st">&quot;AvgMeasure&quot;</span>, <span class="st">&quot;ExpectedMeasure&quot;</span>, <span class="st">&quot;Infit&quot;</span>, <span class="st">&quot;Outfit&quot;</span>)]</span>
+<span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a>scale_toy<span class="sc">$</span>model_context</span>
+<span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a>scale_toy<span class="sc">$</span>owner_category_table[, <span class="fu">c</span>(</span>
+<span id="cb18-5"><a href="#cb18-5" tabindex="-1"></a>  <span class="st">&quot;StepFacet&quot;</span>, <span class="st">&quot;CategoryLabel&quot;</span>, <span class="st">&quot;RawCount&quot;</span>, <span class="st">&quot;Count&quot;</span>, <span class="st">&quot;Percent&quot;</span>, <span class="st">&quot;UsageStatus&quot;</span></span>
+<span id="cb18-6"><a href="#cb18-6" tabindex="-1"></a>)]</span>
+<span id="cb18-7"><a href="#cb18-7" tabindex="-1"></a>scale_toy<span class="sc">$</span>threshold_table[, <span class="fu">c</span>(<span class="st">&quot;StepFacet&quot;</span>, <span class="st">&quot;Step&quot;</span>, <span class="st">&quot;Estimate&quot;</span>, <span class="st">&quot;SE&quot;</span>, <span class="st">&quot;CIUse&quot;</span>)]</span>
+<span id="cb18-8"><a href="#cb18-8" tabindex="-1"></a><span class="fu">plot</span>(scale_toy)</span>
+<span id="cb18-9"><a href="#cb18-9" tabindex="-1"></a>scale_toy<span class="sc">$</span>notes</span></code></pre></div>
+<p><code>AvgMeasure</code> is the average oriented generating measure
+among responses in each observed category; <code>ExpectedMeasure</code>
+is its model expectation. Category residual mean squares are descriptive
+and have no universal unit baseline.</p>
+<p><code>StepOwner</code> tells you which facet supplies the thresholds.
+This RSM has one <code>Common</code> family, so its owner counts
+describe the whole sample. With PCM,
+<code>step_facet = &quot;Criterion&quot;</code> gives counts and thresholds for
+each criterion; <code>step_facet = &quot;Rater&quot;</code> gives them for each
+rater. Choose the owner from the rubric and analysis question.
+Criterion-owned thresholds cannot describe differences in raters’
+threshold spread.</p>
+<p><code>RawCount</code> counts rating rows; <code>Count</code> sums
+their weights, and <code>Percent</code> uses the total weight within the
+indicated owner level. These are not counts of independent persons. A
+category unused by one owner can be common overall.
+<code>UsageStatus</code> distinguishes unobserved categories,
+zero-weight observations and owners with no ratings; the last have
+unavailable percentages. An observed zero does not establish that a
+category is structurally impossible.</p>
+<p>The threshold table reuses SEs and intervals from the supplied
+diagnostics. Check <code>SE_Status</code>, <code>CIUse</code> and
+<code>UncertaintySourceStatus</code> before reporting them. Without
+diagnostics, the same call returns counts and fitted threshold points
+without requesting covariance calculations; its SEs are unavailable.
+Notes remain in the returned object, outside the plot.</p>
+<p>The bars show observed category counts; the line shows fitted
+expected counts. Look for rarely used categories, changes in average
+person measure across categories, and threshold order. Explain the
+observed pattern in terms of the rubric. A warning is a reason to
+investigate, not an automatic instruction to merge categories.</p>
+<p><strong>Which ratings differ most from model expectations?</strong>
+This example uses an explicit exploratory rule and shows up to ten
+cases:</p>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a>unexpected_toy <span class="ot">&lt;-</span> <span class="fu">unexpected_response_table</span>(</span>
+<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a>  fit_toy,</span>
+<span id="cb19-3"><a href="#cb19-3" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag_toy,</span>
+<span id="cb19-4"><a href="#cb19-4" tabindex="-1"></a>  <span class="at">abs_z_min =</span> <span class="fl">1.5</span>,</span>
+<span id="cb19-5"><a href="#cb19-5" tabindex="-1"></a>  <span class="at">prob_max =</span> <span class="fl">0.4</span>,</span>
+<span id="cb19-6"><a href="#cb19-6" tabindex="-1"></a>  <span class="at">top_n =</span> <span class="dv">10</span></span>
+<span id="cb19-7"><a href="#cb19-7" tabindex="-1"></a>)</span>
+<span id="cb19-8"><a href="#cb19-8" tabindex="-1"></a>unexpected_toy<span class="sc">$</span>summary</span>
+<span id="cb19-9"><a href="#cb19-9" tabindex="-1"></a>unexpected_toy<span class="sc">$</span>table[, <span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>, <span class="st">&quot;Observed&quot;</span>, <span class="st">&quot;Expected&quot;</span>, <span class="st">&quot;StdResidual&quot;</span>)]</span>
+<span id="cb19-10"><a href="#cb19-10" tabindex="-1"></a><span class="fu">plot</span>(unexpected_toy)</span></code></pre></div>
+<p>Read the rule in <code>$summary</code> with the residuals. The
+displayed cases are a selected preview; <code>top_n</code> limits the
+table, while the summary counts all flagged ratings. Here this broad
+rule flags 141 of 282 ratings (50%), although only ten cases are
+displayed. Report the rule with the count and percentage. Inspect the
+original work and scoring context before changing a rating or excluding
+a person. A flag does not identify its cause.</p>
+<p>The default diagnostics retain the residual/EAP path and the
+latent-integrated marginal screening path. The latter includes category
+and pairwise agreement gaps. Keep their bases separate when
+reporting:</p>
+<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a>diagnostic_summary_toy<span class="sc">$</span>diagnostic_basis[, <span class="fu">c</span>(<span class="st">&quot;DiagnosticPath&quot;</span>, <span class="st">&quot;Status&quot;</span>, <span class="st">&quot;ReportingUse&quot;</span>)]</span>
+<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a><span class="fu">plot</span>(fit_toy, <span class="at">type =</span> <span class="st">&quot;marginal_fit&quot;</span>, <span class="at">diagnostics =</span> diag_toy)</span></code></pre></div>
+<p>Follow a pairwise warning with <code>plot()</code>. Add residual PCA
+only when residual structure is relevant to the question, using
+<code>diagnose_mfrm(fit_toy, residual_pca = &quot;both&quot;)</code>. Report the
+mode and limits of the screen; residual PCA alone does not establish
+unidimensionality. See
+<code>vignette(&quot;mfrmr-mml-and-marginal-fit&quot;, package = &quot;mfrmr&quot;)</code>
+and <code>vignette(&quot;mfrmr-visual-diagnostics&quot;, package = &quot;mfrmr&quot;)</code>
+for these follow-ups.</p>
+<p><strong>What should I discuss with a rater?</strong> Start from the
+coverage and category checks above, then view severity and its
+uncertainty alongside the screening results. Reuse the same fit and
+diagnostics:</p>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a><span class="fu">plot</span>(fit_toy, <span class="at">type =</span> <span class="st">&quot;rater_severity&quot;</span>, <span class="at">diagnostics =</span> diag_toy, <span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">show_bands =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb21-2"><a href="#cb21-2" tabindex="-1"></a>rater_review <span class="ot">&lt;-</span> <span class="fu">facet_quality_dashboard</span>(</span>
+<span id="cb21-3"><a href="#cb21-3" tabindex="-1"></a>  fit_toy, <span class="at">diagnostics =</span> diag_toy, <span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span></span>
+<span id="cb21-4"><a href="#cb21-4" tabindex="-1"></a>)</span>
+<span id="cb21-5"><a href="#cb21-5" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(</span>
+<span id="cb21-6"><a href="#cb21-6" tabindex="-1"></a>  rater_review<span class="sc">$</span>detail[, <span class="fu">c</span>(<span class="st">&quot;Level&quot;</span>, <span class="st">&quot;N&quot;</span>, <span class="st">&quot;Estimate&quot;</span>, <span class="st">&quot;SE&quot;</span>, <span class="st">&quot;Infit&quot;</span>, <span class="st">&quot;Outfit&quot;</span>)],</span>
+<span id="cb21-7"><a href="#cb21-7" tabindex="-1"></a>  <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>, <span class="at">caption =</span> <span class="st">&quot;Rater estimates and fit&quot;</span></span>
+<span id="cb21-8"><a href="#cb21-8" tabindex="-1"></a>)</span>
+<span id="cb21-9"><a href="#cb21-9" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(</span>
+<span id="cb21-10"><a href="#cb21-10" tabindex="-1"></a>  rater_review<span class="sc">$</span>detail[, <span class="fu">c</span>(<span class="st">&quot;Level&quot;</span>, <span class="st">&quot;MissingMetrics&quot;</span>, <span class="st">&quot;SeverityFlag&quot;</span>, <span class="st">&quot;MisfitFlag&quot;</span>)],</span>
+<span id="cb21-11"><a href="#cb21-11" tabindex="-1"></a>  <span class="at">row.names =</span> <span class="cn">FALSE</span>, <span class="at">caption =</span> <span class="st">&quot;Availability and screening flags&quot;</span></span>
+<span id="cb21-12"><a href="#cb21-12" tabindex="-1"></a>)</span>
+<span id="cb21-13"><a href="#cb21-13" tabindex="-1"></a>rater_review<span class="sc">$</span>settings</span>
+<span id="cb21-14"><a href="#cb21-14" tabindex="-1"></a><span class="fu">writeLines</span>(<span class="fu">strwrap</span>(rater_review<span class="sc">$</span>notes, <span class="at">width =</span> <span class="dv">72</span>))</span></code></pre></div>
+<p>A stricter rater is not necessarily inconsistent or incorrect.
+Individual interval overlap is not a test of the difference between two
+raters. Read <code>MissingMetrics</code> before interpreting flags: zero
+observed flags is not a complete pass when diagnostics are unavailable.
+A <code>REVIEW ONLY</code> label retains the fit’s restrictions; the
+plot does not override them.</p>
+<p>With the unmodified package defaults (absolute severity at least 1
+logit, Infit or Outfit at or beyond 0.5 and 1.5), none of the six raters
+is flagged in this synthetic example. Session options can change the
+misfit band: check <code>rater_review$settings</code> before comparing
+your output. A numeric <code>misfit_warn = 1.5</code> instead selects a
+lower bound of about 0.67; it does not preserve the default 0.5. These
+bands prompt review, not a verdict on quality. The earlier
+response-level screen still selected 141 ratings: the two screens assess
+different units and use different rules. Neither result establishes that
+every rating is appropriate.</p>
+<p>Use the selected unexpected ratings to discuss the rubric and scoring
+context, not to automatically exclude a rater. Limited overlap may call
+for more shared ratings before comparing raters. A change after training
+alone does not establish a training effect. For your own analysis, use
+<code>csv_fit</code> and <code>csv_diagnostics</code>, and replace
+<code>&quot;Rater&quot;</code> with your actual facet name. Keep the whole
+dashboard with <code>saveRDS()</code> to retain its settings and notes;
+<code>export_mfrm_bundle(..., include = c(&quot;dashboard&quot;, &quot;html&quot;))</code>
+includes them with the exported tables. See
+<code>?facet_quality_dashboard</code> for that export route.</p>
+</div>
+<div id="assemble-the-evidence-for-a-report" class="section level3">
+<h3>4. Assemble the evidence for a report</h3>
+<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>res_toy <span class="ot">&lt;-</span> <span class="fu">mfrm_results</span>(fit_toy, <span class="at">diagnostics =</span> diag_toy, <span class="at">include =</span> <span class="st">&quot;publication&quot;</span>)</span>
+<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a>report_toy <span class="ot">&lt;-</span> <span class="fu">mfrm_report</span>(res_toy, <span class="at">style =</span> <span class="st">&quot;apa&quot;</span>)</span>
+<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a>report_toy<span class="sc">$</span>first_screen[, <span class="fu">c</span>(<span class="st">&quot;Area&quot;</span>, <span class="st">&quot;Status&quot;</span>, <span class="st">&quot;MainIssue&quot;</span>, <span class="st">&quot;NextAction&quot;</span>)]</span>
+<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a></span>
+<span id="cb22-5"><a href="#cb22-5" tabindex="-1"></a>checklist_toy <span class="ot">&lt;-</span> <span class="fu">reporting_checklist</span>(fit_toy, <span class="at">diagnostics =</span> diag_toy)</span>
+<span id="cb22-6"><a href="#cb22-6" tabindex="-1"></a><span class="fu">subset</span>(checklist_toy<span class="sc">$</span>checklist, <span class="sc">!</span>DraftReady,</span>
+<span id="cb22-7"><a href="#cb22-7" tabindex="-1"></a>       <span class="fu">c</span>(<span class="st">&quot;Section&quot;</span>, <span class="st">&quot;Item&quot;</span>, <span class="st">&quot;NextAction&quot;</span>))</span></code></pre></div>
+<p><code>DraftReady</code> describes available drafting material with
+caveats. An unrequested bias or linking analysis may be irrelevant to
+the question; do not run every helper merely to turn every flag
+<code>TRUE</code>. The report’s gaps concern the supplied analysis
+objects. They cannot confirm recruitment, rater training, ethics, the
+study rationale, or whether the prose answers the research question.</p>
+<p>For a journal article, the companion
+<code>vignette(&quot;mfrmr-reporting-and-apa&quot;, package = &quot;mfrmr&quot;)</code>
+provides a <strong>Manuscript coverage map</strong>: what to report,
+where the numerical evidence is, and what the author must supply. It
+also shows estimates with uncertainty, reliability and agreement with
+distinct interpretations, and a worked question-to-result
+explanation.</p>
 <pre><code>#&gt;   Priority               Area
 #&gt; 1        1           Overview
 #&gt; 2        2             Triage
@@ -720,413 +1358,504 @@ data-handling policy before sharing.</p>
 #&gt; 6                                          This follow-up separates measure uncertainty from fit displacement while keeping person inclusion explicit.
 #&gt; 7                                         Precision review keeps fit-size, standardized fit, and separation evidence in separate reporting categories.
 #&gt; 8                                                                                Checklist rows identify report-ready, missing, and caveated sections.
-#&gt; 9                                                                   The bundle exposes table roles, plot readiness, and conservative appendix presets.
-#&gt;   Style OverallStatus     FirstAction ReviewAreas NotComputedAreas CaveatAreas
-#&gt; 1    qc        review Start with Fit.           1                0           0
-#&gt;   OptionalAreas UnavailableAreas OkAreas
-#&gt; 1             3                0       1
-#&gt;                                                       SourceInclude
-#&gt; 1 fit, diagnostics, tables, precision, reporting, categories, plots
-#&gt;                          Component Format
+#&gt; 9                                                                   The bundle exposes table roles, plot readiness, and conservative appendix presets.</code></pre>
+</div>
+<div id="display-a-table-and-save-the-analysis" class="section level3">
+<h3>5. Display a table and save the analysis</h3>
+<div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a>measurements_toy <span class="ot">&lt;-</span> <span class="fu">fit_measures_table</span>(fit_toy, <span class="at">diagnostics =</span> diag_toy)</span>
+<span id="cb24-2"><a href="#cb24-2" tabindex="-1"></a>rater_table_toy <span class="ot">&lt;-</span> <span class="fu">subset</span>(</span>
+<span id="cb24-3"><a href="#cb24-3" tabindex="-1"></a>  measurements_toy<span class="sc">$</span>table, Facet <span class="sc">==</span> <span class="st">&quot;Rater&quot;</span>,</span>
+<span id="cb24-4"><a href="#cb24-4" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;Level&quot;</span>, <span class="st">&quot;N&quot;</span>, <span class="st">&quot;Measure&quot;</span>, <span class="st">&quot;SE&quot;</span>, <span class="st">&quot;CI_Lower&quot;</span>, <span class="st">&quot;CI_Upper&quot;</span>, <span class="st">&quot;Infit&quot;</span>, <span class="st">&quot;Outfit&quot;</span>)</span>
+<span id="cb24-5"><a href="#cb24-5" tabindex="-1"></a>)</span>
+<span id="cb24-6"><a href="#cb24-6" tabindex="-1"></a><span class="fu">apa_table</span>(rater_table_toy, <span class="at">digits =</span> <span class="dv">3</span>,</span>
+<span id="cb24-7"><a href="#cb24-7" tabindex="-1"></a>          <span class="at">caption =</span> <span class="st">&quot;Rater severity and fit&quot;</span>,</span>
+<span id="cb24-8"><a href="#cb24-8" tabindex="-1"></a>          <span class="at">note =</span> <span class="st">&quot;N counts rating rows. Rater effects are centered within facet and measured in logits; higher values indicate stricter ratings. Intervals are 95% normal approximations from MML observed-information SEs. Infit and Outfit have reference value 1.&quot;</span>)</span></code></pre></div>
+<p>Report the score scale and direction with the table. For person
+results, state the EAP/posterior-SD basis; for rater results, explain
+that variation in severity is different from inconsistent scoring. Add a
+sentence answering the study’s question instead of repeating every cell
+of the table.</p>
+<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" tabindex="-1"></a><span class="co"># A new temporary directory keeps this synthetic example repeatable</span></span>
+<span id="cb25-2"><a href="#cb25-2" tabindex="-1"></a>export_dir <span class="ot">&lt;-</span> <span class="fu">tempfile</span>(<span class="st">&quot;mfrmr-workflow-export-&quot;</span>)</span>
+<span id="cb25-3"><a href="#cb25-3" tabindex="-1"></a>export_toy <span class="ot">&lt;-</span> <span class="fu">export_mfrm_results</span>(</span>
+<span id="cb25-4"><a href="#cb25-4" tabindex="-1"></a>  res_toy,</span>
+<span id="cb25-5"><a href="#cb25-5" tabindex="-1"></a>  <span class="at">output_dir =</span> export_dir,</span>
+<span id="cb25-6"><a href="#cb25-6" tabindex="-1"></a>  <span class="at">include =</span> <span class="fu">c</span>(<span class="st">&quot;default&quot;</span>, <span class="st">&quot;report&quot;</span>),</span>
+<span id="cb25-7"><a href="#cb25-7" tabindex="-1"></a>  <span class="at">acknowledge_sensitive =</span> <span class="cn">TRUE</span></span>
+<span id="cb25-8"><a href="#cb25-8" tabindex="-1"></a>)</span>
+<span id="cb25-9"><a href="#cb25-9" tabindex="-1"></a>export_preview <span class="ot">&lt;-</span> <span class="fu">head</span>(export_toy<span class="sc">$</span>written_files[, <span class="fu">c</span>(<span class="st">&quot;Component&quot;</span>, <span class="st">&quot;Format&quot;</span>, <span class="st">&quot;Path&quot;</span>)])</span>
+<span id="cb25-10"><a href="#cb25-10" tabindex="-1"></a>export_preview<span class="sc">$</span>Path <span class="ot">&lt;-</span> <span class="fu">basename</span>(export_preview<span class="sc">$</span>Path)</span>
+<span id="cb25-11"><a href="#cb25-11" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(export_preview, <span class="at">row.names =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb25-12"><a href="#cb25-12" tabindex="-1"></a>             <span class="at">caption =</span> <span class="st">&quot;First six exported files (filenames only)&quot;</span>)</span></code></pre></div>
+<p>This archive retains the collected results.
+<code>acknowledge_sensitive = TRUE</code> is used because the example
+contains synthetic data; it does not remove identifiers or local paths
+from real analyses. Review the files before sharing them. The table
+previews six filenames; <code>export_toy$written_files</code> retains
+the full list, and its <code>Path</code> column locates the generated
+files. Temporary files are for practice; choose a study directory for an
+archive you will keep. To reopen the saved analysis without fitting or
+computing diagnostics, locate the RDS in that file list:</p>
+<div class="sourceCode" id="cb26"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" tabindex="-1"></a>results_file <span class="ot">&lt;-</span> <span class="fu">subset</span>(export_toy<span class="sc">$</span>written_files, Component <span class="sc">==</span> <span class="st">&quot;results_rds&quot;</span>)<span class="sc">$</span>Path</span>
+<span id="cb26-2"><a href="#cb26-2" tabindex="-1"></a>restored_results <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(results_file)</span>
+<span id="cb26-3"><a href="#cb26-3" tabindex="-1"></a><span class="fu">summary</span>(restored_results)<span class="sc">$</span>decision</span></code></pre></div>
+<p>This restores the collected results and diagnostics. The separate
+dashboard object <code>rater_review</code> still needs its own
+<code>saveRDS()</code> call as described above. The exported replay
+script also reloads the complete RDS; it does not need <code>fit</code>
+or <code>diagnostics</code> from the original session. Run it with
+<code>source(&quot;path/to/mfrmr_results_replay.R&quot;, chdir = TRUE)</code>,
+replacing the path with the exported script’s location. Keep your
+original data-to-fit script when you also need to reproduce estimation.
+For a fit replay including its input CSV, and for saving a manuscript
+table, figure, and their notes, follow Section 5 of
+<code>vignette(&quot;mfrmr-reporting-and-apa&quot;, package = &quot;mfrmr&quot;)</code>.</p>
+<pre><code>#&gt;                          Component Format
 #&gt; 1                 summary_overview    csv
 #&gt; 2                 summary_decision    csv
 #&gt; 3                   summary_status    csv
 #&gt; 4            summary_fit_readiness    csv
 #&gt; 5 summary_fit_readiness_components    csv
 #&gt; 6 summary_fit_readiness_parameters    csv
-#&gt;                                                 Path Note          DataHandling
-#&gt; 1                 mfrmr_results_summary_overview.csv      review_before_sharing
-#&gt; 2                 mfrmr_results_summary_decision.csv      review_before_sharing
-#&gt; 3                   mfrmr_results_summary_status.csv      review_before_sharing
-#&gt; 4            mfrmr_results_summary_fit_readiness.csv      review_before_sharing
-#&gt; 5 mfrmr_results_summary_fit_readiness_components.csv      review_before_sharing
-#&gt; 6 mfrmr_results_summary_fit_readiness_parameters.csv      review_before_sharing</code></pre>
+#&gt;                                                 Path Note
+#&gt; 1                 mfrmr_results_summary_overview.csv     
+#&gt; 2                 mfrmr_results_summary_decision.csv     
+#&gt; 3                   mfrmr_results_summary_status.csv     
+#&gt; 4            mfrmr_results_summary_fit_readiness.csv     
+#&gt; 5 mfrmr_results_summary_fit_readiness_components.csv     
+#&gt; 6 mfrmr_results_summary_fit_readiness_parameters.csv     
+#&gt;            DataHandling
+#&gt; 1 review_before_sharing
+#&gt; 2 review_before_sharing
+#&gt; 3 review_before_sharing
+#&gt; 4 review_before_sharing
+#&gt; 5 review_before_sharing
+#&gt; 6 review_before_sharing</code></pre>
 </div>
-<div id="diagnostics-and-reporting" class="section level2">
-<h2>Diagnostics and Reporting</h2>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>t4_toy <span class="ot">&lt;-</span> <span class="fu">unexpected_response_table</span>(</span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>  fit_toy,</span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="at">diagnostics =</span> diag_toy,</span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>  <span class="at">abs_z_min =</span> <span class="fl">1.5</span>,</span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>  <span class="at">prob_max =</span> <span class="fl">0.4</span>,</span>
-<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>  <span class="at">top_n =</span> <span class="dv">10</span></span>
-<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>)</span>
-<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>t12_toy <span class="ot">&lt;-</span> <span class="fu">fair_average_table</span>(fit_toy, <span class="at">diagnostics =</span> diag_toy)</span>
-<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>t13_toy <span class="ot">&lt;-</span> <span class="fu">bias_interaction_report</span>(</span>
-<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>  <span class="fu">estimate_bias</span>(fit_toy, diag_toy,</span>
-<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>                <span class="at">facet_a =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">facet_b =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
-<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a>                <span class="at">max_iter =</span> <span class="dv">2</span>),</span>
-<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a>  <span class="at">top_n =</span> <span class="dv">10</span></span>
-<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a>)</span>
-<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a></span>
-<span id="cb7-16"><a href="#cb7-16" tabindex="-1"></a><span class="fu">class</span>(<span class="fu">summary</span>(t4_toy))</span>
-<span id="cb7-17"><a href="#cb7-17" tabindex="-1"></a><span class="fu">class</span>(<span class="fu">summary</span>(t12_toy))</span>
-<span id="cb7-18"><a href="#cb7-18" tabindex="-1"></a><span class="fu">class</span>(<span class="fu">summary</span>(t13_toy))</span>
-<span id="cb7-19"><a href="#cb7-19" tabindex="-1"></a></span>
-<span id="cb7-20"><a href="#cb7-20" tabindex="-1"></a><span class="fu">names</span>(<span class="fu">plot</span>(t4_toy, <span class="at">draw =</span> <span class="cn">FALSE</span>))</span>
-<span id="cb7-21"><a href="#cb7-21" tabindex="-1"></a><span class="fu">names</span>(<span class="fu">plot</span>(t12_toy, <span class="at">draw =</span> <span class="cn">FALSE</span>))</span>
-<span id="cb7-22"><a href="#cb7-22" tabindex="-1"></a><span class="fu">names</span>(<span class="fu">plot</span>(t13_toy, <span class="at">draw =</span> <span class="cn">FALSE</span>))</span>
-<span id="cb7-23"><a href="#cb7-23" tabindex="-1"></a></span>
-<span id="cb7-24"><a href="#cb7-24" tabindex="-1"></a>chk_toy <span class="ot">&lt;-</span> <span class="fu">reporting_checklist</span>(fit_toy, <span class="at">diagnostics =</span> diag_toy)</span>
-<span id="cb7-25"><a href="#cb7-25" tabindex="-1"></a><span class="fu">subset</span>(</span>
-<span id="cb7-26"><a href="#cb7-26" tabindex="-1"></a>  chk_toy<span class="sc">$</span>checklist,</span>
-<span id="cb7-27"><a href="#cb7-27" tabindex="-1"></a>  Section <span class="sc">==</span> <span class="st">&quot;Visual Displays&quot;</span>,</span>
-<span id="cb7-28"><a href="#cb7-28" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;Item&quot;</span>, <span class="st">&quot;DraftReady&quot;</span>, <span class="st">&quot;NextAction&quot;</span>)</span>
-<span id="cb7-29"><a href="#cb7-29" tabindex="-1"></a>)</span></code></pre></div>
-<pre><code>#&gt;                      Object        SummaryClass
-#&gt; 1 unexpected_response_table summary.mfrm_bundle
-#&gt; 2        fair_average_table summary.mfrm_bundle
-#&gt; 3   bias_interaction_report summary.mfrm_bundle
-#&gt;                      Object Components
-#&gt; 1 unexpected_response_table name, data
-#&gt; 2        fair_average_table name, data
-#&gt; 3   bias_interaction_report name, data
-#&gt;                                  Item DraftReady
-#&gt; 1                          Wright map       TRUE
-#&gt; 2                QC / facet dashboard       TRUE
-#&gt; 3                Residual PCA visuals      FALSE
-#&gt; 4 Connectivity / design-matrix visual       TRUE
-#&gt; 5  Inter-rater / displacement visuals       TRUE
-#&gt; 6             Strict marginal visuals      FALSE
-#&gt; 7                  Bias / DIF visuals      FALSE
-#&gt; 8      Precision / information curves       TRUE
-#&gt; 9                Fit/category visuals       TRUE
-#&gt;                                                                                                                      NextAction
-#&gt; 1                                      Include a Wright map when the manuscript benefits from a shared-scale targeting display.
-#&gt; 2                     Use the dashboard as a first-pass triage view, then move to the specific follow-up plot behind each flag.
-#&gt; 3                                         Run residual PCA if you want scree/loadings visuals for residual-structure follow-up.
-#&gt; 4                                                       Use the design-matrix view to support linkage and comparability claims.
-#&gt; 5                                       Use displacement and inter-rater views to localize QC issues after dashboard screening.
-#&gt; 6 Treat strict marginal plots as exploratory corroboration screens, then corroborate with design review and legacy diagnostics.
-#&gt; 7                                                        Run bias or DIF screening before discussing interaction-level visuals.
-#&gt; 8                                Use information curves to describe precision across theta when that is the reporting question.
-#&gt; 9                                        Use category curves and fit visuals as local descriptive follow-up after QC screening.</code></pre>
+<div id="further-analyses-should-answer-a-stated-question" class="section level3">
+<h3>Further analyses should answer a stated question</h3>
+<p>For observed rating agreement, start with the <a href="mfrmr-rating-agreement.html">rating-agreement tutorial</a>. Its
+small runnable example shows how to match person-by-task records,
+distinguish correlation from agreement, compare a score source with a
+reference, and audit missing pairs without fitting another model. It
+also explains why these coefficients answer a different question from
+rater severity or separation reliability.</p>
+<p>For prior sensitivity or an external Bayesian extension, use
+<code>export_mfrm_model()</code> with a unit-weight RSM/PCM or
+one-family GPCM MML fit on the fixed N(0,1) ability scale. Both Stan and
+brms retain supported fixed facet anchors and group means. This example
+reuses the RSM fit above:</p>
+<div class="sourceCode" id="cb28"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" tabindex="-1"></a><span class="co"># Reuse the fit above; no additional estimation or backend is needed to export.</span></span>
+<span id="cb28-2"><a href="#cb28-2" tabindex="-1"></a>stan_model <span class="ot">&lt;-</span> <span class="fu">export_mfrm_model</span>(</span>
+<span id="cb28-3"><a href="#cb28-3" tabindex="-1"></a>  fit_toy, <span class="fu">tempfile</span>(<span class="st">&quot;stan-model-&quot;</span>), <span class="at">format =</span> <span class="st">&quot;stan&quot;</span>,</span>
+<span id="cb28-4"><a href="#cb28-4" tabindex="-1"></a>  <span class="at">acknowledge_sensitive =</span> <span class="cn">TRUE</span></span>
+<span id="cb28-5"><a href="#cb28-5" tabindex="-1"></a>)</span>
+<span id="cb28-6"><a href="#cb28-6" tabindex="-1"></a>brms_model <span class="ot">&lt;-</span> <span class="fu">export_mfrm_model</span>(</span>
+<span id="cb28-7"><a href="#cb28-7" tabindex="-1"></a>  fit_toy, <span class="fu">tempfile</span>(<span class="st">&quot;brms-model-&quot;</span>), <span class="at">format =</span> <span class="st">&quot;brms&quot;</span>,</span>
+<span id="cb28-8"><a href="#cb28-8" tabindex="-1"></a>  <span class="at">acknowledge_sensitive =</span> <span class="cn">TRUE</span></span>
+<span id="cb28-9"><a href="#cb28-9" tabindex="-1"></a>)</span>
+<span id="cb28-10"><a href="#cb28-10" tabindex="-1"></a><span class="fu">names</span>(stan_model<span class="sc">$</span>files)</span>
+<span id="cb28-11"><a href="#cb28-11" tabindex="-1"></a>model_data <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(stan_model<span class="sc">$</span>files[[<span class="st">&quot;model-data.rds&quot;</span>]])</span>
+<span id="cb28-12"><a href="#cb28-12" tabindex="-1"></a>model_data<span class="sc">$</span>categories</span>
+<span id="cb28-13"><a href="#cb28-13" tabindex="-1"></a>model_data<span class="sc">$</span>priors</span></code></pre></div>
+<p>Each directory contains code, data, category/level mappings and
+<code>run.R</code>. <code>stan_model$output_dir</code> and
+<code>brms_model$output_dir</code> locate these practice bundles;
+replace <code>tempfile()</code> with a study directory to retain them.
+The category table maps the external model’s integers back to the
+original rubric. <code>model_data$levels</code> identifies the Persons
+and facet levels, and <code>model_data$step_owners</code> identifies the
+shared RSM or facet-specific PCM steps. Set
+<code>location_prior_sd</code> and <code>step_prior_sd</code> in
+<code>export_mfrm_model()</code> when creating a bundle for a different
+prior choice; both formats use those values. Review its README and
+priors, then run the script from that directory with CmdStanR/CmdStan
+installed (and brms for the second format). Export itself needs neither
+backend. Both formats preserve adjacent-category probabilities, the
+fixed standard-normal ability scale, facet signs and constraints, and
+unordered step offsets with their original sum constraints. Their
+explicit structural priors make this a Bayesian analysis; it does not
+reproduce MML point estimates or qualify frequentist interval coverage.
+Two-family GMFRM also supports Stan export, with explicit component
+log-slope priors and a <code>slope-levels.csv</code> mapping; see the <a href="mfrmr-gpcm-scope.html">two-family workflow</a>. One-family GPCM
+uses <code>log_slope_prior_sd</code> in both formats, with
+geometric-mean-one slopes. For brms, the source must use
+<code>gpcm_mml_identification = &quot;fixed_standard_normal&quot;</code>. The
+default one-family GPCM estimates the population mean and variance. You
+can export its intercept-only population to Stan with
+<code>population_prior = list(mean = c(0, 1), log_sd = c(0, 0.5))</code>;
+each pair gives the location and scale of a normal prior. The mean and
+SD are sampled while relative slopes and anchors retain the native
+metric. brms still requires the fixed-population specification. Changing
+that setting changes the model; do not change it merely to enable
+export. Review prior predictions and sensitivity.</p>
+<p>Anchor values are exact constraints. <code>levels.csv</code> and
+<code>steps.csv</code> in anchored or one-family bundles show the prior
+means, marginal SDs and fixed coordinates. A zero SD reflects a fixed
+value, not evidence that its earlier calibration was certain. The scope
+excludes JML/Person anchors, two-family brms, nonunit weights,
+population regression, interactions and shrinkage. Native two-family
+fitting still excludes anchors. Inspect sampler diagnostics and prior
+sensitivity before using the posterior. Exported ratings and original
+labels require the same sharing review as an analysis archive. See
+<code>?export_mfrm_model</code> for supported post-processing and
+prediction targets.</p>
+<p>After sampling, start with <code>summary-decision.csv</code>: it
+states the sampling review and next action before presenting estimates.
+<code>sampling-review.csv</code> lists the checks and criteria.
+<code>parameter-summary.csv</code> keeps original labels, the meaning of
+larger values, fixed/estimated status and interval status beside the
+numbers. Fixed values have no estimated interval; finite intervals for
+estimated values can still require sampling review. Both formats support
+<code>Rscript run.R --summarize</code> to rebuild these reports from
+saved draws without sampling again. A clean sampling screen does not
+establish model validity.</p>
+<p>Bring those summaries back into mfrmr with
+<code>read_mfrm_posterior()</code>. This small included example has
+short chains and intentionally retains a sampling-review status. It
+demonstrates the reporting path without fitting or requiring Stan.</p>
+<div class="sourceCode" id="cb29"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" tabindex="-1"></a>posterior <span class="ot">&lt;-</span> <span class="fu">read_mfrm_posterior</span>(<span class="fu">system.file</span>(</span>
+<span id="cb29-2"><a href="#cb29-2" tabindex="-1"></a>  <span class="st">&quot;extdata&quot;</span>, <span class="st">&quot;posterior-example&quot;</span>, <span class="at">package =</span> <span class="st">&quot;mfrmr&quot;</span>))</span>
+<span id="cb29-3"><a href="#cb29-3" tabindex="-1"></a><span class="fu">summary</span>(posterior)</span>
+<span id="cb29-4"><a href="#cb29-4" tabindex="-1"></a>posterior_plot <span class="ot">&lt;-</span> <span class="fu">plot</span>(posterior, <span class="at">quantity =</span> <span class="st">&quot;location&quot;</span>, <span class="at">draw =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb29-5"><a href="#cb29-5" tabindex="-1"></a>posterior_report <span class="ot">&lt;-</span> <span class="fu">mfrm_report</span>(posterior, <span class="at">style =</span> <span class="st">&quot;apa&quot;</span>)</span></code></pre></div>
+<p>For your analysis, supply the export directory instead. Use
+<code>as_ggplot(posterior_plot)</code> for an editable figure,
+<code>plot_data(posterior_plot, &quot;table&quot;)</code> for its long table, and
+<code>mfrm_report(posterior, output = &quot;html&quot;)</code> for the full
+report. <code>confint(posterior)</code> retrieves saved 95%
+<strong>credible</strong> intervals, keeping fixed values and review
+flags. Other levels, contrasts, predictions and density/raincloud plots
+need the backend’s joint draws; they cannot be recovered from this
+summary.</p>
+<table>
+<colgroup>
+<col width="50%" />
+<col width="50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Question</th>
+<th>Follow-up</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>How uncertain is a specified difference between two raters?</td>
+<td><code>mfrm_facet_intervals()</code> uses their covariance; choose
+the model-based or sandwich method for the sampling assumptions. Attach
+the result with <code>mfrm_results(fit, intervals = ...)</code>. See
+<code>mfrmr-facet-intervals</code>; an ordinary Wright map does not
+switch to sandwich intervals.</td>
+</tr>
+<tr class="even">
+<td>Do category thresholds need to differ by criterion?</td>
+<td><code>compare_mfrm()</code> and
+<code>mml_quadrature_sensitivity()</code>; fit candidates to the same
+observations and review numerical sensitivity.</td>
+</tr>
+<tr class="odd">
+<td>Which facet combinations merit closer review?</td>
+<td><code>estimate_all_bias(fit)</code> explores all non-Person pairs.
+<code>summary(screens)$overview</code> shows availability and magnitude;
+<code>$cells</code> preserves signed shifts and counts. Use
+<code>plot(screens)</code> and
+<code>plot(screens, pair = &quot;Rater x Criterion&quot;)</code> for overview and
+detail. These conditional screens have no collection-wide multiplicity
+control.</td>
+</tr>
+<tr class="even">
+<td>Do prespecified rater-by-criterion or group contrasts depart from
+the model?</td>
+<td><code>estimate_bias()</code> supplies conditional screening
+evidence; <code>analyze_dff()</code> has its own scope. For jointly
+fitted interactions, see <code>fit_mfrm(facet_interactions = ...)</code>
+and <code>interaction_effect_table()</code>. Specify the target,
+supported inference route and multiplicity plan before inspecting
+results. See the reporting vignette and
+<code>mfrmr-linking-and-dff</code>.</td>
+</tr>
+<tr class="odd">
+<td>How often does a declared rater-warning rule detect a specified
+departure or falsely flag an unaffected rater?</td>
+<td><code>mfrm_screening_performance()</code> with known simulation
+truth and all planned trials. See
+<code>mfrmr-screening-performance</code> for individual/family rates,
+unavailable results and Monte Carlo uncertainty.</td>
+</tr>
+<tr class="even">
+<td>Would the conclusions change under a GPCM?</td>
+<td><code>gpcm_capability_matrix()</code> and
+<code>mfrmr-gpcm-scope</code>; explain what discrimination reweighting
+means for the score interpretation.</td>
+</tr>
+<tr class="odd">
+<td>Are scores missing from assigned rating events?</td>
+<td>Start with the assignment roster, then
+<code>review_mfrm_imputations()</code>, <code>fit_mfrm_imputed()</code>
+and <code>pool_mfrm_imputed()</code>. See
+<code>mfrmr-response-imputation</code> for an explicit imputation model;
+the review function does not generate scores. Do not fill unassigned
+combinations.</td>
+</tr>
+<tr class="even">
+<td>Do external attributes describe different groups of persons, raters
+or tasks?</td>
+<td><code>mfrm_features()</code> with PCA/k-means for numeric features,
+or PAM/hierarchical clustering for mixed features. See
+<code>mfrmr-external-features</code> for missing attributes, group
+stability and links back to rating events. Groups are not ability
+classes or judgments of rater quality.</td>
+</tr>
+<tr class="odd">
+<td>Would more raters or tasks improve observed-score
+dependability?</td>
+<td><code>mfrm_g_study()</code> followed by <code>mfrm_d_study()</code>;
+declare the observed-score design, candidate plans and any composite
+weights. Their help explains G/Phi and SEM. These coefficients describe
+observed scores, not MFRM latent abilities.</td>
+</tr>
+<tr class="even">
+<td>Are forms or waves on a comparable scale?</td>
+<td><code>mfrmr-linking-and-dff</code> and
+<code>mfrmr-portable-calibration</code>; common labels alone do not
+establish linking.</td>
+</tr>
+<tr class="odd">
+<td>How does a proposed rating design perform under stated
+assumptions?</td>
+<td><code>build_mfrm_sim_spec()</code>,
+<code>simulate_mfrm_recovery()</code>, and
+<code>assess_mfrm_recovery()</code>; report generating conditions,
+repetitions, failures, and Monte Carlo uncertainty.</td>
+</tr>
+<tr class="even">
+<td>How should new persons be scored under an existing calibration?</td>
+<td><code>predict_mfrm_units()</code> and
+<code>sample_mfrm_plausible_values()</code>; reuse an eligible fitted
+calibration and report the conditioning assumptions.</td>
+</tr>
+<tr class="odd">
+<td>How certain is a person’s placement relative to supplied ability
+cuts?</td>
+<td>For ordinary RSM/PCM, use <code>cut_scores</code> in the eligible
+scoring API and inspect <code>$decisions</code>.
+<code>apa_table(..., which = &quot;decisions&quot;)</code> retains probabilities,
+priors and review states. Check whether the scoring prior represents the
+target population; numerical checks do not establish that match. See
+<code>mfrmr-portable-calibration</code> for interpretation and
+saved-score reporting; calibration and estimated-prior uncertainty are
+excluded.</td>
+</tr>
+</tbody>
+</table>
+<p>For repeated simulation work, supply <code>file</code> to
+<code>simulate_mfrm_recovery()</code> or
+<code>evaluate_mfrm_design()</code>. An identical call reads a finished
+result or resumes saved trials after interruption. For example, create a
+results directory once and keep this call in the analysis script:</p>
+<div class="sourceCode" id="cb30"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" tabindex="-1"></a><span class="fu">dir.create</span>(<span class="st">&quot;results&quot;</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb30-2"><a href="#cb30-2" tabindex="-1"></a>recovery <span class="ot">&lt;-</span> <span class="fu">simulate_mfrm_recovery</span>(</span>
+<span id="cb30-3"><a href="#cb30-3" tabindex="-1"></a>  <span class="at">n_person =</span> <span class="dv">50</span>, <span class="at">n_rater =</span> <span class="dv">4</span>, <span class="at">n_criterion =</span> <span class="dv">4</span>,</span>
+<span id="cb30-4"><a href="#cb30-4" tabindex="-1"></a>  <span class="at">reps =</span> <span class="dv">100</span>, <span class="at">seed =</span> <span class="dv">20261021</span>, <span class="at">file =</span> <span class="st">&quot;results/recovery.rds&quot;</span></span>
+<span id="cb30-5"><a href="#cb30-5" tabindex="-1"></a>)</span>
+<span id="cb30-6"><a href="#cb30-6" tabindex="-1"></a><span class="fu">summary</span>(recovery)<span class="sc">$</span>rep_overview  <span class="co"># Retains failed attempts, too.</span></span></code></pre></div>
+<p>The default <code>file_refit = &quot;never&quot;</code> rejects a file whose
+inputs, fitting controls, replication count, RNG kind or
+implementation/software identity differ. Use a new path to preserve both
+studies, or explicitly choose <code>&quot;on_change&quot;</code> to replace an
+incompatible study. <code>&quot;always&quot;</code> starts again even if the file
+matches. After completion, ordinary <code>readRDS()</code> also loads
+the result and its <code>reproducibility</code> metadata. Save the
+script and software environment with it; seed recording is not a
+guarantee of identical numerical results on every platform. See
+<code>?simulate_mfrm_recovery</code> for checkpoint boundaries and
+parallel resumption.</p>
+<p>For an injected Group-by-Criterion or Rater-by-Criterion departure,
+<code>evaluate_mfrm_signal_detection()</code> summarizes the behavior of
+the selected screen. Start with
+<code>summary(x)$detection_summary</code>: compare the planned and
+available counts before interpreting a rate. Non-target rates average
+the available-cell proportion within each contributing trial; they are
+neither pooled-cell rates nor the probability of any false flag. Inspect
+<code>x$rep_overview</code> for failed stages and seeds, and
+<code>x$results</code> for target-level unavailability reasons. This
+helper uses <code>saveRDS()</code> for saving the returned result,
+without the checkpoint arguments shown above.</p>
+<p>DIF contrasts are reference minus focal. A residual-score difference
+is not the injected latent effect; a subgroup location difference
+requires common-scale linking before its mean is reported. The bias
+shift is relative to the fitted baseline. These summaries do not
+establish effect recovery or calibrated power. Residual DIF tests remain
+unavailable, and refit/bias rates remain screening summaries. See
+<code>?evaluate_mfrm_signal_detection</code> for denominators, Monte
+Carlo uncertainty and interpretation of older saved results.</p>
+<p>When starting from <code>extract_mfrm_sim_spec(fit)</code>, inspect
+the proposed generating mechanism. Without a population regression, the
+Person spread is the SD of the reported estimates; shrinkage and
+measurement error mean it need not equal the latent population SD. With
+a population regression, the stored coefficients, residual variance,
+transformations and factor coding define Person generation. The
+generating parameters remain fixed across replications. Monte Carlo SEs
+measure the precision of the simulation averages under those
+assumptions; they do not measure uncertainty in the original fit or
+validate future forecasts. When covariates and observed assignments
+belong to the same template Persons, use
+<code>population_assignment = &quot;matched&quot;</code> (the default for newly
+built/extracted specifications). Matching <code>TemplatePerson</code>
+IDs preserve the association between covariates, groups and assignment
+patterns. Choose <code>&quot;independent&quot;</code> only when breaking that
+association is part of the intended scenario. A population
+<code>Group</code> column also defines the response group; conflicting
+group definitions are rejected. Truth metadata retain the selected
+source template IDs.</p>
+<p>Observed skeletons preserve repeated rows and weights. Each row
+generates a new conditionally independent rating; dependence across
+occasions or among peer reviewers requires a different generating model.
+Remove accidental source duplicates before building the specification.
+Weights affect fitting and do not create extra generated responses.
+Older saved specifications without <code>population_assignment</code>
+keep independent template draws; rebuild them and use a new study file
+for matched sampling.</p>
+<p>For a manual refit of generated latent-regression data, take both
+<code>person_data</code> and <code>population_formula</code> from
+<code>attr(simulated_data, &quot;mfrm_population_data&quot;)</code>. The
+formula-compatible terms object retains the template’s transformation
+basis and factor coding. Rewriting it as a fresh <code>~ scale(X)</code>
+formula would relearn the scaling on the new cohort. Old transformed
+specifications without the stored basis must be rebuilt from the
+original template or fit and saved as a new study.</p>
+<p>Read recovery results as relative parameter recovery under the
+declared generating conditions.
+<code>summary(recovery)$recovery_summary</code> reports RMSE and its
+Monte Carlo SE across independent trials. Mean-aligned group bias is
+zero by construction, so a small value does not establish unbiased
+estimation of each parameter. PCM/GPCM comparisons account for the facet
+shift induced by centering the generating step thresholds.</p>
+<p>For interval evidence, read <code>Coverage95</code> together with
+<code>ExpectedRows</code>, <code>CoverageRows</code>,
+<code>CoverageAvailabilityRate</code>, <code>McseCoverage95</code> and
+<code>FailedReps</code>. Coverage is conditional on obtaining a valid
+interval; failures and unavailable intervals remain visible separately.
+Non-Person MML facet coverage uses each level’s deviation from its facet
+mean with the matching covariance. JML point recovery and Person scores
+remain useful, but their source uncertainty is not treated as that
+structural interval; inspect <code>CIReason</code> in
+<code>recovery$recovery</code> or <code>CIReasons</code> in the summary.
+Unknown target rosters produce <code>NA</code> rates, not zero or
+successful outcomes.
+<code>assess_mfrm_recovery(recovery)$uncertainty_review</code> keeps
+these counts and reasons with its checklist.</p>
+<p>For older saved objects, <code>summary()</code>, assessment and
+summary/coverage plotting recalculate the aggregates without fitting.
+They withhold legacy coverage when the required covariance was not
+saved. A new run is needed for corrected PCM/population truth mapping
+and matching interval evidence; retain the old file as a separate study.
+The help page explains which fields can be recovered.</p>
+<p>For stability against an observed-data reference, use
+<code>build_mfrm_resampling_spec()</code> and
+<code>draw_mfrm_resamples()</code>. They resample entire Person clusters
+within optional strata, retaining all ratings for each selected Person.
+A same-size bootstrap requires
+<code>design = &quot;stratified_bootstrap&quot;</code>,
+<code>sample_fraction = 1</code>, and
+<code>topup_preserve_facets = FALSE</code>; the default fraction is one
+half. Adding Persons to restore missing facet levels changes the
+sampling distribution. Read <code>sampling_scheme</code> and the
+base/added/final counts in the manifests. Person resampling holds the
+observed non-Person facets fixed; it does not reproduce sampling new
+raters/tasks or dependence among Persons in a peer-review network.
+Full-data estimates are uncertain references, not known truth, and these
+helpers do not qualify bootstrap confidence intervals.</p>
+<p>Missing <strong>attributes</strong> and missing <strong>rating
+scores</strong> need different models and workflows. Neither clustering
+nor response-score imputation is a prerequisite for ordinary MFRM
+analysis. G/D-studies start from observed scores and their design; do
+not substitute MFRM estimates or testlet variances for their input. For
+these branches, <code>mfrmr_output_guide(&quot;features&quot;)</code>,
+<code>mfrmr_output_guide(&quot;imputation&quot;)</code> and
+<code>mfrmr_output_guide(&quot;gtheory&quot;)</code> identify the supported
+summaries and plots. Save their full objects with
+<code>saveRDS()</code>; they have dedicated output routes and are not
+<code>mfrm_results()</code> inputs.</p>
+<p>Simulation examples with one or two repetitions test the
+computational setup; they do not estimate operating characteristics
+adequately for a paper. A simulation’s assumptions and results also do
+not replace evidence from the observed assessment. Keep these analyses
+in the report only when their role in answering the study question is
+clear.</p>
 </div>
-<div id="fit-and-diagnose-with-full-data" class="section level2">
-<h2>Fit and Diagnose with Full Data</h2>
-<p>For a larger sparse synthetic illustration, use the packaged Study 1
-dataset:</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
-<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>  <span class="at">data =</span> ej2021_study1,</span>
-<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
-<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
-<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
-<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
-<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">7</span></span>
-<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a>)</span>
-<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a></span>
-<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a>diag <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(</span>
-<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a>  fit,</span>
-<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a>  <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>,</span>
-<span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a>  <span class="at">diagnostic_mode =</span> <span class="st">&quot;both&quot;</span>,</span>
-<span id="cb9-15"><a href="#cb9-15" tabindex="-1"></a>  <span class="at">fit_df_method =</span> <span class="st">&quot;both&quot;</span></span>
-<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a>)</span>
-<span id="cb9-17"><a href="#cb9-17" tabindex="-1"></a></span>
-<span id="cb9-18"><a href="#cb9-18" tabindex="-1"></a><span class="fu">summary</span>(fit, <span class="at">profile =</span> <span class="st">&quot;fit&quot;</span>, <span class="at">detail =</span> <span class="st">&quot;brief&quot;</span>)</span>
-<span id="cb9-19"><a href="#cb9-19" tabindex="-1"></a><span class="fu">summary</span>(diag)</span>
-<span id="cb9-20"><a href="#cb9-20" tabindex="-1"></a></span>
-<span id="cb9-21"><a href="#cb9-21" tabindex="-1"></a><span class="co"># Keep the final figure flow explicit: fit -&gt; Wright map -&gt; follow-up plots.</span></span>
-<span id="cb9-22"><a href="#cb9-22" tabindex="-1"></a>s <span class="ot">&lt;-</span> <span class="fu">summary</span>(fit, <span class="at">profile =</span> <span class="st">&quot;facets&quot;</span>, <span class="at">diagnostics =</span> diag)</span>
-<span id="cb9-23"><a href="#cb9-23" tabindex="-1"></a>res <span class="ot">&lt;-</span> s<span class="sc">$</span>results</span>
-<span id="cb9-24"><a href="#cb9-24" tabindex="-1"></a>s</span>
-<span id="cb9-25"><a href="#cb9-25" tabindex="-1"></a><span class="fu">plot</span>(res, <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>, <span class="at">show_ci =</span> <span class="cn">TRUE</span>, <span class="at">top_n =</span> <span class="cn">Inf</span>)</span>
-<span id="cb9-26"><a href="#cb9-26" tabindex="-1"></a></span>
-<span id="cb9-27"><a href="#cb9-27" tabindex="-1"></a><span class="co"># Optional closest FACETS-style asterisk ruler (without mfrmr CI overlays).</span></span>
-<span id="cb9-28"><a href="#cb9-28" tabindex="-1"></a><span class="fu">plot</span>(res, <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>, <span class="at">renderer =</span> <span class="st">&quot;facets&quot;</span>,</span>
-<span id="cb9-29"><a href="#cb9-29" tabindex="-1"></a>     <span class="at">category_labels =</span> rubric_labels, <span class="at">show_ci =</span> <span class="cn">FALSE</span>,</span>
-<span id="cb9-30"><a href="#cb9-30" tabindex="-1"></a>     <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span>
-<span id="cb9-31"><a href="#cb9-31" tabindex="-1"></a></span>
-<span id="cb9-32"><a href="#cb9-32" tabindex="-1"></a><span class="fu">plot</span>(</span>
-<span id="cb9-33"><a href="#cb9-33" tabindex="-1"></a>  res,</span>
-<span id="cb9-34"><a href="#cb9-34" tabindex="-1"></a>  <span class="at">type =</span> <span class="st">&quot;fit_pathway&quot;</span>,</span>
-<span id="cb9-35"><a href="#cb9-35" tabindex="-1"></a>  <span class="at">fit_stat =</span> <span class="st">&quot;Infit&quot;</span>,</span>
-<span id="cb9-36"><a href="#cb9-36" tabindex="-1"></a>  <span class="at">include_person =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb9-37"><a href="#cb9-37" tabindex="-1"></a>  <span class="at">top_n_person =</span> <span class="dv">12</span>,</span>
-<span id="cb9-38"><a href="#cb9-38" tabindex="-1"></a>  <span class="at">person_labels =</span> <span class="st">&quot;none&quot;</span>,</span>
-<span id="cb9-39"><a href="#cb9-39" tabindex="-1"></a>  <span class="at">facet_labels =</span> <span class="st">&quot;flagged&quot;</span>,</span>
-<span id="cb9-40"><a href="#cb9-40" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
-<span id="cb9-41"><a href="#cb9-41" tabindex="-1"></a>)</span></code></pre></div>
-<p>This full-data figure caps the displayed person layer at 12 and
-suppresses routine point labels to keep the first screen legible. The
-selected person IDs and every retained facet row remain in
-<code>plot(..., draw = FALSE)$data$table</code>; use
-<code>person_labels = &quot;all&quot;</code> or <code>facet_labels = &quot;all&quot;</code>
-for a point-identification figure.</p>
-<p>If you need residual-structure evidence for a final report, you can
-add residual PCA after the initial diagnostic pass. Treat this as an
-exploratory screen, not as a standalone unidimensionality test or as a
-DIMTEST/UNIDIM substitute. In MFRM reporting, a cautious claim should
-combine global residual fit, element-level fit, residual PCA, and
-local-dependence screens, for example: “evidence consistent with
-essential unidimensionality under the specified facet structure.”</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>diag_pca <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(</span>
-<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>  fit,</span>
-<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>  <span class="at">residual_pca =</span> <span class="st">&quot;both&quot;</span>,</span>
-<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>  <span class="at">pca_max_factors =</span> <span class="dv">6</span></span>
-<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>)</span>
-<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a></span>
-<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a><span class="fu">summary</span>(diag_pca)</span></code></pre></div>
 </div>
-<div id="strict-diagnostics-for-rsm-and-pcm" class="section level2">
-<h2>Strict Diagnostics for RSM and PCM</h2>
-<p>For <code>RSM</code> and <code>PCM</code>, the package can now keep
-the legacy residual path and the strict marginal path side by side:</p>
-<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>fit_rsm_strict <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
-<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>  <span class="at">data =</span> toy,</span>
-<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
-<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
-<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
-<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
-<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">7</span>,</span>
-<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>  <span class="at">maxit =</span> <span class="dv">30</span></span>
-<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>)</span>
-<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>diag_rsm_strict <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(</span>
-<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a>  fit_rsm_strict,</span>
-<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a>  <span class="at">diagnostic_mode =</span> <span class="st">&quot;both&quot;</span>,</span>
-<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a>  <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span></span>
-<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a>)</span>
-<span id="cb11-16"><a href="#cb11-16" tabindex="-1"></a></span>
-<span id="cb11-17"><a href="#cb11-17" tabindex="-1"></a>fit_pcm_strict <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
-<span id="cb11-18"><a href="#cb11-18" tabindex="-1"></a>  <span class="at">data =</span> toy,</span>
-<span id="cb11-19"><a href="#cb11-19" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
-<span id="cb11-20"><a href="#cb11-20" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
-<span id="cb11-21"><a href="#cb11-21" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb11-22"><a href="#cb11-22" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
-<span id="cb11-23"><a href="#cb11-23" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;PCM&quot;</span>,</span>
-<span id="cb11-24"><a href="#cb11-24" tabindex="-1"></a>  <span class="at">step_facet =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
-<span id="cb11-25"><a href="#cb11-25" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">7</span>,</span>
-<span id="cb11-26"><a href="#cb11-26" tabindex="-1"></a>  <span class="at">maxit =</span> <span class="dv">30</span></span>
-<span id="cb11-27"><a href="#cb11-27" tabindex="-1"></a>)</span>
-<span id="cb11-28"><a href="#cb11-28" tabindex="-1"></a>diag_pcm_strict <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(</span>
-<span id="cb11-29"><a href="#cb11-29" tabindex="-1"></a>  fit_pcm_strict,</span>
-<span id="cb11-30"><a href="#cb11-30" tabindex="-1"></a>  <span class="at">diagnostic_mode =</span> <span class="st">&quot;both&quot;</span>,</span>
-<span id="cb11-31"><a href="#cb11-31" tabindex="-1"></a>  <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span></span>
-<span id="cb11-32"><a href="#cb11-32" tabindex="-1"></a>)</span>
-<span id="cb11-33"><a href="#cb11-33" tabindex="-1"></a></span>
-<span id="cb11-34"><a href="#cb11-34" tabindex="-1"></a><span class="fu">summary</span>(diag_rsm_strict)<span class="sc">$</span>diagnostic_basis[, <span class="fu">c</span>(<span class="st">&quot;DiagnosticPath&quot;</span>, <span class="st">&quot;Status&quot;</span>, <span class="st">&quot;Basis&quot;</span>)]</span>
-<span id="cb11-35"><a href="#cb11-35" tabindex="-1"></a><span class="fu">summary</span>(diag_pcm_strict)<span class="sc">$</span>diagnostic_basis[, <span class="fu">c</span>(<span class="st">&quot;DiagnosticPath&quot;</span>, <span class="st">&quot;Status&quot;</span>, <span class="st">&quot;Basis&quot;</span>)]</span></code></pre></div>
-<p>When you want a compact simulation-based screening check for the
-strict branch, use <code>evaluate_mfrm_diagnostic_screening()</code> on
-a small design:</p>
-<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>screen_rsm <span class="ot">&lt;-</span> <span class="fu">evaluate_mfrm_diagnostic_screening</span>(</span>
-<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>  <span class="at">design =</span> <span class="fu">list</span>(<span class="at">person =</span> <span class="dv">18</span>, <span class="at">rater =</span> <span class="dv">3</span>, <span class="at">criterion =</span> <span class="dv">3</span>, <span class="at">assignment =</span> <span class="dv">3</span>),</span>
-<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>  <span class="at">reps =</span> <span class="dv">1</span>,</span>
-<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>  <span class="at">scenarios =</span> <span class="fu">c</span>(<span class="st">&quot;well_specified&quot;</span>, <span class="st">&quot;local_dependence&quot;</span>),</span>
-<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
-<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>  <span class="at">maxit =</span> <span class="dv">30</span>,</span>
-<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">7</span>,</span>
-<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>  <span class="at">seed =</span> <span class="dv">123</span></span>
-<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>)</span>
-<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a>screen_pcm <span class="ot">&lt;-</span> <span class="fu">evaluate_mfrm_diagnostic_screening</span>(</span>
-<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a>  <span class="at">design =</span> <span class="fu">list</span>(<span class="at">person =</span> <span class="dv">18</span>, <span class="at">rater =</span> <span class="dv">3</span>, <span class="at">criterion =</span> <span class="dv">3</span>, <span class="at">assignment =</span> <span class="dv">3</span>),</span>
-<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a>  <span class="at">reps =</span> <span class="dv">1</span>,</span>
-<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a>  <span class="at">scenarios =</span> <span class="fu">c</span>(<span class="st">&quot;well_specified&quot;</span>, <span class="st">&quot;step_structure_misspecification&quot;</span>),</span>
-<span id="cb12-14"><a href="#cb12-14" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;PCM&quot;</span>,</span>
-<span id="cb12-15"><a href="#cb12-15" tabindex="-1"></a>  <span class="at">maxit =</span> <span class="dv">30</span>,</span>
-<span id="cb12-16"><a href="#cb12-16" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">7</span>,</span>
-<span id="cb12-17"><a href="#cb12-17" tabindex="-1"></a>  <span class="at">seed =</span> <span class="dv">123</span></span>
-<span id="cb12-18"><a href="#cb12-18" tabindex="-1"></a>)</span>
-<span id="cb12-19"><a href="#cb12-19" tabindex="-1"></a></span>
-<span id="cb12-20"><a href="#cb12-20" tabindex="-1"></a>screen_rsm<span class="sc">$</span>performance_summary[, <span class="fu">c</span>(<span class="st">&quot;Scenario&quot;</span>, <span class="st">&quot;EvaluationUse&quot;</span>, <span class="st">&quot;LegacyAnyFlagRate&quot;</span>, <span class="st">&quot;StrictAnyFlagRate&quot;</span>)]</span>
-<span id="cb12-21"><a href="#cb12-21" tabindex="-1"></a>screen_pcm<span class="sc">$</span>performance_summary[, <span class="fu">c</span>(<span class="st">&quot;Scenario&quot;</span>, <span class="st">&quot;EvaluationUse&quot;</span>, <span class="st">&quot;LegacySensitivityProxy&quot;</span>, <span class="st">&quot;StrictSensitivityProxy&quot;</span>, <span class="st">&quot;DeltaStrictMinusLegacyFlagRate&quot;</span>)]</span></code></pre></div>
-<p>The same strict branch is now reflected in the reporting router:</p>
-<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>chk_rsm_strict <span class="ot">&lt;-</span> <span class="fu">reporting_checklist</span>(fit_rsm_strict, <span class="at">diagnostics =</span> diag_rsm_strict)</span>
-<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a><span class="fu">subset</span>(</span>
-<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>  chk_rsm_strict<span class="sc">$</span>checklist,</span>
-<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>  Section <span class="sc">==</span> <span class="st">&quot;Visual Displays&quot;</span> <span class="sc">&amp;</span></span>
-<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>    Item <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;QC / facet dashboard&quot;</span>, <span class="st">&quot;Strict marginal visuals&quot;</span>, <span class="st">&quot;Precision / information curves&quot;</span>),</span>
-<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;Item&quot;</span>, <span class="st">&quot;Available&quot;</span>, <span class="st">&quot;DraftReady&quot;</span>, <span class="st">&quot;NextAction&quot;</span>)</span>
-<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a>)</span></code></pre></div>
-</div>
-<div id="residual-pca-and-reporting" class="section level2">
-<h2>Residual PCA and Reporting</h2>
-<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>pca <span class="ot">&lt;-</span> <span class="fu">analyze_residual_pca</span>(diag_pca, <span class="at">mode =</span> <span class="st">&quot;both&quot;</span>)</span>
-<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a><span class="fu">plot_residual_pca</span>(pca, <span class="at">mode =</span> <span class="st">&quot;overall&quot;</span>, <span class="at">plot_type =</span> <span class="st">&quot;scree&quot;</span>)</span></code></pre></div>
-<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="fu">data</span>(<span class="st">&quot;mfrmr_example_bias&quot;</span>, <span class="at">package =</span> <span class="st">&quot;mfrmr&quot;</span>)</span>
-<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>bias_df <span class="ot">&lt;-</span> mfrmr_example_bias</span>
-<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a>fit_bias <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
-<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a>  bias_df,</span>
-<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
-<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
-<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
-<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
-<span id="cb15-10"><a href="#cb15-10" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">7</span></span>
-<span id="cb15-11"><a href="#cb15-11" tabindex="-1"></a>)</span>
-<span id="cb15-12"><a href="#cb15-12" tabindex="-1"></a>diag_bias <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit_bias, <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>)</span>
-<span id="cb15-13"><a href="#cb15-13" tabindex="-1"></a>bias <span class="ot">&lt;-</span> <span class="fu">estimate_bias</span>(fit_bias, diag_bias, <span class="at">facet_a =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">facet_b =</span> <span class="st">&quot;Criterion&quot;</span>)</span>
-<span id="cb15-14"><a href="#cb15-14" tabindex="-1"></a>fixed <span class="ot">&lt;-</span> <span class="fu">build_fixed_reports</span>(bias)</span>
-<span id="cb15-15"><a href="#cb15-15" tabindex="-1"></a>apa <span class="ot">&lt;-</span> <span class="fu">build_apa_outputs</span>(fit_bias, diag_bias, <span class="at">bias_results =</span> bias)</span>
-<span id="cb15-16"><a href="#cb15-16" tabindex="-1"></a></span>
-<span id="cb15-17"><a href="#cb15-17" tabindex="-1"></a><span class="fu">mfrm_threshold_profiles</span>()</span>
-<span id="cb15-18"><a href="#cb15-18" tabindex="-1"></a>vis <span class="ot">&lt;-</span> <span class="fu">build_visual_summaries</span>(fit_bias, diag_bias, <span class="at">threshold_profile =</span> <span class="st">&quot;standard&quot;</span>)</span>
-<span id="cb15-19"><a href="#cb15-19" tabindex="-1"></a>vis<span class="sc">$</span>warning_map<span class="sc">$</span>residual_pca_overall</span></code></pre></div>
-<p>The same <code>example_bias</code> dataset also carries a
-<code>Group</code> variable so DIF-oriented examples can show a non-null
-pattern instead of a fully clean result. It can be loaded either with
-<code>load_mfrmr_data(&quot;example_bias&quot;)</code> or
-<code>data(&quot;mfrmr_example_bias&quot;, package = &quot;mfrmr&quot;)</code>.</p>
-</div>
-<div id="human-readable-reporting-api" class="section level2">
-<h2>Human-Readable Reporting API</h2>
-<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>spec <span class="ot">&lt;-</span> <span class="fu">specifications_report</span>(fit, <span class="at">title =</span> <span class="st">&quot;Study run&quot;</span>)</span>
-<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a>data_qc <span class="ot">&lt;-</span> <span class="fu">data_quality_report</span>(</span>
-<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a>  fit,</span>
-<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a>  <span class="at">data =</span> ej2021_study1,</span>
-<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
-<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
-<span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span></span>
-<span id="cb16-8"><a href="#cb16-8" tabindex="-1"></a>)</span>
-<span id="cb16-9"><a href="#cb16-9" tabindex="-1"></a>iter <span class="ot">&lt;-</span> <span class="fu">estimation_iteration_report</span>(fit, <span class="at">max_iter =</span> <span class="dv">8</span>)</span>
-<span id="cb16-10"><a href="#cb16-10" tabindex="-1"></a>subset_rep <span class="ot">&lt;-</span> <span class="fu">subset_connectivity_report</span>(fit, <span class="at">diagnostics =</span> diag)</span>
-<span id="cb16-11"><a href="#cb16-11" tabindex="-1"></a>facet_stats <span class="ot">&lt;-</span> <span class="fu">facet_statistics_report</span>(fit, <span class="at">diagnostics =</span> diag)</span>
-<span id="cb16-12"><a href="#cb16-12" tabindex="-1"></a>cat_structure <span class="ot">&lt;-</span> <span class="fu">category_structure_report</span>(fit, <span class="at">diagnostics =</span> diag)</span>
-<span id="cb16-13"><a href="#cb16-13" tabindex="-1"></a>cat_curves <span class="ot">&lt;-</span> <span class="fu">category_curves_report</span>(fit, <span class="at">theta_points =</span> <span class="dv">101</span>)</span>
-<span id="cb16-14"><a href="#cb16-14" tabindex="-1"></a>bias_rep <span class="ot">&lt;-</span> <span class="fu">bias_interaction_report</span>(bias, <span class="at">top_n =</span> <span class="dv">20</span>)</span>
-<span id="cb16-15"><a href="#cb16-15" tabindex="-1"></a><span class="fu">plot_bias_interaction</span>(bias_rep, <span class="at">plot =</span> <span class="st">&quot;scatter&quot;</span>)</span></code></pre></div>
-</div>
-<div id="design-simulation-and-prediction" class="section level2">
-<h2>Design Simulation and Prediction</h2>
-<p>The package also supports a separate simulation/prediction layer. The
-key distinction is:</p>
-<ul>
-<li><code>evaluate_mfrm_recovery()</code> checks whether known
-generating parameters are recovered under a stated simulation design. It
-is the first simulation check to run when you are validating a model
-specification or a planned design.</li>
-<li><code>evaluate_mfrm_design()</code> and
-<code>predict_mfrm_population()</code> are design-level helpers that
-summarize expected operating characteristics under an explicit
-simulation specification.</li>
-<li><code>mfrm_generalizability()</code> and <code>mfrm_d_study()</code>
-summarize observed univariate G-study components and analytic D-study
-projections. Read <code>IdentificationStatus</code>,
-<code>GStatus</code>, and <code>PhiStatus</code> before reporting
-projected coefficients; boundary or singular mixed-model fits are
-design-identification warnings rather than high-stakes-ready reliability
-evidence.</li>
-<li><code>predict_mfrm_units()</code> and
-<code>sample_mfrm_plausible_values()</code> score future or partially
-observed persons under a fixed <code>MML</code> calibration.</li>
-</ul>
-<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">requireNamespace</span>(<span class="st">&quot;lme4&quot;</span>, <span class="at">quietly =</span> <span class="cn">TRUE</span>)) {</span>
-<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a>  gt <span class="ot">&lt;-</span> <span class="fu">mfrm_generalizability</span>(fit)</span>
-<span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a>  gt<span class="sc">$</span>coefficients[, <span class="fu">c</span>(<span class="st">&quot;G&quot;</span>, <span class="st">&quot;Phi&quot;</span>, <span class="st">&quot;GStatus&quot;</span>, <span class="st">&quot;PhiStatus&quot;</span>,</span>
-<span id="cb17-4"><a href="#cb17-4" tabindex="-1"></a>                      <span class="st">&quot;IdentificationStatus&quot;</span>)]</span>
-<span id="cb17-5"><a href="#cb17-5" tabindex="-1"></a></span>
-<span id="cb17-6"><a href="#cb17-6" tabindex="-1"></a>  ds <span class="ot">&lt;-</span> <span class="fu">mfrm_d_study</span>(</span>
-<span id="cb17-7"><a href="#cb17-7" tabindex="-1"></a>    gt,</span>
-<span id="cb17-8"><a href="#cb17-8" tabindex="-1"></a>    <span class="fu">data.frame</span>(<span class="at">Rater =</span> <span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>), <span class="at">Criterion =</span> <span class="dv">4</span>),</span>
-<span id="cb17-9"><a href="#cb17-9" tabindex="-1"></a>    <span class="at">residual_scaling =</span> <span class="st">&quot;sensitivity&quot;</span></span>
-<span id="cb17-10"><a href="#cb17-10" tabindex="-1"></a>  )</span>
-<span id="cb17-11"><a href="#cb17-11" tabindex="-1"></a>  ds[, <span class="fu">c</span>(<span class="st">&quot;n_Rater&quot;</span>, <span class="st">&quot;n_Criterion&quot;</span>, <span class="st">&quot;ResidualScaling&quot;</span>,</span>
-<span id="cb17-12"><a href="#cb17-12" tabindex="-1"></a>         <span class="st">&quot;G&quot;</span>, <span class="st">&quot;Phi&quot;</span>, <span class="st">&quot;GStatus&quot;</span>, <span class="st">&quot;PhiStatus&quot;</span>, <span class="st">&quot;IdentificationStatus&quot;</span>)]</span>
-<span id="cb17-13"><a href="#cb17-13" tabindex="-1"></a>}</span></code></pre></div>
-<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a>sim_spec <span class="ot">&lt;-</span> <span class="fu">build_mfrm_sim_spec</span>(</span>
-<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a>  <span class="at">n_person =</span> <span class="dv">30</span>,</span>
-<span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a>  <span class="at">n_rater =</span> <span class="dv">4</span>,</span>
-<span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a>  <span class="at">n_criterion =</span> <span class="dv">4</span>,</span>
-<span id="cb18-5"><a href="#cb18-5" tabindex="-1"></a>  <span class="at">raters_per_person =</span> <span class="dv">2</span>,</span>
-<span id="cb18-6"><a href="#cb18-6" tabindex="-1"></a>  <span class="at">assignment =</span> <span class="st">&quot;rotating&quot;</span></span>
-<span id="cb18-7"><a href="#cb18-7" tabindex="-1"></a>)</span>
-<span id="cb18-8"><a href="#cb18-8" tabindex="-1"></a></span>
-<span id="cb18-9"><a href="#cb18-9" tabindex="-1"></a>recovery <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(</span>
-<span id="cb18-10"><a href="#cb18-10" tabindex="-1"></a>  <span class="fu">evaluate_mfrm_recovery</span>(</span>
-<span id="cb18-11"><a href="#cb18-11" tabindex="-1"></a>    <span class="at">sim_spec =</span> sim_spec,</span>
-<span id="cb18-12"><a href="#cb18-12" tabindex="-1"></a>    <span class="at">reps =</span> <span class="dv">2</span>,</span>
-<span id="cb18-13"><a href="#cb18-13" tabindex="-1"></a>    <span class="at">maxit =</span> <span class="dv">30</span>,</span>
-<span id="cb18-14"><a href="#cb18-14" tabindex="-1"></a>    <span class="at">include_diagnostics =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb18-15"><a href="#cb18-15" tabindex="-1"></a>    <span class="at">diagnostic_fit_df_method =</span> <span class="st">&quot;both&quot;</span>,</span>
-<span id="cb18-16"><a href="#cb18-16" tabindex="-1"></a>    <span class="at">seed =</span> <span class="dv">2</span></span>
-<span id="cb18-17"><a href="#cb18-17" tabindex="-1"></a>  )</span>
-<span id="cb18-18"><a href="#cb18-18" tabindex="-1"></a>)</span>
-<span id="cb18-19"><a href="#cb18-19" tabindex="-1"></a></span>
-<span id="cb18-20"><a href="#cb18-20" tabindex="-1"></a><span class="fu">summary</span>(recovery)<span class="sc">$</span>recovery_summary[, <span class="fu">c</span>(<span class="st">&quot;ParameterType&quot;</span>, <span class="st">&quot;Facet&quot;</span>, <span class="st">&quot;RMSE&quot;</span>, <span class="st">&quot;Bias&quot;</span>)]</span>
-<span id="cb18-21"><a href="#cb18-21" tabindex="-1"></a><span class="fu">plot</span>(recovery, <span class="at">type =</span> <span class="st">&quot;summary&quot;</span>, <span class="at">metric =</span> <span class="st">&quot;rmse&quot;</span>, <span class="at">draw =</span> <span class="cn">FALSE</span>)<span class="sc">$</span>data<span class="sc">$</span>plot_table</span>
-<span id="cb18-22"><a href="#cb18-22" tabindex="-1"></a></span>
-<span id="cb18-23"><a href="#cb18-23" tabindex="-1"></a>recovery_review <span class="ot">&lt;-</span> <span class="fu">assess_mfrm_recovery</span>(</span>
-<span id="cb18-24"><a href="#cb18-24" tabindex="-1"></a>  recovery,</span>
-<span id="cb18-25"><a href="#cb18-25" tabindex="-1"></a>  <span class="at">min_reps =</span> <span class="dv">2</span>,</span>
-<span id="cb18-26"><a href="#cb18-26" tabindex="-1"></a>  <span class="at">min_se_available =</span> <span class="cn">NULL</span>,</span>
-<span id="cb18-27"><a href="#cb18-27" tabindex="-1"></a>  <span class="at">max_mcse_rmse_ratio =</span> <span class="cn">NULL</span>,</span>
-<span id="cb18-28"><a href="#cb18-28" tabindex="-1"></a>  <span class="at">max_rmse =</span> <span class="fu">c</span>(<span class="at">facet =</span> <span class="dv">1</span>, <span class="at">step =</span> <span class="dv">1</span>, <span class="at">default =</span> <span class="fl">1.5</span>),</span>
-<span id="cb18-29"><a href="#cb18-29" tabindex="-1"></a>  <span class="at">max_abs_bias =</span> <span class="fu">c</span>(<span class="at">default =</span> <span class="fl">0.75</span>)</span>
-<span id="cb18-30"><a href="#cb18-30" tabindex="-1"></a>)</span>
-<span id="cb18-31"><a href="#cb18-31" tabindex="-1"></a></span>
-<span id="cb18-32"><a href="#cb18-32" tabindex="-1"></a><span class="fu">summary</span>(recovery_review)<span class="sc">$</span>checklist[, <span class="fu">c</span>(<span class="st">&quot;Section&quot;</span>, <span class="st">&quot;Item&quot;</span>, <span class="st">&quot;Status&quot;</span>)]</span>
-<span id="cb18-33"><a href="#cb18-33" tabindex="-1"></a><span class="fu">summary</span>(recovery_review)<span class="sc">$</span>reading_order</span>
-<span id="cb18-34"><a href="#cb18-34" tabindex="-1"></a><span class="fu">summary</span>(recovery_review)<span class="sc">$</span>condition_reporting_notes</span>
-<span id="cb18-35"><a href="#cb18-35" tabindex="-1"></a><span class="fu">summary</span>(recovery_review)<span class="sc">$</span>condition_review</span>
-<span id="cb18-36"><a href="#cb18-36" tabindex="-1"></a><span class="fu">summary</span>(recovery_review)<span class="sc">$</span>diagnostic_reporting_notes</span>
-<span id="cb18-37"><a href="#cb18-37" tabindex="-1"></a><span class="fu">summary</span>(recovery_review)<span class="sc">$</span>diagnostic_review</span>
-<span id="cb18-38"><a href="#cb18-38" tabindex="-1"></a></span>
-<span id="cb18-39"><a href="#cb18-39" tabindex="-1"></a>status_plot <span class="ot">&lt;-</span> <span class="fu">plot</span>(recovery_review, <span class="at">type =</span> <span class="st">&quot;status&quot;</span>, <span class="at">draw =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb18-40"><a href="#cb18-40" tabindex="-1"></a>status_plot<span class="sc">$</span>data<span class="sc">$</span>section_status</span>
-<span id="cb18-41"><a href="#cb18-41" tabindex="-1"></a>status_plot<span class="sc">$</span>data<span class="sc">$</span>reading_order</span>
-<span id="cb18-42"><a href="#cb18-42" tabindex="-1"></a></span>
-<span id="cb18-43"><a href="#cb18-43" tabindex="-1"></a>metric_plot <span class="ot">&lt;-</span> <span class="fu">plot</span>(recovery_review, <span class="at">type =</span> <span class="st">&quot;metrics&quot;</span>, <span class="at">metric =</span> <span class="st">&quot;rmse&quot;</span>, <span class="at">draw =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb18-44"><a href="#cb18-44" tabindex="-1"></a>metric_plot<span class="sc">$</span>data<span class="sc">$</span>plot_table</span>
-<span id="cb18-45"><a href="#cb18-45" tabindex="-1"></a>metric_plot<span class="sc">$</span>data<span class="sc">$</span>guidance</span>
-<span id="cb18-46"><a href="#cb18-46" tabindex="-1"></a></span>
-<span id="cb18-47"><a href="#cb18-47" tabindex="-1"></a>recovery_bundle <span class="ot">&lt;-</span> <span class="fu">build_summary_table_bundle</span>(</span>
-<span id="cb18-48"><a href="#cb18-48" tabindex="-1"></a>  recovery_review,</span>
-<span id="cb18-49"><a href="#cb18-49" tabindex="-1"></a>  <span class="at">appendix_preset =</span> <span class="st">&quot;recommended&quot;</span></span>
-<span id="cb18-50"><a href="#cb18-50" tabindex="-1"></a>)</span>
-<span id="cb18-51"><a href="#cb18-51" tabindex="-1"></a>recovery_bundle<span class="sc">$</span>table_index[, <span class="fu">c</span>(<span class="st">&quot;Table&quot;</span>, <span class="st">&quot;Rows&quot;</span>, <span class="st">&quot;Role&quot;</span>)]</span>
-<span id="cb18-52"><a href="#cb18-52" tabindex="-1"></a></span>
-<span id="cb18-53"><a href="#cb18-53" tabindex="-1"></a>pred_pop <span class="ot">&lt;-</span> <span class="fu">predict_mfrm_population</span>(</span>
-<span id="cb18-54"><a href="#cb18-54" tabindex="-1"></a>  <span class="at">sim_spec =</span> sim_spec,</span>
-<span id="cb18-55"><a href="#cb18-55" tabindex="-1"></a>  <span class="at">reps =</span> <span class="dv">2</span>,</span>
-<span id="cb18-56"><a href="#cb18-56" tabindex="-1"></a>  <span class="at">maxit =</span> <span class="dv">30</span>,</span>
-<span id="cb18-57"><a href="#cb18-57" tabindex="-1"></a>  <span class="at">seed =</span> <span class="dv">1</span></span>
-<span id="cb18-58"><a href="#cb18-58" tabindex="-1"></a>)</span>
-<span id="cb18-59"><a href="#cb18-59" tabindex="-1"></a></span>
-<span id="cb18-60"><a href="#cb18-60" tabindex="-1"></a><span class="fu">summary</span>(pred_pop)<span class="sc">$</span>forecast[, <span class="fu">c</span>(<span class="st">&quot;Facet&quot;</span>, <span class="st">&quot;MeanSeparation&quot;</span>, <span class="st">&quot;McseSeparation&quot;</span>)]</span>
-<span id="cb18-61"><a href="#cb18-61" tabindex="-1"></a></span>
-<span id="cb18-62"><a href="#cb18-62" tabindex="-1"></a>keep_people <span class="ot">&lt;-</span> <span class="fu">unique</span>(toy<span class="sc">$</span>Person)[<span class="dv">1</span><span class="sc">:</span><span class="dv">18</span>]</span>
-<span id="cb18-63"><a href="#cb18-63" tabindex="-1"></a>toy_mml <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(</span>
-<span id="cb18-64"><a href="#cb18-64" tabindex="-1"></a>  <span class="fu">fit_mfrm</span>(</span>
-<span id="cb18-65"><a href="#cb18-65" tabindex="-1"></a>    toy[toy<span class="sc">$</span>Person <span class="sc">%in%</span> keep_people, , <span class="at">drop =</span> <span class="cn">FALSE</span>],</span>
-<span id="cb18-66"><a href="#cb18-66" tabindex="-1"></a>    <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
-<span id="cb18-67"><a href="#cb18-67" tabindex="-1"></a>    <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
-<span id="cb18-68"><a href="#cb18-68" tabindex="-1"></a>    <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
-<span id="cb18-69"><a href="#cb18-69" tabindex="-1"></a>    <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
-<span id="cb18-70"><a href="#cb18-70" tabindex="-1"></a>    <span class="at">quad_points =</span> <span class="dv">5</span>,</span>
-<span id="cb18-71"><a href="#cb18-71" tabindex="-1"></a>    <span class="at">maxit =</span> <span class="dv">30</span></span>
-<span id="cb18-72"><a href="#cb18-72" tabindex="-1"></a>  )</span>
-<span id="cb18-73"><a href="#cb18-73" tabindex="-1"></a>)</span>
-<span id="cb18-74"><a href="#cb18-74" tabindex="-1"></a></span>
-<span id="cb18-75"><a href="#cb18-75" tabindex="-1"></a>new_units <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
-<span id="cb18-76"><a href="#cb18-76" tabindex="-1"></a>  <span class="at">Person =</span> <span class="fu">c</span>(<span class="st">&quot;NEW01&quot;</span>, <span class="st">&quot;NEW01&quot;</span>),</span>
-<span id="cb18-77"><a href="#cb18-77" tabindex="-1"></a>  <span class="at">Rater =</span> <span class="fu">unique</span>(toy<span class="sc">$</span>Rater)[<span class="dv">1</span>],</span>
-<span id="cb18-78"><a href="#cb18-78" tabindex="-1"></a>  <span class="at">Criterion =</span> <span class="fu">unique</span>(toy<span class="sc">$</span>Criterion)[<span class="dv">1</span><span class="sc">:</span><span class="dv">2</span>],</span>
-<span id="cb18-79"><a href="#cb18-79" tabindex="-1"></a>  <span class="at">Score =</span> <span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">3</span>)</span>
-<span id="cb18-80"><a href="#cb18-80" tabindex="-1"></a>)</span>
-<span id="cb18-81"><a href="#cb18-81" tabindex="-1"></a></span>
-<span id="cb18-82"><a href="#cb18-82" tabindex="-1"></a>pred_units <span class="ot">&lt;-</span> <span class="fu">predict_mfrm_units</span>(toy_mml, new_units, <span class="at">n_draws =</span> <span class="dv">0</span>)</span>
-<span id="cb18-83"><a href="#cb18-83" tabindex="-1"></a>pv_units <span class="ot">&lt;-</span> <span class="fu">sample_mfrm_plausible_values</span>(toy_mml, new_units, <span class="at">n_draws =</span> <span class="dv">2</span>, <span class="at">seed =</span> <span class="dv">1</span>)</span>
-<span id="cb18-84"><a href="#cb18-84" tabindex="-1"></a></span>
-<span id="cb18-85"><a href="#cb18-85" tabindex="-1"></a><span class="fu">summary</span>(pred_units)<span class="sc">$</span>estimates[, <span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Estimate&quot;</span>, <span class="st">&quot;Lower&quot;</span>, <span class="st">&quot;Upper&quot;</span>)]</span>
-<span id="cb18-86"><a href="#cb18-86" tabindex="-1"></a><span class="fu">summary</span>(pv_units)<span class="sc">$</span>draw_summary[, <span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Draws&quot;</span>, <span class="st">&quot;MeanValue&quot;</span>)]</span></code></pre></div>
-<p>For a report or appendix handoff, pass the recovery objects through
-the same summary-table export route used by the rest of the package:</p>
-<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a><span class="fu">export_summary_appendix</span>(</span>
-<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">recovery =</span> recovery, <span class="at">recovery_review =</span> recovery_review),</span>
-<span id="cb19-3"><a href="#cb19-3" tabindex="-1"></a>  <span class="at">output_dir =</span> <span class="fu">tempdir</span>(),</span>
-<span id="cb19-4"><a href="#cb19-4" tabindex="-1"></a>  <span class="at">prefix =</span> <span class="st">&quot;mfrmr_recovery_appendix&quot;</span>,</span>
-<span id="cb19-5"><a href="#cb19-5" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;recommended&quot;</span>,</span>
-<span id="cb19-6"><a href="#cb19-6" tabindex="-1"></a>  <span class="at">include_html =</span> <span class="cn">FALSE</span>,</span>
-<span id="cb19-7"><a href="#cb19-7" tabindex="-1"></a>  <span class="at">overwrite =</span> <span class="cn">TRUE</span></span>
-<span id="cb19-8"><a href="#cb19-8" tabindex="-1"></a>)</span></code></pre></div>
-<p>For an initial exploratory run, <code>reps = 2</code> or another very
-small value is useful only to check the data-generating setup and refit
-path. For a study report, increase <code>reps</code>, keep the
-ADEMP-style metadata in the exported tables, and set substantive
-RMSE/Bias thresholds so that <code>assess_mfrm_recovery()</code> can
-mark those rows as <code>ok</code>, <code>review</code>, or
-<code>concern</code> rather than <code>not_assessed</code>.</p>
+<div id="an-observed-writing-assessment-example" class="section level2">
+<h2>An observed writing-assessment example</h2>
+<p>The optional <code>sirt</code> package supplies
+<code>data.ratings1</code>, observed German-writing ratings from a 2009
+Austrian educational standards survey. Its 274 rows contain 135
+students, seven observed raters and five rubric criteria scored 0 to 3.
+The <a href="https://alexanderrobitzsch.r-universe.dev/sirt/doc/manual.html#data.ratings">data
+documentation</a> describes the source. This dataset is separate from
+mfrmr’s synthetic examples.</p>
+<p>The practical question is which differences in severity, category use
+or consistency merit discussion with a rater. The example below uses a
+PCM so criteria can have different category thresholds. It assumes a
+common writing scale and conditionally independent ratings; inspecting
+the output does not establish those assumptions. Repeated rubric ratings
+of one performance may still share influences that this model does not
+represent.</p>
+<p>Run this optional example after installing <code>sirt</code>. It is
+not run when building this vignette. Display aliases replace source
+identifiers in the example’s tables; aliases do not make a rating
+archive anonymous.</p>
+<div class="sourceCode" id="cb31"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
+<span id="cb31-2"><a href="#cb31-2" tabindex="-1"></a><span class="fu">data</span>(<span class="st">&quot;data.ratings1&quot;</span>, <span class="at">package =</span> <span class="st">&quot;sirt&quot;</span>)</span>
+<span id="cb31-3"><a href="#cb31-3" tabindex="-1"></a>wide <span class="ot">&lt;-</span> data.ratings1</span>
+<span id="cb31-4"><a href="#cb31-4" tabindex="-1"></a>persons <span class="ot">&lt;-</span> <span class="fu">match</span>(wide<span class="sc">$</span>idstud, <span class="fu">unique</span>(wide<span class="sc">$</span>idstud))</span>
+<span id="cb31-5"><a href="#cb31-5" tabindex="-1"></a>raters <span class="ot">&lt;-</span> <span class="fu">match</span>(wide<span class="sc">$</span>rater, <span class="fu">unique</span>(wide<span class="sc">$</span>rater))</span>
+<span id="cb31-6"><a href="#cb31-6" tabindex="-1"></a>writing <span class="ot">&lt;-</span> <span class="fu">do.call</span>(rbind, <span class="fu">lapply</span>(<span class="fu">paste0</span>(<span class="st">&quot;k&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>), <span class="cf">function</span>(criterion) {</span>
+<span id="cb31-7"><a href="#cb31-7" tabindex="-1"></a>  <span class="fu">data.frame</span>(</span>
+<span id="cb31-8"><a href="#cb31-8" tabindex="-1"></a>    <span class="at">Person =</span> <span class="fu">sprintf</span>(<span class="st">&quot;P%03d&quot;</span>, persons), <span class="at">Rater =</span> <span class="fu">paste0</span>(<span class="st">&quot;R&quot;</span>, raters),</span>
+<span id="cb31-9"><a href="#cb31-9" tabindex="-1"></a>    <span class="at">Criterion =</span> criterion, <span class="at">Score =</span> wide[[criterion]]</span>
+<span id="cb31-10"><a href="#cb31-10" tabindex="-1"></a>  )</span>
+<span id="cb31-11"><a href="#cb31-11" tabindex="-1"></a>}))</span>
+<span id="cb31-12"><a href="#cb31-12" tabindex="-1"></a>review <span class="ot">&lt;-</span> <span class="fu">describe_mfrm_data</span>(</span>
+<span id="cb31-13"><a href="#cb31-13" tabindex="-1"></a>  writing, <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>, <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb31-14"><a href="#cb31-14" tabindex="-1"></a>  <span class="at">rating_min =</span> <span class="dv">0</span>, <span class="at">rating_max =</span> <span class="dv">3</span></span>
+<span id="cb31-15"><a href="#cb31-15" tabindex="-1"></a>)</span>
+<span id="cb31-16"><a href="#cb31-16" tabindex="-1"></a>review<span class="sc">$</span>row_retention</span>
+<span id="cb31-17"><a href="#cb31-17" tabindex="-1"></a>review<span class="sc">$</span>design_connectivity</span>
+<span id="cb31-18"><a href="#cb31-18" tabindex="-1"></a></span>
+<span id="cb31-19"><a href="#cb31-19" tabindex="-1"></a>writing_fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb31-20"><a href="#cb31-20" tabindex="-1"></a>  writing, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb31-21"><a href="#cb31-21" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>, <span class="at">model =</span> <span class="st">&quot;PCM&quot;</span>, <span class="at">step_facet =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
+<span id="cb31-22"><a href="#cb31-22" tabindex="-1"></a>  <span class="at">rating_min =</span> <span class="dv">0</span>, <span class="at">rating_max =</span> <span class="dv">3</span>, <span class="at">quad_points =</span> <span class="dv">61</span>, <span class="at">maxit =</span> <span class="dv">400</span></span>
+<span id="cb31-23"><a href="#cb31-23" tabindex="-1"></a>)</span>
+<span id="cb31-24"><a href="#cb31-24" tabindex="-1"></a>writing_diagnostics <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(writing_fit, <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>)</span>
+<span id="cb31-25"><a href="#cb31-25" tabindex="-1"></a>feedback <span class="ot">&lt;-</span> <span class="fu">facet_quality_dashboard</span>(</span>
+<span id="cb31-26"><a href="#cb31-26" tabindex="-1"></a>  writing_fit, <span class="at">diagnostics =</span> writing_diagnostics, <span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span></span>
+<span id="cb31-27"><a href="#cb31-27" tabindex="-1"></a>)</span>
+<span id="cb31-28"><a href="#cb31-28" tabindex="-1"></a>feedback<span class="sc">$</span>detail[, <span class="fu">c</span>(<span class="st">&quot;Level&quot;</span>, <span class="st">&quot;N&quot;</span>, <span class="st">&quot;Estimate&quot;</span>, <span class="st">&quot;SE&quot;</span>, <span class="st">&quot;Infit&quot;</span>, <span class="st">&quot;Outfit&quot;</span>, <span class="st">&quot;MisfitFlag&quot;</span>)]</span>
+<span id="cb31-29"><a href="#cb31-29" tabindex="-1"></a>feedback<span class="sc">$</span>settings</span>
+<span id="cb31-30"><a href="#cb31-30" tabindex="-1"></a><span class="fu">plot</span>(writing_fit, <span class="at">type =</span> <span class="st">&quot;rater_severity&quot;</span>, <span class="at">diagnostics =</span> writing_diagnostics, <span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">show_bands =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb31-31"><a href="#cb31-31" tabindex="-1"></a><span class="fu">saveRDS</span>(feedback, <span class="st">&quot;writing-feedback.rds&quot;</span>)</span>
+<span id="cb31-32"><a href="#cb31-32" tabindex="-1"></a>archive <span class="ot">&lt;-</span> <span class="fu">export_mfrm_bundle</span>(</span>
+<span id="cb31-33"><a href="#cb31-33" tabindex="-1"></a>  writing_fit, <span class="at">diagnostics =</span> writing_diagnostics, <span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span>,</span>
+<span id="cb31-34"><a href="#cb31-34" tabindex="-1"></a>  <span class="at">output_dir =</span> <span class="st">&quot;writing-analysis&quot;</span>, <span class="at">data =</span> writing, <span class="at">acknowledge_sensitive =</span> <span class="cn">TRUE</span></span>
+<span id="cb31-35"><a href="#cb31-35" tabindex="-1"></a>)</span></code></pre></div>
+<p>Reshaping gives 1,370 criterion ratings; the 274 original rows are
+not the number of students. Each rater has 185 to 205 criterion ratings
+here. The example produces a low-Infit flag for R7: unusually
+predictable ratings also trigger this screen. This is a prompt to
+inspect rubric use and individual ratings, not evidence that R7 is
+inaccurate or should be removed. Severity and consistency answer
+different questions, and this dataset supplies no known true rater
+quality against which to validate either interpretation.</p>
+<p>The quadrature setting belongs to this example; use
+<code>mml_quadrature_sensitivity()</code> when numerical sensitivity
+matters to a comparison. Preserve the dashboard’s notes, review
+rating-category use and common-person coverage, and use the actual
+scripts or rubric descriptors in feedback discussions. A
+different-looking result alone does not establish that a rater needs
+training or that training would improve the scores.</p>
 </div>
 
 

@@ -102,8 +102,8 @@ test_that("plot_rater_agreement_heatmap returns symmetric matrix", {
   m <- p$data$matrix
   valid <- is.finite(m)
   expect_true(all(m[valid] == t(m)[valid]))
-  # Diagonal is 1 (identity agreement).
-  expect_true(all(diag(m) == 1))
+  # Self-agreement is not estimated by the pairwise table.
+  expect_true(all(is.na(diag(m))))
 })
 
 test_that("plot_rater_agreement_heatmap draws without error", {
@@ -118,7 +118,7 @@ test_that("plot_rater_agreement_heatmap metric='correlation' maps to Corr", {
                                      metric = "correlation", draw = FALSE)
   expect_s3_class(p, "mfrm_plot_data")
   expect_identical(p$data$metric, "correlation")
-  expect_true(grepl("Corr", p$data$subtitle))
+  expect_true(grepl("pair comparisons available", p$data$subtitle, fixed = TRUE))
   m <- p$data$matrix
   finite_off <- is.finite(m) & row(m) != col(m)
   # correlations stay within [-1, 1]

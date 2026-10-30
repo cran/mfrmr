@@ -5,7 +5,60 @@
 #' Use this page when you know the reporting question but have not yet decided
 #' which bundle, table, or reporting helper to call.
 #'
+#' @section Recommended report route:
+#' For ordinary MML/JML `mfrm_fit` results, start here. The Examples section
+#' follows the same route with bundled data.
+#' 1. Inspect `summary(fit)$decision` before interpreting the estimates.
+#' 2. Collect `res <- mfrm_results(fit)`. By default it computes missing
+#'    requested diagnostics. Pass existing matching checks through
+#'    `diagnostics = diagnostics` to reuse them; `compute = "never"` leaves
+#'    missing diagnostics unavailable. Saved intervals are explicit attachments.
+#' 3. Read `summary(res)$triage` and `$next_actions`; use `$plot_map` to find
+#'    supported figures. A failed or unavailable component needs its own
+#'    explanation, not an automatically substituted analysis.
+#' 4. Choose `mfrm_report(res)` for an analyst report, `plot(res, ...)` for
+#'    a supported figure, or [export_mfrm_results()] for tables and an archive.
+#'    Save the complete object with `saveRDS(res, file)` for later R use.
+#'    Reopen with `readRDS(file)`; reading or displaying saved outputs does not
+#'    refit the model. Reports and figures are optional, not required to save.
+#'
+#' Native CML and comparison-only fits do not supply ordinary consolidated
+#' reports. Read `summary(fit)`; for CML use [mfrm_facet_intervals()], then
+#' `summary(ci)`, `plot(ci)`, [apa_table()] and `saveRDS(ci, file)`.
+#' G/D-study and observed-agreement results also have their own summary and
+#' saving routes. For GPCM or extended measurement models, [mfrm_results()]
+#' states the supported sections and attachments; model-specific uncertainty
+#' limits remain in the collected results.
+#'
+#' Individual helpers below answer additional questions. [build_apa_outputs()]
+#' drafts manuscript text; [build_summary_table_bundle()] collects selected
+#' tables for [export_summary_appendix()]. Neither is a prerequisite for
+#' [mfrm_report()]. Use `mfrmr_output_guide("beginner")` for a compact
+#' question-to-function map, or the full guide for specialist routes.
+#'
+#' @section Choose what to save:
+#' - [export_mfrm_tables()]: core CSV tables from a fitted model. Supplied
+#'   matching diagnostics enrich the tables; this call does not compute them.
+#' - [export_mfrm_results()]: selected tables/reports and, by default, the
+#'   complete results RDS plus a script that reloads it without refitting.
+#' - [export_mfrm_bundle()]: fit-level tables, optional diagnostics and a
+#'   refitting recipe. Its `"script"` component reruns the analysis; it does
+#'   not preserve a fitted R object. Supply the original data for a colocated
+#'   replay CSV, or replace the script's data-path placeholder yourself.
+#' - [export_summary_appendix()]: selected summary tables for a manuscript.
+#'   Display rounding follows `digits`; retain the source R object for reuse.
+#'
+#' No export certifies estimates as usable or changes their uncertainty target.
+#' Inspect availability and caveat fields along with estimates. For G/D-study
+#' or native CML objects, use `saveRDS()` for the complete object and `write.csv()`
+#' for a selected supported summary table; the MFRM exporters do not widen their
+#' accepted model classes.
+#'
 #' @section Start with the question:
+#' - "How can I read assessment-plan estimates and uncertainty together?"
+#'   Use [summary.mfrm_multivariate_d_study()] with `intervals = TRUE` and
+#'   `assumption = "normal"`, or supply saved intervals. Its `table`,
+#'   `intervals` and `notes` retain methods, design and interpretation limits.
 #' - "How should I document the model setup and run settings?"
 #'   Use [specifications_report()].
 #' - "Was data filtered, dropped, or mapped in unexpected ways?"
@@ -19,44 +72,28 @@
 #'   Use [rating_scale_table()], [category_structure_report()], and
 #'   [category_curves_report()].
 #' - "Is the design linked well enough across subsets, forms, or waves?"
-#'   Use [subset_connectivity_report()] and [plot_anchor_drift()].
+#'   Use [subset_connectivity_report()] and [plot(x)][plot.mfrm_anchor_drift].
 #' - "What should go into the manuscript text and tables?"
-#'   For `RSM` / `PCM`, use [reporting_checklist()], [build_apa_outputs()],
+#'   For ordinary MML/JML `RSM` / `PCM`, use [reporting_checklist()], [build_apa_outputs()],
 #'   and [build_summary_table_bundle()] or [export_summary_appendix()]. For
-#'   bounded `GPCM`, use the same route only where
+#'   `GPCM`, use the same route only where
 #'   [gpcm_capability_matrix()] marks it as `supported_with_caveat`: direct
 #'   table/plot helpers, summary-table appendix export, caveated
 #'   [build_apa_outputs()], and caveated [export_mfrm_bundle()] are available
 #'   with a `gpcm_boundary`; score-side exports and design-forecasting evidence
 #'   use their own caveated or blocked `GPCM` routes.
+#' - "How can I estimate my model in Stan or brms?"
+#'   [export_mfrm_model()] writes code, data, mappings and explicit Bayesian
+#'   priors for supported ordinary MML specifications. Export does not run a
+#'   sampler; posterior credible intervals are distinct from MML intervals.
+#'   After sampling, use [read_mfrm_posterior()] to read the saved summary,
+#'   inspect its sampling review, and continue with `plot()`, `confint()` and
+#'   [mfrm_report()]. The summary does not contain joint posterior draws.
 #' - "Did a simulation recover the known generating parameters well enough?"
-#'   Use [evaluate_mfrm_recovery()] for the recovery study,
+#'   Use [simulate_mfrm_recovery()] for the recovery study,
 #'   [assess_mfrm_recovery()] for the adequacy checklist, and then
 #'   [build_summary_table_bundle()] or [export_summary_appendix()] for the
 #'   appendix handoff.
-#'
-#' @section Recommended report route:
-#' 1. Start with [specifications_report()] and [data_quality_report()] to
-#'    document the run and confirm usable data.
-#' 2. Continue with [estimation_iteration_report()] and
-#'    [precision_review_report()] to judge convergence and inferential strength.
-#' 3. Use [facet_statistics_report()] and [subset_connectivity_report()] to
-#'    describe spread, linkage, and measurability.
-#' 4. Add [rating_scale_table()], [category_structure_report()], and
-#'    [category_curves_report()] to document scale functioning.
-#' 5. For `RSM` / `PCM`, finish with [reporting_checklist()] and
-#'    [build_apa_outputs()] for manuscript-oriented output, then
-#'    [build_summary_table_bundle()] for reusable handoff tables or
-#'    [export_summary_appendix()] for direct appendix export. For bounded
-#'    `GPCM`, the same report/export route is available only as a caveated
-#'    sensitivity-reporting layer with `gpcm_boundary`; keep FACETS-style
-#'    score-side review and design forecasting on their separate capability
-#'    rows.
-#'
-#' If you are unsure which helper to call, start with
-#' [mfrmr_output_guide()]. It returns a compact purpose-to-helper table that
-#' separates `*_table`, `*_report`, `*_review`, `*_bundle`, `export_*`, and
-#' compatibility routes.
 #'
 #' @section Which output answers which question:
 #' \describe{
@@ -105,6 +142,23 @@
 #'   table without rebuilding the analysis object path.}
 #' }
 #'
+#' @section Read availability and method limits separately:
+#' An available table or a passed numerical check does not establish that its
+#' intervals have accurate repeated-sample coverage. For implemented experimental
+#' methods, incomplete qualification means that a stated statistical property
+#' remains unestablished; inspect the specific limitation before interpreting it.
+#' Corrected JML retains this explanation in `interpretation_notes`, two-family
+#' GPCM in `gpcm_interpretation_notes`, and attached population intervals in
+#' `population_<name>_interpretation_notes`. These tables accompany the other
+#' result tables in reports and CSV exports; keep them with the estimates.
+#'
+#' An `IntervalStatus` of `Incomplete` has a different meaning: only one endpoint
+#' was computed. It is neither an infinite bound nor a qualified one-sided
+#' interval. `Unavailable` means the requested result was not supplied; inspect
+#' its reason. `CIEligible`, where present, concerns that interval procedure's
+#' checks, not a universal coverage guarantee. Keep numerical status, method
+#' limitations and unavailable results when saving or sharing an analysis.
+#'
 #' @section Practical interpretation rules:
 #' - Use bundle summaries first, then drill down into component tables.
 #' - Use [precision_review_report()] to determine whether formal inference is
@@ -124,7 +178,9 @@
 #' - Use [reporting_checklist()] before [build_apa_outputs()] when a report
 #'   still needs missing diagnostics or clearer caveats.
 #'
-#' @section Typical workflow:
+#' @section Additional task-specific workflows:
+#' These extend the basic route for eligible ordinary fits; they are not
+#' extra steps required for every report and do not apply to native CML.
 #' - Run documentation:
 #'   [fit_mfrm()] -> [specifications_report()] -> [data_quality_report()].
 #' - Precision and facet review:
@@ -138,13 +194,13 @@
 #'   [build_summary_table_bundle()] -> `summary()` / `plot()` -> [apa_table()]
 #'   or [export_summary_appendix()] /
 #'   [export_mfrm_bundle()](include = "summary_tables").
-#' - Bounded `GPCM` handoff:
+#' - `GPCM` handoff:
 #'   [reporting_checklist()] -> direct summaries/plots ->
 #'   [build_apa_outputs()] or [build_summary_table_bundle()] ->
 #'   [export_summary_appendix()] or caveated [export_mfrm_bundle()], with
 #'   `gpcm_boundary` retained in report/export objects.
 #' - Recovery simulation handoff:
-#'   [evaluate_mfrm_recovery()] -> [plot()] / [assess_mfrm_recovery()] ->
+#'   [simulate_mfrm_recovery()] -> [plot()] / [assess_mfrm_recovery()] ->
 #'   [build_summary_table_bundle()] -> [export_summary_appendix()].
 #'
 #' @section Companion guides:
@@ -155,56 +211,80 @@
 #' - For legacy-compatible wrappers and exports, see [mfrmr_compatibility_layer].
 #'
 #' @examples
-#' \donttest{
-#' toy <- load_mfrmr_data("example_core")
-#' toy_small <- toy[toy$Person %in% unique(toy$Person)[1:12], , drop = FALSE]
+#' # Long-running workflow; run explicitly when needed.
+#' # example("mfrmr_reports_and_tables", run.dontrun = TRUE)
+#' \dontrun{
+#' # Load the package and example ratings
+#' library(mfrmr)
+#' ratings <- load_mfrmr_data("example_operational")
+#'
+#' # Fit the model
 #' fit <- fit_mfrm(
-#'   toy_small,
+#'   data = ratings,
 #'   person = "Person",
 #'   facets = c("Rater", "Criterion"),
 #'   score = "Score",
+#'   rating_min = 1, rating_max = 4, category_policy = "preserve",
 #'   method = "MML",
-#'   quad_points = 7,
-#'   maxit = 30
+#'   model = "RSM"
 #' )
-#' diag <- diagnose_mfrm(fit, residual_pca = "none", diagnostic_mode = "both")
 #'
-#' spec <- specifications_report(fit)
-#' summary(spec)$overview
+#' summary(fit)$decision # Review the fit before interpreting it
 #'
-#' prec <- precision_review_report(fit, diagnostics = diag)
-#' summary(prec)$checks
+#' # Build the comprehensive results and report
+#' res <- mfrm_results(fit)
+#' report <- mfrm_report(res)
+#' summary(report, view = "reader")
 #'
-#' checklist <- reporting_checklist(fit, diagnostics = diag)
-#' subset(checklist$checklist, Section == "Visual Displays", c("Item", "NextAction"))
+#' # Find report sections that need attention
+#' report$first_screen[, c("Area", "Status", "MainIssue", "NextAction")]
 #'
-#' apa <- build_apa_outputs(fit, diagnostics = diag)
-#' apa$section_map[, c("Heading", "Available")]
-#' bundle <- build_summary_table_bundle(checklist)
-#' bundle$table_index
+#' # Extract individual person, rater, and criterion estimates
+#' estimates <- as.data.frame(fit)
+#' head(subset(estimates, Facet == "Person")) # First six persons
+#' subset(estimates, Facet == "Rater")       # All raters
+#' subset(estimates, Facet == "Criterion")   # All criteria
+#'
+#' # Keep the full result, including methods and unavailable-output reasons
+#' file <- tempfile(fileext = ".rds") # Choose a lasting path for your analysis
+#' saveRDS(res, file)
+#' saved <- readRDS(file)
+#' summary(saved)$triage # No refitting or repeated diagnostic calculation
 #' }
-#'
 #' @name mfrmr_reports_and_tables
 NULL
 
 #' Choose an mfrmr output helper by user goal
 #'
 #' @description
-#' `mfrmr_output_guide()` returns a compact table for choosing among the main
-#' table, report, review, bundle, export, and compatibility helpers. It is a
-#' user-facing map, not an analysis result.
+#' Find a function for the next question in your analysis. Start with
+#' `mfrmr_output_guide("beginner")` and read its `Question` and `MainFunction`
+#' columns. With no argument the function returns the full specialist catalogue,
+#' which includes tables, reports, reviews and exports. It does not analyze data.
 #'
-#' @param scope Which rows to return. `"all"` returns the full guide.
+#' @param scope Which rows to return. `"all"` returns the full route catalogue.
+#'   `"plots"` returns a separate purpose-based plot capability table (see below).
 #'   `"public"` returns the canonical six-step route for most users;
 #'   `"beginner"` returns the same compact route rather than combining every
 #'   beginner-labelled specialist row.
 #'   `"entry"` returns the recommended first-screen routes. `"viewer"` returns
 #'   local-viewer routes built around `mfrm_results(include = ...)`. `"binary"`
 #'   returns the two-category person-item Rasch route and checks. Other values
-#'   filter to one output family or to bounded-`GPCM`-relevant routes.
-#'   `"linking"` returns anchor, drift, and equating route rows.
+#'   filter to one output family or to `GPCM`-relevant routes.
+#'   `"linking"` returns anchor, drift, equating and DIF sensitivity routes.
+#'   `"calibration"` returns the portable fixed-calibration lifecycle and
+#'   artifact-only scoring route, conditional decisions and fixed-plan
+#'   classification accuracy/consistency.
 #'   `"simulation"` and `"network"` return advanced design-review rows.
 #'   `"response_time"` returns descriptive response-time QC rows.
+#'   `"models"` compares fixed-facet, shared-rater and Person-specific testlet
+#'   workflows, including their distinct prediction and reporting boundaries.
+#'   `"feedback"` distinguishes fixed-rater uncertainty, unexpected rating
+#'   patterns, shared-rater uncertainty, observed agreement, centrality,
+#'   criterion-referenced accuracy and screening accuracy with known truth.
+#'   `"features"`, `"imputation"` and `"gtheory"` show exploratory attributes,
+#'   assigned-score multiple imputation and observed-score G/D-study workflows,
+#'   including their own table, plot and saving routes.
 #'   `"facets"`, `"conquest"`, and `"r"` return user-pathway rows for people
 #'   arriving from those workflows.
 #'
@@ -219,10 +299,12 @@ NULL
 #' @section First-screen route:
 #' Use `mfrmr_output_guide("public")` or
 #' `mfrmr_output_guide("beginner")` for the shortest top-level API map:
-#' an explicit [describe_mfrm_data()] check and [fit_mfrm()] MML fit, the lightweight fit summary, the
-#' comprehensive FACETS-organized summary, the required native Wright map
-#' with SE/CI, optional FACETS-style Wright and person-inclusive Infit views,
-#' and finally report/export. Use `mfrmr_output_guide("entry")` when you
+#' an explicit [describe_mfrm_data()] check and [fit_mfrm()] MML fit, the lightweight
+#' fit summary, `res <- mfrm_results(fit)` and its triage, optional figures,
+#' and report/export or RDS saving. Plotting is not required before saving.
+#' Earlier scripts may obtain the same result bundle from
+#' `summary(fit, profile = "facets")$results`; no FACETS software is required.
+#' Use `mfrmr_output_guide("entry")` when you
 #' specifically need alternative first-screen creation routes, including
 #' existing result objects, the optional viewer, or interactive console work.
 #' After creating `res`, use `summary(res)$next_actions` to choose a
@@ -230,18 +312,122 @@ NULL
 #' Use `mfrmr_output_guide("viewer")` when the next step is the optional local
 #' Shiny reader; it shows which `include` preset to use before calling
 #' [launch_mfrmr_viewer()].
+#' Use `mfrmr_output_guide("feedback")` when preparing rater feedback. Start
+#' with the question and the fitted model: severity, response misfit and the
+#' accuracy of a warning rule are different quantities. A severe rater need
+#' not misfit, and an observed flag does not establish poor rater quality.
+#' For observed agreement, choose [pairwise_kappa_table()],
+#' [krippendorff_alpha_table()], [gwet_ac2_table()] or [pairwise_icc_table()]
+#' according to the score scale, rater target and missingness assumptions.
+#' [score_comparison_table()] compares a score source with reference ratings;
+#' [rater_centrality_table()] describes residual and threshold-spread indices;
+#' [fit_rater_accuracy()] models exact matches to fixed reference ratings.
+#' High rater separation reliability indicates distinguishable severities,
+#' not high agreement. These quantities do not replace one another.
+#' For a fixed future plan, use [classification_table()] under
+#' `scope = "calibration"`; its model-based accuracy/consistency differs from
+#' observed reference agreement and posterior ability-band probabilities.
+#' For DIF sensitivity, `scope = "linking"` points to
+#' [mantel_haenszel_table()], [ordinal_logistic_table()] and the shared-roster
+#' example in `vignette("mfrmr-linking-and-dff")`.
+#' For an individual native additive RSM/PCM or experimental two-family GPCM sheet, use
+#' `mfrm_report(res, style = "rater", facet = "Rater", rater = "R01")`.
+#' The selected sheet omits source identifiers; the comprehensive result and
+#' export bundle retain the original analysis.
 #' Use `mfrmr_output_guide("psychometric")` for the technical table,
 #' review, and reporting routes whose interpretation boundaries should be
 #' checked before manuscript use.
 #'
 #' @section How to use this guide:
-#' Treat `MainFunction` as the route to try next and `UseWhen` as the guardrail.
-#' The guide is not a replacement for the help pages of the listed functions;
-#' it is a namespace map for deciding which page to open.
-#' For bounded `GPCM`, use `scope = "gpcm"` to find both the support matrix
+#' For route scopes, read `Question` first, then open the help for a function
+#' in `MainFunction`. For `"plots"`, use the figure instructions below.
+#' `UseWhen` describes its inputs and purpose; `NextStep` explains what to inspect.
+#' Cells containing `...` are outlines, not complete scripts to paste and run.
+#' Use [mfrmr_workflow_methods] for a runnable introduction and an explanation
+#' of function names. Inspect `DecisionBoundary` before interpreting a result.
+#' For construct-focused research, the *Use results as evidence about a
+#' construct* section of [mfrmr_methods_reference] connects a claim to observable
+#' patterns, competing explanations and the limits of a conclusion.
+#' For `GPCM`, use `scope = "gpcm"` to find both the support matrix
 #' and the table that explains how out-of-scope routes are handled.
+#' Use `scope = "exports"` to distinguish saved-analysis archives from
+#' [export_mfrm_model()], which generates a Stan/brms model for a separate
+#' Bayesian analysis with explicit priors. That route returns to mfrmr through
+#' [read_mfrm_posterior()]: inspect `summary(x)` before using `plot(x)`,
+#' `confint(x)` or [mfrm_report()]. Other interval levels, contrasts and
+#' predictions require the backend's joint draws.
 #'
-#' @return A data.frame with one row per recommended route and columns:
+#' @section Check the model before following a route:
+#' The six-step beginner route starts with ordinary RSM/PCM. The result class
+#' `mfrm_fit` alone does not establish which diagnostics or figures are valid:
+#' one-family GPCM, two-family GPCM and corrected JML share that class.
+#' Read the fitted model and estimation method in `summary(fit)` first.
+#' For GPCM, consult [gpcm_capability_matrix()] and
+#' `vignette("mfrmr-gpcm-scope", package = "mfrmr")`.
+#' Two-family GPCM and corrected JML have separate result/report and descriptive
+#' response-diagnostic routes; ordinary fit tests and Wright/Pathway maps do
+#' not apply. Corrected JML supplies point plots for slopes, locations and steps,
+#' without structural confidence intervals.
+#'
+#' Use `scope = "models"` for fixed-facet, shared-rater and testlet roles,
+#' `scope = "feedback"` for the distinct rater-review targets, and
+#' `scope = "calibration"` for scoring or fixed-plan decisions.
+#' For exploratory bias review across eligible facet pairs, use
+#' [estimate_all_bias()], followed by `summary(screens)` and `plot(screens)`.
+#' Use [estimate_bias()] for a prespecified pair. Retain failed pairs and
+#' unavailable cells; the collection does not supply multiplicity-controlled
+#' inference or evidence that no bias exists. Save the complete collection.
+#'
+#' Use `scope = "gtheory"` for observed-score assessment planning. Start with
+#' the G-study component or covariance view, then compare D-study curves while
+#' keeping other facet counts fixed or in separate panels. Use
+#' `plot(d, type = "error_components")` to inspect each plan's error sources,
+#' including signed covariance contributions, or `type = "sem"` for error in
+#' score units. Error-source contributions are point estimates; SEM uncertainty
+#' requires the separately supported interval calculation. These projections
+#' and paired plan-difference intervals answer different questions. Component
+#' SEs/intervals are available for the designs and methods documented in
+#' [confint.mfrm_multivariate_gstudy()] and [vcov.mfrm_multivariate_gstudy()].
+#' For coefficient sampling SEs, use [confint.mfrm_multivariate_d_study()]
+#' with `method = "delta"` and `assumption = "normal"`. These differ from
+#' measurement SEM. Its normal-reference intervals and plots retain bounds
+#' outside `[0,1]` with approximation qualifications; defaults are unchanged.
+#' General distribution-robust comparison intervals are not supplied.
+#' Save each complete result with [base::saveRDS()] and reopen it with
+#' [base::readRDS()]; a CSV alone does not retain its design or qualifications.
+#' Fixed-facet output also depends on the estimator: native CML uses dedicated
+#' summaries and [mfrm_facet_intervals()] plots/tables, without ordinary Person
+#' scoring or consolidated reports. [mfrmr_interval_guide()] separates that
+#' route from MML interaction contrasts and their population-SD standardization.
+#'
+#' @section Choosing a figure:
+#' Use `mfrmr_output_guide("plots")` to find selected plots by purpose, input
+#' class and explicit plot call. This is a curated map, not an exhaustive list
+#' of every plot method, view or component. Unlisted routes are not necessarily
+#' unsupported. Existing scopes, including `"all"`, keep their route-table format.
+#'
+#' For linked figure previews and runnable examples, open
+#' `vignette("mfrmr-visual-diagnostics")`.
+#' `ResultFunction` names a help page for creating the required result.
+#' In `PlotCall`, replace `x` with the indicated result object and save the
+#' returned object as `p`. Calls use `draw = FALSE`; change it to `TRUE` to
+#' display the original figure. Then follow `GGPlotCall`, if available.
+#' `DataComponent` is for [plot_data()] extraction; it is not automatically a
+#' valid or equivalent `component` argument to [as_ggplot()].
+#'
+#' `GGPlot` distinguishes `"dedicated"` (a converter for this plot), `"native"`
+#' (the plot method already returns ggplot), `"generic"` (a table-based view
+#' that need not reproduce the original figure), and `"unavailable"` (use the
+#' original plot or build a custom graphic from its data). ggplot routes need
+#' the optional ggplot2 package. Display support does not broaden the fitted
+#' model's statistical scope or establish interval coverage. Read `Notes` and
+#' the source function's help before interpretation.
+#'
+#' @return For `scope = "plots"`, a data.frame with `Question`, `InputClass`,
+#'   `PlotCall`, `PlotName` (the name in the saved plot data), `DataComponent`,
+#'   `GGPlot`, `GGPlotCall` (`NA` when unavailable), `Notes`, `ResultFunction`
+#'   and `NextStep`.
+#'   All other scopes return a data.frame with one row per route and columns:
 #' - `Scope`
 #' - `Question`
 #' - `OutputFamily`
@@ -259,24 +445,18 @@ NULL
 #' - `Notes`
 #'
 #' @examples
-#' public <- mfrmr_output_guide("public")
-#' public[, c("Question", "APILayer", "ObjectRole", "MainFunction")]
+#' beginner <- mfrmr_output_guide("beginner")
+#' beginner[, c("Question", "MainFunction", "NextStep")]
 #'
-#' entry <- mfrmr_output_guide("entry")
-#' entry[, c("Question", "Lifecycle", "UserLevel", "MainFunction")]
+#' # Ask for a specialist map only when that question arises.
+#' linking <- mfrmr_output_guide("linking")
+#' linking[, c("Question", "MainFunction", "UseWhen")]
 #'
-#' reviews <- mfrmr_output_guide("reviews")
-#' reviews[, c("Question", "MainFunction", "UseWhen")]
+#' feedback <- mfrmr_output_guide("feedback")
+#' feedback[, c("Question", "MainFunction", "DecisionBoundary")]
 #'
-#' mfrmr_output_guide("gpcm")[, c("Question", "MainFunction", "GPCMStatus")]
-#' mfrmr_output_guide("simulation")[, c("Question", "Lifecycle")]
-#' mfrmr_output_guide("linking")[, c("Question", "MainFunction")]
-#' mfrmr_output_guide("facets")[, c("Question", "MainFunction")]
-#' mfrmr_output_guide("binary")[, c("Question", "MainFunction")]
-#' mfrmr_output_guide("viewer")[, c("Question", "MainFunction")]
-#' mfrmr_output_guide("response_time")[, c("Question", "MainFunction")]
-#' mfrmr_output_guide("beginner")[, c("Question", "MainFunction")]
-#' mfrmr_output_guide("psychometric")[, c("Question", "DecisionBoundary")]
+#' figures <- mfrmr_output_guide("plots")
+#' figures[, c("Question", "ResultFunction", "GGPlot")]
 #' @concept reporting workflow
 #' @concept route selection
 #' @concept GPCM boundaries
@@ -284,745 +464,67 @@ NULL
 mfrmr_output_guide <- function(scope = c("all", "public", "beginner", "psychometric",
                                          "entry", "viewer", "binary", "tables", "reports", "reviews",
                                          "bundles", "exports", "compatibility",
-                                         "gpcm", "simulation", "linking", "network",
-                                         "response_time", "facets", "conquest", "r")) {
+                                         "gpcm", "calibration", "simulation", "linking", "network",
+                                         "response_time", "facets", "conquest", "r", "models",
+                                         "features", "imputation", "gtheory", "feedback", "plots")) {
   scope <- match.arg(scope)
+  if (identical(scope, "plots")) return(.mfrmr_plot_guide())
 
-  out <- data.frame(
-    Scope = c(
-      "reports", "reports", "reviews", "reviews", "reports", "tables", "reviews",
-      "reviews", "reviews", "bundles", "reports", "exports", "compatibility"
-    ),
-    Question = c(
-      "Document the model setup and run settings",
-      "Check whether data were filtered, dropped, or remapped",
-      "Review response-time metadata as descriptive QC context",
-      "Decide how strongly precision claims can be phrased",
-      "Summarize facet variability, separation, and measurability",
-      "Review category functioning and expected-score curves",
-      "Screen bias, DFF, or interaction evidence",
-      "Review anchors, drift, and linking readiness",
-      "Compare equal-weighting and bounded-GPCM routes",
-      "Turn summaries into reusable appendix tables",
-      "Assemble manuscript-oriented narrative output",
-      "Write files for appendix, replay, or handoff",
-      "Serve a legacy-compatible downstream layout"
-    ),
-    OutputFamily = c(
-      "report", "report", "review", "review", "report", "table", "review",
-      "review", "review", "bundle", "bundle", "export", "compatibility"
-    ),
-    MainFunction = c(
-      "specifications_report()",
-      "data_quality_report()",
-      "response_time_review(); mfrm_results(include = \"response_time\", response_time = ...); plot_response_time_review(); plot_data_components()",
-      "precision_review_report()",
-      "facet_statistics_report()",
-      "rating_scale_table(); category_structure_report(); category_curves_report()",
-      "mfrm_results(fit, include = \"bias\"); estimate_bias(); analyze_dff(); bias_interaction_report()",
-      "review_mfrm_anchors(); detect_anchor_drift(); build_linking_review()",
-      "build_model_choice_review(); build_weighting_review(); compare_mfrm()",
-      "build_summary_table_bundle()",
-      "mfrm_report(); reporting_checklist(); build_apa_outputs()",
-      "export_mfrm_results(); export_summary_appendix(); export_mfrm_bundle(); build_mfrm_manifest()",
-      "run_mfrm_facets(); facets_output_file_bundle(); facets_output_contract_review()"
-    ),
-    UseWhen = c(
-      "You need methods-section settings or reproducibility context.",
-      "You need to explain retained rows, missing values, or unknown elements.",
-      "You have event-level timing metadata and need rapid/slow-response screening outside the fitted MFRM likelihood.",
-      "You need to separate model-based, hybrid, and exploratory precision evidence.",
-      "You need facet-level reporting before writing interpretation.",
-      "You need category diagnostics or curve data for figures.",
-      "You need screening evidence for follow-up fairness or interaction review.",
-      "You need operational scale-maintenance checks for RSM/PCM workflows.",
-      "You need to review whether discrimination-based reweighting changes conclusions.",
-      "You need named data.frame outputs for appendix or handoff.",
-      "You need manuscript text, captions, notes, and section maps.",
-      "You need files on disk rather than R objects.",
-      "You need a fixed-width, graphfile, scorefile, or contract-check layout."
-    ),
-    TypicalInput = c(
-      "mfrm_fit",
-      "mfrm_fit plus optional raw data",
-      "long-format rating-event data with person, time, and optional facet/score columns",
-      "mfrm_fit plus mfrm_diagnostics",
-      "mfrm_fit plus mfrm_diagnostics",
-      "mfrm_fit",
-      "mfrm_fit plus optional diagnostics/grouping",
-      "anchor tables, drift results, or equating chain objects",
-      "two or more fitted candidate models",
-      "summary(), review, recovery, prediction, or checklist objects",
-      "mfrm_results, or mfrm_fit plus diagnostics/checklist evidence",
-      "summary-table bundle, manifest, or fitted analysis bundle",
-      "mfrm_fit or run_mfrm_facets() output"
-    ),
-    NextStep = c(
-      "Read summary rows before adding interpretation.",
-      "Inspect row-level reasons before reporting exclusions.",
-      "Inspect thresholds, grouped summaries, summary(res)$next_actions, and draw-free plot data before deciding whether a separate QC note is needed.",
-      "Use the status mix to decide wording strength.",
-      "Use plots or summary-table bundles for presentation.",
-      "Use plot helpers or export curve tables.",
-      "Treat positive screens as follow-up prompts, not final decisions.",
-      "Use operational linking synthesis for RSM/PCM; keep bounded GPCM linking review caveated and exploratory.",
-      "Report GPCM fit gains as sensitivity evidence, not automatic scoring policy.",
-      "Use apa_table() or export_summary_appendix().",
-      "Start from res <- mfrm_results(fit); use mfrm_report(res, style = \"qc\") before manuscript-specific prose.",
-      "Check written_files and available_outputs before sharing.",
-      "Prefer package-native routes unless a downstream tool requires this layout."
-    ),
-    GPCMStatus = c(
-      "supported",
-      "supported",
-      "supported",
-      "supported_with_caveat",
-      "supported_with_caveat",
-      "supported_with_caveat",
-      "supported_with_caveat",
-      "supported_with_caveat; exploratory_gpcm_linking_review",
-      "supported_with_caveat",
-      "supported_for_direct_outputs",
-      "supported_with_caveat",
-      "summary_appendix_supported; fit_bundle_supported_with_caveat",
-      "graph_only_or_blocked_by_score_side_semantics"
-    ),
-    Notes = c(
-      "Best first report object when methods documentation is the goal.",
-      "Pairs naturally with describe_mfrm_data().",
-      "Timing summaries are descriptive QC only; they do not alter MFRM estimates, fit speed-accuracy models, estimate speed parameters, or define exclusion rules.",
-      "Use before formal confidence or reliability language.",
-      "Good bridge from diagnostics to report text.",
-      "Category curves carry reusable plot data.",
-      "Bias outputs are screening layers.",
-      "Operational linking conclusions remain RSM/PCM-scoped; bounded GPCM review is caveated exploratory synthesis.",
-      "Use with gpcm_capability_matrix().",
-      "Works for several object classes; inspect table_index.",
-      "mfrm_report() is the report entry point over mfrm_results(); bounded GPCM APA text is caveated and carries gpcm_boundary.",
-      "Use export_mfrm_results() for controlled mfrm_results analysis archives; it does not deidentify files. Choose the narrowest route needed for review and keep gpcm_boundary with bounded GPCM bundles.",
-      "Compatibility is a presentation contract, not numerical equivalence."
-    ),
-    stringsAsFactors = FALSE
-  )
+  out <- .mfrmr_table_mfrmr_output_guide_out
 
-  public_rows <- data.frame(
-    Scope = rep("public", 6L),
-    Question = c(
-      "1. Check score support and fit with explicit data roles",
-      "2. Check convergence and fitted-model settings",
-      "3. Build the comprehensive FACETS-organized review",
-      "4. Create the required native Wright map with SE or CI",
-      "5. Add optional FACETS-style and Infit pathway views",
-      "6. Review, report, and export the completed results"
-    ),
-    OutputFamily = c("entry", "entry", "entry", "plot-data", "plot-data", "export"),
-    MainFunction = c(
-      paste0(
-        "describe_mfrm_data(data, person = ..., facets = ..., score = ...); ",
-        "fit <- fit_mfrm(data, person = ..., facets = ..., score = ..., method = \"MML\")"
-      ),
-      "summary(fit, profile = \"fit\", detail = \"brief\")",
-      "review <- summary(fit, profile = \"facets\", detail = \"brief\"); res <- review$results",
-      "plot(res, type = \"wright\", renderer = \"native\", show_ci = TRUE, top_n = Inf, preset = \"publication\")",
-      paste0(
-        "fit$prep$score_map; ",
-        "plot(res, type = \"wright\", renderer = \"facets\", category_labels = rubric_labels, show_ci = FALSE); ",
-        "plot(res, type = \"fit_pathway\", fit_stat = \"Infit\", include_person = TRUE, person_labels = \"none\")"
-      ),
-      "report <- mfrm_report(res); summary(report, view = \"reader\"); export_mfrm_results(res, preset = \"starter\")"
-    ),
-    UseWhen = c(
-      "You can name the person, facet, and ordered-score columns and confirm the intended rubric support in long-format data.",
-      "The fit has completed and you need a fast check before computing diagnostic sections.",
-      "The fitted model is ready for an organized first review of measures, fit, precision, and category steps.",
-      "You need the required shared-logit-scale figure before any optional follow-up plot.",
-      "FACETS-style reading, rubric-labelled transitions, or person-inclusive fit review will help answer a focused question.",
-      "The required Wright map and first-screen evidence have been inspected and you are ready to draft a controlled report or create an analysis archive for approved handling."
-    ),
-    TypicalInput = c(
-      "long-format data.frame, explicit column roles, and intended score support",
-      "mfrm_fit",
-      "mfrm_fit",
-      "mfrm_results from summary(fit, profile = \"facets\")",
-      "mfrm_results plus study-specific rubric labels",
-      "mfrm_results"
-    ),
-    NextStep = c(
-      "Review retained/missing categories and the score map, then run the lightweight fit profile and confirm convergence.",
-      "If the fit is usable, request profile = \"facets\"; otherwise resolve convergence or data issues first.",
-      "Save review$results as res, then create the native Wright map before optional displays.",
-      "Inspect targeting, facet uncertainty, and every retained step; keep this figure with the analysis record.",
-      "Use rubric labels from the actual instrument and treat person points as case-review prompts, not exclusion decisions.",
-      "Read the report summary before export and keep replay plus data-handling metadata with every controlled analysis archive."
-    ),
-    GPCMStatus = c(
-      "supported_with_caveat",
-      "supported_with_caveat",
-      "supported_with_caveat",
-      "supported_with_caveat",
-      "supported_with_caveat",
-      "summary_appendix_supported; fit_bundle_supported_with_caveat"
-    ),
-    Notes = c(
-      "Use describe_mfrm_data() before an explicit fit_mfrm() call; do not rely on automatic data-frame role inference.",
-      "This fit-only profile is intentionally lightweight and does not compute the comprehensive diagnostic sections.",
-      "FACETS describes the organization of this review; mfrmr estimated the model and numerical equivalence is not implied.",
-      "The native map retains mfrmr's facet uncertainty display and is the required first fitted-scale figure.",
-      "The closest FACETS-style renderer uses show_ci = FALSE; show_ci = TRUE is a deliberate hybrid that adds mfrmr uncertainty intervals. The Infit pathway adds persons only when explicitly requested.",
-      "Reporting and export organize existing evidence; they do not improve model fit or create an automatic acceptance rule."
-    ),
-    stringsAsFactors = FALSE
-  )
+  public_rows <- .mfrmr_table_mfrmr_output_guide_public_rows
 
-  entry_rows <- data.frame(
-    Scope = c("entry", "entry", "entry", "entry", "entry"),
-    Question = c(
-      "Start with explicit model roles and a comprehensive first screen",
-      "Open a FACETS-style result surface from an existing fit",
-      "Browse the comprehensive result in a local Shiny viewer",
-      "Choose the next purpose-specific helper without scanning the namespace",
-      "Use column-selection prompts for exploratory data-frame input"
-    ),
-    OutputFamily = c("entry", "entry", "viewer", "guide", "entry"),
-    MainFunction = c(
-      "fit_mfrm(); diagnose_mfrm(); mfrm_results()",
-      "mfrm_results()",
-      "res <- mfrm_results(fit); launch_mfrmr_viewer(res)",
-      "mfrmr_output_guide(); summary(res)$next_actions",
-      "mfrm_results_interactive()"
-    ),
-    UseWhen = c(
-      "You are writing a script, Quarto document, or reproducible analysis and can name person, facet, and score columns.",
-      "You already have an mfrm_fit or run_mfrm_facets() object and want fit, diagnostics, table coverage, plot routes, and next actions together.",
-      "You want a local point-and-click reader for triage, QC, report text, bias screens, pathway/misfit review, tables, plots, and replay code after creating mfrm_results().",
-      "You need to move from the first screen into reporting, review, export, compatibility, network, or simulation routes.",
-      "You are exploring an unfamiliar data frame at the console and explicitly want prompts."
-    ),
-    TypicalInput = c(
-      "long-format data.frame",
-      "mfrm_fit, mfrm_facets_run, or conservative standard data.frame",
-      "mfrm_results",
-      "scope label or mfrm_results summary",
-      "interactive long-format data.frame"
-    ),
-    NextStep = c(
-      "Read summary(res), then use plot(res, type = \"qc\") and summary(res)$next_actions.",
-      "Inspect summary(res)$status before treating unavailable sections as evidence.",
-      "Install optional shiny support if needed; use the Replay tab output in scripts and reports, and make explicit follow-up choices for bias interaction review.",
-      "Filter this guide by scope such as \"reviews\", \"reports\", \"exports\", \"facets\", or \"r\".",
-      "Copy the printed replay code into a script before using the result in a report."
-    ),
-    GPCMStatus = c(
-      "supported_with_caveat",
-      "supported_with_caveat",
-      "viewer_only_uses_existing_results",
-      "supported",
-      "supported_with_caveat"
-    ),
-    Notes = c(
-      "Preferred route for new work: explicit fit first, then comprehensive results.",
-      "mfrm_results() is a results surface over existing estimators, diagnostics, and table/report helpers.",
-      "The viewer does not fit models or change diagnostics; it reads the supplied mfrm_results object and shows follow-up routes when a section is absent.",
-      "Use this table as the public API map rather than memorizing every helper name.",
-      "Interactive selection is deliberately opt-in and stops in non-interactive sessions."
-    ),
-    stringsAsFactors = FALSE
-  )
+  calibration_rows <- .mfrmr_table_mfrmr_output_guide_calibration_rows
 
-  viewer_rows <- data.frame(
-    Scope = rep("viewer", 7L),
-    Question = c(
-      "Open the standard first-screen viewer",
-      "Prepare publication-oriented viewer sections",
-      "Check validation, fit, and separation surfaces before reporting",
-      "Inspect bias-screen prompts without choosing contrasts automatically",
-      "Inspect pathway-map and row-level misfit prompts",
-      "Inspect anchor and linking readiness",
-      "Prepare a broad reviewer-facing viewer object"
-    ),
-    OutputFamily = rep("viewer", 7L),
-    MainFunction = c(
-      "res <- mfrm_results(fit, include = \"standard\"); launch_mfrmr_viewer(res)",
-      "res <- mfrm_results(fit, include = \"publication\"); launch_mfrmr_viewer(res)",
-      "res <- mfrm_results(fit, include = \"validation\"); launch_mfrmr_viewer(res)",
-      "res <- mfrm_results(fit, include = \"bias\"); launch_mfrmr_viewer(res)",
-      "res <- mfrm_results(fit, include = \"misfit_review\"); launch_mfrmr_viewer(res)",
-      "res <- mfrm_results(fit, include = \"linking\"); launch_mfrmr_viewer(res)",
-      "res <- mfrm_results(fit, include = c(\"publication\", \"bias\", \"misfit_review\", \"linking\")); launch_mfrmr_viewer(res)"
-    ),
-    UseWhen = c(
-      "You want a local reader for overview, triage, status, QC, tables, plot routes, and replay code.",
-      "You want APA-style draft text, table notes, figure notes, and reporting tables visible in the viewer.",
-      "You want fit, precision, reliability, and FACETS-style review surfaces visible before making manuscript claims.",
-      "You want facet-level bias-screen guidance while keeping interaction-bias facet-pair selection explicit in code.",
-      "You want pathway-map annotations, unexpected-response rows, and displacement prompts in one inspection surface.",
-      "You want anchor-readiness status and anchor plots visible before moving to explicit drift or equating checks.",
-      "You are preparing a QC or review meeting and want the main publication, bias-screen, misfit-review, and linking-readiness surfaces together."
-    ),
-    TypicalInput = rep("mfrm_fit or mfrm_results", 7L),
-    NextStep = c(
-      "Read the Overview and Status tabs first; then use Tables, Plots, and Replay for drill-down.",
-      "Treat report text as a draft template and reconcile it with the fitted model, diagnostics, and study design.",
-      "Use precision and separation evidence as reporting context, not as automatic pass/fail gates.",
-      "Choose the substantive facet pair explicitly before running bias_interaction_report() or bias_pairwise_report().",
-      "Treat unexpected rows as case-review prompts; document any exclusion or adjudication rule outside the viewer.",
-      "Use detect_anchor_drift() or build_equating_chain() only after assembling an explicit list of fitted waves or forms.",
-      "Use the Replay tab to move final choices back into an explicit script or Quarto document."
-    ),
-    GPCMStatus = c(
-      "viewer_only_uses_existing_results",
-      "supported_with_caveat",
-      "supported_with_caveat",
-      "supported_with_caveat",
-      "supported_with_caveat",
-      "anchor_readiness_supported; exploratory_linking_review_supported_with_caveat",
-      "viewer_only_uses_existing_results"
-    ),
-    Notes = c(
-      "The viewer reads a completed mfrm_results object; it does not estimate or change diagnostics.",
-      "For bounded GPCM, publication viewer sections can show direct outputs, caveated APA text, and gpcm_boundary.",
-      "This route is a display layer over existing validation and fit/separation helpers.",
-      "Bias screens are follow-up prompts, not fairness conclusions.",
-      "Pathway and unexpected-response displays help locate cases; they do not decide whether observations are invalid.",
-      "The first-screen viewer does not infer drift from a single fitted model.",
-      "Do not use the viewer as the only analysis record; keep the replayed mfrm_results() call in source control or the report source."
-    ),
-    stringsAsFactors = FALSE
-  )
+  entry_rows <- .mfrmr_table_mfrmr_output_guide_entry_rows
 
-  binary_rows <- data.frame(
-    Scope = c("binary", "binary", "binary"),
-    Question = c(
-      "Fit ordinary person-item binary responses",
-      "Confirm the two-category score support",
-      "Open the first-screen results for a binary Rasch run"
-    ),
-    OutputFamily = c("entry", "guide", "entry"),
-    MainFunction = c(
-      "fit_mfrm(data, person = ..., facets = \"Item\", score = ..., model = \"RSM\"); mfrm_results()",
-      "describe_mfrm_data(); fit$prep$score_map; summary(fit)$settings_overview",
-      "mfrm_results(fit); plot(res, type = \"wright\"); plot(res, type = \"qc\")"
-    ),
-    UseWhen = c(
-      "The data have one person column, one item column, and ordered binary scores such as 0/1 or 1/2.",
-      "Score codes may not start at zero, boundary categories may be unobserved, or you need to document the internal score map.",
-      "You want the same comprehensive first screen used for rating-scale MFRM fits."
-    ),
-    TypicalInput = c(
-      "long-format binary response data",
-      "raw data or mfrm_fit",
-      "mfrm_fit"
-    ),
-    NextStep = c(
-      "Do not include the person column again in facets; pass the item column as the non-person facet.",
-      "Check that fit$summary$Categories is 2. Set rating_min/rating_max only when the intended response scale includes unobserved boundary categories.",
-      "Read summary(res)$triage and summary(res)$next_actions before moving to fit, category, bias, or reporting helpers."
-    ),
-    GPCMStatus = c(
-      "rsm_recommended_for_ordinary_binary",
-      "supported",
-      "supported_with_caveat"
-    ),
-    Notes = c(
-      "With two ordered categories, the RSM branch reduces to the usual binary Rasch logit up to package centering and threshold identification.",
-      "Binary 1/2 input is still binary; the observed range and score mapping are recorded in prep metadata.",
-      "Binary runs use the same diagnostics and plotting routes, but category-threshold interpretation has only one boundary."
-    ),
-    stringsAsFactors = FALSE
-  )
+  viewer_rows <- .mfrmr_table_mfrmr_output_guide_viewer_rows
 
-  linking_rows <- data.frame(
-    Scope = c("linking", "linking", "linking", "linking"),
-    Question = c(
-      "Open first-screen anchor and linking readiness from an existing fit",
-      "Review intended anchor and group-anchor tables before fitting",
-      "Check drift across separately fitted waves or forms",
-      "Build a screened equating chain across ordered calibrations"
-    ),
-    OutputFamily = c("review", "review", "review", "review"),
-    MainFunction = c(
-      "mfrm_results(fit, include = \"linking\"); plot(res, type = \"anchors\")",
-      "make_anchor_table(); review_mfrm_anchors(); fit_mfrm(anchors = ..., group_anchors = ...)",
-      "detect_anchor_drift(list(Wave1 = fit1, Wave2 = fit2)); build_linking_review(drift = ...); plot_anchor_drift()",
-      "build_equating_chain(list(Form1 = fit1, Form2 = fit2)); build_linking_review(chain = ...); plot_anchor_drift(type = \"chain\")"
-    ),
-    UseWhen = c(
-      "You already have an mfrm_fit and want the stored anchor-review evidence in the comprehensive results surface.",
-      "You are preparing fixed anchors or group anchors and need to catch overlap, duplicate, missing, sparse, or unsupported anchor rows before estimation.",
-      "You have two or more independently fitted waves and need common-element drift and thin-link support checks.",
-      "You have an ordered sequence of forms or administrations and need screened adjacent-link offsets before operational score-scale maintenance."
-    ),
-    TypicalInput = c(
-      "mfrm_fit",
-      "raw long-format data plus anchor/group-anchor tables",
-      "named list of mfrm_fit objects",
-      "ordered named list of mfrm_fit objects"
-    ),
-    NextStep = c(
-      "Use summary(res$components$linking_review), plot(res, type = \"anchors\"), and build_summary_table_bundle(res$components$linking_review).",
-      "Resolve issue_counts and recommendations before fitting the anchored model.",
-      "Inspect common_by_facet and flagged drift rows before treating fitted waves as comparable.",
-      "Inspect link support and residual spread before using cumulative offsets operationally."
-    ),
-    GPCMStatus = c(
-      "anchor_readiness_supported; exploratory_linking_review_supported_with_caveat",
-      "supported_with_caveat",
-      "supported_with_caveat; exploratory_gpcm_linking_review",
-      "supported_with_caveat; exploratory_gpcm_linking_review"
-    ),
-    Notes = c(
-      "The first-screen route does not infer drift from one fit; it makes the anchor-readiness evidence visible and routes users to multi-fit checks.",
-      "Pre-fit anchor review is a data/design check, not a proof that anchored estimates are valid.",
-      "Drift review removes common-element link offsets before flagging residual drift.",
-      "The equating chain is a screened practical aid, not a full general-purpose equating framework."
-    ),
-    stringsAsFactors = FALSE
-  )
+  binary_rows <- .mfrmr_table_mfrmr_output_guide_binary_rows
 
-  advanced_rows <- data.frame(
-    Scope = c("simulation", "simulation", "simulation", "simulation", "network", "network"),
-    Question = c(
-      "Generate planned, sparse, or peer-review response data",
-      "Evaluate design and recovery operating behavior",
-      "Screen diagnostic behavior under misspecification scenarios",
-      "Export simulation operating-characteristic tables for appendices",
-      "Review co-observation connectivity as design evidence",
-      "Review peer-review assignment topology"
-    ),
-    OutputFamily = c("simulation", "review", "simulation", "export", "review", "review"),
-    MainFunction = c(
-      "build_mfrm_sim_spec(); simulate_mfrm_data(); extract_mfrm_sim_spec()",
-      "evaluate_mfrm_design(); evaluate_mfrm_recovery(); assess_mfrm_recovery()",
-      "evaluate_mfrm_diagnostic_screening(); summary(); plot(..., draw = FALSE); plot_data()",
-      "summary(diag_eval); build_summary_table_bundle(diag_eval); export_summary_appendix(diag_eval)",
-      "mfrm_network_analysis(); build_mfrm_network_review()",
-      "build_peer_review_sim_spec(); build_peer_review_design_review(); build_mfrm_network_review(peer_review_design = ...)"
-    ),
-    UseWhen = c(
-      "You need synthetic rating data with documented generator settings, sparse linked assignment, or peer-review assignment metadata.",
-      "You need Monte Carlo evidence about design density, recovery behavior, fit/separation operating characteristics, or sparse linked coverage.",
-      "You need to compare legacy residual ZSTD screens, strict marginal/pairwise screens, scenario contrasts, runtime, and optional report-review signals.",
-      "You need scenario, performance, report-signal, contrast, and draw-free plot-data tables for Quarto, reviewers, or supplementary files.",
-      "You need graph connectedness, shared-observation, or subset diagnostics before treating measures as comparable.",
-      "You need to document reviewer load, reciprocal pairs, low-common reviewer links, or assignment topology before interpreting peer-review scores."
-    ),
-    TypicalInput = c(
-      "simulation specification or explicit generator arguments",
-      "simulation specification, generated data, or recovery-assessment output",
-      "mfrm_diagnostic_screening object or its summary",
-      "mfrm_diagnostic_screening object or summary.mfrm_diagnostic_screening",
-      "mfrm_fit, data frame, or diagnostics with co-observation structure",
-      "peer-review simulation output or peer-review design metadata"
-    ),
-    NextStep = c(
-      "Inspect embedded metadata before fitting; preserve the simulation spec with the generated data.",
-      "Separate design diagnostics and recovery evidence from inferential or validation conclusions.",
-      "Read scenario_summary and performance_summary first; use plot_overview_rate or plot_report_rate for reusable figure data.",
-      "Use appendix_preset = \"recommended\" for a compact handoff, or include_empty = TRUE when documenting unavailable report-signal tables.",
-      "Carry design connectivity into reporting as design evidence, not as fit, separation, or fairness evidence.",
-      "Use the design review before any peer-quality, fairness, fit, separation, or recovery interpretation."
-    ),
-    GPCMStatus = c(
-      "supported_with_caveat",
-      "supported_with_caveat",
-      "supported_with_caveat",
-      "supported_with_caveat",
-      "design_diagnostic_not_measurement_gate",
-      "design_diagnostic_not_measurement_gate"
-    ),
-    Notes = c(
-      "Generator labels and slope-regime metadata document conditions; they are not fit or adequacy thresholds.",
-      "Use ADEMP-style condition and metric separation when reporting simulation evidence.",
-      "Diagnostic-screening simulations describe operating characteristics; they are not calibrated inferential tests or standalone validation criteria.",
-      "The appendix route reuses the package-wide summary-table contract instead of creating a separate simulation-only export API.",
-      "Network review is a design/connectivity layer and does not replace MFRM estimates.",
-      "Peer-review topology is an assignment-design diagnostic, not a reviewer-quality decision."
-    ),
-    stringsAsFactors = FALSE
-  )
+  linking_rows <- .mfrmr_table_mfrmr_output_guide_linking_rows
 
-  gpcm_rows <- data.frame(
-    Scope = rep("gpcm", 2L),
-    Question = c(
-      "Check the bounded GPCM support matrix",
-      "Find alternatives for unavailable bounded GPCM routes"
-    ),
-    OutputFamily = c("guide", "review"),
-    MainFunction = c(
-      "gpcm_capability_matrix()",
-      "gpcm_runtime_guard_coverage()"
-    ),
-    UseWhen = c(
-      "You need to confirm which GPCM helper families are supported, caveated, blocked, or deferred before choosing a route.",
-      "A bounded GPCM route is blocked or deferred and you need an available alternative."
-    ),
-    TypicalInput = c(
-      "none",
-      "none"
-    ),
-    NextStep = c(
-      "Use supported rows directly; for caveated, blocked, or deferred rows, read Boundary and RecommendedRoute.",
-      "Read Boundary and RecommendedRoute before choosing a substitute analysis."
-    ),
-    GPCMStatus = c(
-      "bounded_support_matrix",
-      "out_of_scope_route_guidance"
-    ),
-    Notes = c(
-      "The capability matrix is the user-facing bounded-GPCM support matrix.",
-      "This table lists unavailable routes and the supported alternatives; it does not expand GPCM availability."
-    ),
-    stringsAsFactors = FALSE
-  )
+  advanced_rows <- .mfrmr_table_mfrmr_output_guide_advanced_rows
 
-  migration_entry_rows <- data.frame(
-    Scope = c(
-      rep("facets", 4L),
-      rep("conquest", 2L)
-    ),
-    Question = c(
-      "1. Check score support, then open a FACETS-organized review from an explicit MML fit",
-      "2. Draw the required native Wright map with facet SE or CI",
-      "3. Add the FACETS-style ruler with rubric-labelled steps",
-      "4. Review Infit by measure, adding persons explicitly when needed",
-      "1. Fit the supported overlap model explicitly with MML in mfrmr",
-      "2. State the ConQuest comparison scope before preparing external review"
-    ),
-    OutputFamily = c(
-      "entry", "plot-data", "plot-data", "plot-data",
-      "entry", "compatibility"
-    ),
-    MainFunction = c(
-      paste0(
-        "describe_mfrm_data(data, person = ..., facets = ..., score = ...); ",
-        "fit <- fit_mfrm(data, person = ..., facets = ..., score = ..., method = \"MML\"); ",
-        "review <- summary(fit, profile = \"facets\", detail = \"brief\"); res <- review$results"
-      ),
-      "plot(res, type = \"wright\", renderer = \"native\", show_ci = TRUE, top_n = Inf, preset = \"publication\")",
-      paste0(
-        "fit$prep$score_map; ",
-        "plot(res, type = \"wright\", renderer = \"facets\", category_labels = rubric_labels, show_ci = FALSE)"
-      ),
-      paste0(
-        "plot(res, type = \"fit_pathway\", fit_stat = \"Infit\", include_person = TRUE, ",
-        "top_n_person = 12, person_labels = \"none\", facet_labels = \"flagged\")"
-      ),
-      paste0(
-        "fit_lr <- fit_mfrm(data, person = \"Person\", facets = \"Item\", score = \"Score\", ",
-        "method = \"MML\", model = \"RSM\", population_formula = ~ X, person_data = person_data)"
-      ),
-      "mfrmr_output_guide(\"conquest\"); build_conquest_overlap_bundle(fit_lr)"
-    ),
-    UseWhen = c(
-      "You are moving from FACETS terminology to an explicit, reproducible mfrmr analysis.",
-      "You need the shared logit scale and mfrmr facet uncertainty before any compatibility-oriented plot.",
-      "Readers need the familiar asterisk ruler and actual evaluation labels for adjacent category transitions.",
-      "You need an Infit-centred follow-up and have a reason to inspect a bounded subset of person measures.",
-      "Your design is inside the documented unidimensional RSM/PCM MML overlap that mfrmr implements.",
-      "You plan to compare mfrmr with a separately run ConQuest analysis and need to state the boundary first."
-    ),
-    TypicalInput = c(
-      "long-format data.frame with explicit person, facet, and score roles",
-      "mfrm_results from summary(fit, profile = \"facets\")",
-      "mfrm_results plus named labels from the rating rubric",
-      "mfrm_results with available diagnostics",
-      "long-format data.frame inside the documented overlap scope",
-      "eligible latent-regression MML RSM/PCM fit with one numeric person covariate"
-    ),
-    NextStep = c(
-      "Create the native Wright map first, then use FACETS-style views only for familiar presentation and migration.",
-      "Inspect targeting, uncertainty, and every retained step before opening the FACETS-style renderer.",
-      "Verify that each displayed transition uses the instrument's real category wording; do not infer numerical equivalence from the layout.",
-      "Treat flagged or extreme person points as review prompts and document any substantive follow-up rule separately.",
-      "Read the scope note before generating a comparison bundle or extracting tables from an external ConQuest run.",
-      "Run the generated command in ConQuest, use normalize_conquest_overlap_exports() on its four comparison CSV files, retain the history CSV for objective/free-dimension verification, and then use review_conquest_overlap()."
-    ),
-    GPCMStatus = c(
-      rep("supported_with_caveat", 4L),
-      rep("blocked_for_gpcm; rsm_pcm_overlap_only", 2L)
-    ),
-    Notes = c(
-      "The model is estimated by mfrmr. FACETS-style organization does not mean that FACETS software was run.",
-      "The native Wright map is the required first scale figure and retains the package's SE/CI advantage.",
-      "The closest FACETS-style renderer uses show_ci = FALSE and reproduces Table 6-style ruler grammar and labelled step lines, not optimizer-level numerical identity; show_ci = TRUE is an mfrmr uncertainty hybrid.",
-      "Persons are opt-in because person identifiers and dense labels require deliberate privacy and readability choices.",
-      "This call runs mfrmr only; it does not execute ConQuest, read a ConQuest command file, or parse raw ConQuest output.",
-      "The bundle prepares a scoped comparison contract and command-text template. It does not execute ConQuest or parse raw report text."
-    ),
-    stringsAsFactors = FALSE
-  )
+  gpcm_rows <- .mfrmr_table_mfrmr_output_guide_gpcm_rows
 
-  user_pathway_rows <- data.frame(
-    Scope = c(
-      "facets", "facets", "facets", "facets", "facets", "facets", "facets",
-      "facets", "facets", "facets", "facets",
-      "conquest", "conquest", "conquest",
-      "r", "r", "r", "r"
-    ),
-    Question = c(
-      "State the FACETS relationship before using FACETS-style routes",
-      "Translate FACETS direct and group anchor blocks",
-      "Review anchor drift across forms, raters, or waves",
-      "List fit measures and misfit flags by facet",
-      "Explain FACETS df and ZSTD conversion",
-      "Bring an external FACETS fit table into the review",
-      "Review rating-scale categories, fair averages, and expected curves",
-      "Review FACETS Table 14-style bias and interaction signals",
-      "Draw a Wright map / variable map on the common logit scale",
-      "Check score support and rater response patterns before fitting claims",
-      "Write residual and subset files for external review",
-      "Prepare a scoped ConQuest overlap case",
-      "Compare extracted ConQuest tables after the external run",
-      "State where mfrmr is less flexible than ConQuest",
-      "Reuse plotting data for custom graphics",
-      "Start from data-quality plot data for QC dashboards",
-      "Reuse response-time plot data for custom QC graphics",
-      "Combine tables and plot data for reports"
-    ),
-    OutputFamily = c(
-      "compatibility", "review", "review", "table", "review", "review",
-      "table", "review", "plot-data", "report",
-      "export",
-      "compatibility", "review", "compatibility",
-      "plot-data", "plot-data", "plot-data", "bundle"
-    ),
-    MainFunction = c(
-      "facets_positioning_guide(); facets_feature_coverage(); run_mfrm_facets(); mfrmRFacets(); facets_output_file_bundle()",
-      "review_mfrm_anchors(); make_anchor_table(); fit_mfrm(anchors = ..., group_anchors = ...)",
-      "anchor_to_baseline(); detect_anchor_drift(); build_equating_chain(); plot_anchor_drift()",
-      "fit_measures_table(); facets_chisq_table(); displacement_table()",
-      "facets_fit_df_guide(); diagnose_mfrm(fit_df_method = \"both\")",
-      "read_facets_fit_table(); facets_fit_review(); plot(..., type = \"df_sensitivity\")",
-      "rating_scale_table(); category_structure_report(); category_curves_report(); fair_average_table(); plot_fair_average()",
-      "mfrm_results(fit, include = \"bias\"); estimate_bias(); bias_interaction_report(); bias_pairwise_report(); plot_bias_interaction()",
-      "plot(fit, type = \"wright\"); plot_wright_unified(); plot_data(type = \"wright\")",
-      "data_quality_report(); plot(..., type = \"dashboard\")",
-      "write_mfrm_residual_file(); write_mfrm_subset_file(); facets_output_file_bundle()",
-      "build_conquest_overlap_bundle()",
-      "normalize_conquest_overlap_exports(); review_conquest_overlap()",
-      "reporting_checklist(); reference_case_benchmark()",
-      "mfrm_results(fit, include = \"misfit_review\"); mfrmr_interval_guide(); plot_data_components(); plot_data(); plot(..., draw = FALSE); plot(fit, type = \"pathway\", draw = FALSE); plot_data(category_curves_report(...), component = \"plot_long\"); plot_bias_interaction(..., draw = FALSE); plot_information(..., draw = FALSE)",
-      "plot_data(data_quality_report(...), type = \"dashboard\")",
-      "response_time_review(); plot_response_time_review(..., draw = FALSE); plot_data_components(); plot_data()",
-      "build_summary_table_bundle(); build_visual_summaries()"
-    ),
-    UseWhen = c(
-      "You need to explain the limits of FACETS correspondence while using familiar names, coverage maps, fixed files, or graphfile-style handoff.",
-      "You are translating FACETS D/A or D/G anchor blocks before fitting.",
-      "You need to screen common-element drift across administrations, forms, raters, or waves.",
-      "You want a Table 7-like view of measures, standard errors, and fit status.",
-      "You need to show whether a ZSTD difference is caused by df convention rather than MnSq.",
-      "You have already extracted a FACETS fit table and want a df/ZSTD-sensitive side-by-side review.",
-      "You want FACETS Table 8/category and Table 12 fair-average style evidence.",
-      "You want a FACETS Table 14-like route for local interaction-bias screening.",
-      "You want a variable-map view of persons, facet levels, and step thresholds.",
-      "You want a pre-interpretation QC screen for zero categories, dominant raters, or dropped rows.",
-      "You need standalone residual rows or connected-subset membership files for a reviewer, spreadsheet, or external QC workflow.",
-      "You need the narrow documented MML latent-regression overlap bundle.",
-      "You have the four comparison CSV files requested by the generated ConQuest command and have retained its additional history CSV for verification.",
-      "You need to explain why a ConQuest command-file workflow is not interchangeable with this package.",
-      "You want to draw your own ggplot2/base/plotly figure from package plot data.",
-      "You want the dashboard tables without accepting the package's default base-R drawing.",
-      "You have response-time metadata and want reusable timing tables for ggplot2, plotly, Quarto, or dashboard QC views.",
-      "You need stable data frames and reusable plot-data objects for an R Markdown or Quarto report."
-    ),
-    TypicalInput = c(
-      "mfrm_fit or run_mfrm_facets() output",
-      "raw data plus anchor and/or group-anchor tables",
-      "baseline anchors, baseline fit, new data, or a list of fitted waves",
-      "mfrm_fit plus optional diagnostics",
-      "mfrm_fit, mfrm_diagnostics, or a fit-measures/review table",
-      "mfrm_fit plus extracted FACETS table",
-      "mfrm_fit plus optional diagnostics",
-      "mfrm_fit plus diagnostics",
-      "mfrm_fit",
-      "mfrm_fit plus optional raw data",
-      "mfrm_fit plus optional diagnostics",
-      "eligible MML RSM/PCM fit",
-      "ConQuest parameter, regression, covariance, and case-EAP CSVs plus the overlap bundle",
-      "mfrm_fit plus optional diagnostics or benchmark request",
-      "mfrm_plot_data or any mfrmr object with a plot method",
-      "mfrm_data_quality bundle",
-      "mfrm_response_time_review or long-format rating-event data",
-      "summary/checklist/report/review objects"
-    ),
-    NextStep = c(
-      "Start with facets_positioning_guide(), then use native mfrmr objects for inference and FACETS-style files for handoff layout.",
-      "Review issue_counts and recommendations before choosing anchor_policy for fit_mfrm().",
-      "Check drift flags and link residuals before treating linked measures as comparable.",
-      "Use threshold profiles to show how underfit/overfit rates depend on the chosen band.",
-      "Compare MnSq first, then df, then ZSTD; label convention-sensitive flags explicitly.",
-      "Normalize the external table first, then inspect df_sensitivity, df_sensitive, and external_comparison.",
-      "Check zero/sparse categories and threshold ordering before reporting fair averages.",
-      "Use estimate_bias() for screening, bias_interaction_report() for ranked cells, and bias_pairwise_report() for pairwise contrasts.",
-      "Use draw = FALSE or plot_data(type = \"wright\") when you need reusable coordinates for custom graphics.",
-      "Resolve severe QC flags before interpreting fit or fairness outputs.",
-      "Keep residual, subset, and graph/score files distinct; use the native writers unless a legacy graph/score contract is required.",
-      "Run ConQuest externally and keep the generated command text as a conservative template.",
-      "Review missing/non-numeric/status rows before treating differences as numerical evidence.",
-      "Document that mfrmr currently exposes selected overlap checks, not the full ConQuest modeling language.",
-      "Start with plot_data_components(); for interval-aware figures use mfrmr_interval_guide(); for pathway maps use pathway_long/pathway_annotations/fit_measures; for category, bias, and information plots use plot_long plus annotations/settings.",
-      "Use component names such as quality_flags, category_usage_by_facet, and facet_response_patterns.",
-      "Use the table, thresholds, overview, and notes components; keep timing interpretation descriptive unless a separate speed-accuracy model is fitted.",
-      "Keep table objects and plot-data objects separate so custom reporting remains reproducible."
-    ),
-    GPCMStatus = c(
-      "graph_only_or_blocked_by_score_side_semantics",
-      "supported_with_caveat",
-      "supported_with_caveat; exploratory_gpcm_linking_review",
-      "supported_with_caveat",
-      "supported_with_caveat",
-      "supported_with_caveat",
-      "supported_with_caveat",
-      "supported_with_caveat",
-      "supported_with_caveat",
-      "supported",
-      "supported",
-      "blocked_for_gpcm; rsm_pcm_overlap_only",
-      "blocked_for_gpcm; rsm_pcm_overlap_only",
-      "blocked_for_gpcm; rsm_pcm_overlap_only",
-      "supported",
-      "supported",
-      "supported",
-      "supported_for_direct_outputs"
-    ),
-    Notes = c(
-      "mfrmr is not a FACETS numerical clone; familiar names help transition, but estimates remain package-native unless external output is supplied.",
-      "Direct anchors fix element logits; group anchors constrain a group mean, with direct anchors taking precedence.",
-      "Operational linking conclusions remain RSM/PCM-scoped; bounded GPCM linking review is caveated exploratory synthesis.",
-      "Closest current route for FACETS users who expect fit measures in one table.",
-      "The guide explains engine df, FACETS-style df, Wilson-Hilferty ZSTD, and WHEXACT caveats.",
-      "This is a review of supplied rectangular output, not raw FACETS text parsing; use df_sensitive for convention-sensitive rows.",
-      "GPCM fair averages are slope-aware direct outputs, not FACETS score-side equivalence.",
-      "Bias outputs are conditional screening layers; use substantive review before fairness conclusions.",
-      "Wright maps visualize fitted scale locations; under bounded GPCM, interpret step/threshold locations with slope-aware caveats.",
-      "Designed to catch user-visible data problems before fit interpretation.",
-      "Residual and subset writers are package-native CSV/TSV handoff routes, not exact FACETS fixed-field command-file clones.",
-      "ConQuest support is intentionally scoped to a documented comparison case.",
-      "The helper reads extracted tables, not raw ConQuest report text.",
-      "Use this row when reporting scope differences to ConQuest users.",
-      "Best R-first route for users who want full control over graphics, interval-aware displays, fit-annotated pathway maps, bias-screening views, and TIF/conditional-SEM plots.",
-      "The accessor avoids depending on the underlying object structure in user scripts.",
-      "Response-time plot data are a QC display contract, not a measurement-model extension.",
-      "Use this path for Quarto/R Markdown pipelines and downstream custom tables."
-    ),
-    stringsAsFactors = FALSE
-  )
+  migration_entry_rows <- .mfrmr_table_mfrmr_output_guide_migration_entry_rows
+
+  user_pathway_rows <- .mfrmr_table_mfrmr_output_guide_user_pathway_rows
+
+  model_rows <- .mfrmr_table_mfrmr_output_guide_model_rows
+
+  workflow_rows <- .mfrmr_table_mfrmr_output_guide_workflow_rows
+
+  feedback_rows <- .mfrmr_table_mfrmr_output_guide_feedback_rows
+
+  feedback_rows <- rbind(feedback_rows, .mfrmr_table_mfrmr_output_guide_data)
+
+  calibration_rows <- rbind(calibration_rows, .mfrmr_table_mfrmr_output_guide_data_1)
+
+  rating_evaluation_rows <- .mfrmr_table_mfrmr_output_guide_rating_evaluation_rows
+
+  model_export_row <- .mfrmr_table_mfrmr_output_guide_model_export_row
+
+  workflow_rows <- rbind(workflow_rows, .mfrmr_table_mfrmr_output_guide_data_2)
+
+  network_rows <- .mfrmr_table_mfrmr_output_guide_network_rows
 
   out <- rbind(
-    public_rows, entry_rows, viewer_rows, binary_rows, out, linking_rows,
-    advanced_rows, gpcm_rows, migration_entry_rows, user_pathway_rows
+    public_rows, calibration_rows, entry_rows, viewer_rows, binary_rows, out, linking_rows,
+    advanced_rows, gpcm_rows, migration_entry_rows, user_pathway_rows, model_rows, workflow_rows,
+    feedback_rows, rating_evaluation_rows, model_export_row, network_rows
   )
   out$Lifecycle <- "stable"
   out$Lifecycle[out$OutputFamily %in% "compatibility" | out$Scope %in% c("compatibility", "facets", "conquest")] <- "compatibility"
   out$Lifecycle[out$Scope %in% c("simulation", "network")] <- "advanced"
   out$UserLevel <- "intermediate"
-  out$UserLevel[out$Scope %in% c("public", "entry", "viewer", "binary")] <- "beginner"
+  out$UserLevel[out$Scope %in% c("public", "calibration", "entry", "viewer", "binary")] <- "beginner"
   out$UserLevel[out$Scope %in% c("simulation", "network", "reviews")] <- "advanced"
   out$UserLevel[out$Scope %in% c("compatibility", "facets", "conquest")] <- "migration"
   out$APILayer <- "specialist_component"
   out$APILayer[out$Scope %in% "public"] <- "top_level_public_surface"
-  out$APILayer[out$Scope %in% c("entry", "viewer", "binary")] <- "recommended_entry_route"
+  out$APILayer[out$Scope %in% c("calibration", "entry", "viewer", "binary")] <- "recommended_entry_route"
   out$APILayer[out$Scope %in% c("reports", "reviews", "tables", "bundles", "exports", "linking", "gpcm")] <- "specialist_followup"
   out$APILayer[out$Scope %in% c("simulation", "network")] <- "advanced_design_review"
   out$APILayer[out$Scope %in% c("compatibility", "facets", "conquest", "r")] <- "migration_or_integration"
@@ -1041,12 +543,20 @@ mfrmr_output_guide <- function(scope = c("all", "public", "beginner", "psychomet
   out$ObjectRole[grepl("launch_mfrmr_viewer", out$MainFunction, fixed = TRUE)] <- "local reader over existing results"
   out$ObjectRole[grepl("export_", out$MainFunction, fixed = TRUE)] <- "file export surface"
   out$ObjectRole[grepl("mfrmr_output_guide", out$MainFunction, fixed = TRUE)] <- "route-selection guide"
-  out$ObjectRole[grepl("gpcm_runtime_guard_coverage", out$MainFunction, fixed = TRUE)] <- "unavailable-route alternatives"
+  out$ObjectRole[grepl("view = 'unavailable'", out$MainFunction, fixed = TRUE)] <- "unavailable-route alternatives"
+  out$ObjectRole[grepl("mfrm_calibration_capabilities", out$MainFunction, fixed = TRUE)] <- "route-selection guide"
+  out$ObjectRole[grepl("extract_mfrm_calibration", out$MainFunction, fixed = TRUE)] <- "portable calibration lifecycle"
+  out$ObjectRole[grepl("save_mfrm_calibration", out$MainFunction, fixed = TRUE)] <- "calibration persistence"
+  out$ObjectRole[grepl("score_mfrm_calibration", out$MainFunction, fixed = TRUE)] <- "artifact-only posterior scoring"
+  out$ObjectRole[grepl("summary(scores)", out$MainFunction, fixed = TRUE)] <- "portable score-batch review"
+  out$ObjectRole[grepl("with cut_scores", out$MainFunction, fixed = TRUE)] <- "conditional ability decisions"
   out$ObjectRole[grepl("mfrm_results_interactive", out$MainFunction, fixed = TRUE)] <- "explicit opt-in interactive entry"
   out$ObjectRole[grepl('summary(fit, profile = "fit"', out$MainFunction, fixed = TRUE)] <- "fit summary surface"
   out$ObjectRole[grepl('summary(fit, profile = "facets"', out$MainFunction, fixed = TRUE)] <- "comprehensive result object"
 
   out$DecisionBoundary <- "Specialist follow-up: inspect the source object and help page before treating output as report evidence."
+  out$DecisionBoundary[out$ObjectRole == "conditional ability decisions"] <-
+    "Posterior event probabilities conditional on point calibration, scoring prior and supplied cuts; no automatic decision rule or calibration uncertainty."
   out$DecisionBoundary[out$ObjectRole %in% "model estimation and result-object entry"] <-
     "Fits model parameters first; diagnostics, reporting, and validity claims are separate follow-up steps."
   out$DecisionBoundary[out$ObjectRole %in% "fit summary surface"] <-
@@ -1062,9 +572,24 @@ mfrmr_output_guide <- function(scope = c("all", "public", "beginner", "psychomet
   out$DecisionBoundary[out$ObjectRole %in% "route-selection guide"] <-
     "Chooses the next help route; it is not analysis evidence."
   out$DecisionBoundary[out$ObjectRole %in% "out-of-scope route-status table"] <-
-    "Explains supported-with-caveat, blocked, and deferred bounded-GPCM route handling; it does not broaden any route beyond its current capability row."
+    "Explains supported-with-caveat, blocked, and deferred GPCM route handling; it does not broaden any route beyond its current capability row."
   out$DecisionBoundary[out$ObjectRole %in% "explicit opt-in interactive entry"] <-
     "Collects column choices interactively; move replay code into an explicit script before reporting."
+  out$DecisionBoundary[out$ObjectRole %in% "portable calibration lifecycle"] <-
+    "Creates fixed-standard-normal RSM/PCM MML, conditional estimated-normal one-family or experimental fixed-standard-normal two-family GPCM MML, or reference-prior RSM/PCM and shared-owner GPCM JML artifacts within their documented scope; incomplete GPCM global audits remain recorded. Every refusal must be resolved before freezing."
+  out$DecisionBoundary[out$ObjectRole %in% "calibration persistence"] <-
+    "Preserves and validates a calibration lifecycle object; loading is not authentication of an untrusted file."
+  out$DecisionBoundary[out$ObjectRole %in% "artifact-only posterior scoring"] <-
+    paste(
+      "Returns posterior EAP uncertainty conditional on the frozen point",
+      "calibration and recorded prior, excludes calibration-parameter",
+      "uncertainty, and performs no refit."
+    )
+  out$DecisionBoundary[out$ObjectRole %in% "portable score-batch review"] <-
+    paste(
+      "Reviews score dispositions and conditional uncertainty; it does not",
+      "establish source-fit quality, reliability, transport, or validity."
+    )
   out$DecisionBoundary[grepl("precision", out$MainFunction, ignore.case = TRUE)] <-
     "Precision and separation evidence are not inter-rater agreement or standalone validity proof."
   out$DecisionBoundary[grepl("response_time", out$MainFunction, fixed = TRUE)] <-
@@ -1078,7 +603,21 @@ mfrmr_output_guide <- function(scope = c("all", "public", "beginner", "psychomet
   out$DecisionBoundary[out$Scope %in% c("compatibility", "facets", "conquest")] <-
     "Compatibility rows are presentation or migration contracts, not numerical equivalence claims unless external outputs are explicitly compared."
 
-  out$RecommendedEntry <- out$Scope %in% c("public", "entry", "viewer", "binary")
+  out$RecommendedEntry <- out$Scope %in% c("public", "calibration", "entry", "viewer", "binary")
+  dedicated <- out$Scope %in% c("features", "imputation", "gtheory")
+  rating_evaluation <- out$MainFunction %in% rating_evaluation_rows$MainFunction
+  targeted <- dedicated | rating_evaluation | out$Scope %in% c("models", "feedback")
+  out$DecisionBoundary[targeted] <- out$Notes[targeted]
+  batch_bias <- grepl("estimate_all_bias()", out$MainFunction, fixed = TRUE)
+  out$DecisionBoundary[batch_bias] <- out$Notes[batch_bias]
+  model_export <- out$MainFunction == model_export_row$MainFunction
+  out$ObjectRole[model_export] <- "external model and saved posterior summary workflow"
+  out$DecisionBoundary[model_export] <- out$Notes[model_export]
+  out$ObjectRole[dedicated] <- "dedicated analysis and saved-output workflow"
+  out$ObjectRole[out$Scope == "feedback"] <- "rater-feedback route selection"
+  out$APILayer[out$Scope == "feedback"] <- "specialist_followup"
+  out$Lifecycle[dedicated] <- "advanced"
+  out$Lifecycle[out$Scope == "models" & out$MainFunction != "fit_mfrm()"] <- "advanced"
   out <- out[, c(
     "Scope", "Question", "OutputFamily", "Lifecycle", "UserLevel",
     "APILayer", "ObjectRole", "DecisionBoundary", "RecommendedEntry",
@@ -1098,12 +637,10 @@ mfrmr_output_guide <- function(scope = c("all", "public", "beginner", "psychomet
         "focused evidence table", "reporting evidence bundle",
         "review and follow-up surface", "specialist evidence component"
       )
-    return(out[keep, , drop = FALSE])
+    return(out[keep | rating_evaluation, , drop = FALSE])
   }
   if (identical(scope, "gpcm")) {
-    keep <- out$GPCMStatus != "supported" |
-      grepl("GPCM|gpcm", out$Question, ignore.case = TRUE) |
-      grepl("GPCM|gpcm", out$Notes, ignore.case = TRUE)
+    keep <- !out$GPCMStatus %in% c("supported", "not_applicable")
     return(out[keep, , drop = FALSE])
   }
   if (identical(scope, "response_time")) {

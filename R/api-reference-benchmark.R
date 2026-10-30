@@ -519,30 +519,51 @@ build_latent_recovery_checks <- function(case_id, fit_obj) {
     Detail = "Criterion recovery is reviewed after centering because the Rasch location origin remains unidentified."
   )
 
-  pred_new <- dplyr::bind_rows(lapply(c("LOW", "HIGH"), function(id) {
-    data.frame(
-      Person = id,
-      Criterion = names(truth$criterion),
-      Score = c(0L, 0L, 0L, 1L, 1L, 1L),
+  scoring_readiness <- prediction_source_scoring_readiness(fit_obj$fit)
+  shift <- NA_real_
+  shift_status <- "Warn"
+  shift_detail <- paste0(
+    "Posterior-shift recovery was not evaluated because the benchmark fit ",
+    "was not scoring-ready (", paste(scoring_readiness$reason_codes,
+                                      collapse = "; "), ")."
+  )
+  if (isTRUE(scoring_readiness$ready)) {
+    pred_new <- dplyr::bind_rows(lapply(c("LOW", "HIGH"), function(id) {
+      data.frame(
+        Person = id,
+        Criterion = names(truth$criterion),
+        Score = c(0L, 0L, 0L, 1L, 1L, 1L),
+        stringsAsFactors = FALSE
+      )
+    }))
+    pred_person <- data.frame(
+      Person = c("LOW", "HIGH"), X = c(-1.5, 1.5),
       stringsAsFactors = FALSE
     )
-  }))
-  pred_person <- data.frame(Person = c("LOW", "HIGH"), X = c(-1.5, 1.5), stringsAsFactors = FALSE)
-  pred_obj <- predict_mfrm_units(
-    fit = fit_obj$fit,
-    new_data = pred_new,
-    person_data = pred_person,
-    n_draws = 0
-  )
-  pred_tbl <- as.data.frame(pred_obj$estimates, stringsAsFactors = FALSE)
-  shift <- with(pred_tbl, Estimate[Person == "HIGH"][1] - Estimate[Person == "LOW"][1])
+    pred_obj <- predict_mfrm_units(
+      fit = fit_obj$fit,
+      new_data = pred_new,
+      person_data = pred_person,
+      n_draws = 0
+    )
+    pred_tbl <- as.data.frame(pred_obj$estimates, stringsAsFactors = FALSE)
+    shift <- with(
+      pred_tbl,
+      Estimate[Person == "HIGH"][1] - Estimate[Person == "LOW"][1]
+    )
+    shift_status <- if (is.finite(shift) && shift > 0) "Pass" else "Fail"
+    shift_detail <- paste(
+      "Posterior scoring for matched response patterns should shift upward",
+      "when the scored covariate value is higher."
+    )
+  }
   shift_row <- tibble::tibble(
     Case = case_id,
     Facet = "Population:posterior_shift",
     Correlation = NA_real_,
     MeanAbsoluteDeviation = NA_real_,
-    Status = if (is.finite(shift) && shift > 0) "Pass" else "Fail",
-    Detail = "Posterior scoring for matched response patterns should shift upward when the scored covariate value is higher."
+    Status = shift_status,
+    Detail = shift_detail
   )
 
   dplyr::bind_rows(dplyr::bind_rows(coeff_rows), sigma_row, criterion_row, shift_row)
@@ -605,7 +626,7 @@ build_gpcm_recovery_checks <- function(case_id, fit_obj) {
     } else {
       "Fail"
     },
-    Detail = "Step recovery is reviewed on the row-centered step scale stored by the current bounded GPCM branch."
+    Detail = "Step recovery is reviewed on the row-centered step scale stored by the current GPCM branch."
   )
 
   criterion_tbl <- as.data.frame(fit_obj$fit$facets$others, stringsAsFactors = FALSE)
@@ -850,8 +871,8 @@ build_bias_contract_checks <- function(case_id,
     use_a <- isTRUE(bias_tbl$FacetA[1] == target_facet)
     target_level_col <- if (use_a) "FacetA_Level" else "FacetB_Level"
     context_level_col <- if (use_a) "FacetB_Level" else "FacetA_Level"
-    bias_lookup <- bias_tbl[, c(target_level_col, context_level_col, "Bias Size", "S.E.", "d.f."), drop = FALSE]
-    names(bias_lookup) <- c("Target", "Context", "BiasSize", "BiasSE", "BiasDF")
+    bias_lookup <- bias_tbl[, c(target_level_col, context_level_col, "Bias Size", "S.E.", "Observd Count"), drop = FALSE]
+    names(bias_lookup) <- c("Target", "Context", "BiasSize", "BiasSE", "BiasCount")
 
     lookup_key <- paste(bias_lookup$Target, bias_lookup$Context, sep = "\r")
     pair1_idx <- match(paste(pair_tbl$Target, pair_tbl$Context1, sep = "\r"), lookup_key)
@@ -861,10 +882,10 @@ build_bias_contract_checks <- function(case_id,
 
     local1_err <- abs((suppressWarnings(as.numeric(pair_tbl$`Local Measure1`)) -
                          suppressWarnings(as.numeric(pair_tbl$`Target Measure`))) -
-                        suppressWarnings(as.numeric(pair1_lookup$BiasSize)))
+                        suppressWarnings(as.numeric(pair1_lookup$BiasSize)) / pair_tbl$TargetSign)
     local2_err <- abs((suppressWarnings(as.numeric(pair_tbl$`Local Measure2`)) -
                          suppressWarnings(as.numeric(pair_tbl$`Target Measure`))) -
-                        suppressWarnings(as.numeric(pair2_lookup$BiasSize)))
+                        suppressWarnings(as.numeric(pair2_lookup$BiasSize)) / pair_tbl$TargetSign)
     contrast_err <- with(pair_tbl, abs(Contrast - (`Local Measure1` - `Local Measure2`)))
     se_expected <- sqrt(suppressWarnings(as.numeric(pair1_lookup$BiasSE))^2 +
                           suppressWarnings(as.numeric(pair2_lookup$BiasSE))^2)
@@ -875,8 +896,8 @@ build_bias_contract_checks <- function(case_id,
       },
       se1 = suppressWarnings(as.numeric(pair1_lookup$BiasSE)),
       se2 = suppressWarnings(as.numeric(pair2_lookup$BiasSE)),
-      df1 = suppressWarnings(as.numeric(pair1_lookup$BiasDF)),
-      df2 = suppressWarnings(as.numeric(pair2_lookup$BiasDF))
+      df1 = suppressWarnings(as.numeric(pair1_lookup$BiasCount)) - 1,
+      df2 = suppressWarnings(as.numeric(pair2_lookup$BiasCount)) - 1
     )
     df_pair_err <- abs(suppressWarnings(as.numeric(pair_tbl$`d.f.`)) - df_expected)
     local_max <- finite_max(c(local1_err, local2_err))
@@ -890,7 +911,7 @@ build_bias_contract_checks <- function(case_id,
         Metric = "LocalMeasureIdentity",
         MaxError = local_max,
         Status = score_reference_metric(local_max),
-        Detail = "Local target measures matched overall target measures plus the corresponding context-specific bias terms."
+        Detail = "Local target measures matched overall target measures plus the context-specific predictor shift divided by the target orientation."
       ),
       tibble::tibble(
         Case = case_id,
@@ -944,7 +965,8 @@ build_conquest_overlap_dry_run_checks <- function(case_id, fit_obj) {
     conquest_case_person = "PID",
     conquest_case_estimate = "EAP"
   )
-  audit <- review_conquest_overlap(bundle, normalized)
+  # These synthetic tables copy the same native coordinates, not external fits.
+  audit <- review_conquest_overlap(bundle, normalized, conquest_location_shift = 0)
   overall <- as.data.frame(audit$overall, stringsAsFactors = FALSE)
 
   row_metric <- function(metric, value, pass_max, warn_max, detail) {
@@ -1264,7 +1286,7 @@ summarize_reference_benchmark_case <- function(case_id, case_type, fit_runs, des
 #'   bundle for the latent-regression synthetic case, round-trips package tables
 #'   through the normalization/review helpers, and confirms the package-side
 #'   workflow without claiming that ConQuest itself was executed.
-#' - `synthetic_gpcm`: checks whether the bounded `GPCM` branch recovers
+#' - `synthetic_gpcm`: checks whether the `GPCM` branch recovers
 #'   known criterion-specific slopes, row-centered step parameters, and
 #'   criterion ordering from a synthetic overlap case. This case
 #'   currently requires `model = "GPCM"` and is intended for `method = "MML"`.
@@ -1294,7 +1316,9 @@ summarize_reference_benchmark_case <- function(case_id, case_type, fit_runs, des
 #'   categorical-coding details when present).
 #' - `design_checks`: exact design recovery checks for each dataset.
 #' - `recovery_checks`: known-truth recovery metrics for the synthetic cases,
-#'   including the latent-regression reference case.
+#'   including the latent-regression reference case. If a benchmark fit is not
+#'   scoring-ready, its posterior-shift row is retained as `Warn` and is not
+#'   calculated from a review-only score.
 #' - `bias_checks`: source-backed bias/local-measure identity checks.
 #' - `pair_checks`: paired-dataset stability screens for the iterated cases.
 #' - `linking_checks`: common-element reviews for paired calibration datasets.
@@ -1307,7 +1331,9 @@ summarize_reference_benchmark_case <- function(case_id, case_type, fit_runs, des
 #'
 #' @return An object of class `mfrm_reference_benchmark`.
 #' @examples
-#' \donttest{
+#' # Long-running workflow; run explicitly when needed.
+#' # example("reference_case_benchmark", run.dontrun = TRUE)
+#' \dontrun{
 #' bench <- reference_case_benchmark(
 #'   cases = "synthetic_truth",
 #'   method = "JML",

@@ -1,6 +1,8 @@
 #' Build an observed-data resampling specification
 #'
-#' @param data A long-format observed MFRM data set.
+#' @param data A long-format observed MFRM data set with distinct column names.
+#'   The `.mfrm_*` metadata columns listed below are reserved and must not
+#'   already be present. Numeric identifiers must retain distinct text labels.
 #' @param person Person/respondent identifier column.
 #' @param facets Non-person facet columns used by the target MFRM fit.
 #' @param score Ordered score column.
@@ -16,22 +18,28 @@
 #'   instances in the returned data.
 #' @param reps Number of resampling replicates to draw.
 #' @param sample_fraction Fraction of persons to draw within each stratum when
-#'   `sample_n = NULL`.
+#'   `sample_n = NULL`. Targets are rounded upward and respect
+#'   `min_per_stratum`. The default is `0.5` for both designs; use `1` for a
+#'   same-size bootstrap.
 #' @param sample_n Optional target number of persons to draw per stratum. Supply
 #'   either one scalar used for every stratum, or a named numeric vector whose
-#'   names match the computed stratum labels.
+#'   names match `spec$target_plan$Stratum`. An unnamed vector of length equal
+#'   to the number of strata follows that table's order. Targets are rounded
+#'   upward and capped at available Persons when sampling without replacement.
 #' @param replace Optional logical override for replacement. By default,
 #'   replacement is `FALSE` for `"stratified_subsample"` and `TRUE` for
 #'   `"stratified_bootstrap"`.
 #' @param seed Optional seed used by [draw_mfrm_resamples()].
 #' @param min_per_stratum Minimum target persons per represented stratum.
 #' @param topup_preserve_facets Logical; if `TRUE`, add extra person clusters
-#'   when possible to recover missing levels of `preserve_facets`.
+#'   when possible to recover missing levels of `preserve_facets`. This changes
+#'   the sampling distribution and can increase stratum sizes; it is not an
+#'   ordinary bootstrap. Set `FALSE` for ordinary cluster-bootstrap draws.
 #'
 #' @details
 #' This helper defines a resampling design for observed-data stability checks.
 #' It is intentionally separate from [build_mfrm_sim_spec()] and
-#' [evaluate_mfrm_recovery()]. The full-data estimates used with these draws
+#' [simulate_mfrm_recovery()]. The full-data estimates used with these draws
 #' are reference estimates, not known truth, so downstream summaries should be
 #' described as estimation stability, reproducibility, or agreement with a
 #' full-data reference rather than strict parameter recovery.
@@ -41,22 +49,63 @@
 #' returned data while the original identifier is retained in
 #' `.mfrm_original_person`.
 #'
-#' @return An object of class `mfrm_resampling_spec`.
+#' @section Sampling assumptions and interpretation:
+#' For ordinary stratified Person-cluster bootstrap draws, set
+#' `design = "stratified_bootstrap"`, `sample_fraction = 1`,
+#' `sample_n = NULL`, and `topup_preserve_facets = FALSE`. The unit is a
+#' Person, not a rating row; unequal-sized clusters retain all their rows on
+#' every draw. This targets variation across independent Persons within strata,
+#' conditional on the observed non-Person facet levels and assignment patterns.
+#' It does not reproduce sampling new raters or tasks, or dependence across
+#' Persons induced by shared random effects or peer-review networks. Crossed
+#' random effects require a resampling scheme matched to that sampling target.
+#'
+#' A reduced sample size or coverage top-up instead defines a stability
+#' experiment. Top-up chooses an additional Person carrying a currently absent
+#' preserved level, and can also bring other missing levels. It changes
+#' inclusion probabilities and stratum totals. Use `sampling_scheme`, the
+#' returned terminology and base/added/final counts to report what was drawn.
+#' These helpers do not fit models or construct confidence intervals; the
+#' presence of the word bootstrap does not qualify downstream interval coverage.
+#' Reference estimates from the full sample still have estimation uncertainty.
+#'
+#' @section Labels and saved specifications:
+#' Original Person keys and data values are retained. Stratum labels escape
+#' percent signs and vertical bars, and distinguish missing values, empty
+#' strings and literal `"(missing)"`/`"(empty)"` labels. Inspect `target_plan`
+#' before supplying named `sample_n` values. Data column names
+#' `.mfrm_original_person`, `.mfrm_draw_unit`, `.mfrm_stratum`, `.mfrm_topup`,
+#' and `.mfrm_topup_reason` are reserved for returned metadata.
+#'
+#' `draw_mfrm_resamples()` rebuilds derived tables from the specification's
+#' declared inputs, including saved older specifications. Corrected labels and
+#' top-up rules can change old draws even with the same seed; retain old results
+#' separately. `saveRDS(spec, ...)` preserves the input data and seed;
+#' `saveRDS(draws, ...)` preserves the actual samples, per-replicate seeds and
+#' manifests. Use an explicit seed to reproduce draws in a matching R/RNG
+#' environment. Manifest-only results retain the specification and input data
+#' but omit the materialized samples.
+#'
+#' @return An object of class `mfrm_resampling_spec` containing the input data,
+#'   columns, target plan, person/stratum rosters, `sampling_scheme` and
+#'   interpretation in `terminology`.
+#' @references
+#' Owen, A. B. and Eckles, D. (2012). Bootstrapping data arrays of arbitrary
+#' order. \emph{The Annals of Applied Statistics}, 6(3), 895--927.
+#' \doi{10.1214/12-AOAS547}. This discusses crossed-factor resampling;
+#' it is not the method implemented by this Person-cluster helper.
 #' @seealso [draw_mfrm_resamples()], [build_mfrm_sim_spec()]
 #' @examples
-#' toy <- simulate_mfrm_data(n_person = 12, n_rater = 3, n_criterion = 2,
-#'                           raters_per_person = 2, seed = 11)
-#' region_map <- setNames(rep(c("A", "B", "C"),
-#'                            length.out = length(unique(toy$Person))),
-#'                        unique(toy$Person))
-#' toy$Region <- unname(region_map[toy$Person])
+#' # Bundled synthetic ratings: inspect stability in half-samples by Group.
+#' ratings <- load_mfrmr_data("example_operational")
 #' spec <- build_mfrm_resampling_spec(
-#'   toy, person = "Person", facets = c("Rater", "Criterion"),
-#'   score = "Score", strata = "Region", preserve_facets = "Rater",
+#'   ratings, person = "Person", facets = c("Rater", "Criterion"),
+#'   score = "Score", strata = "Group", preserve_facets = "Rater",
 #'   reps = 2, sample_fraction = 0.5, seed = 99
 #' )
 #' draws <- draw_mfrm_resamples(spec)
 #' summary(draws)$overview
+#' draws$stratum_manifest  # Base, top-up and final Person-cluster counts.
 #' @export
 build_mfrm_resampling_spec <- function(data,
                                        person,
@@ -74,10 +123,17 @@ build_mfrm_resampling_spec <- function(data,
                                        topup_preserve_facets = TRUE) {
   design <- match.arg(tolower(as.character(design[1])),
                       c("stratified_subsample", "stratified_bootstrap"))
-  if (!is.data.frame(data) || nrow(data) == 0L) {
-    stop("`data` must be a non-empty data.frame.", call. = FALSE)
+  if (!is.data.frame(data) || nrow(data) == 0L || anyDuplicated(names(data)) ||
+      anyNA(names(data)) || any(!nzchar(names(data)))) {
+    stop("`data` must be a non-empty data.frame with unique, nonempty column names.", call. = FALSE)
   }
   data <- as.data.frame(data, stringsAsFactors = FALSE)
+  reserved <- c(".mfrm_original_person", ".mfrm_draw_unit", ".mfrm_stratum",
+    ".mfrm_topup", ".mfrm_topup_reason")
+  if (any(reserved %in% names(data))) stop(
+    "`data` contains reserved resampling columns: ",
+    paste(intersect(reserved, names(data)), collapse = ", "),
+    ". Rename them or supply the original input columns.", call. = FALSE)
   person <- resampling_scalar_name(person, "person")
   score <- resampling_scalar_name(score, "score")
   facets <- resampling_name_vector(facets, "facets", min_len = 1L)
@@ -89,6 +145,18 @@ build_mfrm_resampling_spec <- function(data,
   if (length(missing_cols) > 0L) {
     stop("`data` is missing required columns: ",
          paste(missing_cols, collapse = ", "), ".", call. = FALSE)
+  }
+  for (name in unique(c(person, facets, strata, preserve_facets))) {
+    value <- data[[name]]
+    if (!(is.character(value) || is.factor(value) || is.logical(value) ||
+          (is.numeric(value) && !is.object(value) && !is.complex(value))) ||
+        !is.null(dim(value))) stop(
+      "Resampling identifiers/strata must be character, factor, logical or numeric vectors: ",
+      name, ".", call. = FALSE)
+    if (is.numeric(value) && (any(!is.finite(value) & !is.na(value)) ||
+        length(unique(value[!is.na(value)])) != length(unique(as.character(value[!is.na(value)]))))) stop(
+      "Numeric identifiers/strata must be finite and retain distinct text labels: ",
+      name, ". Supply distinct character labels.", call. = FALSE)
   }
   if (any(is.na(data[[person]]) | !nzchar(as.character(data[[person]])))) {
     stop("`data` contains missing or empty person identifiers.", call. = FALSE)
@@ -137,6 +205,12 @@ build_mfrm_resampling_spec <- function(data,
     data = data,
     preserve_facets = preserve_facets
   )
+  sampling_scheme <- if (!replace) "stratified_person_subsample" else if (
+    all(target_plan$TargetPersons == target_plan$AvailablePersons)) {
+    "stratified_person_bootstrap"
+  } else "stratified_person_resample_with_replacement"
+  if (isTRUE(topup_preserve_facets) && length(preserve_facets))
+    sampling_scheme <- paste0("coverage_augmented_", sampling_scheme)
 
   spec <- list(
     data = data,
@@ -148,6 +222,7 @@ build_mfrm_resampling_spec <- function(data,
       preserve_facets = preserve_facets
     ),
     design = design,
+    sampling_scheme = sampling_scheme,
     reps = reps,
     sample_fraction = sample_fraction,
     sample_n = sample_n,
@@ -162,7 +237,11 @@ build_mfrm_resampling_spec <- function(data,
     terminology = c(
       "Observed-data resampling checks stability and reproducibility against a full-data reference.",
       "Full-data estimates are reference estimates, not known true parameters.",
-      "Use parameter-recovery wording only for simulations with known generated truth."
+      "Use parameter-recovery wording only for simulations with known generated truth.",
+      "The resampling unit is the entire Person cluster; inference requires independent Persons within strata, conditional on the observed facet levels and assignment patterns.",
+      "Person resampling does not reproduce sampling new raters/tasks or dependence shared across Persons, including peer-review networks.",
+      "A same-size stratified Person bootstrap uses replacement, the original number of Persons in each stratum and no coverage top-up. Other sample sizes and coverage top-up are stability designs, not automatic bootstrap confidence-interval procedures.",
+      paste0("Sampling scheme: ", sampling_scheme, ". Top-up can change stratum sizes and inclusion probabilities; inspect base and added cluster counts.")
     )
   )
   class(spec) <- "mfrm_resampling_spec"
@@ -175,20 +254,34 @@ build_mfrm_resampling_spec <- function(data,
 #' @param keep_data Logical; if `TRUE`, return a list of replicate data frames.
 #'   If `FALSE`, return manifest tables only.
 #'
-#' @return An object of class `mfrm_resamples` with `samples`, `manifest`,
-#'   `stratum_manifest`, and `preserve_manifest`.
+#' @details See [build_mfrm_resampling_spec()] for sampling assumptions,
+#'   top-up, label handling and saved-specification compatibility. Sampling
+#'   keeps each selected Person's entire rating cluster and re-keys every
+#'   instance when drawing with replacement. Other facet labels are retained.
+#'
+#' @return An object of class `mfrm_resamples` with:
+#' - `samples`: replicate data frames with original Person, draw-unit, stratum
+#'   and top-up metadata, or an empty list when `keep_data = FALSE`.
+#' - `manifest`: replicate seeds, sampling scheme, base/added/final cluster
+#'   counts, original Person counts, rating-row counts and coverage checks.
+#' - `stratum_manifest`: `BasePersonClusters` before top-up,
+#'   `TopupPersonClusters`, final `SelectedPersonClusters` and
+#'   `SelectedOriginalPersons`, and final `Rows` for each stratum.
+#' - `preserve_manifest`: observed coverage of requested facet levels.
+#' - `spec` and `terminology`: inputs, sampling assumptions and interpretation.
+#' `summary()` retains full manifests as well as compact tables. For older
+#' results with top-up, pre-top-up stratum counts are retained as base counts;
+#' unrecorded final cluster counts are `NA`, with a note, while final row counts
+#' remain available. This does not redraw old samples.
 #' @seealso [build_mfrm_resampling_spec()]
 #' @examples
-#' toy <- simulate_mfrm_data(n_person = 12, n_rater = 3, n_criterion = 2,
-#'                           raters_per_person = 2, seed = 11)
-#' region_map <- setNames(rep(c("A", "B", "C"),
-#'                            length.out = length(unique(toy$Person))),
-#'                        unique(toy$Person))
-#' toy$Region <- unname(region_map[toy$Person])
+#' # Same-size Person-cluster bootstrap within the observed Group strata.
+#' ratings <- load_mfrmr_data("example_operational")
 #' spec <- build_mfrm_resampling_spec(
-#'   toy, person = "Person", facets = c("Rater", "Criterion"),
-#'   score = "Score", strata = "Region", reps = 2,
-#'   sample_fraction = 0.5, seed = 99
+#'   ratings, person = "Person", facets = c("Rater", "Criterion"),
+#'   score = "Score", strata = "Group", reps = 2,
+#'   design = "stratified_bootstrap", sample_fraction = 1,
+#'   topup_preserve_facets = FALSE, seed = 99
 #' )
 #' draws <- draw_mfrm_resamples(spec, keep_data = FALSE)
 #' summary(draws)$overview
@@ -197,6 +290,10 @@ draw_mfrm_resamples <- function(spec, keep_data = TRUE) {
   if (!inherits(spec, "mfrm_resampling_spec")) {
     stop("`spec` must be output from build_mfrm_resampling_spec().", call. = FALSE)
   }
+  # Rebuild derived rosters so old saved specs cannot retain merged identities.
+  controls <- setdiff(names(formals(build_mfrm_resampling_spec)), c("data", names(spec$columns)))
+  spec <- do.call(build_mfrm_resampling_spec,
+    c(list(data = spec$data), spec$columns, spec[intersect(controls, names(spec))]))
   keep_data <- isTRUE(keep_data)
 
   with_preserved_rng_seed(spec$seed, {
@@ -237,6 +334,7 @@ draw_mfrm_resamples <- function(spec, keep_data = TRUE) {
 summary.mfrm_resampling_spec <- function(object, ...) {
   overview <- data.frame(
     Design = object$design,
+    SamplingScheme = object$sampling_scheme %||% "legacy_scheme_unreviewed",
     Reps = object$reps,
     Replace = isTRUE(object$replace),
     Persons = length(unique(object$person_table[[object$columns$person]])),
@@ -298,6 +396,16 @@ summary.mfrm_resamples <- function(object, top_n = 10, ...) {
   manifest <- as.data.frame(object$manifest %||% data.frame(), stringsAsFactors = FALSE)
   stratum_manifest <- as.data.frame(object$stratum_manifest %||% data.frame(), stringsAsFactors = FALSE)
   preserve_manifest <- as.data.frame(object$preserve_manifest %||% data.frame(), stringsAsFactors = FALSE)
+  terminology <- object$terminology
+  if (nrow(stratum_manifest) && !"BasePersonClusters" %in% names(stratum_manifest)) {
+    stratum_manifest$BasePersonClusters <- stratum_manifest$SelectedPersonClusters
+    affected <- stratum_manifest$Replicate %in% manifest$Replicate[manifest$TopupPersonClusters > 0]
+    stratum_manifest$TopupPersonClusters <- ifelse(affected, NA_integer_, 0L)
+    stratum_manifest$SelectedPersonClusters[affected] <- NA_integer_
+    stratum_manifest$SelectedOriginalPersons[affected] <- NA_integer_
+    if (any(affected)) terminology <- c(terminology,
+      "Legacy stratum counts describe the base draw only. Final cluster counts by stratum are unavailable where top-up was used; original base counts and final row counts are retained.")
+  }
 
   coverage_rate <- if (nrow(manifest) == 0L) NA_real_ else {
     mean(manifest$PreserveCoverageComplete %in% TRUE, na.rm = TRUE)
@@ -310,6 +418,7 @@ summary.mfrm_resamples <- function(object, top_n = 10, ...) {
   }
   overview <- data.frame(
     Design = as.character(object$spec$design),
+    SamplingScheme = object$spec$sampling_scheme %||% "legacy_scheme_unreviewed",
     Reps = nrow(manifest),
     SamplesReturned = length(object$samples),
     Replace = isTRUE(object$spec$replace),
@@ -327,7 +436,11 @@ summary.mfrm_resamples <- function(object, top_n = 10, ...) {
       dplyr::summarise(
         AvailablePersons = dplyr::first(.data$AvailablePersons),
         MeanTargetPersons = mean(.data$TargetPersons, na.rm = TRUE),
-        MeanSelectedPersonClusters = mean(.data$SelectedPersonClusters, na.rm = TRUE),
+        MeanSelectedPersonClusters = mean(.data$SelectedPersonClusters),
+        MeanBasePersonClusters = if ("BasePersonClusters" %in% names(stratum_manifest))
+          mean(.data$BasePersonClusters) else NA_real_,
+        MeanTopupPersonClusters = if ("TopupPersonClusters" %in% names(stratum_manifest))
+          mean(.data$TopupPersonClusters) else NA_real_,
         MeanRows = mean(.data$Rows, na.rm = TRUE),
         Reps = dplyr::n(),
         .groups = "drop"
@@ -355,7 +468,7 @@ summary.mfrm_resamples <- function(object, top_n = 10, ...) {
     manifest = utils::head(manifest, n = top_n),
     stratum_summary = stratum_summary,
     preserve_summary = preserve_summary,
-    terminology = object$terminology,
+    terminology = terminology,
     full_manifest = manifest,
     full_stratum_manifest = stratum_manifest,
     full_preserve_manifest = preserve_manifest
@@ -364,11 +477,8 @@ summary.mfrm_resamples <- function(object, top_n = 10, ...) {
   out
 }
 
-#' @export
-print.mfrm_resamples <- function(x, ...) {
-  print(summary(x), ...)
-  invisible(x)
-}
+#' @rawNamespace S3method(print,mfrm_resamples,print.mfrm_bundle)
+NULL
 
 #' @export
 print.summary.mfrm_resamples <- function(x, ...) {
@@ -411,8 +521,15 @@ resampling_name_vector <- function(x, arg_name, min_len = 1L) {
 }
 
 resampling_missing_label <- function(x) {
+  missing <- is.na(x)
   x <- as.character(x)
-  x[is.na(x) | !nzchar(x)] <- "(missing)"
+  # Escape separators and sentinel literals before constructing tuple labels.
+  x <- gsub("%", "%25", x, fixed = TRUE)
+  x <- gsub("|", "%7C", x, fixed = TRUE)
+  x[!missing & x == "(missing)"] <- "%28missing%29"
+  x[!missing & x == "(empty)"] <- "%28empty%29"
+  x[!missing & x == ""] <- "(empty)"
+  x[missing] <- "(missing)"
   x
 }
 
@@ -425,13 +542,14 @@ resampling_person_table <- function(data, person, strata) {
     return(tbl)
   }
 
-  tbl <- data[, c(person, strata), drop = FALSE]
-  tbl[] <- lapply(tbl, resampling_missing_label)
-  tbl <- unique(tbl)
-  stratum_count <- tbl |>
-    dplyr::count(.data[[person]], name = "n_strata")
-  if (any(stratum_count$n_strata > 1L)) {
-    bad <- stratum_count[[person]][stratum_count$n_strata > 1L]
+  tbl <- data[, unique(c(person, strata)), drop = FALSE]
+  tbl[[person]] <- person_values
+  # The Person key remains unchanged; only stratum display labels are escaped.
+  stratum_values <- lapply(data[, strata, drop = FALSE], resampling_missing_label)
+  tbl$.mfrm_stratum <- do.call(paste, c(unname(stratum_values), sep = " | "))
+  tbl <- tbl[!duplicated(tbl[, c(person, ".mfrm_stratum"), drop = FALSE]), , drop = FALSE]
+  if (anyDuplicated(tbl[[person]])) {
+    bad <- unique(tbl[[person]][duplicated(tbl[[person]])])
     stop(
       "Each person must map to at most one stratum combination. Conflicting persons: ",
       paste(utils::head(bad, 5), collapse = ", "),
@@ -440,28 +558,24 @@ resampling_person_table <- function(data, person, strata) {
       call. = FALSE
     )
   }
-  tbl$.mfrm_stratum <- apply(tbl[, strata, drop = FALSE], 1L, paste, collapse = " | ")
   tibble::as_tibble(tbl)
 }
 
 resampling_stratum_overview <- function(data, person, person_table) {
-  row_counts <- data.frame(
-    .mfrm_person = as.character(data[[person]]),
+  counts <- data.frame(
+    Stratum = person_table$.mfrm_stratum,
+    Rows = tabulate(match(as.character(data[[person]]), person_table[[person]]),
+      nbins = nrow(person_table)),
     stringsAsFactors = FALSE
-  ) |>
-    dplyr::count(.data$.mfrm_person, name = "Rows")
-  names(row_counts)[names(row_counts) == ".mfrm_person"] <- person
-
-  out <- person_table |>
-    dplyr::left_join(row_counts, by = person) |>
-    dplyr::group_by(.data$.mfrm_stratum) |>
+  )
+  out <- counts |>
+    dplyr::group_by(.data$Stratum) |>
     dplyr::summarise(
       Persons = dplyr::n(),
       Rows = sum(.data$Rows, na.rm = TRUE),
       .groups = "drop"
     ) |>
-    dplyr::arrange(.data$.mfrm_stratum)
-  names(out)[names(out) == ".mfrm_stratum"] <- "Stratum"
+    dplyr::arrange(.data$Stratum)
   as.data.frame(out, stringsAsFactors = FALSE)
 }
 
@@ -550,8 +664,7 @@ resampling_draw_one <- function(spec, rep_id, rep_seed) {
       Stratum = stratum,
       AvailablePersons = as.integer(nrow(pool)),
       TargetPersons = target,
-      SelectedPersonClusters = as.integer(nrow(unit_tbl)),
-      SelectedOriginalPersons = length(unique(unit_tbl[[person_col]])),
+      BasePersonClusters = as.integer(nrow(unit_tbl)),
       Rows = NA_integer_,
       TargetStatus = target_plan$TargetStatus[i],
       stringsAsFactors = FALSE
@@ -563,6 +676,13 @@ resampling_draw_one <- function(spec, rep_id, rep_seed) {
 
   sample_data <- resampling_materialize_sample(spec, selected_units)
   stratum_manifest <- dplyr::bind_rows(stratum_rows)
+  unit_by_stratum <- selected_units |>
+    dplyr::group_by(.data$.mfrm_stratum) |>
+    dplyr::summarise(SelectedPersonClusters = dplyr::n(),
+      SelectedOriginalPersons = dplyr::n_distinct(.data[[person_col]]),
+      TopupPersonClusters = sum(.data$.mfrm_topup %in% TRUE), .groups = "drop")
+  stratum_manifest <- dplyr::left_join(stratum_manifest, unit_by_stratum,
+    by = c("Stratum" = ".mfrm_stratum"))
   row_by_stratum <- sample_data |>
     dplyr::count(.data$.mfrm_stratum, name = "Rows")
   stratum_manifest <- stratum_manifest |>
@@ -588,9 +708,11 @@ resampling_draw_one <- function(spec, rep_id, rep_seed) {
     ResampleID = resample_id,
     Replicate = as.integer(rep_id),
     Design = spec$design,
+    SamplingScheme = spec$sampling_scheme,
     Replace = isTRUE(spec$replace),
     RepSeed = as.integer(rep_seed),
     PersonClusters = as.integer(nrow(selected_units)),
+    BasePersonClusters = sum(!selected_units$.mfrm_topup),
     OriginalPersons = length(unique(selected_units[[person_col]])),
     Rows = nrow(sample_data),
     StrataRepresented = length(unique(sample_data$.mfrm_stratum)),
@@ -638,6 +760,7 @@ resampling_topup_units <- function(spec, selected_units) {
     if (length(missing_levels) == 0L) next
 
     for (level in missing_levels) {
+      if (level %in% resampling_missing_label(selected_rows[[facet]])) next
       candidate_people <- unique(as.character(data[[person_col]][resampling_missing_label(data[[facet]]) == level]))
       if (!isTRUE(spec$replace)) {
         candidate_people <- setdiff(candidate_people, selected_people)

@@ -23,6 +23,7 @@ plot_wright_unified(
   wright_range = NULL,
   extreme_placement = c("ends", "estimate"),
   persons_per_star = NULL,
+  highlight = NULL,
   ...
 )
 }
@@ -86,6 +87,17 @@ their fitted \code{"estimate"} in the FACETS-style renderer.}
 
 \item{persons_per_star}{Number of persons represented by one \code{*}; \code{NULL}
 selects a compact value automatically.}
+
+\item{highlight}{Optional named list of non-person facet level IDs, for
+example \code{list(Rater = c("R01", "R02"))}, for Wright maps only (including
+\code{view = "unified"} and the Wright component of a bundle). Selected labels
+receive a \verb{> } prefix in both renderers and saved ggplot conversion.
+Levels outside the usual \code{top_n} selection are added, so the displayed
+count may exceed that limit. Fitted locations and uncertainty do not
+change; the automatic scale uses all fitted locations before compaction.
+Selection is not a statistical flag. Inspect \code{locations$Highlighted},
+\code{retention} and \code{notes} in the returned plot data. Unknown IDs or levels
+without finite locations are rejected. \code{NULL} selects no levels.}
 
 \item{...}{Additional graphical parameters.}
 }
@@ -159,7 +171,7 @@ targeting problems.
 
 \enumerate{
 \item Fit a model with \code{\link[=fit_mfrm]{fit_mfrm()}}.
-\item Plot with \code{plot_wright_unified(fit)}.
+\item Plot with \code{plot(fit, type = "wright", view = "unified")}.
 \item Compare person distribution with facet level locations.
 \item Use \code{show_thresholds = TRUE} when you want the category structure in the
 same view.
@@ -168,8 +180,8 @@ same view.
 
 \section{When to use this instead of plot_information}{
 
-Use \code{plot_wright_unified()} when your main question is targeting or coverage
-on the shared logit scale. Use \code{\link[=plot_information]{plot_information()}} when your main question
+Use \code{plot()} when your main question is targeting or coverage
+on the shared logit scale. Use \link[=plot.mfrm_information]{plot(x)} when your main question
 is measurement precision across theta.
 }
 
@@ -180,22 +192,58 @@ For a plot-selection guide and a longer walkthrough, see
 \code{vignette("mfrmr-visual-diagnostics", package = "mfrmr")}.
 }
 
+\section{Migration in 0.2.4}{
+
+This renderer is internal. Use the corresponding \code{plot()} route in
+\link{mfrmr_plot_migration}; the former exported name is no longer available.
+}
+
+\section{Session plot defaults}{
+
+Set \code{options(mfrmr.plot_preset = "publication")} to choose a session default
+for plotting functions that expose the common \code{preset} argument. The
+supported values are \code{"standard"}, \code{"publication"}, \code{"compact"} and
+\code{"monochrome"}. Precedence is an explicit call argument, then the session
+option, then \code{"standard"}. For example, \code{preset = "standard"} overrides
+a session set to \code{"monochrome"}. Explicit \code{preset = NULL} retains the
+earlier package-default behavior; it does not read the session option.
+Invalid session values cause an error only when that option is needed.
+
+The category-curve, data-quality, fit-review, connectivity and network
+routes of \code{plot()} for report bundles use the same option through \code{...}.
+Plots without a common \code{preset} argument, including extended-model plots
+with their own \code{palette} controls, keep their own settings. This option
+selects a preset, not a universal theme or a guarantee that all renderers
+implement every appearance control identically.
+
+New plot payloads retain the resolved preset for supported saved-data
+rendering. Converting an existing payload with \code{\link[=as_ggplot]{as_ggplot()}} uses its saved
+appearance, even after the session option changes. A call that creates a
+new plot from a fit or statistical result uses the current default.
+For a reproducible script, supply \code{preset} explicitly or set the option in
+that script. Saving only the fitted model does not save a session option.
+No global ggplot theme is changed.
+
+Restore previous settings with \code{old <- options(mfrmr.plot_preset = "monochrome")} followed by \code{options(old)}. Use
+\code{options(mfrmr.plot_preset = NULL)} to remove the option. The preset changes
+appearance, not estimates, confidence levels or diagnostic thresholds.
+}
+
 \examples{
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("plot_wright_unified", run.dontrun = TRUE)
+\dontrun{
 toy <- load_mfrmr_data("example_core")
 toy_small <- toy[toy$Person \%in\% unique(toy$Person)[1:12], , drop = FALSE]
 fit <- fit_mfrm(toy_small, "Person", c("Rater", "Criterion"), "Score",
                  method = "JML", model = "RSM", maxit = 30)
-map_data <- plot_wright_unified(fit, draw = FALSE)
+map_data <- plot(fit, type = "wright", view = "unified", draw = FALSE)
 names(map_data)
-facets_map <- plot_wright_unified(
-  fit,
-  renderer = "facets",
-  category_labels = c(
+facets_map <- plot(fit, type = "wright", view = "unified", renderer = "facets", category_labels = c(
     `1` = "Beginning", `2` = "Developing", `3` = "Secure", `4` = "Advanced"
-  ),
-  draw = FALSE
-)
+  ), draw = FALSE)
 facets_map$facets_style$settings
+}
 }
 \seealso{
 \code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=plot.mfrm_fit]{plot.mfrm_fit()}}, \link{mfrmr_visual_diagnostics}
@@ -203,3 +251,4 @@ facets_map$facets_style$settings
 \concept{Wright maps}
 \concept{confidence intervals}
 \concept{visual diagnostics}
+\keyword{internal}

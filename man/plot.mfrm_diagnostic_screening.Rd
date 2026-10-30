@@ -52,14 +52,15 @@ optional report-index review rates so simulation results can be inspected in
 one operating-characteristic surface.
 }
 \examples{
-\donttest{
-diag_eval <- evaluate_mfrm_diagnostic_screening(
-  design = list(person = 10, rater = 2, criterion = 2, assignment = 2),
-  reps = 1,
-  maxit = 30,
-  include_report = TRUE,
-  seed = 123
-)
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("plot.mfrm_diagnostic_screening", run.dontrun = TRUE)
+\dontrun{
+# One saved replication illustrates output structure, not precise rates.
+# Regeneration recipe: examples/simulation-results.R in the package.
+saved <- readRDS(system.file("examples", "simulation-diagnostic-screening.rds",
+  package = "mfrmr", mustWork = TRUE))
+# Inspect saved$generation_warnings and the result's run/status tables.
+diag_eval <- saved$result
 plot(diag_eval, type = "overview", draw = FALSE)
 plot_data(diag_eval, type = "overview", component = "plot_long")
 plot_data(diag_eval, type = "overview", component = "next_actions")

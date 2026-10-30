@@ -22,9 +22,8 @@ Produces APA-style narrative text interpreting the results of a differential-
 functioning analysis or interaction table. For \code{method = "refit"}, the
 report summarises linked screening contrasts and whether conditional plug-in
 uncertainty was available. For \code{method = "residual"}, it summarises
-screening-positive results, lists the specific levels and their direction,
-and includes a caveat about the distinction between construct-relevant
-variation and measurement bias.
+the availability and meaning of residual comparisons, without testing
+differential functioning or classifying comparisons as positive or negative.
 }
 \details{
 When \code{dif_result} is an \code{mfrm_dff}/\code{mfrm_dif} object, the report is based on
@@ -37,7 +36,7 @@ calibrations retain the required anchors. Their separate-subgroup plug-in
 standard errors condition on those anchors and omit baseline-anchor
 uncertainty and cross-refit covariance, so the report does not assign ETS
 labels or present refit rows as formal inference. The residual method also
-uses screening-positive versus screening-negative language.
+returns descriptive group differences without tests or binary classifications.
 }
 \section{Interpreting output}{
 
@@ -45,17 +44,21 @@ uses screening-positive versus screening-negative language.
 \item \verb{$narrative}: character scalar with the full narrative text.
 \item \verb{$counts}: named integer vector of method-appropriate counts.
 \item \verb{$large_dif}: an empty compatibility table for current refit output, or
-screening-positive contrasts/cells (\code{method = "residual"}).
-\item \verb{$gpcm_boundary}: for bounded \code{GPCM} inputs, a capability-boundary table
+an empty table for residual comparisons. Interaction reports include only
+cells above the requested absolute residual mean threshold, in score units.
+\item \verb{$gpcm_boundary}: for \code{GPCM} inputs, a capability-boundary table
 marking the narrative as caveated DFF screening output.
 \item \verb{$config}: analysis configuration inherited from the input.
+\item \verb{$comparison_review}: when supplied to \code{\link[=analyze_dff]{analyze_dff()}}, its separate
+prospective interaction review, retained without treating its states as
+classifications of the residual/refit contrasts. Also retained by \code{summary()}.
 }
 }
 
 \section{GPCM boundary}{
 
-If the input comes from a bounded \code{GPCM} fit, the narrative includes a
-bounded-\code{GPCM} note and the returned report carries \code{gpcm_boundary}.
+If the input comes from a \code{GPCM} fit, the narrative includes a
+\code{GPCM} note and the returned report carries \code{gpcm_boundary}.
 Treat the text as slope-aware screening/reporting support, not as a
 standalone fairness, invariance, or operational subgroup decision.
 }
@@ -85,11 +88,13 @@ Rasch measurement in language testing. \emph{Language Testing}, 29(4),
 }
 
 \examples{
-\donttest{
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("dif_report", run.dontrun = TRUE)
+\dontrun{
 toy <- load_mfrmr_data("example_bias")
 
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-  method = "JML", model = "RSM", maxit = 30
+  method = "JML", model = "RSM", maxit = 300
 )
 diag <- diagnose_mfrm(fit, residual_pca = "none")
 dif <- analyze_dff(fit, diag, facet = "Rater", group = "Group", data = toy)
@@ -99,5 +104,5 @@ cat(rpt$narrative)
 }
 \seealso{
 \code{\link[=analyze_dff]{analyze_dff()}}, \code{\link[=analyze_dif]{analyze_dif()}}, \code{\link[=dif_interaction_table]{dif_interaction_table()}},
-\code{\link[=plot_dif_heatmap]{plot_dif_heatmap()}}, \code{\link[=build_apa_outputs]{build_apa_outputs()}}
+\link[=plot.mfrm_dif]{plot(x, type = "heatmap")}, \code{\link[=build_apa_outputs]{build_apa_outputs()}}
 }

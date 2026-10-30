@@ -38,7 +38,7 @@ bundles the four panel data objects under \code{wright}, \code{severity},
 \description{
 Builds a 2x2 draft composite for an \code{mfrm_fit}, suitable for reviewing a
 possible "Figure 1" in the Rasch-family \code{RSM}/\code{PCM} manuscript route. Panels: (1)
-Wright map, (2)
+single-panel FACETS-style Wright map (without CI whiskers), (2)
 rater severity profile with CI whiskers, (3) threshold ladder, (4)
 a one-line reliability / separation summary block. Each panel reuses
 the standalone plot helper so the visual language is consistent
@@ -51,25 +51,66 @@ summary panel prints the model class, sample size, log-likelihood, the
 canonical MML IC panel or an explicit ineligibility/legacy label, and the
 largest non-Person facet's separation /
 reliability if available. A fit that has not passed its numerical, data,
-design, and stability gates produces one warning and a visible
+design, and stability checks produce one warning and a visible
 \code{"REVIEW ONLY"} label. Resolve that review before treating the composite as
 report-ready evidence.
 }
 
+\section{Migration in 0.2.4}{
+
+This renderer is internal. Use the corresponding \code{plot()} route in
+\link{mfrmr_plot_migration}; the former exported name is no longer available.
+}
+
+\section{Session plot defaults}{
+
+Set \code{options(mfrmr.plot_preset = "publication")} to choose a session default
+for plotting functions that expose the common \code{preset} argument. The
+supported values are \code{"standard"}, \code{"publication"}, \code{"compact"} and
+\code{"monochrome"}. Precedence is an explicit call argument, then the session
+option, then \code{"standard"}. For example, \code{preset = "standard"} overrides
+a session set to \code{"monochrome"}. Explicit \code{preset = NULL} retains the
+earlier package-default behavior; it does not read the session option.
+Invalid session values cause an error only when that option is needed.
+
+The category-curve, data-quality, fit-review, connectivity and network
+routes of \code{plot()} for report bundles use the same option through \code{...}.
+Plots without a common \code{preset} argument, including extended-model plots
+with their own \code{palette} controls, keep their own settings. This option
+selects a preset, not a universal theme or a guarantee that all renderers
+implement every appearance control identically.
+
+New plot payloads retain the resolved preset for supported saved-data
+rendering. Converting an existing payload with \code{\link[=as_ggplot]{as_ggplot()}} uses its saved
+appearance, even after the session option changes. A call that creates a
+new plot from a fit or statistical result uses the current default.
+For a reproducible script, supply \code{preset} explicitly or set the option in
+that script. Saving only the fitted model does not save a session option.
+No global ggplot theme is changed.
+
+Restore previous settings with \code{old <- options(mfrmr.plot_preset = "monochrome")} followed by \code{options(old)}. Use
+\code{options(mfrmr.plot_preset = NULL)} to remove the option. The preset changes
+appearance, not estimates, confidence levels or diagnostic thresholds.
+}
+
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 30)
-p <- plot_apa_figure_one(fit, draw = FALSE)
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("plot_apa_figure_one", run.dontrun = TRUE)
+\dontrun{
+# Saved synthetic JML/RSM analysis of example_core.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "core-jml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+p <- plot(fit, type = "apa_summary", draw = FALSE)
 names(p$data)
 }
 }
 \seealso{
 \code{\link[=plot.mfrm_fit]{plot.mfrm_fit()}} (\code{type = "wright"}),
-\code{\link[=plot_rater_severity_profile]{plot_rater_severity_profile()}}, \code{\link[=plot_threshold_ladder]{plot_threshold_ladder()}},
+\link[=plot.mfrm_fit]{plot(x, type = "rater_severity")}, \link[=plot.mfrm_fit]{plot(x, type = "thresholds")},
 \code{\link[=build_apa_outputs]{build_apa_outputs()}}.
 }
 \concept{confidence intervals}
 \concept{reporting workflow}
 \concept{visual diagnostics}
+\keyword{internal}

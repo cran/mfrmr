@@ -254,7 +254,7 @@ test_that("table2_data_summary with include_fixed=TRUE no raw data", {
 test_that("subset_connectivity_report with missing subsets data", {
   dx_mod <- .dx
   dx_mod$subsets <- NULL
-  result <- mfrmr:::table6_subsets_listing(.fit, diagnostics = dx_mod)
+  result <- subset_connectivity_report(.fit, diagnostics = dx_mod)
   expect_true(is.list(result))
 })
 
@@ -327,7 +327,7 @@ test_that("fair_average_table scatter draws", {
   fa <- fair_average_table(.fit, diagnostics = .dx)
   with_null_device({
     for (fn in names(fa$by_facet)) {
-      p <- plot(fa, facet = fn, plot = "scatter", draw = TRUE)
+      p <- plot(fa, facet = fn, plot = "scatter", metric = "FairZ", draw = TRUE)
       expect_s3_class(p, "mfrm_plot_data")
     }
   })
@@ -594,7 +594,7 @@ test_that("unexpected_after_bias_table rejects non-mfrm_fit", {
 test_that("unexpected_response_table rejects empty obs", {
   empty_dx <- .dx
   empty_dx$obs <- NULL
-  expect_error(unexpected_response_table(.fit, diagnostics = empty_dx), "obs")
+  expect_error(unexpected_response_table(.fit, diagnostics = empty_dx), "fit/diagnostics mismatch", fixed = TRUE)
 })
 
 test_that("displacement_table rejects empty obs", {
@@ -612,7 +612,7 @@ test_that("measurable_summary_table rejects empty obs", {
 test_that("rating_scale_table rejects empty obs", {
   empty_dx <- .dx
   empty_dx$obs <- NULL
-  expect_error(rating_scale_table(.fit, diagnostics = empty_dx), "obs")
+  expect_error(rating_scale_table(.fit, diagnostics = empty_dx), "fit/diagnostics mismatch", fixed = TRUE)
 })
 
 test_that("rating_scale_table with drop_unused", {

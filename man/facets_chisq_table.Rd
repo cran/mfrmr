@@ -15,7 +15,9 @@ facets_chisq_table(
 \arguments{
 \item{fit}{Output from \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
-\item{diagnostics}{Optional output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.}
+\item{diagnostics}{Optional output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.
+Must match this fitted analysis; see \link{mfrmr_compatibility_layer} for
+migration of saved diagnostics.}
 
 \item{fixed_p_max}{Warning cutoff for fixed-effect chi-square p-values.}
 
@@ -42,7 +44,8 @@ chi-square indices for spread and heterogeneity checks.
 
 \itemize{
 \item \code{table}: facet-level fixed/random chi-square and p-value flags.
-\item \code{summary}: number of significant facets and overall magnitude indicators.
+\item \code{summary}: full-family available/unavailable counts and screen-positive
+counts, before \code{top_n} limits displayed rows.
 \item \code{thresholds}: p-value criteria used for flagging.
 }
 
@@ -55,7 +58,7 @@ distinguish global facet effects from local anomalies.
 \enumerate{
 \item Run \code{facets_chisq_table(fit, ...)}.
 \item Inspect \code{summary(chi)} then facet rows in \code{chi$table}.
-\item Visualize with \code{\link[=plot_facets_chisq]{plot_facets_chisq()}}.
+\item Visualize with \link[=plot.mfrm_fit]{plot(x, type = "facets_chisq")}.
 }
 }
 
@@ -69,18 +72,23 @@ The \code{table} data.frame contains:
 \item{FixedChiSq, FixedDF, FixedProb}{Fixed-effect chi-square test
 (null hypothesis: all levels equal). Significant result means the
 facet elements differ more than measurement error alone.}
-\item{RandomChiSq, RandomDF, RandomProb, RandomVar}{Random-effect test
-(null hypothesis: variation equals that of a random sample from a
-single population). Significant result suggests systematic
-heterogeneity beyond sampling variation.}
+\item{RandomChiSq, RandomDF, RandomProb, RandomVar}{FACETS-form random
+spread index and reference tail area. It does not establish normality
+or random sampling: with equal SEs and positive adjusted variance the
+statistic is identically eligible-level count minus one, regardless of
+distributional shape. Full covariance is not propagated.}
 \item{FixedFlag, RandomFlag}{Logical flags for significance.}
 }
 }
 
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("facets_chisq_table", run.dontrun = TRUE)
+\dontrun{
+# Saved synthetic JML/RSM analysis of example_core.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "core-jml.rds", package = "mfrmr"))
+fit <- example_fit$fit
 chi <- facets_chisq_table(fit)
 summary(chi)
 p_chi <- plot(chi, draw = FALSE)
@@ -88,5 +96,5 @@ p_chi$data$plot
 }
 }
 \seealso{
-\code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=interrater_agreement_table]{interrater_agreement_table()}}, \code{\link[=plot_facets_chisq]{plot_facets_chisq()}}
+\code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=interrater_agreement_table]{interrater_agreement_table()}}, \link[=plot.mfrm_fit]{plot(x, type = "facets_chisq")}
 }

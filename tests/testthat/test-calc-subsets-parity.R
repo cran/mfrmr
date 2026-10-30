@@ -114,3 +114,16 @@ test_that("calc_subsets parity holds for repeated crossed observations", {
     c("Person", "Rater", "Criterion")
   )
 })
+
+
+test_that("connectivity preserves Unicode facet names and excludes incomplete rows in C locale", {
+  withr::local_locale(c(LC_CTYPE="C"))
+  d <- data.frame(Person=c("p1","p2",NA,"p2"),Judge=c("a","a","b",NA))
+  names(d)[2] <- "\u89b3\u70b9 \u540d"
+  expect_warning(x <- calc_subsets(d,names(d)),NA)
+  expect_equal(nrow(x$summary),1L)
+  expect_equal(x$summary$Observations,2L)
+  expect_equal(nrow(x$nodes),3L)
+  expect_setequal(x$nodes$Facet,names(d))
+  expect_true(names(d)[2] %in% names(x$summary))
+})

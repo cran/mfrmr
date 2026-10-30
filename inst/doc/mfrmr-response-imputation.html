@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Missing scores on assigned ratings</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Missing scores on assigned ratings</h1>
+
+
+
+<p>An assessment team has missing scores from ratings that were
+assigned. It wants to compare two raters’ severity while allowing for
+uncertainty about those scores. Other performances were never assigned
+to one rater. Those unassigned combinations are part of the design, not
+scores to invent.</p>
+<p>This example uses fictional assessment data, a specified joint
+rating-scale imputation model, separate MFRM analyses and a pooled rater
+difference. It compares the result with direct inference from observed
+scores and changes the missing-score assumption in a sensitivity
+analysis. The saved completions are supplied with the package, so the
+analysis runs without installing a Bayesian sampler. An accompanying
+R/Stan script regenerates them if required. These functions are
+available in version 0.2.4.</p>
+<div id="keep-assignment-separate-from-missing-scores" class="section level2">
+<h2>Keep assignment separate from missing scores</h2>
+<p>The original data have 48 persons, four raters and four criteria.
+Every rating has an event ID. Six R04 Content events are unassigned.
+Among the remaining R04 Content and Language events, scores are masked
+with probability <code>plogis(-0.5 + (2.5 - mean_R01_score))</code>. All
+R01 scores remain observed. The fixed random seed selects 30 missing
+assigned scores; five persons have two missing scores each. Repeated
+ratings would need different event IDs even if their person, rater and
+criterion were identical.</p>
+<p>This missingness mechanism depends only on observed scores and is MAR
+by construction. It illustrates ignorable missingness, not a test
+showing that missingness in a real assessment is MAR. Hidden scores are
+saved solely to check predictions; they are never supplied to the
+imputation model.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>example <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="fu">system.file</span>(<span class="st">&quot;examples&quot;</span>, <span class="st">&quot;response-imputation.rds&quot;</span>, <span class="at">package =</span> <span class="st">&quot;mfrmr&quot;</span>))</span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>ratings <span class="ot">&lt;-</span> example<span class="sc">$</span>ratings</span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>missing_assigned <span class="ot">&lt;-</span> example<span class="sc">$</span>missing</span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>unassigned <span class="ot">&lt;-</span> example<span class="sc">$</span>unassigned</span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>held_out_scores <span class="ot">&lt;-</span> example<span class="sc">$</span>held_out</span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a>impute_ids <span class="ot">&lt;-</span> ratings<span class="sc">$</span>Event[missing_assigned]</span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a>m <span class="ot">&lt;-</span> <span class="fu">ncol</span>(example<span class="sc">$</span>scores)</span>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>model <span class="ot">&lt;-</span> example<span class="sc">$</span>imputation_model</span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a><span class="fu">with</span>(ratings, <span class="fu">table</span>(Assigned, <span class="at">MissingScore =</span> <span class="fu">is.na</span>(Score)))</span></code></pre></div>
+<p>Absent roster rows remain absent. If the input contains assigned
+events only, omit the <code>assigned</code> argument. To deliberately
+exclude other assigned nonresponse from imputation, retain it as missing
+and explicitly request <code>missing = &quot;omit&quot;</code>. Review omission
+counts and their substantive consequences; exclusion can still bias an
+analysis.</p>
+</div>
+<div id="use-a-joint-score-model" class="section level2">
+<h2>Use a joint score model</h2>
+<p>Within each completion, the imputation model draws:</p>
+<ol style="list-style-type: decimal">
+<li>One joint set of rater severities, criterion difficulties and shared
+steps, allowing for their posterior uncertainty and covariance.</li>
+<li>One latent ability for each person, informed by that person’s
+observed ratings. All missing ratings of that person share this ability
+draw.</li>
+<li>A category for each selected missing rating, conditional on those
+draws.</li>
+</ol>
+<p>This retains uncertainty in both calibration and missing scores, as
+well as dependence between missing ratings. Plugging in an EAP or
+drawing a separate ability independently for each missing rating would
+be a different procedure. Observed scores and unassigned events never
+change.</p>
+<p>For a category coded internally as <span class="math inline">\(k=0,1,2,3\)</span>, the model is</p>
+<p><span class="math display">\[
+P(Y_{prc}=k\mid\theta_p,\rho_r,\beta_c,\tau)
+\propto \exp\left\{k(\theta_p-\rho_r-\beta_c)
+                 -\sum_{h=1}^{k}\tau_h\right\}.
+\]</span></p>
+<p>Persons are independent draws from a <strong>known standard-normal
+population</strong>. The rater, criterion and step vectors each sum to
+zero, matching the default completed-data analysis below. The model is
+an adjacent-category RSM; its steps are not required to be ordered
+cumulative-logit cutpoints. Orthonormal sum-zero coordinates for
+calibration have independent <code>normal(0, 2.5)</code> priors (2.5 is
+the SD). This gives a proper, level-symmetric prior on each centered
+vector. It does not turn the fixed raters into a population of
+exchangeable random-rater effects with an estimated variance.</p>
+<p>These are assumptions of this example, not automatic defaults for
+arbitrary assessments. Review the population distribution, category
+model and dependence structure. Covariates or additional effects can be
+needed when nonresponse relates to information outside this model.
+Several tasks, shared random raters or local dependence may require a
+different joint imputation model.</p>
+<div id="inspect-sampling-and-preserve-provenance" class="section level3">
+<h3>Inspect sampling and preserve provenance</h3>
+<p>The saved result contains 40 completions selected at random without
+replacement from 8,000 retained draws in four well-mixing chains. The
+generation script requires Rhat below 1.01, bulk/tail effective sample
+sizes of at least 400, no divergences or maximum-tree-depth hits and
+E-BFMI of at least 0.3. It saves all chains before reviewing these
+diagnostics and stops if they fail.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>diagnostics <span class="ot">&lt;-</span> model<span class="sc">$</span>diagnostics</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="fu">c</span>(<span class="at">MaxRhat =</span> <span class="fu">max</span>(diagnostics<span class="sc">$</span>rhat),</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>  <span class="at">MinBulkESS =</span> <span class="fu">min</span>(diagnostics<span class="sc">$</span>ess_bulk),</span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>  <span class="at">MinTailESS =</span> <span class="fu">min</span>(diagnostics<span class="sc">$</span>ess_tail))</span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>model<span class="sc">$</span>sampler</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="fu">head</span>(model<span class="sc">$</span>draw_ids)</span></code></pre></div>
+<p>Good sampling diagnostics do not prove that the response model
+describes the assessment. Random selection approximates independent
+posterior draws here; it cannot repair a poorly mixing chain. Forty
+completions are an example setting: examine Monte Carlo error relative
+to the decision’s required precision. More completions reduce simulation
+noise, not model bias.</p>
+<p>To regenerate the example, use the accompanying script with an
+existing <a href="https://mc-stan.org/cmdstanr/">CmdStanR/Stan
+installation</a>. This optional step compiles and samples the model;
+importing the supplied completions and running the analyses below does
+not require that toolchain. The script is specific to this example, not
+a general imputation API.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">source</span>(<span class="fu">system.file</span>(<span class="st">&quot;examples&quot;</span>, <span class="st">&quot;response-imputation.R&quot;</span>, <span class="at">package =</span> <span class="st">&quot;mfrmr&quot;</span>))</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>example <span class="ot">&lt;-</span> <span class="fu">response_imputation_example</span>(<span class="st">&quot;mi-example-output&quot;</span>)</span></code></pre></div>
+<p>The output directory retains the model code, data, sampler settings,
+all chains and diagnostics. Use a new directory for a new run. Draw
+identities, selected scores and model specification are also retained in
+the compact example file. The full chains can be used for further
+posterior checks.</p>
+</div>
+</div>
+<div id="return-completions-to-the-original-roster" class="section level2">
+<h2>Return completions to the original roster</h2>
+<p>Only eligible event IDs receive scores. A long-format
+<code>mids</code> object from another suitable imputation model can
+instead be supplied directly; the API checks its original data and
+<code>where</code> mask. Common category labels or a successful import
+do not establish compatibility with the analysis model.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>completed <span class="ot">&lt;-</span> <span class="fu">lapply</span>(<span class="fu">seq_len</span>(m), <span class="cf">function</span>(i) {</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>  result <span class="ot">&lt;-</span> ratings</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  result<span class="sc">$</span>Score[missing_assigned] <span class="ot">&lt;-</span> example<span class="sc">$</span>scores[, i]</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  result</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>})</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>review <span class="ot">&lt;-</span> <span class="fu">review_mfrm_imputations</span>(</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>  ratings, completed, <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>, <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>, <span class="at">event_id =</span> <span class="st">&quot;Event&quot;</span>, <span class="at">impute_ids =</span> impute_ids, <span class="at">categories =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>,</span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>  <span class="at">assigned =</span> <span class="st">&quot;Assigned&quot;</span>, <span class="at">imputation_model =</span> model</span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>)</span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>review</span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a><span class="fu">subset</span>(<span class="fu">summary</span>(review), Facet <span class="sc">==</span> <span class="st">&quot;Rater&quot;</span>)</span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">all</span>(<span class="fu">vapply</span>(review<span class="sc">$</span>completed, <span class="cf">function</span>(d) {</span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a>  <span class="fu">all</span>(<span class="fu">is.na</span>(d<span class="sc">$</span>Score[unassigned])) <span class="sc">&amp;&amp;</span></span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a>    <span class="fu">identical</span>(d<span class="sc">$</span>Score[<span class="sc">!</span><span class="fu">is.na</span>(ratings<span class="sc">$</span>Score)], ratings<span class="sc">$</span>Score[<span class="sc">!</span><span class="fu">is.na</span>(ratings<span class="sc">$</span>Score)])</span>
+<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a>}, <span class="fu">logical</span>(<span class="dv">1</span>))))</span></code></pre></div>
+<p>The support table separates observed and imputed information. A
+person or rater with no observed scores depends especially strongly on
+the imputation assumptions. Imputed links are not evidence of empirical
+overlap. All selected scores must be completed in every imputation; no
+invalid completion is dropped.</p>
+</div>
+<div id="check-the-missing-score-predictions" class="section level2">
+<h2>Check the missing-score predictions</h2>
+<p>The saved category probabilities average all 8,000 posterior draws.
+They are more precise simulation summaries than the category frequencies
+from just 40 completions. Labels show percentages as well as color, so
+the figure can be read without distinguishing colors. Each row is a
+marginal prediction; dependence between rows is preserved in the joint
+completions. The figure shows predicted category probabilities for the
+missing assigned ratings; its description stays outside the plotting
+area.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>probabilities <span class="ot">&lt;-</span> example<span class="sc">$</span>probability_mean</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="fu">nrow</span>(probabilities)</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="fu">image</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>, <span class="fu">seq_len</span>(n), <span class="fu">t</span>(probabilities[n<span class="sc">:</span><span class="dv">1</span>, , <span class="at">drop =</span> <span class="cn">FALSE</span>]),</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>      <span class="at">zlim =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">1</span>), <span class="at">col =</span> <span class="fu">colorRampPalette</span>(<span class="fu">c</span>(<span class="st">&quot;#ffffd9&quot;</span>, <span class="st">&quot;#7fcdbb&quot;</span>, <span class="st">&quot;#41b6c4&quot;</span>))(<span class="dv">64</span>), <span class="at">axes =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>      <span class="at">xlab =</span> <span class="st">&quot;Score&quot;</span>, <span class="at">ylab =</span> <span class="st">&quot;&quot;</span>, <span class="at">main =</span> <span class="st">&quot;&quot;</span>)</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="fu">axis</span>(<span class="dv">1</span>, <span class="at">at =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>)</span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="fu">axis</span>(<span class="dv">2</span>, <span class="at">at =</span> <span class="fu">seq_len</span>(n), <span class="at">labels =</span> <span class="fu">rev</span>(impute_ids), <span class="at">las =</span> <span class="dv">1</span>, <span class="at">cex.axis =</span> .<span class="dv">7</span>)</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a><span class="cf">for</span> (j <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>) <span class="fu">text</span>(j, <span class="fu">seq_len</span>(n),</span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>  <span class="at">labels =</span> <span class="fu">sprintf</span>(<span class="st">&quot;%.0f%%&quot;</span>, probabilities[n<span class="sc">:</span><span class="dv">1</span>, j] <span class="sc">*</span> <span class="dv">100</span>), <span class="at">cex =</span> .<span class="dv">65</span>,</span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a>  <span class="at">col =</span> <span class="st">&quot;black&quot;</span>)</span></code></pre></div>
+<p>Rounded zero percentages do not mean impossible categories. In
+addition to sampling diagnostics, examine whether predictions describe
+the assessment. Because we deliberately masked scores, we can compare
+the predictions with held-out values. The Brier score compares
+probabilities with the observed category; smaller is better.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>prediction_check <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  <span class="at">Event =</span> impute_ids, <span class="at">HeldOutScore =</span> held_out_scores,</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="at">PredictedMean =</span> <span class="fu">drop</span>(probabilities <span class="sc">%*%</span> (<span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>)),</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="at">Brier =</span> <span class="fu">rowSums</span>((probabilities <span class="sc">-</span> <span class="fu">outer</span>(held_out_scores, <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>, <span class="st">&quot;==&quot;</span>))<span class="sc">^</span><span class="dv">2</span>)</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>)</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="fu">head</span>(prediction_check)</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a><span class="fu">c</span>(<span class="at">HeldOutMean =</span> <span class="fu">mean</span>(held_out_scores),</span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>  <span class="at">PredictedMean =</span> <span class="fu">mean</span>(prediction_check<span class="sc">$</span>PredictedMean),</span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>  <span class="at">Brier =</span> <span class="fu">mean</span>(prediction_check<span class="sc">$</span>Brier))</span></code></pre></div>
+<p>The held-out mean is 2.10 and the predicted mean about 2.24. This
+small check makes prediction discrepancies visible, but cannot establish
+population bias, probability calibration or coverage of a rater
+interval. The RSM’s population and dependence assumptions still require
+substantive review.</p>
+</div>
+<div id="analyze-every-completion-on-the-same-scale" class="section level2">
+<h2>Analyze every completion on the same scale</h2>
+<p>The declared 1–4 category ladder and identical facet constraints are
+retained in every fit. This workflow currently supports
+fixed-standard-normal RSM/PCM MML analysis. PCM requires
+<code>step_facet = &quot;Criterion&quot;</code> explicitly. Shared anchors can be
+supplied, but are treated as known: their uncertainty is not
+included.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>analyses <span class="ot">&lt;-</span> <span class="fu">fit_mfrm_imputed</span>(review, <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>, <span class="at">quad_points =</span> <span class="dv">61</span>)</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="fu">summary</span>(analyses)[, <span class="fu">c</span>(<span class="st">&quot;Imputation&quot;</span>, <span class="st">&quot;Status&quot;</span>, <span class="st">&quot;Error&quot;</span>, <span class="st">&quot;Warnings&quot;</span>)]</span></code></pre></div>
+<p>Before interpretation, review model fit, observed support and
+quadrature sensitivity using the retained fits. The default quadrature
+grid is a starting point, not an adequacy certificate. A fit can
+complete computation and still be ineligible for inference.
+<code>analysis_summary</code> retains errors and warnings; pooling
+requires every fit to be eligible and to have unregularized observed
+information. Increasing the number of imputations does not cure a flawed
+imputation model or a failed measurement analysis.</p>
+</div>
+<div id="pool-the-rater-contrast-including-its-covariance" class="section level2">
+<h2>Pool the rater contrast, including its covariance</h2>
+<p>For feedback, a prespecified difference is often more interpretable
+than an isolated centered severity. Here a positive R04-minus-R01 value
+means that R04 is more severe under the default facet orientation.
+Differences are on the common logit scale. The covariance between the
+two rater estimates contributes to their difference’s variance in every
+completed analysis.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>levels <span class="ot">&lt;-</span> analyses<span class="sc">$</span>fits[[<span class="dv">1</span>]]<span class="sc">$</span>config<span class="sc">$</span>facet_specs<span class="sc">$</span>Rater<span class="sc">$</span>levels</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>contrast <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="dv">0</span>, <span class="dv">1</span>, <span class="fu">length</span>(levels),</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>                   <span class="at">dimnames =</span> <span class="fu">list</span>(<span class="st">&quot;R04 minus R01&quot;</span>, levels))</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>contrast[<span class="dv">1</span>, <span class="fu">c</span>(<span class="st">&quot;R04&quot;</span>, <span class="st">&quot;R01&quot;</span>)] <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="sc">-</span><span class="dv">1</span>)</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>pooled <span class="ot">&lt;-</span> <span class="fu">pool_mfrm_imputed</span>(analyses, <span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">contrasts =</span> contrast)</span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a><span class="fu">summary</span>(pooled)</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="fu">plot</span>(pooled)</span></code></pre></div>
+<p>The development version also supports a ggplot made from these saved
+intervals:</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">requireNamespace</span>(<span class="st">&quot;ggplot2&quot;</span>, <span class="at">quietly =</span> <span class="cn">TRUE</span>)) {</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>  pooled_figure <span class="ot">&lt;-</span> <span class="fu">as_ggplot</span>(pooled, <span class="at">title =</span> <span class="cn">NULL</span>, <span class="at">preset =</span> <span class="st">&quot;monochrome&quot;</span>)</span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>  <span class="fu">print</span>(pooled_figure)</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>  <span class="fu">plot_data</span>(pooled_figure)<span class="sc">$</span>table[, <span class="fu">c</span>(<span class="st">&quot;Target&quot;</span>, <span class="st">&quot;Estimate&quot;</span>, <span class="st">&quot;Lower&quot;</span>, <span class="st">&quot;Upper&quot;</span>, <span class="st">&quot;DF&quot;</span>)]</span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>}</span></code></pre></div>
+<p>Default and <code>component = &quot;table&quot;</code> conversion keep the
+complete interval view. The t interval is not replaced by a normal
+interval from <code>SE</code>; changing its level requires a new,
+explicit pooling call. Fixed targets are open diamonds without
+inferential intervals. Missing intervals have crosses, and infinite
+endpoints have arrows whose tips are drawing limits rather than finite
+bounds. Full contrasts, settings, degrees of freedom and information
+cautions remain in <code>plot_data()</code>, even after titles or
+captions are hidden. These display symbols do not establish interval
+coverage or classify rater quality.</p>
+<p><code>Estimate</code> averages the completed-data estimates.
+<code>WithinVariance</code> averages their model-based variances;
+<code>BetweenVariance</code> captures their variation across
+imputations. <code>TotalVariance</code> includes both, with the
+finite-imputation factor <code>1 + 1/m</code>. <code>SE</code> and the
+pointwise t interval use that total. <code>MonteCarloSE</code> instead
+quantifies simulation error in the pooled point estimate.
+<code>MissingVarianceFraction</code> is not the percentage of missing
+scores. The finite-imputation correction and <code>MonteCarloSE</code>
+assume independent completion draws. Duplicating completed datasets does
+not add Monte Carlo information. MCMC-based completions require sampling
+review; the example above uses draws spread across its retained chains,
+without claiming exact independence.</p>
+<p>The default <code>df_complete = Inf</code> uses large-sample
+complete-data inference. There is no automatic conversion of rating-row
+counts into independent sample size. A finite <code>df_complete</code>
+is available when the target has a justified complete-data
+degrees-of-freedom approximation; it does not create one. Fixed
+constraints are reported as fixed, without confidence intervals.
+<code>IntervalReason</code> distinguishes these fixed targets from
+numerical resolution or range limits. In those numerical cases, the
+estimate and variance remain available while interval bounds are
+missing. A rounded zero-width interval is not evidence of perfect
+precision. Saved <code>notes</code> and plot data retain these
+assumptions and qualifications.</p>
+<p>These are model-based MI intervals, treating any supplied anchors as
+known. They do not guarantee finite-sample coverage, robustness to
+misspecification, or simultaneous control over a selected collection of
+rater flags. A severity difference is not a measure of rater quality.
+Feedback should use content, observed behavior and practical importance
+along with the uncertainty.</p>
+<p>Person EAPs and posterior SDs remain in the separate fitted objects.
+They are not ordinary parameter estimates and standard errors for the
+pooling operation above. Neither averaged imputed scores nor
+Rubin-pooled EAPs substitute for an appropriately specified
+person-scoring target.</p>
+</div>
+<div id="compare-with-inference-from-the-observed-scores" class="section level2">
+<h2>Compare with inference from the observed scores</h2>
+<p>If only scores are missing, the observed-score likelihood can already
+estimate this contrast under the same RSM and ignorable missingness
+assumptions. Multiple imputation does not add observed information. It
+is useful when completed rosters are needed for a downstream analysis or
+an explicit missing-score sensitivity assumption. For this single
+contrast, direct observed-score MML is a simpler starting point.</p>
+<p>Keep the full roster and its missingness review. Here we explicitly
+select its 732 observed assigned scores after the known masking
+procedure. This selection is justified by the example’s construction; it
+is not a remedy for unreviewed nonresponse, missing identifiers or a
+disconnected design. Passing the roster with <code>NA</code> scores
+directly to <code>fit_mfrm()</code> retains an input-review state, which
+the interval helper will ask you to resolve.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>observed_ratings <span class="ot">&lt;-</span> <span class="fu">subset</span>(ratings, Assigned <span class="sc">&amp;</span> <span class="sc">!</span><span class="fu">is.na</span>(Score))</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>observed_fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(observed_ratings, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>  <span class="st">&quot;Score&quot;</span>, <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>, <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>, <span class="at">rating_min =</span> <span class="dv">1</span>, <span class="at">rating_max =</span> <span class="dv">4</span>,</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">121</span>, <span class="at">keep_original =</span> <span class="cn">TRUE</span>, <span class="at">attach_diagnostics =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>observed_interval <span class="ot">&lt;-</span> <span class="fu">mfrm_facet_intervals</span>(observed_fit, <span class="st">&quot;Rater&quot;</span>, <span class="at">contrasts =</span> contrast)</span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>comparison <span class="ot">&lt;-</span> <span class="fu">rbind</span>(</span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>  <span class="fu">data.frame</span>(<span class="at">Method =</span> <span class="st">&quot;Observed-score MML&quot;</span>,</span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>             <span class="fu">summary</span>(observed_interval)[<span class="fu">c</span>(<span class="st">&quot;Estimate&quot;</span>, <span class="st">&quot;SE&quot;</span>, <span class="st">&quot;Lower&quot;</span>, <span class="st">&quot;Upper&quot;</span>)]),</span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>  example<span class="sc">$</span>reference,</span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>  <span class="fu">data.frame</span>(<span class="at">Method =</span> <span class="st">&quot;Joint-model MI&quot;</span>,</span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>             <span class="fu">summary</span>(pooled)[<span class="fu">c</span>(<span class="st">&quot;Estimate&quot;</span>, <span class="st">&quot;SE&quot;</span>, <span class="st">&quot;Lower&quot;</span>, <span class="st">&quot;Upper&quot;</span>)])</span>
+<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a>)</span>
+<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a>comparison</span></code></pre></div>
+<p>The saved Bayesian reference comes from the same observed-score
+posterior used for imputation. Its <code>SE</code> column is a
+<strong>posterior SD</strong>, and its bounds are an equal-tailed
+credible interval; the other rows use frequentist interval
+approximations. In this example, the three estimates are about 0.46–0.47
+logits with uncertainty scales about 0.14–0.15 logits. The MI estimate’s
+Monte Carlo SE is about 0.008 logits. Increasing from 61 to 121
+quadrature points changes the direct MML estimate by less than 0.000002
+logits.</p>
+<p>This agreement is reassuring for this calculation, but does not prove
+congeniality or repeated-sampling coverage. The imputer has proper
+calibration priors; the completed-data analyses use MML estimates and
+inverse observed information without those priors. Treating the latter
+as Bayesian posterior moments is a large-sample approximation. Prior
+influence, sparse support and model misspecification can make that
+approximation inadequate. Merely sharing the response likelihood is
+insufficient; see Bartlett and Hughes (2020).</p>
+</div>
+<div id="what-repeated-sampling-showed" class="section level2">
+<h2>What repeated sampling showed</h2>
+<p>A separate simulation examined this joint-RSM completion workflow for
+a fixed rater contrast. It used 200 independent datasets, each with 80
+persons, three raters, two criteria and scores 0–2. Twenty ratings were
+structurally unassigned. Missing scores were concentrated in the third
+rater’s ratings; forty completions were used per incomplete roster. The
+true R1-minus-R3 contrast was 0.5 logits, and the known standard-normal
+ability distribution and RSM were correctly specified.</p>
+<p>Each dataset was analyzed under two missingness mechanisms. In the
+MAR condition, missingness depended on the first rater’s observed
+scores. In the MNAR condition, it additionally depended on the missing
+rating’s own value, with lower scores more likely to be missing. Both
+conditions were analyzed using the same MAR imputer. This second
+condition deliberately violates the missingness assumption; it does not
+evaluate an MNAR imputation model.</p>
+<table>
+<colgroup>
+<col width="13%" />
+<col width="13%" />
+<col width="18%" />
+<col width="18%" />
+<col width="18%" />
+<col width="18%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Missingness</th>
+<th>Procedure</th>
+<th align="right">Available / 200</th>
+<th align="right">Coverage, % (95% MC interval)</th>
+<th align="right">Mean bias, logits</th>
+<th align="right">Mean interval width, logits</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>MAR</td>
+<td>Observed-score MML</td>
+<td align="right">200</td>
+<td align="right">97.0 (93.6–98.9)</td>
+<td align="right">-0.007</td>
+<td align="right">0.813</td>
+</tr>
+<tr class="even">
+<td>MAR</td>
+<td>Observed-score Bayes</td>
+<td align="right">198</td>
+<td align="right">97.0 (93.5–98.9)</td>
+<td align="right">-0.004</td>
+<td align="right">0.814</td>
+</tr>
+<tr class="odd">
+<td>MAR</td>
+<td>Joint-model MI</td>
+<td align="right">198</td>
+<td align="right">96.5 (92.9–98.6)</td>
+<td align="right">-0.004</td>
+<td align="right">0.817</td>
+</tr>
+<tr class="even">
+<td>MNAR</td>
+<td>Observed-score MML</td>
+<td align="right">200</td>
+<td align="right">25.0 (19.2–31.6)</td>
+<td align="right">+0.574</td>
+<td align="right">0.859</td>
+</tr>
+<tr class="odd">
+<td>MNAR</td>
+<td>Observed-score Bayes</td>
+<td align="right">200</td>
+<td align="right">24.5 (18.7–31.1)</td>
+<td align="right">+0.578</td>
+<td align="right">0.859</td>
+</tr>
+<tr class="even">
+<td>MNAR</td>
+<td>Joint-model MI</td>
+<td align="right">200</td>
+<td align="right">26.0 (20.1–32.7)</td>
+<td align="right">+0.574</td>
+<td align="right">0.864</td>
+</tr>
+</tbody>
+</table>
+<p>Coverage is the fraction of available nominal 95% intervals
+containing the true contrast. The parentheses describe <strong>Monte
+Carlo uncertainty in that coverage rate</strong>, not an interval for a
+rater’s severity. The Bayesian row uses credible intervals. Two MAR
+posteriors missed the prespecified Rhat &lt;1.01 criterion (1.0106 and
+1.0104); their Bayesian and MI results were unavailable, and neither
+case was replaced. Counting these as unsuccessful results, MI returned
+an interval containing the truth in 191/200 trials (95.5%), compared
+with 191/198 (96.5%) among available intervals. All 15,920
+completed-data MML fits from the retained posteriors were eligible.</p>
+<p>In this MAR design, all three methods met the prespecified bounded
+coverage, availability and bias criteria. For MI, the bias MC interval
+was [-0.033, 0.025] logits. The mean point-estimate Monte Carlo SE was
+about 8% of the inferential SE. This supports this specific workflow
+under the tested assumptions, not a universal nominal-coverage
+guarantee, arbitrary supplied imputations or a validation of other
+populations, sparse designs or model families.</p>
+<p>The two conditions had almost identical average missing fractions:
+<strong>14.14% and 14.19% of assigned ratings</strong>. Nevertheless,
+the MNAR condition produced large positive bias and very poor coverage
+for all three methods. MI and direct inference can agree closely while
+both miss the target. Missingness concentrated in one rater also makes
+the overall missing fraction an insufficient description. More
+completions cannot correct the wrong missing-score distribution. Review
+the recording process, relevant auxiliary information and justified
+sensitivity assumptions before substantive feedback.</p>
+</div>
+<div id="challenge-the-missingness-assumption" class="section level2">
+<h2>Challenge the missingness assumption</h2>
+<p>The baseline uses the same conditional score model for observed and
+missing assigned ratings, given the observed ratings and common latent
+ability. To examine a specific departure, suppose an unrecorded score
+would be <strong>one category lower</strong> than its baseline
+imputation, with the lowest category retained at 1. This is a
+deliberately strong, discrete pattern-mixture sensitivity scenario. It
+is not an estimated MNAR mechanism, a universal correction or an
+instruction to subtract a category from real ratings. Its size and
+direction need subject-matter justification in an actual assessment.</p>
+<p>Use the same baseline draws to isolate this change. Only the selected
+scores change; observed and unassigned events stay as they were. Analyze
+and pool each assumption separately, rather than treating the
+assumptions as additional imputations of one model.</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>lower_scores <span class="ot">&lt;-</span> <span class="fu">lapply</span>(completed, <span class="cf">function</span>(d) {</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>  d<span class="sc">$</span>Score[missing_assigned] <span class="ot">&lt;-</span> <span class="fu">pmax</span>(<span class="dv">1</span><span class="dt">L</span>, d<span class="sc">$</span>Score[missing_assigned] <span class="sc">-</span> <span class="dv">1</span><span class="dt">L</span>)</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>  d</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>})</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>lower_review <span class="ot">&lt;-</span> <span class="fu">review_mfrm_imputations</span>(</span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>  ratings, lower_scores, <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>, <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>, <span class="at">event_id =</span> <span class="st">&quot;Event&quot;</span>, <span class="at">impute_ids =</span> impute_ids, <span class="at">categories =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>,</span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>  <span class="at">assigned =</span> <span class="st">&quot;Assigned&quot;</span>, <span class="at">imputation_model =</span> <span class="fu">list</span>(</span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>    <span class="at">baseline =</span> model, <span class="at">assumption =</span> <span class="st">&quot;Missing scores one category lower, floored at 1&quot;</span>)</span>
+<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a>)</span>
+<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a>lower_analyses <span class="ot">&lt;-</span> <span class="fu">fit_mfrm_imputed</span>(lower_review, <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>, <span class="at">quad_points =</span> <span class="dv">61</span>)</span>
+<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a>lower_pooled <span class="ot">&lt;-</span> <span class="fu">pool_mfrm_imputed</span>(lower_analyses, <span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">contrasts =</span> contrast)</span>
+<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a>comparison <span class="ot">&lt;-</span> <span class="fu">rbind</span>(</span>
+<span id="cb12-14"><a href="#cb12-14" tabindex="-1"></a>  <span class="fu">cbind</span>(<span class="at">Assumption =</span> <span class="st">&quot;Joint RSM baseline&quot;</span>, <span class="fu">summary</span>(pooled)),</span>
+<span id="cb12-15"><a href="#cb12-15" tabindex="-1"></a>  <span class="fu">cbind</span>(<span class="at">Assumption =</span> <span class="st">&quot;Missing scores one category lower&quot;</span>, <span class="fu">summary</span>(lower_pooled))</span>
+<span id="cb12-16"><a href="#cb12-16" tabindex="-1"></a>)</span>
+<span id="cb12-17"><a href="#cb12-17" tabindex="-1"></a>comparison[, <span class="fu">c</span>(<span class="st">&quot;Assumption&quot;</span>, <span class="st">&quot;Estimate&quot;</span>, <span class="st">&quot;SE&quot;</span>, <span class="st">&quot;Lower&quot;</span>, <span class="st">&quot;Upper&quot;</span>, <span class="st">&quot;MonteCarloSE&quot;</span>)]</span>
+<span id="cb12-18"><a href="#cb12-18" tabindex="-1"></a>paired_change <span class="ot">&lt;-</span> <span class="fu">drop</span>(lower_pooled<span class="sc">$</span>estimates <span class="sc">-</span> pooled<span class="sc">$</span>estimates)</span>
+<span id="cb12-19"><a href="#cb12-19" tabindex="-1"></a><span class="fu">c</span>(<span class="at">ContrastChange =</span> <span class="fu">mean</span>(paired_change),</span>
+<span id="cb12-20"><a href="#cb12-20" tabindex="-1"></a>  <span class="at">MonteCarloSEOfChange =</span> <span class="fu">sd</span>(paired_change) <span class="sc">/</span> <span class="fu">sqrt</span>(m))</span></code></pre></div>
+<p>Read the change in the rater contrast together with its uncertainty
+and your prespecified practically important difference. A modest change
+here would concern only this 30-event scenario; it would not establish
+robustness to other missing scores or mechanisms. A large change would
+identify dependence on the assumed missing scores, not prove which
+assumption is true. Inspect every analysis’s warnings and eligibility
+before interpreting either row. Neither an interval overlapping zero nor
+agreement between two scenarios validates the imputation model. The
+paired Monte Carlo SE quantifies simulation noise in the change between
+these two assumptions; it is not a sampling SE for that change.</p>
+</div>
+<div id="save-enough-to-review-and-reproduce-the-result" class="section level2">
+<h2>Save enough to review and reproduce the result</h2>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="fu">saveRDS</span>(pooled, <span class="st">&quot;rater-imputation-result.rds&quot;</span>)</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>saved <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="st">&quot;rater-imputation-result.rds&quot;</span>)</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a><span class="fu">summary</span>(saved)</span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a><span class="fu">write.csv</span>(<span class="fu">summary</span>(saved), <span class="st">&quot;rater-imputation-table.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>saved<span class="sc">$</span>analyses<span class="sc">$</span>imputations<span class="sc">$</span>imputation_model<span class="sc">$</span>diagnostics</span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a><span class="fu">saveRDS</span>(<span class="fu">list</span>(<span class="at">baseline =</span> pooled, <span class="at">lower_scores =</span> lower_pooled),</span>
+<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a>        <span class="st">&quot;rater-imputation-sensitivity.rds&quot;</span>)</span></code></pre></div>
+<p>The saved result retains the original roster, completions, imputation
+model, all fitted analyses and pooling settings. The CSV contains the
+selected summary, so retain the RDS alongside it. Use
+<code>mfrmr_output_guide(&quot;imputation&quot;)</code> for these dedicated output
+routes; a pooled result is not an <code>mfrm_results()</code> input. Its
+plot preserves the stored MI bounds. For custom graphics, extract
+<code>plot_data(saved)$table</code> and specify the estimate and both
+endpoints explicitly; <code>as_ggplot()</code> has dedicated conversion
+for the saved pooled interval view, including
+<code>component = &quot;table&quot;</code>; use <code>plot_data()</code> for other
+components. Changing the contrast or confidence level reuses the fits;
+changing the imputation model requires new completions and analyses.
+Saved objects contain response data and identifiers: choose an
+appropriate storage location when using real assessments.</p>
+</div>
+<div id="references" class="section level2">
+<h2>References</h2>
+<ul>
+<li>Andrich, D. (1978). A rating formulation for ordered response
+categories. <em>Psychometrika</em>, 43, 561–573. <a href="https://doi.org/10.1007/BF02293814" class="uri">https://doi.org/10.1007/BF02293814</a>.</li>
+<li>Rubin, D. B. (1987). <em>Multiple Imputation for Nonresponse in
+Surveys</em>. Wiley.</li>
+<li>Barnard, J., and Rubin, D. B. (1999). Small-sample degrees of
+freedom with multiple imputation. <em>Biometrika</em>, 86, 948–955. <a href="https://doi.org/10.1093/biomet/86.4.948" class="uri">https://doi.org/10.1093/biomet/86.4.948</a>.</li>
+<li>Bartlett, J. W., and Hughes, R. A. (2020). Bootstrap inference for
+multiple imputation under uncongeniality and misspecification. <a href="https://doi.org/10.1177/0962280220932189" class="uri">https://doi.org/10.1177/0962280220932189</a>.</li>
+<li>Stan User’s Guide: <a href="https://mc-stan.org/docs/stan-users-guide/posterior-prediction.html">posterior
+predictive sampling</a> and <a href="https://mc-stan.org/docs/stan-users-guide/missing-data.html">missing
+data</a>.</li>
+</ul>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

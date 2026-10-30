@@ -2,6 +2,7 @@
 % Please edit documentation in R/api-simulation.R
 \name{evaluate_mfrm_signal_detection}
 \alias{evaluate_mfrm_signal_detection}
+\alias{plot.mfrm_signal_detection}
 \title{Evaluate DIF power and bias-screening behavior under known simulated signals}
 \usage{
 evaluate_mfrm_signal_detection(
@@ -44,6 +45,17 @@ evaluate_mfrm_signal_detection(
   bias_abs_t = 2,
   seed = NULL
 )
+
+\method{plot}{mfrm_signal_detection}(
+  x,
+  signal = c("dif", "bias"),
+  metric = c("power", "false_positive", "estimate", "screen_rate",
+    "screen_false_positive"),
+  x_var = c("n_person", "n_rater", "n_criterion", "raters_per_person"),
+  group_var = NULL,
+  draw = TRUE,
+  ...
+)
 }
 \arguments{
 \item{n_person}{Vector of person counts to evaluate.}
@@ -67,7 +79,8 @@ variable through both \code{design} and the scalar design-grid arguments.}
 \item{reps}{Number of replications per design condition.}
 
 \item{group_levels}{Group labels used for DIF simulation. The first two levels
-define the default reference and focal groups.}
+define the default reference and focal groups. If omitted, inherits the
+groups stored in \code{sim_spec}, when present.}
 
 \item{reference_group}{Optional reference group label used when extracting the
 target DIF contrast.}
@@ -80,7 +93,8 @@ integer index or a criterion label such as \code{"C04"}. Defaults to the last
 criterion level in each design.}
 
 \item{dif_effect}{True DIF effect size added to the focal group on the target
-criterion.}
+criterion's linear predictor. For GPCM, discrimination multiplies this
+shift in the adjacent-category log odds.}
 
 \item{bias_rater}{Target rater level for the true interaction-bias effect.
 Can be an integer index or a label such as \code{"R04"}. Defaults to the last
@@ -91,7 +105,7 @@ effect. Can be an integer index or a criterion label. Defaults to the last
 criterion level in each design.}
 
 \item{bias_effect}{True interaction-bias effect added to the target
-\verb{Rater x Criterion} cell.}
+\verb{Rater x Criterion} cell's linear predictor, with the same GPCM scaling.}
 
 \item{score_levels}{Number of ordered score categories.}
 
@@ -107,7 +121,7 @@ criterion level in each design.}
 
 \item{fit_method}{Estimation method passed to \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
-\item{model}{Measurement model passed to \code{\link[=fit_mfrm]{fit_mfrm()}}. Bounded \code{GPCM} is
+\item{model}{Measurement model passed to \code{\link[=fit_mfrm]{fit_mfrm()}}. \code{GPCM} is
 supported with caveats as slope-aware signal-detection sensitivity
 evidence.}
 
@@ -119,7 +133,7 @@ When left \code{NULL}, the function inherits the generator step facet from
 \item{slope_facet}{Slope facet passed to \code{\link[=fit_mfrm]{fit_mfrm()}} when
 \code{model = "GPCM"}. Defaults to the fitted step facet.}
 
-\item{slopes}{Optional bounded-\code{GPCM} slope specification used by direct
+\item{slopes}{Optional \code{GPCM} slope specification used by direct
 simulation calls when \code{sim_spec = NULL}.}
 
 \item{maxit}{Maximum iterations passed to \code{\link[=fit_mfrm]{fit_mfrm()}}.}
@@ -142,7 +156,9 @@ latent-regression population generator, this helper currently requires
 
 \item{dif_min_obs}{Minimum observations per group cell for \code{\link[=analyze_dff]{analyze_dff()}}.}
 
-\item{dif_p_adjust}{P-value adjustment method passed to \code{\link[=analyze_dff]{analyze_dff()}}.}
+\item{dif_p_adjust}{P-value adjustment method passed to \code{\link[=analyze_dff]{analyze_dff()}}.
+Target and non-target screens use the returned adjusted tail areas; an
+unavailable adjusted value never falls back to an unadjusted one.}
 
 \item{dif_p_cut}{P-value cutoff for counting a target DIF detection.}
 
@@ -157,7 +173,33 @@ target DIF detection. When omitted, the effective default is \code{0.43} for
 
 \item{bias_abs_t}{Absolute t cutoff for counting a target bias screen-positive result.}
 
-\item{seed}{Optional seed for reproducible replications.}
+\item{seed}{Optional seed for reproducible replications. Trial seeds are
+allocated before execution and cover generation, fitting and diagnostics.
+A supplied seed preserves the caller's RNG state.}
+
+\item{x}{Output from \code{\link[=evaluate_mfrm_signal_detection]{evaluate_mfrm_signal_detection()}}.}
+
+\item{signal}{Whether to plot DIF or bias screening results.}
+
+\item{metric}{Metric to plot. For \code{signal = "bias"}, prefer
+\code{metric = "screen_rate"} for the screening hit rate. The older
+\code{metric = "power"} spelling is retained as a backwards-compatible alias
+that maps to \code{BiasScreenRate}.
+\code{"estimate"} plots the signed reference-minus-focal DIF contrast or
+the additive bias shift. A refit contrast requires common-scale linking.}
+
+\item{x_var}{Design variable used on the x-axis. When \code{x} was generated from
+a \code{sim_spec} with custom public facet names, the corresponding aliases
+(for example \code{n_judge}, \code{n_task}, \code{judge_per_person}) are also accepted.
+Role keywords (\code{person}, \code{rater}, \code{criterion}, \code{assignment}) are accepted
+as an abstraction over the current two-facet schema.}
+
+\item{group_var}{Optional design variable used for separate lines. The same
+alias rules as \code{x_var} apply.}
+
+\item{draw}{If \code{TRUE}, draw with base graphics; otherwise return plotting data.}
+
+\item{...}{Reserved for generic compatibility.}
 }
 \value{
 An object of class \code{mfrm_signal_detection} with:
@@ -166,9 +208,12 @@ An object of class \code{mfrm_signal_detection} with:
 public facet names, matching design-variable alias columns are included
 alongside the standard result columns.
 \item \code{results}: replicate-level detection results, with the same
-design-variable alias columns when applicable.
+design-variable alias columns when applicable. \code{Seed} identifies the trial;
+\code{DIFReferenceGroup}, \code{DIFFocalGroup}, \code{DIFContrastDirection} and
+\code{DIFContrastScale} identify its contrast. \code{DIFScreenReason} and
+\code{BiasScreenReason} retain target-level unavailability explanations.
 \item \code{rep_overview}: run-level status and timing, with the same design-variable
-alias columns when applicable.
+alias columns when applicable, including failed attempts and their stage.
 \item \code{design_descriptor}: role-based design-variable metadata used by planning
 summaries and plots
 \item \code{planning_scope}: explicit record of the current planning contract
@@ -176,12 +221,26 @@ summaries and plots
 mutable under the current simulation specification
 \item \code{planning_schema}: structured planning metadata bundling the role
 descriptor, scope boundary, and current mutability map
-\item \code{gpcm_boundary}: bounded-\code{GPCM} caveat row when a \code{GPCM} screening route
+\item \code{gpcm_boundary}: \code{GPCM} caveat row when a \code{GPCM} screening route
 is used
 \item \code{settings}: signal-analysis settings
 \item \code{ademp}: simulation-study metadata (aims, DGM, estimands, methods, performance measures)
 \item \code{notes}: short interpretation notes
 }
+
+For \code{plot()}: If \code{draw = TRUE}, invisibly returns plotting data. If \code{draw = FALSE},
+returns that plotting-data list directly. The returned list includes
+resolved canonical variables (\code{x_var}, \code{group_var}) together with public
+labels (\code{x_label}, \code{group_label}), \code{design_variable_aliases},
+\code{design_descriptor}, \code{planning_scope}, \code{planning_constraints},
+\code{planning_schema},
+\code{display_metric}, and \code{interpretation_note} so
+callers can label bias-side plots as screening summaries rather than
+formal power/error-rate displays.
+\code{summary_table} retains per-design means and availability denominators;
+\code{notes} retains interpretation and legacy-result restrictions. If additional
+design variables are collapsed, each plotted point is an equally weighted
+average of available design-level means, not a pooled trial/cell rate.
 }
 \description{
 Evaluate DIF power and bias-screening behavior under known simulated signals
@@ -196,15 +255,15 @@ For each design condition (combination of \code{n_person}, \code{n_rater},
 \enumerate{
 \item Generates synthetic data with \code{\link[=simulate_mfrm_data]{simulate_mfrm_data()}}
 \item Injects one known Group \eqn{\times} Criterion DIF effect
-(\code{dif_effect} logits added to the focal group on the target criterion)
+(\code{dif_effect} added to the focal group's linear predictor on the target criterion)
 \item Injects one known Rater \eqn{\times} Criterion interaction-bias
-effect (\code{bias_effect} logits)
+effect (\code{bias_effect} added to the linear predictor)
 \item Fits and diagnoses the MFRM
 \item Runs \code{\link[=analyze_dff]{analyze_dff()}} and \code{\link[=estimate_bias]{estimate_bias()}}
 \item Records whether the injected signals were detected or screen-positive
 }
 
-Bounded-\code{GPCM} runs preserve the current package constraint
+\code{GPCM} runs preserve the current package constraint
 \code{slope_facet == step_facet} within the generator and fitted model. The
 resulting DIF and bias rates are slope-aware screening summaries, not
 formal inferential power, alpha calibration, operational scoring, or
@@ -212,34 +271,84 @@ arbitrary-facet planning evidence.
 
 \strong{Detection criteria}:
 A DIF signal is counted as "detected" when the target contrast has
-\eqn{p <} \code{dif_p_cut} \strong{and}, when an absolute contrast cutoff is in
+\eqn{p \le} \code{dif_p_cut} \strong{and}, when an absolute contrast cutoff is in
 force, \eqn{|\mathrm{Contrast}| \ge} \code{dif_abs_cut}. For
 \code{dif_method = "refit"}, \code{dif_abs_cut} is interpreted on the logit scale.
-For \code{dif_method = "residual"}, the residual-contrast screening result is
-used and the default is to rely on the significance test alone.
+For \code{dif_method = "residual"}, DIF detection, classification and false-positive
+rates are unavailable (\code{NA}). Residual contrasts remain available as
+descriptive summaries; a missing test is not counted as a non-detection.
 
 Bias results are different: \code{\link[=estimate_bias]{estimate_bias()}} reports \code{t} and \code{Prob.} as
 screening metrics rather than formal inferential quantities. Here, a bias
 cell is counted as \strong{screen-positive} only when those screening metrics are
 available and satisfy
 
-\eqn{p <} \code{bias_p_cut} \strong{and} \eqn{|t| \ge} \code{bias_abs_t}.
+\eqn{p \le} \code{bias_p_cut} \strong{and} \eqn{|t| \ge} \code{bias_abs_t}.
+If either required metric is unavailable, the result is \code{NA}, not \code{FALSE}.
+A descriptive-only DIF classification likewise supplies no classification
+detection outcome, even when the contrast itself is available.
 
 \strong{Power} is the proportion of replications in which the target signal
-was correctly detected. For DIF this is a conventional power summary.
+was flagged when a comparison statistic is available. Refit DIF rates are
+conditional screening rates, not calibrated inferential power.
 For bias, the primary summary is \code{BiasScreenRate}, a screening hit rate
-rather than formal inferential power.
+rather than formal inferential power. With a zero generating effect, the
+target rate describes null flags rather than sensitivity. The historical
+column name \code{DIFPower} is retained for compatibility.
 
-\strong{False-positive rate} is the proportion of non-target cells that were
-incorrectly flagged. For DIF this is interpreted in the usual testing
-sense. For bias, \code{BiasScreenFalsePositiveRate} is a screening rate and
-should not be read as a calibrated inferential alpha level.
+\strong{False-positive rate} first counts flags among available non-target cells
+within each replication, then averages those proportions across replications.
+\code{DIFNonTargetPlanned}/\code{DIFNonTargetAvailable} and the corresponding
+\verb{BiasNonTarget*} columns retain cell denominators. These rates are neither
+calibrated inferential alpha levels nor probabilities of any false flag in
+a family. For per-target and any-target rates with a complete planned roster,
+use \code{\link[=mfrm_screening_performance]{mfrm_screening_performance()}}.
 
-\strong{Default effect sizes}: \code{dif_effect = 0.6} logits corresponds to a
-moderate criterion-linked differential-functioning effect; \code{bias_effect = -0.8}
-logits represents a substantial rater-criterion interaction.  Adjust
-these to match the smallest effect size of practical concern for your
-application.
+Target summaries retain planned, available, unavailable and positive counts,
+exact 95\% binomial Monte Carlo bounds, and bounds obtained by assigning every
+unresolved outcome negative or positive. Rates and Monte Carlo intervals
+condition on available outcomes; unresolved-outcome bounds are not confidence
+intervals. These uncertainty calculations describe independent simulation
+replications, not uncertainty about the quality of a real rater.
+
+\strong{Direction and scale}: \code{DIFContrast} is always reference minus focal,
+regardless of the order returned by \code{\link[=analyze_dff]{analyze_dff()}}. For \code{"residual"}, this
+is a difference in mean observed-minus-expected scores. For \code{"refit"}, it is
+a difference in facet locations; means and absolute means require documented
+common-scale comparability. Raw differences with unavailable linking remain
+in \code{results} with \code{DIFContrastComparable = FALSE} and \code{DIFScaleLinkStatus}.
+Neither contrast is automatically an estimate of the injected \code{dif_effect}:
+the residual contrast uses score units, and refit locations use difficulty/
+severity orientation and estimated linking anchors. \code{BiasSize} is a fitted
+additive shift relative to the estimated baseline, not recovery against a
+known unchanged baseline. See \code{\link[=analyze_dff]{analyze_dff()}} and \code{\link[=estimate_bias]{estimate_bias()}} for the
+conditioning assumptions.
+
+\strong{Failures and replay}: failures of generation, fitting or diagnostics keep
+their planned trial rows, with \code{Seed}, \code{ErrorStage} and \code{Error} in
+\code{rep_overview}. Missing outcomes do not count as negative screens. Generation
+failure gives unavailable observation/category counts, not zero observations.
+\code{ElapsedSec} includes generation and all analysis stages. Each later trial
+keeps its own seed even if an earlier trial fails. Save the returned object
+with \code{saveRDS()} and preserve the call and software environment; this helper
+does not provide the file/checkpoint arguments of \code{\link[=evaluate_mfrm_design]{evaluate_mfrm_design()}}.
+Seeds alone do not guarantee identical results across software/platforms.
+
+Rebuild older saved summaries and plots from the original evaluation to
+correct unavailable target outcomes and retain full-precision summaries.
+Older runs lack non-target availability counts, so their non-target rates
+are withheld: recovering those cell rates requires rerunning the simulation.
+Runs lacking contrast-direction metadata cannot supply signed means; old
+refit runs lacking comparability metadata cannot supply absolute means either.
+Original stored results and otherwise available screening outcomes remain.
+This function evaluates Group-by-Criterion DIF and Rater-by-Criterion bias;
+it does not evaluate general Rater-by-Group differential rater functioning.
+
+\strong{Default effect sizes}: \code{dif_effect = 0.6} and \code{bias_effect = -0.8} are
+example shifts of the latent linear predictor, not validated small/moderate/
+large effect thresholds. Choose values of practical concern for the intended
+assessment. GPCM slopes multiply these shifts on the adjacent-logit scale;
+response-probability changes also depend on ability and category thresholds.
 
 This is again a \strong{parametric simulation study}. The function does not
 estimate a new design directly from one observed dataset. Instead, it
@@ -262,6 +371,8 @@ If that specification also stores a latent-regression population generator,
 each replication carries simulated one-row-per-person background data into
 the MML fit. This remains a screening-oriented Monte Carlo study; it is not
 a person-level posterior prediction for one observed sample.
+
+\code{plot()} method: Plot DIF/bias screening simulation results
 }
 \section{References}{
 
@@ -284,7 +395,9 @@ reporting}. Psychological Methods.
 }
 
 \examples{
-\donttest{
+# Long-running workflow; run explicitly when needed.
+# example("evaluate_mfrm_signal_detection", run.dontrun = TRUE)
+\dontrun{
 sig_eval <- suppressWarnings(evaluate_mfrm_signal_detection(
   design = list(person = 8, rater = 2, criterion = 2, assignment = 2),
   reps = 1,
@@ -295,7 +408,20 @@ sig_eval <- suppressWarnings(evaluate_mfrm_signal_detection(
 s_sig <- summary(sig_eval)
 s_sig$overview
 }
+# Long-running workflow; run explicitly when needed.
+# example("plot.mfrm_signal_detection", run.dontrun = TRUE)
+\dontrun{
+# One saved replication illustrates output structure, not precise rates.
+# Regeneration recipe: examples/simulation-results.R in the package.
+saved <- readRDS(system.file("examples", "simulation-signal-detection.rds",
+  package = "mfrmr", mustWork = TRUE))
+# Inspect saved$generation_warnings and the result's run/status tables.
+sig_eval <- saved$result
+plot(sig_eval, signal = "dif", metric = "power", x_var = "n_person", draw = FALSE)
+}
 }
 \seealso{
 \code{\link[=simulate_mfrm_data]{simulate_mfrm_data()}}, \code{\link[=evaluate_mfrm_design]{evaluate_mfrm_design()}}, \code{\link[=analyze_dff]{analyze_dff()}}, \code{\link[=analyze_dif]{analyze_dif()}}, \code{\link[=estimate_bias]{estimate_bias()}}
+
+\code{\link[=evaluate_mfrm_signal_detection]{evaluate_mfrm_signal_detection()}}, \link{summary.mfrm_signal_detection}
 }

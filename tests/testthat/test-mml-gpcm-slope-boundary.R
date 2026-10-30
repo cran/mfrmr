@@ -29,6 +29,8 @@ fit_mml_gpcm_slope_boundary_fixture <- function(reverse = FALSE) {
     step_facet = "Criterion",
     slope_facet = "Criterion",
     anchors = anchors,
+    # This boundary-path fixture fixes a nonzero rater mean on the legacy scale.
+    centering_scope = "remainder",
     rating_min = 0,
     rating_max = 1,
     quad_points = 5L,
@@ -57,6 +59,9 @@ mml_gpcm_slope_boundary_problem <- function(fit) {
 test_that("MML fixed-quadrature marginal slope path is certified", {
   fit <- fit_mml_gpcm_slope_boundary_fixture()
   audit <- fit$config$boundary_audit$gpcm_slope_boundary
+
+  expect_identical(fit$config$centering_scope, "remainder")
+  expect_equal(fit$facets$others$Estimate[fit$facets$others$Facet == "Rater"], c(R1 = -10, R2 = -10))
 
   expect_identical(
     audit$state,

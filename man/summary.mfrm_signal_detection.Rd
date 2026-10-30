@@ -9,7 +9,7 @@
 \arguments{
 \item{object}{Output from \code{\link[=evaluate_mfrm_signal_detection]{evaluate_mfrm_signal_detection()}}.}
 
-\item{digits}{Number of digits used in numeric summaries.}
+\item{digits}{Number of digits used when printing numeric summaries.}
 
 \item{...}{Reserved for generic compatibility.}
 }
@@ -17,8 +17,20 @@
 An object of class \code{summary.mfrm_signal_detection} with:
 \itemize{
 \item \code{overview}: run-level overview
-\item \code{detection_summary}: aggregated detection rates by design, with
-design-variable alias columns when applicable
+\item \code{detection_summary}: full-precision rates by design, with design-variable
+aliases when applicable. \verb{DIF*}, \verb{DIFClass*} and \verb{BiasScreen*} columns retain \code{Planned},
+\code{Available}, \code{Unavailable}, \code{Positive}, \code{MCLower}, \code{MCUpper},
+\code{AllTrialsLower} and \code{AllTrialsUpper} for target outcomes. Monte Carlo
+bounds are exact 95\% binomial intervals conditional on availability;
+all-trial bounds describe unresolved outcomes, not confidence intervals.
+\verb{DIFNonTarget*}/\verb{BiasNonTarget*} retain summed \code{Planned} and \code{Available}
+cell counts and \code{AvailableReps}, the number of trials contributing a
+non-target proportion. Those proportions receive equal weight across
+contributing trials, even with unequal cell counts; their MCSE is the
+sample SD of the proportions divided by the square root of \code{AvailableReps}.
+\code{TargetContrastAvailable}, \code{TargetContrastAbsAvailable},
+\code{TargetBiasAvailable} and \code{TargetBiasTAvailable} are denominators for the
+corresponding finite point summaries. All-missing means return \code{NA}.
 \item \code{ademp}: simulation-study metadata carried forward from the original object
 \item \code{facet_names}: public facet labels carried from the simulation specification
 \item \code{design_variable_aliases}: accepted public aliases for design variables
@@ -29,7 +41,7 @@ design-variable alias columns when applicable
 \item \code{structural_design_review}: deterministic structural review of the
 named-facet design grid; it reports
 design bookkeeping rather than signal-detection performance
-\item \code{gpcm_boundary}: bounded-\code{GPCM} caveat row when present
+\item \code{gpcm_boundary}: \code{GPCM} caveat row when present
 \item \code{notes}: short interpretation notes, including the bias-side screening caveat
 }
 }
@@ -37,17 +49,15 @@ design bookkeeping rather than signal-detection performance
 Summarize a DIF/bias screening simulation
 }
 \examples{
-\donttest{
-sig_eval <- suppressWarnings(evaluate_mfrm_signal_detection(
-  n_person = 8,
-  n_rater = 2,
-  n_criterion = 2,
-  raters_per_person = 1,
-  reps = 1,
-  maxit = 30,
-  bias_max_iter = 1,
-  seed = 123
-))
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("summary.mfrm_signal_detection", run.dontrun = TRUE)
+\dontrun{
+# One saved replication illustrates output structure, not precise rates.
+# Regeneration recipe: examples/simulation-results.R in the package.
+saved <- readRDS(system.file("examples", "simulation-signal-detection.rds",
+  package = "mfrmr", mustWork = TRUE))
+# Inspect saved$generation_warnings and the result's run/status tables.
+sig_eval <- saved$result
 summary(sig_eval)
 }
 }

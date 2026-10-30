@@ -186,6 +186,12 @@ test_that("mfrm_results propagates a disconnected-design hold", {
   expect_identical(stability_triage$Severity, "ok")
   expect_identical(wright_triage$Severity, "review")
   expect_identical(wright_triage$Signal, "required_wright_map_review_only")
+  missing_map <- res$plot_map
+  missing_map$Available[missing_map$Type == "wright"] <- FALSE
+  missing_triage <- mfrmr:::mfrm_results_triage(res$status, missing_map,
+    res$components, res$table_index, fit, res$diagnostics, res$summaries, res$readiness)
+  expect_identical(missing_triage$Signal[missing_triage$Area == "Wright map"],
+    "required_wright_map_missing")
   expect_identical(reporting_triage$Severity, "review")
   expect_identical(
     reporting_triage$Signal,

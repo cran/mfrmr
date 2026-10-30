@@ -7,26 +7,43 @@
 mfrmr_output_guide(
   scope = c("all", "public", "beginner", "psychometric", "entry", "viewer", "binary",
     "tables", "reports", "reviews", "bundles", "exports", "compatibility", "gpcm",
-    "simulation", "linking", "network", "response_time", "facets", "conquest", "r")
+    "calibration", "simulation", "linking", "network", "response_time", "facets",
+    "conquest", "r", "models", "features", "imputation", "gtheory", "feedback", "plots")
 )
 }
 \arguments{
-\item{scope}{Which rows to return. \code{"all"} returns the full guide.
+\item{scope}{Which rows to return. \code{"all"} returns the full route catalogue.
+\code{"plots"} returns a separate purpose-based plot capability table (see below).
 \code{"public"} returns the canonical six-step route for most users;
 \code{"beginner"} returns the same compact route rather than combining every
 beginner-labelled specialist row.
 \code{"entry"} returns the recommended first-screen routes. \code{"viewer"} returns
 local-viewer routes built around \code{mfrm_results(include = ...)}. \code{"binary"}
 returns the two-category person-item Rasch route and checks. Other values
-filter to one output family or to bounded-\code{GPCM}-relevant routes.
-\code{"linking"} returns anchor, drift, and equating route rows.
+filter to one output family or to \code{GPCM}-relevant routes.
+\code{"linking"} returns anchor, drift, equating and DIF sensitivity routes.
+\code{"calibration"} returns the portable fixed-calibration lifecycle and
+artifact-only scoring route, conditional decisions and fixed-plan
+classification accuracy/consistency.
 \code{"simulation"} and \code{"network"} return advanced design-review rows.
 \code{"response_time"} returns descriptive response-time QC rows.
+\code{"models"} compares fixed-facet, shared-rater and Person-specific testlet
+workflows, including their distinct prediction and reporting boundaries.
+\code{"feedback"} distinguishes fixed-rater uncertainty, unexpected rating
+patterns, shared-rater uncertainty, observed agreement, centrality,
+criterion-referenced accuracy and screening accuracy with known truth.
+\code{"features"}, \code{"imputation"} and \code{"gtheory"} show exploratory attributes,
+assigned-score multiple imputation and observed-score G/D-study workflows,
+including their own table, plot and saving routes.
 \code{"facets"}, \code{"conquest"}, and \code{"r"} return user-pathway rows for people
 arriving from those workflows.}
 }
 \value{
-A data.frame with one row per recommended route and columns:
+For \code{scope = "plots"}, a data.frame with \code{Question}, \code{InputClass},
+\code{PlotCall}, \code{PlotName} (the name in the saved plot data), \code{DataComponent},
+\code{GGPlot}, \code{GGPlotCall} (\code{NA} when unavailable), \code{Notes}, \code{ResultFunction}
+and \code{NextStep}.
+All other scopes return a data.frame with one row per route and columns:
 \itemize{
 \item \code{Scope}
 \item \code{Question}
@@ -46,9 +63,10 @@ A data.frame with one row per recommended route and columns:
 }
 }
 \description{
-\code{mfrmr_output_guide()} returns a compact table for choosing among the main
-table, report, review, bundle, export, and compatibility helpers. It is a
-user-facing map, not an analysis result.
+Find a function for the next question in your analysis. Start with
+\code{mfrmr_output_guide("beginner")} and read its \code{Question} and \code{MainFunction}
+columns. With no argument the function returns the full specialist catalogue,
+which includes tables, reports, reviews and exports. It does not analyze data.
 }
 \details{
 Naming convention used by the guide:
@@ -64,10 +82,12 @@ Naming convention used by the guide:
 
 Use \code{mfrmr_output_guide("public")} or
 \code{mfrmr_output_guide("beginner")} for the shortest top-level API map:
-an explicit \code{\link[=describe_mfrm_data]{describe_mfrm_data()}} check and \code{\link[=fit_mfrm]{fit_mfrm()}} MML fit, the lightweight fit summary, the
-comprehensive FACETS-organized summary, the required native Wright map
-with SE/CI, optional FACETS-style Wright and person-inclusive Infit views,
-and finally report/export. Use \code{mfrmr_output_guide("entry")} when you
+an explicit \code{\link[=describe_mfrm_data]{describe_mfrm_data()}} check and \code{\link[=fit_mfrm]{fit_mfrm()}} MML fit, the lightweight
+fit summary, \code{res <- mfrm_results(fit)} and its triage, optional figures,
+and report/export or RDS saving. Plotting is not required before saving.
+Earlier scripts may obtain the same result bundle from
+\code{summary(fit, profile = "facets")$results}; no FACETS software is required.
+Use \code{mfrmr_output_guide("entry")} when you
 specifically need alternative first-screen creation routes, including
 existing result objects, the optional viewer, or interactive console work.
 After creating \code{res}, use \code{summary(res)$next_actions} to choose a
@@ -75,6 +95,28 @@ purpose-specific specialist helper.
 Use \code{mfrmr_output_guide("viewer")} when the next step is the optional local
 Shiny reader; it shows which \code{include} preset to use before calling
 \code{\link[=launch_mfrmr_viewer]{launch_mfrmr_viewer()}}.
+Use \code{mfrmr_output_guide("feedback")} when preparing rater feedback. Start
+with the question and the fitted model: severity, response misfit and the
+accuracy of a warning rule are different quantities. A severe rater need
+not misfit, and an observed flag does not establish poor rater quality.
+For observed agreement, choose \code{\link[=pairwise_kappa_table]{pairwise_kappa_table()}},
+\code{\link[=krippendorff_alpha_table]{krippendorff_alpha_table()}}, \code{\link[=gwet_ac2_table]{gwet_ac2_table()}} or \code{\link[=pairwise_icc_table]{pairwise_icc_table()}}
+according to the score scale, rater target and missingness assumptions.
+\code{\link[=score_comparison_table]{score_comparison_table()}} compares a score source with reference ratings;
+\code{\link[=rater_centrality_table]{rater_centrality_table()}} describes residual and threshold-spread indices;
+\code{\link[=fit_rater_accuracy]{fit_rater_accuracy()}} models exact matches to fixed reference ratings.
+High rater separation reliability indicates distinguishable severities,
+not high agreement. These quantities do not replace one another.
+For a fixed future plan, use \code{\link[=classification_table]{classification_table()}} under
+\code{scope = "calibration"}; its model-based accuracy/consistency differs from
+observed reference agreement and posterior ability-band probabilities.
+For DIF sensitivity, \code{scope = "linking"} points to
+\code{\link[=mantel_haenszel_table]{mantel_haenszel_table()}}, \code{\link[=ordinal_logistic_table]{ordinal_logistic_table()}} and the shared-roster
+example in \code{vignette("mfrmr-linking-and-dff")}.
+For an individual native additive RSM/PCM or experimental two-family GPCM sheet, use
+\code{mfrm_report(res, style = "rater", facet = "Rater", rater = "R01")}.
+The selected sheet omits source identifiers; the comprehensive result and
+export bundle retain the original analysis.
 Use \code{mfrmr_output_guide("psychometric")} for the technical table,
 review, and reporting routes whose interpretation boundaries should be
 checked before manuscript use.
@@ -82,32 +124,108 @@ checked before manuscript use.
 
 \section{How to use this guide}{
 
-Treat \code{MainFunction} as the route to try next and \code{UseWhen} as the guardrail.
-The guide is not a replacement for the help pages of the listed functions;
-it is a namespace map for deciding which page to open.
-For bounded \code{GPCM}, use \code{scope = "gpcm"} to find both the support matrix
+For route scopes, read \code{Question} first, then open the help for a function
+in \code{MainFunction}. For \code{"plots"}, use the figure instructions below.
+\code{UseWhen} describes its inputs and purpose; \code{NextStep} explains what to inspect.
+Cells containing \code{...} are outlines, not complete scripts to paste and run.
+Use \link{mfrmr_workflow_methods} for a runnable introduction and an explanation
+of function names. Inspect \code{DecisionBoundary} before interpreting a result.
+For construct-focused research, the \emph{Use results as evidence about a
+construct} section of \link{mfrmr_methods_reference} connects a claim to observable
+patterns, competing explanations and the limits of a conclusion.
+For \code{GPCM}, use \code{scope = "gpcm"} to find both the support matrix
 and the table that explains how out-of-scope routes are handled.
+Use \code{scope = "exports"} to distinguish saved-analysis archives from
+\code{\link[=export_mfrm_model]{export_mfrm_model()}}, which generates a Stan/brms model for a separate
+Bayesian analysis with explicit priors. That route returns to mfrmr through
+\code{\link[=read_mfrm_posterior]{read_mfrm_posterior()}}: inspect \code{summary(x)} before using \code{plot(x)},
+\code{confint(x)} or \code{\link[=mfrm_report]{mfrm_report()}}. Other interval levels, contrasts and
+predictions require the backend's joint draws.
+}
+
+\section{Check the model before following a route}{
+
+The six-step beginner route starts with ordinary RSM/PCM. The result class
+\code{mfrm_fit} alone does not establish which diagnostics or figures are valid:
+one-family GPCM, two-family GPCM and corrected JML share that class.
+Read the fitted model and estimation method in \code{summary(fit)} first.
+For GPCM, consult \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}} and
+\code{vignette("mfrmr-gpcm-scope", package = "mfrmr")}.
+Two-family GPCM and corrected JML have separate result/report and descriptive
+response-diagnostic routes; ordinary fit tests and Wright/Pathway maps do
+not apply. Corrected JML supplies point plots for slopes, locations and steps,
+without structural confidence intervals.
+
+Use \code{scope = "models"} for fixed-facet, shared-rater and testlet roles,
+\code{scope = "feedback"} for the distinct rater-review targets, and
+\code{scope = "calibration"} for scoring or fixed-plan decisions.
+For exploratory bias review across eligible facet pairs, use
+\code{\link[=estimate_all_bias]{estimate_all_bias()}}, followed by \code{summary(screens)} and \code{plot(screens)}.
+Use \code{\link[=estimate_bias]{estimate_bias()}} for a prespecified pair. Retain failed pairs and
+unavailable cells; the collection does not supply multiplicity-controlled
+inference or evidence that no bias exists. Save the complete collection.
+
+Use \code{scope = "gtheory"} for observed-score assessment planning. Start with
+the G-study component or covariance view, then compare D-study curves while
+keeping other facet counts fixed or in separate panels. Use
+\code{plot(d, type = "error_components")} to inspect each plan's error sources,
+including signed covariance contributions, or \code{type = "sem"} for error in
+score units. Error-source contributions are point estimates; SEM uncertainty
+requires the separately supported interval calculation. These projections
+and paired plan-difference intervals answer different questions. Component
+SEs/intervals are available for the designs and methods documented in
+\code{\link[=confint.mfrm_multivariate_gstudy]{confint.mfrm_multivariate_gstudy()}} and \code{\link[=vcov.mfrm_multivariate_gstudy]{vcov.mfrm_multivariate_gstudy()}}.
+For coefficient sampling SEs, use \code{\link[=confint.mfrm_multivariate_d_study]{confint.mfrm_multivariate_d_study()}}
+with \code{method = "delta"} and \code{assumption = "normal"}. These differ from
+measurement SEM. Its normal-reference intervals and plots retain bounds
+outside \verb{[0,1]} with approximation qualifications; defaults are unchanged.
+General distribution-robust comparison intervals are not supplied.
+Save each complete result with \code{\link[base:saveRDS]{base::saveRDS()}} and reopen it with
+\code{\link[base:readRDS]{base::readRDS()}}; a CSV alone does not retain its design or qualifications.
+Fixed-facet output also depends on the estimator: native CML uses dedicated
+summaries and \code{\link[=mfrm_facet_intervals]{mfrm_facet_intervals()}} plots/tables, without ordinary Person
+scoring or consolidated reports. \code{\link[=mfrmr_interval_guide]{mfrmr_interval_guide()}} separates that
+route from MML interaction contrasts and their population-SD standardization.
+}
+
+\section{Choosing a figure}{
+
+Use \code{mfrmr_output_guide("plots")} to find selected plots by purpose, input
+class and explicit plot call. This is a curated map, not an exhaustive list
+of every plot method, view or component. Unlisted routes are not necessarily
+unsupported. Existing scopes, including \code{"all"}, keep their route-table format.
+
+For linked figure previews and runnable examples, open
+\code{vignette("mfrmr-visual-diagnostics")}.
+\code{ResultFunction} names a help page for creating the required result.
+In \code{PlotCall}, replace \code{x} with the indicated result object and save the
+returned object as \code{p}. Calls use \code{draw = FALSE}; change it to \code{TRUE} to
+display the original figure. Then follow \code{GGPlotCall}, if available.
+\code{DataComponent} is for \code{\link[=plot_data]{plot_data()}} extraction; it is not automatically a
+valid or equivalent \code{component} argument to \code{\link[=as_ggplot]{as_ggplot()}}.
+
+\code{GGPlot} distinguishes \code{"dedicated"} (a converter for this plot), \code{"native"}
+(the plot method already returns ggplot), \code{"generic"} (a table-based view
+that need not reproduce the original figure), and \code{"unavailable"} (use the
+original plot or build a custom graphic from its data). ggplot routes need
+the optional ggplot2 package. Display support does not broaden the fitted
+model's statistical scope or establish interval coverage. Read \code{Notes} and
+the source function's help before interpretation.
 }
 
 \examples{
-public <- mfrmr_output_guide("public")
-public[, c("Question", "APILayer", "ObjectRole", "MainFunction")]
+beginner <- mfrmr_output_guide("beginner")
+beginner[, c("Question", "MainFunction", "NextStep")]
 
-entry <- mfrmr_output_guide("entry")
-entry[, c("Question", "Lifecycle", "UserLevel", "MainFunction")]
+# Ask for a specialist map only when that question arises.
+linking <- mfrmr_output_guide("linking")
+linking[, c("Question", "MainFunction", "UseWhen")]
 
-reviews <- mfrmr_output_guide("reviews")
-reviews[, c("Question", "MainFunction", "UseWhen")]
+feedback <- mfrmr_output_guide("feedback")
+feedback[, c("Question", "MainFunction", "DecisionBoundary")]
 
-mfrmr_output_guide("gpcm")[, c("Question", "MainFunction", "GPCMStatus")]
-mfrmr_output_guide("simulation")[, c("Question", "Lifecycle")]
-mfrmr_output_guide("linking")[, c("Question", "MainFunction")]
-mfrmr_output_guide("facets")[, c("Question", "MainFunction")]
-mfrmr_output_guide("binary")[, c("Question", "MainFunction")]
-mfrmr_output_guide("viewer")[, c("Question", "MainFunction")]
-mfrmr_output_guide("response_time")[, c("Question", "MainFunction")]
-mfrmr_output_guide("beginner")[, c("Question", "MainFunction")]
-mfrmr_output_guide("psychometric")[, c("Question", "DecisionBoundary")]
+figures <- mfrmr_output_guide("plots")
+figures[, c("Question", "ResultFunction", "GGPlot")]
 }
 \concept{GPCM boundaries}
 \concept{reporting workflow}

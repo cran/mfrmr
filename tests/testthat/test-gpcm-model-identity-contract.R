@@ -1,4 +1,7 @@
 test_that("Draft.63 registers owner-specific GPCM evidence identities", {
+  skip_if_private_validation_missing(c(
+    "release-evidence-checklist-0.2.3.csv"
+  ))
   pkg_root <- normalizePath(testthat::test_path("..", ".."), mustWork = TRUE)
   identity_path <- file.path(
     pkg_root, "inst", "validation", "gpcm-model-identity-contract-0.2.3.csv"

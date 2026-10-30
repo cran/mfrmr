@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Portable calibration and fresh-session scoring</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Portable calibration and fresh-session
+scoring</h1>
+
+
+
+<p>This workflow creates a portable calibration from an eligible fitted
+model, validates and freezes it, saves it, and then scores new Persons
+without the source fit or training responses. The scoring phase uses
+only the saved artifact and the new response rows.</p>
+<p>For example, after calibrating a rubric and its raters, you may
+receive ratings for a new class. The frozen calibration lets you score
+that class on the stored scale. It does not estimate the severity of new
+raters or establish that the original scoring prior suits the new
+class.</p>
+<p>Choose the object to save according to what you want to do later:</p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Later task</th>
+<th>Object and saving route</th>
+<th>What it preserves</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Revisit the fitted analysis and reports</td>
+<td>Fitted model or <code>mfrm_results()</code> via
+<code>saveRDS()</code></td>
+<td>The retained analysis, diagnostics and attached results; it may
+contain response-level data.</td>
+</tr>
+<tr class="even">
+<td>Score new response rows without the training fit</td>
+<td>Frozen <code>mfrm_calibration</code> via
+<code>save_mfrm_calibration()</code></td>
+<td>Calibrated coordinates, scoring basis and checks; no training
+responses or Person estimates.</td>
+</tr>
+<tr class="odd">
+<td>Reproduce an already scored batch’s tables and figures</td>
+<td><code>mfrm_calibration_score</code> via <code>saveRDS()</code></td>
+<td>Scores, intervals, dispositions and actual scoring settings; no
+rescoring is needed.</td>
+</tr>
+</tbody>
+</table>
+<p>CSV exports are useful tables, but do not replace these complete
+objects. Validation checks the saved parameters, scoring settings and
+model checks; freezing makes that calibration available for scoring.
+These steps do not establish model fit, absence of bias or validity for
+a new population. A new Person can use known calibrated facet levels; an
+unknown rater, task or category requires an appropriate calibration
+workflow, not relabeling it as an existing level.</p>
+<p>The portable workflow is deliberately narrower than fitted-object
+scoring. It supports one observed score scale and one latent dimension.
+<code>RSM</code> and <code>PCM</code> MML use the fixed standard-normal
+calibration basis (file format 1). In the development version,
+<code>GPCM</code> MML also supports an estimated intercept-only normal
+population (file format 2), one positive slope family and shared or
+separate slope/step owners. GPCM requires unit weights and no anchors or
+interactions. RSM/PCM JML also supports post-hoc EAP from a portable
+artifact (file format 3), with a finite identified source, unit weights
+and no anchors or interactions. Shared-owner GPCM JML uses file format 4
+after passing its conditional joint-likelihood and curvature checks.
+Experimental corrected shared-owner GPCM JML uses file format 5 with
+fresh adjusted-equation checks, an explicit correction order and a
+separate post-hoc normal reference prior. Its finite EAPs are not
+corrected Person maxima; calibration uncertainty and residual bias are
+not included in posterior intervals. See the corrected-JML example in
+<code>vignette(&quot;mfrmr-gpcm-scope&quot;, package = &quot;mfrmr&quot;)</code>.
+Estimated-population RSM/PCM and latent regression remain
+fitted-object-only routes.</p>
+<p>Experimental two-family GPCM MML uses file format 6 with the same
+public lifecycle below. It retains two ordered slope owners,
+second-owner steps, the original category coding and fixed N(0,1) prior.
+The first owner’s locations and log slopes are centered; the second
+owner’s locations and slopes remain free. Source identity/convergence
+and finer-integration checks must pass before extraction; review-only
+sources cannot be frozen. Each scoring batch must pass its own EAP/SD
+integration checks. Both fixed-grid EM and adaptive direct MML retain
+their scoring integration method.</p>
+<p>The artifact contains no training responses or Person estimates.
+Known facet levels may form new combinations, flagged by
+<code>row_dispositions$ObservedContext</code>; this is a model-based
+extension, not empirical validation of those combinations. Unit weights
+are required, with no prior override or repeated-event extension. Facet
+names must not collide with the reserved scoring/disposition columns
+listed in <code>?mfrm_calibration_workflow</code>. Validation and
+freezing do not qualify sampling coverage, global identification or
+population transport, and intervals exclude calibration uncertainty.
+Older readers refuse format 6; formats 1–5 retain their interpretation.
+See the two-family example in the GPCM scope vignette.</p>
+<p>For a JML source, EAP holds the calibration fixed and adds a
+standard-normal reference prior by default, or uses an explicit
+<code>scoring_prior</code>. JML did not estimate that distribution. This
+is not ML/WLE scoring or a replay of the original joint Person
+estimates. A full fit saved with <code>saveRDS()</code> and a portable
+calibration are different objects; only the latter omits training
+responses and Person estimates. See the GPCM scope vignette for the
+MML/JML feature comparison.</p>
+<p>For RSM/PCM MML, supported direct and group facet anchors and two-way
+facet interactions are retained in the calibration. New responses must
+use its recorded non-Person facet levels. Preserving an interaction for
+scoring does not establish its statistical significance or the model’s
+suitability for another population.</p>
+<p>For an anchored calibration, inspect
+<code>frozen$constraints$identification</code> and
+<code>frozen$constraints$anchors</code> after the freezing step below.
+New exports record whether a facet uses whole-facet centering, legacy
+remainder centering, or no centering. For example, if four raters sum to
+zero and the first three have mean 0.10, the fourth must be -0.30. The
+other members can still differ in severity; freezing then holds all
+their calibrated values fixed for scoring.</p>
+<p>The returned Person <code>SD</code> and posterior intervals condition
+on those fixed values and the scoring prior. They do not include
+uncertainty in the original calibration or the supplied anchors, and are
+not rater SEs. Use <code>mfrm_facet_intervals()</code> for supported
+facet uncertainty. To score supplied rows directly from an anchored fit,
+use <code>predict_mfrm_units()</code>; <code>score_mfrm_persons()</code>
+has a narrower, unanchored ordinary-model scope.</p>
+<p>An old calibration is not migrated merely by loading it. Its original
+values and labels remain intact. Older generic identification labels do
+not fully describe centering; retain the source fit, or re-extract that
+fit for explicit labels. Re-extraction documents its original
+convention; changing the convention requires a corresponding
+recalibration.</p>
+<p>If you have only the old calibration file, its generic constraint
+label is not enough to infer the missing convention. Keep the file
+unchanged and use its documented scoring interpretation. Re-extraction
+requires the source fit and the current checks, including the applicable
+quadrature review. If that review is missing, the source fit alone is
+insufficient for RSM/PCM MML extraction: completing the review requires
+the original data and additional fits at the chosen integration orders.
+Re-extraction creates a new artifact; do not overwrite the original or
+edit its integrity fields. For a change of convention, refit from the
+original ratings and extract from that new fit. The linking vignette’s
+migration example separates reopening, reproducing and changing an
+analysis. Regenerating a summary from an existing fit can display the
+convention; loading an already saved summary alone does not add fields
+to it.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="fu">mfrm_calibration_capabilities</span>()[, <span class="fu">c</span>(</span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>  <span class="st">&quot;Model&quot;</span>, <span class="st">&quot;Estimator&quot;</span>, <span class="st">&quot;ScoringBasis&quot;</span>, <span class="st">&quot;PortableCalibration&quot;</span></span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>)]</span></code></pre></div>
+<div id="calibration-session" class="section level2">
+<h2>Calibration session</h2>
+<p>The bundled <code>example_core</code> data are synthetic. This
+example uses 18 Persons to keep vignette runtime modest; a substantive
+analysis should use its planned sample and design rather than copying
+that count.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>synthetic <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_core&quot;</span>)</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>person_ids <span class="ot">&lt;-</span> <span class="fu">unique</span>(<span class="fu">as.character</span>(synthetic<span class="sc">$</span>Person))</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>training_ids <span class="ot">&lt;-</span> person_ids[<span class="fu">seq_len</span>(<span class="dv">18</span><span class="dt">L</span>)]</span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>training <span class="ot">&lt;-</span> synthetic[</span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>  <span class="fu">as.character</span>(synthetic<span class="sc">$</span>Person) <span class="sc">%in%</span> training_ids,</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>  ,</span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>  drop <span class="ot">=</span> <span class="cn">FALSE</span></span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>]</span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a></span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a>  training,</span>
+<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>,</span>
+<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
+<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
+<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">31</span></span>
+<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a>)</span>
+<span id="cb2-19"><a href="#cb2-19" tabindex="-1"></a></span>
+<span id="cb2-20"><a href="#cb2-20" tabindex="-1"></a>quadrature_review <span class="ot">&lt;-</span> <span class="fu">mml_quadrature_sensitivity</span>(</span>
+<span id="cb2-21"><a href="#cb2-21" tabindex="-1"></a>  fit,</span>
+<span id="cb2-22"><a href="#cb2-22" tabindex="-1"></a>  training,</span>
+<span id="cb2-23"><a href="#cb2-23" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="fu">c</span>(<span class="dv">31</span>, <span class="dv">61</span>),</span>
+<span id="cb2-24"><a href="#cb2-24" tabindex="-1"></a>  <span class="at">theta_points =</span> <span class="dv">41</span></span>
+<span id="cb2-25"><a href="#cb2-25" tabindex="-1"></a>)</span>
+<span id="cb2-26"><a href="#cb2-26" tabindex="-1"></a><span class="fu">summary</span>(quadrature_review)</span>
+<span id="cb2-27"><a href="#cb2-27" tabindex="-1"></a>fit <span class="ot">&lt;-</span> quadrature_review<span class="sc">$</span>fits<span class="sc">$</span>q61</span>
+<span id="cb2-28"><a href="#cb2-28" tabindex="-1"></a></span>
+<span id="cb2-29"><a href="#cb2-29" tabindex="-1"></a>draft <span class="ot">&lt;-</span> <span class="fu">extract_mfrm_calibration</span>(</span>
+<span id="cb2-30"><a href="#cb2-30" tabindex="-1"></a>  fit,</span>
+<span id="cb2-31"><a href="#cb2-31" tabindex="-1"></a>  <span class="at">calibration_id =</span> <span class="st">&quot;portable-rsm-example&quot;</span>,</span>
+<span id="cb2-32"><a href="#cb2-32" tabindex="-1"></a>  <span class="at">source_fit_id =</span> <span class="st">&quot;synthetic-rsm-fit&quot;</span>,</span>
+<span id="cb2-33"><a href="#cb2-33" tabindex="-1"></a>  <span class="at">scoring_quad_points =</span> <span class="dv">121</span>,</span>
+<span id="cb2-34"><a href="#cb2-34" tabindex="-1"></a>  <span class="at">quadrature_review =</span> quadrature_review</span>
+<span id="cb2-35"><a href="#cb2-35" tabindex="-1"></a>)</span>
+<span id="cb2-36"><a href="#cb2-36" tabindex="-1"></a><span class="fu">review_mfrm_calibration</span>(draft)</span>
+<span id="cb2-37"><a href="#cb2-37" tabindex="-1"></a></span>
+<span id="cb2-38"><a href="#cb2-38" tabindex="-1"></a>validated <span class="ot">&lt;-</span> <span class="fu">validate_mfrm_calibration</span>(draft)</span>
+<span id="cb2-39"><a href="#cb2-39" tabindex="-1"></a>frozen <span class="ot">&lt;-</span> <span class="fu">freeze_mfrm_calibration</span>(validated)</span>
+<span id="cb2-40"><a href="#cb2-40" tabindex="-1"></a>frozen</span>
+<span id="cb2-41"><a href="#cb2-41" tabindex="-1"></a></span>
+<span id="cb2-42"><a href="#cb2-42" tabindex="-1"></a>artifact_file <span class="ot">&lt;-</span> <span class="fu">tempfile</span>(<span class="at">fileext =</span> <span class="st">&quot;.rds&quot;</span>)</span>
+<span id="cb2-43"><a href="#cb2-43" tabindex="-1"></a><span class="fu">save_mfrm_calibration</span>(frozen, artifact_file)</span></code></pre></div>
+<p>The fit-time quadrature and the scoring-time quadrature are distinct.
+The two fit grids above illustrate a numerical sensitivity review; they
+are not universal sufficient orders. Inspect continuous movement on
+grids chosen for the application and extend them when needed. Public
+extraction accepts the exact highest-grid fit in that review but does
+not decide whether its movement is small enough. The artifact separately
+records the 121-point grid used for later posterior scoring, and the
+response-linked review should be archived outside the portable artifact
+when it is needed for an audit trail.</p>
+</div>
+<div id="fresh-scoring-session" class="section level2">
+<h2>Fresh scoring session</h2>
+<p>In operational use, start a new R process and supply only the
+artifact path and new response rows. The following chunk removes the
+fit, draft, validation object, and training data before loading the
+artifact, so none can influence the score.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>new_rows <span class="ot">&lt;-</span> synthetic[</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>  <span class="fu">as.character</span>(synthetic<span class="sc">$</span>Person) <span class="sc">%in%</span> person_ids[<span class="dv">19</span><span class="sc">:</span><span class="dv">20</span>],</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>, <span class="st">&quot;Score&quot;</span>),</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  drop <span class="ot">=</span> <span class="cn">FALSE</span></span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>]</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>new_ids <span class="ot">&lt;-</span> stats<span class="sc">::</span><span class="fu">setNames</span>(</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;NEW_PERSON_1&quot;</span>, <span class="st">&quot;NEW_PERSON_2&quot;</span>), person_ids[<span class="dv">19</span><span class="sc">:</span><span class="dv">20</span>]</span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>)</span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>new_rows<span class="sc">$</span>Person <span class="ot">&lt;-</span> <span class="fu">unname</span>(new_ids[<span class="fu">as.character</span>(new_rows<span class="sc">$</span>Person)])</span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a><span class="fu">rownames</span>(new_rows) <span class="ot">&lt;-</span> <span class="cn">NULL</span></span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a></span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a><span class="co"># Create one explicit review case for the tutorial figure. In operational</span></span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a><span class="co"># scoring, never alter observed responses to manufacture a disposition.</span></span>
+<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a>new_rows<span class="sc">$</span>Score[new_rows<span class="sc">$</span>Person <span class="sc">==</span> <span class="st">&quot;NEW_PERSON_2&quot;</span>] <span class="ot">&lt;-</span> <span class="fu">max</span>(training<span class="sc">$</span>Score)</span>
+<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a></span>
+<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a><span class="fu">rm</span>(fit, quadrature_review, draft, validated, frozen, training, synthetic)</span>
+<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a><span class="fu">invisible</span>(<span class="fu">gc</span>())</span>
+<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a></span>
+<span id="cb3-19"><a href="#cb3-19" tabindex="-1"></a>calibration <span class="ot">&lt;-</span> <span class="fu">load_mfrm_calibration</span>(artifact_file)</span>
+<span id="cb3-20"><a href="#cb3-20" tabindex="-1"></a>scores <span class="ot">&lt;-</span> <span class="fu">score_mfrm_calibration</span>(</span>
+<span id="cb3-21"><a href="#cb3-21" tabindex="-1"></a>  calibration, new_rows, <span class="at">adaptive_quad_points =</span> <span class="fu">c</span>(<span class="dv">31</span>, <span class="dv">61</span>),</span>
+<span id="cb3-22"><a href="#cb3-22" tabindex="-1"></a>  <span class="at">cut_scores =</span> <span class="fu">c</span>(<span class="at">Basic =</span> <span class="sc">-</span><span class="fl">0.5</span>, <span class="at">Advanced =</span> <span class="fl">0.8</span>)</span>
+<span id="cb3-23"><a href="#cb3-23" tabindex="-1"></a>)</span>
+<span id="cb3-24"><a href="#cb3-24" tabindex="-1"></a><span class="fu">summary</span>(scores)</span>
+<span id="cb3-25"><a href="#cb3-25" tabindex="-1"></a></span>
+<span id="cb3-26"><a href="#cb3-26" tabindex="-1"></a><span class="fu">plot</span>(</span>
+<span id="cb3-27"><a href="#cb3-27" tabindex="-1"></a>  scores,</span>
+<span id="cb3-28"><a href="#cb3-28" tabindex="-1"></a>  <span class="at">type =</span> <span class="st">&quot;interval&quot;</span>,</span>
+<span id="cb3-29"><a href="#cb3-29" tabindex="-1"></a>  <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span></span>
+<span id="cb3-30"><a href="#cb3-30" tabindex="-1"></a>)</span>
+<span id="cb3-31"><a href="#cb3-31" tabindex="-1"></a></span>
+<span id="cb3-32"><a href="#cb3-32" tabindex="-1"></a><span class="fu">unlink</span>(artifact_file)</span></code></pre></div>
+<p>The base and optional ggplot2 renderers distinguish scored and review
+states by shape as well as colour. The complete score and review tables
+remain in the summary object even though its console printout shows only
+a compact preview. <code>as_ggplot(plot(scores, draw = FALSE))</code>
+and an explicit <code>component = &quot;data&quot;</code> preserve the same
+selected display and saved endpoints. Use <code>plot_data()</code> for
+other components; drawing does not change the requested interval level.
+For overlapping review labels in precision or edge-mass plots, use
+<code>label_review = FALSE</code> and inspect
+<code>summary(scores)$review</code> for Person IDs. The colour and shape
+still identify review points.</p>
+<p>The interval figure is the first score-batch review. Orange triangles
+identify Persons whose <code>Disposition</code> is
+<code>scored_review</code>; inspect their <code>ReasonCodes</code>
+before using the estimate. A Person with no valid response has no score
+coordinate and therefore appears in <code>summary(scores)$review</code>
+and in the draw-free plot payload’s <code>unplotted_dispositions</code>,
+not as an artificial point.</p>
+<p>Two focused follow-up views use the same score object without
+consulting the source fit:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="co"># Valid response rows versus posterior SD.</span></span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="fu">plot</span>(scores, <span class="at">type =</span> <span class="st">&quot;precision&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="co"># Posterior mass on the outer quadrature nodes versus the recorded threshold.</span></span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>edge_review <span class="ot">&lt;-</span> <span class="fu">plot</span>(scores, <span class="at">type =</span> <span class="st">&quot;edge_mass&quot;</span>, <span class="at">draw =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>edge_review<span class="sc">$</span>data<span class="sc">$</span>selection_summary</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>edge_review<span class="sc">$</span>data<span class="sc">$</span>unplotted_dispositions</span></code></pre></div>
+<p>These displays review a returned score batch. They do not establish
+source-fit quality, reliability, calibration transport, or validity.
+Every interval and posterior SD remains conditional on the frozen point
+calibration and excludes calibration-parameter uncertainty.</p>
+<div id="conditional-ability-level-probabilities" class="section level3">
+<h3>Conditional ability-level probabilities</h3>
+<p>The cuts above are illustrative, not CEFR boundaries or recommended
+passing scores. Supply boundaries justified externally on the same
+calibration scale. <code>above_cut</code> gives the posterior
+probability above a cut; <code>ability_band</code> gives the probability
+in <code>Lower &lt; ability &lt;= Upper</code>. Only the band
+probabilities sum to one. <code>Basic</code> and <code>Advanced</code>
+name cuts, while <code>Band1</code>, <code>Band2</code> and
+<code>Band3</code> name the successive regions. These are continuous
+posterior integrals, not counts of plausible-value draws or a normal
+approximation around the EAP.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>decision_table <span class="ot">&lt;-</span> <span class="fu">apa_table</span>(scores, <span class="at">which =</span> <span class="st">&quot;decisions&quot;</span>)</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>decision_table<span class="sc">$</span>table[, <span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Type&quot;</span>, <span class="st">&quot;Label&quot;</span>, <span class="st">&quot;Lower&quot;</span>, <span class="st">&quot;Upper&quot;</span>,</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>                         <span class="st">&quot;Probability&quot;</span>, <span class="st">&quot;Status&quot;</span>, <span class="st">&quot;Reason&quot;</span>)]</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>saved_scores <span class="ot">&lt;-</span> <span class="fu">tempfile</span>(<span class="at">fileext =</span> <span class="st">&quot;.rds&quot;</span>)</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="fu">saveRDS</span>(scores, saved_scores)</span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>restored_scores <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(saved_scores)</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a><span class="co"># The appendix retains estimates, review dispositions, cuts and exact probabilities.</span></span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>appendix_dir <span class="ot">&lt;-</span> <span class="fu">tempfile</span>()</span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a>appendix <span class="ot">&lt;-</span> <span class="fu">export_summary_appendix</span>(restored_scores, <span class="at">output_dir =</span> appendix_dir,</span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a>                                   <span class="at">include_html =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a><span class="fu">unlink</span>(appendix_dir, <span class="at">recursive =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a><span class="fu">unlink</span>(saved_scores)</span></code></pre></div>
+<p>Review <code>Status</code> and <code>Reason</code> before
+interpretation. An extreme response pattern can remain
+<code>review_only</code>; a portable Person with no scored responses is
+<code>unavailable</code>, with <code>NA</code> probabilities.
+<code>available_conditional</code> records passing applicable numerical
+checks, not the validity of a classification rule.</p>
+<p>The complete object retains each prior in
+<code>PriorMean</code>/<code>PriorSD</code> and the fixed uncertainty
+basis. Summary, APA table and CSV export preserve these values without
+rescoring. Existing interval figures continue to show EAPs and
+intervals, not the cut probabilities.</p>
+<p>These probabilities hold calibration, population/prior parameters and
+cuts fixed. They exclude calibration-estimation error, are not tests of
+Person differences, and do not predict passing a later administration.
+Tiny tails have absolute rather than relative numerical accuracy, so a
+returned zero or one does not establish impossibility or certainty.</p>
+<p>When reopening an older artifact, inspect
+<code>review_mfrm_calibration()</code> if it reports missing or
+inconsistent records. Keep the original file and follow the specific
+message: missing checks of the original model require re-extraction from
+a saved fit that passes current checks; incomplete score records require
+rescoring from a valid frozen calibration. Do not change saved check
+results to force acceptance. Model refitting is not automatically
+required. This is separate from a valid legacy grid-interval file, whose
+original algorithm and interval limitations remain explicit.</p>
+<p>Before reusing a calibration, identify the population to which the
+new Persons belong and why the retained scoring prior is appropriate on
+this ability scale. For example, a calibration from a broad intake may
+be used to score an advanced class or a group with a much narrower
+ability range. Accurate item and rater parameters do not make the
+original prior appropriate for those groups. Increasing the calibration
+sample does not remove that mismatch. When the prior was estimated from
+a small cohort, its sampling uncertainty is also absent from the
+reported probabilities.</p>
+<p><code>PriorMean</code> and <code>PriorSD</code> show the distribution
+actually used, not evidence that it represents the new group. A fixed
+reference prior is not generally better than an estimated prior. Where a
+route permits <code>scoring_prior</code>, compare only alternatives
+justified for the target population and retain that justification with
+the saved result. Such a comparison describes sensitivity; choosing the
+prior that gives the desired classification does not validate the
+decision. Population-averaged accuracy does not guarantee accurate
+probabilities in every subgroup, close to a cut, or for each individual
+Person.</p>
+<p>The same option is available for ordinary RSM/PCM
+<code>predict_mfrm_units()</code> and eligible ordinary RSM MML
+<code>score_mfrm_persons()</code>. Each route keeps its existing source,
+prior and missing-data rules; source-roster missing-only Persons may be
+<code>prior_only</code>. JML supplies a separate reference prior rather
+than estimating a population distribution. Unit weights and
+continuous-posterior artifacts are required. The GPCM examples later in
+this article do not support cuts.</p>
+<p>A small edge mass does not guarantee accurate integration: a narrow
+posterior can fall between nodes near the middle of the grid. The
+optional <code>adaptive_quad_points</code> above adds a separate
+numerical comparison, placing nodes around each scored Person’s
+posterior mode and scaling their spacing to its local width. It holds
+the calibration parameters and prior fixed.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">summary</span>(scores)<span class="sc">$</span>quadrature_overview</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="co"># Keep full precision when inspecting individual differences.</span></span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a><span class="fu">head</span>(scores<span class="sc">$</span>quadrature_review[<span class="fu">c</span>(</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="st">&quot;Person&quot;</span>, <span class="st">&quot;AdaptiveNodes&quot;</span>, <span class="st">&quot;EAPChange&quot;</span>, <span class="st">&quot;PosteriorSDChange&quot;</span>,</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  <span class="st">&quot;AdaptiveEAPChangeFromPrevious&quot;</span>, <span class="st">&quot;AdaptiveSDChangeFromPrevious&quot;</span>, <span class="st">&quot;Status&quot;</span></span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>)])</span></code></pre></div>
+<p>Check fixed-versus-adaptive differences and changes between adaptive
+orders, including log-marginal likelihood contributions in the full
+table. Observation weights, when supplied, enter the likelihood as in
+the original scoring call. The first adaptive order has no previous
+order, so its change columns are <code>NA</code>. A
+<code>computed</code> status means the calculation finished; it does not
+certify accuracy. An <code>unavailable</code> row retains the reason in
+<code>Detail</code>. Persons with no scored responses remain in the
+ordinary disposition review and have no numerical integration row.
+Archive the full table with the score batch when reporting numerical
+checks. The comparison does not replace returned scores, intervals, or
+the artifact’s stored grid, and it does not change readiness. Use the
+same option in <code>predict_mfrm_units()</code> or
+<code>mml_quadrature_sensitivity()</code> to review a fitted object; the
+latter also retains its separate comparison of refitted models.</p>
+<p>To use adapted grids during fitting and subsequent scoring, set
+<code>mml_integration = &quot;adaptive&quot;</code> in the <code>fit_mfrm()</code>
+call above. The direct MML engine then updates the grids while
+estimating parameters. The refit review retains this mode, and the
+frozen artifact records
+<code>scoring_algorithm = &quot;adaptive_quadrature_eap_v2&quot;</code>. Its
+stored nodes and weights define the base Hermite rule; scoring places
+that rule around each new Person’s posterior. A small edge mass on an
+adapted grid is still not an accuracy certificate. Keep the order
+comparison and report the integration mode. Ordinary fitting defaults to
+<code>mml_integration = &quot;fixed&quot;</code>, and existing fixed-grid
+artifacts retain their scoring algorithm.</p>
+<p>New v2 scoring uses continuous equal-tail posterior intervals: a 95%
+interval leaves 2.5% of the continuous posterior below each lower
+endpoint and above each upper endpoint. EAP and SD still use the stored
+quadrature rule. Older v1 artifacts retain their discrete grid endpoints
+for reproducibility and carry a note that their continuous posterior
+mass may differ from the requested level. A frozen point calibration’s
+intervals exclude calibration-parameter uncertainty; they do not
+guarantee 95% coverage at every fixed true ability.</p>
+<p>Printed results and interval plots state the requested level and
+identify saved grid-based intervals. Both <code>scores$estimates</code>
+and <code>summary(scores)$estimates</code> retain
+<code>ScoringAlgorithm</code> and <code>IntervalLevel</code> for CSV
+export, alongside the calibration and uncertainty basis.
+<code>IntervalLevel</code> is the requested posterior probability, not
+measured frequentist coverage, and is not rounded by
+<code>summary()</code>. For older saved score results, re-running
+<code>summary()</code> recovers these fields from the result’s stored
+settings without recomputing scores.</p>
+<p>The scoring prior is also an assumption about the target population.
+For example, a new population with a wider ability distribution than the
+recorded standard normal prior can have less than 95% of its true
+abilities inside these intervals, even when the numerical integration is
+accurate. Increasing the quadrature order checks approximation under the
+same prior; it does not establish that this prior fits the new
+population. Report the scoring prior and explain its relevance to the
+population receiving scores, alongside the calibration and integration
+settings.</p>
+<p>An intercept-only normal population fitted to training data can
+adjust the scoring mean and variance, but it does not learn a skewed
+population shape. Its score intervals still condition on the estimated
+calibration and population parameters and exclude uncertainty from
+estimating them. Training and scoring populations also need not match.
+Conditional fitted-object scoring can pass fresh local likelihood,
+gradient, information and integration checks without requiring a review
+override. GPCM fits passing these checks can also be exported within the
+scope above. This does not certify a global maximum or resolve
+unevaluated boundary/identification audits. Those original states remain
+in the artifact; loading checks the stored records, not the omitted
+training data.</p>
+<p>For example, a calibration may come from last year’s cohort while
+this year’s cohort has a different ability distribution. With an
+intercept-only population model, scoring the new response batch retains
+the fitted mean and variance; it does not estimate a new batch
+population. Source readiness alone therefore does not establish that the
+prior represents this year’s people. Identify the training and scoring
+cohorts in the report, explain why the scoring prior can be applied to
+the new cohort, and examine sensitivity when that assumption is
+uncertain. A larger training sample can estimate last year’s population
+more precisely without resolving a difference between the two
+populations.</p>
+</div>
+<div id="reuse-a-gpcm-calibration-for-a-later-cohort" class="section level3">
+<h3>Reuse a GPCM calibration for a later cohort</h3>
+<p>Suppose a team uses the same rubric and known raters to score next
+year’s performances. The calibration describes the relationships between
+categories, facet effects and ability. The later session applies those
+fixed relationships; it does not recalibrate raters or estimate the new
+cohort’s distribution.</p>
+<p>Use the full planned calibration sample, not the 18-person RSM
+illustration above. Each row in <code>calibration_responses</code>
+represents an assigned rating, with columns <code>Person</code>,
+<code>Rater</code>, <code>Criterion</code> and <code>Score</code>. This
+model gives criteria their own discriminations and raters their own
+category thresholds. For rater-owned discriminations instead, set
+<code>slope_facet = &quot;Rater&quot;</code>. The 0–2 category ladder is an
+example: specify the actual rubric’s score range.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>calibration_responses <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="st">&quot;calibration-responses.csv&quot;</span>, <span class="at">colClasses =</span> <span class="st">&quot;character&quot;</span>, <span class="at">na.strings =</span> <span class="st">&quot;&quot;</span>,</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>  <span class="at">check.names =</span> <span class="cn">FALSE</span>, <span class="at">fileEncoding =</span> <span class="st">&quot;UTF-8-BOM&quot;</span></span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>)</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>gpcm_fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>  calibration_responses,</span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>  <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>, <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;GPCM&quot;</span>, <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>,</span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>  <span class="at">step_facet =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">slope_facet =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>  <span class="at">rating_min =</span> <span class="dv">0</span>, <span class="at">rating_max =</span> <span class="dv">2</span>, <span class="at">category_policy =</span> <span class="st">&quot;preserve&quot;</span>,</span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a>  <span class="at">mml_integration =</span> <span class="st">&quot;adaptive&quot;</span>, <span class="at">quad_points =</span> <span class="dv">31</span>,</span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a>  <span class="at">maxit =</span> <span class="dv">400</span>, <span class="at">reltol =</span> <span class="fl">1e-10</span></span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a>)</span>
+<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a><span class="fu">summary</span>(gpcm_fit, <span class="at">profile =</span> <span class="st">&quot;fit&quot;</span>, <span class="at">detail =</span> <span class="st">&quot;brief&quot;</span>)</span></code></pre></div>
+<p>These settings are a starting configuration, not a convergence or
+sample-size guarantee. Inspect the fit and its warnings. Extraction
+checks the calibration before it can be frozen; increasing only the
+later scoring grid cannot repair a failed calibration check. A profile
+interval for a discrimination is a separate experimental option, not a
+required step in scoring or an interval for a new person’s ability. Once
+<code>gpcm_fit</code> has passed calibration review:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>draft <span class="ot">&lt;-</span> <span class="fu">extract_mfrm_calibration</span>(</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>  gpcm_fit, <span class="at">calibration_id =</span> <span class="st">&quot;rubric-calibration&quot;</span>,</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  <span class="at">source_fit_id =</span> <span class="st">&quot;training-cohort&quot;</span>, <span class="at">scoring_quad_points =</span> <span class="dv">141</span></span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>)</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="fu">review_mfrm_calibration</span>(draft)</span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>calibration <span class="ot">&lt;-</span> <span class="fu">freeze_mfrm_calibration</span>(<span class="fu">validate_mfrm_calibration</span>(draft))</span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a><span class="fu">save_mfrm_calibration</span>(calibration, <span class="st">&quot;gpcm-calibration.rds&quot;</span>)</span></code></pre></div>
+<p>In a <strong>new R session</strong>, read that artifact and the later
+cohort’s responses:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="co"># A later session needs only this file and the new response rows.</span></span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>calibration <span class="ot">&lt;-</span> <span class="fu">load_mfrm_calibration</span>(<span class="st">&quot;gpcm-calibration.rds&quot;</span>)</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>new_responses <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>  <span class="st">&quot;new-responses.csv&quot;</span>, <span class="at">colClasses =</span> <span class="st">&quot;character&quot;</span>, <span class="at">na.strings =</span> <span class="st">&quot;&quot;</span>,</span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>  <span class="at">check.names =</span> <span class="cn">FALSE</span>, <span class="at">fileEncoding =</span> <span class="st">&quot;UTF-8-BOM&quot;</span></span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>)</span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a>scores <span class="ot">&lt;-</span> <span class="fu">score_mfrm_calibration</span>(</span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a>  calibration, new_responses, <span class="at">missing_response =</span> <span class="st">&quot;omit&quot;</span></span>
+<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a>)</span>
+<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a>score_review <span class="ot">&lt;-</span> <span class="fu">summary</span>(scores)</span>
+<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a>score_review</span>
+<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a>score_review<span class="sc">$</span>review</span>
+<span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a>score_review<span class="sc">$</span>settings<span class="sc">$</span>score_integration_review</span>
+<span id="cb9-15"><a href="#cb9-15" tabindex="-1"></a><span class="fu">plot</span>(scores, <span class="at">type =</span> <span class="st">&quot;interval&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>, <span class="at">top_n =</span> <span class="cn">Inf</span>)</span>
+<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a></span>
+<span id="cb9-17"><a href="#cb9-17" tabindex="-1"></a><span class="co"># Keep full-precision scores and every Person&#39;s disposition, including those</span></span>
+<span id="cb9-18"><a href="#cb9-18" tabindex="-1"></a><span class="co"># without scores. The complete object supports later review and plotting.</span></span>
+<span id="cb9-19"><a href="#cb9-19" tabindex="-1"></a><span class="fu">write.csv</span>(scores<span class="sc">$</span>estimates, <span class="st">&quot;person-scores.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>, <span class="at">na =</span> <span class="st">&quot;&quot;</span>)</span>
+<span id="cb9-20"><a href="#cb9-20" tabindex="-1"></a><span class="fu">write.csv</span>(scores<span class="sc">$</span>person_dispositions, <span class="st">&quot;person-review.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>, <span class="at">na =</span> <span class="st">&quot;&quot;</span>)</span>
+<span id="cb9-21"><a href="#cb9-21" tabindex="-1"></a><span class="fu">saveRDS</span>(scores, <span class="st">&quot;scored-cohort.rds&quot;</span>)</span></code></pre></div>
+<p>The omission policy applies to assigned ratings whose score is
+missing. It does not impute scores or repair informative missingness.
+Leave unassigned rating combinations absent rather than manufacturing
+observations. A person with only missing assigned scores remains
+<code>not_scored</code> in the review table, with no plotted point. A
+person entirely absent from the input is not invented by the scorer.
+Keep the review file with the score file so unavailable results do not
+disappear. Identifiers <code>001</code>, <code>1</code> and the literal
+<code>NA</code> stay distinct with the character-column import
+above.</p>
+<p><code>top_n = Inf</code> displays every available score; the default
+is at most 40, with review cases prioritized. For a large cohort use a
+legible subset and retain the complete tables. After
+<code>readRDS(&quot;scored-cohort.rds&quot;)</code>, <code>summary()</code>,
+<code>plot()</code> and <code>as_ggplot()</code> reuse saved results
+without fitting or scoring again.</p>
+<p>The summary distinguishes the actual reported-score integration check
+from the additional fixed-versus-adaptive grid comparison. For an
+adaptive scorer, a difference from an unused fixed grid does not
+contradict passing agreement of the reported EAP/SD with higher-order
+adaptive references.</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>retained <span class="ot">&lt;-</span> scores<span class="sc">$</span>settings<span class="sc">$</span>retained_prior_identity</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a></span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a><span class="co"># Sensitivity analysis on the same calibration scale, not a new population fit.</span></span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>alternative <span class="ot">&lt;-</span> <span class="fu">score_mfrm_calibration</span>(</span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>  calibration, new_responses, <span class="at">missing_response =</span> <span class="st">&quot;omit&quot;</span>,</span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>  <span class="at">scoring_prior =</span> <span class="fu">list</span>(<span class="at">mean =</span> retained<span class="sc">$</span>mean <span class="sc">+</span> <span class="fl">0.5</span>, <span class="at">sd =</span> retained<span class="sc">$</span>sd <span class="sc">*</span> <span class="fl">1.25</span>)</span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>)</span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a><span class="fu">summary</span>(alternative)</span></code></pre></div>
+<p>The shift of 0.5 logits and 25% wider SD illustrate a declared
+assumption; they are not recommended prior values. Compare the same
+people, retain both priors and justify substantive scenarios. These
+posterior score intervals condition on the calibration and prior. They
+differ from confidence intervals for estimated slopes or facet
+parameters.</p>
+<p>For the <strong>training-model report</strong>, use
+<code>mfrm_results(gpcm_fit)</code> and <code>mfrm_report()</code> in
+the calibration session. For the <strong>later score batch</strong>, use
+the dedicated summary, plots, CSV tables and saved score object above.
+<code>mfrm_report()</code> does not accept portable score batches; a
+report of the training fit does not become a report of the new
+cohort.</p>
+<p>There are two distinct checks. Extraction evaluates the estimated
+calibration using the training fit. Scoring checks the new response
+patterns under the actual prior. A calibration that passes the first
+check can still require a finer scoring grid for extreme new patterns.
+If scoring stops with <code>SCORING_INTEGRATION_FAILED</code>, extract
+again with more <code>scoring_quad_points</code> and repeat validation
+and freezing; 141 is an example, not a universal adequate order. There
+is no review override for failed portable numerical checks. Passing them
+does not remove endpoint or sparse-response review labels.</p>
+<p>The default retains the estimated normal mean and SD from
+calibration. <code>scoring_prior</code> supplies an assumption for
+sensitivity analysis; it does not estimate the later cohort’s
+distribution or change the saved calibration. Both original and actual
+prior values remain in score tables, summaries and plot data. Intervals
+condition on these fixed values and exclude uncertainty from estimating
+the calibration and its population. The same prior option is available
+for current RSM/PCM artifacts; older artifacts using grid-endpoint
+intervals require re-extraction first.</p>
+<p>For a separate scoring script, the essential code is:</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a></span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>calibration <span class="ot">&lt;-</span> <span class="fu">load_mfrm_calibration</span>(<span class="st">&quot;reviewed-calibration.rds&quot;</span>)</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>new_rows <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>  <span class="st">&quot;new-responses.csv&quot;</span>,</span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>  <span class="at">colClasses =</span> <span class="st">&quot;character&quot;</span>,</span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>  <span class="at">na.strings =</span> <span class="st">&quot;&quot;</span>,</span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>  <span class="at">check.names =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>  <span class="at">fileEncoding =</span> <span class="st">&quot;UTF-8-BOM&quot;</span></span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>)</span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>scores <span class="ot">&lt;-</span> <span class="fu">score_mfrm_calibration</span>(calibration, new_rows)</span>
+<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a><span class="fu">print</span>(scores)</span>
+<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a><span class="fu">plot</span>(scores, <span class="at">type =</span> <span class="st">&quot;interval&quot;</span>, <span class="at">preset =</span> <span class="st">&quot;publication&quot;</span>)</span>
+<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a><span class="fu">write.csv</span>(scores<span class="sc">$</span>estimates, <span class="st">&quot;person-scores.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span></code></pre></div>
+<p>Read identifiers as text: <code>001</code> and <code>1</code> can
+identify different Persons, and <code>NA</code> can be a literal
+identifier. The example treats empty cells as missing; if your response
+file uses another missing-score token, convert it only in the score
+column before scoring. Do not let automatic CSV type conversion merge
+people or change the frozen facet labels. Numeric score strings are
+validated against the frozen score map by the scorer.</p>
+<p>Keep <code>scores</code> with <code>saveRDS()</code> when the full
+review and numerical settings are needed. The CSV above preserves
+per-score identities and uncertainty labels, but does not contain the
+complete row review or optional integration review. When reading that
+CSV back, also preserve identifier columns as text.</p>
+<p>Unknown facet levels, unknown score values, invalid weights,
+ambiguous duplicates, and malformed artifacts fail closed. Missing
+responses require an explicit <code>missing_response = &quot;omit&quot;</code>
+policy.</p>
+</div>
+</div>
+<div id="if-scoring-stops-or-asks-for-review" class="section level2">
+<h2>If scoring stops or asks for review</h2>
+<p>An input error stops the scoring call. A returned
+<code>scored_review</code> result has an estimate that needs review;
+<code>not_scored</code> means no estimate is available. Inspect
+<code>summary(scores)$review</code>, including Persons absent from the
+interval plot. The printed review translates the reason codes into
+descriptions.</p>
+<table>
+<colgroup>
+<col width="50%" />
+<col width="50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>What you see</th>
+<th>What to check or change</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>An unseen rater, task, or other facet level</td>
+<td>Check spelling and preserve IDs as text. A genuinely new level has
+no parameter in this calibration: return to calibration with an
+appropriate linking design. Do not rename it as an existing level or
+edit the frozen artifact.</td>
+</tr>
+<tr class="even">
+<td>A score outside the frozen map</td>
+<td>Check the original rubric and missing-score codes. Correct an entry
+error or explicitly recode a documented missing marker. A changed rubric
+requires calibration review; widening a score range cannot update the
+saved map.</td>
+</tr>
+<tr class="odd">
+<td>Missing scores or IDs</td>
+<td>Correct unintended missing values. Explicit omission applies to
+missing scores, not missing Person or facet IDs, and does not correct
+selective nonresponse. Review omitted counts after rescoring.</td>
+</tr>
+<tr class="even">
+<td>Duplicate response cells</td>
+<td>Check whether rows are accidental copies or distinct rating events.
+Correct copies; use the documented <code>event_id</code> argument only
+for genuine distinct events under the intended model. New event IDs do
+not model dependence between repeated performances.</td>
+</tr>
+<tr class="odd">
+<td>A missing, nonfinite, or nonpositive weight on a scored row</td>
+<td>Check the weight column and its intended meaning. Correct erroneous
+values; do not replace them with arbitrary constants just to obtain
+scores.</td>
+</tr>
+<tr class="even">
+<td>A malformed or incompatible artifact</td>
+<td>Restore the original file and use a compatible package version. If
+it must be recreated, return to the source fit and the documented
+extraction/review workflow. Do not edit schema or validation fields to
+bypass the refusal.</td>
+</tr>
+<tr class="odd">
+<td>Review because responses are very few, omitted, or all at one
+endpoint</td>
+<td>Check the original ratings and valid/omitted counts. Interpret
+precision and dependence on the prior before using the estimate; further
+ratings may be needed. These flags do not by themselves diagnose an
+invalid Person or justify changing responses.</td>
+</tr>
+<tr class="even">
+<td>Review because posterior mass is near integration limits</td>
+<td>Examine the numerical comparisons described above. Increasing
+optimizer iterations cannot alter a frozen calibration. If scoring
+settings need revision, return to the calibration workflow and retain a
+new artifact and its review.</td>
+</tr>
+<tr class="odd">
+<td>No valid responses (<code>not_scored</code>)</td>
+<td>Correct missing-score coding if erroneous, or obtain valid ratings.
+Retain the unavailable result; do not substitute a zero-logit
+score.</td>
+</tr>
+</tbody>
+</table>
+<p>A completed numerical comparison does not automatically clear these
+review states. Record the reason, the action taken, and the calibration
+used with the score batch.</p>
+<p>Every returned estimate is a posterior EAP conditional on the
+recorded fixed point calibration and prior; its uncertainty interval
+excludes calibration-parameter uncertainty. Validate the intended score
+use, population transport, and decision consequences outside this
+numerical workflow.</p>
+</div>
+<div id="when-the-calibration-was-estimated-with-jml" class="section level2">
+<h2>When the calibration was estimated with JML</h2>
+<p>Suppose raters have already scored one cohort, and you want to score
+a later cohort using their existing severity estimates. RSM/PCM JML can
+now use the same extract/validate/freeze/save/load/score functions.
+Extraction checks a current, finite, identified source and freshly
+evaluates its joint likelihood and gradient. It does not use
+<code>mml_quadrature_sensitivity()</code>, because JML calibration does
+not integrate over a population distribution. An unresolved source is
+refused, not automatically switched to MML or made acceptable by a
+scoring prior.</p>
+<p>The following PCM example uses 14 synthetic learners for a small
+illustration, not as a sample-size recommendation. Its 141-node scoring
+grid is also an example, not a generally sufficient setting. Each new
+batch receives integration checks; if those fail, inspect the error and
+increase <code>scoring_quad_points</code> when extracting.</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>jml_data <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_core&quot;</span>)</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>jml_data <span class="ot">&lt;-</span> jml_data[jml_data<span class="sc">$</span>Person <span class="sc">%in%</span> <span class="fu">unique</span>(jml_data<span class="sc">$</span>Person)[<span class="dv">1</span><span class="sc">:</span><span class="dv">14</span>], ]</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>jml_fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(jml_data, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;PCM&quot;</span>, <span class="at">method =</span> <span class="st">&quot;JML&quot;</span>, <span class="at">step_facet =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>  <span class="at">maxit =</span> <span class="dv">500</span>, <span class="at">reltol =</span> <span class="fl">1e-10</span>)</span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>jml_draft <span class="ot">&lt;-</span> <span class="fu">extract_mfrm_calibration</span>(jml_fit, <span class="at">scoring_quad_points =</span> <span class="dv">141</span>)</span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>jml_calibration <span class="ot">&lt;-</span> <span class="fu">freeze_mfrm_calibration</span>(<span class="fu">validate_mfrm_calibration</span>(jml_draft))</span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a><span class="fu">save_mfrm_calibration</span>(jml_calibration, <span class="st">&quot;jml-calibration.rds&quot;</span>)</span>
+<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a></span>
+<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a><span class="co"># In a new session, supply your later cohort&#39;s ratings instead of these example rows.</span></span>
+<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a>jml_new <span class="ot">&lt;-</span> jml_data[jml_data<span class="sc">$</span>Person <span class="sc">==</span> <span class="fu">unique</span>(jml_data<span class="sc">$</span>Person)[<span class="dv">1</span>], ]</span>
+<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a>jml_new<span class="sc">$</span>Person <span class="ot">&lt;-</span> <span class="st">&quot;NEXT01&quot;</span></span>
+<span id="cb12-14"><a href="#cb12-14" tabindex="-1"></a>jml_saved <span class="ot">&lt;-</span> <span class="fu">load_mfrm_calibration</span>(<span class="st">&quot;jml-calibration.rds&quot;</span>)</span>
+<span id="cb12-15"><a href="#cb12-15" tabindex="-1"></a>jml_scores <span class="ot">&lt;-</span> <span class="fu">score_mfrm_calibration</span>(jml_saved, jml_new)</span>
+<span id="cb12-16"><a href="#cb12-16" tabindex="-1"></a><span class="fu">summary</span>(jml_scores)</span>
+<span id="cb12-17"><a href="#cb12-17" tabindex="-1"></a><span class="fu">plot</span>(jml_scores, <span class="at">main =</span> <span class="st">&quot;New-cohort EAP scores&quot;</span>)</span>
+<span id="cb12-18"><a href="#cb12-18" tabindex="-1"></a></span>
+<span id="cb12-19"><a href="#cb12-19" tabindex="-1"></a>jml_alternative <span class="ot">&lt;-</span> <span class="fu">score_mfrm_calibration</span>(jml_saved, jml_new,</span>
+<span id="cb12-20"><a href="#cb12-20" tabindex="-1"></a>  <span class="at">scoring_prior =</span> <span class="fu">list</span>(<span class="at">mean =</span> <span class="fl">0.25</span>, <span class="at">sd =</span> <span class="fl">1.2</span>))</span>
+<span id="cb12-21"><a href="#cb12-21" tabindex="-1"></a>jml_scores<span class="sc">$</span>estimates[, <span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Estimate&quot;</span>, <span class="st">&quot;SD&quot;</span>, <span class="st">&quot;PriorMean&quot;</span>, <span class="st">&quot;PriorSD&quot;</span>)]</span>
+<span id="cb12-22"><a href="#cb12-22" tabindex="-1"></a>jml_alternative<span class="sc">$</span>estimates[, <span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Estimate&quot;</span>, <span class="st">&quot;SD&quot;</span>, <span class="st">&quot;PriorMean&quot;</span>, <span class="st">&quot;PriorSD&quot;</span>)]</span></code></pre></div>
+<p>For a ggplot without headings or a caption, use
+<code>as_ggplot(jml_scores) + ggplot2::labs(title = NULL, subtitle = NULL, caption = NULL)</code>.
+Keep the interval interpretation in the surrounding report if you remove
+it from the figure.</p>
+<p>The default N(0,1) prior is a reference assumption on the JML
+calibration scale, not an estimate of either cohort’s distribution. A
+different explicit prior changes the EAP target without changing the
+saved calibration. Report that choice alongside the scores. Posterior
+SDs and intervals condition on the calibration; they do not account for
+JML calibration bias or uncertainty in raters and steps. Extreme
+new-response patterns can have finite EAP scores and review flags; this
+does not turn an infinite JML estimate into a finite maximum-likelihood
+estimate. Formal JML slope intervals remain unavailable.</p>
+<div id="using-gpcm-jml-slopes-in-the-same-workflow" class="section level3">
+<h3>Using GPCM JML slopes in the same workflow</h3>
+<p>GPCM JML can now preserve one shared slope/step owner and its
+relative slopes in a portable calibration. The following example uses
+criterion-specific slopes and steps. The same workflow supports a rater
+owner; different slope and step owners remain MML-only.</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>gpcm_jml_fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(jml_data, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;GPCM&quot;</span>, <span class="at">method =</span> <span class="st">&quot;JML&quot;</span>, <span class="at">step_facet =</span> <span class="st">&quot;Criterion&quot;</span>, <span class="at">slope_facet =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>  <span class="at">maxit =</span> <span class="dv">600</span>, <span class="at">reltol =</span> <span class="fl">1e-11</span>)</span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>gpcm_jml_calibration <span class="ot">&lt;-</span> <span class="fu">freeze_mfrm_calibration</span>(<span class="fu">validate_mfrm_calibration</span>(</span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>  <span class="fu">extract_mfrm_calibration</span>(gpcm_jml_fit, <span class="at">scoring_quad_points =</span> <span class="dv">141</span>)))</span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a><span class="fu">save_mfrm_calibration</span>(gpcm_jml_calibration, <span class="st">&quot;gpcm-jml-calibration.rds&quot;</span>)</span>
+<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a>gpcm_jml_scores <span class="ot">&lt;-</span> <span class="fu">score_mfrm_calibration</span>(</span>
+<span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a>  <span class="fu">load_mfrm_calibration</span>(<span class="st">&quot;gpcm-jml-calibration.rds&quot;</span>), jml_new)</span>
+<span id="cb13-9"><a href="#cb13-9" tabindex="-1"></a><span class="fu">summary</span>(gpcm_jml_scores)</span>
+<span id="cb13-10"><a href="#cb13-10" tabindex="-1"></a><span class="fu">plot</span>(gpcm_jml_scores, <span class="at">main =</span> <span class="st">&quot;New-cohort GPCM JML EAP scores&quot;</span>)</span></code></pre></div>
+<p>A GPCM JML fit may still report incomplete global identification or
+boundary checks. The conditional scoring route does not change that
+finding: it checks the current joint likelihood, gradient and full local
+curvature, and rejects known Person, additive or slope boundary
+certificates. This distinction matters: even positive local curvature
+can coexist with a certified infinite Person estimate. The fit’s finite
+optimizer trace does not override that certificate. If the source does
+not pass, inspect its diagnostics; an explicitly requested fitted-object
+<code>readiness_policy = &quot;review&quot;</code> result is not a portable
+calibration.</p>
+<p>After qualification, scores are conditional on the frozen calibration
+and the reference or explicitly supplied normal prior. Source audit
+states remain in saved scores and summaries, and every batch checks
+integration accuracy. These checks do not qualify slope confidence
+intervals, establish a unique global maximum, validate the new cohort’s
+prior or remove JML bias. Computing source curvature can be expensive
+with many Persons because it uses a dense joint matrix; freezing the
+calibration lets later scoring avoid that calculation.</p>
+</div>
+<div id="what-supports-these-scores" class="section level3">
+<h3>What supports these scores?</h3>
+<p>Bock and Mislevy (1982, pp. 432-433) explain EAP and posterior-SD
+scoring from fixed response functions and a specified prior, including
+multiple-category responses. That is the basis of the scoring
+calculation. Their adaptive-testing examples do not establish that JML
+calibration is unbiased, that N(0,1) matches your next cohort, or that
+posterior intervals have nominal frequentist coverage in your rating
+design. The numerical cutoffs used to qualify a source are package
+checks, not statistical thresholds prescribed by that paper.</p>
+<p>It is useful to compare the same fixed calibration and prior in TAM
+or ConQuest. Agreement then checks score computation; it does not
+establish agreement of their estimation methods. In particular, ConQuest
+does not estimate free item scores under JML, while TAM’s JML defaults
+include extreme-score adjustment and item-parameter bias correction. A
+finite EAP for an extreme <em>new</em> response pattern also does not
+qualify a training calibration with an infinite JML Person estimate.
+Refusing to export that calibration is the current workflow’s scope; it
+does not assert that every structural parameter is inestimable.</p>
+<p>Bock, R. D., &amp; Mislevy, R. J. (1982). Adaptive EAP estimation of
+ability in a microcomputer environment. <em>Applied Psychological
+Measurement, 6</em>(4), 431-444. <a href="https://doi.org/10.1177/014662168200600405">doi:10.1177/014662168200600405</a>.
+See also <a href="https://alexanderrobitzsch.github.io/TAM/reference/tam.jml.html">TAM’s
+JML help</a> and the <a href="https://conquestmanual.acer.org/s4-00.html">ConQuest command
+reference</a>.</p>
+</div>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

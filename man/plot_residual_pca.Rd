@@ -61,8 +61,8 @@ Visualize residual PCA results
 Plot types:
 \itemize{
 \item \code{"scree"}: component vs eigenvalue line plot
-\item \code{"parallel_scree"}: observed eigenvalues with residual-permutation
-parallel-analysis mean and upper cutoff
+\item \code{"parallel_scree"}: observed eigenvalues with the selected reference's
+mean and upper cutoff (residual permutation or model bootstrap)
 \item \code{"parallel_excess"}: observed eigenvalue minus the parallel-analysis
 cutoff by component
 \item \code{"loadings"}: horizontal bar chart of top absolute loadings
@@ -79,8 +79,10 @@ this as exploratory residual-structure screening, not a standalone
 unidimensionality test or a DIMTEST/UNIDIM substitute.
 \item \code{plot_type = "parallel_scree"} or \code{"parallel_excess"}: use only after
 running \code{\link[=analyze_residual_pca]{analyze_residual_pca()}} with \code{parallel = TRUE}. Components
-above the residual-permutation cutoff are candidates for follow-up,
-not proof of multidimensionality.
+above the selected reference cutoff are candidates for follow-up,
+not proof of multidimensionality. Model-bootstrap plots label the refitted
+reference explicitly; unavailable comparisons are explained in
+\code{parallel_status} and \code{bootstrap_trials}.
 \item \code{plot_type = "loadings"}: identifies variables/elements driving each
 component; inspect both sign and absolute magnitude.
 }
@@ -98,30 +100,44 @@ specific facet after global PCA review.
 }
 }
 
-\examples{
-\donttest{
-toy_full <- load_mfrmr_data("example_core")
-toy_people <- unique(toy_full$Person)[1:24]
-toy <- toy_full[match(toy_full$Person, toy_people, nomatch = 0L) > 0L, , drop = FALSE]
-fit <- suppressWarnings(
-  fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
-)
-diag <- diagnose_mfrm(fit, residual_pca = "overall")
-pca <- analyze_residual_pca(diag, mode = "overall")
-plt <- plot_residual_pca(pca, mode = "overall", plot_type = "scree", draw = FALSE)
-head(plt$data)
-pca_pa <- analyze_residual_pca(diag, mode = "overall", parallel = TRUE, parallel_reps = 10)
-pa <- plot_residual_pca(pca_pa, mode = "overall", plot_type = "parallel_scree", draw = FALSE)
-head(pa$data)
-plt_load <- plot_residual_pca(
-  pca, mode = "overall", plot_type = "loadings", component = 1, draw = FALSE
-)
-head(plt_load$data)
-if (interactive()) {
-  plot_residual_pca(pca, mode = "overall", plot_type = "scree", preset = "publication")
+\section{Migration in 0.2.4}{
+
+This renderer is internal. Use the corresponding \code{plot()} route in
+\link{mfrmr_plot_migration}; the former exported name is no longer available.
 }
+
+\section{Session plot defaults}{
+
+Set \code{options(mfrmr.plot_preset = "publication")} to choose a session default
+for plotting functions that expose the common \code{preset} argument. The
+supported values are \code{"standard"}, \code{"publication"}, \code{"compact"} and
+\code{"monochrome"}. Precedence is an explicit call argument, then the session
+option, then \code{"standard"}. For example, \code{preset = "standard"} overrides
+a session set to \code{"monochrome"}. Explicit \code{preset = NULL} retains the
+earlier package-default behavior; it does not read the session option.
+Invalid session values cause an error only when that option is needed.
+
+The category-curve, data-quality, fit-review, connectivity and network
+routes of \code{plot()} for report bundles use the same option through \code{...}.
+Plots without a common \code{preset} argument, including extended-model plots
+with their own \code{palette} controls, keep their own settings. This option
+selects a preset, not a universal theme or a guarantee that all renderers
+implement every appearance control identically.
+
+New plot payloads retain the resolved preset for supported saved-data
+rendering. Converting an existing payload with \code{\link[=as_ggplot]{as_ggplot()}} uses its saved
+appearance, even after the session option changes. A call that creates a
+new plot from a fit or statistical result uses the current default.
+For a reproducible script, supply \code{preset} explicitly or set the option in
+that script. Saving only the fitted model does not save a session option.
+No global ggplot theme is changed.
+
+Restore previous settings with \code{old <- options(mfrmr.plot_preset = "monochrome")} followed by \code{options(old)}. Use
+\code{options(mfrmr.plot_preset = NULL)} to remove the option. The preset changes
+appearance, not estimates, confidence levels or diagnostic thresholds.
 }
-}
+
 \seealso{
 \code{\link[=analyze_residual_pca]{analyze_residual_pca()}}, \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}
 }
+\keyword{internal}

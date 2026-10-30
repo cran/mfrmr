@@ -46,6 +46,8 @@ test_that("default GPCM MML estimates the common population scale", {
   fit <- fit_gpcm_identification_fixture(gpcm_identification_fixture())
 
   expect_true(isTRUE(fit$population$active))
+  expect_null(fit$config$replay_inputs$population_sd)
+  expect_null(mfrmr_gqs_population_arguments(fit)$population_sd)
   expect_identical(fit$population$source, "gpcm_mml_default_identification")
   expect_identical(
     fit$population$identification_role,
@@ -136,17 +138,27 @@ test_that("default GPCM MML estimates the common population scale", {
     paste(fit_console, collapse = " ")
   )
   expect_true(any(grepl(
-    "Scale: estimated_population_scale",
+    "Scale: estimated population",
     fit_console_text,
     fixed = TRUE
   )))
   expect_true(any(grepl(
-    "Discrimination: geometric_mean_one_relative_discrimination",
+    "Discrimination: relative slopes with geometric mean 1",
     fit_console_text,
     fixed = TRUE
   )))
   expect_true(any(grepl(
-    "GPCM estimator: marginal_maximum_likelihood",
+    "GPCM estimator: marginal maximum likelihood",
+    fit_console_text,
+    fixed = TRUE
+  )))
+  expect_true(any(grepl(
+    "Integration: fixed non-adaptive Gauss-Hermite, q=7",
+    fit_console_text,
+    fixed = TRUE
+  )))
+  expect_true(any(grepl(
+    "Population identification: estimated N(beta0,sigma^2) | relative slopes: geometric mean=1",
     fit_console_text,
     fixed = TRUE
   )))
@@ -156,8 +168,8 @@ test_that("default GPCM MML estimates the common population scale", {
     fixed = TRUE
   )))
   kernel_console_line <- paste0(
-    "GPCM kernel: aligned_single_owner_relative_slope_gpcm | ",
-    "Slope action: complete_adjacent_predictor"
+    "GPCM slopes multiply the complete adjacent-category predictor, ",
+    "including thresholds"
   )
   expect_true(any(grepl(kernel_console_line, fit_console_text, fixed = TRUE)))
   summary_console <- capture.output(print(summary_fit))
@@ -167,7 +179,17 @@ test_that("default GPCM MML estimates the common population scale", {
     paste(summary_console, collapse = " ")
   )
   expect_true(any(grepl(
-    "GPCM estimator: marginal_maximum_likelihood",
+    "GPCM estimator: marginal maximum likelihood",
+    summary_console_text,
+    fixed = TRUE
+  )))
+  expect_true(any(grepl(
+    "Integration: fixed non-adaptive Gauss-Hermite, q=7",
+    summary_console_text,
+    fixed = TRUE
+  )))
+  expect_true(any(grepl(
+    "Population identification: estimated N(beta0,sigma^2) | relative slopes: geometric mean=1",
     summary_console_text,
     fixed = TRUE
   )))

@@ -9,12 +9,14 @@ plot_fair_average(
   diagnostics = NULL,
   facet = NULL,
   metric = c("AdjustedAverage", "StandardizedAdjustedAverage", "FairM", "FairZ"),
-  plot_type = c("difference", "scatter"),
+  plot_type = c("difference", "scatter", "measure"),
   top_n = 40,
   show_ci = FALSE,
   ci_level = 0.95,
   draw = TRUE,
   preset = c("standard", "publication", "compact", "monochrome"),
+  show_title = FALSE,
+  show_notes = FALSE,
   ...
 )
 }
@@ -23,31 +25,26 @@ plot_fair_average(
 
 \item{diagnostics}{Optional output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} when \code{x} is \code{mfrm_fit}.}
 
-\item{facet}{Optional facet name for level-wise lollipop plots.}
+\item{facet}{Optional facet name or names. Use \code{"Person"} for ability-to-score relationships.}
 
 \item{metric}{Adjusted-score metric. Accepts legacy names (\code{"FairM"},
 \code{"FairZ"}) and package-native names (\code{"AdjustedAverage"},
 \code{"StandardizedAdjustedAverage"}).}
 
-\item{plot_type}{\code{"difference"} or \code{"scatter"}.}
+\item{plot_type}{\code{"difference"}, \code{"scatter"}, or \code{"measure"} (Measure on x, fair score on y).}
 
 \item{top_n}{Maximum levels shown for \code{"difference"} plot.}
 
-\item{show_ci}{Logical. When \code{TRUE}, draw approximate
-confidence-interval whiskers on the fair metric using a
-delta-method propagation from the logit \code{Measure} standard error
-to the observed-score scale. The derivative equals the implied
-score variance \code{Var(X | Measure)}, so the fair-scale standard
-error is \code{Var(X) * ModelSE}. CI bounds are clipped to the rating
-range. Rows where the score variance is effectively zero (levels
-whose measure sits near the rating boundary, so the delta-method
-approximation becomes uninformative) are drawn with an open
-circle and excluded from the whiskers; the excluded count is
-reported in the subtitle. For bounded \code{GPCM} fits, this option requests
-\code{fair_average_table(fair_se = TRUE)} when \code{x} is a fit object and uses the
-structural delta-method fair-average CI columns when they are available.
-If \code{x} is a precomputed fair-average bundle without those columns, the
-plot records an unavailable-CI note.}
+\item{show_ci}{Draw approximate fair-score intervals. RSM/PCM propagate
+only the focal measure SE, holding thresholds, other effects and reference
+means fixed. This is not full calibration uncertainty. GPCM uses available
+structural delta-method SEs, conditioning on person EAP/reference means;
+person rows are unavailable. Bounds are clipped to the internal rating
+range. Unavailable intervals are retained as NA with status and notes.
+The difference view treats the observed average as fixed: its whiskers
+are not confidence intervals for the observed-minus-fair gap.
+Returned \code{CI_Eligible} is \code{FALSE}; \code{CI_ReportingUse} distinguishes
+diagnostic-only and unavailable intervals, including stored bundles.}
 
 \item{ci_level}{Confidence level used when \code{show_ci = TRUE};
 default \code{0.95}. The returned plot-data object gains \code{CI_Lower},
@@ -57,68 +54,60 @@ default \code{0.95}. The returned plot-data object gains \code{CI_Lower},
 
 \item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, \code{"compact"}, or \code{"monochrome"}).}
 
+\item{show_title}{Show the figure title. The title remains in the return value.}
+
+\item{show_notes}{Show short figure annotations. Full interpretation and
+uncertainty notes remain in \code{data$notes} and the ggplot \code{mfrmr_notes} attribute.}
+
 \item{...}{Additional arguments passed to \code{\link[=fair_average_table]{fair_average_table()}} when \code{x} is \code{mfrm_fit}.}
 }
 \value{
 A plotting-data object of class \code{mfrm_plot_data}.
 With \code{draw = FALSE}, the returned plot data includes \code{title}, \code{subtitle},
-\code{legend}, \code{reference_lines}, and the stacked fair-average data.
+\code{legend}, \code{reference_lines}, and the stacked fair-average \code{data}.
+\code{plot_data} contains the displayed rows and coordinates; \code{excluded} retains
+non-finite rows. \code{notes} explains the reference, uncertainty and row selection.
 }
 \description{
 Plot fair-average diagnostics using base R
 }
 \details{
-Fair-average plots compare observed scoring tendency against model-based
-fair metrics.
+FairM is an expected score at the mean measures of the other facets; for
+non-person rows it also uses the mean estimated person measure. FairZ uses
+zero reference measures instead. \strong{FairZ is not a z-score.} The historical
+alias \code{StandardizedAdjustedAverage} refers to the reference environment,
+not z-standardization. Both metrics use fitted internal score coding.
+PCM averages expectations over the administered rating scales using the
+same observation weights and \code{totalscore} selection as the fair-score table.
+Its conditional derivative averages the within-scale score variances.
+In ordinary additive RSM/PCM JML, finite direct anchors remain eligible in
+both the fair score and its conditional derivative when \code{totalscore = FALSE},
+even if their observed responses are all minimum or all maximum.
+GPCM uses an element's own thresholds for the step facet and the mean
+threshold profile for other facets, with its own slope for the slope facet
+and slope 1 otherwise. Person and other-facet measures remain at the chosen
+reference; these scores do not average over the observed person distribution.
 
-\strong{FairM} is the model-predicted mean score for each element, adjusting
-for the ability distribution of persons actually encountered.  It
-answers: "What average score would this rater/criterion produce if all
-raters/criteria saw the same mix of persons?"
+\code{plot_type = "measure"} connects measures (person ability or facet effects)
+to the reported fair score. Select \code{facet = "Person"} for an ability-to-score
+view. Points reuse the table values, without fitting a trend across different
+reference profiles. This transformation is not independent validation of
+the fitted model. \code{umean}/\code{uscale} change Measure units, not score units;
+Positive \code{xtreme} disables conditional fair-score intervals. With the default
+\code{xtreme_method = "display"}, it changes only the reported Measure.
+\code{xtreme_method = "facets"} also uses the extrapolated measure in that
+element's fair scores; its measure SE describes information at a corrected
+total, not uncertainty of the original infinite MLE. See \code{\link[=fair_average_table]{fair_average_table()}}.
 
-\strong{FairZ} standardises FairM to a z-score across elements within each
-facet, making it easier to compare relative severity across facets
-with different raw-score scales.
-
-Use FairM when the raw-score metric is meaningful (e.g., reporting
-average ratings on the original 1--4 scale).
-Use FairZ when comparing standardised severity ranks across facets.
+\code{"difference"} ranks absolute observed-minus-fair gaps; \code{"scatter"} compares
+observed averages against fair scores with an identity line. These gaps
+also reflect assignment and person mix and do not by themselves diagnose
+leniency, severity or bias. Intervals are conditional approximations with
+full-refit coverage unverified. RSM/PCM intervals require a fitted model;
+a stored bundle alone lacks the calibration needed to calculate them.
+GPCM bundle intervals honor \code{ci_level}; older bundles without rating limits
+can only reuse intervals at their recorded confidence level.
 }
-\section{Plot types}{
-
-\describe{
-\item{\code{"difference"} (default)}{Lollipop chart showing the gap between
-observed and fair-average score for each element.  X-axis:
-Observed - Fair metric.  Y-axis: element labels.  Points colored
-teal (lenient, gap >= 0) or orange (severe, gap < 0).  Ordered by
-absolute gap.}
-\item{\code{"scatter"}}{Scatter plot of fair metric (x) vs observed average
-(y) with an identity line.  Points colored by facet.  Useful for
-checking overall alignment between observed and model-adjusted
-scores.}
-}
-}
-
-\section{Interpreting output}{
-
-Difference plot: ranked element-level gaps (\code{Observed - Fair}), useful
-for triage of potentially lenient/severe levels.
-
-Scatter plot: global agreement pattern relative to the identity line.
-
-Larger absolute gaps suggest stronger divergence between observed and
-model-adjusted scoring.
-}
-
-\section{Typical workflow}{
-
-\enumerate{
-\item Start with \code{plot_type = "difference"} to find largest discrepancies.
-\item Use \code{plot_type = "scatter"} to check overall alignment pattern.
-\item Follow up with facet-level diagnostics for flagged levels.
-}
-}
-
 \section{Further guidance}{
 
 For a plot-selection guide and a longer walkthrough, see
@@ -126,24 +115,72 @@ For a plot-selection guide and a longer walkthrough, see
 \code{vignette("mfrmr-visual-diagnostics", package = "mfrmr")}.
 }
 
-\examples{
-\donttest{
-toy_full <- load_mfrmr_data("example_core")
-toy_people <- unique(toy_full$Person)[1:12]
-toy <- toy_full[toy_full$Person \%in\% toy_people, , drop = FALSE]
-fit <- suppressWarnings(
-  fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
-)
-p <- plot_fair_average(fit, metric = "AdjustedAverage", draw = FALSE)
-if (interactive()) {
-  plot_fair_average(fit, metric = "AdjustedAverage", plot_type = "difference")
+\section{Migration in 0.2.4}{
+
+This renderer is internal. Use the corresponding \code{plot()} route in
+\link{mfrmr_plot_migration}; the former exported name is no longer available.
 }
+
+\section{Session plot defaults}{
+
+Set \code{options(mfrmr.plot_preset = "publication")} to choose a session default
+for plotting functions that expose the common \code{preset} argument. The
+supported values are \code{"standard"}, \code{"publication"}, \code{"compact"} and
+\code{"monochrome"}. Precedence is an explicit call argument, then the session
+option, then \code{"standard"}. For example, \code{preset = "standard"} overrides
+a session set to \code{"monochrome"}. Explicit \code{preset = NULL} retains the
+earlier package-default behavior; it does not read the session option.
+Invalid session values cause an error only when that option is needed.
+
+The category-curve, data-quality, fit-review, connectivity and network
+routes of \code{plot()} for report bundles use the same option through \code{...}.
+Plots without a common \code{preset} argument, including extended-model plots
+with their own \code{palette} controls, keep their own settings. This option
+selects a preset, not a universal theme or a guarantee that all renderers
+implement every appearance control identically.
+
+New plot payloads retain the resolved preset for supported saved-data
+rendering. Converting an existing payload with \code{\link[=as_ggplot]{as_ggplot()}} uses its saved
+appearance, even after the session option changes. A call that creates a
+new plot from a fit or statistical result uses the current default.
+For a reproducible script, supply \code{preset} explicitly or set the option in
+that script. Saving only the fitted model does not save a session option.
+No global ggplot theme is changed.
+
+Restore previous settings with \code{old <- options(mfrmr.plot_preset = "monochrome")} followed by \code{options(old)}. Use
+\code{options(mfrmr.plot_preset = NULL)} to remove the option. The preset changes
+appearance, not estimates, confidence levels or diagnostic thresholds.
+}
+
+\examples{
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("plot_fair_average", run.dontrun = TRUE)
+\dontrun{
+library(mfrmr)
+
+# Saved synthetic MML/RSM analysis of example_operational.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "operational-mml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+
+# Use the diagnostics saved with this fit
+diagnostics <- example_fit$diagnostics
+
+# How do the observed and reference-adjusted person averages compare?
+plot(fit, type = "fair_average", diagnostics = diagnostics,
+  facet = "Person", metric = "FairM", view = "scatter")
+
+# Optional: inspect the gap (observed average minus FairM)
+plot(fit, type = "fair_average", diagnostics = diagnostics,
+  facet = "Person", metric = "FairM", view = "difference")
+# A positive gap means the observed average is higher than the model-based FairM
 }
 }
 \seealso{
-\code{\link[=fair_average_table]{fair_average_table()}}, \code{\link[=plot_unexpected]{plot_unexpected()}}, \code{\link[=plot_displacement]{plot_displacement()}},
-\code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}}, \link{mfrmr_visual_diagnostics}
+\code{\link[=fair_average_table]{fair_average_table()}}, \link[=plot.mfrm_fit]{plot(x, type = "unexpected")}, \link[=plot.mfrm_fit]{plot(x, type = "displacement")},
+\link[=plot.mfrm_fit]{plot(x, type = "qc")}, \link{mfrmr_visual_diagnostics}
 }
 \concept{confidence intervals}
 \concept{fair averages}
 \concept{visual diagnostics}
+\keyword{internal}

@@ -49,7 +49,7 @@ Table 11,bias_count_table,t11,table,Facet1|Facet2|Sq|Observd Count|Obs-Exp Avera
 Table 11,bias_count_table,t11,by_facet_a,Facet|Level|Cells|TotalCount|MeanCount|MinCount|LowCountCells
 Table 11,bias_count_table,t11,by_facet_b,Facet|Level|Cells|TotalCount|MeanCount|MinCount|LowCountCells
 Table 11,bias_count_table,t11,summary,InteractionFacets|InteractionOrder|InteractionMode|Branch|Style|FacetA|FacetB|Cells|TotalCount|MeanCount|MedianCount|MinCount|MaxCount|LowCountCells|LowCountPercent
-Table 12,fair_average_table,t12,stacked,Facet|Total Score|Total Count|Weightd Score|Weightd Count|Obsvd Average|Fair(M) Average|Fair(Z) Average|Measure|Model S.E.|Real S.E.|Infit MnSq|Infit ZStd|Outfit MnSq|Outfit ZStd|PtMea Corr|Anch|Status|Element
+Table 7,fair_average_table,t12,stacked,Facet|Total Score|Total Count|Weightd Score|Weightd Count|Obsvd Average|Fair(M) Average|Fair(Z) Average|Measure|Model S.E.|Real S.E.|Infit MnSq|Infit ZStd|Outfit MnSq|Outfit ZStd|PtMea Corr|Anch|Status|Element
 Table 13,bias_interaction_report,t13,ranked_table,InteractionFacets|InteractionOrder|InteractionMode|FacetA|FacetB|Level1|Level2|ObsExpAverage|BiasSize|SE|t|Prob|ObservedCount|Pair|AbsT|AbsBias|TFlag|BiasFlag|PFlag|Flag|Facet1|Facet1_Level|Facet2|Facet2_Level|FacetA_Level|FacetB_Level
 Table 13,bias_interaction_report,t13,scatter_data,InteractionFacets|InteractionOrder|InteractionMode|FacetA|FacetA_Level|FacetB|FacetB_Level|Facet1|Facet2|Facet1_Level|Facet2_Level|Pair|ObsExpAverage|BiasSize|SE|t|Prob|ObservedCount|Flag|TFlag|BiasFlag|PFlag
 Table 13,bias_interaction_report,t13,facet_profile,Facet|Level|Cells|MeanAbsBias|MeanAbsT|Flagged|FlagRate

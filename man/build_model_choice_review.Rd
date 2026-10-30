@@ -2,7 +2,8 @@
 % Please edit documentation in R/api-advanced.R
 \name{build_model_choice_review}
 \alias{build_model_choice_review}
-\title{Build a model-choice review across RSM, PCM, and bounded GPCM fits}
+\alias{summary.mfrm_model_choice_review}
+\title{Build a model-choice review across RSM, PCM, and GPCM fits}
 \usage{
 build_model_choice_review(
   ...,
@@ -13,28 +14,38 @@ build_model_choice_review(
   top_n = 10L,
   warn_constraints = TRUE
 )
+
+\method{summary}{mfrm_model_choice_review}(object, digits = 3, ...)
 }
 \arguments{
-\item{...}{Two or more fitted \code{mfrm_fit} objects from \code{\link[=fit_mfrm]{fit_mfrm()}}.}
+\item{...}{For \code{build_model_choice_review()}: Two or more fitted \code{mfrm_fit} objects from \code{\link[=fit_mfrm]{fit_mfrm()}}.
+
+For \code{summary()}: Reserved for generic compatibility.}
 
 \item{labels}{Optional labels for the supplied fits. If omitted, names from
 \code{...} are used when available; otherwise labels are generated from
 model/method combinations.}
 
 \item{run_weighting_review}{Logical. If \code{TRUE} and the supplied fits include
-at least one \code{RSM}/\code{PCM} reference plus one bounded \code{GPCM} fit, also run
+at least one \code{RSM}/\code{PCM} reference plus one \code{GPCM} fit, also run
 \code{\link[=build_weighting_review]{build_weighting_review()}} for the first such pair.}
 
 \item{theta_range, theta_points, top_n}{Passed to \code{\link[=build_weighting_review]{build_weighting_review()}} when
 \code{run_weighting_review = TRUE}.}
 
 \item{warn_constraints}{Passed to \code{\link[=compare_mfrm]{compare_mfrm()}}.}
+
+\item{object}{Output from \code{\link[=build_model_choice_review]{build_model_choice_review()}}.}
+
+\item{digits}{Number of digits for printed numeric values.}
 }
 \value{
 An object of class \code{mfrm_model_choice_review}.
+
+For \code{summary()}: An object of class \code{summary.mfrm_model_choice_review}.
 }
 \description{
-Build a model-choice review across RSM, PCM, and bounded GPCM fits
+Build a model-choice review across RSM, PCM, and GPCM fits
 }
 \details{
 \code{build_model_choice_review()} is a user-facing synthesis helper. It does not
@@ -44,30 +55,31 @@ estimate new models. It bundles:
 comparison;
 \item comparison-boundary warnings captured from \code{\link[=compare_mfrm]{compare_mfrm()}} and retained
 in \code{comparison_warnings} for printing and appendix export;
-\item model-role guidance for \code{RSM}, \code{PCM}, and bounded \code{GPCM};
+\item model-role guidance for \code{RSM}, \code{PCM}, and \code{GPCM};
 \item reported step/slope coordinate counts, identified free-parameter counts,
 and the stored fit-readiness decision for every supplied model;
 \item downstream-route availability for APA output, score-side export, linking,
 recovery, fair averages, bias screening, and summary-appendix handoff;
-\item report wording templates that avoid treating better bounded-\code{GPCM} fit as
+\item report wording templates that avoid treating better \code{GPCM} fit as
 an automatic operational-scoring decision;
-\item \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}} when bounded \code{GPCM} is present;
+\item \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}} when \code{GPCM} is present;
 \item optionally, \code{\link[=build_weighting_review]{build_weighting_review()}} for the first Rasch-family reference
-versus bounded-\code{GPCM} pair.
+versus \code{GPCM} pair.
 }
 
 The word "bounded" describes the documented model and workflow scope: the
 package does not implement every possible generalized partial-credit
 many-facet extension. It does \strong{not} mean that finite optimizer box bounds
-define the estimator. The current route uses positive slopes, requires
-\code{slope_facet == step_facet}, identifies slopes on the log scale with
-geometric mean 1, and keeps several downstream score-side/reporting helpers
+define the estimator. The current route uses positive slopes, allows separate
+slope/step owners in MML (JML requires \code{slope_facet == step_facet}), identifies
+slopes on the log scale with geometric mean 1, and keeps several downstream score-side/reporting helpers
 outside the documented boundary.
 Model-choice ranking also requires the current selectable IC contract:
 q<31 fits retain raw criteria but produce a screening/review-only bundle.
+
+\code{summary()} method: Summarize a model-choice review
 }
 \examples{
-\donttest{
 toy <- load_mfrmr_data("example_core")
 fit_rsm <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                     method = "MML", model = "RSM", quad_points = 31)
@@ -77,8 +89,9 @@ fit_pcm <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
 review <- build_model_choice_review(RSM = fit_rsm, PCM = fit_pcm)
 summary(review)
 }
-}
 \seealso{
 \code{\link[=compare_mfrm]{compare_mfrm()}}, \code{\link[=build_weighting_review]{build_weighting_review()}},
 \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}}, \code{\link[=compute_information]{compute_information()}}
+
+\code{\link[=build_model_choice_review]{build_model_choice_review()}}
 }

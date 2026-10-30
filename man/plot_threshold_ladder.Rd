@@ -15,8 +15,8 @@ plot_threshold_ladder(
 \item{fit}{An \code{mfrm_fit} from \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
 \item{highlight_disorder}{Logical. When \code{TRUE} (default), draw
-disordered segments with the preset's \code{fail} colour and add a
-subtitle counting the disordered groups.}
+disordered segments with the preset's \code{fail} colour. The number of
+affected groups is returned in the notes, outside the figure.}
 
 \item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, \code{"compact"},
 or \code{"monochrome"}).}
@@ -32,25 +32,72 @@ row.
 Renders the Rasch-Andrich threshold structure as a vertical ladder per
 step-facet level. Each tick is a \code{tau_k}; lines connecting adjacent
 thresholds are coloured to make disordered crossings (\verb{tau_\{k+1\} < tau_k}) visually obvious. For RSM there is one ladder; for PCM (and
-bounded GPCM) there is one ladder per \code{step_facet} level.
+GPCM) there is one ladder per \code{step_facet} level.
 }
 \section{Interpreting output}{
 
-Within each ladder, thresholds should ascend monotonically. A
-disordered crossing (highlighted in the fail colour) suggests that
-the corresponding category is rarely the most likely response over
-any logit interval, and is a common trigger for category-collapsing
-decisions.
+Each ladder shows centered step offsets for one step-owner level, including
+when GPCM slopes belong to a different facet. Slopes do not duplicate the
+threshold families. Disorder describes point estimates; inspect owner-level
+counts, curves and the rubric before considering category changes.
+Missing steps remain unavailable and are not bridged by connecting lines.
+No intervals or full ability-axis crossings are calculated. Save the result
+of \code{plot()} to retain its model context and interpretation notes.
+Automatic ggplot conversion of this ladder is unavailable; use base graphics
+or \code{\link[=plot_data]{plot_data()}} for custom graphics. The saved \code{\link[=rating_scale_table]{rating_scale_table()}}
+threshold view has its own ggplot conversion.
+}
+
+\section{Migration in 0.2.4}{
+
+This renderer is internal. Use the corresponding \code{plot()} route in
+\link{mfrmr_plot_migration}; the former exported name is no longer available.
+}
+
+\section{Session plot defaults}{
+
+Set \code{options(mfrmr.plot_preset = "publication")} to choose a session default
+for plotting functions that expose the common \code{preset} argument. The
+supported values are \code{"standard"}, \code{"publication"}, \code{"compact"} and
+\code{"monochrome"}. Precedence is an explicit call argument, then the session
+option, then \code{"standard"}. For example, \code{preset = "standard"} overrides
+a session set to \code{"monochrome"}. Explicit \code{preset = NULL} retains the
+earlier package-default behavior; it does not read the session option.
+Invalid session values cause an error only when that option is needed.
+
+The category-curve, data-quality, fit-review, connectivity and network
+routes of \code{plot()} for report bundles use the same option through \code{...}.
+Plots without a common \code{preset} argument, including extended-model plots
+with their own \code{palette} controls, keep their own settings. This option
+selects a preset, not a universal theme or a guarantee that all renderers
+implement every appearance control identically.
+
+New plot payloads retain the resolved preset for supported saved-data
+rendering. Converting an existing payload with \code{\link[=as_ggplot]{as_ggplot()}} uses its saved
+appearance, even after the session option changes. A call that creates a
+new plot from a fit or statistical result uses the current default.
+For a reproducible script, supply \code{preset} explicitly or set the option in
+that script. Saving only the fitted model does not save a session option.
+No global ggplot theme is changed.
+
+Restore previous settings with \code{old <- options(mfrmr.plot_preset = "monochrome")} followed by \code{options(old)}. Use
+\code{options(mfrmr.plot_preset = NULL)} to remove the option. The preset changes
+appearance, not estimates, confidence levels or diagnostic thresholds.
 }
 
 \examples{
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("plot_threshold_ladder", run.dontrun = TRUE)
+\dontrun{
 toy <- load_mfrmr_data("example_operational")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
                 method = "MML", quad_points = 7, maxit = 30)
-p <- plot_threshold_ladder(fit, draw = FALSE)
+p <- plot(fit, type = "thresholds", draw = FALSE)
 head(p$data$data)
+}
 }
 \seealso{
 \code{\link[=category_structure_report]{category_structure_report()}}, \code{\link[=category_curves_report]{category_curves_report()}},
 \code{\link[=plot.mfrm_fit]{plot.mfrm_fit()}} (\code{type = "ccc"}).
 }
+\keyword{internal}

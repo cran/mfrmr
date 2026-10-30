@@ -68,7 +68,7 @@ audit_mfrm_mml_gpcm_slope_boundary <- function(
                      optimizer_log_likelihood = NA_real_,
                      likelihood_difference = NA_real_) {
     list(
-      contract_version = mfrmr_boundary_contract_version(),
+      contract_version = mfrmr_readiness_contract_version(),
       method = method,
       model = model,
       scope = paste(
@@ -79,7 +79,7 @@ audit_mfrm_mml_gpcm_slope_boundary <- function(
       complete = isTRUE(complete),
       scope_complete = isTRUE(scope_complete),
       structural_identification_complete = FALSE,
-      fixed_quadrature_certificate = TRUE,
+      fixed_quadrature_certificate = !mfrmr_adaptive_integration(config),
       continuous_integral_certificate = FALSE,
       readiness_effect = "none_instrumentation_only",
       target_status = target_status,
@@ -112,6 +112,12 @@ audit_mfrm_mml_gpcm_slope_boundary <- function(
     return(finish(
       "not_applicable_estimator", TRUE, FALSE,
       "The audit is specific to the fixed-quadrature MML objective."
+    ))
+  }
+  if (mfrmr_adaptive_integration(config)) {
+    return(finish(
+      "not_evaluated_adaptive_quadrature", FALSE, FALSE,
+      "The fixed-node log-slope ray certificate does not apply to moving adaptive nodes."
     ))
   }
 
@@ -187,7 +193,7 @@ audit_mfrm_mml_gpcm_slope_boundary <- function(
     levels, slope_facet, params$log_slopes, params$slopes
   )
 
-  if (n_levels <= 1L || as.integer(sizes$log_slopes %||% 0L) == 0L) {
+  if (n_levels <= 1L || as.integer(sizes[["log_slopes"]] %||% 0L) == 0L) {
     targets <- mfrmr_jml_gpcm_slope_targets(
       levels, slope_facet, params$log_slopes, params$slopes,
       positive = rep(FALSE, n_levels), negative = rep(FALSE, n_levels),
@@ -484,7 +490,7 @@ audit_mfrm_mml_gpcm_slope_boundary <- function(
   loading_rows <- list()
   loading_cursor <- 0L
   slices <- build_param_slices(sizes)
-  optimizer_indices <- as.integer(slices$log_slopes %||% integer(0))
+  optimizer_indices <- as.integer(slices[["log_slopes"]] %||% integer(0))
   for (certificate_index in certified_rows) {
     certificate <- certificates[certificate_index, , drop = FALSE]
     expanded_direction <- rep(0, n_levels)

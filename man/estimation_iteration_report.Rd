@@ -25,7 +25,7 @@ estimation_iteration_report(
 block.}
 }
 \value{
-A named list with iteration-report components and, for bounded
+A named list with iteration-report components and, for
 \code{GPCM}, a \code{gpcm_boundary} table. Class: \code{mfrm_iteration_report}.
 }
 \description{
@@ -45,7 +45,7 @@ Build an estimation-iteration report (preferred alias)
 \item optional \code{PROX} row: pseudo-initial reference point when enabled.
 }
 
-For bounded \code{GPCM}, this helper replays slope-aware optimization steps from
+For \code{GPCM}, this helper replays slope-aware optimization steps from
 a reconstructed starting state. It is not the exact optimizer history from
 the fitted object and is not an additional convergence test. Use
 \code{summary(fit, profile = "fit", detail = "brief")} for the recorded
@@ -63,6 +63,9 @@ the replay.
 }
 
 \examples{
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("estimation_iteration_report", run.dontrun = TRUE)
+\dontrun{
 toy <- load_mfrmr_data("example_operational")
 fit <- fit_mfrm(
   toy, "Person", c("Rater", "Criterion"), "Score",
@@ -72,6 +75,7 @@ out <- estimation_iteration_report(fit, max_iter = 5)
 summary(out)
 p_iter <- plot(out, draw = FALSE)
 p_iter$data$plot
+}
 }
 \seealso{
 \code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=specifications_report]{specifications_report()}}, \code{\link[=data_quality_report]{data_quality_report()}},

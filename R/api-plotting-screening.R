@@ -41,16 +41,19 @@
 #'
 #' @seealso [unexpected_response_table()] for the case-level review of
 #'   the cells flagged in the overlay;
-#'   [plot_rater_agreement_heatmap()] for a complementary rater-pair
+#'   [plot(x, type = "agreement", view = "heatmap")][plot.mfrm_fit] for a complementary rater-pair
 #'   view of the same residual structure;
 #'   [diagnose_mfrm()] for the underlying diagnostics bundle.
 #'
 #' @examples
-#' \donttest{
-#' toy <- load_mfrmr_data("example_core")
-#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-#'                 method = "JML", maxit = 30)
-#' p <- plot_guttman_scalogram(fit, draw = FALSE)
+#' # Supplementary workflow: run explicitly to keep routine checks brief.
+#' # example("plot_guttman_scalogram", run.dontrun = TRUE)
+#' \dontrun{
+#' # Saved synthetic JML/RSM analysis of example_core.
+#' # For your own data, fit a model first; see ?fit_mfrm.
+#' example_fit <- readRDS(system.file("examples", "core-jml.rds", package = "mfrmr"))
+#' fit <- example_fit$fit
+#' p <- plot(fit, type = "guttman", draw = FALSE)
 #' dim(p$data$matrix)
 #' # Look for: a clean monotone "staircase" of higher scores in the
 #' #   upper-right triangle and lower scores in the lower-left, once
@@ -58,7 +61,11 @@
 #' #   unexpected-response overlay break the staircase and warrant
 #' #   case-level review with `unexpected_response_table()`.
 #' }
-#' @export
+#' @inheritSection mfrmr_visual_diagnostics Session plot defaults
+#' @keywords internal
+#' @section Migration in 0.2.4:
+#' This renderer is internal. Use the corresponding `plot()` route in
+#' [mfrmr_plot_migration]; the former exported name is no longer available.
 plot_guttman_scalogram <- function(fit,
                                    diagnostics = NULL,
                                    column_facet = NULL,
@@ -66,6 +73,7 @@ plot_guttman_scalogram <- function(fit,
                                    highlight_unexpected = TRUE,
                                    preset = c("standard", "publication", "compact", "monochrome"),
                                    draw = TRUE) {
+  if (missing(preset)) preset <- .mfrm_default_plot_preset()
   if (!inherits(fit, "mfrm_fit")) {
     stop("`fit` must be an mfrm_fit object from fit_mfrm().", call. = FALSE)
   }
@@ -162,17 +170,17 @@ plot_guttman_scalogram <- function(fit,
     apply_plot_preset(style)
     n_cat <- length(unique(stats::na.omit(as.vector(mat))))
     cat_palette <- grDevices::hcl.colors(max(3L, n_cat), "YlGnBu", rev = TRUE)
-    graphics::image(
+    image(
       x = seq_len(ncol(mat)), y = seq_len(nrow(mat)),
       z = t(mat), col = cat_palette,
       xaxt = "n", yaxt = "n",
       xlab = column_facet, ylab = "Person (sorted by measure)",
-      main = "Guttman scalogram"
+      main = ""
     )
-    graphics::axis(1, at = seq_len(ncol(mat)), labels = cols,
+    axis(1, at = seq_len(ncol(mat)), labels = cols,
                    las = 2, cex.axis = 0.75)
     if (nrow(mat) <= 25L) {
-      graphics::axis(2, at = seq_len(nrow(mat)), labels = rownames(mat),
+      axis(2, at = seq_len(nrow(mat)), labels = rownames(mat),
                      las = 1, cex.axis = 0.7)
     }
     if (nrow(unexpected_overlay) > 0L) {
@@ -180,7 +188,7 @@ plot_guttman_scalogram <- function(fit,
         r <- match(unexpected_overlay$Person[k], rownames(mat))
         c <- match(unexpected_overlay$Column[k], colnames(mat))
         if (is.finite(r) && is.finite(c)) {
-          graphics::rect(c - 0.5, r - 0.5, c + 0.5, r + 0.5,
+          rect(c - 0.5, r - 0.5, c + 0.5, r + 0.5,
                          border = style$fail, lwd = 2)
         }
       }
@@ -223,34 +231,39 @@ plot_guttman_scalogram <- function(fit,
 #'   `Person`, `Theoretical`, `Sample` columns.
 #'
 #' @examples
-#' \donttest{
-#' toy <- load_mfrmr_data("example_core")
-#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-#'                 method = "JML", maxit = 30)
-#' p <- plot_residual_qq(fit, draw = FALSE)
+#' # Supplementary workflow: run explicitly to keep routine checks brief.
+#' # example("plot_residual_qq", run.dontrun = TRUE)
+#' \dontrun{
+#' # Saved synthetic JML/RSM analysis of example_core.
+#' # For your own data, fit a model first; see ?fit_mfrm.
+#' example_fit <- readRDS(system.file("examples", "core-jml.rds", package = "mfrmr"))
+#' fit <- example_fit$fit
+#' p <- plot(fit, type = "residual_qq", draw = FALSE)
 #' head(p$data$data)
 #' # Look for: points hugging the y = x reference line. Heavy upper-
 #' #   right tails indicate persons whose residual aggregates exceed
-#' #   the standard normal expectation; pair with `plot_unexpected()`
+#' #   the standard normal expectation; pair with `plot()`
 #' #   for case-level follow-up. This is an exploratory screen; do
 #' #   not treat tail behaviour as a definitive normality test.
 #' }
-#' @export
+#' @inheritSection mfrmr_visual_diagnostics Session plot defaults
+#' @keywords internal
+#' @section Migration in 0.2.4:
+#' This renderer is internal. Use the corresponding `plot()` route in
+#' [mfrmr_plot_migration]; the former exported name is no longer available.
 plot_residual_qq <- function(fit,
                              diagnostics = NULL,
                              preset = c("standard", "publication", "compact", "monochrome"),
                              draw = TRUE) {
+  if (missing(preset)) preset <- .mfrm_default_plot_preset()
   if (!inherits(fit, "mfrm_fit")) {
     stop("`fit` must be an mfrm_fit object from fit_mfrm().", call. = FALSE)
   }
   style <- resolve_plot_preset(preset)
-  if (is.null(diagnostics)) {
-    diagnostics <- suppressMessages(suppressWarnings(
-      diagnose_mfrm(fit, residual_pca = "none",
-                    diagnostic_mode = "legacy")
-    ))
-  }
-  obs <- as.data.frame(diagnostics$obs %||% NULL, stringsAsFactors = FALSE)
+  obs <- if (is.null(diagnostics)) {
+    compute_obs_table(.mfrm_validate_diagnostic_fit(fit))
+  } else diagnostics$obs
+  obs <- as.data.frame(obs %||% NULL, stringsAsFactors = FALSE)
   if (nrow(obs) == 0L || !"StdResidual" %in% names(obs)) {
     stop("Standardized residuals are not available on this fit.",
          call. = FALSE)
@@ -275,14 +288,14 @@ plot_residual_qq <- function(fit,
 
   if (isTRUE(draw)) {
     apply_plot_preset(style)
-    graphics::plot(
+    plot(
       x = q_theory, y = q_sample,
       xlab = "Theoretical quantile (N(0, 1))",
       ylab = "Sample quantile (person standardized residual)",
-      main = "Normal Q-Q of person residuals",
+      main = "",
       pch = 19, col = style$accent_primary
     )
-    graphics::abline(a = 0, b = 1, lty = 2, col = style$neutral)
+    abline(a = 0, b = 1, lty = 2, col = style$neutral)
   }
 
   out <- new_mfrm_plot_data(
@@ -318,7 +331,7 @@ plot_residual_qq <- function(fit,
 #' common anchors fixed across fits (see
 #' [mfrmr_linking_and_dff] for the supported linking route), or
 #' (ii) harmonizing the scale post-hoc with a Stocking-Lord type
-#' transformation and reviewing the result via [plot_anchor_drift()].
+#' transformation and reviewing the result via [plot(x)][plot.mfrm_anchor_drift].
 #' The trajectory plot itself does not perform linking; it only
 #' visualizes the supplied fits on their as-fit scales.
 #'
@@ -336,20 +349,23 @@ plot_residual_qq <- function(fit,
 #'   data.frame with `Wave`, `Level`, `Estimate`, `SE`, `CI_Lower`,
 #'   `CI_Upper` columns.
 #'
-#' @seealso [plot_anchor_drift()], [mfrmr_linking_and_dff]
+#' @seealso [plot(x)][plot.mfrm_anchor_drift], [mfrmr_linking_and_dff]
 #'
 #' @concept confidence intervals
 #' @concept visual diagnostics
 #' @concept linking
 #'
 #' @examples
-#' \donttest{
+#' # Long-running workflow; run explicitly when needed.
+#' # example("plot_rater_trajectory", run.dontrun = TRUE)
+#' \dontrun{
 #' toy <- load_mfrmr_data("example_core")
 #' fit_a <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-#'                   method = "JML", maxit = 30)
+#'                   method = "JML", maxit = 300)
 #' fit_b <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-#'                   method = "JML", maxit = 30)
-#' p <- plot_rater_trajectory(list(T1 = fit_a, T2 = fit_b), draw = FALSE)
+#'                   method = "JML", maxit = 300)
+#' p <- plot(fit_a, type = "trajectory", comparison = list(T2 = fit_b),
+#'   labels = c("T1", "T2"), draw = FALSE)
 #' head(p$data$data)
 #' # Look for: stable trajectories (small wave-to-wave shifts within
 #' #   each rater's CI ribbon) once the waves are anchor-linked. A
@@ -358,12 +374,19 @@ plot_residual_qq <- function(fit,
 #' #   logits are on different scales and the picture cannot be read
 #' #   as drift; see the Anchor-linking caveat in the docstring.
 #' }
-#' @export
+#' @inheritSection mfrmr_visual_diagnostics Session plot defaults
+#' @keywords internal
+#' @section Migration in 0.2.4:
+#' This renderer is internal. Use the corresponding `plot()` route in
+#' [mfrmr_plot_migration]; the former exported name is no longer available.
 plot_rater_trajectory <- function(fits,
                                   facet = "Rater",
                                   ci_level = 0.95,
                                   preset = c("standard", "publication", "compact", "monochrome"),
                                   draw = TRUE) {
+  for (fit in fits) stop_if_product_slopes(fit, "plot((fits)[[1L]], type = \"trajectory\", comparison = (fits)[-1L], labels = names(fits))")
+
+  if (missing(preset)) preset <- .mfrm_default_plot_preset()
   if (!is.list(fits) || length(fits) < 2L) {
     stop("`fits` must be a named list of at least two mfrm_fit objects.",
          call. = FALSE)
@@ -372,7 +395,7 @@ plot_rater_trajectory <- function(fits,
     stop("`fits` must have distinct non-empty names.", call. = FALSE)
   }
   style <- resolve_plot_preset(preset)
-  z_ci <- stats::qnorm(1 - (1 - ci_level) / 2)
+  z_ci <- stats::qnorm((1 - ci_level) / 2, lower.tail = FALSE)
   rows <- list()
   for (w in names(fits)) {
     fit <- fits[[w]]
@@ -429,30 +452,30 @@ plot_rater_trajectory <- function(fits,
     xlim <- c(0.8, length(fits) + 0.2)
     y_range <- range(c(long$Estimate, long$CI_Lower, long$CI_Upper),
                      finite = TRUE, na.rm = TRUE)
-    graphics::plot(
+    plot(
       x = numeric(0), y = numeric(0),
       xlim = xlim, ylim = y_range,
       xaxt = "n", xlab = "Wave", ylab = "Severity (logit)",
-      main = sprintf("%s severity trajectory", facet)
+      main = ""
     )
-    graphics::axis(1, at = seq_along(fits), labels = names(fits),
+    axis(1, at = seq_along(fits), labels = names(fits),
                    las = 1)
-    graphics::abline(h = 0, lty = 2, col = style$neutral)
+    abline(h = 0, lty = 2, col = style$neutral)
     for (k in seq_along(levels_kept)) {
       lvl <- levels_kept[k]
       sub <- long[long$Level == lvl, , drop = FALSE]
-      graphics::lines(sub$WaveOrder, sub$Estimate,
+      lines(sub$WaveOrder, sub$Estimate,
                       col = pal[k], lwd = 2)
-      graphics::points(sub$WaveOrder, sub$Estimate,
+      points(sub$WaveOrder, sub$Estimate,
                        pch = 19, col = pal[k])
       valid <- is.finite(sub$CI_Lower) & is.finite(sub$CI_Upper)
       if (any(valid)) {
-        graphics::segments(sub$WaveOrder[valid], sub$CI_Lower[valid],
+        segments(sub$WaveOrder[valid], sub$CI_Lower[valid],
                            sub$WaveOrder[valid], sub$CI_Upper[valid],
                            col = pal[k], lwd = 1)
       }
     }
-    graphics::legend("topright", legend = levels_kept, col = pal,
+    legend("topright", legend = levels_kept, col = pal,
                      lwd = 2, bty = "n", cex = 0.75, inset = 0.02)
   }
 
@@ -482,7 +505,7 @@ plot_rater_trajectory <- function(fits,
 #' heatmap. Cells are coloured by the chosen agreement metric: exact
 #' agreement proportion by default, or the Pearson-style `Corr` column
 #' from [interrater_agreement_table()] when `metric = "correlation"`.
-#' The plot is a compact alternative to [plot_interrater_agreement()]'s
+#' The plot is a compact alternative to [plot(x, type = "agreement")][plot.mfrm_fit]'s
 #' bar chart when the rater count exceeds ~6 pairs.
 #'
 #' @param fit An `mfrm_fit`.
@@ -497,20 +520,29 @@ plot_rater_trajectory <- function(fits,
 #' @param draw If `TRUE`, draw with base graphics.
 #'
 #' @return An `mfrm_plot_data` object whose `data` slot bundles the
-#'   rater x rater matrix and the raw pairwise rows.
+#'   rater x rater matrix, raw pairwise rows, matching settings and palette.
+#'   [as_ggplot()] preserves the selected metric, facet labels and unavailable
+#'   cells, with a fixed 0--1 exact-agreement or -1--1 correlation scale.
+#'   The `"monochrome"` preset applies to both renderers. Self comparisons
+#'   are unavailable, not estimated perfect agreement. Save the plot payload
+#'   with [base::saveRDS()] to convert it without recomputing diagnostics;
+#'   interpretation notes remain in `plot_data(p, "notes")`.
 #'
 #' @seealso [interrater_agreement_table()] for the underlying numeric
-#'   table; [plot_guttman_scalogram()] for a complementary
+#'   table; [plot(x, type = "guttman")][plot.mfrm_fit] for a complementary
 #'   person-by-element view of residual structure;
 #'   [diagnose_mfrm()] for the diagnostics bundle the heatmap
 #'   reads from.
 #'
 #' @examples
-#' \donttest{
-#' toy <- load_mfrmr_data("example_core")
-#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-#'                 method = "JML", maxit = 30)
-#' p <- plot_rater_agreement_heatmap(fit, draw = FALSE)
+#' # Supplementary workflow: run explicitly to keep routine checks brief.
+#' # example("plot_rater_agreement_heatmap", run.dontrun = TRUE)
+#' \dontrun{
+#' # Saved synthetic JML/RSM analysis of example_core.
+#' # For your own data, fit a model first; see ?fit_mfrm.
+#' example_fit <- readRDS(system.file("examples", "core-jml.rds", package = "mfrmr"))
+#' fit <- example_fit$fit
+#' p <- plot(fit, type = "agreement", view = "heatmap", draw = FALSE)
 #' dim(p$data$matrix)
 #' # Look for (default `metric = "exact"`):
 #' # - Off-diagonal cells close to the corresponding entry of
@@ -520,25 +552,28 @@ plot_rater_trajectory <- function(fits,
 #' # - With `metric = "correlation"` the colour scale switches to
 #' #   `[-1, 1]`; positive cells = pairs agree on relative ordering,
 #' #   negative cells = pairs systematically rank persons in opposite
-#' #   directions and are the highest-priority review cases.
+#' #   directions. Review context, exposure and sample size before deciding
+#' #   whether any rater needs follow-up.
 #' }
-#' @export
+#' @inheritSection mfrmr_visual_diagnostics Session plot defaults
+#' @keywords internal
+#' @section Migration in 0.2.4:
+#' This renderer is internal. Use the corresponding `plot()` route in
+#' [mfrmr_plot_migration]; the former exported name is no longer available.
 plot_rater_agreement_heatmap <- function(fit,
                                          diagnostics = NULL,
                                          rater_facet = "Rater",
                                          metric = c("exact", "correlation"),
                                          preset = c("standard", "publication", "compact", "monochrome"),
                                          draw = TRUE) {
+  if (missing(preset)) preset <- .mfrm_default_plot_preset()
   if (!inherits(fit, "mfrm_fit")) {
     stop("`fit` must be an mfrm_fit object from fit_mfrm().", call. = FALSE)
   }
   metric <- match.arg(metric)
   style <- resolve_plot_preset(preset)
-  agree <- tryCatch(
-    interrater_agreement_table(fit, diagnostics = diagnostics,
-                                rater_facet = rater_facet),
-    error = function(e) NULL
-  )
+  agree <- interrater_agreement_table(fit, diagnostics = diagnostics,
+                                       rater_facet = rater_facet)
   if (is.null(agree) || is.null(agree$pairs)) {
     stop("interrater_agreement_table() did not return pairwise rows.",
          call. = FALSE)
@@ -565,7 +600,8 @@ plot_rater_agreement_heatmap <- function(fit,
   raters <- sort(unique(c(pairs$Rater1, pairs$Rater2)))
   mat <- matrix(NA_real_, nrow = length(raters), ncol = length(raters),
                 dimnames = list(raters, raters))
-  diag(mat) <- 1
+  # Self comparisons are not estimated agreement evidence.
+  diag(mat) <- NA_real_
   for (k in seq_len(nrow(pairs))) {
     i <- match(pairs$Rater1[k], raters)
     j <- match(pairs$Rater2[k], raters)
@@ -577,29 +613,37 @@ plot_rater_agreement_heatmap <- function(fit,
 
   zlim <- if (identical(metric, "correlation")) c(-1, 1) else c(0, 1)
   palette_name <- if (identical(metric, "correlation")) "RdBu" else "YlGnBu"
+  cols <- if (identical(style$name, "monochrome")) {
+    grDevices::gray.colors(20L, start = 0.95, end = 0.15)
+  } else grDevices::hcl.colors(20L, palette_name, rev = TRUE)
   if (isTRUE(draw)) {
     apply_plot_preset(style)
-    cols <- grDevices::hcl.colors(20L, palette_name, rev = TRUE)
-    old_par <- graphics::par(no.readonly = TRUE)
+    old_par <- graphics::par()["mar"]
     on.exit(graphics::par(old_par), add = TRUE)
-    graphics::par(mar = c(5, 5, 3, 2))
-    graphics::image(
+    label_lines <- max(graphics::strwidth(raters, units = "inches", cex = .8)) /
+      (graphics::par("csi") * graphics::par("mex"))
+    graphics::par(mar = c(rep(max(4, label_lines + 2.5), 2), 1, 1))
+    image(
       x = seq_len(ncol(mat)), y = seq_len(nrow(mat)),
       z = mat, col = cols, zlim = zlim,
       xaxt = "n", yaxt = "n",
-      xlab = "Rater", ylab = "Rater",
-      main = sprintf("Pairwise rater agreement (%s)", metric)
+      xlab = "", ylab = "",
+      main = ""
     )
-    graphics::axis(1, at = seq_along(raters), labels = raters,
+    axis(1, at = seq_along(raters), labels = raters,
                    las = 2, cex.axis = 0.8)
-    graphics::axis(2, at = seq_along(raters), labels = raters,
+    axis(2, at = seq_along(raters), labels = raters,
                    las = 1, cex.axis = 0.8)
+    mtext(agree$settings$rater_facet, side = 1, line = label_lines + 1.4)
+    mtext(agree$settings$rater_facet, side = 2, line = label_lines + 1.4)
     for (i in seq_along(raters)) for (j in seq_along(raters)) {
       v <- mat[i, j]
       if (is.finite(v)) {
-        contrast_ref <- if (identical(metric, "correlation")) abs(v) else v
-        graphics::text(j, i, sprintf("%.2f", v), cex = 0.7,
-                       col = if (contrast_ref > 0.6) "white" else "black")
+        color_index <- findInterval(v, seq(zlim[1], zlim[2], length.out = length(cols) + 1L),
+          all.inside = TRUE)
+        luminance <- sum(grDevices::col2rgb(cols[color_index]) / 255 * c(.299, .587, .114))
+        text(j, i, sprintf("%.2f", v), cex = 0.7,
+                       col = if (luminance < .5) "white" else "black")
       }
     }
   }
@@ -610,9 +654,12 @@ plot_rater_agreement_heatmap <- function(fit,
       matrix = mat,
       pairs = pairs,
       metric = metric,
+      settings = agree$settings,
+      colors = cols,
       title = sprintf("Pairwise rater agreement (%s)", metric),
-      subtitle = sprintf("%d rater(s); metric column = `%s`",
-                         length(raters), value_col),
+      subtitle = sprintf("%d raters; %d / %d pair comparisons available. Blank cells are unassessed; self-comparisons are omitted.",
+                         length(raters), sum(is.finite(pairs$Value)), nrow(pairs)),
+      notes = agree$notes,
       preset = style$name
     )
   )

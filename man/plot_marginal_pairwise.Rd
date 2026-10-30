@@ -14,7 +14,8 @@ plot_marginal_pairwise(
   palette = NULL,
   label_angle = 45,
   preset = c("standard", "publication", "compact", "monochrome"),
-  draw = TRUE
+  draw = TRUE,
+  title = NULL
 )
 }
 \arguments{
@@ -28,7 +29,9 @@ plot_marginal_pairwise(
 
 \item{facet}{Optional facet name used to keep only matching pairwise rows.}
 
-\item{main}{Optional custom plot title.}
+\item{main}{Compatibility title argument. Omitted or \code{NULL} keeps the default
+title. Existing calls remain supported without a deprecation warning.
+For new code, prefer \code{title}; do not supply both arguments.}
 
 \item{palette}{Optional named color overrides. Recognized names: \code{ok}, \code{flag}.}
 
@@ -37,6 +40,13 @@ plot_marginal_pairwise(
 \item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, \code{"compact"}, or \code{"monochrome"}).}
 
 \item{draw}{If \code{TRUE}, draw with base graphics.}
+
+\item{title}{Plot title. Omit it to keep the default, supply one character
+string to replace it, or use \code{NULL} (or \code{""}) to suppress it. This changes
+only the heading; numerical results, reference lines, subtitles and
+interpretation notes remain. Both \code{main} and \code{title} explicitly supplied
+is an error, even if equal or \code{NULL}. Positional legacy arguments retain
+their order; use the exact name \code{title}.}
 }
 \value{
 A plotting-data object of class \code{mfrm_plot_data}.
@@ -51,7 +61,10 @@ from posterior-integrated expected exact and adjacent agreement.
 The \code{"exact"} view ranks level pairs by the absolute exact-agreement
 standardized residual. The \code{"adjacent"} view uses the adjacent-agreement
 standardized residual instead. Both are exploratory corroboration screens for
-strict marginal-fit flags.
+strict marginal-fit flags. Selection uses all pairs within the requested
+facet, not a preselected list for the other metric. \code{retention} counts
+available/unavailable metric values, while \code{full_table} retains all candidates.
+Grey bars/labels indicate unavailable values or classifications.
 }
 \section{Interpreting output}{
 
@@ -60,7 +73,9 @@ strict marginal-fit flags.
 agreement for that level pair.
 \item Negative bars mean the observed agreement fell below the posterior-expected
 agreement.
-\item Red bars indicate the pair exceeded the current strict-warning threshold.
+\item Red bars indicate an available standardized-residual or agreement-gap
+rule was crossed. A missing companion rule does not cancel a known crossing.
+These are descriptive cutoffs without calibrated error rates.
 }
 }
 
@@ -69,7 +84,7 @@ agreement.
 \enumerate{
 \item Fit with \code{\link[=fit_mfrm]{fit_mfrm()}} using \code{method = "MML"} for \code{RSM} / \code{PCM}.
 \item Run \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} with \code{diagnostic_mode = "both"}.
-\item Use \code{plot_marginal_pairwise()} to inspect level pairs behind pairwise
+\item Use \code{plot()} to inspect level pairs behind pairwise
 local-dependence flags.
 \item Corroborate with legacy diagnostics, design review, and substantive
 interpretation before making claims.
@@ -83,31 +98,62 @@ For a plot-selection guide and a longer walkthrough, see
 \code{vignette("mfrmr-visual-diagnostics", package = "mfrmr")}.
 }
 
+\section{Migration in 0.2.4}{
+
+This renderer is internal. Use the corresponding \code{plot()} route in
+\link{mfrmr_plot_migration}; the former exported name is no longer available.
+}
+
+\section{Session plot defaults}{
+
+Set \code{options(mfrmr.plot_preset = "publication")} to choose a session default
+for plotting functions that expose the common \code{preset} argument. The
+supported values are \code{"standard"}, \code{"publication"}, \code{"compact"} and
+\code{"monochrome"}. Precedence is an explicit call argument, then the session
+option, then \code{"standard"}. For example, \code{preset = "standard"} overrides
+a session set to \code{"monochrome"}. Explicit \code{preset = NULL} retains the
+earlier package-default behavior; it does not read the session option.
+Invalid session values cause an error only when that option is needed.
+
+The category-curve, data-quality, fit-review, connectivity and network
+routes of \code{plot()} for report bundles use the same option through \code{...}.
+Plots without a common \code{preset} argument, including extended-model plots
+with their own \code{palette} controls, keep their own settings. This option
+selects a preset, not a universal theme or a guarantee that all renderers
+implement every appearance control identically.
+
+New plot payloads retain the resolved preset for supported saved-data
+rendering. Converting an existing payload with \code{\link[=as_ggplot]{as_ggplot()}} uses its saved
+appearance, even after the session option changes. A call that creates a
+new plot from a fit or statistical result uses the current default.
+For a reproducible script, supply \code{preset} explicitly or set the option in
+that script. Saving only the fitted model does not save a session option.
+No global ggplot theme is changed.
+
+Restore previous settings with \code{old <- options(mfrmr.plot_preset = "monochrome")} followed by \code{options(old)}. Use
+\code{options(mfrmr.plot_preset = NULL)} to remove the option. The preset changes
+appearance, not estimates, confidence levels or diagnostic thresholds.
+}
+
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(
-  toy,
-  "Person",
-  c("Rater", "Criterion"),
-  "Score",
-  method = "MML",
-  quad_points = 7,
-  maxit = 30
-)
-diag <- diagnose_mfrm(fit, residual_pca = "none", diagnostic_mode = "both")
-p <- plot_marginal_pairwise(diag, draw = FALSE, preset = "publication")
-p$data$preset
-if (interactive()) {
-  plot_marginal_pairwise(
-    diag,
-    metric = "adjacent",
-    draw = TRUE,
-    preset = "publication"
-  )
-}
-}
+library(mfrmr)
+
+# Saved synthetic MML/RSM analysis of example_operational.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "operational-mml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+
+# Use the diagnostics saved with this fit
+diagnostics <- example_fit$diagnostics
+
+# Which pairs show more or less exact agreement than the model expects?
+plot(diagnostics, type = "marginal_pairwise")
+# These are screening results; inspect the rating design before drawing conclusions
+
+# Optional: agreement within one score category
+plot(diagnostics, type = "marginal_pairwise", metric = "adjacent")
 }
 \seealso{
-\code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=plot_marginal_fit]{plot_marginal_fit()}}, \link{mfrmr_visual_diagnostics}
+\code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \link[=plot.mfrm_fit]{plot(x, type = "marginal_fit")}, \link{mfrmr_visual_diagnostics}
 }
+\keyword{internal}

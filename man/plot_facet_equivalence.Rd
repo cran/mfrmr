@@ -14,10 +14,11 @@ plot_facet_equivalence(
 )
 }
 \arguments{
-\item{x}{Output from \code{\link[=analyze_facet_equivalence]{analyze_facet_equivalence()}} or \code{\link[=fit_mfrm]{fit_mfrm()}}.}
+\item{x}{Output from \code{\link[=analyze_facet_equivalence]{analyze_facet_equivalence()}} or an eligible MML
+\code{\link[=fit_mfrm]{fit_mfrm()}} object. Legacy equivalence bundles must be recomputed.}
 
-\item{diagnostics}{Optional output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} when \code{x} is an
-\code{mfrm_fit} object.}
+\item{diagnostics}{Optional matching output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} when
+\code{x} is an \code{mfrm_fit} object.}
 
 \item{facet}{Facet to analyze when \code{x} is an \code{mfrm_fit} object.}
 
@@ -29,64 +30,59 @@ prepared plotting data.}
 \item{...}{Additional graphical arguments passed to base plotting functions.}
 }
 \value{
-Invisibly returns the plotting data. If \code{draw = FALSE}, the plotting
-data are returned without drawing.
+Invisibly returns the plotting data and inference/covariance basis.
+With \code{draw = FALSE}, returns the data without drawing.
 }
 \description{
 Plot facet-equivalence results
 }
 \details{
-\code{plot_facet_equivalence()} is a visual companion to
-\code{\link[=analyze_facet_equivalence]{analyze_facet_equivalence()}}. It does not recompute the equivalence
-analysis; it only reshapes and displays the returned results.
+Fit inputs use the same eligibility checks as \code{\link[=analyze_facet_equivalence]{analyze_facet_equivalence()}}.
+Bundle inputs display the already calculated results. Both routes require
+the current inference and covariance basis, including when \code{draw = FALSE}.
 }
 \section{Plot types}{
 
 \itemize{
-\item \code{"forest"} places each level on the logit scale with its confidence
-interval and shades the practical-equivalence region around the weighted
-grand mean.
-\item \code{"rope"} shows the percentage of each level's uncertainty mass that falls
-inside the ROPE.
+\item \code{"forest"} shows each level's deviation from the equally weighted facet
+mean, with covariance-aware deviation intervals and the practical region
+around zero. The raw marginal measure intervals remain in the data table.
+\item \code{"rope"} shows the normal confidence-distribution mass within that region.
 }
 }
 
 \section{Interpreting output}{
 
-In the \strong{forest plot}, the shaded band marks the ROPE
-(\eqn{\pm}\code{equivalence_bound} around the weighted grand mean).
-Levels whose entire confidence interval lies inside this band are
-close to the facet grand mean under this descriptive screen. Levels whose
-interval extends outside the band are more displaced from the facet average.
-Overlapping intervals between two elements suggest they are not
-reliably separable, but overlap alone does not establish formal
-equivalence---use the TOST results for that.
-
-In the \strong{ROPE bar chart}, each bar shows the proportion of the
-element's normal-approximation distribution that falls inside the
-ROPE-style grand-mean proximity.  Values > 95\\% indicate that most of
-the element's normal-approximation uncertainty falls near the facet
-average; 50--95\\% is indeterminate; < 50\\% suggests the element is
-meaningfully displaced from that average.
+Both plots describe grand-mean proximity. Colors in the forest plot indicate
+whether the deviation interval is inside, outside, or overlaps the practical
+region. Neither plot establishes pairwise equivalence or a Bayesian
+probability. Read the pairwise TOST results for pair-specific conclusions.
 }
 
 \section{Typical workflow}{
 
 \enumerate{
-\item Run \code{\link[=analyze_facet_equivalence]{analyze_facet_equivalence()}}.
-\item Start with \code{type = "forest"} to see the facet on the logit scale.
-\item Switch to \code{type = "rope"} when you want a ranking of levels by
-grand-mean proximity.
+\item Run \code{\link[=analyze_facet_equivalence]{analyze_facet_equivalence()}} with a prespecified practical bound.
+\item Use \code{type = "forest"} to inspect deviations and their uncertainty.
+\item Use \code{type = "rope"} for a descriptive proximity view.
 }
 }
 
+\section{Migration in 0.2.4}{
+
+This renderer is internal. Use the corresponding \code{plot()} route in
+\link{mfrmr_plot_migration}; the former exported name is no longer available.
+}
+
 \examples{
-\donttest{
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("plot_facet_equivalence", run.dontrun = TRUE)
+\dontrun{
 toy <- load_mfrmr_data("example_core")
 fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 30)
+                method = "MML", quad_points = 31, maxit = 150)
 eq <- analyze_facet_equivalence(fit, facet = "Rater")
-pdat <- plot_facet_equivalence(eq, type = "forest", draw = FALSE)
+pdat <- plot(eq, type = "facet_equivalence", view = "forest", draw = FALSE)
 c(pdat$facet, pdat$type)
 }
 }
@@ -96,3 +92,4 @@ c(pdat$facet, pdat$type)
 \concept{confidence intervals}
 \concept{facet equivalence}
 \concept{visual diagnostics}
+\keyword{internal}

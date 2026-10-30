@@ -1,4 +1,4 @@
-## ----include = FALSE----------------------------------------------------------
+## ----include = FALSE--------------------------------------------------------
 is_cran_check <- !isTRUE(as.logical(Sys.getenv("NOT_CRAN", "false")))
 vignette_artifact <- function(name) {
   path <- system.file(
@@ -22,455 +22,335 @@ knitr::opts_chunk$set(
   eval = !is_cran_check
 )
 
-## ----load-data----------------------------------------------------------------
+## ----quick-start, fig.alt = "Wright map of fitted person abilities, rater severities, criterion difficulties and shared category steps for the synthetic ratings. All locations use the same logit scale."----
+# # Load the package
 # library(mfrmr)
 # 
-# list_mfrmr_data(details = TRUE)[, c("Key", "PrimaryUse", "Design", "CountBasis")]
+# # Load example ratings and look at the first six rows
+# ratings <- load_mfrmr_data("example_operational")
+# head(ratings)
 # 
-# data("ej2021_study1", package = "mfrmr")
-# head(ej2021_study1)
+# # Fit the model
+# fit <- fit_mfrm(
+#   data = ratings,
+#   person = "Person",
+#   facets = c("Rater", "Criterion"),
+#   score = "Score",
+#   rating_min = 1, rating_max = 4,
+#   category_policy = "preserve",
+#   method = "MML",
+#   model = "RSM"
+# )
 # 
-# study1_alt <- load_mfrmr_data("study1")
-# identical(names(ej2021_study1), names(study1_alt))
+# # Plot the results (Wright map)
+# plot(fit)
+# 
+# # Save the summary, then display its tables
+# results <- summary(fit)
+# results$person_overview # One row summarizing person ability estimates
+# results$facet_overview  # One row per facet: number of levels, mean, SD, range
+# 
+# # Check the interpretation status and recommended next step
+# results$decision
 
-## ----toy-setup----------------------------------------------------------------
-# data("mfrmr_example_operational", package = "mfrmr")
-# data("mfrmr_example_operational_design", package = "mfrmr")
-# toy <- mfrmr_example_operational
-# 
-# data_review_toy <- describe_mfrm_data(
-#   data = toy,
+## ----quick-start-estimates--------------------------------------------------
+# estimates <- as.data.frame(fit)
+# head(subset(estimates, Facet == "Person")) # First six persons
+# subset(estimates, Facet == "Rater")       # All raters
+# subset(estimates, Facet == "Criterion")   # All criteria
+
+## ----quick-start-diagnostics------------------------------------------------
+# diagnostics <- diagnose_mfrm(fit)
+# diagnostic_summary <- summary(diagnostics)
+# diagnostic_summary$decision
+
+## ----csv-practice-file------------------------------------------------------
+# library(mfrmr)
+# csv_path <- tempfile(fileext = ".csv")
+# write.csv(load_mfrmr_data("example_operational"), csv_path,
+#           row.names = FALSE, na = "")
+
+## ----csv-select-file, eval = FALSE------------------------------------------
+# library(mfrmr)
+# csv_path <- file.choose()
+
+## ----csv-read---------------------------------------------------------------
+# ratings <- read.csv(
+#   csv_path,
+#   colClasses = "character",
+#   na.strings = "",
+#   check.names = FALSE,
+#   fileEncoding = "UTF-8-BOM"
+# )
+# # Treat the documented missing-score marker only in the score column
+# ratings <- recode_missing_codes(ratings, columns = "Score", codes = "NA")
+# head(ratings)
+# names(ratings)
+# table(ratings$Score, useNA = "ifany")
+
+## ----csv-data-review--------------------------------------------------------
+# data_review <- describe_mfrm_data(
+#   data = ratings,
 #   person = "Person",
 #   facets = c("Rater", "Criterion"),
 #   score = "Score",
 #   rating_min = 1,
 #   rating_max = 4,
-#   expected_design = mfrmr_example_operational_design
+#   category_policy = "preserve"
+# )
+# data_review$row_retention
+# data_review$missing_by_column
+# data_review$score_distribution
+# data_review$design_connectivity
+
+## ----csv-fit----------------------------------------------------------------
+# csv_fit <- fit_mfrm(
+#   data = ratings,
+#   person = "Person",
+#   facets = c("Rater", "Criterion"),
+#   score = "Score",
+#   rating_min = 1,
+#   rating_max = 4,
+#   category_policy = "preserve",
+#   method = "MML",
+#   model = "RSM"
+# )
+# csv_diagnostics <- diagnose_mfrm(csv_fit)
+# csv_results <- summary(csv_fit, diagnostics = csv_diagnostics)
+# csv_results$decision
+
+## ----csv-results, fig.alt = "Wright map for the ratings read from the example CSV. Compare person, facet and step locations on the fitted scale; the display does not establish that model assumptions hold."----
+# plot(csv_fit)
+# csv_estimates <- as.data.frame(csv_fit)
+# head(subset(csv_estimates, Facet == "Person"))
+# subset(csv_estimates, Facet == "Rater")
+# subset(csv_estimates, Facet == "Criterion")
+
+## ----csv-missing-codes, eval = FALSE----------------------------------------
+# ratings <- recode_missing_codes(
+#   ratings, columns = "Score", codes = c("99", ".")
+# )
+# table(ratings$Score, useNA = "ifany")
+
+## ----csv-wide-to-long-------------------------------------------------------
+# wide <- data.frame(
+#   Person = c("001", "001"),
+#   Rater = c("R1", "R2"),
+#   Content = c(3, 4),
+#   Style = c(2, 3)
+# )
+# ratings_long <- tidyr::pivot_longer(
+#   wide,
+#   cols = c("Content", "Style"),
+#   names_to = "Criterion",
+#   values_to = "Score"
+# )
+# ratings_long
+
+## ----reporting-input--------------------------------------------------------
+# analysis_data <- ratings
+# fit_toy <- fit
+# diag_toy <- diagnostics
+# data("mfrmr_example_operational_design", package = "mfrmr")
+# analysis_roster <- mfrmr_example_operational_design
+
+## ----reporting-csv-input, eval = FALSE--------------------------------------
+# analysis_data <- ratings
+# fit_toy <- csv_fit
+# diag_toy <- csv_diagnostics
+# analysis_roster <- NULL # Replace with your own planned roster if available
+
+## ----ratings-setup----------------------------------------------------------
+# data_review_toy <- describe_mfrm_data(
+#   data = analysis_data,
+#   person = "Person",
+#   facets = c("Rater", "Criterion"),
+#   score = "Score",
+#   rating_min = 1,
+#   rating_max = 4,
+#   category_policy = "preserve",
+#   expected_design = analysis_roster
 # )
 # data_summary_toy <- summary(data_review_toy)
 # data_summary_toy$structural_missingness
 # data_summary_toy$design_connectivity
 # 
-# fit_toy <- fit_mfrm(
-#   data = toy,
-#   person = "Person",
-#   facets = c("Rater", "Criterion"),
-#   score = "Score",
-#   method = "MML",
-#   model = "RSM"
-# )
-# diag_toy <- diagnose_mfrm(
-#   fit_toy,
-#   residual_pca = "none",
-#   diagnostic_mode = "both",
-#   fit_df_method = "both"
-# )
-# 
-# # Fast fit-only summary: this does not compute diagnostics.
-# fit_summary_toy <- summary(fit_toy, profile = "fit", detail = "brief")
-# 
-# # Comprehensive review, reusing diagnostics already computed above.
-# facets_summary_toy <- summary(
-#   fit_toy,
-#   profile = "facets",
-#   detail = "brief",
-#   diagnostics = diag_toy
-# )
-# res_toy <- facets_summary_toy$results
-# 
+# fit_summary_toy <- summary(fit_toy)
+# fit_summary_toy$overview[, c("Model", "Method", "N", "Persons", "Converged")]
 # fit_summary_toy$decision
-# fit_summary_toy$overview
-# fit_summary_toy$readiness
-# fit_summary_toy$data_review
-# summary(diag_toy)$overview
-# facets_summary_toy
-# 
-# # Required first fitted-scale figure.
-# plot(res_toy, type = "wright", preset = "publication", show_ci = TRUE, top_n = Inf)
-# 
-# # Optional FACETS-style ruler. Replace these examples with the study rubric.
-# rubric_labels <- c(
-#   "1" = "Level 1",
-#   "2" = "Level 2",
-#   "3" = "Level 3",
-#   "4" = "Level 4"
-# )
-# plot(
-#   res_toy,
-#   type = "wright",
-#   renderer = "facets",
-#   category_labels = rubric_labels,
-#   show_ci = FALSE,
-#   preset = "publication"
-# )
-# # Setting show_ci = TRUE on this FACETS-style ruler is available as a
-# # deliberate hybrid: FACETS ruler grammar plus mfrmr uncertainty intervals.
-# 
-# # Optional follow-up: Infit on x, measure on y; persons are explicit opt-in.
-# plot(
-#   res_toy,
-#   type = "fit_pathway",
-#   fit_stat = "Infit",
-#   include_person = TRUE,
-#   top_n_person = 12,
-#   person_labels = "none",
-#   facet_labels = "flagged",
-#   preset = "publication"
-# )
 
-## ----summary-profile-controls, eval = FALSE-----------------------------------
-# reporting_summary_toy <- summary(
-#   fit_toy,
-#   profile = "reporting",
-#   diagnostics = diag_toy
-# )
-# 
-# availability_only <- summary(
-#   fit_toy,
-#   profile = "facets",
-#   compute = "never"
-# )
-# availability_only$section_status
-
-## ----toy-setup-artifacts, echo = FALSE, eval = is_cran_check------------------
+## ----ratings-setup-artifacts, echo = FALSE, eval = is_cran_check------------
 vignette_artifact("workflow_fit_decision.csv")
 vignette_artifact("workflow_fit_overview.csv")
+
+## ----precision-and-fit, fig.alt = "Fitted person, facet and step locations with the requested uncertainty display. Interpret precision using the accompanying table and its stated interval basis."----
+# diagnostic_summary_toy <- summary(diag_toy)
+# diagnostic_summary_toy$decision
+# diagnostic_summary_toy$overall_fit
+# 
+# precision_toy <- precision_review_report(fit_toy, diagnostics = diag_toy)
+# precision_toy$profile[, c(
+#   "PrecisionTier", "SupportsFormalInference", "PersonSEBasis", "NonPersonSEBasis"
+# )]
+# precision_toy$checks
+# 
+# # View the fitted locations with their uncertainty
+# plot(fit_toy, diagnostics = diag_toy, show_ci = TRUE)
+
+## ----diagnostic-overview-artifact, echo = FALSE, eval = is_cran_check-------
 vignette_artifact("workflow_diagnostic_overview.csv")
-vignette_artifact("workflow_plot_components.csv")
 
-## ----primary-route------------------------------------------------------------
-# report_toy <- mfrm_report(res_toy, style = "qc")
-# 
-# summary(res_toy)$next_actions
-# summary(report_toy)$overview
-# 
-# # This is a controlled analysis archive, not a deidentified shareable export.
-# export_dir <- file.path(tempdir(), "mfrmr-workflow-export")
-# export_toy <- export_mfrm_results(
-#   res_toy,
-#   output_dir = export_dir,
-#   include = c("default", "report"),
-#   overwrite = TRUE,
-#   acknowledge_sensitive = TRUE
-# )
-# export_preview <- head(export_toy$written_files)
-# export_preview$Path <- basename(export_preview$Path)
-# export_preview
+## ----category-review, fig.alt = "Category-use and threshold summaries for the fitted rubric. Sparse categories and transition ordering should be reviewed together with the rating design."----
+# scale_toy <- rating_scale_table(fit_toy, diagnostics = diag_toy)
+# scale_toy$category_table[, c("Category", "Count", "AvgMeasure", "ExpectedMeasure", "Infit", "Outfit")]
+# scale_toy$model_context
+# scale_toy$owner_category_table[, c(
+#   "StepFacet", "CategoryLabel", "RawCount", "Count", "Percent", "UsageStatus"
+# )]
+# scale_toy$threshold_table[, c("StepFacet", "Step", "Estimate", "SE", "CIUse")]
+# plot(scale_toy)
+# scale_toy$notes
 
-## ----primary-route-artifacts, echo = FALSE, eval = is_cran_check--------------
-vignette_artifact("workflow_next_actions.csv")
-vignette_artifact("workflow_report_overview.csv")
-vignette_artifact("workflow_export_files.csv")
-
-## ----diagnostics-reporting----------------------------------------------------
-# t4_toy <- unexpected_response_table(
+## ----diagnostics-reporting, fig.alt = "Unusual rating observations selected by the stated residual and probability thresholds. Flags support review of the underlying records, not automatic removal."----
+# unexpected_toy <- unexpected_response_table(
 #   fit_toy,
 #   diagnostics = diag_toy,
 #   abs_z_min = 1.5,
 #   prob_max = 0.4,
 #   top_n = 10
 # )
-# t12_toy <- fair_average_table(fit_toy, diagnostics = diag_toy)
-# t13_toy <- bias_interaction_report(
-#   estimate_bias(fit_toy, diag_toy,
-#                 facet_a = "Rater", facet_b = "Criterion",
-#                 max_iter = 2),
-#   top_n = 10
-# )
-# 
-# class(summary(t4_toy))
-# class(summary(t12_toy))
-# class(summary(t13_toy))
-# 
-# names(plot(t4_toy, draw = FALSE))
-# names(plot(t12_toy, draw = FALSE))
-# names(plot(t13_toy, draw = FALSE))
-# 
-# chk_toy <- reporting_checklist(fit_toy, diagnostics = diag_toy)
-# subset(
-#   chk_toy$checklist,
-#   Section == "Visual Displays",
-#   c("Item", "DraftReady", "NextAction")
-# )
+# unexpected_toy$summary
+# unexpected_toy$table[, c("Person", "Rater", "Criterion", "Observed", "Expected", "StdResidual")]
+# plot(unexpected_toy)
 
-## ----diagnostics-reporting-artifacts, echo = FALSE, eval = is_cran_check------
-vignette_artifact("workflow_summary_classes.csv")
-vignette_artifact("workflow_plot_object_components.csv")
-vignette_artifact("workflow_visual_checklist.csv")
+## ----diagnostic-bases, fig.alt = "Marginal fit display based on posterior-averaged response probabilities. Its probability basis differs from conditional residual diagnostics."----
+# diagnostic_summary_toy$diagnostic_basis[, c("DiagnosticPath", "Status", "ReportingUse")]
+# plot(fit_toy, type = "marginal_fit", diagnostics = diag_toy)
 
-## ----fit-full-----------------------------------------------------------------
-# fit <- fit_mfrm(
-#   data = ej2021_study1,
-#   person = "Person",
-#   facets = c("Rater", "Criterion"),
-#   score = "Score",
-#   method = "MML",
-#   model = "RSM",
-#   quad_points = 7
+## ----rater-feedback, fig.alt = "Rater severity estimates with 95% normal intervals on the fitted logit scale. Positive estimates indicate stricter ratings relative to the fitted reference."----
+# plot(fit_toy, type = "rater_severity", diagnostics = diag_toy, facet = "Rater", show_bands = FALSE)
+# rater_review <- facet_quality_dashboard(
+#   fit_toy, diagnostics = diag_toy, facet = "Rater"
 # )
-# 
-# diag <- diagnose_mfrm(
-#   fit,
-#   residual_pca = "none",
-#   diagnostic_mode = "both",
-#   fit_df_method = "both"
+# knitr::kable(
+#   rater_review$detail[, c("Level", "N", "Estimate", "SE", "Infit", "Outfit")],
+#   digits = 3, row.names = FALSE, caption = "Rater estimates and fit"
 # )
-# 
-# summary(fit, profile = "fit", detail = "brief")
-# summary(diag)
-# 
-# # Keep the final figure flow explicit: fit -> Wright map -> follow-up plots.
-# s <- summary(fit, profile = "facets", diagnostics = diag)
-# res <- s$results
-# s
-# plot(res, type = "wright", preset = "publication", show_ci = TRUE, top_n = Inf)
-# 
-# # Optional closest FACETS-style asterisk ruler (without mfrmr CI overlays).
-# plot(res, type = "wright", renderer = "facets",
-#      category_labels = rubric_labels, show_ci = FALSE,
-#      preset = "publication")
-# 
-# plot(
-#   res,
-#   type = "fit_pathway",
-#   fit_stat = "Infit",
-#   include_person = TRUE,
-#   top_n_person = 12,
-#   person_labels = "none",
-#   facet_labels = "flagged",
-#   preset = "publication"
+# knitr::kable(
+#   rater_review$detail[, c("Level", "MissingMetrics", "SeverityFlag", "MisfitFlag")],
+#   row.names = FALSE, caption = "Availability and screening flags"
 # )
+# rater_review$settings
+# writeLines(strwrap(rater_review$notes, width = 72))
 
-## ----fit-full-pca-------------------------------------------------------------
-# diag_pca <- diagnose_mfrm(
-#   fit,
-#   residual_pca = "both",
-#   pca_max_factors = 6
-# )
+## ----primary-route----------------------------------------------------------
+# res_toy <- mfrm_results(fit_toy, diagnostics = diag_toy, include = "publication")
+# report_toy <- mfrm_report(res_toy, style = "apa")
+# report_toy$first_screen[, c("Area", "Status", "MainIssue", "NextAction")]
 # 
-# summary(diag_pca)
+# checklist_toy <- reporting_checklist(fit_toy, diagnostics = diag_toy)
+# subset(checklist_toy$checklist, !DraftReady,
+#        c("Section", "Item", "NextAction"))
 
-## ----strict-rsm-pcm-----------------------------------------------------------
-# fit_rsm_strict <- fit_mfrm(
-#   data = toy,
-#   person = "Person",
-#   facets = c("Rater", "Criterion"),
-#   score = "Score",
-#   method = "MML",
-#   model = "RSM",
-#   quad_points = 7,
-#   maxit = 30
-# )
-# diag_rsm_strict <- diagnose_mfrm(
-#   fit_rsm_strict,
-#   diagnostic_mode = "both",
-#   residual_pca = "none"
-# )
-# 
-# fit_pcm_strict <- fit_mfrm(
-#   data = toy,
-#   person = "Person",
-#   facets = c("Rater", "Criterion"),
-#   score = "Score",
-#   method = "MML",
-#   model = "PCM",
-#   step_facet = "Criterion",
-#   quad_points = 7,
-#   maxit = 30
-# )
-# diag_pcm_strict <- diagnose_mfrm(
-#   fit_pcm_strict,
-#   diagnostic_mode = "both",
-#   residual_pca = "none"
-# )
-# 
-# summary(diag_rsm_strict)$diagnostic_basis[, c("DiagnosticPath", "Status", "Basis")]
-# summary(diag_pcm_strict)$diagnostic_basis[, c("DiagnosticPath", "Status", "Basis")]
+## ----report-overview-artifact, echo = FALSE, eval = is_cran_check-----------
+vignette_artifact("workflow_next_actions.csv")
 
-## ----strict-screening---------------------------------------------------------
-# screen_rsm <- evaluate_mfrm_diagnostic_screening(
-#   design = list(person = 18, rater = 3, criterion = 3, assignment = 3),
-#   reps = 1,
-#   scenarios = c("well_specified", "local_dependence"),
-#   model = "RSM",
-#   maxit = 30,
-#   quad_points = 7,
-#   seed = 123
+## ----report-table-----------------------------------------------------------
+# measurements_toy <- fit_measures_table(fit_toy, diagnostics = diag_toy)
+# rater_table_toy <- subset(
+#   measurements_toy$table, Facet == "Rater",
+#   c("Level", "N", "Measure", "SE", "CI_Lower", "CI_Upper", "Infit", "Outfit")
 # )
-# screen_pcm <- evaluate_mfrm_diagnostic_screening(
-#   design = list(person = 18, rater = 3, criterion = 3, assignment = 3),
-#   reps = 1,
-#   scenarios = c("well_specified", "step_structure_misspecification"),
-#   model = "PCM",
-#   maxit = 30,
-#   quad_points = 7,
-#   seed = 123
+# apa_table(rater_table_toy, digits = 3,
+#           caption = "Rater severity and fit",
+#           note = "N counts rating rows. Rater effects are centered within facet and measured in logits; higher values indicate stricter ratings. Intervals are 95% normal approximations from MML observed-information SEs. Infit and Outfit have reference value 1.")
+
+## ----report-export----------------------------------------------------------
+# # A new temporary directory keeps this synthetic example repeatable
+# export_dir <- tempfile("mfrmr-workflow-export-")
+# export_toy <- export_mfrm_results(
+#   res_toy,
+#   output_dir = export_dir,
+#   include = c("default", "report"),
+#   acknowledge_sensitive = TRUE
 # )
-# 
-# screen_rsm$performance_summary[, c("Scenario", "EvaluationUse", "LegacyAnyFlagRate", "StrictAnyFlagRate")]
-# screen_pcm$performance_summary[, c("Scenario", "EvaluationUse", "LegacySensitivityProxy", "StrictSensitivityProxy", "DeltaStrictMinusLegacyFlagRate")]
+# export_preview <- head(export_toy$written_files[, c("Component", "Format", "Path")])
+# export_preview$Path <- basename(export_preview$Path)
+# knitr::kable(export_preview, row.names = FALSE,
+#              caption = "First six exported files (filenames only)")
 
-## ----strict-reporting-route---------------------------------------------------
-# chk_rsm_strict <- reporting_checklist(fit_rsm_strict, diagnostics = diag_rsm_strict)
-# subset(
-#   chk_rsm_strict$checklist,
-#   Section == "Visual Displays" &
-#     Item %in% c("QC / facet dashboard", "Strict marginal visuals", "Precision / information curves"),
-#   c("Item", "Available", "DraftReady", "NextAction")
+## ----report-reload----------------------------------------------------------
+# results_file <- subset(export_toy$written_files, Component == "results_rds")$Path
+# restored_results <- readRDS(results_file)
+# summary(restored_results)$decision
+
+## ----export-artifact, echo = FALSE, eval = is_cran_check--------------------
+vignette_artifact("workflow_export_files.csv")
+
+## ----model-export-example---------------------------------------------------
+# # Reuse the fit above; no additional estimation or backend is needed to export.
+# stan_model <- export_mfrm_model(
+#   fit_toy, tempfile("stan-model-"), format = "stan",
+#   acknowledge_sensitive = TRUE
 # )
-
-## ----residual-pca-------------------------------------------------------------
-# pca <- analyze_residual_pca(diag_pca, mode = "both")
-# plot_residual_pca(pca, mode = "overall", plot_type = "scree")
-
-## ----bias-apa-----------------------------------------------------------------
-# data("mfrmr_example_bias", package = "mfrmr")
-# bias_df <- mfrmr_example_bias
-# fit_bias <- fit_mfrm(
-#   bias_df,
-#   person = "Person",
-#   facets = c("Rater", "Criterion"),
-#   score = "Score",
-#   method = "MML",
-#   model = "RSM",
-#   quad_points = 7
+# brms_model <- export_mfrm_model(
+#   fit_toy, tempfile("brms-model-"), format = "brms",
+#   acknowledge_sensitive = TRUE
 # )
-# diag_bias <- diagnose_mfrm(fit_bias, residual_pca = "none")
-# bias <- estimate_bias(fit_bias, diag_bias, facet_a = "Rater", facet_b = "Criterion")
-# fixed <- build_fixed_reports(bias)
-# apa <- build_apa_outputs(fit_bias, diag_bias, bias_results = bias)
-# 
-# mfrm_threshold_profiles()
-# vis <- build_visual_summaries(fit_bias, diag_bias, threshold_profile = "standard")
-# vis$warning_map$residual_pca_overall
+# names(stan_model$files)
+# model_data <- readRDS(stan_model$files[["model-data.rds"]])
+# model_data$categories
+# model_data$priors
 
-## ----reporting-api------------------------------------------------------------
-# spec <- specifications_report(fit, title = "Study run")
-# data_qc <- data_quality_report(
-#   fit,
-#   data = ej2021_study1,
-#   person = "Person",
-#   facets = c("Rater", "Criterion"),
-#   score = "Score"
+## ----saved-posterior-return-------------------------------------------------
+# posterior <- read_mfrm_posterior(system.file(
+#   "extdata", "posterior-example", package = "mfrmr"))
+# summary(posterior)
+# posterior_plot <- plot(posterior, quantity = "location", draw = FALSE)
+# posterior_report <- mfrm_report(posterior, style = "apa")
+
+## ----simulation-file-workflow, eval=FALSE-----------------------------------
+# dir.create("results", showWarnings = FALSE)
+# recovery <- simulate_mfrm_recovery(
+#   n_person = 50, n_rater = 4, n_criterion = 4,
+#   reps = 100, seed = 20261021, file = "results/recovery.rds"
 # )
-# iter <- estimation_iteration_report(fit, max_iter = 8)
-# subset_rep <- subset_connectivity_report(fit, diagnostics = diag)
-# facet_stats <- facet_statistics_report(fit, diagnostics = diag)
-# cat_structure <- category_structure_report(fit, diagnostics = diag)
-# cat_curves <- category_curves_report(fit, theta_points = 101)
-# bias_rep <- bias_interaction_report(bias, top_n = 20)
-# plot_bias_interaction(bias_rep, plot = "scatter")
+# summary(recovery)$rep_overview  # Retains failed attempts, too.
 
-## ----gd-study-reading-order, eval=FALSE---------------------------------------
-# if (requireNamespace("lme4", quietly = TRUE)) {
-#   gt <- mfrm_generalizability(fit)
-#   gt$coefficients[, c("G", "Phi", "GStatus", "PhiStatus",
-#                       "IdentificationStatus")]
-# 
-#   ds <- mfrm_d_study(
-#     gt,
-#     data.frame(Rater = c(2, 3, 4), Criterion = 4),
-#     residual_scaling = "sensitivity"
+## ----observed-writing-example, eval = FALSE---------------------------------
+# library(mfrmr)
+# data("data.ratings1", package = "sirt")
+# wide <- data.ratings1
+# persons <- match(wide$idstud, unique(wide$idstud))
+# raters <- match(wide$rater, unique(wide$rater))
+# writing <- do.call(rbind, lapply(paste0("k", 1:5), function(criterion) {
+#   data.frame(
+#     Person = sprintf("P%03d", persons), Rater = paste0("R", raters),
+#     Criterion = criterion, Score = wide[[criterion]]
 #   )
-#   ds[, c("n_Rater", "n_Criterion", "ResidualScaling",
-#          "G", "Phi", "GStatus", "PhiStatus", "IdentificationStatus")]
-# }
-
-## ----design-prediction--------------------------------------------------------
-# sim_spec <- build_mfrm_sim_spec(
-#   n_person = 30,
-#   n_rater = 4,
-#   n_criterion = 4,
-#   raters_per_person = 2,
-#   assignment = "rotating"
+# }))
+# review <- describe_mfrm_data(
+#   writing, person = "Person", facets = c("Rater", "Criterion"), score = "Score",
+#   rating_min = 0, rating_max = 3
 # )
+# review$row_retention
+# review$design_connectivity
 # 
-# recovery <- suppressWarnings(
-#   evaluate_mfrm_recovery(
-#     sim_spec = sim_spec,
-#     reps = 2,
-#     maxit = 30,
-#     include_diagnostics = TRUE,
-#     diagnostic_fit_df_method = "both",
-#     seed = 2
-#   )
+# writing_fit <- fit_mfrm(
+#   writing, "Person", c("Rater", "Criterion"), "Score",
+#   method = "MML", model = "PCM", step_facet = "Criterion",
+#   rating_min = 0, rating_max = 3, quad_points = 61, maxit = 400
 # )
-# 
-# summary(recovery)$recovery_summary[, c("ParameterType", "Facet", "RMSE", "Bias")]
-# plot(recovery, type = "summary", metric = "rmse", draw = FALSE)$data$plot_table
-# 
-# recovery_review <- assess_mfrm_recovery(
-#   recovery,
-#   min_reps = 2,
-#   min_se_available = NULL,
-#   max_mcse_rmse_ratio = NULL,
-#   max_rmse = c(facet = 1, step = 1, default = 1.5),
-#   max_abs_bias = c(default = 0.75)
+# writing_diagnostics <- diagnose_mfrm(writing_fit, residual_pca = "none")
+# feedback <- facet_quality_dashboard(
+#   writing_fit, diagnostics = writing_diagnostics, facet = "Rater"
 # )
-# 
-# summary(recovery_review)$checklist[, c("Section", "Item", "Status")]
-# summary(recovery_review)$reading_order
-# summary(recovery_review)$condition_reporting_notes
-# summary(recovery_review)$condition_review
-# summary(recovery_review)$diagnostic_reporting_notes
-# summary(recovery_review)$diagnostic_review
-# 
-# status_plot <- plot(recovery_review, type = "status", draw = FALSE)
-# status_plot$data$section_status
-# status_plot$data$reading_order
-# 
-# metric_plot <- plot(recovery_review, type = "metrics", metric = "rmse", draw = FALSE)
-# metric_plot$data$plot_table
-# metric_plot$data$guidance
-# 
-# recovery_bundle <- build_summary_table_bundle(
-#   recovery_review,
-#   appendix_preset = "recommended"
-# )
-# recovery_bundle$table_index[, c("Table", "Rows", "Role")]
-# 
-# pred_pop <- predict_mfrm_population(
-#   sim_spec = sim_spec,
-#   reps = 2,
-#   maxit = 30,
-#   seed = 1
-# )
-# 
-# summary(pred_pop)$forecast[, c("Facet", "MeanSeparation", "McseSeparation")]
-# 
-# keep_people <- unique(toy$Person)[1:18]
-# toy_mml <- suppressWarnings(
-#   fit_mfrm(
-#     toy[toy$Person %in% keep_people, , drop = FALSE],
-#     person = "Person",
-#     facets = c("Rater", "Criterion"),
-#     score = "Score",
-#     method = "MML",
-#     quad_points = 5,
-#     maxit = 30
-#   )
-# )
-# 
-# new_units <- data.frame(
-#   Person = c("NEW01", "NEW01"),
-#   Rater = unique(toy$Rater)[1],
-#   Criterion = unique(toy$Criterion)[1:2],
-#   Score = c(2, 3)
-# )
-# 
-# pred_units <- predict_mfrm_units(toy_mml, new_units, n_draws = 0)
-# pv_units <- sample_mfrm_plausible_values(toy_mml, new_units, n_draws = 2, seed = 1)
-# 
-# summary(pred_units)$estimates[, c("Person", "Estimate", "Lower", "Upper")]
-# summary(pv_units)$draw_summary[, c("Person", "Draws", "MeanValue")]
-
-## ----recovery-export, eval = FALSE--------------------------------------------
-# export_summary_appendix(
-#   list(recovery = recovery, recovery_review = recovery_review),
-#   output_dir = tempdir(),
-#   prefix = "mfrmr_recovery_appendix",
-#   preset = "recommended",
-#   include_html = FALSE,
-#   overwrite = TRUE
+# feedback$detail[, c("Level", "N", "Estimate", "SE", "Infit", "Outfit", "MisfitFlag")]
+# feedback$settings
+# plot(writing_fit, type = "rater_severity", diagnostics = writing_diagnostics, facet = "Rater", show_bands = FALSE)
+# saveRDS(feedback, "writing-feedback.rds")
+# archive <- export_mfrm_bundle(
+#   writing_fit, diagnostics = writing_diagnostics, facet = "Rater",
+#   output_dir = "writing-analysis", data = writing, acknowledge_sensitive = TRUE
 # )
 

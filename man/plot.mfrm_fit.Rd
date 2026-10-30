@@ -21,7 +21,7 @@
   include_fit_measures = TRUE,
   fit_stat = c("Infit", "Outfit"),
   fit_scale = c("mnsq", "zstd"),
-  zstd_method = c("engine", "facets"),
+  zstd_method = c("facets", "engine"),
   include_person = FALSE,
   person_subset = NULL,
   top_n_person = 30,
@@ -39,7 +39,15 @@
   wright_range = NULL,
   extreme_placement = c("ends", "estimate"),
   persons_per_star = NULL,
-  ...
+  show_title = FALSE,
+  show_notes = FALSE,
+  ...,
+  level = NULL,
+  view = NULL,
+  metric = NULL,
+  comparison = NULL,
+  labels = NULL,
+  highlight = NULL
 )
 }
 \arguments{
@@ -51,12 +59,15 @@ the three-part fit bundle; otherwise choose one of \code{"facet"}, \code{"person
 \code{"step"}, \code{"wright"}, \code{"pathway"}, \code{"fit_pathway"}, \code{"ccc"},
 \code{"ccc_surface"}, or \code{"category_surface"}. \code{"pathway"} is the
 theta-to-expected-score display; \code{"fit_pathway"} is the
-fit-statistic-to-measure display.}
+fit-statistic-to-measure display.
+Additional diagnostic and reporting views are listed under "Single-fit
+views" in \link{mfrmr_plot_migration}, with replacements for all former helpers.}
 
 \item{facet}{Optional facet name for \code{type = "facet"}.}
 
-\item{top_n}{Maximum number of facet/step locations retained by the native
-Wright map for compact displays. Step transitions are always retained;
+\item{top_n}{Maximum number of non-person facet locations retained by the
+native Wright map for compact displays. Step transitions are always
+retained separately and do not consume this limit;
 any omitted facet locations are counted in the returned \code{retention} table
 and disclosed in the plot subtitle/note. Use \code{Inf} for a complete
 all-level final map. The FACETS-style payload always retains every fitted
@@ -72,7 +83,9 @@ category-surface plot data.}
 
 \item{palette}{Optional color overrides.}
 
-\item{label_angle}{Rotation angle for x-axis labels where applicable.}
+\item{label_angle}{Rotation angle for x-axis labels where applicable.
+Native Wright maps reserve bottom space for full labels when abbreviating
+them would make different groups indistinguishable.}
 
 \item{show_ci}{Whether to add approximate confidence intervals when
 available. \code{NULL} selects the display-specific default: \code{TRUE} for the
@@ -92,11 +105,15 @@ values and for \code{wright_style = "facets_style"}, whose person column is a
 single FACETS-style star frequency. To pass the source data alongside, use
 \verb{plot(fit, type = "wright", group = "MyCol", group_data = <df>)}.}
 
-\item{diagnostics}{Optional output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}. When supplied,
+\item{diagnostics}{Optional matching output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.
+Recompute it after refitting; mismatched or outdated readiness records
+are rejected. When supplied,
 Wright-map standard errors and precision metadata reuse matching rows from
 \code{diagnostics$measures} without replacing fitted coordinates,
 while pathway plot data reuse \code{fit_measures}, \code{fit_status}, and
-\code{curve_fit_status} instead of recomputing diagnostics.}
+\code{curve_fit_status} instead of recomputing diagnostics.
+Must match this fitted analysis; see \link{mfrmr_compatibility_layer} for
+migration of saved diagnostics.}
 
 \item{include_fit_measures}{If \code{TRUE} (default), pathway plot data include
 tidy fit-measure and fit-status tables for custom R graphics. Set to
@@ -108,10 +125,11 @@ tidy fit-measure and fit-status tables for custom R graphics. Set to
 \item{fit_scale}{For \code{type = "fit_pathway"}, use mean squares (\code{"mnsq"})
 or standardized fit (\code{"zstd"}) on the horizontal axis.}
 
-\item{zstd_method}{For a ZSTD fit pathway, use the package engine degrees
-of freedom (\code{"engine"}, default) or the FACETS/Wright-Masters companion
-calculation (\code{"facets"}). The latter is a comparison aid, not a claim of
-complete FACETS output equivalence.}
+\item{zstd_method}{For a ZSTD fit pathway, \code{"facets"} (default) uses the
+FACETS/Wright-Masters fourth-moment df, matching \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.
+\code{"engine"} retains the former package-native df convention. Neither
+establishes complete FACETS output equivalence. Refreshing companions
+from supplied diagnostics preserves their recorded WHEXACT choice.}
 
 \item{include_person}{If \code{TRUE}, include person rows in a fit pathway.}
 
@@ -170,21 +188,84 @@ persons at the ruler \code{"ends"} or retain their fitted \code{"estimate"}.}
 \item{persons_per_star}{Number of persons represented by one \code{*} in the
 FACETS-style frequency column. \code{NULL} chooses a compact value automatically.}
 
-\item{...}{Additional arguments ignored for S3 compatibility.}
+\item{show_title}{Logical; display the main plot title (default \code{FALSE}). Structural panel
+headings, axis labels, legends, and data labels remain visible.}
+
+\item{show_notes}{Logical; display explanatory subtitles, footnotes, and
+review-only title markers. Notes remain available in the returned object,
+and R warnings are still issued. Default \code{FALSE}; use
+\code{plot_data(p, "notes")} for the descriptions and cautions outside the figure.}
+
+\item{...}{View-specific controls listed in \link{mfrmr_plot_migration}. The
+consolidated routes reject irrelevant or duplicated arguments.}
+
+\item{level}{Named alternative to \code{ci_level}, a single number strictly
+between 0 and 1. Supply only one of these names, even when equal.
+Both omitted retain 0.95. This controls the fitted-model plot intervals;
+attached interval results retain the level chosen when they were computed.}
+
+\item{view}{Optional display variant for consolidated routes: for example,
+\code{"pairs"} or \code{"heatmap"} for agreement, \code{"unified"} for the former unified
+Wright helper, or \code{"funnel"} for shrinkage. See \link{mfrmr_plot_migration}.}
+
+\item{metric}{Quantity for a consolidated route, for example \code{"reliability"},
+\code{"separation"} or \code{"strata"}, or \code{"exact"} / \code{"correlation"} for agreement.}
+
+\item{comparison}{Another fitted model for paired Wright/CCC displays, or an
+ordered list of additional fits for \code{type = "trajectory"}. Plotting does
+not equate their scales or perform a model-selection test.}
+
+\item{labels}{Labels for paired models or all trajectory waves, reference first.}
+
+\item{highlight}{Optional named list of non-person facet level IDs, for
+example \code{list(Rater = c("R01", "R02"))}, for Wright maps only (including
+\code{view = "unified"} and the Wright component of a bundle). Selected labels
+receive a \verb{> } prefix in both renderers and saved ggplot conversion.
+Levels outside the usual \code{top_n} selection are added, so the displayed
+count may exceed that limit. Fitted locations and uncertainty do not
+change; the automatic scale uses all fitted locations before compaction.
+Selection is not a statistical flag. Inspect \code{locations$Highlighted},
+\code{retention} and \code{notes} in the returned plot data. Unknown IDs or levels
+without finite locations are rejected. \code{NULL} selects no levels.}
 }
 \value{
 Invisibly, an \code{mfrm_plot_data} object (default and for any
 single \code{type}), or an \code{mfrm_plot_bundle} when
 \code{type = "bundle"} / \code{"all"} / \code{"default"}. Each returned fit plot
 includes domain-specific readiness and an interpretation status in its
-data payload. It also includes a one-row \code{scale_contract} table recording
+data payload, plus a \code{notes} table and \code{display} settings. It also includes
+a one-row \code{scale_contract} table recording
 the fitted coordinate basis, population SD when applicable,
-discrimination basis, and bounded-GPCM MML identification convention.
+discrimination basis, and GPCM MML identification convention.
 }
 \description{
 Plot fitted MFRM results with base R
 }
 \details{
+Start with \code{plot(fit)}: it draws a Wright map of person abilities, rater
+severities, other facet locations, and category thresholds on one logit
+scale. No plot options are needed for this first view.
+
+For adjusted-score comparisons, use \code{plot(fit, type = "fair_average", show_ci = TRUE)}. \code{metric = "FairM"} uses mean reference measures;
+\code{metric = "FairZ"} uses a zero reference, not a z-score. PCM averages
+expectations over administered scales with the table's observation weights
+and \code{totalscore} selection. Its conditional delta-method intervals use the
+same retained observations as the table: finite direct anchors in ordinary
+additive RSM/PCM JML are retained even with all-minimum/all-maximum responses,
+including when \code{totalscore = FALSE}. The intervals use the
+derivative of that same average. RSM/PCM intervals hold thresholds, other
+effects and reference means fixed; they are diagnostic approximations,
+not full calibration-uncertainty intervals. Inspect the returned data and
+notes for the interval method and unavailable rows. See \code{\link[=fair_average_table]{fair_average_table()}}
+for reference definitions and \link{plot_fair_average} for view-specific controls.
+For ordinary additive RSM/PCM JML, \verb{xtreme = .3, xtreme_method = "facets"}
+requests conditional total-score extrapolation of extreme measures and
+their fair scores. Primary estimates and fixed anchors are retained.
+Group-mean anchors are unsupported. The measure SE describes the corrected
+total; fair-score intervals remain unavailable for positive \code{xtreme}.
+The default \code{xtreme_method = "display"} retains the old average-score
+display convention and leaves fair scores unchanged.
+
 This S3 plotting method provides the core fit-family visuals for
 \code{mfrmr}. When \code{type} is omitted, it returns the Wright map alone as
 an \code{mfrm_plot_data} object (the most useful single figure for a
@@ -194,9 +275,11 @@ Wright map, pathway map, and category characteristic curves. The
 compact native default records any omitted facet locations in
 \code{data$retention} and annotates the subtitle and drawn figure; use
 \code{top_n = Inf} to retain every fitted location in the final Wright map.
-Every retained native location is labelled. Collision-aware \code{LabelX} /
-\code{LabelY} coordinates and leader lines displace text without moving the
-fitted point; \code{label_points} retains both point and text coordinates for
+Every retained native location is labelled. \code{LabelX} / \code{LabelY} provide
+initial text positions; base graphics further adjusts these positions for
+the device's text dimensions, avoiding nearby labels and fitted points where
+space permits. Leader lines connect displaced text to the unchanged point.
+\code{label_points} retains fitted coordinates and initial text positions for
 custom renderers. Step transitions share one vertical ladder and their
 labels include the fitted threshold logit. When the fit records
 boundary-separated facet levels and no
@@ -209,27 +292,65 @@ triangles and the plot footer disclose any omitted or clipped interval.
 The returned object always carries machine-readable metadata through
 the \code{mfrm_plot_data} contract, even when the plot is drawn
 immediately.
+Set \code{show_title = FALSE} and \code{show_notes = FALSE} for a figure whose title
+and explanation will be supplied by the surrounding document. The returned
+\code{data$notes} table contains \code{Type} and \code{Text} columns for interpretation,
+reference-profile conditions, and display/retention notes where applicable;
+\code{print()} also prints these notes. \code{data$display} records the two flags.
+Original titles, subtitles, coordinates, and readiness metadata are retained.
+Device-dependent crowding warnings are issued during drawing rather than
+stored in this draw-free notes table. \code{as_ggplot()} respects these flags and
+retains the notes in \code{attr(plot, "mfrmr_notes")}.
+
+Fit-family Wright, pathway, and CCC displays use a shared, CUD-informed
+palette. The first eight series use an Okabe-Ito foundation with bright
+yellow omitted and darker pink/amber/cyan entries for light backgrounds.
+Beyond eight series, colours come from the dark half of the viridis HCL
+palette. Expected-score and category curves also vary line type; Wright
+locations retain their distinct point shapes, and small data labels use
+dark neutral text. Six line types cycle for larger series sets, so dense
+plots still require labels, panels, or more space. This is not a guarantee
+of perceptual separation for every viewer or device.
+\code{preset = "monochrome"} applies to these series in both base and ggplot
+renderers. Custom \code{palette} values are retained in \code{data$palette} and used
+during ggplot conversion; colour overrides keep the non-colour encodings.
+See \url{https://jfly.uni-koeln.de/color/} for Color Universal Design guidance.
 
 Every fit-derived payload also carries \code{data$fit_readiness},
 \code{data$interpretation_status}, and \code{data$interpretation_note}. Availability
 and interpretability are separate: when a numerical, data, design, or
-stability gate requires review, the coordinates remain available for
+stability status requires review, the coordinates remain available for
 diagnosis, but the call warns and marks the returned subtitle and drawn
-title \verb{REVIEW ONLY}.
+title \verb{REVIEW ONLY} by default. Hiding that annotation changes presentation
+only; it does not change the fit's interpretation status or suppress warnings.
 A prior-regularized extreme MML EAP remains in \code{fit$facets$person}. If its
 source fit is blocked, however, it is omitted from the Wright-map scale so
 that a finite but non-interpretable trace cannot collapse the display. The
 exact excluded rows and reason remain in \code{data$person_exclusions}, and the
 omission is stated in \code{data$retention_note}.
 
+\code{type = "unexpected"} uses the same default as
+\code{\link[=unexpected_response_table]{unexpected_response_table()}}: \verb{abs_z_min = 3, rule = "residual"}.
+The optional \code{rule = "either"} or \code{"both"} also uses \code{prob_max}.
+Saved table plots retain the recorded thresholds. A fully evaluated screen
+with no flags yields an empty display and retains its screening summary.
+
 \code{type = "wright"} shows persons, facet levels, and step thresholds on
 a shared logit scale. Estimates are plotted as fitted, so the sign
-convention follows the fit: higher person values indicate higher
-ability, and higher non-person facet values indicate greater
-severity/difficulty under the default negative facet orientation.
+convention follows the fit: higher Person values predict higher coded
+scores in these positive-discrimination models. Whether that means more
+comprehensible or less comprehensible speech depends on the rubric coding.
+Under the default negative orientation, higher non-Person facet values
+reduce expected coded scores; calling this greater severity/difficulty
+presumes that higher scores represent better performance.
 Facets listed in \code{fit_mfrm(positive_facets = ...)} are reversed
 (higher values raise expected scores); state the active orientation in
 figure captions when reporting.
+The returned \code{notes}, also shown by \code{print()}, state the recorded facet
+directions and the score-coding caveat. Missing orientation in an older or
+imported result is not guessed. Category labels do not recode the data.
+See \link{mfrmr_visual_diagnostics} for reverse-coded comprehensibility, fit,
+conditional bias and Step explanations.
 
 Set \code{renderer = "facets"} (equivalently,
 \code{wright_style = "facets_style"}) for a line-printer-inspired common
@@ -245,6 +366,9 @@ and standard errors remain those produced by \code{mfrmr}. Use
 \code{show_ci = FALSE} for the closest FACETS-style rendering. If
 \code{show_ci = TRUE} is requested, interpret the result as a hybrid that adds
 mfrmr uncertainty intervals to FACETS-style ruler grammar.
+Column headings are retained even on narrow devices. If headings or person
+frequency stars need more space, drawing warns; use a wider device or increase
+\code{persons_per_star} for a more compact frequency column.
 
 \code{type = "pathway"} shows expected score
 traces and dominant-category regions across theta. This expected-score
@@ -259,10 +383,18 @@ map in ggplot2, plotly, or a report pipeline while keeping the same
 underfit/overfit labels used by \code{\link[=fit_measures_table]{fit_measures_table()}}. \code{type = "ccc"} shows
 category response probabilities. Multiple curve groups are faceted rather
 than overplotted by the native renderer, and category-specific legends use
-the same colours across panels. For \code{GPCM}, these curves retain the
-estimated step-facet slope; all curve families are reference-profile curves
+the same colours across panels. Multiple groups or more than five categories use one legend
+beside the plotting area; colour presets use distinct default colours
+beyond eight categories. For \code{GPCM}, these curves retain the
+estimated slope. With separate owners, each step-level/slope-level pair is
+a labeled curve group. Such joint profiles have no single-facet Infit/Outfit
+flag; inspect \code{fit_measures} or \code{type = "fit_pathway"} separately.
+All curve families are reference-profile curves
 with additive facet main effects and fitted interactions fixed at zero; the
 native footer and ggplot subtitle disclose that conditioning.
+Expected-score pathways use the same reference profile and expose the
+same \code{curve_basis} table. These curves do not average over the observed
+rater assignments or show a particular fitted interaction cell.
 The draw-free \code{curve_basis}, \code{CurveBasis}, and \code{PredictorOffset} fields make
 that conditioning explicit. \code{type = "ccc_surface"} or
 \code{type = "category_surface"} returns 3D-ready category-probability surface
@@ -274,6 +406,63 @@ manuscript-use boundaries remain visible to beginners. The remaining
 types (\code{"facet"}, \code{"person"}, \code{"step"}, \code{"shrinkage"}) provide
 compact location-specific displays.
 }
+\section{Facet locations and practical equivalence}{
+
+\code{plot(fit, type = "rater_severity", facet = "Rater")} orders locations
+and shows available normal uncertainty intervals. Pass matching
+\code{diagnostics} to reuse their precision metadata. The default has no
+magnitude bands; \code{show_bands = TRUE} explicitly adds gray guides at
++/-0.5 and +/-1.0 logits. These distances from the fitted zero are not
+equivalence bounds, evidence of homogeneity or calibration standards.
+The returned \code{data} table uses numerical absolute-location ranges in
+\code{Band}; a common range does not imply small pairwise differences.
+
+Use \code{p <- plot(fit, type = "rater_severity", diagnostics = diagnostics)}
+and \code{\link[=plot_data]{plot_data()}} to read \code{"data"} and \code{"notes"}. Intervals retain their
+\code{CIUse}, \code{SE_Method} and \code{IntervalStatus}; individual whisker overlap is
+not a contrast interval. \code{\link[=analyze_facet_equivalence]{analyze_facet_equivalence()}} separately examines
+pairwise differences with their full covariance and a prespecified practical
+bound in its supported MML scope. It does not use the profile's guides.
+The zero depends on the model constraints/anchors, so read the signed
+differences and their uncertainty instead of inferring quality from color.
+Older saved profiles retain their original colors and labels when converted
+with \code{\link[=as_ggplot]{as_ggplot()}}; regenerate the figure from the saved fit and matching
+diagnostics for the new display. No refitting is needed.
+}
+
+\section{Corrected JML plots}{
+
+A fit with an explicit \code{jml_correction_order} uses \code{type = "slopes"}
+(default), \code{"locations"} or \code{"steps"}. Locations show one \code{facet}, defaulting
+to the first declared facet. \code{style = "points"} shows estimates without
+intervals; \code{"distribution"} shows their empirical cumulative distribution.
+These displays do not classify rater quality. They support \code{title}, \code{caption},
+\code{show_title}, \code{show_notes}, \code{show_labels}, \code{sort}, \code{palette}, \code{preset},
+\code{text_scale}, \code{point_size}, and draw-free \code{\link[=as_ggplot]{as_ggplot()}} conversion. Slopes
+use a reference of one; location/step displays use zero. Ordinary plot types,
+\code{show_ci = TRUE}, and unrelated plot controls are rejected for this estimator.
+The figure retains point estimates if their RootSE is unavailable; it cannot
+be drawn if no unambiguous point solution was obtained.
+}
+
+\section{Graphics layout}{
+
+Single-panel plots advance through a caller's \code{par(mfrow = ...)} or
+\code{layout()} arrangement and restore the style and margins they change.
+Native Wright maps, multi-group CCC plots, and faceted fit pathways create
+their own page layouts; call these outside a custom \code{layout()} arrangement.
+Use \code{renderer = "facets"} for a single-panel Wright map in a custom grid.
+A 7 by 5 inch device is a useful starting size for standalone plots;
+dense PCM labels benefit from a wider device.
+Native Wright/pathway plots warn when labels cannot be separated within
+the available space. Enlarge the device (for example, to 12 by 8 inches)
+and inspect the result; this warning concerns readability, not model fit.
+Abbreviated labels retain distinguishing text where possible, falling back
+to full names if needed. Original names remain available in the plot data.
+For non-Latin labels, select a graphics device and font that support the
+characters before plotting; the package retains the caller's font family.
+}
+
 \section{Typical workflow}{
 
 \enumerate{
@@ -293,63 +482,64 @@ For a plot-selection guide and extended examples, see
 \code{vignette("mfrmr-visual-diagnostics", package = "mfrmr")}.
 }
 
+\section{Session plot defaults}{
+
+Set \code{options(mfrmr.plot_preset = "publication")} to choose a session default
+for plotting functions that expose the common \code{preset} argument. The
+supported values are \code{"standard"}, \code{"publication"}, \code{"compact"} and
+\code{"monochrome"}. Precedence is an explicit call argument, then the session
+option, then \code{"standard"}. For example, \code{preset = "standard"} overrides
+a session set to \code{"monochrome"}. Explicit \code{preset = NULL} retains the
+earlier package-default behavior; it does not read the session option.
+Invalid session values cause an error only when that option is needed.
+
+The category-curve, data-quality, fit-review, connectivity and network
+routes of \code{plot()} for report bundles use the same option through \code{...}.
+Plots without a common \code{preset} argument, including extended-model plots
+with their own \code{palette} controls, keep their own settings. This option
+selects a preset, not a universal theme or a guarantee that all renderers
+implement every appearance control identically.
+
+New plot payloads retain the resolved preset for supported saved-data
+rendering. Converting an existing payload with \code{\link[=as_ggplot]{as_ggplot()}} uses its saved
+appearance, even after the session option changes. A call that creates a
+new plot from a fit or statistical result uses the current default.
+For a reproducible script, supply \code{preset} explicitly or set the option in
+that script. Saving only the fitted model does not save a session option.
+No global ggplot theme is changed.
+
+Restore previous settings with \code{old <- options(mfrmr.plot_preset = "monochrome")} followed by \code{options(old)}. Use
+\code{options(mfrmr.plot_preset = NULL)} to remove the option. The preset changes
+appearance, not estimates, confidence levels or diagnostic thresholds.
+}
+
 \examples{
-toy <- load_mfrmr_data("example_operational")
-# Seven quadrature points keep this executable example short. For a final
-# analysis, restore the default or a prespecified grid and review sensitivity.
-fit <- fit_mfrm(
-  toy,
-  "Person",
-  c("Rater", "Criterion"),
-  "Score",
-  method = "MML",
-  model = "RSM",
-  quad_points = 7,
-  maxit = 30
-)
+library(mfrmr)
+
+# Saved synthetic MML/RSM analysis of example_operational.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "operational-mml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+
+# Run each plot command separately to inspect its figure
+plot(fit) # Wright map: persons, facets, and category thresholds
+
+# Rater severity estimates (higher means stricter in this example)
+plot(fit, type = "facet", facet = "Rater")
+
+# Probability of each score category across the ability scale
+plot(fit, type = "ccc")
+
+# Optional: get plot data instead of drawing a figure
 wright <- plot(fit, draw = FALSE)
 head(wright$data$locations)
-# Look for: persons clustered against the facet / step rows on the
-#   shared logit axis. Large gaps between the person density and
-#   the step / facet rails indicate weak targeting; ceiling /
-#   floor stripes mean the test is too easy / hard.
-bundle <- plot(fit, type = "bundle", draw = FALSE)
-bundle$wright_map$data$group_summary
-# Look for: pathway curves rising in the expected order with
-#   visible dominant-category bands; CCC curves peaking sequentially
-#   without one category being completely overlapped by neighbours.
-surface <- plot(fit, type = "ccc_surface", draw = FALSE)
-head(surface$data$surface)
-surface$data$category_support
-# Look for: every retained category having `Observed > 0`; categories
-#   with zero observations are returned as a zero-observation slice and
-#   should not be interpreted as a real score region.
-surface$data$interpretation_guide
-if (interactive()) {
-  plot(
-    fit,
-    type = "wright",
-    preset = "publication",
-    title = "Customized Wright Map",
-    show_ci = TRUE,
-    label_angle = 45
-  )
-  plot(
-    fit,
-    type = "pathway",
-    title = "Customized Pathway Map",
-    palette = c("#1f78b4")
-  )
-  plot(
-    fit,
-    type = "ccc",
-    title = "Customized Category Characteristic Curves",
-    palette = c("#1b9e77", "#d95f02", "#7570b3")
-  )
-}
+# Find a named judge without refitting or dropping the surrounding scale
+judge <- subset(wright$data$locations, Group == "Rater")$Label[1]
+focused <- plot(fit, highlight = list(Rater = judge), draw = FALSE)
+subset(plot_data(focused, "locations"), Highlighted)
 }
 \seealso{
-\code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=plot_wright_unified]{plot_wright_unified()}}, \code{\link[=plot_bubble]{plot_bubble()}},
+\code{\link[=fit_mfrm]{fit_mfrm()}}, \link[=plot.mfrm_fit]{plot(x, type = "wright", view = "unified")}, \link[=plot.mfrm_fit]{plot(x, type = "bubble")},
 \link{mfrmr_visual_diagnostics}
 }
 \concept{confidence intervals}

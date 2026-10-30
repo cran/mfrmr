@@ -28,13 +28,16 @@ export_mfrm_results(
 underscores.}
 
 \item{include}{Export components. \code{"default"} expands to \code{"summary"},
-\code{"tables"}, \code{"html"}, \code{"rds"}, \code{"replay"}, and \code{"manifest"}. Add
+\code{"tables"}, \code{"html"}, \code{"rds"}, \code{"replay"}, and \code{"manifest"}.
+\code{"replay"} always includes \code{"rds"} to reload the complete saved result. Add
 \code{"report"} to write \code{\link[=mfrm_report]{mfrm_report()}} tables plus Markdown and HTML; add
-\code{"plots"} to write available plot routes as PNG files, or use \code{"all"}.}
+\code{"plots"} to write available plot routes as PNG files with separate
+title/notes CSV files, or use \code{"all"}.}
 
 \item{preset}{Optional reader-facing analysis-archive preset. \code{"starter"} adds the
 report and plot routes to the default files and writes \code{index.html} with
-the required Wright map embedded at the start of the reading flow.}
+the required Wright map for ordinary models, or the available model-specific
+figures for testlet and random-rater results.}
 
 \item{overwrite}{Logical; if \code{FALSE}, existing files stop the export.}
 
@@ -67,15 +70,40 @@ The helper writes:
 \itemize{
 \item summary CSVs from \code{summary(x)} such as overview, status, triage, plot
 routes, next actions, mapping, and replay-code lines;
-\item collected \code{x$tables} as CSV files;
+\item collected \code{x$tables} as CSV files (tables with no columns are omitted;
+zero-row tables with defined columns retain their headers);
 \item optional report artifacts from \code{mfrm_report(x)}, including report-index,
 evidence-summary, and reporting-template CSVs plus Markdown and HTML;
 \item a lightweight HTML report equivalent to \code{mfrm_results(x, output = "html")}
 for the already-created object;
 \item an \code{.rds} copy of the \code{mfrm_results} object;
-\item a replay \code{.R} script from \code{x$input$reproducible_code};
+\item a replay \code{.R} script that reloads the complete exported result;
+\item optional PNG figures and matching \verb{_plot_\{type\}_notes.csv} files. Each
+CSV retains \code{\link[=plot_data]{plot_data()}} notes and their source-specific columns, with
+suggested titles identified by \code{Type = "title"}. Titles and explanatory
+notes remain outside the image; the starter index links each PNG to its CSV.
+A multi-plot \code{fit} bundle produces one PNG/CSV pair per member, named
+\verb{_plot_fit_wright_map}, \verb{_plot_fit_pathway_map} and
+\verb{_plot_fit_category_characteristic_curves}, rather than one combined PNG;
 \item a written-files manifest and compact export summary.
 }
+
+For every supported result type, replay reloads the exported RDS without
+reconstructing the analysis, refitting, rescoring or resampling. Requesting
+\code{"replay"} also includes \code{"rds"}; source-session variables such as \code{fit}
+and \code{diagnostics} are not required. Run the script with
+\code{source("path/to/prefix_replay.R", chdir = TRUE)}, replacing the path with
+the exported script's location, or run it from the exported folder.
+Use \code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}} for a separate refitting script.
+Result CSV files use UTF-8; when importing with base R, use
+\code{read.csv(path, encoding = "UTF-8", check.names = FALSE)} to preserve
+user-supplied names across locales.
+
+Use \code{\link[=export_mfrm_tables]{export_mfrm_tables()}} when only the fit's core CSV tables are needed.
+Stored prediction settings,
+unavailable rows, numerical checks and interval meanings travel with the
+result. A bootstrap interval may have infinite endpoints; exports retain
+them instead of substituting finite ordinary intervals.
 
 All presets, including \code{"starter"}, are analysis archives. In particular,
 the default \code{.rds} file retains the complete result object, and CSV, HTML,
@@ -89,28 +117,60 @@ Plot export is intentionally optional because some plot routes can be
 comparatively slow or require richer graphics devices. Plot failures are
 recorded in the returned \code{plot_errors} table rather than stopping the export.
 The \code{"starter"} preset is the recommended reader-oriented analysis archive
-because it always
+because, for ordinary models, it
 requests the Wright map in addition to the result summary, report, replay
 script, and manifest. Its Infit pathway includes a bounded selection of
 person rows so person fit can be reviewed without replacing the required
 Wright-map first screen.
+
+With \code{overwrite = TRUE}, a requested ZIP is rebuilt from files written by
+this call; members from an older archive are not retained. ZIP command or
+content-check failure leaves any older ZIP in place, sets \code{ZipWritten} to
+\code{FALSE}, and explains the failure in \code{zip_note}. That older archive is not
+listed as a new output. Unrequested loose files in \code{output_dir} are neither
+deleted nor included. The on-disk file manifest and export summary describe
+the non-ZIP artifacts, including any plot-error CSV; the returned
+\code{written_files} and \code{summary} additionally record a successful ZIP.
 }
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-toy_small <- toy[toy$Person \%in\% unique(toy$Person)[1:6], , drop = FALSE]
-fit <- fit_mfrm(toy_small, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 30)
-res <- mfrm_results(fit, include = c("fit", "diagnostics", "tables"))
+# Long-running workflow; run explicitly when needed.
+# example("export_mfrm_results", run.dontrun = TRUE)
+\dontrun{
+# Load the package and example ratings
+library(mfrmr)
+ratings <- load_mfrmr_data("example_operational")
 
+# Fit these ratings; replace the data-loading line for your own analysis
+fit <- fit_mfrm(
+  data = ratings,
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  score = "Score",
+  rating_min = 1, rating_max = 4, category_policy = "preserve",
+  method = "MML",
+  model = "RSM"
+)
+
+res <- mfrm_results(fit)
+
+# Create a new temporary folder for this example's files
+# For your own analysis, use a permanent folder you can write to
+output_dir <- tempfile("mfrmr-example-")
 exported <- export_mfrm_results(
   res,
-  output_dir = tempdir(),
-  prefix = "mfrmr_results_example",
+  output_dir = output_dir,
   preset = "starter",
-  overwrite = TRUE
+  acknowledge_sensitive = TRUE # These data are synthetic; exports retain IDs
 )
-exported$summary[, c("FilesWritten", "CsvWritten", "HtmlWritten")]
+
+# Preview filenames and check whether any plots could not be exported
+head(data.frame(
+  Component = exported$written_files$Component,
+  File = basename(exported$written_files$Path)
+))
+exported$plot_errors
+# Full paths remain in exported$written_files$Path.
+# Open index.html in output_dir to read the report.
 }
 }
 \seealso{

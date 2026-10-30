@@ -9,7 +9,9 @@ precision_review_report(fit, diagnostics = NULL)
 \arguments{
 \item{fit}{Output from \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
-\item{diagnostics}{Optional output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.}
+\item{diagnostics}{Optional matching output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.
+Recompute it after refitting; mismatched or outdated readiness records
+are rejected.}
 }
 \value{
 A named list with:
@@ -77,16 +79,26 @@ as hybrid, or should remain exploratory in the final report.
 \item Use \code{summary()} to see whether the run supports model-based reporting
 language or should remain in exploratory/screening mode.
 }
+
+Regularized or fallback SEs remain diagnostic only. Numerical convergence
+does not establish inferential support. Older reports without the recorded
+regularization distinction must be recreated with \code{precision_review_report(fit)};
+the existing fit can be reused without refitting.
 }
 
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
-diag <- diagnose_mfrm(fit, residual_pca = "none")
-out <- precision_review_report(fit, diagnostics = diag)
-summary(out)
-}
+library(mfrmr)
+
+# Saved synthetic MML/RSM analysis of example_operational.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "operational-mml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+
+# Review support for standard errors, intervals, and reliability summaries
+diagnostics <- example_fit$diagnostics
+precision <- precision_review_report(fit, diagnostics = diagnostics)
+review <- summary(precision)
+review$checks # Check statuses and reasons before making precision claims
 }
 \seealso{
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=facet_statistics_report]{facet_statistics_report()}}, \code{\link[=reporting_checklist]{reporting_checklist()}}

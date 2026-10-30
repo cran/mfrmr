@@ -67,7 +67,7 @@ in UI code.
 \item \code{top_misfit_n}: number of top misfit entries included
 }
 
-For bounded \code{GPCM}, this helper returns caveated warning/summary maps over
+For \code{GPCM}, this helper returns caveated warning/summary maps over
 supported diagnostics, direct tables, and plots. The returned object includes
 \code{gpcm_boundary} so score-side, design-forecasting, DFF, and linking routes
 remain visibly separate capability rows.
@@ -102,7 +102,9 @@ functions behind each visual family.
 }
 
 \examples{
-\donttest{
+# Long-running workflow; run explicitly when needed.
+# example("build_visual_summaries", run.dontrun = TRUE)
+\dontrun{
 toy <- load_mfrmr_data("example_core")
 # A balanced slice retains every Rater and Criterion while running quickly.
 toy <- toy[toy$Person \%in\% unique(toy$Person)[1:12], , drop = FALSE]
@@ -140,5 +142,5 @@ if (interactive()) {
 }
 \seealso{
 \code{\link[=mfrm_threshold_profiles]{mfrm_threshold_profiles()}}, \code{\link[=build_apa_outputs]{build_apa_outputs()}},
-\code{\link[=plot_marginal_fit]{plot_marginal_fit()}}, \code{\link[=plot_marginal_pairwise]{plot_marginal_pairwise()}}
+\link[=plot.mfrm_fit]{plot(x, type = "marginal_fit")}, \link[=plot.mfrm_fit]{plot(x, type = "marginal_pairwise")}
 }

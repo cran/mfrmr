@@ -1,0 +1,162 @@
+---
+title: "Assessment review: anchors, bias and model choice"
+output:
+  html_document:
+    toc: true
+params:
+  run_bias: true
+  run_anchors: false
+  run_comparison: false
+  output_dir: "assessment-review-files"
+---
+
+```{r setup, include=FALSE}
+library(mfrmr)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, fig.width = 7.5, fig.height = 5)
+ratings <- load_mfrmr_data("example_core")
+context <- c(
+  question = "Review a specified rater-criterion interaction; add linking or model sensitivity only when relevant",
+  rating_unit = "One synthetic Person by Rater by Criterion rating",
+  score_direction = "Illustrative interpretation: higher coded scores are more favorable",
+  rubric = "Permitted scores 1 to 4; replace with the actual endpoint wording",
+  transformation = "None"
+)
+fit <- fit_mfrm(ratings, "Person", c("Rater", "Criterion"), "Score",
+  method = "MML", model = "RSM", rating_min = 1, rating_max = 4,
+  category_policy = "preserve")
+diagnostics <- diagnose_mfrm(fit, residual_pca = "none")
+results <- mfrm_results(fit, diagnostics = diagnostics, include = "standard")
+reports <- list(measurement = mfrm_report(results, style = "apa", study_context = context))
+objects <- list(fit = fit, diagnostics = diagnostics, results = results)
+out <- params$output_dir
+dir.create(out, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Question, units and score meaning
+
+This is an executable **synthetic teaching example**, not a study of actual
+raters or evidence that any particular rater is unfair. Choose the sections
+with `run_bias`, `run_anchors` and `run_comparison`; optional analyses are not
+requirements for every manuscript. For your own study, replace the data and
+context, specify the sampling/assignment and exclusions, and explain why the
+selected model and contrasts answer the question.
+
+```{r context}
+knitr::kable(reports$measurement$study_context)
+knitr::kable(reports$measurement$first_screen[, c("Area", "Status", "MainIssue")])
+```
+
+If higher Comprehensibility values mean **harder** to understand, state that
+direction explicitly. Changing this declaration does not reverse the scores
+or estimated parameters. Recoding requires compatible endpoints, anchors,
+model refitting and dependent output. MFRM latent estimates and raw G-study
+score components are different quantities even when their labels match.
+
+## A prespecified bias question
+
+```{r bias, eval=params$run_bias}
+bias <- estimate_bias(fit, diagnostics, facet_a = "Rater", facet_b = "Criterion")
+reports$bias <- mfrm_report(bias, style = "apa", study_context = context)
+objects$bias <- bias
+knitr::kable(reports$bias$tables$overview, digits = 3)
+knitr::kable(reports$bias$tables$bias_cells[, c("FacetA_Level", "FacetB_Level", "Bias Size",
+  "S.E.", "t", "Prob.", "BiasStatus", "ScreenStatus")], digits = 3)
+bias_plot <- plot(bias_interaction_report(bias), type = "scatter")
+```
+
+Report the signed contrast, cell counts and unavailable screens alongside the
+screening rule. Positive Bias Size raises expected **coded** scores; it is not
+automatically favorable performance. These are conditional plug-in screens.
+The overview's Bonferroni/Holm counts use this interaction's whole cell family,
+including unavailable cells in its size; they do not establish formal error
+control or cover a search across multiple interactions. Do not select only
+flagged cells for the appendix. Explain the proposed substantive follow-up;
+a flag is not evidence of unfairness or a reason to exclude a rater.
+
+For an exploratory search across facet pairs, replace the bias module's
+calculation with `bias <- estimate_all_bias(fit, diagnostics)` and keep
+`reports$bias <- mfrm_report(bias, study_context = context)`. Its `overview`
+lists every requested interaction; `bias_cells` adds an `Interaction` key and
+`errors` retains failed pairs. Use `plot(bias)` for the collection overview.
+Report the search scope and full cells without claiming collection-wide error
+control. A joint model chosen from these screens remains exploratory when
+compared on the same data; consult the Linking and DFF guide for that route.
+
+## Reusing anchors in a receiving cohort
+
+```{r anchors, eval=params$run_anchors}
+people <- unique(ratings$Person)
+reference_data <- ratings[ratings$Person %in% people[1:24], ]
+receiving_data <- ratings[ratings$Person %in% people[25:48], ]
+reference_fit <- fit_mfrm(reference_data, "Person", c("Rater", "Criterion"), "Score",
+  method = "MML", rating_min = 1, rating_max = 4, category_policy = "preserve")
+anchors <- make_anchor_table(reference_fit, facets = "Criterion")
+review <- review_mfrm_anchors(receiving_data, "Person", c("Rater", "Criterion"), "Score",
+  anchors = anchors, rating_min = 1, rating_max = 4, category_policy = "preserve")
+anchor_context <- c(context, anchor_source = "Criterion locations estimated from the first 24 synthetic Persons",
+  anchor_uncertainty = "Receiving fit conditions on these supplied values; source uncertainty is not propagated")
+reports$anchors <- mfrm_report(review, study_context = anchor_context)
+knitr::kable(reports$anchors$tables$anchors, digits = 4)
+knitr::kable(reports$anchors$tables$issue_counts)
+receiving_fit <- fit_mfrm(receiving_data, "Person", c("Rater", "Criterion"), "Score",
+  method = "MML", anchors = anchors, rating_min = 1, rating_max = 4,
+  category_policy = "preserve")
+linking <- build_linking_review(anchor_review = review)
+reports$linking <- mfrm_report(linking, study_context = anchor_context)
+knitr::kable(reports$linking$tables$status)
+objects$anchor_analysis <- list(reference_fit = reference_fit, receiving_fit = receiving_fit,
+  anchors = anchors, review = review, linking = linking)
+```
+
+Keep full-precision internal-logit anchor values, matching identities and
+score coding. State the centering and population assumptions and why the
+criteria are expected to be invariant. These illustrative cohorts are disjoint,
+but using their shared criterion labels does not prove invariance. This module
+does not estimate drift or propagate reference-calibration uncertainty; missing
+drift evidence stays missing. It does not demonstrate equivalent populations
+or change a conditional SE into an unconditional one.
+
+## Does the model choice change the answer?
+
+```{r comparison, eval=params$run_comparison}
+pcm <- fit_mfrm(ratings, "Person", c("Rater", "Criterion"), "Score", method = "MML",
+  model = "PCM", step_facet = "Criterion", rating_min = 1, rating_max = 4,
+  category_policy = "preserve")
+choice <- build_model_choice_review(RSM = fit, PCM = pcm)
+reports$model_choice <- mfrm_report(choice, style = "apa", study_context = context)
+knitr::kable(reports$model_choice$tables$comparison_table, digits = 3)
+knitr::kable(reports$model_choice$tables$model_roles)
+objects$model_choice <- list(pcm = pcm, review = choice)
+```
+
+The RSM uses a shared category-step structure; this PCM lets it vary by
+criterion. Read comparability and numerical readiness before interpreting ICs.
+The review does not request an LRT. If a prespecified nested-model test is
+needed, call `compare_mfrm(fit, pcm, nested = TRUE)` and retain its separate
+eligibility and reasons. Models must use compatible observations, weights,
+estimator, identification and numerical rules. Report whether the substantive
+answer or score interpretation changes, not only the smallest AIC.
+
+## Answer and save the evidence
+
+**Complete for your study:** answer the question, report effect magnitude and
+its uncertainty or screening status, then explain limitations and the justified
+action. Use `gtheory-report.Rmd` for future rating plans and `gpcm-report.Rmd`
+for the one-family slope workflow. State any change in units, aggregation or
+score meaning when joining those analyses; shared context is not proof of
+cross-analysis equivalence.
+
+```{r save, include=FALSE}
+for (nm in names(reports)) {
+  export_summary_appendix(reports[[nm]], output_dir = out, prefix = nm, overwrite = TRUE)
+  writeLines(reports[[nm]]$markdown, file.path(out, paste0(nm, ".md")))
+}
+saveRDS(list(objects = objects, reports = reports, study_context = context,
+  session = sessionInfo()), file.path(out, "assessment-review.rds"))
+```
+
+The archive retains analysis-level source information; review its contents
+before sharing. Record the package archive/version and the analysis decisions
+with the manuscript. For method references and additional qualifications, see
+`help("estimate_bias")`, `help("review_mfrm_anchors")`, `help("compare_mfrm")`
+and the installed linking and reporting tutorials.

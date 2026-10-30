@@ -17,13 +17,16 @@ category_structure_report(
 \arguments{
 \item{fit}{Output from \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
-\item{diagnostics}{Optional output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.}
+\item{diagnostics}{Optional matching output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}. Reuses
+stored uncertainty and marginal-fit results; omitted diagnostics do not
+trigger a covariance calculation.}
 
 \item{theta_range}{Theta/logit range used to derive transition points.}
 
 \item{theta_points}{Number of grid points used for transition-point search.}
 
-\item{drop_unused}{If \code{TRUE}, remove zero-count categories from outputs.}
+\item{drop_unused}{If \code{TRUE}, remove zero-count rows from the global category
+display. Owner-specific counts and their denominators remain complete.}
 
 \item{include_fixed}{If \code{TRUE}, include a legacy-compatible fixed-width text
 block.}
@@ -46,7 +49,8 @@ bundle interface for reporting and plotting.
 
 Key components include:
 \itemize{
-\item category usage/fit table (count, expected, infit/outfit, ZSTD)
+\item category usage and descriptive residual table; category ZSTD and fit flags
+are unavailable because outcome-selected residuals lack a unit baseline
 \item threshold ordering and adjacent threshold gaps
 \item category transition-point table on the requested theta grid
 }
@@ -55,10 +59,25 @@ Practical read order:
 \enumerate{
 \item \code{summary(out)} for compact warnings and threshold ordering.
 \item \code{out$category_table} for sparse/misfitting categories.
-\item \code{out$median_thresholds} for adjacent-threshold caveats when zero-count
-categories are retained.
+\item \code{out$median_thresholds} for cumulative 50\% boundaries and their range
+status; \code{AndrichThreshold} separately retains adjacent-category steps.
 \item \code{plot(out)} for quick visual check.
 }
+
+\code{owner_category_table}, \code{threshold_table}, \code{model_context} and \code{notes}
+follow \code{\link[=rating_scale_table]{rating_scale_table()}}, including source checks and uncertainty
+status. The global usage display does not replace owner-specific counts.
+\code{curve_profiles} maps each \code{CurveGroup} to its step/slope owners and levels.
+Curves use zero additive facet locations. \code{MedianThreshold} now solves a
+cumulative 50\% boundary, replacing the old mislabeled adjacent-category step.
+Recreate saved category structure reports; no calibration refit is needed.
+Half-score crossings outside \code{theta_range} are NA with an explicit status.
+Mode peaks describe the finite grid, not an unbounded global maximum.
+Stored step SEs are reported only in \code{threshold_table}, not transferred to
+modal, half-score or cumulative boundaries. Two-family GPCM remains
+unsupported by this helper.
+Counts support \code{\link[=as_ggplot]{as_ggplot()}}; modal-boundary and half-score views require the
+base renderer or explicitly grouped custom graphics from \code{\link[=plot_data]{plot_data()}}.
 }
 
 \section{Typical workflow}{
@@ -72,9 +91,13 @@ categories are retained.
 }
 
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("category_structure_report", run.dontrun = TRUE)
+\dontrun{
+# Saved synthetic JML/RSM analysis of example_core.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "core-jml.rds", package = "mfrmr"))
+fit <- example_fit$fit
 out <- category_structure_report(fit)
 summary(out)
 head(out$category_table[, c("Category", "Count", "Infit", "Outfit")])

@@ -161,7 +161,7 @@ test_that("design and recovery evaluation retain sparse linked diagnostics", {
                     names(design_bundle$tables$sparse_design)))
   expect_true(all(design_bundle$tables$sparse_design$LinkReviewStatus == "ok"))
 
-  rec <- suppressWarnings(evaluate_mfrm_recovery(
+  rec <- suppressWarnings(simulate_mfrm_recovery(
     n_person = 12,
     n_rater = 4,
     n_criterion = 2,

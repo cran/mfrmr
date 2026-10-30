@@ -39,16 +39,42 @@ sentinels used in SPSS / SAS / FACETS exports (\code{99}, \code{999}, \code{-1},
 \code{"N"}, \code{"NA"}, \code{"n/a"}, \code{"."}, \code{""}) with \code{NA} across the columns
 you select. It is useful before calling \code{\link[=fit_mfrm]{fit_mfrm()}} on data exported with
 those conventions.
+A sentinel is a value used to mean "missing" instead of an actual score.
+Only recode values that your data documentation defines as missing. For
+custom score markers, specify both \code{columns = "Score"} and \code{codes}; this
+preserves a person or rater identifier such as \code{99}.
+}
+\details{
+Save the returned data, for example \code{cleaned <- recode_missing_codes(...)}.
+The original object is unchanged. This helper replaces cells and retains
+every row; later, \code{\link[=describe_mfrm_data]{describe_mfrm_data()}} and \code{\link[=fit_mfrm]{fit_mfrm()}} exclude rating rows
+with missing scores or required identifiers. Inspect the replacement counts
+with \code{attr(cleaned, "mfrm_missing_recoding")}, then review and fit \code{cleaned}.
+
+The defaults differ across entry points: this helper scans all columns when
+\code{columns} is omitted. In \code{describe_mfrm_data()} and \code{fit_mfrm()},
+\code{missing_codes = TRUE} uses the conventional code set on the score column
+only; an explicit \code{missing_codes} vector applies to the person, facet, and
+score columns. Use this helper with an explicit score column when your custom code
+could also be a legitimate identifier.
 }
 \examples{
-dat <- data.frame(
-  Person = paste0("P", 1:5),
-  Rater = c("R1", "R1", "R2", "R2", "R2"),
-  Score = c(1, 99, 2, -1, 3)
+library(mfrmr)
+
+# A small input example: 99 and . mean missing only in the Score column
+ratings <- data.frame(
+  Person = c("001", "001", "002", "002"),
+  Rater = c("R1", "99", "R1", "99"),
+  Score = c("3", "99", ".", "2")
 )
-cleaned <- recode_missing_codes(dat, columns = "Score")
-cleaned$Score
-attr(cleaned, "mfrm_missing_recoding")
+cleaned <- recode_missing_codes(
+  ratings,
+  columns = "Score",
+  codes = c("99", ".")
+)
+cleaned # Two scores become NA; rater ID 99 and all four rows remain
+attr(cleaned, "mfrm_missing_recoding") # Score: Replaced = 2
+# Use the returned cleaned data for subsequent data review and fitting
 }
 \seealso{
 \code{\link[=describe_mfrm_data]{describe_mfrm_data()}}, \code{\link[=fit_mfrm]{fit_mfrm()}}.

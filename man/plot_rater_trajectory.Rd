@@ -49,19 +49,59 @@ across waves as rater drift, link the waves by either (i) holding
 common anchors fixed across fits (see
 \link{mfrmr_linking_and_dff} for the supported linking route), or
 (ii) harmonizing the scale post-hoc with a Stocking-Lord type
-transformation and reviewing the result via \code{\link[=plot_anchor_drift]{plot_anchor_drift()}}.
+transformation and reviewing the result via \link[=plot.mfrm_anchor_drift]{plot(x)}.
 The trajectory plot itself does not perform linking; it only
 visualizes the supplied fits on their as-fit scales.
 }
 
+\section{Migration in 0.2.4}{
+
+This renderer is internal. Use the corresponding \code{plot()} route in
+\link{mfrmr_plot_migration}; the former exported name is no longer available.
+}
+
+\section{Session plot defaults}{
+
+Set \code{options(mfrmr.plot_preset = "publication")} to choose a session default
+for plotting functions that expose the common \code{preset} argument. The
+supported values are \code{"standard"}, \code{"publication"}, \code{"compact"} and
+\code{"monochrome"}. Precedence is an explicit call argument, then the session
+option, then \code{"standard"}. For example, \code{preset = "standard"} overrides
+a session set to \code{"monochrome"}. Explicit \code{preset = NULL} retains the
+earlier package-default behavior; it does not read the session option.
+Invalid session values cause an error only when that option is needed.
+
+The category-curve, data-quality, fit-review, connectivity and network
+routes of \code{plot()} for report bundles use the same option through \code{...}.
+Plots without a common \code{preset} argument, including extended-model plots
+with their own \code{palette} controls, keep their own settings. This option
+selects a preset, not a universal theme or a guarantee that all renderers
+implement every appearance control identically.
+
+New plot payloads retain the resolved preset for supported saved-data
+rendering. Converting an existing payload with \code{\link[=as_ggplot]{as_ggplot()}} uses its saved
+appearance, even after the session option changes. A call that creates a
+new plot from a fit or statistical result uses the current default.
+For a reproducible script, supply \code{preset} explicitly or set the option in
+that script. Saving only the fitted model does not save a session option.
+No global ggplot theme is changed.
+
+Restore previous settings with \code{old <- options(mfrmr.plot_preset = "monochrome")} followed by \code{options(old)}. Use
+\code{options(mfrmr.plot_preset = NULL)} to remove the option. The preset changes
+appearance, not estimates, confidence levels or diagnostic thresholds.
+}
+
 \examples{
-\donttest{
+# Long-running workflow; run explicitly when needed.
+# example("plot_rater_trajectory", run.dontrun = TRUE)
+\dontrun{
 toy <- load_mfrmr_data("example_core")
 fit_a <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                  method = "JML", maxit = 30)
+                  method = "JML", maxit = 300)
 fit_b <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                  method = "JML", maxit = 30)
-p <- plot_rater_trajectory(list(T1 = fit_a, T2 = fit_b), draw = FALSE)
+                  method = "JML", maxit = 300)
+p <- plot(fit_a, type = "trajectory", comparison = list(T2 = fit_b),
+  labels = c("T1", "T2"), draw = FALSE)
 head(p$data$data)
 # Look for: stable trajectories (small wave-to-wave shifts within
 #   each rater's CI ribbon) once the waves are anchor-linked. A
@@ -72,8 +112,9 @@ head(p$data$data)
 }
 }
 \seealso{
-\code{\link[=plot_anchor_drift]{plot_anchor_drift()}}, \link{mfrmr_linking_and_dff}
+\link[=plot.mfrm_anchor_drift]{plot(x)}, \link{mfrmr_linking_and_dff}
 }
 \concept{confidence intervals}
 \concept{linking}
 \concept{visual diagnostics}
+\keyword{internal}

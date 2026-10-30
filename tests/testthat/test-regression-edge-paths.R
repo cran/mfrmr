@@ -181,49 +181,47 @@ test_that("summarize_top_misfit_levels handles all non-finite", {
 # ---- lines 619, 628, 635: build_apa_report_text context branches ----
 test_that("build_apa_report_text with assessment-only context (no setting)", {
   ctx <- list(assessment = "essay scoring")
-  txt <- mfrmr:::build_apa_report_text(.fit, .diag, context = ctx)
+  txt <- mfrmr:::build_apa_reporting_contract(.fit, .diag, context = ctx)$report_text
   expect_true(grepl("essay scoring", txt))
   expect_true(grepl("focused on", txt))
 })
 
 test_that("build_apa_report_text with assessment+setting context", {
   ctx <- list(assessment = "essay scoring", setting = "a university course")
-  txt <- mfrmr:::build_apa_report_text(.fit, .diag, context = ctx)
+  txt <- mfrmr:::build_apa_reporting_contract(.fit, .diag, context = ctx)$report_text
   expect_true(grepl("university course", txt))
 })
 
 test_that("build_apa_report_text with line_width too small falls back to 92", {
   ctx <- list(line_width = 10L)
-  txt <- mfrmr:::build_apa_report_text(.fit, .diag, context = ctx)
+  txt <- mfrmr:::build_apa_reporting_contract(.fit, .diag, context = ctx)$report_text
   expect_true(nzchar(txt))
 })
 
-# ---- lines 760-766, 769: PCA branches ----
-# To trigger PCA NULL, we need to remove StdResidual from obs to prevent
-# recomputation inside safe_residual_pca.
-test_that("build_apa_report_text handles PCA not available", {
+# Reporting must not add PCA when the stored diagnostics omit it.
+test_that("build_apa_report_text does not add an unrequested PCA", {
   mock_diag <- .diag
   mock_diag$residual_pca_overall <- NULL
   mock_diag$residual_pca_by_facet <- NULL
-  mock_diag$obs$StdResidual <- NA_real_  # prevents PCA recomputation
-  txt <- mfrmr:::build_apa_report_text(.fit, mock_diag)
-  expect_true(grepl("Residual PCA was not available", txt))
+  expect_null(mfrmr:::safe_residual_pca(mock_diag))
+  txt <- mfrmr:::build_apa_reporting_contract(.fit, mock_diag)$report_text
+  expect_false(grepl("residual PCA", txt, ignore.case = TRUE))
 })
 
 # ---- lines 795: build_apa_report_text bias fallback label ----
 test_that("build_apa_report_text bias results with facet_a/facet_b fallback", {
   mock_bias <- .bias
   mock_bias$interaction_facets <- NULL
-  txt <- mfrmr:::build_apa_report_text(.fit, .diag, bias_results = mock_bias)
+  txt <- mfrmr:::build_apa_reporting_contract(.fit, .diag, bias_results = mock_bias)$report_text
   expect_true(grepl("Bias", txt) || nzchar(txt))
 })
 
 # ---- lines 839-840: build_apa_table_figure_note_map with rater_facet ----
 test_that("build_apa_table_figure_note_map includes rater reliability", {
   ctx <- list(rater_facet = "Rater")
-  note_map <- mfrmr:::build_apa_table_figure_note_map(
+  note_map <- mfrmr:::build_apa_reporting_contract(
     .fit, .diag, context = ctx
-  )
+  )$note_map
   expect_true(grepl("Rater", note_map$table3))
 })
 
@@ -235,7 +233,7 @@ test_that("build_apa_table_figure_note_map covers non-finite overall fit", {
     InfitZSTD = NA_real_, OutfitZSTD = NA_real_,
     stringsAsFactors = FALSE
   )
-  note_map <- mfrmr:::build_apa_table_figure_note_map(.fit, mock_diag)
+  note_map <- mfrmr:::build_apa_reporting_contract(.fit, mock_diag)$note_map
   expect_true(grepl("mean infit", note_map$table3))
 })
 
@@ -245,7 +243,7 @@ test_that("build_apa_table_figure_note_map PCA unavailable branches", {
   mock_diag$residual_pca_overall <- NULL
   mock_diag$residual_pca_by_facet <- NULL
   mock_diag$obs$StdResidual <- NA_real_
-  note_map <- mfrmr:::build_apa_table_figure_note_map(.fit, mock_diag)
+  note_map <- mfrmr:::build_apa_reporting_contract(.fit, mock_diag)$note_map
   expect_true(grepl("not available", note_map$residual_pca_overall))
   expect_true(grepl("not available", note_map$residual_pca_by_facet))
 })
@@ -254,7 +252,7 @@ test_that("build_apa_table_figure_note_map PCA unavailable branches", {
 test_that("build_apa_table_figure_captions uses facet_a/facet_b fallback", {
   mock_bias <- .bias
   mock_bias$interaction_facets <- NULL
-  caps <- mfrmr:::build_apa_table_figure_captions(.fit, .diag, bias_results = mock_bias)
+  caps <- mfrmr:::build_apa_reporting_contract(.fit, .diag, bias_results = mock_bias, whexact = FALSE)$caption_text
   expect_true(grepl("Table 1", caps))
   expect_true(grepl("Bias", caps))
 })
@@ -444,7 +442,7 @@ test_that("build_anchor_recommendations handles issue_counts", {
     dummy_facets = character(0)
   )
   expect_true(length(recs) >= 5)
-  expect_true(any(grepl("precedence", recs)))
+  expect_true(any(grepl("retain both constraints", recs)))
   expect_true(any(grepl("default 0", recs)))
   expect_true(any(grepl("Duplicate anchors", recs)))
   expect_true(any(grepl("multiple groups", recs)))
@@ -525,16 +523,10 @@ test_that("calc_displacement_table without measures", {
   expect_true("Displacement" %in% names(dt))
 })
 
-# ---- lines 2125, 2127, 2152: compute_scorefile / compute_residual_file ----
-test_that("compute_scorefile returns expected columns", {
-  sf <- mfrmr:::compute_scorefile(.fit)
-  expect_true(is.data.frame(sf))
-  expect_true(all(c("MostLikely", "MaxProb") %in% names(sf)))
-  expect_gt(nrow(sf), 0)
-})
+# ---- residual export columns ----
 
-test_that("compute_residual_file returns expected columns", {
-  rf <- mfrmr:::compute_residual_file(.fit)
+test_that("residual export retains squared standardized residuals", {
+  rf <- mfrmr:::mfrm_residual_table_for_export(.fit)
   expect_true(is.data.frame(rf))
   expect_true("StdSq" %in% names(rf))
   expect_gt(nrow(rf), 0)
@@ -733,14 +725,6 @@ test_that("extract_anchor_tables returns lists", {
   expect_true("groups" %in% names(at))
 })
 
-# ---- lines 3775, 3780, 3790: ensure_positive_definite ----
-test_that("ensure_positive_definite handles non-PD matrix", {
-  mat <- matrix(c(1, 0.99, 0.99, 1), nrow = 2)
-  result <- mfrmr:::ensure_positive_definite(mat)
-  expect_true(is.matrix(result))
-  expect_equal(dim(result), c(2, 2))
-})
-
 # ---- lines 3814, 3818, 3821: compute_pca_overall edge cases ----
 test_that("compute_pca_overall returns NULL for empty facets", {
   r <- mfrmr:::compute_pca_overall(data.frame(), character(0))
@@ -769,11 +753,11 @@ test_that("PCM model covers PCM-specific branches", {
   probs_pcm <- mfrmr:::compute_prob_matrix(fit_pcm)
   expect_true(nrow(probs_pcm) > 0)
 
-  sf_pcm <- mfrmr:::compute_scorefile(fit_pcm)
-  expect_true(nrow(sf_pcm) > 0)
-
-  rf_pcm <- mfrmr:::compute_residual_file(fit_pcm)
-  expect_true(nrow(rf_pcm) > 0)
+  exported_pcm <- mfrmr:::mfrm_residual_table_for_export(
+    fit_pcm, include_probabilities = TRUE
+  )
+  expect_true(nrow(exported_pcm) > 0)
+  expect_true(all(c("Expected", "StdSq", "ResponseReason") %in% names(exported_pcm)))
 
   ect_pcm <- mfrmr:::calc_expected_category_counts(fit_pcm)
   expect_true(nrow(ect_pcm) > 0)
@@ -831,18 +815,19 @@ test_that("loglik_rsm and loglik_pcm with weights", {
   expect_true(is.finite(ll_pcm_w))
 })
 
-# ---- additional reporting.R line 536: disordered step with non-finite spacing ----
-test_that("summarize_step_estimates with disordered steps and non-finite spacing", {
+# ---- Step summaries recompute ordering from estimates ----
+test_that("summarize_step_estimates retains decreasing and unavailable comparisons", {
   tbl <- data.frame(
-    Step = c("S1", "S2"),
-    Estimate = c(-0.5, 0.5),
-    StepFacet = c("Common", "Common"),
-    Spacing = c(NA_real_, -0.3),
-    Ordered = c(TRUE, FALSE),
+    Step = c("S1", "S2", "S3"),
+    Estimate = c(-0.5, -0.8, NA_real_),
+    StepFacet = "Common",
+    Spacing = c(NA_real_, 0.3, 0.4),
+    Ordered = TRUE,
     stringsAsFactors = FALSE
   )
   txt <- mfrmr:::summarize_step_estimates(tbl)
-  expect_true(grepl("disordered", txt))
+  expect_match(txt, "1 decreasing among 1 available; 1 of 2 comparisons unavailable", fixed = TRUE)
+  expect_match(txt, "Decreasing pairs end at Common:S2", fixed = TRUE)
 })
 
 # ---- PCM with bias for PCM branches ----
@@ -901,7 +886,7 @@ test_that("calc_expected_category_counts with NULL returns empty", {
 # ---- build_apa_report_text with no additional facet context ----
 test_that("build_apa_report_text with no facets renders text", {
   ctx <- list()
-  txt <- mfrmr:::build_apa_report_text(.fit, .diag, context = ctx)
+  txt <- mfrmr:::build_apa_reporting_contract(.fit, .diag, context = ctx)$report_text
   expect_true(grepl("Method", txt))
   expect_true(grepl("Results", txt))
 })

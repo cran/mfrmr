@@ -14,22 +14,23 @@ detect_facet_nesting(data, facets, person = NULL, weight_col = NULL)
 \item{person}{Optional name of the person column (adds Person to the
 nesting matrix if supplied).}
 
-\item{weight_col}{Optional name of a weight column; if supplied, rows
-are replicated proportionally when counting element co-occurrences.}
+\item{weight_col}{Optional name of a numeric column of finite, nonnegative
+weights. Zero-weight rows are excluded; at least one weight must be positive.
+Weighted frequencies are used directly, without rounding or replicating rows.}
 }
 \value{
 A list of class \code{mfrm_facet_nesting} with:
 \itemize{
-\item \code{pairwise_table}: one row per ordered facet pair with
+\item \code{pairwise_table}: one row per facet pair, reporting both directions with
 \code{NestingIndex_AinB}, \code{NestingIndex_BinA}, classification strings,
-and \code{Direction}.
+\code{Direction}, \code{UsedRows} and \code{ExcludedRows}.
 \item \code{summary}: a one-line summary table with facet counts and whether
 any non-crossed structure was detected.
 \item \code{facets}: the facet vector that was reviewed.
 }
 }
 \description{
-Classifies every ordered pair of facets (optionally including \code{Person})
+Classifies both directions of each pair of facets (optionally including \code{Person})
 as crossed, partially nested, near-perfectly nested, or fully nested,
 based on a conditional-entropy index:
 \deqn{\text{nesting\_index}(A \to B) = 1 - H(B \mid A) / H(B).}
@@ -52,6 +53,19 @@ effects.
 
 The direction column records which facet is nested in which, or
 \code{"crossed"} when neither direction is above 0.95.
+}
+
+\section{Missing values and weights}{
+
+Each pair uses rows observed on both columns and having positive weight.
+Both marginal entropies and both conditional entropies use those same rows.
+\code{UsedRows} and \code{ExcludedRows} report this pair-specific scope; they count
+original rows, not the sum of weights. Different pairs may use different rows.
+Multiplying all weights by a positive constant leaves the indices unchanged.
+Weights are descriptive frequency weights, not a survey-variance correction.
+The index is undefined (\code{NA}) when its denominator entropy is zero, including
+pairs with no usable rows. Missing-value exclusion does not establish that
+the observed pattern represents the missing ratings.
 }
 
 \section{Interpreting output}{
@@ -78,7 +92,7 @@ combinations, which is the setting Linacre (1989) assumed.
 numeric index and the \code{LevelsA}/\code{LevelsB} counts.
 \item For downstream reporting, use \code{\link[=analyze_hierarchical_structure]{analyze_hierarchical_structure()}}
 to bundle this output with ICC and design-effect summaries, which
-\code{\link[=build_mfrm_manifest]{build_mfrm_manifest()}} then records for reproducibility.
+\code{\link[=reporting_checklist]{reporting_checklist()}} can record as available report material.
 }
 }
 
@@ -101,6 +115,10 @@ nest$pairwise_table[, c("FacetA", "FacetB",
                         "NestingIndex_AinB", "Direction")]
 }
 \references{
+Shannon, C. E. (1948). A mathematical theory of communication.
+\emph{Bell System Technical Journal, 27}, 379-423, 623-656.
+\url{https://web.mit.edu/6.976/www/handout/shannon.pdf}
+
 McEwen, M. R. (2018). \emph{The effects of incomplete rating designs on
 results from many-facets-Rasch model analyses} (Doctoral thesis,
 Brigham Young University). \url{https://scholarsarchive.byu.edu/etd/6689/}

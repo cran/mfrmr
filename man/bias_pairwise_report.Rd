@@ -2,7 +2,7 @@
 % Please edit documentation in R/api-reports.R
 \name{bias_pairwise_report}
 \alias{bias_pairwise_report}
-\title{Build a bias pairwise-contrast report (FACETS Table 14: pairwise contrasts)}
+\title{Build a conditional bias pairwise-contrast report (Table 14 style)}
 \usage{
 bias_pairwise_report(
   x,
@@ -18,7 +18,8 @@ bias_pairwise_report(
   context_facet = NULL,
   top_n = 50,
   p_max = 0.05,
-  sort_by = c("abs_t", "abs_contrast", "prob")
+  sort_by = c("abs_t", "abs_contrast", "prob"),
+  df_method = c("facets", "classical")
 )
 }
 \arguments{
@@ -45,14 +46,18 @@ bias_pairwise_report(
 \item{target_facet}{Facet whose local contrasts should be compared across
 the paired context facet. Defaults to the first interaction facet.}
 
-\item{context_facet}{Optional facet to condition on. Defaults to the other
-facet in a 2-way interaction.}
+\item{context_facet}{Facet whose levels supply the two contexts. Must be
+the other facet in a 2-way interaction.}
 
 \item{top_n}{Maximum number of ranked rows to keep.}
 
-\item{p_max}{Flagging cutoff for pairwise p-values.}
+\item{p_max}{Screening tail-area cutoff. An available row is flagged when
+\code{abs(t) >= 2} OR \code{Prob. <= p_max}; this is not a p-value-only test.}
 
-\item{sort_by}{Ranking key: \code{"abs_t"}, \code{"abs_bias"}, or \code{"prob"}.}
+\item{sort_by}{Ranking key: \code{"abs_t"}, \code{"abs_contrast"}, or \code{"prob"}.}
+
+\item{df_method}{Pairwise df convention: \code{"facets"} (modified Rasch-Welch,
+integer part, matching FACETS 4.5.0) or \code{"classical"} (former continuous df).}
 }
 \value{
 A named list with:
@@ -71,37 +76,36 @@ does not emit one
 }
 }
 \description{
-Build a pairwise contrast table that, for a chosen target facet
-(e.g. raters), compares each pair of target-facet levels while
-holding a context facet (e.g. items / criteria) constant. This is
-the FACETS Table 14 view: it answers "is rater A consistently
-more severe than rater B on the same items?" rather than "which
-(rater, item) cell has the largest local bias?" -- the latter is
-covered by \code{\link[=bias_interaction_report]{bias_interaction_report()}}.
+Compare each target element's local measure across pairs of contexts.
+With target \code{Rater} and context \code{Criterion}, a row compares the same
+rater's local severity on two criteria. With target \code{Criterion} and
+context \code{Rater}, it compares the same criterion's local difficulty
+across two raters. The calculation uses conditional bias cells and
+does not establish numerical equivalence to FACETS Table 14.
 }
 \details{
 This helper exposes the pairwise contrast table that was previously only
 reachable through fixed-width output generation. It is available only for
-2-way interactions. The pairwise contrast statistic uses a
-Welch/Satterthwaite approximation and is labeled as a Rasch-Welch
-comparison in the output metadata.
+2-way interactions. Rows without available orientation or precision are
+retained with missing screening results. \code{top_n} limits displayed rows;
+the summary always describes the complete pairwise family.
 }
 \section{Interpreting output}{
 
 \itemize{
-\item \code{table}: one row per ordered (target_level_1, target_level_2)
-pair, with \code{Bias_diff}, \code{SE_diff}, \code{t_diff}, \code{df_diff},
-\code{p_diff}, and the underlying per-level bias rows. Rows are
-sorted so that the largest-magnitude \verb{|t_diff|} rises to the
-top.
-\item \code{summary}: one-row screening summary with \code{MaxAbsBiasDiff},
-\code{MaxAbsT}, \code{Significant} (count of flagged pairs at \code{p_max}),
-\code{BonferroniSignificant}, and \code{HolmSignificant}.
+\item \code{table}: one row per target element and context pair, with \code{Target},
+\code{Context1}, \code{Context2}, \verb{Local Measure1}, \verb{Local Measure2}, \code{Contrast},
+\code{SE}, \code{t}, \code{d.f.}, \code{Prob.}, \code{Flag}, and calculation/status metadata.
+The default sort places the largest absolute t first and unavailable
+values last.
+\item \code{summary}: full-family \code{Contrasts}, \code{ScreenAvailable},
+\code{ScreenUnavailable}, \code{Flagged}, \code{MeanAbsContrast}, and \code{MeanAbsT}.
+\code{Flagged} counts known screen-positive rows and is missing when none
+can be screened. A zero count does not clear unavailable comparisons.
 \item \code{orientation_review} carries the same facet-orientation sign
 review as the parent \code{estimate_bias()} run.
-\item The SE caveat below applies: read \code{Significant} /
-\code{BonferroniSignificant} as a screening triage, not as formal
-inferential tests.
+\item Flags are unadjusted exploratory screens. This report does not apply
+multiplicity correction or establish the absence of differential bias.
 }
 }
 
@@ -110,10 +114,10 @@ inferential tests.
 \enumerate{
 \item Fit and diagnose the model.
 \item Run \code{estimate_bias()} to get the underlying interaction effects.
-\item Pass that result to \code{bias_pairwise_report()} for the rater-pair
-contrast table.
-\item Use \code{summary(out)$MaxAbsT} and the top rows of \code{out$table} to
-flag rater-pair systematic differences for follow-up review.
+\item Pass that result to \code{bias_pairwise_report()} with the intended target
+and context facets.
+\item Read \code{out$summary} for availability and \code{out$table} for direction,
+magnitude and uncertainty of the local comparisons.
 \item For the ranked flagged-cells view (which (rater, item) pairs
 have the largest local bias), use \code{bias_interaction_report()}
 on the same \code{estimate_bias()} output.
@@ -124,17 +128,13 @@ on the same \code{estimate_bias()} output.
 
 The contrast standard error is computed as
 \code{SE(b_i - b_j) = sqrt(SE_i^2 + SE_j^2)} -- the independence
-approximation. For same-facet bias values that share a sum-to-zero
-identification, \code{Cov(b_i, b_j) < 0}, so the true contrast variance
-is \code{SE_i^2 + SE_j^2 - 2 * Cov(b_i, b_j)}, which is \strong{smaller}
-than the reported value. The reported t-statistics and p-values
-are therefore conservative for same-facet contrasts (the true
-significance is higher than reported). For across-facet contrasts
-the covariance term is approximately zero and the approximation
-is appropriate. Use the report as a screening / triage table; for
-inferential claims that hinge on a marginally-significant
-same-facet contrast, follow up with a contrast that uses the full
-parameter covariance.
+approximation conditional on the calibration. The general variance of a
+difference also subtracts \code{2 * Cov(b_i, b_j)}: a negative covariance
+increases that variance, while a positive covariance decreases it. Neither
+its sign nor its magnitude is established here. There is no general claim
+that these screens are conservative. The cell shifts are estimated
+separately with fixed baseline parameters, not by a jointly estimated
+sum-to-zero bias model.
 }
 
 \section{References}{
@@ -153,24 +153,68 @@ rater effects using many-facet Rasch measurement: Part II.
 }
 }
 
+\section{Pairwise calculation}{
+
+For each target element, compare its local measure in two contexts.
+If the target has predictor sign \code{s}, its local measure is
+\code{target + bias/s}; the contrast is Context1 minus Context2. A negatively
+oriented rater therefore has local severity \code{severity - bias}.
+\code{TargetSign} comes from the saved bias result's \code{orientation_review}.
+Missing orientation withholds local measures, contrasts and tail areas;
+it is not inferred from a facet name.
+
+\code{SE1} and \code{SE2} are conditional cell-information SEs with baseline
+calibration held fixed. The contrast SE is \code{sqrt(SE1^2 + SE2^2)} under
+conditional independence of the two cells. Calibration uncertainty and
+cross-cell covariance are not propagated. \verb{Target S.E.} describes the
+original target estimate separately and is not added to the conditional
+local SE; a fixed target can still have uncertain local bias.
+
+The default \code{df_method = "facets"} uses the modified Rasch-Welch formula
+described in the FACETS t-statistics manual (von Davier, 2025). Writing
+\code{v1 = SE1^2}, \code{v2 = SE2^2} and \code{n1}, \code{n2} for weighted counts, its df is
+\code{(v1+v2)^2 * (n1+n2-2) / ((n1+n2+2) * (v1^2/(n1+1)+v2^2/(n2+1)))}.
+The tail area uses its integer part, matching executed FACETS 4.5.0
+unequal-count examples. Values are stabilized to ten decimal places before
+truncation to avoid numerical noise at integer boundaries. \code{DFUnrounded}
+retains the original continuous value.
+\code{df_method = "classical"} retains the former Welch-Satterthwaite reference
+with \code{n1-1}, \code{n2-1} and no integer truncation. \code{DFMethod} and \code{DFBasis}
+identify the choice; equal counts alone cannot distinguish the formulas.
+\code{ObsN1} and \code{ObsN2} are raw row counts. Both weighted counts must exceed
+one, both SEs must be positive and finite, and the final df must be positive.
+Otherwise the screen remains unavailable. Fractional weights follow the
+same rule but are outside the executed comparison. These are conditional
+screens, not calibrated fairness tests or general FACETS equivalence.
+}
+
+\section{Saved pairwise results}{
+
+Current tables carry \code{CalculationVersion = 3}. Recreate older fixed or
+pairwise reports using \code{\link[=build_fixed_reports]{build_fixed_reports()}} or \code{\link[=bias_pairwise_report]{bias_pairwise_report()}}.
+If the bias bundle predates baseline-score corrections or lacks orientation,
+recreate \code{\link[=estimate_bias]{estimate_bias()}} from the saved fit and current diagnostics first.
+No main calibration refit is needed. Keep historical values separately;
+summaries and fixed-report plots reject older pairwise calculations.
+}
+
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_bias")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
-diag <- diagnose_mfrm(fit, residual_pca = "none")
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("bias_pairwise_report", run.dontrun = TRUE)
+\dontrun{
+# Saved synthetic JML/RSM analysis of example_bias.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "bias-jml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+diag <- example_fit$diagnostics
 out <- bias_pairwise_report(fit, diagnostics = diag, facet_a = "Rater", facet_b = "Criterion")
 s <- summary(out)
 s$summary
-# Look for: `MaxAbsBiasDiff` < ~0.5 logits and `Significant = 0` mean
-#   no rater pair contrasts above the screen. The `BonferroniSignificant`
-#   / `HolmSignificant` columns count pairs that survive multiple-
-#   testing correction; both being 0 is a stronger "no rater-pair
-#   inconsistency" signal than the raw screen-positive count alone.
+# Check ScreenUnavailable before reading the known Flagged count.
+# Zero flags do not establish equivalence or absence of bias.
 head(out$table)
-# Look for: top rows with `|t_diff|` > 2 and |Bias_diff| > 0.5 logits
-#   warrant content-review of the two raters' scoring conventions on
-#   the conditioning context facet (e.g. compare their item-level
-#   marks for systematic strictness/leniency patterns).
+# For target Rater, compare that rater's local severity across criteria.
+# Read Context1 minus Context2 and the conditional SE before follow-up.
 }
 }
 \seealso{

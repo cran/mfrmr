@@ -2,6 +2,7 @@
 % Please edit documentation in R/api-reports.R
 \name{build_apa_outputs}
 \alias{build_apa_outputs}
+\alias{summary.mfrm_apa_outputs}
 \title{Build APA text outputs from model results}
 \usage{
 build_apa_outputs(
@@ -11,6 +12,8 @@ build_apa_outputs(
   context = list(),
   whexact = FALSE
 )
+
+\method{summary}{mfrm_apa_outputs}(object, top_n = 3, preview_chars = 160, ...)
 }
 \arguments{
 \item{fit}{Output from \code{\link[=fit_mfrm]{fit_mfrm()}}.}
@@ -22,6 +25,14 @@ build_apa_outputs(
 \item{context}{Optional named list for report context.}
 
 \item{whexact}{Use exact ZSTD transformation.}
+
+\item{object}{Output from \code{\link[=build_apa_outputs]{build_apa_outputs()}}.}
+
+\item{top_n}{Maximum non-empty lines shown in each component preview.}
+
+\item{preview_chars}{Maximum characters shown in each preview cell.}
+
+\item{...}{Reserved for generic compatibility.}
 }
 \value{
 An object of class \code{mfrm_apa_outputs} with:
@@ -29,7 +40,7 @@ An object of class \code{mfrm_apa_outputs} with:
 \item \code{report_text}: APA-oriented Method/Results draft prose
 \item \code{decision}: plain-language source-fit interpretation plus the separate
 precision-contract decision; \code{FormalInference} is \code{"Yes"} only when both
-the fit gate and \code{contract$precision$supports_formal_inference} pass
+fit readiness and \code{contract$precision$supports_formal_inference} support it
 \item \code{fit_readiness}, \code{fit_readiness_components}, and
 \code{fit_readiness_parameters}: exact source-fit readiness provenance
 \item \code{table_figure_notes}: consolidated draft notes for tables/visuals
@@ -37,6 +48,8 @@ the fit gate and \code{contract$precision$supports_formal_inference} pass
 \item \code{section_map}: package-native section table for manuscript assembly
 \item \code{contract}: structured APA reporting contract used for downstream checks
 }
+
+For \code{summary()}: An object of class \code{summary.mfrm_apa_outputs}.
 }
 \description{
 Build APA text outputs from model results
@@ -54,7 +67,7 @@ Frequently used fields include:
 Output text includes residual-PCA screening commentary if PCA diagnostics are
 available in \code{diagnostics}.
 
-For bounded \code{GPCM}, this helper returns a caveated partial reporting bundle
+For \code{GPCM}, this helper returns a caveated partial reporting bundle
 over supported diagnostics, direct tables, and plots. It also includes a
 \code{gpcm_boundary} table. Treat the output as slope-aware sensitivity-reporting
 text, not FACETS score-side equivalence, automatic operational scoring, or
@@ -67,13 +80,34 @@ By default, \code{report_text} includes:
 the eligible canonical MML AIC/Person-BIC/SABIC panel or its explicit
 ineligibility and legacy-descriptive status; q<31 MML criteria are
 explicitly labelled screening/review-only rather than automatic ranking
-\item anchor/constraint summary (\code{noncenter_facet}, anchored levels, group anchors, dummy facets)
+\item anchor/constraint summary (\code{noncenter_facet}, centering convention,
+anchored levels, group anchors, dummy facets)
 \item latent-regression population-model wording when \code{fit} has an active
 \code{population_formula}
 \item category/threshold diagnostics (including disordered-step details when present)
 \item overall fit, misfit count, and top misfit levels
 \item facet reliability/separation, residual PCA summary, and bias-screen counts
+\item stored inter-rater agreement, its matched-opportunity denominator and
+unavailable outcomes, separately from separation reliability
 }
+
+Agreement wording uses the rater facet in the stored diagnostics summary;
+\code{context$rater_facet} does not recalculate or relabel that summary. The
+model-expected baseline uses fitted category probabilities with calibration
+fixed, not marginal-frequency chance agreement. Adjacent agreement includes
+exact matches and differences of at most 1 on the compared score scale.
+Missing expected values remain explicit, including the stored number of
+opportunities without valid probabilities. An absent summary does not
+establish agreement. See \code{\link[=interrater_agreement_table]{interrater_agreement_table()}} for the matching,
+repeated-rating and denominator conventions.
+
+\code{summary()} method: Summarize APA report-output bundles
+
+For \code{summary()}: This summary is a diagnostics layer for APA text products, not a replacement
+for the full narrative.
+
+It reports component completeness, line/character volume, and a compact
+preview for quick QA before manuscript insertion.
 }
 \section{Interpreting output}{
 
@@ -94,6 +128,26 @@ from post hoc regression on EAP/MLE scores.
 
 When bias results or PCA diagnostics are not supplied, those sections
 are omitted from the narrative rather than producing placeholder text.
+Reporting reuses stored residual PCA results and does not compute omitted
+overall or facet-specific analyses. Request the intended scope with
+\code{diagnose_mfrm(..., residual_pca = "overall")}, \code{"facet"}, or \code{"both"} first.
+
+
+For \code{summary()}:
+\itemize{
+\item \code{overview}: total coverage across standard text components.
+\item \code{decision}: the source-fit decision shown before draft-completeness checks;
+text completeness cannot promote a review or blocked fit.
+\item \code{components}: per-component density and mention checks
+(including residual-PCA mentions).
+\item \code{sections}: package-native section coverage table.
+\item \code{content_checks}: contract-based alignment checks for APA drafting readiness.
+\item \code{overview$DraftContractPass}: the primary contract-completeness flag for
+draft text components.
+\item \code{overview$ReadyForAPA}: a backward-compatible alias of that contract flag,
+not a certification of inferential adequacy.
+\item \code{preview}: first non-empty lines for fast visual review.
+}
 }
 
 \section{Typical workflow}{
@@ -106,6 +160,15 @@ reporting runs, prefer an \code{MML} fit and
 \item Check \code{summary(apa)} for completeness.
 \item Insert \code{apa$report_text} and note/caption fields into manuscript drafts
 after checking the listed cautions.
+}
+
+
+For \code{summary()}:
+\enumerate{
+\item Build outputs via \code{\link[=build_apa_outputs]{build_apa_outputs()}}.
+\item Run \code{summary(apa)} to screen for empty/short components.
+\item Use \code{apa$report_text}, \code{apa$table_figure_notes},
+and \code{apa$table_figure_captions} as draft components for final-text review.
 }
 }
 
@@ -129,55 +192,61 @@ If supplied, \code{bias_results} must come from \code{\link[=estimate_bias]{esti
 package-native bias helper that provides a table component.
 }
 
-\examples{
-\donttest{
-# Minimal APA-output example using a JML fit and lightweight diagnostics.
-toy <- load_mfrmr_data("example_core")
-# A balanced slice retains every Rater and Criterion while running quickly.
-toy <- toy[toy$Person \%in\% unique(toy$Person)[1:12], , drop = FALSE]
-fit_quick <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-  method = "JML", maxit = 30
-)
-diag_quick <- diagnose_mfrm(fit_quick,
-  residual_pca = "none",
-  diagnostic_mode = "legacy"
-)
-apa_quick <- build_apa_outputs(fit_quick, diag_quick)
-nchar(apa_quick$report_text) > 0
+\section{Saved-result reuse}{
 
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-  method = "MML", quad_points = 7, maxit = 30
-)
-diag <- diagnose_mfrm(fit, residual_pca = "both", diagnostic_mode = "both")
+Supplied screening results must describe this fitted analysis. Results from
+another fit or older results without identity metadata are refused. See
+\link{mfrmr_compatibility_layer} to recreate them from the saved fit and matching
+diagnostics without refitting the model.
+}
+
+\examples{
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("build_apa_outputs", run.dontrun = TRUE)
+\dontrun{
+library(mfrmr)
+
+# Saved synthetic MML/RSM analysis of example_operational.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "operational-mml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+
+# Use the diagnostics saved with this fit
+diagnostics <- example_fit$diagnostics
+
+# Prepare draft wording from the fitted model and diagnostics
 apa <- build_apa_outputs(
   fit,
-  diag,
+  diagnostics = diagnostics,
   context = list(
-    assessment = "Toy writing task",
+    assessment = "Synthetic writing assessment",
     setting = "Demonstration dataset",
-    scale_desc = "0-2 rating scale",
+    scale_desc = "1-4 rating scale",
     rater_facet = "Rater"
   )
 )
-s_apa <- summary(apa)
-s_apa$overview
-# Look for: `SentenceCount` non-zero in every section that the run
-#   should support (Method / Results / fit / reliability / bias).
-#   Zero counts mean that section's prose is empty and the
-#   manuscript will need to fill it manually.
-chk <- reporting_checklist(fit, diagnostics = diag)
-head(chk$checklist[, c("Section", "Item", "DraftReady", "NextAction")])
-# Look for: rows with `DraftReady = "yes"` are ready to paste into
-#   the manuscript. `"no"` rows tell you which helper / setting
-#   needs to run before that paragraph can be drafted, via
-#   `NextAction`. Aim for every Visual Displays / Reliability /
-#   Diagnostics row to be `"yes"` before submitting.
-cat(apa$report_text)
-apa$section_map[, c("SectionId", "Available")]
 
+# Check which sections are supported, then read the draft
+apa_review <- summary(apa)
+apa_review$content_checks
+cat(apa$report_text)
+# Adapt the text to the study question, design, and evidence before using it
+}
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("summary.mfrm_apa_outputs", run.dontrun = TRUE)
+\dontrun{
+# Saved synthetic JML/RSM analysis of example_core.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "core-jml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+diag <- example_fit$diagnostics
+apa <- build_apa_outputs(fit, diag)
+summary(apa)
 }
 }
 \seealso{
 \code{\link[=build_visual_summaries]{build_visual_summaries()}}, \code{\link[=estimate_bias]{estimate_bias()}},
 \code{\link[=reporting_checklist]{reporting_checklist()}}, \link{mfrmr_reporting_and_apa}
+
+\code{\link[=build_apa_outputs]{build_apa_outputs()}}, \code{\link[=summary]{summary()}}
 }

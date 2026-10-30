@@ -81,6 +81,26 @@ recoded.
 }
 }
 
+\section{Local category avoidance is not automatically a GPCM problem}{
+
+Suppose a declared 1--10 scale is observed globally, but one rater uses only
+scores 3--8. If other raters use 1, 2, 9, and 10, the shared score support is
+not globally missing. The affected rater instead has local zero-category use:
+inspect \code{category_usage_by_facet}, \code{category_usage_summary}, and
+\code{plot(out, type = "facet_category_usage")}. This pattern can reflect range
+restriction, assignment/case mix, sparse information, or operational scoring
+practice; the table alone does not identify the cause.
+
+Do not select \code{GPCM} merely to absorb category avoidance. \code{GPCM} changes the
+designated step/slope owner's threshold and discrimination structure; it does
+not repair a rater's restricted use of the rubric. When the affected rater is
+itself the \code{step_facet}/\code{slope_facet} owner, local category gaps can also
+weaken owner-specific PCM/GPCM parameter support and the fit-readiness result
+must be checked. Under RSM, or when another facet owns the steps, the same
+local pattern remains important response-use evidence without automatically
+becoming a distinct response model.
+}
+
 \section{Typical workflow}{
 
 \enumerate{
@@ -94,19 +114,19 @@ final estimation/reporting.
 }
 
 \examples{
-toy <- load_mfrmr_data("example_operational")
-fit <- fit_mfrm(
-  toy, "Person", c("Rater", "Criterion"), "Score",
-  method = "MML", quad_points = 7, maxit = 30
-)
-out <- data_quality_report(
-  fit,
-  data = toy, person = "Person",
-  facets = c("Rater", "Criterion"), score = "Score"
-)
-summary(out)
-p_dq <- plot(out, draw = FALSE)
-p_dq$data$plot
+library(mfrmr)
+
+# Saved synthetic MML/RSM analysis of example_operational.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "operational-mml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+
+# Review the input-data checks recorded with this fit
+quality <- data_quality_report(fit)
+summary(quality)
+
+# Draw the data-quality overview
+plot(quality)
 }
 \seealso{
 \code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=describe_mfrm_data]{describe_mfrm_data()}}, \code{\link[=specifications_report]{specifications_report()}},

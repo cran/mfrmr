@@ -18,12 +18,12 @@
 )
 }
 \arguments{
-\item{x}{Output from \code{\link[=evaluate_mfrm_recovery]{evaluate_mfrm_recovery()}}.}
+\item{x}{Output from \code{\link[=simulate_mfrm_recovery]{simulate_mfrm_recovery()}}.}
 
 \item{y}{Reserved for S3 generic compatibility.}
 
 \item{type}{Plot route: \code{"summary"} draws a metric from
-\code{x$recovery_summary}, \code{"coverage"} draws 95\% coverage by parameter group,
+\code{summary(x)$recovery_summary}, \code{"coverage"} draws 95\% coverage by parameter group,
 \code{"errors"} draws row-level recovery-error distributions, \code{"scatter"} draws
 truth against estimated values, and \code{"replications"} summarizes run status.}
 
@@ -57,22 +57,29 @@ Plot parameter-recovery simulation results
 These plots are intended as simulation-review graphics. They do not replace
 the row-level \code{x$recovery} table or the ADEMP metadata; they make the main
 recovery estimands easier to inspect during model-development and design
-checks. Coverage is displayed only for parameter groups with available
-standard errors.
+checks. Coverage is displayed only for groups with valid centered structural
+intervals, conditional on availability. Summary/coverage routes refresh
+aggregates from saved rows; their \code{data$availability_table} preserves all
+selected groups, including those omitted from drawing. Inspect counts,
+availability rates, MCSEs and \code{CIReasons} there and in \code{summary(x)}.
+A wholly unavailable coverage plot gives an informative error; it does not
+draw missing coverage as zero. See \code{\link[=simulate_mfrm_recovery]{simulate_mfrm_recovery()}} for the target
+and the treatment of legacy saved intervals. A zero mean-aligned bias is an
+identification identity, not evidence of unbiased estimation.
 }
 \examples{
-\donttest{
-rec <- evaluate_mfrm_recovery(
-  n_person = 12,
-  n_rater = 2,
-  n_criterion = 2,
-  reps = 1,
-  maxit = 30,
-  seed = 123
-)
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("plot.mfrm_recovery_simulation", run.dontrun = TRUE)
+\dontrun{
+# One saved replication illustrates output structure, not precise rates.
+# Regeneration recipe: examples/simulation-results.R in the package.
+saved <- readRDS(system.file("examples", "simulation-recovery.rds",
+  package = "mfrmr", mustWork = TRUE))
+# Inspect saved$generation_warnings and the result's run/status tables.
+rec <- saved$result
 plot(rec, type = "summary", metric = "rmse", draw = FALSE)
 }
 }
 \seealso{
-\code{\link[=evaluate_mfrm_recovery]{evaluate_mfrm_recovery()}}, \code{\link[=summary]{summary()}}
+\code{\link[=simulate_mfrm_recovery]{simulate_mfrm_recovery()}}, \code{\link[=summary]{summary()}}
 }

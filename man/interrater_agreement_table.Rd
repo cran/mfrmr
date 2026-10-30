@@ -32,15 +32,28 @@ agreement. If \code{NULL}, all remaining facets (including \code{Person}) are us
 \item{include_precision}{If \code{TRUE}, append rater severity spread indices from
 the facet precision summary when available.}
 
-\item{top_n}{Optional maximum number of pair rows to keep.}
+\item{top_n}{Optional maximum number of pair rows to keep, after ordering
+by flag, exact agreement and correlation. The summary still describes
+all candidate pairs. Leave \code{NULL} to retain the complete pair audit.}
 }
 \value{
-A named list with:
+An \code{mfrm_interrater} bundle (a named list) with:
 \itemize{
 \item \code{summary}: one-row inter-rater summary
 \item \code{pairs}: pair-level agreement table
+\item \code{notes}: interpretation and availability qualifications
 \item \code{settings}: applied options and thresholds
 }
+
+Use \code{summary(ir)} or \code{ir$summary} to inspect a result and \code{plot(ir)} for
+its saved agreement figure. Save the full bundle with \code{\link[base:saveRDS]{base::saveRDS()}}
+and reopen with \code{\link[base:readRDS]{base::readRDS()}}; export \code{ir$pairs} and \code{ir$summary}
+separately with \code{\link[utils:write.csv]{utils::write.csv()}}. Reopening performs no fitting.
+\code{plot(ir, type = "agreement", metric = "correlation")} selects the
+correlation view; \code{metric = "difference"} selects observed-score gaps.
+These plots retain the saved flag thresholds. Changing them requires
+recreating this result from the existing fit, not fitting a new model.
+\code{\link[=as_ggplot]{as_ggplot()}} converts a saved plot payload without recomputation.
 }
 \description{
 Build an inter-rater agreement report
@@ -52,10 +65,38 @@ package-native and does not require knowledge of legacy report numbering.
 When fitted category probabilities are available, expected exact agreement
 for a matched context is the model-implied quantity
 \eqn{\sum_k P_{r1}(X=k)P_{r2}(X=k)}. It is not a marginal-frequency chance
-agreement statistic. Observed exact agreement uses equality of the package's
-observed score categories. The current function does not translate category
+agreement statistic. This product assumes conditional independence at the
+saved Person point score and fitted structural parameters. MML uses the
+saved EAP: it does not integrate either the product or its factors over
+the Person posterior. Calibration and population uncertainty are not
+propagated. Nonfinite primary Person/facet/step estimates or unavailable
+GPCM slopes withhold the affected expectations; finite internal optimizer
+proxies are not substituted and limiting boundary probabilities are not
+calculated here. \code{ExpectedReason} records unavailable primary estimates,
+repeated ratings, unavailable probabilities or absent matched scores.
+Observed exact agreement uses equality of the package's
+observed score categories. Repeated ratings in a rater/context cell are
+averaged using observation weights; comparisons then describe those means,
+and expected exact agreement is withheld for the repeated cells. The
+current function does not translate category
 positions across multiple independent scales, apply an agreement-based SE
 inflation, or establish numerical equivalence with FACETS Table 7.
+For two-way observed-score ICCs without an MFRM fit, use
+\code{\link[=pairwise_icc_table]{pairwise_icc_table()}}. That function requires one rating per rater/unit
+and an explicit choice of agreement/consistency and single/average ratings.
+The raw-score kappa, alpha and AC2 helpers also reject repeated rater-unit
+cells; they do not inherit this function's averaging convention. See
+\link{mfrmr_methods_reference} for choosing among these targets.
+
+Within a pair, every matched context with two finite scores contributes
+one opportunity, after any within-cell averaging. Observation weights
+affect that averaging, not the weight assigned to the resulting context.
+Overall exact/adjacent agreement divides the corresponding counts by the
+total opportunities across pairs. A context with finite compared scores
+from m judges contributes m(m-1)/2 opportunities, so this is not equal weighting of distinct contexts
+or independent evidence from that many people. Pairwise correlation is
+computed from the matched scores, and \code{MeanCorr} weights each available
+correlation by its pair's matched-context count. It is not a panel ICC.
 }
 \section{Interpreting output}{
 
@@ -65,8 +106,13 @@ inflation, or establish numerical equivalence with FACETS Table 7.
 \item \code{settings}: applied facet matching and warning thresholds.
 }
 
-Pairs flagged by both low exact agreement and low correlation generally
-deserve highest calibration priority.
+Flags indicate configured review thresholds, not rater quality, fairness
+or an automatic training priority. A missing rule remains unavailable;
+a known cutoff crossing still flags the pair. Overall flag rates require
+complete classification. Expected agreement is withheld if any matched
+context lacks valid category probabilities; availability counts are retained.
+Recreate older agreement/network results from the existing fit and matching
+diagnostics with the original settings, then regenerate plots and exports.
 }
 
 \section{Typical workflow}{
@@ -74,7 +120,7 @@ deserve highest calibration priority.
 \enumerate{
 \item Run with explicit \code{rater_facet} (and \code{context_facets} if needed).
 \item Review \code{summary(ir)} and top flagged rows in \code{ir$pairs}.
-\item Visualize with \code{\link[=plot_interrater_agreement]{plot_interrater_agreement()}}.
+\item Visualize with \link[=plot.mfrm_fit]{plot(x, type = "agreement")}.
 }
 }
 
@@ -83,50 +129,74 @@ deserve highest calibration priority.
 The \code{pairs} data.frame contains:
 \describe{
 \item{Rater1, Rater2}{Rater pair identifiers.}
-\item{N}{Number of matched-context observations for this pair.}
+\item{N, OpportunityCount}{Number of matched contexts with two finite
+scores for this pair, after any repeated-cell averaging.}
 \item{Exact}{Proportion of exact score agreements.}
 \item{ExpectedExact}{Model-implied expected exact agreement from the two
 raters' fitted category-probability vectors. \code{NA} when those probabilities
 are unavailable.}
-\item{Adjacent}{Proportion of adjacent (+/- 1 category) agreements.}
+\item{Adjacent}{Proportion whose absolute compared-score difference is
+at most 1, including exact agreements.}
 \item{MeanDiff}{Signed mean score difference (Rater1 - Rater2).}
 \item{MAD}{Mean absolute score difference.}
 \item{Corr}{Pearson correlation between paired scores.}
 \item{Flag}{Logical; \code{TRUE} when Exact < \code{exact_warn} or Corr < \code{corr_warn}.}
-\item{OpportunityCount, ExactCount, ExpectedExactCount, AdjacentCount}{Raw
-counts behind the agreement proportions.}
+\item{ExactCount, AdjacentCount}{Observed counts behind the proportions.}
+\item{ExpectedExactCount}{Sum of model-implied exact-agreement
+probabilities over matched contexts; it may be fractional. Unavailable
+if any such context lacks valid probabilities.}
+\item{ExpectedAvailableContexts, ExpectedUnavailableContexts}{Counts of
+matched contexts with and without valid fitted probabilities.}
+\item{ExpectedReason}{\code{available}, or semicolon-separated reasons:
+\code{primary_estimate_unavailable}, \code{repeated_ratings},
+\code{fitted_probabilities_unavailable}, or \code{no_matched_scores}.}
 }
 
 The \code{summary} data.frame contains:
 \describe{
 \item{RaterFacet}{Name of the rater facet analyzed.}
-\item{TotalPairs}{Number of rater pairs evaluated.}
-\item{ExactAgreement}{Mean exact agreement across all pairs.}
+\item{Pairs, AvailablePairs, UnavailablePairs}{All candidate rater pairs,
+those with matched scores, and those without.}
+\item{TotalPairs, OpportunityCount}{Total matched-context opportunities
+across rater pairs, not the number of distinct people or contexts.}
+\item{Contexts}{Distinct contexts with at least two finite compared scores.}
+\item{ExactAgreement}{Exact agreements divided by all matched-context
+opportunities.}
 \item{AgreementMinusExpected}{Observed exact agreement minus expected exact
 agreement.}
-\item{MeanCorr}{Mean pairwise correlation.}
-\item{FlaggedPairs, FlaggedShare}{Count and proportion of flagged pairs.}
+\item{MeanCorr}{Mean available pairwise correlation weighted by each
+pair's matched-context count; unavailable correlations are excluded.}
+\item{FlaggedPairs, FlaggedShare}{Known flagged pairs and their share of
+all pairs; the share is unavailable if classification is incomplete.}
+\item{ClassifiedPairs, UnclassifiedPairs}{Available and unavailable combined
+flag decisions. Correlation availability is recorded separately.}
 \item{RaterSeparation, RaterReliability}{Severity-spread indices for the
 rater facet, reported separately from agreement.}
 }
 }
 
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
-ir <- interrater_agreement_table(fit, rater_facet = "Rater")
-# One-row overview: ExactAgreement, ExpectedExactAgreement, MeanCorr,
-# RaterSeparation, and RaterReliability are the headline reportable
-# statistics.
-ir$summary
-# Per-pair detail (Rater1 vs Rater2 with Exact, Adjacent, Corr, MAD).
-head(ir$pairs)
-p_ir <- plot(ir, draw = FALSE)
-p_ir$data$plot
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("interrater_agreement_table", run.dontrun = TRUE)
+\dontrun{
+library(mfrmr)
+
+# Saved synthetic MML/RSM analysis of example_operational.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "operational-mml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+
+# Compare ratings of the same person on the same criterion
+agreement <- interrater_agreement_table(fit, rater_facet = "Rater")
+agreement$summary
+agreement$pairs[, c("Rater1", "Rater2", "N", "Exact", "Corr", "MeanDiff")]
+# N is the number of matched ratings; Exact is the fraction with identical scores
+# MeanDiff = Rater1 minus Rater2: positive means Rater1 assigned higher scores
+# These observed-score comparisons are distinct from fitted rater severity
 }
 }
 \seealso{
-\code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=facets_chisq_table]{facets_chisq_table()}}, \code{\link[=plot_interrater_agreement]{plot_interrater_agreement()}},
-\link{mfrmr_visual_diagnostics}
+\code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=facets_chisq_table]{facets_chisq_table()}}, \link[=plot.mfrm_fit]{plot(x, type = "agreement")},
+\code{\link[=pairwise_icc_table]{pairwise_icc_table()}}, \code{\link[=pairwise_kappa_table]{pairwise_kappa_table()}}, \code{\link[=gwet_ac2_table]{gwet_ac2_table()}},
+\code{\link[=krippendorff_alpha_table]{krippendorff_alpha_table()}}, \link{mfrmr_visual_diagnostics}
 }

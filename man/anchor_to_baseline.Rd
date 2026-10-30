@@ -19,6 +19,8 @@ anchor_to_baseline(
   model = NULL,
   method = NULL,
   anchor_policy = "warn",
+  mml_integration = NULL,
+  centering_scope = NULL,
   ...
 )
 
@@ -31,7 +33,8 @@ anchor_to_baseline(
 \arguments{
 \item{new_data}{Data frame in long format (one row per rating).}
 
-\item{baseline_fit}{An \code{mfrm_fit} object from a previous calibration.}
+\item{baseline_fit}{An inference-ready \code{mfrm_fit} object from a previous
+calibration under the current readiness contract.}
 
 \item{person}{Character column name for person/examinee.}
 
@@ -42,7 +45,9 @@ anchor_to_baseline(
 \item{anchor_facets}{Character vector of facets to anchor (default: all
 non-Person facets).}
 
-\item{include_person}{If \code{TRUE}, also anchor person estimates.}
+\item{include_person}{If \code{TRUE}, also export Person values for a receiving
+JML fit. MML rejects Person anchors. Use only when constant ability for the
+same Persons is substantively intended; shared Persons need not be fixed.}
 
 \item{weight}{Optional character column name for observation weights.}
 
@@ -53,11 +58,19 @@ non-Person facets).}
 \item{anchor_policy}{How to handle anchor issues: \code{"warn"}, \code{"error"},
 \code{"silent"}.}
 
-\item{...}{Ignored.}
+\item{mml_integration}{MML integration mode passed to \code{\link[=fit_mfrm]{fit_mfrm()}}. \code{NULL}
+inherits the baseline fit's mode for MML; JML uses \code{"fixed"}.}
 
-\item{x}{An \code{mfrm_anchored_fit} object.}
+\item{centering_scope}{\code{NULL} inherits the baseline's convention. Older fits
+without this setting retain \code{"remainder"}. Supply \code{"facet"} or \code{"remainder"}
+explicitly only when that constraint system is intended; see \code{\link[=fit_mfrm]{fit_mfrm()}}.}
+
+\item{...}{For \code{anchor_to_baseline()}, additional arguments passed to
+\code{\link[=fit_mfrm]{fit_mfrm()}}. Ignored by the S3 print and summary methods on this page.}
 
 \item{object}{An \code{mfrm_anchored_fit} object (for \code{summary}).}
+
+\item{x}{An \code{mfrm_anchored_fit} object.}
 }
 \value{
 Object of class \code{mfrm_anchored_fit} with components:
@@ -71,10 +84,10 @@ Object of class \code{mfrm_anchored_fit} with components:
 \description{
 Re-estimates a fitted many-facet model on new data while holding selected
 facet parameters fixed at the values from a previous (baseline) calibration.
-This is the standard workflow for placing new data onto an existing scale,
-linking test forms, or carrying a baseline calibration across
-administration windows.
-For bounded \code{GPCM}, treat this as direct exploratory anchor/drift support
+This transfers baseline coordinates into a new fit through direct equality
+constraints. Common-scale interpretation is conditional on a defensible
+baseline and invariant cross-run element identity.
+For \code{GPCM}, treat this as direct exploratory anchor/drift support
 rather than as the package's formal linking-synthesis route.
 }
 \details{
@@ -84,34 +97,58 @@ This function automates the baseline-anchored calibration workflow:
 \item Re-estimates the model on \code{new_data} with those anchors fixed via
 \code{fit_mfrm(..., anchors = anchor_table)}.
 \item Runs \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} on the anchored fit.
-\item Computes element-level differences (new estimate minus baseline
-estimate) for every common element.
+\item Compares the fixed non-Person anchor values in the new fit with their
+supplied values. This checks constraint consistency, not invariance.
 }
 
-The \code{model} and \code{method} arguments default to the baseline fit's settings
-so the calibration framework remains consistent.  Elements present in the
+The helper refuses a baseline unless its current readiness record has
+\code{InferenceReady = TRUE}. Also confirm compatible model, score coding,
+orientation, and population conventions, and document that anchor labels
+denote the same elements with invariant meaning. The function checks object
+shape and receiving-data anchor compatibility, but does not establish those
+substantive conditions. Fixing parameters can identify coordinates; it does
+not create observed common-rating links.
+
+Only \code{model}, \code{method}, the centering convention and MML integration mode inherit baseline
+settings automatically. Supply other settings explicitly through \code{...},
+including rubric bounds, category policy, facet orientation, PCM/GPCM facet
+roles and any population model. RSM/PCM MML without a population model uses
+a fixed standard-normal ability distribution; anchors do not automatically
+estimate a new cohort's mean or variance.
+
+The table fixes locations only: thresholds and GPCM slopes are re-estimated.
+Use \code{\link[=extract_mfrm_calibration]{extract_mfrm_calibration()}} and \code{\link[=score_mfrm_calibration]{score_mfrm_calibration()}} when the question is scoring
+against a complete fixed calibration. Partial anchors retain the centering
+restrictions described in \code{\link[=fit_mfrm]{fit_mfrm()}}; this is not an unrestricted
+fixed-common-parameter linking implementation for arbitrary new levels.
+Elements present in the
 anchor table but absent from the new data are handled according to
 \code{anchor_policy}: \code{"warn"} (default) emits a message, \code{"error"} stops
 execution, and \code{"silent"} ignores silently.
 
-The returned \code{drift} table is best interpreted as an anchored consistency
-check. When a facet is fixed through \code{anchor_facets}, those anchored levels
-are constrained in the new run, so their reported differences are not an
-independent drift analysis. For genuine cross-wave drift monitoring, fit the
-waves separately and use \code{\link[=detect_anchor_drift]{detect_anchor_drift()}} on the resulting fits.
+The returned \code{drift} table contains only non-Person anchor rows that match
+the new data. Unanchored common levels and Person levels are absent. The
+compared values are fixed by construction, so zero differences do not show
+that raters or tasks remained stable. For separate cross-wave screening,
+fit the waves independently and use \code{\link[=detect_anchor_drift]{detect_anchor_drift()}}, retaining its
+offset and uncertainty limitations.
 
-Element-level differences are calculated for every element that appears in
-both the baseline and the new calibration:
+Differences compare each retained fixed value to the supplied anchor:
 \deqn{\Delta_e = \hat{\delta}_{e,\text{new}} - \hat{\delta}_{e,\text{base}}}
 An element is \strong{flagged} when \eqn{|\Delta_e| > 0.5} logits or
 \eqn{|\Delta_e / SE_{\Delta_e}| > 2.0}, where
 \eqn{SE_{\Delta_e} = \sqrt{SE_{\mathrm{base}}^2 + SE_{\mathrm{new}}^2}}.
+\code{SE_Diff} is a plug-in independence calculation. It does not propagate
+baseline-anchor uncertainty or cross-fit covariance, and anchored estimates
+in the new fit are constrained rather than independently re-estimated.
+Consequently, \code{Drift_SE_Ratio} and \code{Flag} are descriptive consistency
+screens, not formal z tests or calibrated error-rate decisions.
 }
 \section{Which function should I use?}{
 
 \itemize{
 \item Use \code{anchor_to_baseline()} when you have one new dataset and want to place
-it directly on a baseline scale.
+it on baseline coordinates within the documented constraint system.
 \item Use \code{\link[=detect_anchor_drift]{detect_anchor_drift()}} when you already have multiple fitted waves
 and want to compare their stability.
 \item Use \code{\link[=build_equating_chain]{build_equating_chain()}} when you need cumulative offsets across an
@@ -122,18 +159,17 @@ ordered series of waves.
 \section{Interpreting output}{
 
 \itemize{
-\item \verb{$drift}: one row per common element with columns \code{Facet}, \code{Level},
+\item \verb{$drift}: one row per retained non-Person anchor with columns \code{Facet}, \code{Level},
 \code{Baseline}, \code{New}, \code{Drift}, \code{SE_Baseline}, \code{SE_New}, \code{SE_Diff},
 \code{Drift_SE_Ratio}, and \code{Flag}.
-Read this as an anchored consistency table. Small absolute differences
-indicate that the anchored re-fit stayed close to the baseline scale.
-Flagged rows warrant review, but they are not a substitute for a separate
-drift study on unanchored common elements.
+Read this as a constraint-consistency table. Zero differences are expected
+by construction and provide no independent evidence of stability.
 \item \verb{$fit}: the full anchored \code{mfrm_fit} object, usable with
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=measurable_summary_table]{measurable_summary_table()}}, etc.
 \item \verb{$diagnostics}: pre-computed diagnostics for the anchored calibration.
-\item \verb{$baseline_anchors}: the anchor table fed to \code{\link[=fit_mfrm]{fit_mfrm()}}, useful for
-reviewing which elements were constrained.
+\item \verb{$baseline_anchors}: the candidate table fed to \code{\link[=fit_mfrm]{fit_mfrm()}}. Some rows may
+be excluded when \code{anchor_policy} permits unmatched IDs. Inspect
+\verb{$fit$config$anchor_review$anchors} for the retained direct constraints.
 }
 }
 
@@ -143,28 +179,33 @@ reviewing which elements were constrained.
 \item Fit the baseline model: \code{fit1 <- fit_mfrm(...)}.
 \item Collect new data (e.g., a later administration).
 \item Call \code{res <- anchor_to_baseline(new_data, fit1, ...)}.
-\item Inspect \code{summary(res)} to confirm the anchored run remains close to the
-baseline scale.
+\item Inspect \code{summary(res)} for numerical readiness and fixed-value consistency;
+neither establishes anchor invariance or a successful substantive link.
 \item For multi-wave drift monitoring, fit waves separately and pass the fits to
 \code{\link[=detect_anchor_drift]{detect_anchor_drift()}} or \code{\link[=build_equating_chain]{build_equating_chain()}}.
 }
 }
 
 \examples{
-\donttest{
-# Deliberately linked teaching waves: both retain the same rater and
-# criterion identities from one synthetic calibration design.
-toy <- load_mfrmr_data("example_core")
-people <- unique(toy$Person)
-# Two balanced 12-Person waves retain every Rater and Criterion.
-d1 <- toy[toy$Person \%in\% people[1:12], , drop = FALSE]
-d2 <- toy[toy$Person \%in\% people[13:24], , drop = FALSE]
+# Long-running workflow; run explicitly when needed.
+# example("anchor_to_baseline", run.dontrun = TRUE)
+\dontrun{
+# Packaged synthetic teaching data; no data-generation code is needed.
+ratings <- load_mfrmr_data("example_core")
+people <- unique(ratings$Person)
+# Two balanced 24-Person waves retain every Rater and Criterion.
+d1 <- ratings[ratings$Person \%in\% people[1:24], , drop = FALSE]
+d2 <- ratings[ratings$Person \%in\% people[25:48], , drop = FALSE]
 fit1 <- fit_mfrm(d1, "Person", c("Rater", "Criterion"), "Score",
-                 method = "MML", quad_points = 7, maxit = 30)
+                 method = "MML", rating_min = 1, rating_max = 4,
+                 category_policy = "preserve")
 res <- anchor_to_baseline(d2, fit1, "Person",
                           c("Rater", "Criterion"), "Score",
-                          anchor_facets = "Criterion")
+                          anchor_facets = "Criterion", anchor_policy = "error",
+                          rating_min = 1, rating_max = 4,
+                          category_policy = "preserve")
 summary(res)
+# These fixed-value differences are not a test of Criterion stability.
 head(res$drift[, c("Facet", "Level", "Drift", "Flag")])
 res$baseline_anchors[1:3, ]
 }

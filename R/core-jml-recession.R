@@ -11,10 +11,47 @@
 # constraints, interactions, and steps enter without being reconstructed from
 # response totals.
 #
-# The result is deliberately an internal certificate instrument.  It does not
+# The result is a non-exported diagnostic certificate. It does not
 # yet overwrite the finite optimizer iterate in public facet, interaction, or
 # step tables.  That promotion belongs to the cross-surface propagation work
 # after the certificate and target mapping have been stress-tested.
+
+mfrmr_check_extreme_person_anchor_origin <- function(prep, config) {
+  if (!identical(config$centering_scope, "anchor_origin") ||
+      !identical(config$method, "JML") ||
+      !config$model %in% c("RSM", "PCM") ||
+      length(config$interaction_specs) > 0L) {
+    return(invisible(NULL))
+  }
+  person_spec <- config$theta_spec
+  noncenter <- config$noncenter_facet
+  other_spec <- config$facet_specs[[noncenter]]
+  if (is.null(other_spec) || isTRUE(person_spec$centered) ||
+      isTRUE(other_spec$centered) || any(is.finite(other_spec$anchors)) ||
+      any(!is.na(person_spec$groups)) || any(!is.na(other_spec$groups))) {
+    return(invisible(NULL))
+  }
+  anchored <- names(person_spec$anchors)[is.finite(person_spec$anchors)]
+  data <- prep$data
+  rows <- as.character(data$Person) %in% anchored & data$Weight > 0
+  if (!any(rows)) return(invisible(NULL))
+  tail <- if (all(data$Score[rows] == prep$rating_min)) "minimum" else
+    if (all(data$Score[rows] == prep$rating_max)) "maximum" else NULL
+  if (is.null(tail)) return(invisible(NULL))
+
+  # All positive-weight anchored responses lie at the same boundary. Shift
+  # every free Person by c and every level of the noncenter facet by -c/sign.
+  # Free-Person predictors are unchanged; fixed-Person predictors move by -c.
+  # Choosing the sign of c toward that boundary strictly increases likelihood
+  # at every finite point, preserving every anchor and centering constraint.
+  # This certificate needs neither an optimizer nor the optional LP solver.
+  stop("`centering_scope = 'anchor_origin'`: all retained responses of the ",
+       "directly anchored Persons are at the declared ", tail, ". ",
+       "Free Person and ", noncenter, " locations can diverge together. ",
+       "No finite joint maximum is available under these anchors; review ",
+       "anchor support and constraints. Finite FACETS Xtreme reporting values ",
+       "do not supply an ordinary JML solution.", call. = FALSE)
+}
 
 mfrmr_jml_recession_empty_target_table <- function() {
   data.frame(
@@ -231,7 +268,7 @@ mfrmr_jml_structural_target_system <- function(config, sizes, params,
   }
 
   interaction_specs <- config$interaction_specs %||% list()
-  interaction_slice <- as.integer(slices$interactions %||% integer(0))
+  interaction_slice <- as.integer(slices[["interactions"]] %||% integer(0))
   interaction_cursor <- 0L
   if (length(interaction_specs) > 0L) {
     for (name in names(interaction_specs)) {
@@ -947,7 +984,7 @@ audit_mfrm_jml_additive_recession <- function(prep,
         prescreen_out$target_lp_calls
     )
     list(
-      contract_version = mfrmr_boundary_contract_version(),
+      contract_version = mfrmr_readiness_contract_version(),
       method = method,
       model = model,
       scope = if (joint_scope) {
@@ -968,18 +1005,22 @@ audit_mfrm_jml_additive_recession <- function(prep,
       detail = detail,
       limitations = if (joint_scope) {
         paste(
-          "This bounded audit certifies joint additive recession directions",
+          "This check identifies joint additive recession directions",
+          "(parameters that can diverge without reducing the likelihood)",
           "for structural targets and unresolved constraint-coupled extreme",
           "Person targets. Ordinary free extreme Persons remain governed by",
-          "the sufficient-score audit. GPCM log-slope recession and public-",
-          "table propagation are not part of this implementation slice."
+          "the sufficient-score check. GPCM log-slope recession is outside",
+          "this check. These diagnostics alone do not establish usable",
+          "estimates or intervals for every parameter."
         )
       } else {
         paste(
-          "This bounded audit certifies additive structural recession directions",
-          "with Person coordinates fixed. GPCM log-slope recession and public-",
-          "table propagation are not part of this implementation slice; joint",
-          "Person movement is evaluated by the companion additive audit."
+          "This check identifies additive structural recession directions",
+          "(parameters that can diverge without reducing the likelihood)",
+          "with Person coordinates fixed. GPCM log-slope recession is outside",
+          "this check; joint Person movement is evaluated by the joint additive",
+          "check. These diagnostics alone do not establish usable estimates",
+          "or intervals for every parameter."
         )
       }
     )

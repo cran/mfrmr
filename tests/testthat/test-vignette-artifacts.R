@@ -29,7 +29,10 @@ test_that("precomputed vignette artifacts match their semantic manifest", {
     ))
   }
   expect_true(all(manifest$DataKey == "example_operational"))
-  expect_true(all(manifest$GeneratedWith == as.character(utils::packageVersion("mfrmr"))))
+  # Pin the actual provenance of these saved tables. An unrelated package
+  # version change does not regenerate their estimates. Intentional artifact
+  # regeneration must update this expectation and retain the semantic checks.
+  expect_true(all(manifest$GeneratedWith == "0.2.4.9000"))
 
   for (i in seq_len(nrow(manifest))) {
     path <- file.path(artifact_dir, manifest$Artifact[i])
@@ -78,7 +81,7 @@ test_that("precomputed workflow artifacts represent the canonical successful fit
   expect_true(isTRUE(fit_overview$InferenceReady))
   expect_identical(fit_overview$ConvergenceSeverity, "pass")
   expect_identical(fit_decision$Interpretation,
-                   "Fit gates passed; formal precision review required")
+                   "Fit-readiness requirements satisfied; formal precision review required")
   expect_identical(fit_decision$FormalInference, "No")
   expect_identical(fit_decision$FitReadiness, "ready")
   expect_identical(fit_decision$Why,

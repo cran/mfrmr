@@ -33,9 +33,10 @@ and should separate MnSq differences from df/ZSTD convention differences;
 \item current model boundary: one ordered-categorical response-model family and
 one observed score scale are used per fit; nominal and count-response
 families, mixed families, multiple independent scales,
-general threshold anchoring, and scoring from an imported versioned frozen
-calibration are not part of the current public estimator; posterior
-scoring from an existing fitted object is a separate current route;
+general threshold anchoring, and importing FACETS or third-party frozen
+calibrations are not part of the current public estimator; native portable
+calibration is available within the scope of \code{\link[=mfrm_calibration_capabilities]{mfrm_calibration_capabilities()}},
+and posterior scoring from an existing fitted object remains separate;
 \item extension surface: native R tables, plot data, GPCM diagnostics,
 network views, and G/D-study helpers are package extensions, not promises
 of FACETS menu-level reproduction.

@@ -1,0 +1,195 @@
+topic,execution,reason,replay_in_full_tests,help_topic
+analyze_dff,dontrun,Existing optional workflow or externally supplied input,False,analyze_dff
+analyze_hierarchical_structure,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,analyze_hierarchical_structure
+analyze_residual_pca,mixed,Short observed PCA runs automatically; optional permutation reference remains in help for explicit execution,True,analyze_residual_pca
+anchor_to_baseline,dontrun,Existing optional workflow or externally supplied input,False,anchor_to_baseline
+as.data.frame.mfrm_fit,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,as.data.frame.mfrm_fit
+as_flextable,dontrun,Existing optional workflow or externally supplied input,False,as_flextable
+as_flextable.apa_table,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,as_flextable.apa_table
+as_ggplot,dontrun,Existing optional workflow or externally supplied input,False,as_ggplot
+assess_mfrm_recovery,dontrun,Existing optional workflow or externally supplied input,False,assess_mfrm_recovery
+bias_count_table,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,bias_count_table
+bias_interaction_report,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,bias_interaction_report
+bias_iteration_report,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,bias_iteration_report
+bias_pairwise_report,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,bias_pairwise_report
+build_apa_outputs,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,build_apa_outputs
+build_conquest_overlap_bundle,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,build_conquest_overlap_bundle
+build_equating_chain,dontrun,Existing optional workflow or externally supplied input,False,build_equating_chain
+build_fixed_reports,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,build_fixed_reports
+build_linking_review,dontrun,Existing optional workflow or externally supplied input,False,build_linking_review
+build_mfrm_manifest,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,build_mfrm_manifest
+build_mfrm_network_review,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,build_mfrm_network_review
+build_mfrm_replay_script,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,build_mfrm_replay_script
+build_mfrm_sim_spec,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,build_mfrm_sim_spec
+build_misfit_casebook,dontrun,Existing optional workflow or externally supplied input,False,build_misfit_casebook
+build_summary_table_bundle,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,build_summary_table_bundle
+build_visual_summaries,dontrun,Existing optional workflow or externally supplied input,False,build_visual_summaries
+build_weighting_review,dontrun,Existing optional workflow or externally supplied input,False,build_weighting_review
+category_curves_report,dontrun,Existing optional workflow or externally supplied input,False,category_curves_report
+category_structure_report,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,category_structure_report
+classification_table,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,classification_table
+compare_mfrm,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,compare_mfrm
+compute_facet_design_effect,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,compute_facet_design_effect
+compute_facet_icc,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,compute_facet_icc
+compute_information,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,compute_information
+confint.mfrm_fair_average,dontrun,Existing optional workflow or externally supplied input,False,confint.mfrm_fair_average
+confint.mfrm_fit,dontrun,Existing optional workflow or externally supplied input,False,confint.mfrm_fit
+confint.mfrm_multivariate_d_study,dontrun,Existing optional workflow or externally supplied input,False,confint.mfrm_multivariate_d_study
+confint.mfrm_multivariate_gstudy,dontrun,Existing optional workflow or externally supplied input,False,confint.mfrm_multivariate_gstudy
+detect_anchor_drift,dontrun,Existing optional workflow or externally supplied input,False,detect_anchor_drift
+diagnose_mfrm,dontrun,Existing optional workflow or externally supplied input,False,diagnose_mfrm
+dif_interaction_table,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,dif_interaction_table
+dif_report,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,dif_report
+displacement_table,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,displacement_table
+estimate_all_bias,dontrun,Existing optional workflow or externally supplied input,False,estimate_all_bias
+estimate_bias,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,estimate_bias
+estimation_iteration_report,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,estimation_iteration_report
+evaluate_mfrm_design,dontrun,Existing optional workflow or externally supplied input,False,evaluate_mfrm_design
+evaluate_mfrm_diagnostic_screening,dontrun,Existing optional workflow or externally supplied input,False,evaluate_mfrm_diagnostic_screening
+evaluate_mfrm_signal_detection,dontrun,Existing optional workflow or externally supplied input,False,evaluate_mfrm_signal_detection
+export_mfrm_bundle,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,export_mfrm_bundle
+export_mfrm_model,dontrun,Existing optional workflow or externally supplied input,False,export_mfrm_model
+export_mfrm_results,dontrun,Existing optional workflow or externally supplied input,False,export_mfrm_results
+export_mfrm_tables,automatic,Short primary workflow using packaged data or saved results,True,export_mfrm_tables
+export_summary_appendix,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,export_summary_appendix
+facet_quality_dashboard,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,facet_quality_dashboard
+facet_statistics_report,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,facet_statistics_report
+facets_chisq_table,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,facets_chisq_table
+facets_fit_review,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,facets_fit_review
+facets_output_contract_review,dontrun,Existing optional workflow or externally supplied input,False,facets_output_contract_review
+facets_output_file_bundle,dontrun,Existing optional workflow or externally supplied input,False,facets_output_file_bundle
+fair_average_table,dontrun,Existing optional workflow or externally supplied input,False,fair_average_table
+fit_measures_table,dontrun,Existing optional workflow or externally supplied input,False,fit_measures_table
+fit_mfrm,dontrun,Existing optional workflow or externally supplied input,False,fit_mfrm
+fit_mfrm_random_rater,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,fit_mfrm_random_rater
+fit_mfrm_testlet,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,fit_mfrm_testlet
+fit_rater_network,dontrun,Existing optional workflow or externally supplied input,False,fit_rater_network
+gwet_ac2_table,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,gwet_ac2_table
+import_mirt_fit,dontrun,Existing optional workflow or externally supplied input,False,import_mirt_fit
+interaction_effect_table,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,interaction_effect_table
+interrater_agreement_table,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,interrater_agreement_table
+make_anchor_table,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,make_anchor_table
+mantel_haenszel_table,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,mantel_haenszel_table
+measurable_summary_table,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,measurable_summary_table
+mfrm_calibration_score_methods,dontrun,Existing optional workflow or externally supplied input,False,mfrm_calibration_score_methods
+mfrm_cluster,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,mfrm_cluster
+mfrm_cluster_imputed,dontrun,Existing optional workflow or externally supplied input,False,mfrm_cluster_imputed
+mfrm_curve_intervals,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,mfrm_curve_intervals
+mfrm_d_study,mixed,Short primary analysis runs automatically; supplementary designs and comparisons remain in help for explicit example() execution,True,mfrm_d_study
+mfrm_facet_intervals,dontrun,Existing optional workflow or externally supplied input,False,mfrm_facet_intervals
+mfrm_g_study,mixed,Short primary analysis runs automatically; supplementary designs and comparisons remain in help for explicit example() execution,True,mfrm_g_study
+mfrm_generalizability,automatic,Short primary workflow using packaged data or saved results,True,mfrm_generalizability
+mfrm_multivariate_d_compare,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,mfrm_multivariate_d_compare
+mfrm_network_analysis,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,mfrm_network_analysis
+mfrm_population_intervals,dontrun,Existing optional workflow or externally supplied input,False,mfrm_population_intervals
+mfrm_report,dontrun,Existing optional workflow or externally supplied input,False,mfrm_report
+mfrm_residual_network,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,mfrm_residual_network
+mfrm_response_diagnostics,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,mfrm_response_diagnostics
+mfrm_results,dontrun,Existing optional workflow or externally supplied input,False,mfrm_results
+mfrmr_compatibility_layer,dontrun,Existing optional workflow or externally supplied input,False,mfrmr_compatibility_layer
+mfrmr_linking_and_dff,dontrun,Existing optional workflow or externally supplied input,False,mfrmr_linking_and_dff
+mfrmr_output_guide,automatic,Short primary workflow using packaged data or saved results,True,mfrmr_output_guide
+mfrmr_reporting_and_apa,dontrun,Existing optional workflow or externally supplied input,False,mfrmr_reporting_and_apa
+mfrmr_reports_and_tables,dontrun,Existing optional workflow or externally supplied input,False,mfrmr_reports_and_tables
+mfrmr_visual_diagnostics,dontrun,Existing optional workflow or externally supplied input,False,mfrmr_visual_diagnostics
+mml_quadrature_sensitivity,dontrun,Existing optional workflow or externally supplied input,False,mml_quadrature_sensitivity
+normalize_conquest_overlap_exports,dontrun,Existing optional workflow or externally supplied input,False,normalize_conquest_overlap_exports
+ordinal_logistic_table,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,ordinal_logistic_table
+pairwise_icc_table,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,pairwise_icc_table
+pairwise_kappa_table,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,pairwise_kappa_table
+plot.apa_table,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,apa_table
+plot.mfrm_anchor_drift,dontrun,Existing optional workflow or externally supplied input,False,detect_anchor_drift
+plot.mfrm_anchor_review,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,review_mfrm_anchors
+plot.mfrm_bias,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,estimate_bias
+plot.mfrm_bias_collection,dontrun,Existing optional workflow or externally supplied input,False,estimate_all_bias
+plot.mfrm_bundle,dontrun,Existing optional workflow or externally supplied input,False,plot.mfrm_bundle
+plot.mfrm_clusters,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot.mfrm_clusters
+plot.mfrm_data_description,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,describe_mfrm_data
+plot.mfrm_design_evaluation,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot.mfrm_design_evaluation
+plot.mfrm_design_recommendation,automatic,Short primary workflow using packaged data or saved results,True,recommend_mfrm_design
+plot.mfrm_diagnostic_screening,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot.mfrm_diagnostic_screening
+plot.mfrm_dif,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot.mfrm_dif
+plot.mfrm_dif_interaction,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,dif_interaction_table
+plot.mfrm_dstudy_intervals,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot.mfrm_dstudy_intervals
+plot.mfrm_facets_results,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,read_facets_results
+plot.mfrm_facets_run,dontrun,Existing optional workflow or externally supplied input,False,run_mfrm_facets
+plot.mfrm_information,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,compute_information
+plot.mfrm_multivariate_d_study,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot.mfrm_multivariate_d_study
+plot.mfrm_multivariate_gstudy,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot.mfrm_multivariate_gstudy
+plot.mfrm_pca,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,mfrm_pca
+plot.mfrm_posterior_summary,automatic,Short primary workflow using packaged data or saved results,True,read_mfrm_posterior
+plot.mfrm_qc_pipeline,dontrun,Existing optional workflow or externally supplied input,False,run_qc_pipeline
+plot.mfrm_recovery_simulation,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot.mfrm_recovery_simulation
+plot.mfrm_residual_pca,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,analyze_residual_pca
+plot.mfrm_signal_detection,dontrun,Existing optional workflow or externally supplied input,False,evaluate_mfrm_signal_detection
+plot.mfrm_summary_table_bundle,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,build_summary_table_bundle
+plot_apa_figure_one,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot_apa_figure_one
+plot_bubble,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot_bubble
+plot_compare_mfrm,dontrun,Existing optional workflow or externally supplied input,False,plot_compare_mfrm
+plot_displacement,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot_displacement
+plot_facet_equivalence,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot_facet_equivalence
+plot_facet_quality_dashboard,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot_facet_quality_dashboard
+plot_facets_chisq,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot_facets_chisq
+plot_fair_average,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot_fair_average
+plot_guttman_scalogram,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot_guttman_scalogram
+plot_interrater_agreement,dontrun,Existing optional workflow or externally supplied input,False,plot_interrater_agreement
+plot_local_dependence_heatmap,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot_local_dependence_heatmap
+plot_person_fit,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot_person_fit
+plot_qc_dashboard,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot_qc_dashboard
+plot_rater_agreement_heatmap,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot_rater_agreement_heatmap
+plot_rater_severity_profile,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot_rater_severity_profile
+plot_rater_trajectory,dontrun,Existing optional workflow or externally supplied input,False,plot_rater_trajectory
+plot_reliability_snapshot,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot_reliability_snapshot
+plot_residual_matrix,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot_residual_matrix
+plot_residual_qq,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot_residual_qq
+plot_response_time_review,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot_response_time_review
+plot_shrinkage_funnel,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot_shrinkage_funnel
+plot_threshold_ladder,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot_threshold_ladder
+plot_unexpected,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot_unexpected
+plot_wright_unified,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,plot_wright_unified
+predict.mfrm_testlet,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,predict.mfrm_testlet
+predict_mfrm_population,dontrun,Existing optional workflow or externally supplied input,False,predict_mfrm_population
+predict_mfrm_units,mixed,Primary scoring runs automatically; alternative-prior comparison remains in help for explicit execution,True,predict_mfrm_units
+print.mfrm_apa_text,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,print.mfrm_apa_text
+rater_centrality_table,automatic,Short primary workflow using packaged data or saved results,True,rater_centrality_table
+rater_network_analysis,automatic,Short primary workflow using packaged data or saved results,True,rater_network_analysis
+read_facets_fit_table,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,read_facets_fit_table
+read_facets_results,automatic,Short primary workflow using packaged data or saved results,True,read_facets_results
+read_mfrm_posterior,automatic,Short primary workflow using packaged data or saved results,True,read_mfrm_posterior
+recommend_mfrm_design,automatic,Short primary workflow using packaged data or saved results,True,recommend_mfrm_design
+reference_case_benchmark,dontrun,Existing optional workflow or externally supplied input,False,reference_case_benchmark
+reference_case_review,dontrun,Existing optional workflow or externally supplied input,False,reference_case_review
+reporting_checklist,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,reporting_checklist
+review_conquest_overlap,dontrun,Existing optional workflow or externally supplied input,False,review_conquest_overlap
+review_mfrm_anchors,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,review_mfrm_anchors
+run_mfrm_facets,dontrun,Existing optional workflow or externally supplied input,False,run_mfrm_facets
+run_qc_pipeline,dontrun,Existing optional workflow or externally supplied input,False,run_qc_pipeline
+sample_mfrm_plausible_values,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,sample_mfrm_plausible_values
+shrinkage_report,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,shrinkage_report
+simulate_mfrm_data,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,simulate_mfrm_data
+simulate_mfrm_recovery,dontrun,Existing optional workflow or externally supplied input,False,simulate_mfrm_recovery
+specifications_report,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,specifications_report
+subset_connectivity_report,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,subset_connectivity_report
+summary.apa_table,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,apa_table
+summary.mfrm_anchor_review,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,review_mfrm_anchors
+summary.mfrm_apa_outputs,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,build_apa_outputs
+summary.mfrm_bias,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,estimate_bias
+summary.mfrm_bias_collection,dontrun,Existing optional workflow or externally supplied input,False,estimate_all_bias
+summary.mfrm_bundle,dontrun,Existing optional workflow or externally supplied input,False,summary.mfrm_bundle
+summary.mfrm_data_description,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,describe_mfrm_data
+summary.mfrm_design_evaluation,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,summary.mfrm_design_evaluation
+summary.mfrm_design_recommendation,automatic,Short primary workflow using packaged data or saved results,True,recommend_mfrm_design
+summary.mfrm_diagnostic_screening,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,summary.mfrm_diagnostic_screening
+summary.mfrm_facet_dashboard,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,facet_quality_dashboard
+summary.mfrm_facets_run,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,summary.mfrm_facets_run
+summary.mfrm_jeffreys_fit,dontrun,Existing optional workflow or externally supplied input,False,summary.mfrm_jeffreys_fit
+summary.mfrm_multivariate_d_study,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,summary.mfrm_multivariate_d_study
+summary.mfrm_plausible_values,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,sample_mfrm_plausible_values
+summary.mfrm_population_prediction,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,summary.mfrm_population_prediction
+summary.mfrm_reporting_checklist,dontrun,Existing optional workflow or externally supplied input,False,reporting_checklist
+summary.mfrm_signal_detection,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,summary.mfrm_signal_detection
+summary.mfrm_summary_table_bundle,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,build_summary_table_bundle
+summary.mfrm_threshold_profiles,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,mfrm_threshold_profiles
+unexpected_after_bias_table,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,unexpected_after_bias_table
+unexpected_response_table,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,unexpected_response_table
+vcov.mfrm_multivariate_gstudy,dontrun,Supplementary workflow; explicit example() execution and full regression replay,True,vcov.mfrm_multivariate_gstudy

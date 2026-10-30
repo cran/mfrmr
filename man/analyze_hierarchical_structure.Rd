@@ -10,7 +10,7 @@ analyze_hierarchical_structure(
   person = "Person",
   score = "Score",
   compute_icc = TRUE,
-  ci_method = c("none", "profile", "boot"),
+  ci_method = c("none", "boot"),
   ci_level = 0.95,
   ci_boot_reps = 1000L,
   ci_boot_seed = NULL,
@@ -18,7 +18,8 @@ analyze_hierarchical_structure(
   icc_ci_method = NULL,
   icc_ci_level = NULL,
   icc_ci_boot_reps = NULL,
-  icc_ci_boot_seed = NULL
+  icc_ci_boot_seed = NULL,
+  missing = c("error", "omit")
 )
 }
 \arguments{
@@ -37,7 +38,8 @@ ICC and design-effect tables.}
 
 \item{ci_method}{ICC confidence-interval method passed through to
 \code{\link[=compute_facet_icc]{compute_facet_icc()}}. One of \code{"none"} (default, point estimate
-only), \code{"profile"}, or \code{"boot"}. Deprecated alias:
+only) or \code{"boot"}. The former \code{"profile"} method is refused because it
+did not calculate an ICC profile-likelihood interval. Deprecated alias:
 \code{icc_ci_method} (kept for backward compatibility, emits a
 lifecycle warning).}
 
@@ -59,6 +61,13 @@ person x facet levels.}
 Supplying a non-\code{NULL} value routes through
 \code{\link[lifecycle:deprecate_warn]{lifecycle::deprecate_warn()}} and overrides the canonical
 \verb{ci_*} argument.}
+
+\item{missing}{Missing-value policy for the ICC and design-effect tables,
+passed to \code{\link[=compute_facet_icc]{compute_facet_icc()}}. Invalid input or model errors stop the
+requested ICC analysis. Nesting, cross-tabulation, and connectivity tables
+describe the supplied design, including rows excluded from the ICC model.
+When \code{data} is a fit, ICC row counts start from its stored fitted rows;
+they cannot recover exclusions made before fitting the MFRM.}
 }
 \value{
 A list of class \code{mfrm_hierarchical_structure} with:
@@ -75,14 +84,21 @@ when \code{igraph} is available.
 \item \code{facets}: character vector of facet names that were reviewed
 (echoed for downstream reporting helpers that need to label rows
 by review scope).
+\item \code{data_identity}: reviewed column roles, input row count and a compact
+fingerprint for reuse checks. The optional person column also contributes
+to nesting pair counts; \code{summary$NFacets} counts the requested \code{facets}.
 }
+
+\code{plot(x, type = "icc")} draws variance shares and any available intervals
+without an embedded title or footnote. Save its returned object as \code{p} and
+use \code{plot_data(p, "notes")} to read the interval method or the reason bounds
+are unavailable. These notes survive \code{saveRDS()}/\code{readRDS()}; they do not
+change the underlying ICC estimates.
 }
 \description{
 One-stop review that combines the nesting, cross-tabulation, ICC, and
-design-effect reports into a single object. Designed to be reused by
-the publication-workflow surface: its summary feeds into
-\code{reporting_checklist()}, and its tables are picked up by
-\code{build_mfrm_manifest()} for reproducibility bundles.
+design-effect reports into a single object. Its summary feeds into
+\code{\link[=reporting_checklist]{reporting_checklist()}} after checking the reviewed data against the fit.
 }
 \section{Interpreting output}{
 
@@ -94,7 +110,8 @@ as Crossed / Partially / Near-perfectly / Fully nested.
 one per facet pair. Plot via \code{plot(x, type = "crosstab", pair = "FacetA__FacetB")}.
 \item \code{icc}: per-facet variance shares. See
 \code{\link[=compute_facet_icc]{compute_facet_icc()}} for the two-scale interpretation.
-\item \code{design_effect}: Kish (1965) \code{Deff} and \code{EffectiveN}.
+\item \code{design_effect}: per-facet design-effect approximations and descriptive
+equivalent row counts; not precision estimates for the full design.
 \item \code{connectivity}: number of bipartite components linking
 Person x facet levels. A single component is required for a
 common measurement scale; multiple components indicate a
@@ -108,14 +125,35 @@ disconnected design.
 \item Optional: fit the MFRM with \code{fit_mfrm()}.
 \item Call \code{analyze_hierarchical_structure(fit)} (or on the raw data).
 \item Read \code{summary(x)} for the condensed view.
-\item Feed the object to \code{\link[=reporting_checklist]{reporting_checklist()}} and
-\code{\link[=build_mfrm_manifest]{build_mfrm_manifest()}} to record the review in publication
-bundles. \code{build_apa_outputs()} uses the fit-level
-\code{FacetSampleSizeFlag} to add a Methods sentence automatically.
+\item Pass it as \code{hierarchical_structure} to \code{\link[=reporting_checklist]{reporting_checklist()}} and
+save the review with \code{saveRDS()} when its full tables are needed later.
+\code{\link[=build_mfrm_manifest]{build_mfrm_manifest()}} records a separate fit-level rating-count
+review; it does not accept or archive this structural-review object.
 }
 }
 
+\section{Saved-result reuse}{
+
+A reporting checklist checks the reviewed column roles and retained rating
+rows, including scores when an ICC table was computed. It accepts a subset
+of fitted facets and reports that scope explicitly. Reviews from raw data
+also work when the selected columns and rows match, using either canonical
+\code{Person}/\code{Score} names or the fit's original source-column names.
+Row order, unused factor levels, unused columns and MFRM estimates do not
+affect this match. Nesting and row counts are unweighted; when ICC is absent,
+the match does not depend on scores. These rules do not establish that a
+partial review covers all facets or that the design supports valid inference.
+A review of additional rows, other strata or columns absent from the fit
+remains usable on its own, but cannot mark this fit's checklist item as
+available. Recreate older reviews without \code{data_identity} from the saved
+fit or matching retained rows and original options; no MFRM refit is needed.
+See \link{mfrmr_compatibility_layer}.
+}
+
 \examples{
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("analyze_hierarchical_structure", run.dontrun = TRUE)
+\dontrun{
 toy <- load_mfrmr_data("example_core")
 hs <- analyze_hierarchical_structure(toy,
                                      facets = c("Rater", "Criterion"),
@@ -123,7 +161,6 @@ hs <- analyze_hierarchical_structure(toy,
                                      igraph_layout = FALSE)
 summary(hs)
 
-\donttest{
 # Full review when lme4 and igraph are available.
 if (requireNamespace("lme4", quietly = TRUE) &&
     requireNamespace("igraph", quietly = TRUE)) {

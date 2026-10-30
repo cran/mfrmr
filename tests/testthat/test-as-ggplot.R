@@ -15,7 +15,77 @@ test_that("as_ggplot converts the core fitted-result plots", {
   plots <- lapply(payloads, as_ggplot)
   expect_true(all(vapply(plots, inherits, logical(1), what = "ggplot")))
   for (p in plots) expect_no_error(ggplot2::ggplot_build(p))
+  for (p in plots) expect_null(p$labels$caption)
+  for (i in c(2L, 4L)) {
+    subtitle <- plot_data(plots[[i]], "subtitle")
+    expect_null(plots[[i]]$labels$subtitle)
+    expect_match(gsub("\n", " ", subtitle),
+      "reference profile fixes additive facet effects and fitted interactions at zero", fixed = TRUE)
+  }
   expect_gte(length(ggplot2::ggplot_build(plots[[1]])$data), 8L)
+})
+
+test_that("fit curves share colour and line encodings across renderers", {
+  skip_if_not_installed("ggplot2", minimum_version = "3.4.0")
+  fit <- make_toy_fit(model = "PCM", maxit = 20)
+  grDevices::pdf(NULL, width = 9, height = 6)
+  on.exit(grDevices::dev.off(), add = TRUE)
+  drawn <- list()
+  original_lines <- graphics::lines
+  testthat::local_mocked_bindings(lines = function(...) {
+    args <- list(...)
+    if (!is.null(args$lty)) drawn[[length(drawn) + 1L]] <<- args
+    original_lines(...)
+  }, .package = "mfrmr")
+  for (type in c("ccc", "pathway")) {
+    original <- .mfrmr_muffle_expected_warnings(
+      plot(fit, type = type, draw = FALSE), "^Review-only display:")
+    table_name <- if (type == "ccc") "probabilities" else "expected"
+    key <- if (type == "ccc") "Category" else "CurveGroup"
+    series <- unique(as.character(original$data[[table_name]][[key]]))
+    for (preset in c("standard", "publication", "monochrome")) {
+      drawn <- list()
+      p <- .mfrmr_muffle_expected_warnings(plot(fit, type = type, preset = preset),
+                                         "^Review-only display:")
+      expected <- mfrmr:::.plot_series_colors(series, preset)
+      lty <- mfrmr:::.plot_series_linetypes(series)
+      expect_identical(p$data[[table_name]], original$data[[table_name]])
+      expect_identical(p$data$fit_readiness, original$data$fit_readiness)
+      colors <- vapply(drawn, function(a) unname(as.character(a$col)), character(1))
+      types <- vapply(drawn, function(a) unname(as.character(a$lty)), character(1))
+      expect_identical(unique(colors), unname(expected))
+      expect_identical(unique(types), unique(unname(lty)))
+      g <- ggplot2::ggplot_build(as_ggplot(p))$plot
+      expect_identical(unname(g$scales$get_scales("colour")$map(series)), unname(expected))
+      expect_identical(unname(g$scales$get_scales("linetype")$map(series)), unname(lty))
+    }
+    custom <- stats::setNames(rep("#333333", length(series)), series)
+    p <- .mfrmr_muffle_expected_warnings(
+      plot(fit, type = type, palette = custom, draw = FALSE), "^Review-only display:")
+    expect_identical(p$data$palette, custom)
+    g <- ggplot2::ggplot_build(as_ggplot(p))$plot
+    expect_identical(unname(g$scales$get_scales("colour")$map(series)), unname(custom))
+    expect_identical(p$data[[table_name]], original$data[[table_name]])
+  }
+  # Check opaque line ink against the two built-in light backgrounds.
+  luminance <- function(col) {
+    rgb <- grDevices::col2rgb(col) / 255
+    linear <- ifelse(rgb <= 0.04045, rgb / 12.92, ((rgb + 0.055) / 1.055)^2.4)
+    colSums(linear * c(0.2126, 0.7152, 0.0722))
+  }
+  for (n in c(8, 10)) for (background in c("white", "#fcfdff")) {
+    contrast <- (luminance(background) + 0.05) /
+      (luminance(mfrmr:::.plot_series_colors(seq_len(n))) + 0.05)
+    expect_true(all(contrast >= 3))
+  }
+  overlay <- .mfrmr_muffle_expected_warnings(
+    plot(fit, type = "ccc_overlay", draw = FALSE), "^Review-only display:")
+  for (slope in c("none", "linewidth", "alpha", "colour")) {
+    expect_no_error(built <- ggplot2::ggplot_build(as_ggplot(overlay, slope_aes = slope)))
+    points <- which(vapply(built$plot$layers, function(layer)
+      inherits(layer$geom, "GeomPoint"), logical(1)))
+    expect_gt(length(unique(built$data[[points[1L]]]$shape)), 1L)
+  }
 })
 
 test_that("as_ggplot accepts fitted objects and CCC slope styling", {
@@ -87,4 +157,13 @@ test_that("as_ggplot converts simulation handoff lists", {
   signal$display_metric <- "Bias screening hit rate"
   class(signal) <- "mfrm_signal_detection_plot_data"
   expect_no_error(ggplot2::ggplot_build(as_ggplot(signal)))
+})
+
+
+test_that("residual Q-Q payloads cannot become generic bar charts", {
+  p <- new_mfrm_plot_data("residual_qq", list(
+    table = data.frame(Person = c("A", "B"), Theoretical = c(-1, 1), Observed = c(-.5, 2))))
+  expect_error(as_ggplot(p), "both quantile axes")
+  expect_error(as_ggplot(p, component = "table"), "both quantile axes")
+  expect_identical(plot_data(p, "table")$Observed, c(-.5, 2))
 })

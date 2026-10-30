@@ -1,0 +1,5 @@
+2 Rater
+   T.Score   T.Count  Obs.Avge FairMAvge   Measure      S.E.   InfitMS    InfitZ  OutfitMS   OutfitZ     PtMea   PtMeExp   Discrim  Displace    Status     Group    Weight      Sign InfChiSqu   Infitdf   InfPr2s OutfChiSq  Outfitdf  OutfPr2s         2 R   F-Number F-Label          
+     18.00     32.00       .56       .59  -.266822   .449600      1.24      1.07      1.10       .36       .51       .61       .70  -.000001        -1         0      1.00        -1     50.63     40.95     .2855     12.29     11.19     .7154         1 1          2 Rater
+     17.00     32.00       .53       .54  -.065841   .447239      1.10       .50      1.60      1.37       .53       .61       .74   .000000        -1         0      1.00        -1     45.68     41.65     .6169     18.81     11.79     .1722         2 2          2 Rater
+     15.00     32.00       .47       .44   .332663   .446354       .65     -1.80       .47     -1.42       .76       .61      1.57   .000001        -1         0      1.00        -1     27.21     42.16     .0722      5.27     11.14     .1556         3 3          2 Rater

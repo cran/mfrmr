@@ -329,25 +329,25 @@ test_that("plot_bias_interaction covers scatter, ranked, abs_t_hist, and facet_p
 
   # scatter (drawn)
   p_scatter <- with_null_device(
-    mfrmr::plot_bias_interaction(t13, plot = "scatter", draw = TRUE)
+    plot(t13, type = "bias", view = "scatter", draw = TRUE)
   )
   expect_s3_class(p_scatter, "mfrm_plot_data")
 
   # ranked (drawn)
   p_ranked <- with_null_device(
-    mfrmr::plot_bias_interaction(t13, plot = "ranked", draw = TRUE)
+    plot(t13, type = "bias", view = "ranked", draw = TRUE)
   )
   expect_s3_class(p_ranked, "mfrm_plot_data")
 
   # abs_t_hist (drawn)
   p_hist <- with_null_device(
-    mfrmr::plot_bias_interaction(t13, plot = "abs_t_hist", draw = TRUE)
+    plot(t13, type = "bias", view = "abs_t_hist", draw = TRUE)
   )
   expect_s3_class(p_hist, "mfrm_plot_data")
 
   # facet_profile (drawn)
   p_prof <- with_null_device(
-    mfrmr::plot_bias_interaction(t13, plot = "facet_profile", draw = TRUE)
+    plot(t13, type = "bias", view = "facet_profile", draw = TRUE)
   )
   expect_s3_class(p_prof, "mfrm_plot_data")
 })
@@ -423,7 +423,7 @@ test_that("print.summary.mfrm_threshold_profiles covers all sections", {
   expect_true(any(grepl("Overview", out, fixed = TRUE)))
   expect_true(any(grepl("Profile thresholds", out, fixed = TRUE)))
   expect_true(any(grepl("Threshold ranges", out, fixed = TRUE)))
-  expect_true(any(grepl("PCA reference bands", out, fixed = TRUE)))
+  expect_true(any(grepl("PCA descriptive reference values (uncalibrated)", out, fixed = TRUE)))
 })
 
 # ==========================================================================
@@ -685,7 +685,7 @@ test_that("plot_fair_average covers scatter (observed vs metric) branch", {
   t12 <- mfrmr::fair_average_table(fit, diagnostics = dx)
   # scatter is the default when plot_type = "scatter"
   p <- with_null_device(
-    mfrmr::plot_fair_average(t12, plot_type = "scatter", draw = TRUE)
+    plot(t12, type = "fair_average", view = "scatter", draw = TRUE)
   )
   expect_s3_class(p, "mfrm_plot_data")
 })
@@ -699,13 +699,13 @@ test_that("plot_facets_chisq covers random_chisq and variance branches", {
 
   # random plot
   p1 <- with_null_device(
-    mfrmr::plot_facets_chisq(fchi, plot_type = "random", draw = TRUE)
+    plot(fchi, type = "facets_chisq", view = "random", draw = TRUE)
   )
   expect_s3_class(p1, "mfrm_plot_data")
 
   # variance plot
   p2 <- with_null_device(
-    mfrmr::plot_facets_chisq(fchi, plot_type = "variance", draw = TRUE)
+    plot(fchi, type = "facets_chisq", view = "variance", draw = TRUE)
   )
   expect_s3_class(p2, "mfrm_plot_data")
 })
@@ -715,7 +715,7 @@ test_that("plot_facets_chisq covers random_chisq and variance branches", {
 # ==========================================================================
 test_that("plot_qc_dashboard draws all 9 panels", {
   qc <- with_null_device(
-    mfrmr::plot_qc_dashboard(fit, diagnostics = dx, rater_facet = "Rater", draw = TRUE)
+    plot(fit, type = "qc", diagnostics = dx, rater_facet = "Rater", draw = TRUE)
   )
   expect_s3_class(qc, "mfrm_plot_data")
   expect_equal(qc$name, "qc_dashboard")
@@ -1014,7 +1014,7 @@ test_that("plot.mfrm_fixed_reports covers contrast and pvalue plots", {
 # 45. plot_qc_dashboard with draw=FALSE returns plot data
 # ==========================================================================
 test_that("plot_qc_dashboard draw=FALSE returns plot data without drawing", {
-  qc <- mfrmr::plot_qc_dashboard(fit, diagnostics = dx, draw = FALSE)
+  qc <- plot(fit, type = "qc", diagnostics = dx, draw = FALSE)
   expect_s3_class(qc, "mfrm_plot_data")
   expect_equal(qc$name, "qc_dashboard")
 })

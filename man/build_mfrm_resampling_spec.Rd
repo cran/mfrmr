@@ -22,7 +22,9 @@ build_mfrm_resampling_spec(
 )
 }
 \arguments{
-\item{data}{A long-format observed MFRM data set.}
+\item{data}{A long-format observed MFRM data set with distinct column names.
+The \verb{.mfrm_*} metadata columns listed below are reserved and must not
+already be present. Numeric identifiers must retain distinct text labels.}
 
 \item{person}{Person/respondent identifier column.}
 
@@ -46,11 +48,15 @@ instances in the returned data.}
 \item{reps}{Number of resampling replicates to draw.}
 
 \item{sample_fraction}{Fraction of persons to draw within each stratum when
-\code{sample_n = NULL}.}
+\code{sample_n = NULL}. Targets are rounded upward and respect
+\code{min_per_stratum}. The default is \code{0.5} for both designs; use \code{1} for a
+same-size bootstrap.}
 
 \item{sample_n}{Optional target number of persons to draw per stratum. Supply
 either one scalar used for every stratum, or a named numeric vector whose
-names match the computed stratum labels.}
+names match \code{spec$target_plan$Stratum}. An unnamed vector of length equal
+to the number of strata follows that table's order. Targets are rounded
+upward and capped at available Persons when sampling without replacement.}
 
 \item{replace}{Optional logical override for replacement. By default,
 replacement is \code{FALSE} for \code{"stratified_subsample"} and \code{TRUE} for
@@ -61,10 +67,14 @@ replacement is \code{FALSE} for \code{"stratified_subsample"} and \code{TRUE} fo
 \item{min_per_stratum}{Minimum target persons per represented stratum.}
 
 \item{topup_preserve_facets}{Logical; if \code{TRUE}, add extra person clusters
-when possible to recover missing levels of \code{preserve_facets}.}
+when possible to recover missing levels of \code{preserve_facets}. This changes
+the sampling distribution and can increase stratum sizes; it is not an
+ordinary bootstrap. Set \code{FALSE} for ordinary cluster-bootstrap draws.}
 }
 \value{
-An object of class \code{mfrm_resampling_spec}.
+An object of class \code{mfrm_resampling_spec} containing the input data,
+columns, target plan, person/stratum rosters, \code{sampling_scheme} and
+interpretation in \code{terminology}.
 }
 \description{
 Build an observed-data resampling specification
@@ -72,7 +82,7 @@ Build an observed-data resampling specification
 \details{
 This helper defines a resampling design for observed-data stability checks.
 It is intentionally separate from \code{\link[=build_mfrm_sim_spec]{build_mfrm_sim_spec()}} and
-\code{\link[=evaluate_mfrm_recovery]{evaluate_mfrm_recovery()}}. The full-data estimates used with these draws
+\code{\link[=simulate_mfrm_recovery]{simulate_mfrm_recovery()}}. The full-data estimates used with these draws
 are reference estimates, not known truth, so downstream summaries should be
 described as estimation stability, reproducibility, or agreement with a
 full-data reference rather than strict parameter recovery.
@@ -82,20 +92,64 @@ together. For bootstrap draws, duplicated person clusters are re-keyed in the
 returned data while the original identifier is retained in
 \code{.mfrm_original_person}.
 }
+\section{Sampling assumptions and interpretation}{
+
+For ordinary stratified Person-cluster bootstrap draws, set
+\code{design = "stratified_bootstrap"}, \code{sample_fraction = 1},
+\code{sample_n = NULL}, and \code{topup_preserve_facets = FALSE}. The unit is a
+Person, not a rating row; unequal-sized clusters retain all their rows on
+every draw. This targets variation across independent Persons within strata,
+conditional on the observed non-Person facet levels and assignment patterns.
+It does not reproduce sampling new raters or tasks, or dependence across
+Persons induced by shared random effects or peer-review networks. Crossed
+random effects require a resampling scheme matched to that sampling target.
+
+A reduced sample size or coverage top-up instead defines a stability
+experiment. Top-up chooses an additional Person carrying a currently absent
+preserved level, and can also bring other missing levels. It changes
+inclusion probabilities and stratum totals. Use \code{sampling_scheme}, the
+returned terminology and base/added/final counts to report what was drawn.
+These helpers do not fit models or construct confidence intervals; the
+presence of the word bootstrap does not qualify downstream interval coverage.
+Reference estimates from the full sample still have estimation uncertainty.
+}
+
+\section{Labels and saved specifications}{
+
+Original Person keys and data values are retained. Stratum labels escape
+percent signs and vertical bars, and distinguish missing values, empty
+strings and literal \code{"(missing)"}/\code{"(empty)"} labels. Inspect \code{target_plan}
+before supplying named \code{sample_n} values. Data column names
+\code{.mfrm_original_person}, \code{.mfrm_draw_unit}, \code{.mfrm_stratum}, \code{.mfrm_topup},
+and \code{.mfrm_topup_reason} are reserved for returned metadata.
+
+\code{draw_mfrm_resamples()} rebuilds derived tables from the specification's
+declared inputs, including saved older specifications. Corrected labels and
+top-up rules can change old draws even with the same seed; retain old results
+separately. \code{saveRDS(spec, ...)} preserves the input data and seed;
+\code{saveRDS(draws, ...)} preserves the actual samples, per-replicate seeds and
+manifests. Use an explicit seed to reproduce draws in a matching R/RNG
+environment. Manifest-only results retain the specification and input data
+but omit the materialized samples.
+}
+
 \examples{
-toy <- simulate_mfrm_data(n_person = 12, n_rater = 3, n_criterion = 2,
-                          raters_per_person = 2, seed = 11)
-region_map <- setNames(rep(c("A", "B", "C"),
-                           length.out = length(unique(toy$Person))),
-                       unique(toy$Person))
-toy$Region <- unname(region_map[toy$Person])
+# Bundled synthetic ratings: inspect stability in half-samples by Group.
+ratings <- load_mfrmr_data("example_operational")
 spec <- build_mfrm_resampling_spec(
-  toy, person = "Person", facets = c("Rater", "Criterion"),
-  score = "Score", strata = "Region", preserve_facets = "Rater",
+  ratings, person = "Person", facets = c("Rater", "Criterion"),
+  score = "Score", strata = "Group", preserve_facets = "Rater",
   reps = 2, sample_fraction = 0.5, seed = 99
 )
 draws <- draw_mfrm_resamples(spec)
 summary(draws)$overview
+draws$stratum_manifest  # Base, top-up and final Person-cluster counts.
+}
+\references{
+Owen, A. B. and Eckles, D. (2012). Bootstrapping data arrays of arbitrary
+order. \emph{The Annals of Applied Statistics}, 6(3), 895--927.
+\doi{10.1214/12-AOAS547}. This discusses crossed-factor resampling;
+it is not the method implemented by this Person-cluster helper.
 }
 \seealso{
 \code{\link[=draw_mfrm_resamples]{draw_mfrm_resamples()}}, \code{\link[=build_mfrm_sim_spec]{build_mfrm_sim_spec()}}

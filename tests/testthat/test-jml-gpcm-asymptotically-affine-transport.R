@@ -262,6 +262,7 @@ test_that("nonvanishing zero-rate residuals can destroy a common limit", {
 })
 
 test_that("source incoherence and estimator scope fail closed", {
+  skip_if_not_installed("lpSolve")
   fit <- fit_jml_gpcm_affine_transport_fixture("positive")
   config <- fit$config
   slope <- config$boundary_audit$gpcm_slope_boundary

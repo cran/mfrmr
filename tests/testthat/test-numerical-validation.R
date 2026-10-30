@@ -206,7 +206,7 @@ test_that("JML and MML produce correlated facet estimates", {
   }
   expect_identical(
     as.character(fit_jml$summary$FitReadiness[1]),
-    "ready_with_exclusions"
+    if (requireNamespace("lpSolve", quietly = TRUE)) "ready_with_exclusions" else "review"
   )
   expect_false(isTRUE(fit_jml$summary$InferenceReady[1]))
   expect_match(

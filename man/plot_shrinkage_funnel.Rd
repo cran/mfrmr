@@ -24,11 +24,12 @@ shrinkage columns present).}
 
 \item{preset}{Visual preset.}
 
-\item{show_ci}{Logical. When \code{TRUE}, draw approximate confidence-interval
-whiskers for raw and shrunken estimates when \code{SE} / \code{ShrunkSE} evidence is
-available.}
+\item{show_ci}{Logical. When \code{TRUE}, draw descriptive normal bands from
+raw and plug-in shrunken SEs. These omit prior-variance uncertainty and
+cross-level covariance; zero width after full pooling is not perfect precision.}
 
-\item{ci_level}{Confidence level used when \code{show_ci = TRUE}; default 0.95.}
+\item{ci_level}{Nominal normal-band level when \code{show_ci = TRUE}; default
+0.95. This does not assert repeated-sampling coverage.}
 
 \item{draw}{If \code{TRUE}, draw with base graphics.}
 }
@@ -50,13 +51,53 @@ a \code{fit_mfrm(..., facet_shrinkage = "empirical_bayes")} run, so that
 \code{fit$facets$others} carries \code{Estimate}, \code{ShrunkEstimate}, and
 \code{ShrinkageFactor} columns.
 }
+\section{Migration in 0.2.4}{
+
+This renderer is internal. Use the corresponding \code{plot()} route in
+\link{mfrmr_plot_migration}; the former exported name is no longer available.
+}
+
+\section{Session plot defaults}{
+
+Set \code{options(mfrmr.plot_preset = "publication")} to choose a session default
+for plotting functions that expose the common \code{preset} argument. The
+supported values are \code{"standard"}, \code{"publication"}, \code{"compact"} and
+\code{"monochrome"}. Precedence is an explicit call argument, then the session
+option, then \code{"standard"}. For example, \code{preset = "standard"} overrides
+a session set to \code{"monochrome"}. Explicit \code{preset = NULL} retains the
+earlier package-default behavior; it does not read the session option.
+Invalid session values cause an error only when that option is needed.
+
+The category-curve, data-quality, fit-review, connectivity and network
+routes of \code{plot()} for report bundles use the same option through \code{...}.
+Plots without a common \code{preset} argument, including extended-model plots
+with their own \code{palette} controls, keep their own settings. This option
+selects a preset, not a universal theme or a guarantee that all renderers
+implement every appearance control identically.
+
+New plot payloads retain the resolved preset for supported saved-data
+rendering. Converting an existing payload with \code{\link[=as_ggplot]{as_ggplot()}} uses its saved
+appearance, even after the session option changes. A call that creates a
+new plot from a fit or statistical result uses the current default.
+For a reproducible script, supply \code{preset} explicitly or set the option in
+that script. Saving only the fitted model does not save a session option.
+No global ggplot theme is changed.
+
+Restore previous settings with \code{old <- options(mfrmr.plot_preset = "monochrome")} followed by \code{options(old)}. Use
+\code{options(mfrmr.plot_preset = NULL)} to remove the option. The preset changes
+appearance, not estimates, confidence levels or diagnostic thresholds.
+}
+
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                 method = "JML", maxit = 30)
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("plot_shrinkage_funnel", run.dontrun = TRUE)
+\dontrun{
+# Saved synthetic JML/RSM analysis of example_core.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "core-jml.rds", package = "mfrmr"))
+fit <- example_fit$fit
 fit_eb <- apply_empirical_bayes_shrinkage(fit)
-p <- plot_shrinkage_funnel(fit_eb, draw = FALSE)
+p <- plot(fit_eb, type = "shrinkage", view = "funnel", draw = FALSE)
 head(p$data$table)
 # Look for: short segments (Raw and Shrunken close together) =
 #   little pooling. Long segments fanning toward the centre = the
@@ -69,3 +110,4 @@ head(p$data$table)
 \code{\link[=apply_empirical_bayes_shrinkage]{apply_empirical_bayes_shrinkage()}},
 \link{mfrmr_visual_diagnostics}
 }
+\keyword{internal}

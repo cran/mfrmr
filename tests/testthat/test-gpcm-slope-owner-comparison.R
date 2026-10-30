@@ -1,4 +1,4 @@
-test_that("bounded GPCM assigns level-specific slopes to exactly one facet", {
+test_that("GPCM assigns level-specific slopes to exactly one facet", {
   facets <- c("Rater", "Task", "Criterion")
 
   criterion <- mfrmr:::resolve_step_and_slope_facets(
@@ -42,61 +42,6 @@ test_that("bounded GPCM assigns level-specific slopes to exactly one facet", {
   expect_equal(exp(mean(log(slopes))), 1, tolerance = 1e-15)
 })
 
-test_that("PCM versus aligned GPCM records IC-only nesting scope", {
-  make_signature_fit <- function(model,
-                                 step_facet,
-                                 slope_facet = NULL) {
-    list(
-      config = list(
-        model = model,
-        method = "MML",
-        person_col = "Person",
-        facet_cols = c("Rater", "Criterion"),
-        score_col = "Score",
-        rating_min = 0,
-        rating_max = 3,
-        score_map = data.frame(
-          OriginalScore = 0:3,
-          InternalScore = 0:3
-        ),
-        weight_col = NULL,
-        step_facet = step_facet,
-        slope_facet = slope_facet,
-        facet_interactions = character(0),
-        noncenter_facet = "Person",
-        dummy_facets = character(0),
-        positive_facets = character(0),
-        anchors = NULL,
-        group_anchors = NULL
-      )
-    )
-  }
-
-  pcm <- make_signature_fit("PCM", "Criterion")
-  gpcm <- make_signature_fit("GPCM", "Criterion", "Criterion")
-  aligned <- mfrmr:::audit_compare_mfrm_nesting(
-    list(pcm, gpcm),
-    labels = c("PCM", "GPCM")
-  )
-  expect_false(aligned$eligible)
-  expect_identical(aligned$relation, "PCM_in_GPCM_ic_only")
-  expect_identical(aligned$simpler, "PCM")
-  expect_identical(aligned$complex, "GPCM")
-  expect_match(aligned$reason, "unit-slope response-kernel reduction")
-  expect_match(aligned$reason, "chi-square LRT is not implemented")
-
-  rater_gpcm <- make_signature_fit("GPCM", "Rater", "Rater")
-  mismatch <- mfrmr:::audit_compare_mfrm_nesting(
-    list(pcm, rater_gpcm),
-    labels = c("PCM", "rater GPCM")
-  )
-  expect_false(mismatch$eligible)
-  expect_identical(mismatch$relation, "PCM_GPCM_owner_mismatch")
-  expect_true(is.na(mismatch$simpler))
-  expect_true(is.na(mismatch$complex))
-  expect_match(mismatch$reason, "do not share one explicit aligned")
-})
-
 test_that("model-choice contract names level-specific single-owner slopes", {
   contract <- mfrmr:::.model_choice_score_contract("GPCM")
   expect_match(contract, "every level of one designated slope facet")
@@ -105,7 +50,7 @@ test_that("model-choice contract names level-specific single-owner slopes", {
   expect_false(grepl("one common slope for the whole model", contract, fixed = TRUE))
 })
 
-test_that("weighting comparison contract separates selectable MML from descriptive JML", {
+test_that("weighting comparison cannot enable GPCM ranking from supplied comparison flags", {
   make_fit <- function(model, method) {
     list(config = list(model = model, method = method))
   }
@@ -137,13 +82,13 @@ test_that("weighting comparison contract separates selectable MML from descripti
     aligned_pcm_owner = TRUE,
     pcm_gpcm_lrt = "withheld_current_scope"
   )
-  expect_identical(mml$EvidenceTier, "same_basis_mml_information_criteria")
-  expect_true(mml$FormalModelSelectionAvailable)
+  expect_identical(mml$EvidenceTier, "mml_numerical_review_only")
+  expect_false(mml$FormalModelSelectionAvailable)
   expect_equal(mml$ObservedLogLikDifference, 3)
-  expect_identical(mml$AICPreferred, "GPCM/MML")
+  expect_true(is.na(mml$AICPreferred))
   expect_identical(
     mml$LogLikDifferenceStatus,
-    "available_but_read_with_information_criterion_penalties"
+    "numerical_review_required"
   )
 
   jml <- mfrmr:::.weighting_review_comparison_contract(
@@ -154,15 +99,42 @@ test_that("weighting comparison contract separates selectable MML from descripti
     aligned_pcm_owner = TRUE,
     pcm_gpcm_lrt = "withheld_current_scope"
   )
-  expect_identical(jml$EvidenceTier, "jml_descriptive_reweighting_only")
+  expect_identical(jml$EvidenceTier, "jml_numerical_review_only")
   expect_false(jml$FormalModelSelectionAvailable)
   expect_true(is.na(jml$AICPreferred))
   expect_identical(
     jml$LogLikDifferenceStatus,
-    "descriptive_unpenalized_gain_not_selection"
+    "numerical_review_required"
   )
   expect_identical(
     jml$FACETSComparisonRole,
     "PCM_JML_side_only_no_FACETS_free_slope_GPCM_counterpart"
   )
+})
+
+
+test_that("weighting review distinguishes numerical convergence from inference readiness", {
+  state <- "ready"
+  testthat::local_mocked_bindings(
+    mfrmr_get_readiness_record = function(...) list(fit = data.frame(NumericalState = state)),
+    .package = "mfrmr"
+  )
+  contract <- function() mfrmr:::.weighting_review_comparison_contract(
+    list(config = list(model = "PCM", method = "MML")),
+    list(config = list(model = "GPCM", method = "MML")),
+    list(table = data.frame(LogLik = c(-100, -97)),
+         comparison_basis = list(same_data = TRUE, all_inference_ready = FALSE)),
+    "PCM", TRUE, "withheld_current_scope"
+  )
+  ready <- contract()
+  expect_true(ready$BothNumericallyReady)
+  expect_false(ready$BothInferenceReady)
+  expect_false(ready$FormalModelSelectionAvailable)
+  expect_identical(ready$EvidenceTier, "mml_descriptive_not_inference_ready")
+  expect_identical(ready$LogLikDifferenceStatus, "descriptive_noncomparable")
+  expect_match(ready$NumericalReview, "checks passed for both fits", fixed = TRUE)
+  state <- "review"
+  pending <- contract()
+  expect_false(pending$BothNumericallyReady)
+  expect_identical(pending$LogLikDifferenceStatus, "numerical_review_required")
 })

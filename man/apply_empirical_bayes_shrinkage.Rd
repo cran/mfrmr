@@ -16,12 +16,15 @@ apply_empirical_bayes_shrinkage(
 
 \item{facet_prior_sd}{Optional numeric scalar. When supplied, the
 shrinkage variance is fixed at \code{facet_prior_sd^2} instead of being
-estimated from the data. Useful when a prior is elicited from
+estimated from the data. Its square must be representable, and positive
+when the supplied SD is positive. Useful when a prior is elicited from
 expert knowledge or a previous fit.}
 
 \item{shrink_person}{Logical. When \code{TRUE}, the same empirical-Bayes
-shrinkage is also applied to \code{fit$facets$person}. Default \code{FALSE},
-since MML person estimates already reflect a N(0, sigma^2) prior.}
+adjustment is also applied to ordinary-JML Person estimates with
+available sampling SEs. Default \code{FALSE}. Other estimators are refused:
+MML EAP estimates already use a population prior, and their posterior
+SDs are not sampling SEs for a second normal-model update.}
 }
 \value{
 The same \code{mfrm_fit}, with augmented columns and a new
@@ -29,54 +32,64 @@ The same \code{mfrm_fit}, with augmented columns and a new
 \code{fit$config$facet_shrinkage} set to \code{"empirical_bayes"}.
 }
 \description{
-Post-hoc shrinkage helper that augments an \code{mfrm_fit} with James-Stein
-/ empirical-Bayes shrunk estimates for each non-person facet. The
+Post-hoc normal-model shrinkage helper that augments an \code{mfrm_fit}
+with descriptive empirical-Bayes adjustments for each non-person facet. The
 shrinkage variance \eqn{\hat{\tau}^2} is estimated by method of
 moments from the facet-level point estimates and their standard
 errors:
 \deqn{\hat{\tau}^2 = \max\!\left(0,
   \frac{1}{K}\sum_{j=1}^{K}\hat{\delta}_j^{2} -
   \overline{\mathrm{SE}^2}\right),}
-where the first term is the population variance of the facet point
-estimates around their \emph{known} mean of zero (the mfrmr sum-to-zero
-identification pins the facet mean exactly at 0, so no degree of
-freedom is consumed by mean estimation). The shrinkage factor is
-\eqn{B_j = \mathrm{SE}_j^2 / (\hat{\tau}^2 + \mathrm{SE}_j^2)}, and
-the shrunk point / standard error are
-\eqn{\hat{\delta}_j^{EB} = (1 - B_j)\hat{\delta}_j} and
-\eqn{\mathrm{SE}_j^{EB} = \sqrt{(1 - B_j)\mathrm{SE}_j^2}}.
-The posterior SE form treats \eqn{\hat{\tau}^2} as known; it omits
-the Morris (1983, eqs. 4.1-4.2, p. 51) confidence-interval correction
-\eqn{v \cdot \hat{\delta}_j^{2}} with
-\eqn{v = 2 B_j^2 / (K - r - 2)}, where \eqn{r} is the number of
-regression coefficients used to model the prior mean (under mfrmr's
-sum-to-zero pinning, \eqn{r = 0}, so the divisor is \eqn{K - 2}).
-This correction adds variance proportional to the squared deviation
-\eqn{\hat{\delta}_j^{2}}, accounting for uncertainty in
-\eqn{\hat{\tau}^2}. Under the equal-variance assumption
-\eqn{\hat{\delta}_j^{2} \approx \hat{\tau}^2}, the omitted variance is
-on the order of \eqn{2 / (K - 2)} times the reported posterior
-variance \eqn{V(1 - B_j)}, so the true SE is approximately
-\eqn{\sqrt{1 + 2/(K - 2)}} times the reported \code{ShrunkSE}. Magnitudes:
-SE understated by ~73\\% at \eqn{K = 3}, ~29\\% at \eqn{K = 5}, ~15\\%
-at \eqn{K = 8}, ~7\\% at \eqn{K = 15}. For a small-K facet, treat
-\code{ShrunkSE} as a lower bound rather than a calibrated posterior SE.
+where zero is the chosen shrinkage target and the moment is calculated on
+complete finite estimate/positive-SE pairs. A sum-to-zero identification
+constraint does not establish a known population mean or independent errors.
+The shrinkage factor is
+\eqn{B_j = \mathrm{SE}_j^2 / (\hat{\tau}^2 + \mathrm{SE}_j^2)}, with
+\eqn{\hat{\delta}_j^{EB} = (1-B_j)\hat{\delta}_j} and
+\eqn{\mathrm{ShrunkSE}_j = \sqrt{(1-B_j)\mathrm{SE}_j^2}}.
 }
 \details{
-\code{fit$facets$others} gains \code{ShrunkEstimate}, \code{ShrunkSE}, and
-\code{ShrinkageFactor} columns, and \code{fit$shrinkage_report} records the
-per-facet \eqn{\hat{\tau}^2}, mean shrinkage, and effective degrees
-of freedom (\eqn{\mathrm{EffectiveDF}_f = \sum_j (1 - B_j)}, which
-matches the "effective number of parameters" defined by
-Efron & Morris, 1973). The original \code{Estimate} / \code{SE} columns are
-preserved.
+\code{ShrunkSE} is a plug-in normal-model quantity conditional on the selected
+prior variance. It omits uncertainty in that variance, cross-level covariance
+and the fitted identification/anchor constraints. It is neither a calibrated
+SE nor a guaranteed lower bound. Unequal shrinkage can break the original
+sum-to-zero constraint. Original estimates, anchors and predictions are
+unchanged; this helper does not refit a hierarchical MFRM.
+The normal-normal formula is exact for an independent Gaussian observation
+with a known Gaussian prior variance. Applying it to jointly calibrated
+MFRM estimates is a descriptive approximation; a James-Stein improvement
+in risk is not established for this adjustment.
+
+A zero estimated prior variance fully pools eligible estimates at zero and
+gives zero plug-in SE; this does not establish perfect precision. Optional
+plot whiskers are descriptive normal bands. Their legacy \code{CI} column names
+do not confer confidence-interval coverage; \code{SupportsFormalInference} is
+false. Invalid estimate/SE pairs retain their original values with unavailable
+shrinkage factors. With fewer than three valid pairs no shrinkage is applied.
+Unrepresentable moment variances also leave the original values unchanged,
+with unavailable factors and an explanatory \code{Note} in the report.
+
+The report records complete-pair counts and mean shrinkage over those pairs.
+\code{EffectiveDF} sums retained weights over eligible levels, conditional on the
+chosen prior variance; it is not model degrees of freedom for testing or IC.
+Reapply this helper to existing fits to refresh old reports; no MFRM refit
+is needed. Regenerate previously saved plots and exports as well. Updated
+reports carry \code{CalculationVersion = 2}: positive prior variances no longer
+produce zero plug-in SE merely because a shrinkage factor rounded to one.
+Reapplication replaces the previous adjustment; \code{shrink_person = FALSE}
+removes any previous Person shrinkage columns. The original fitting inputs
+remain recorded separately from the latest post-fit shrinkage settings.
+\code{\link[=build_mfrm_replay_script]{build_mfrm_replay_script()}} replays the adjustment after fitting, preserving
+whether diagnostic SEs were attached by \code{\link[=fit_mfrm]{fit_mfrm()}}. Manually edited SEs
+or other table edits require their own reproducible editing steps.
 }
 \section{Typical workflow}{
 
 \enumerate{
 \item Fit the model as usual with \code{fit_mfrm()}.
 \item Call \code{apply_empirical_bayes_shrinkage(fit)} when small-N facets
-are present (see \code{\link[=facet_small_sample_review]{facet_small_sample_review()}}).
+are present and zero-centered pooling is substantively defensible
+(see \code{\link[=facet_small_sample_review]{facet_small_sample_review()}}); small counts alone do not require it.
 \item Report both the original and shrunk estimates in the manuscript,
 citing Efron & Morris (1973). \code{build_apa_outputs()} will add the
 sentence automatically when \code{fit$config$facet_shrinkage} is set.
@@ -84,27 +97,24 @@ sentence automatically when \code{fit$config$facet_shrinkage} is set.
 }
 
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 30)
+# Saved synthetic JML/RSM analysis of example_core.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "core-jml.rds", package = "mfrmr"))
+fit <- example_fit$fit
 fit_eb <- apply_empirical_bayes_shrinkage(fit)
 fit_eb$shrinkage_report
 # Look for:
 # - `Tau2` is the estimated between-level prior variance per facet.
-#   `Tau2 = 0` means the data did not justify any pooling and the
-#   shrunken estimates equal the raw estimates (`MeanShrinkage = 0`).
+#   `Tau2 = 0` fully pools eligible estimates at zero
+#   (`MeanShrinkage = 1`). Zero plug-in SE is not perfect precision.
 # - `MeanShrinkage` near 0 = little movement, near 1 = heavy pooling
-#   toward 0. Small-N facets typically pull values further than
-#   well-identified ones.
-# - `EffectiveDF` is the implied "effective number of parameters"
-#   (Efron & Morris 1973); EffectiveDF much smaller than the row
-#   count of the facet means most levels were pooled together.
+#   toward the chosen zero target; inspect the SEs and prior variance.
+# - `EffectiveDF` sums retained weights over eligible levels, conditional
+#   on the chosen prior variance; it is not degrees of freedom for testing.
 head(fit_eb$facets$others[, c("Facet", "Level", "Estimate",
                                "ShrunkEstimate", "ShrinkageFactor")])
 # Look for: rows where `ShrinkageFactor` is large (close to 1) had
 #   their estimates pulled most strongly toward the facet mean (0).
-}
 }
 \references{
 Efron, B., & Morris, C. (1973). Combining possibly related

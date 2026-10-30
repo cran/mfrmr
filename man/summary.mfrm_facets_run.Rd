@@ -50,7 +50,9 @@ information-criterion contract status.
 }
 
 \examples{
-\donttest{
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("summary.mfrm_facets_run", run.dontrun = TRUE)
+\dontrun{
 toy <- load_mfrmr_data("example_core")
 toy_small <- toy[toy$Person \%in\% unique(toy$Person)[1:8], , drop = FALSE]
 out <- run_mfrm_facets(

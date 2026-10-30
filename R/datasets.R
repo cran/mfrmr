@@ -167,7 +167,7 @@ NULL
 #' - Use `mfrmr_example_core` for fast, idealized checks and examples that
 #'   specifically require complete crossing.
 #' - Use `mfrmr_example_bias` for [analyze_dff()], [analyze_dif()], [dif_interaction_table()],
-#'   [plot_dif_heatmap()], and [estimate_bias()].
+#'   [plot(x, type = "heatmap")][plot.mfrm_dif], and [estimate_bias()].
 #'
 #' All three objects can be loaded either with [load_mfrmr_data()] or directly
 #' with `data()`, for example
@@ -219,11 +219,12 @@ NULL
 #' @name mfrmr_example_operational_design
 NULL
 
-#' List packaged simulation datasets
+#' List packaged ordered-response MFRM datasets
 #'
 #' @param details If `FALSE` (default), return the backward-compatible
 #'   character vector of dataset keys. If `TRUE`, return a catalog describing
-#'   the intended teaching role and design of every dataset.
+#'   the intended teaching role and design of each dataset accepted by
+#'   [load_mfrmr_data()].
 #'
 #' @return A character vector of dataset keys accepted by [load_mfrmr_data()],
 #'   or, when `details = TRUE`, a data.frame with `Key`, `Rows`, `Persons`,
@@ -232,6 +233,9 @@ NULL
 #' @details
 #' Use this helper when you want to select packaged data programmatically
 #' (e.g., inside scripts, loops, or interactive-application wrappers).
+#' For the separately packaged G-theory and agreement tables loaded with
+#' `data()`, see [mfrmr_gtheory_data] and [mfrmr_agreement_data]. These use
+#' different input structures and are not keys for [load_mfrmr_data()].
 #'
 #' Typical pattern:
 #' 1. call `list_mfrmr_data()` to see available keys.
@@ -253,13 +257,18 @@ NULL
 #'
 #' @seealso [load_mfrmr_data()], [ej2021_data]
 #' @examples
-#' keys <- list_mfrmr_data()
-#' keys
-#' list_mfrmr_data(details = TRUE)[, c(
-#'   "Key", "PrimaryUse", "Design", "CountBasis"
-#' )]
-#' d <- load_mfrmr_data("example_operational")
-#' head(d)
+#' library(mfrmr)
+#'
+#' # See the names accepted by load_mfrmr_data()
+#' list_mfrmr_data()
+#'
+#' # Compare the purpose and design of the available datasets
+#' catalog <- list_mfrmr_data(details = TRUE)
+#' catalog[, c("Key", "PrimaryUse", "Design")]
+#'
+#' # Choose one dataset
+#' ratings <- load_mfrmr_data("example_operational")
+#' head(ratings)
 #' @export
 list_mfrmr_data <- function(details = FALSE) {
   if (!is.logical(details) || length(details) != 1L || is.na(details)) {
@@ -318,16 +327,23 @@ list_mfrmr_data <- function(details = FALSE) {
   catalog
 }
 
-#' Load a packaged simulation dataset
+#' Load a packaged ordered-response MFRM dataset
 #'
 #' @param name Dataset key. One of the values from [list_mfrmr_data()]. If
 #'   omitted, the backward-compatible default is `"example_core"`; new code
 #'   should pass a key explicitly.
 #'
-#' @return A data.frame in long format.
+#' @return A data.frame in long format: each row is one rating, not one Person.
 #' @details
-#' `load_mfrmr_data("<key>")` is the canonical loader for the packaged
-#' datasets and the entry point used across the package help and
+#' For a first MFRM analysis, run
+#' `ratings <- load_mfrmr_data("example_operational")`. This reads data already
+#' included in mfrmr; no CSV, download or data-generation code is needed.
+#' `ratings` is a name you choose for the returned table. It is not a second
+#' dataset to create. Older examples may name the same object `toy` or `d`.
+#' Start by reading `head(ratings)`, `names(ratings)` and `table(ratings$Score)`.
+#'
+#' `load_mfrmr_data("<key>")` is the canonical loader for packaged
+#' ordered-response MFRM datasets and the entry point used across the package help and
 #' vignettes. The equivalent base-R alternative
 #' `data("<object-name>", package = "mfrmr")` remains available for users
 #' who prefer the full `data()` spelling; both paths return identical
@@ -337,6 +353,11 @@ list_mfrmr_data <- function(details = FALSE) {
 #' `Study`, `Person`, `Rater`, `Criterion`, and `Score`.
 #' Some datasets, such as the packaged documentation examples, also include
 #' auxiliary variables like `Group` for DIF/bias demonstrations.
+#' The supplied ratings are synthetic teaching data, not empirical records.
+#' For observed-score G-theory examples with multiple score columns, see
+#' [mfrmr_gtheory_data]; for agreement examples, see [mfrmr_agreement_data].
+#' Those datasets use `data()` because their row/column roles differ from the
+#' ordered-response MFRM tables returned here.
 #'
 #' @section Interpreting output:
 #' The return value is a plain long-format `data.frame`. The example and
@@ -353,12 +374,17 @@ list_mfrmr_data <- function(details = FALSE) {
 #'
 #' @seealso [list_mfrmr_data()], [ej2021_data]
 #' @examples
-#' data("mfrmr_example_operational", package = "mfrmr")
-#' head(mfrmr_example_operational)
+#' library(mfrmr)
 #'
-#' d <- load_mfrmr_data("example_operational")
-#' table(d$Rater)
-#' table(d$Criterion, d$Score)
+#' # Load synthetic ratings and inspect their columns and score frequencies
+#' ratings <- load_mfrmr_data("example_operational")
+#' head(ratings)
+#' names(ratings)
+#' table(ratings$Score)
+#'
+#' # Optional: base R's data() loads the same dataset under its full name
+#' data("mfrmr_example_operational", package = "mfrmr")
+#' identical(ratings, mfrmr_example_operational) # TRUE: both contain the same data
 #' @export
 load_mfrmr_data <- function(name = c(
                             "example_core",
@@ -386,6 +412,89 @@ load_mfrmr_data <- function(name = c(
     combined_itercal = "ej2021_combined_itercal"
   )
 
-  utils::data(list = obj_name, package = "mfrmr", envir = environment())
-  get(obj_name, envir = environment(), inherits = FALSE)
+  getExportedValue("mfrmr", obj_name)
 }
+
+#' Synthetic crossed and nested data for learning G theory
+#'
+#' Existing tutorial examples supplied as ready-to-load tables. Load one with
+#' `data("mfrmr_example_gtheory_crossed", package = "mfrmr")`, then assign it
+#' to a shorter name such as `ratings`. No simulation code is needed to run
+#' the G-study or D-study examples.
+#'
+#' @format Two data frames with five columns: `Person`, `Rater`, `Task`,
+#'   `Content`, and `Organization`. Each row is one Person-by-Rater-by-Task
+#'   rating cell; the last two columns are continuous numeric scores.
+#'   `mfrmr_example_gtheory_crossed` has 1,920 rows (40 Persons, eight common
+#'   raters and six common tasks). `mfrmr_example_gtheory_nested` has 540 rows
+#'   (30 Persons, six tasks and three raters per task).
+#' @details
+#' In the crossed example, the same rater ID denotes the same rater on every
+#' task. In the nested example, `R1`, `R2`, `R3` are local labels: the pair
+#' `Task` and `Rater` identifies a rater, giving 18 raters in total. Declare
+#' `nesting = c(Rater = "Task")` for that example. Persons are crossed with
+#' all tasks and rater teams in both examples.
+#'
+#' The scores were constructed from independent normal random effects for
+#' every source in the respective design. The nested example correlates the
+#' two score components within each source. These are fictional unbounded
+#' continuous scores, not ordered rubric categories or MFRM ability estimates.
+#' Their design and sample sizes demonstrate the functions; they do not establish
+#' that an assessment's assumptions or estimation precision are adequate.
+#' @source The existing crossed G-theory tutorial (seed 24) and nested
+#'   G-study help example (seed 2027). Their unchanged generation recipes are
+#'   retained in `data-raw/make-teaching-data.R` in the source repository.
+#' @seealso [mfrm_g_study()], [mfrm_d_study()],
+#'   [mfrm_multivariate_d_compare()], [load_mfrmr_data()]
+#' @examples
+#' data("mfrmr_example_gtheory_crossed", package = "mfrmr")
+#' ratings <- mfrmr_example_gtheory_crossed
+#' head(ratings)
+#' g <- mfrm_g_study(ratings, scores = c("Content", "Organization"),
+#'   person = "Person", rater = "Rater", task = "Task")
+#' g$component_diagnostics
+#' # Inspect component estimates before projecting future plans.
+#' d <- mfrm_d_study(g,
+#'   design_grid = data.frame(Raters = c(2, 4), Tasks = 3),
+#'   weights = c(Content = .5, Organization = .5))
+#' summary(d)
+#' @name mfrmr_gtheory_data
+#' @aliases mfrmr_example_gtheory_crossed mfrmr_example_gtheory_nested
+NULL
+
+#' Synthetic ratings illustrating agreement, offsets and missing scores
+#'
+#' Ready-to-load data from the rating-agreement tutorial. Six Persons complete
+#' two Tasks, with up to three Raters on each response. Load with
+#' `data("mfrmr_example_agreement", package = "mfrmr")`.
+#'
+#' @format A data frame with 35 rows and four columns:
+#'   `Person`, `Task`, `Rater`, and `Score`. Each row is one rater's rating of
+#'   one Person's response to one Task. Scores use the declared categories 0--3.
+#' @details
+#' Rater R2 always scores one category above R1, so their rankings agree but
+#' their scores differ. R3 has two deliberately different scores, one missing
+#' score (P06/T2) and one absent row (P02/T2). There are 34 observed scores.
+#' Missing ratings are not zero scores; an absent row alone does not identify
+#' whether a rating was planned. Use `unit = c("Person", "Task")` to match
+#' responses. `unit = "Person"` would mix two different responses.
+#'
+#' These are constructed teaching data, not empirical records, expert standards
+#' or evidence of a method's performance in a population.
+#' @source Existing data from the rating-agreement tutorial. The deterministic
+#'   construction is retained in `data-raw/make-teaching-data.R` in the source
+#'   repository.
+#' @seealso [pairwise_kappa_table()], [krippendorff_alpha_table()],
+#'   [gwet_ac2_table()], [pairwise_icc_table()], [load_mfrmr_data()]
+#' @examples
+#' data("mfrmr_example_agreement", package = "mfrmr")
+#' ratings <- mfrmr_example_agreement
+#' head(ratings)
+#' with(ratings, table(Rater, Score, useNA = "ifany"))
+#' agreement <- pairwise_kappa_table(ratings, rater = "Rater",
+#'   unit = c("Person", "Task"), score = "Score", categories = 0:3)
+#' agreement$table
+#' # Each pair uses its own shared responses; inspect its denominator as well.
+#' @name mfrmr_agreement_data
+#' @aliases mfrmr_example_agreement
+NULL

@@ -9,6 +9,13 @@
 # `mfrm_estimate()` and the surrounding orchestration helpers.
 
 # ---- data preparation ----
+mfrm_single_person_caution <- function(prep) {
+  if (!identical(as.integer(prep$n_person), 1L)) return(character())
+  paste("Only one Person remains. Calibration depends on that response vector and the assumed within-Person conditional independence.",
+    "Any returned model-information interval is an unqualified normal approximation; its finite-sample coverage is not established.",
+    "One Person cannot supply independent-Person sandwich uncertainty or empirical evidence of between-Person variation.")
+}
+
 mfrm_preparation_note <- function(stage,
                                   condition,
                                   severity = "info",
@@ -45,10 +52,29 @@ bind_mfrm_preparation_notes <- function(notes) {
   do.call(rbind, notes)
 }
 
+mfrm_validate_facet_names <- function(facets) {
+  reserved <- intersect(facets, c("Person", "Score", "Weight", "score_k",
+    "theta", "steps", "interactions", "log_slopes", "beta", "log_sigma2"))
+  if (length(reserved)) {
+    stop("Facet columns cannot use reserved internal names: ",
+      paste(reserved, collapse = ", "),
+      ". Rename these facet columns before analysis; affected saved fits require refitting from the original data.",
+      call. = FALSE)
+  }
+  invisible(NULL)
+}
+
 prepare_mfrm_data <- function(data, person_col, facet_cols, score_col,
                               rating_min = NULL, rating_max = NULL,
                               weight_col = NULL, keep_original = FALSE,
-                              missing_codes = NULL) {
+                              missing_codes = NULL,
+                              repeated_ratings = c("review", "independent"),
+                              allow_single_person = FALSE,
+                              allow_constant_scores = FALSE) {
+  repeated_ratings <- match.arg(repeated_ratings)
+  if (!is.data.frame(data)) stop("`data` must be a data.frame.", call. = FALSE)
+  # Model columns, not inherited dplyr grouping, define the analysis rows.
+  data <- dplyr::ungroup(data)
   preparation_notes <- list()
   emit_preparation_messages <- isTRUE(getOption("mfrmr.show_preparation_messages", FALSE)) &&
     !isTRUE(getOption("mfrmr._preparation_messages_announced", FALSE))
@@ -82,6 +108,7 @@ prepare_mfrm_data <- function(data, person_col, facet_cols, score_col,
          "but duplicates were found: ", paste(dup_names, collapse = ", "), ". ",
          "Remove or rename the duplicated references.", call. = FALSE)
   }
+  mfrm_validate_facet_names(facet_cols)
   missing_cols <- setdiff(required, names(data))
   if (length(missing_cols) > 0) {
     stop("Column(s) not found in data: ", paste(missing_cols, collapse = ", "), ". ",
@@ -195,7 +222,11 @@ prepare_mfrm_data <- function(data, person_col, facet_cols, score_col,
   raw_weight <- if ("Weight" %in% names(df)) as.character(df$Weight) else NULL
   input_rows <- nrow(df)
 
-  score_num <- suppressWarnings(as.numeric(raw_score))
+  if (is.complex(df$Score) || !is.null(dim(df$Score))) {
+    stop("`Score` must be a vector of real ordered integer category codes.", call. = FALSE)
+  }
+  score_num <- if (is.numeric(df$Score)) as.numeric(df$Score) else
+    suppressWarnings(as.numeric(raw_score))
   # Practical integer tolerance. sqrt(.Machine$double.eps) (~1.5e-8) was
   # too strict: CSV round-trip artifacts like "1.0000001" (diff 1e-7
   # from an integer) were rejected as fractional. 1e-6 still catches
@@ -267,13 +298,16 @@ prepare_mfrm_data <- function(data, person_col, facet_cols, score_col,
       call. = FALSE
     )
   }
+  if (any(is.finite(score_num) & abs(round(score_num)) > .Machine$integer.max)) {
+    stop("`Score` category codes exceed R's integer range. Recode categories explicitly before fitting.", call. = FALSE)
+  }
   raw_person_id <- as.character(df$Person)
   raw_facet_id <- lapply(facet_cols, function(f) as.character(df[[f]]))
   names(raw_facet_id) <- facet_cols
   df <- df |>
     mutate(
-      Person = trimws(as.character(Person)),
-      across(all_of(facet_cols), ~ trimws(as.character(.x))),
+      Person = enc2utf8(trimws(as.character(Person))),
+      across(all_of(facet_cols), ~ enc2utf8(trimws(as.character(.x)))),
       Score = score_num
     )
   blank_person <- !is.na(df$Person) & !nzchar(df$Person)
@@ -343,7 +377,11 @@ prepare_mfrm_data <- function(data, person_col, facet_cols, score_col,
   if (!"Weight" %in% names(df)) {
     df <- df |> mutate(Weight = 1)
   } else {
-    weight_num <- suppressWarnings(as.numeric(raw_weight))
+    if (is.complex(df$Weight) || !is.null(dim(df$Weight))) {
+      stop("`Weight` must be a vector of real numeric values.", call. = FALSE)
+    }
+    weight_num <- if (is.numeric(df$Weight)) as.numeric(df$Weight) else
+      suppressWarnings(as.numeric(raw_weight))
     nonfinite_weight <- is.nan(weight_num) |
       (!is.na(weight_num) & !is.finite(weight_num))
     if (any(nonfinite_weight)) {
@@ -382,6 +420,9 @@ prepare_mfrm_data <- function(data, person_col, facet_cols, score_col,
   }
 
   rows_before_drop <- nrow(df)
+  omitted <- !stats::complete.cases(df) | (!is.na(df$Weight) & df$Weight <= 0)
+  omitted_data <- as.data.frame(df[omitted, , drop = FALSE])
+  omitted_input_rows <- which(omitted)
   df <- df |>
     tidyr::drop_na() |>
     filter(Weight > 0)
@@ -420,22 +461,31 @@ prepare_mfrm_data <- function(data, person_col, facet_cols, score_col,
          "contain valid (non-NA, non-empty) data.", call. = FALSE)
   }
 
-  # Detect duplicate person x facet rows. They violate the MFRM
-  # conditional-independence assumption and silently bias estimates;
-  # the user should make their unit of observation explicit.
+  # Repeated cell keys do not establish dependence. Keep the default review
+  # unless the analyst explicitly declares conditionally independent events.
   if (nrow(df) > 0L) {
     key_cols <- c("Person", facet_cols)
     dup_mask <- duplicated(df[, key_cols, drop = FALSE]) |
                 duplicated(df[, key_cols, drop = FALSE], fromLast = TRUE)
     n_dup <- sum(dup_mask)
-    if (n_dup > 0L) {
+    if (n_dup > 0L && identical(repeated_ratings, "independent")) {
+      add_preparation_note(
+        stage = "design_check",
+        condition = "independent_repeated_ratings_declared",
+        severity = "info", count = n_dup,
+        affected = paste(key_cols, collapse = ", "),
+        message = "Repeated Person-by-facet ratings are retained as separate conditionally independent events, as explicitly declared by the analyst.",
+        action = "This declaration does not verify independence or distinguish accidental copies. Use a dependence model when ratings remain associated after conditioning on the model."
+      )
+    } else if (n_dup > 0L) {
       n_dup_cells <- nrow(unique(df[dup_mask, key_cols, drop = FALSE]))
       duplicate_msg <- paste0(
         "Detected ", n_dup, " row(s) across ", n_dup_cells,
         " duplicated Person x ",
         "(", paste(facet_cols, collapse = ", "), ") combination. MFRM ",
-        "assumes one observation per cell; aggregate, deduplicate, or ",
-        "introduce a distinguishing facet column before fitting. Continuing ",
+        "requires review of repeated ratings; correct accidental copies, model ",
+        "dependence, or explicitly declare repeated_ratings = 'independent' ",
+        "when conditional independence is justified. Continuing ",
         "with the rows as supplied."
       )
       add_preparation_note(
@@ -445,7 +495,7 @@ prepare_mfrm_data <- function(data, person_col, facet_cols, score_col,
         count = n_dup,
         affected = paste(c("Person", facet_cols), collapse = ", "),
         message = duplicate_msg,
-        action = "Aggregate, deduplicate, or add a distinguishing facet before interpreting the fit."
+        action = "Review repeated events: correct accidental copies, model dependence, or explicitly declare conditional independence."
       )
       duplicate_warning_announced <- isTRUE(
         getOption("mfrmr._duplicate_warning_announced", FALSE)
@@ -459,15 +509,27 @@ prepare_mfrm_data <- function(data, person_col, facet_cols, score_col,
     }
   }
 
+  rounded_n <- sum(df$Score != round(df$Score))
+  if (rounded_n > 0L) {
+    add_preparation_note(
+      stage = "score_coercion", condition = "score_roundoff_normalized",
+      severity = "info", count = rounded_n, affected = score_col,
+      message = "Normalized retained scores within 1e-6 of an integer to the nearest category code.",
+      action = "Inspect the source scores; genuine fractional responses require explicit recoding."
+    )
+  }
   df <- df |>
-    mutate(Score = as.integer(Score))
+    mutate(Score = as.integer(round(Score)))
+  if (!is.finite(sum(df$Weight))) {
+    stop("The sum of retained weights exceeds finite numeric range. Choose a representable weighting scheme explicitly; weights are not rescaled automatically.", call. = FALSE)
+  }
 
   observed_score_values <- sort(unique(df$Score))
 
-  if (length(unique(df$Score)) < 2) {
+  if (length(unique(df$Score)) < 2 && !isTRUE(allow_constant_scores)) {
     stop("Only one score category found in the data (Score = ",
          unique(df$Score), "). ",
-         "MFRM requires at least two distinct response categories.", call. = FALSE)
+         "This calibration interface currently requires at least two distinct response categories.", call. = FALSE)
   }
 
   rating_min_supplied <- !is.null(rating_min)
@@ -515,18 +577,23 @@ prepare_mfrm_data <- function(data, person_col, facet_cols, score_col,
       }
     }
   }
-  if (!is.numeric(rating_min) || length(rating_min) != 1L ||
-      !is.finite(rating_min) || abs(rating_min - round(rating_min)) > score_tol) {
+  if (!is.numeric(rating_min) || is.complex(rating_min) || length(rating_min) != 1L ||
+      !is.finite(rating_min) || abs(rating_min - round(rating_min)) > score_tol ||
+      abs(round(rating_min)) > .Machine$integer.max) {
     stop("`rating_min` must be a single finite integer category value.", call. = FALSE)
   }
-  if (!is.numeric(rating_max) || length(rating_max) != 1L ||
-      !is.finite(rating_max) || abs(rating_max - round(rating_max)) > score_tol) {
+  if (!is.numeric(rating_max) || is.complex(rating_max) || length(rating_max) != 1L ||
+      !is.finite(rating_max) || abs(rating_max - round(rating_max)) > score_tol ||
+      abs(round(rating_max)) > .Machine$integer.max) {
     stop("`rating_max` must be a single finite integer category value.", call. = FALSE)
   }
   rating_min <- as.integer(round(rating_min))
   rating_max <- as.integer(round(rating_max))
   if (rating_max <= rating_min) {
     stop("`rating_max` must be larger than `rating_min`.", call. = FALSE)
+  }
+  if (as.double(rating_max) - rating_min + 1 > .Machine$integer.max) {
+    stop("The declared category range exceeds R's integer indexing capacity. Recode categories explicitly.", call. = FALSE)
   }
   explicit_rating_range <- rating_min_supplied || rating_max_supplied
   expected_vals <- seq(rating_min, rating_max)
@@ -643,26 +710,24 @@ prepare_mfrm_data <- function(data, person_col, facet_cols, score_col,
   facet_levels <- lapply(facet_names, function(f) levels(df[[f]]))
   names(facet_levels) <- facet_names
 
-  # Minimum data requirements. Surface these limits as targeted errors before
-  # estimation starts.
+  # Single-Person support is admitted by the caller; it is not a universal
+  # identification theorem. Unreviewed fitting routes retain their input limit.
   n_person <- length(levels(df$Person))
-  if (n_person < 2L) {
+  if (n_person < 2L && !isTRUE(allow_single_person)) {
     stop(
-      "fit_mfrm() requires at least two persons (got ", n_person, "). ",
-      "Check the `person` column or provide data from multiple persons; ",
-      "a one-person dataset cannot identify person and facet effects in this model.",
+      "This fitting route requires at least two persons (got ", n_person, "). ",
+      "One-Person calibration is supported only for full RSM/PCM JML, CML or fixed-population MML. ",
+      "The selected route retains a software support limit, not a general mathematical impossibility claim.",
       call. = FALSE
     )
   }
-  if (nrow(df) < 10L) {
-    stop(
-      "fit_mfrm() requires at least 10 response rows (got ", nrow(df), "). ",
-      "This software minimum does not imply that 10 rows are sufficient for ",
-      "stable estimates; evaluate data support for the intended model.",
-      call. = FALSE
-    )
-  }
-
+  # A count alone is not an invalid-input condition. Interval outputs also
+  # carry this caution, separately from their numerical eligibility checks.
+  if (n_person == 1L) add_preparation_note(
+    stage = "design_check", condition = "single_person_calibration",
+    severity = "info", count = 1L, affected = levels(df$Person),
+    message = mfrm_single_person_caution(list(n_person = n_person)),
+    action = "Review the independent rating events, identification and boundary checks; do not interpret numerical availability as population-level validation.")
   # Record facets that have only a single observed level. They are structurally
   # identified at 0 by the sum-to-zero constraint and do not contribute
   # measurement information; users often supply them by mistake.
@@ -696,6 +761,7 @@ prepare_mfrm_data <- function(data, person_col, facet_cols, score_col,
   list(
     data = df,
     n_obs = nrow(df),
+    repeated_ratings = repeated_ratings,
     weighted_n = sum(df$Weight, na.rm = TRUE),
     n_person = length(levels(df$Person)),
     rating_min = rating_min,
@@ -715,6 +781,8 @@ prepare_mfrm_data <- function(data, person_col, facet_cols, score_col,
     weight_col = if (!is.null(weight_col)) weight_col else NULL,
     keep_original = isTRUE(keep_original),
     row_retention = row_retention,
+    omitted_data = omitted_data,
+    omitted_input_rows = omitted_input_rows,
     preparation_notes = preparation_notes,
     source_columns = list(
       person = person_col,
@@ -727,7 +795,7 @@ prepare_mfrm_data <- function(data, person_col, facet_cols, score_col,
 }
 
 build_indices <- function(prep, step_facet = NULL, slope_facet = NULL,
-                          interaction_specs = NULL) {
+                          interaction_specs = NULL, gpcm_spec = NULL) {
   df <- prep$data
   facets_idx <- lapply(prep$facet_names, function(f) as.integer(df[[f]]))
   names(facets_idx) <- prep$facet_names
@@ -736,7 +804,18 @@ build_indices <- function(prep, step_facet = NULL, slope_facet = NULL,
   } else {
     NULL
   }
-  slope_idx <- if (!is.null(slope_facet)) {
+  slope_idx <- if (length(slope_facet) > 1L) {
+    if (is.null(gpcm_spec$cells) || !identical(slope_facet, gpcm_spec$slope_facet)) {
+      stop("Multiple slope families require their fitted crossing specification.")
+    }
+    if (!identical(prep$levels[slope_facet], gpcm_spec$component_levels)) {
+      stop("Slope indices require the fitted facet level ordering.")
+    }
+    key <- function(x) do.call(paste, c(unname(lapply(x, as.integer)), sep = ":"))
+    index <- match(key(df[slope_facet]), key(gpcm_spec$cells))
+    if (anyNA(index)) stop("Slope indices require crossings in the supplied specification.")
+    index
+  } else if (!is.null(slope_facet)) {
     as.integer(df[[slope_facet]])
   } else {
     NULL
@@ -829,43 +908,9 @@ with_preserved_rng_seed <- function(seed, expr) {
   force(expr)
 }
 
-format_tab_template <- function(df) {
-  char_df <- df |> mutate(across(everything(), ~ replace_na(as.character(.x), "")))
-  widths <- vapply(seq_along(char_df), function(i) {
-    max(nchar(c(names(char_df)[i], char_df[[i]])), na.rm = TRUE)
-  }, integer(1))
-  format_row <- function(row_vec) {
-    padded <- mapply(function(value, width) {
-      value <- ifelse(is.na(value), "", value)
-      stringr::str_pad(value, width = width, side = "right")
-    }, row_vec, widths, SIMPLIFY = TRUE)
-    paste(padded, collapse = "\t")
-  }
-  header <- format_row(names(char_df))
-  rows <- apply(char_df, 1, format_row)
-  paste(c(header, rows), collapse = "\n")
-}
-
-template_tab_source_demo <- sample_mfrm_data(seed = 20240131) |>
-  slice_head(n = 24)
-template_tab_source_toy <- sample_mfrm_data(seed = 20240131) |>
-  slice_head(n = 8)
-template_tab_text <- format_tab_template(template_tab_source_demo)
-template_tab_text_toy <- format_tab_template(template_tab_source_toy)
-template_header_text <- format_tab_template(template_tab_source_demo[0, ])
-download_sample_data <- sample_mfrm_data(seed = 20240131)
-
 guess_col <- function(cols, patterns, fallback = 1) {
   if (length(cols) == 0) return(character(0))
   hit <- which(stringr::str_detect(tolower(cols), paste(patterns, collapse = "|")))
   if (length(hit) > 0) return(cols[hit[1]])
   cols[min(fallback, length(cols))]
-}
-
-truncate_label <- function(x, width = 28) {
-  stringr::str_trunc(as.character(x), width = width)
-}
-
-facet_report_id <- function(facet) {
-  paste0("facet_report_", stringr::str_replace_all(as.character(facet), "[^A-Za-z0-9]", "_"))
 }

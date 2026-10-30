@@ -18,7 +18,9 @@ facets_output_contract_review(
 \item{fit}{Output from \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
 \item{diagnostics}{Optional output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}. If omitted,
-diagnostics are computed internally with \code{residual_pca = "none"}.}
+diagnostics are computed internally with \code{residual_pca = "none"}.
+Must match this fitted analysis; see \link{mfrmr_compatibility_layer} for
+migration of saved diagnostics.}
 
 \item{bias_results}{Optional output from \code{\link[=estimate_bias]{estimate_bias()}}. If omitted and
 at least two facets exist, a 2-way bias run is computed internally.}
@@ -65,13 +67,13 @@ package-native counterpart and which remain unavailable. It does not
 establish external validity or software equivalence beyond the specific
 schema/metric contract encoded in the contract file.
 }
-\section{Bounded GPCM boundary}{
+\section{GPCM boundary}{
 
-This helper is unavailable for bounded \code{GPCM} fits because the FACETS
+This helper is unavailable for \code{GPCM} fits because the FACETS
 output contract includes score-side rows whose measure-to-score and
 uncertainty semantics are supported for the Rasch-family route, not
-for free-discrimination bounded \code{GPCM}. Use \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}} before
-routing a bounded \code{GPCM} fit into score-side compatibility-output helpers.
+for free-discrimination \code{GPCM}. Use \code{\link[=gpcm_capability_matrix]{gpcm_capability_matrix()}} before
+routing a \code{GPCM} fit into score-side compatibility-output helpers.
 
 Coverage interpretation in \code{overall}:
 \itemize{
@@ -110,11 +112,23 @@ retain the scope limitation in the report.
 }
 }
 
+\section{Saved-result reuse}{
+
+Supplied screening results must describe this fitted analysis. Results from
+another fit or older results without identity metadata are refused. See
+\link{mfrmr_compatibility_layer} to recreate them from the saved fit and matching
+diagnostics without refitting the model.
+}
+
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
-diag <- diagnose_mfrm(fit, residual_pca = "none")
+# Long-running workflow; run explicitly when needed.
+# example("facets_output_contract_review", run.dontrun = TRUE)
+\dontrun{
+# Saved synthetic JML/RSM analysis of example_core.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "core-jml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+diag <- example_fit$diagnostics
 contract_review <- facets_output_contract_review(fit, diagnostics = diag, branch = "facets")
 summary(contract_review)
 p <- plot(contract_review, draw = FALSE)

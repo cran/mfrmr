@@ -1,0 +1,1460 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Shared random raters: feedback and replacement raters</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Shared random raters: feedback and
+replacement raters</h1>
+
+
+
+<p>An assessment coordinator wants feedback for the raters who marked
+this year’s performances and wants to understand what could happen when
+other raters are recruited. These are different questions. A fixed-rater
+MFRM describes the particular raters. A random-rater model additionally
+assumes that these raters are draws from a specified population. That
+assumption needs a substantive justification: a hand-picked panel is not
+automatically representative.</p>
+<p>The same issue arises for music juries, clinical performance
+assessments and sports judges. Changing the names of the columns is
+straightforward; deciding whether the population, assignment and scoring
+assumptions fit the setting is essential. This workflow currently uses
+an adjacent-category rating scale model (RSM), unit weights and additive
+fixed facets.</p>
+<p>The crossed-effects rationale is related to <a href="https://doi.org/10.3102/10769986028004369">Van den Noortgate, De
+Boeck and Meulders (2003)</a>. Their binary model shares each random
+effect across all responses involving that unit. <a href="https://doi.org/10.3102/10769986231193351">Huang and Cai
+(2024)</a> model crossed effects for item-level ordinal ratings with a
+graded-response model. These papers explain why sharing matters; they do
+not establish equivalence to this RSM or validate its numerical
+approximation and intervals.</p>
+<div id="fit-the-shared-rater-model" class="section level2">
+<h2>Fit the shared-rater model</h2>
+<p>Install the optional <code>RTMB</code> package (version 2.0 or later)
+to fit this model and to score responses and compute profile intervals.
+Saved summaries, plots and point predictions do not require a live
+optimizer. The examples below run when RTMB is available.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>ratings <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_core&quot;</span>)</span></code></pre></div>
+<p>The next call estimates the model. The rendered tutorial uses the
+packaged synthetic calibration, Person scores and bootstrap draws for
+these data and settings, so rebuilding the article does not repeat those
+long calculations. The estimation calls remain below for recomputation.
+A complete regeneration recipe is available at
+<code>system.file(&quot;examples&quot;, &quot;extended-models.R&quot;, package = &quot;mfrmr&quot;)</code>.
+Reading saved output is not a new estimation or bootstrap
+validation.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>random_fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm_random_rater</span>(</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>  ratings, <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>, <span class="at">rater =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>  <span class="at">facets =</span> <span class="st">&quot;Criterion&quot;</span>, <span class="at">score_levels =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>, <span class="at">quad_points =</span> <span class="dv">121</span></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>saved_example <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="fu">system.file</span>(<span class="st">&quot;examples&quot;</span>, <span class="st">&quot;extended-models.rds&quot;</span>,</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>                                      <span class="at">package =</span> <span class="st">&quot;mfrmr&quot;</span>, <span class="at">mustWork =</span> <span class="cn">TRUE</span>))<span class="sc">$</span>random_rater</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>random_fit <span class="ot">&lt;-</span> saved_example<span class="sc">$</span>fit</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>random_fit<span class="sc">$</span>checks</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="fu">summary</span>(random_fit)<span class="sc">$</span>data_usage</span></code></pre></div>
+<p>These demonstration data contain 48 persons, four raters and four
+criteria. Four raters can illustrate the calculations, but provide
+little information about an entire rater population. Adding ratings from
+the same four raters does not create more independent draws from that
+population.</p>
+<p>Each person has one latent ability, and each rater has one severity
+effect shared across <strong>all persons rated by that rater</strong>.
+Drawing a fresh rater effect for every person would describe a different
+dependence structure. Abilities are independent normal with mean zero
+and estimated SD; severities are independent normal with mean zero and
+estimated SD, independent of abilities and assignment. Fixed-facet level
+effects sum to zero. Steps are unconstrained adjacent thresholds, and
+their mean determines overall location. The observed raters’ severities
+are not forced to sum to zero.</p>
+<p>The default <code>person_sd = NULL</code> estimates the ability
+population’s SD. It is reported separately from rater population
+variation:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>random_fit<span class="sc">$</span>calibration[<span class="fu">c</span>(<span class="st">&quot;person_sd&quot;</span>, <span class="st">&quot;person_variance&quot;</span>, <span class="st">&quot;rater_sd&quot;</span>)]</span></code></pre></div>
+<p>Set <code>person_sd = 1</code> to impose a known standard normal
+population, or supply another positive known SD. With the Rasch slope
+fixed at one, fixing ability variance is a substantive restriction: a
+population twice as dispersed cannot be represented simply by relabeling
+the same fitted scale. The mean remains zero; the step location is free.
+Estimating a common SD does not accommodate different ability
+populations across panels. Connecting such panels with a few common
+persons does not establish a homogeneous population or ignorable
+assignment. Earlier saved fits retain their original known standard
+normal population.</p>
+<p>Fixed-facet and step calibration tables retain estimates and
+approximate SEs, but bounds are omitted by default. To inspect a
+pointwise normal approximation explicitly, use:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">confint</span>(random_fit, <span class="at">parm =</span> <span class="st">&quot;calibration&quot;</span>, <span class="at">level =</span> .<span class="dv">95</span>)</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="fu">summary</span>(random_fit, <span class="at">calibration_intervals =</span> <span class="st">&quot;normal&quot;</span>, <span class="at">level =</span> .<span class="dv">95</span>)<span class="sc">$</span>calibration</span></code></pre></div>
+<p>This does not request intervals for the observed raters or population
+SDs. Finite-sample coverage is not established. For tables, reports and
+exports, use
+<code>mfrm_results(random_fit, calibration_intervals = &quot;normal&quot;, calibration_level = .95)</code>.
+Rebuilding output from an older saved fit applies the new default
+without refitting; older result bundles keep their stored tables.</p>
+<p>Both estimated zero variances are checked explicitly. At either
+estimated boundary, regular calibration and rater intervals are
+unavailable. An estimated ability variance at the upper search bound
+also prevents numerical readiness; inspect
+<code>PersonVarianceUpperBoundary</code>, increase
+<code>person_variance_max</code> and refit before interpretation. The
+default bound of 16 is a search limit, not evidence that larger
+population variances are impossible.</p>
+<p>The fit uses frequentist approximate marginal maximum likelihood,
+with no priors on calibration or variance parameters. Person effects are
+integrated with quadrature conditional on the shared raters; a Laplace
+approximation integrates the joint rater vector. <a href="https://doi.org/10.18637/jss.v070.i05">Kristensen et
+al. (2016)</a> describe the automatic differentiation and Laplace
+framework.</p>
+<p><code>NumericalReady</code> compares the chosen Person quadrature
+with a higher order and checks optimization. This example uses 121
+points because lower orders were insufficient for its response vectors.
+Up to 241 points can be requested; no order is universally adequate,
+especially when ability variance is large.
+<code>InformationPositive</code> additionally checks usable local
+curvature. A separated facet can have a tiny gradient as its coefficient
+diverges; that does not make it a finite, identified solution. Failed
+numerical or information checks block prediction and profiling, and
+withhold regular intervals. These checks do <strong>not</strong> test
+the separate rater Laplace approximation, establish model fit, or
+guarantee interval coverage. If a check fails, inspect it and resolve
+the numerical issue before prediction or profiling.</p>
+<p>For a failed <code>PersonQuadratureStable</code> check, refit the
+same data with a larger <code>quad_points</code>. For example, after an
+insufficient 61-point fit, keep that fit and try 121 points with the
+same model and population settings:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>refined <span class="ot">&lt;-</span> <span class="fu">fit_mfrm_random_rater</span>(</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  ratings, <span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Score&quot;</span>, <span class="at">facets =</span> <span class="st">&quot;Criterion&quot;</span>,</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="at">score_levels =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>, <span class="at">person_sd =</span> <span class="cn">NULL</span>, <span class="at">quad_points =</span> <span class="dv">121</span></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>)</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>refined<span class="sc">$</span>checks</span></code></pre></div>
+<p>Match the arguments to your original fit: changing a known
+<code>person_sd</code> to <code>NULL</code>, for example, changes the
+model as well as the computation. The <code>LogLikDifference</code> and
+<code>GradientDifference</code> compare integration orders at the fitted
+calibration; the higher-order check alone does not reestimate the
+parameters. A successful refit must pass optimization, integration and
+information checks, while an estimated zero variance retains its own
+interval restrictions. If 241 points still fail, the computation remains
+unresolved. Do not change the recorded checks to obtain intervals from
+the earlier fit.</p>
+<div id="how-accurate-is-the-calibration-likelihood-near-the-estimate" class="section level3">
+<h3>How accurate is the calibration likelihood near the estimate?</h3>
+<p>The fit uses Person quadrature and a shared-rater Laplace
+approximation. Increasing the Person quadrature order checks one
+numerical integration; it does not measure the error of the separate
+rater approximation. An independent comparison reused eight
+three-category datasets with 240 Persons, six or 24 raters, and rotating
+pairs or weakly linked panels. It moved all six calibration coordinates,
+a criterion contrast and the two population SDs along directions scaled
+to one local information unit. Calibration was held at each planned
+point; no alternative model was fitted.</p>
+<p>All 144 planned likelihood-change comparisons met the stated
+tolerance of <strong>0.05 log-likelihood units</strong>, including Monte
+Carlo uncertainty. They contain 128 distinct parameter points: the named
+criterion-contrast direction repeats one basis direction. The largest
+absolute difference from the refined reference was 0.005 log-likelihood
+units; the largest error allowance was 0.0071. These are numerical
+tolerances, not logits or assessment cutoffs.</p>
+<p>The initial importance-sampling reference left 61 comparisons
+unresolved because of reference precision or its uncertainty allowance.
+A second, predeclared calculation transformed the same saved joint
+posterior draws and included the exact change-of-variables determinant.
+This reduced reference noise without changing the target integral,
+parameter points, package likelihood or tolerance. It was applied to all
+points, and the initial results remain recorded. It was not a new
+sampling run or an independent replication.</p>
+<p>This supports the tested <strong>local likelihood changes</strong>.
+It does not establish an exact maximum-likelihood solution, absolute
+likelihood normalization, accuracy along an entire refitted SD profile,
+or behavior at a zero-variance boundary. It also does not establish
+interval coverage. Fixed-facet and step intervals remain
+observed-information normal approximations; the rater-SD profile and
+conditional Person intervals have the separate meanings below.</p>
+</div>
+</div>
+<div id="give-feedback-about-the-observed-raters" class="section level2">
+<h2>Give feedback about the observed raters</h2>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>random_fit<span class="sc">$</span>raters</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="fu">plot</span>(random_fit)</span></code></pre></div>
+<p>Positive severity means stricter ratings relative to the assumed
+rater population mean. Points are conditional modes, with shrinkage
+toward that mean. <code>ConditionalSD</code> describes uncertainty
+holding calibration fixed. <code>PredictionSE</code> additionally
+incorporates first-order calibration uncertainty. The full
+<code>rater_covariance</code> retains dependence between raters. Neither
+number establishes the coverage of an interval.</p>
+<p>Individual-rater <code>Lower</code> and <code>Upper</code> are
+missing by default, and the default plot shows points only. Nominal
+interval coverage has not been established. If an approximate interval
+is useful for investigating the calculation, request it explicitly from
+the saved fit:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>normal_approximation <span class="ot">&lt;-</span> <span class="fu">confint</span>(random_fit, <span class="at">parm =</span> <span class="st">&quot;raters&quot;</span>)</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>normal_approximation</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="co"># Optional display: plot(random_fit, intervals = &quot;normal&quot;)</span></span></code></pre></div>
+<p>These are first-order normal prediction intervals for the
+<strong>realized random rater effects</strong>, not confidence intervals
+for fixed-rater coefficients. Their coverage can be poor with few
+raters, sparse panels, an inaccurate approximation or a wrong population
+model. They do not classify rater quality. Discuss specific ratings and
+rubric interpretation before considering any intervention; severity
+alone does not establish inconsistency, bias against a group or a need
+to exclude a rater. Existing <code>diagnose_mfrm()</code> and
+fixed-facet interval helpers do not accept this distinct model
+class.</p>
+</div>
+<div id="choose-a-view-and-adapt-its-presentation" class="section level2">
+<h2>Choose a view and adapt its presentation</h2>
+<p>For feedback, start with severity points and concrete examples of
+ratings. The explicitly selected normal approximation can be inspected
+in a precision view; its vertical axis is the <strong>approximate
+interval width</strong>, not validated precision, Infit, reliability or
+a quality score. The cumulative distribution summarizes the observed
+point estimates. Shrinkage and which raters were included affect that
+distribution, so it is not an estimate of the latent rater population.
+Four raters make a small descriptive example.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="fu">plot</span>(random_fit, <span class="at">style =</span> <span class="st">&quot;precision&quot;</span>, <span class="at">intervals =</span> <span class="st">&quot;normal&quot;</span>, <span class="at">point_size =</span> <span class="dv">3</span>,</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>     <span class="at">title =</span> <span class="st">&quot;Rater severity and approximate interval width&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="fu">plot</span>(random_fit, <span class="at">style =</span> <span class="st">&quot;distribution&quot;</span>, <span class="at">reference =</span> <span class="cn">NULL</span>,</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>     <span class="at">title =</span> <span class="st">&quot;Distribution of the observed rater estimates&quot;</span>)</span></code></pre></div>
+<p>The same views work for saved Person scores and testlet fixed-facet
+estimates. <code>sort = &quot;estimate&quot;</code> or
+<code>sort = &quot;uncertainty&quot;</code> reorders an interval plot without
+altering the source table. For rater fits, sorting by interval width
+also requires <code>intervals = &quot;normal&quot;</code>. It does not test
+differences between rows. <code>palette = &quot;mono&quot;</code> supports
+black-and-white reproduction. Open and filled symbols distinguish
+prior-only and response-based scores, independently of colour.
+Prior-only scores are omitted from cumulative distributions. Precision
+views omit rows without finite intervals. Every omitted row and reason
+remains in <code>plot_data(figure)$display_data</code>; the complete
+source is in <code>$table</code>.</p>
+<p>For a publication with its own caption, suppress the built-in
+text:</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>figure <span class="ot">&lt;-</span> <span class="fu">plot</span>(random_fit, <span class="at">draw =</span> <span class="cn">FALSE</span>, <span class="at">sort =</span> <span class="st">&quot;estimate&quot;</span>, <span class="at">palette =</span> <span class="st">&quot;mono&quot;</span>,</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>               <span class="at">show_title =</span> <span class="cn">FALSE</span>, <span class="at">show_notes =</span> <span class="cn">FALSE</span>, <span class="at">text_scale =</span> <span class="fl">1.15</span>)</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">requireNamespace</span>(<span class="st">&quot;ggplot2&quot;</span>, <span class="at">quietly =</span> <span class="cn">TRUE</span>)) <span class="fu">print</span>(<span class="fu">as_ggplot</span>(figure))</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a><span class="co"># Text alternatives and the full table can accompany the exported image:</span></span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a><span class="fu">plot_data</span>(figure)<span class="sc">$</span>alt_text</span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a><span class="fu">plot_data</span>(figure)<span class="sc">$</span>table</span></code></pre></div>
+<p><code>title</code> and <code>caption</code> accept replacement text;
+<code>&quot;&quot;</code> removes it. <code>show_labels = FALSE</code> removes
+individual IDs in interval and precision views, which can help with
+crowded figures. <code>reference = NULL</code> removes the vertical
+reference line; <code>text_scale</code> and <code>point_size</code>
+adjust size. The reference is an orientation aid, not a decision
+threshold. Interpretation notes remain available even when hidden.
+Explain the interval target in your figure caption or surrounding
+text.</p>
+<p><code>as_ggplot()</code> preserves these choices and adds an
+alternative description via <code>labs(alt = ...)</code>; use standard
+<code>ggplot2::labs()</code> and <code>theme()</code> for axis labels,
+fonts and further layout changes. Supply a textual description and table
+when publishing an image: the image file alone does not expose its
+stored metadata to a screen reader. Bootstrap interval comparisons also
+support the display controls and ggplot conversion, retaining dashed
+ordinary intervals and arrows for unbounded bootstrap endpoints. They
+keep the interval view.</p>
+</div>
+<div id="compare-the-same-observed-panel-with-fixed-raters" class="section level2">
+<h2>Compare the same observed panel with fixed raters</h2>
+<p>The practical question is how changing rater treatment changes the
+fitted severity summaries for <strong>the same ratings</strong>. Fit the
+ordinary reference with the same common normal population assumption.
+<code>population_formula = ~1</code> estimates its ability SD; the
+ordinary RSM default instead fixes N(0,1).</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>ordinary_fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>  ratings, <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>, <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>, <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>, <span class="at">rating_min =</span> <span class="dv">1</span>, <span class="at">rating_max =</span> <span class="dv">4</span>,</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>  <span class="at">keep_original =</span> <span class="cn">TRUE</span>, <span class="at">population_formula =</span> <span class="sc">~</span><span class="dv">1</span>,</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>  <span class="at">person_data =</span> <span class="fu">unique</span>(ratings[<span class="st">&quot;Person&quot;</span>]), <span class="at">quad_points =</span> <span class="dv">121</span></span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>model_comparison <span class="ot">&lt;-</span> <span class="fu">compare_mfrm</span>(</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>  ordinary_fit, random_fit, <span class="at">labels =</span> <span class="fu">c</span>(<span class="st">&quot;Fixed raters&quot;</span>, <span class="st">&quot;Shared random raters&quot;</span>)</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>)</span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>model_comparison<span class="sc">$</span>checks</span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>model_comparison<span class="sc">$</span>models</span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a><span class="fu">subset</span>(model_comparison<span class="sc">$</span>effects, Facet <span class="sc">==</span> <span class="st">&quot;Rater&quot;</span>)</span>
+<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a><span class="fu">plot</span>(model_comparison, <span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">style =</span> <span class="st">&quot;paired&quot;</span>)</span></code></pre></div>
+<p>Each model’s rater estimates are centered at the unweighted mean over
+the same observed panel. This preserves pairwise rater contrasts while
+removing arbitrary origins. The raw values and subtracted centers remain
+in the table. <code>Difference</code> is the second model minus the
+first. Random-rater points are conditional modes, whereas the ordinary
+points are fixed-effect estimates: shrinkage toward the center does not
+establish greater accuracy or justify excluding a rater. The ordinary
+model’s wider inferential-readiness status is also retained, even when
+descriptive numerical checks pass.</p>
+<p>Use <code>style = &quot;difference&quot;</code> for differences against their
+means, or <code>as_ggplot(plot(model_comparison, draw = FALSE))</code>
+for custom styling. The comparison uses saved fits and does not refit,
+score or resample. It provides no intervals for model differences,
+AIC/BIC preference or ordinary chi-squared variance-component test.
+Person scores, replacement-rater predictions and predictive fit
+statistics require separately aligned targets and are not compared by
+this facet table.</p>
+<p>Checks include repeated-event multiplicity, categories, unit weights,
+fixed facets, population assumptions and omitted-score identities. New
+ordinary fits save excluded events in <code>prep$omitted_data</code>. An
+older fit with omissions but no such provenance must be refitted from
+the complete assigned roster; matching row counts alone are
+insufficient. The comparison supports missing assigned scores, not
+missing IDs or excluded weights. Unsupported constraints or mismatched
+data are refused even with <code>warn_constraints = FALSE</code>.</p>
+</div>
+<div id="what-the-bounded-validation-shows" class="section level2">
+<h2>What the bounded validation shows</h2>
+<p>With <strong>estimated ability SD</strong>, a prespecified study used
+240 Persons, three criteria and two raters per Person (1,440 responses),
+with 200 independent datasets per condition. Abilities were N(0,1.3²),
+rater effects N(0,0.7²), and scores 0–2. Rotating adjacent pairs were
+compared with two half-panels joined by only two bridging Persons.
+Per-rater workload was held equal within each rater count. Both models
+estimated ability variance; the shared-rater fit used 61-point Person
+quadrature with its higher-order check.</p>
+<table>
+<colgroup>
+<col width="21%" />
+<col width="15%" />
+<col width="21%" />
+<col width="21%" />
+<col width="21%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="right">Raters</th>
+<th>Assignment</th>
+<th align="right">Finite intervals / planned</th>
+<th align="right">Conditional coverage</th>
+<th align="right">95% Monte Carlo interval</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">6</td>
+<td>Rotating</td>
+<td align="right">198/200</td>
+<td align="right">91.58%</td>
+<td align="right">88.77–94.39%</td>
+</tr>
+<tr class="even">
+<td align="right">6</td>
+<td>Weakly linked</td>
+<td align="right">198/200</td>
+<td align="right">91.84%</td>
+<td align="right">88.99–94.68%</td>
+</tr>
+<tr class="odd">
+<td align="right">24</td>
+<td>Rotating</td>
+<td align="right">176/200</td>
+<td align="right">94.06%</td>
+<td align="right">93.18–94.94%</td>
+</tr>
+<tr class="even">
+<td align="right">24</td>
+<td>Weakly linked</td>
+<td align="right">174/200</td>
+<td align="right">93.99%</td>
+<td align="right">93.08–94.90%</td>
+</tr>
+</tbody>
+</table>
+<p>Coverage targets realized <strong>uncentered</strong> rater effects.
+It is first averaged within each dataset; the dataset is the independent
+Monte Carlo unit. These Monte Carlo intervals describe simulation
+precision, not an interval for one assessment. Missing intervals are
+excluded only from conditional coverage, and remain in the planned
+availability denominator. The proportion both available and covering was
+90.67%, 90.92%, 82.77% and 81.77%, respectively.</p>
+<p>All optimizers converged and information checks passed. Higher-order
+Person quadrature checks failed in 2, 1, 24 and 26 datasets in the
+table’s order; one additional six-rater weak-design fit estimated zero
+rater variance. No failed result was replaced. These checks do not
+assess rater Laplace error.</p>
+<p><strong>No condition met the combined qualification
+criterion.</strong> The study required the lower 95% Monte Carlo
+coverage bound to be at least 92.5%, the coverage estimate no greater
+than 97.5%, and the lower exact availability bound to be at least 95%.
+Six-rater uncertainty was also too wide to conclude coverage below the
+prespecified 92.5% material-undercoverage floor. The correct decision is
+inconclusive, not proof of equivalence or a new definitive failure.
+Increasing replication after seeing these outcomes was not part of the
+plan.</p>
+<p>On the same available datasets, shared-rater point estimates had
+lower <strong>sample-centered</strong> rater MSE than ordinary MFRM with
+24 raters (about .075 versus .094 for rotating pairs and .077 versus
+.097 for weak linking). Six-rater MSE differences were inconclusive.
+This comparison uses a different target from the uncentered intervals
+and does not establish overall model superiority. Six-rater mean
+population-SD estimates were about .622 instead of .7; the Monte Carlo
+bias intervals crossed the prespecified 10% tolerance. The study does
+not isolate the causes of these results.</p>
+<p>Consequently, automatic individual-rater normal intervals are
+withdrawn. <code>confint(fit, parm = &quot;raters&quot;)</code> and
+<code>plot(fit, intervals = &quot;normal&quot;)</code> preserve explicit access to
+the approximation; neither corrects it. New summaries, plots and reports
+of earlier saved fits follow this default, without changing the saved
+object or refitting. Raw older objects and already saved plot data
+retain their historical values. Bootstrap intervals are not promoted as
+a validated replacement. Numerical integration, retained uncertainty and
+the Laplace approximation still need qualification; no minimum rater
+count is established. This study does not qualify Person intervals or
+the testlet model.</p>
+<div id="earlier-fixed-population-evidence" class="section level3">
+<h3>Earlier fixed-population evidence</h3>
+<p>A normal-population pilot used 240 persons, three fixed criteria and
+two rotating adjacent raters per person: 1,440 ratings in each dataset.
+It crossed six or 24 raters with true rater population SD zero or 0.7,
+with 40 independent datasets per condition. Abilities were generated as
+N(0,1) and their SD was fixed as known at one during fitting. These
+results apply to that restricted branch; they do not qualify the default
+estimated ability-SD workflow. Every fit passed its numerical and
+information checks; every population-SD profile interval was available.
+This did not make all nominal 95% intervals accurate. Under true SD
+0.7:</p>
+<table>
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="right">Raters</th>
+<th align="right">Mean estimated population SD</th>
+<th align="right">SD intervals containing 0.7</th>
+<th align="right">Individual-rater interval coverage</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">6</td>
+<td align="right">0.640</td>
+<td align="right">37/40 (92.5%)</td>
+<td align="right">84.2%</td>
+</tr>
+<tr class="even">
+<td align="right">24</td>
+<td align="right">0.690</td>
+<td align="right">39/40 (97.5%)</td>
+<td align="right">94.4%</td>
+</tr>
+</tbody>
+</table>
+<p>Individual-rater coverage was averaged within each dataset, then
+across the 40 independent datasets. Its Monte Carlo SE was 4.6 and 1.0
+percentage points, respectively; the individual raters were not counted
+as independent simulation replications. Exact 95% Monte Carlo intervals
+for population-SD coverage were 79.6–98.4% and 86.8–99.9%. Forty
+replications cannot establish precise nominal coverage, and this
+comparison changes both rater count and workload/linking. It does not
+establish a minimum adequate rater count.</p>
+<p>Under true SD zero, all 40 profile intervals in each condition
+contained zero. The fitted variance was on the boundary in 29/40
+six-rater datasets and 19/40 24-rater datasets. Regular individual-rater
+and calibration intervals were withheld in those cases; their
+availability was therefore 11/40 and 21/40, not 40/40. The population-SD
+interval remained a separate, available target.</p>
+<p><strong>Few-rater interval calibration remains unresolved.</strong>
+Even with the stated normal populations, the six-rater prediction
+intervals under-covered. The four-rater demonstration above illustrates
+the workflow; it is not evidence that an explicitly requested interval
+achieves 95% coverage. These intervals alone should not drive rater
+exclusion or formal quality classifications. Nonnormal populations,
+informative assignment, missingness and other designs were not qualified
+by this pilot. Numerical checks and a precise implementation of a
+Laplace formula do not establish the accuracy of that approximation or
+its intervals.</p>
+</div>
+</div>
+<div id="estimate-population-variation-including-zero" class="section level2">
+<h2>Estimate population variation, including zero</h2>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>sd_interval <span class="ot">&lt;-</span> <span class="fu">confint</span>(random_fit, <span class="at">parm =</span> <span class="st">&quot;rater_sd&quot;</span>)</span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>sd_interval[, <span class="fu">c</span>(<span class="st">&quot;Lower&quot;</span>, <span class="st">&quot;Upper&quot;</span>), drop <span class="ot">=</span> <span class="cn">FALSE</span>]</span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">attr</span>(sd_interval, <span class="st">&quot;profile&quot;</span>))</span></code></pre></div>
+<p>This interval concerns the <strong>SD across the assumed rater
+population</strong>, not the uncertainty of any single rater and not an
+interval for a future score. The profile refits fixed facets, steps and
+the estimated ability SD at each proposed rater SD. A known ability SD
+remains fixed. It can include zero; a log-Wald interval cannot do so. If
+the estimated variance is zero, regular calibration and individual-rater
+intervals are withheld. That estimate alone is not proof that all raters
+have exactly the same severity. The profile may still provide a positive
+upper limit when ability variance is positive. If ability variance is
+itself an estimated zero boundary at the source or along the profile,
+the profile stops: the additional nuisance-boundary reference has not
+been qualified. No interval for ability population SD is supplied.</p>
+<p>The cutoff uses an asymptotic chi-square likelihood-ratio rule.
+Boundary asymptotics differ from ordinary interior asymptotics; the
+usual one-degree cutoff is conservative under the standard
+single-variance boundary conditions (<a href="https://doi.org/10.1080/01621459.1987.10478472">Self and Liang,
+1987</a>). Those conditions do not provide a finite-sample or
+arbitrary-design guarantee. Failed profile checks stop the calculation
+instead of manufacturing limits; the error’s <code>profile</code> field
+retains the numerical evaluations and reasons. The profile table
+includes <code>LR</code>, the twice-log-likelihood loss from the source,
+and <code>InformationPositive</code>. When ability SD is known, the
+nuisance curvature is checked at both integration orders;
+<code>Detail</code> explains a failed check. Every nonzero endpoint must
+attain the requested likelihood-ratio cutoff. A search that cannot
+resolve the cutoff numerically returns an error, not coincident bounds
+suggesting certainty. Such an error does not establish that the
+statistical interval is absent.</p>
+<p>These are local numerical checks, not a proof of a global optimum or
+a search for every disconnected likelihood-ratio region. More ratings
+from the same small panel can improve estimates of those raters but do
+not add independent rater-population draws. Even perfect knowledge of a
+fixed panel’s effects would leave population-SD uncertainty. Neither a
+large Person count nor successful numerical checks establish the
+asymptotic reference distribution for this shared-rater design.</p>
+<p><code>rater_sd = 0</code> has a different meaning: it <strong>fixes a
+known zero variance</strong> and fits that submodel. Do not choose it
+merely because the estimated variance is small. Likewise, fixing a
+positive SD assumes that value is known, rather than propagating
+uncertainty from a previous estimate.</p>
+</div>
+<div id="compare-intervals-using-complete-model-refits" class="section level2">
+<h2>Compare intervals using complete model refits</h2>
+<p><code>mfrm_random_rater_intervals()</code> provides a model-based
+bootstrap candidate for <strong>observed-rater effects relative to the
+population mean</strong>. It regenerates one ability per person, one
+shared effect per rater and the scores at the same analyzed assignment.
+Abilities are generated with the fitted ability SD. Every replicate
+refits calibration and both population SDs (each stays fixed only if
+originally specified as known). Per-trial <code>PersonSD</code> and
+<code>EstimatedPersonVarianceBoundary</code> retain the
+ability-population outcome. It neither holds the original fitted raters
+fixed nor draws an independent severity for each rating.</p>
+<p>For each rater it retains the generated effect minus the refitted
+estimate. The default divides this error by the replicate’s
+calibration-adjusted prediction SE. The bootstrap tail quantiles then
+multiply the original SE and are added to the original point estimate.
+Keeping the <strong>prediction error</strong> is essential: percentiles
+of refitted rater modes alone would ignore the changing true random
+effect. This studentized construction is motivated by mixed-model
+prediction research (<a href="https://doi.org/10.1214/07-AOS512">Chatterjee, Lahiri and Li,
+2008</a>); their Gaussian linear-model accuracy result does not
+establish accuracy for this ordinal crossed-rater model.</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="co"># A small run checks the workflow; 19 draws cannot stabilize 2.5% tails.</span></span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>bootstrap_intervals <span class="ot">&lt;-</span> <span class="fu">mfrm_random_rater_intervals</span>(</span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a>  random_fit, <span class="at">nsim =</span> <span class="dv">19</span>, <span class="at">seed =</span> <span class="dv">923701</span></span>
+<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a>)</span></code></pre></div>
+<p>The following summaries reuse all 19 saved draws, including their
+original failure accounting. Changing the confidence level reuses those
+draws.</p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>bootstrap_intervals <span class="ot">&lt;-</span> saved_example<span class="sc">$</span>intervals</span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">identical</span>(bootstrap_intervals<span class="sc">$</span>source, random_fit))</span>
+<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a>bootstrap_summary <span class="ot">&lt;-</span> <span class="fu">summary</span>(bootstrap_intervals)</span>
+<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a>bootstrap_summary<span class="sc">$</span>trials</span>
+<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a>bootstrap_summary<span class="sc">$</span>availability</span>
+<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a>bootstrap_summary<span class="sc">$</span>intervals[, <span class="fu">c</span>(<span class="st">&quot;Lower&quot;</span>, <span class="st">&quot;Upper&quot;</span>), drop <span class="ot">=</span> <span class="cn">FALSE</span>]</span>
+<span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a><span class="fu">confint</span>(bootstrap_intervals, <span class="at">method =</span> <span class="st">&quot;error&quot;</span>)[, <span class="fu">c</span>(<span class="st">&quot;Lower&quot;</span>, <span class="st">&quot;Upper&quot;</span>), drop <span class="ot">=</span> <span class="cn">FALSE</span>]</span>
+<span id="cb16-8"><a href="#cb16-8" tabindex="-1"></a><span class="co"># Reuse the same roots at a different level, with no further fitting:</span></span>
+<span id="cb16-9"><a href="#cb16-9" tabindex="-1"></a><span class="fu">confint</span>(bootstrap_intervals, <span class="at">level =</span> .<span class="dv">90</span>)[, <span class="fu">c</span>(<span class="st">&quot;Lower&quot;</span>, <span class="st">&quot;Upper&quot;</span>), drop <span class="ot">=</span> <span class="cn">FALSE</span>]</span></code></pre></div>
+<p>The default is 499 refits; larger runs improve Monte Carlo tail
+resolution but do not correct a wrong model. At 95%, 19 replicates give
+only 0.475 expected draws per tail. This demonstration is not an
+adequate production interval analysis. The result records
+<code>expected_tail_draws</code>, every replicate’s seed, generated
+severity, estimate, SE and fit status. <code>method = &quot;error&quot;</code>
+provides unscaled-error intervals from the same draws as a comparison;
+it is not automatically a remedy when studentization fails.</p>
+<p>For newly computed bootstrap results, <code>$trials</code> also
+retains the optimizer code, numerical and information checks, Person
+quadrature orders and their likelihood/gradient differences. These help
+answer <strong>why a refit could not supply a usable interval</strong>.
+A failed refit has missing additional checks and its error message; a
+missing check does not mean success. Older saved bootstrap examples do
+not contain these extra fields. Reopening them does not reconstruct the
+missing checks or change their original intervals.</p>
+<p>Review the causes separately. Unresolved Person integration calls for
+a numerical review; an estimated variance boundary makes ordinary
+studentization unavailable; neither is a measurement of the interval’s
+repeated-sampling coverage. More quadrature points, more bootstrap draws
+and more independently simulated assessments address different problems.
+If you compare a revised numerical procedure, retain the original
+results and specify the revision before examining its outcomes; do not
+keep retrying only failed trials until they succeed.</p>
+<p>If a bootstrap fit estimates zero variance, its ordinary rater SE is
+unavailable. Its generated-minus-estimated error can still be recorded,
+but its studentized error is unresolved. Failed refits are also
+retained. The lower endpoint treats unresolved errors as minus infinity;
+the upper endpoint treats them as plus infinity. These are outer limits
+covering the empirical intervals from any completion of those unresolved
+errors. When too many replicates are unresolved, a limit is unbounded.
+Dropping those draws or simulating until a chosen number succeeds would
+change the reference sample.</p>
+<p>More refits do not necessarily make an unbounded interval finite. At
+the default 499 refits and 95% level, 13 unresolved studentized errors
+for one rater make both limits infinite. With 12 unresolved errors and
+all remaining errors and source values finite, the empirical limits are
+finite. These counts follow the interval calculation; they are not
+acceptable-failure or coverage thresholds. If the unresolved fraction
+stays above the 2.5% tail probability, increasing the run size still
+yields unbounded limits. Inspect the numerical and variance-boundary
+records before investing in more draws.</p>
+<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a><span class="fu">plot</span>(bootstrap_intervals)</span>
+<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a>bootstrap_intervals<span class="sc">$</span>trials[</span>
+<span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a>  <span class="sc">!</span>bootstrap_intervals<span class="sc">$</span>trials<span class="sc">$</span>FitReady <span class="sc">|</span></span>
+<span id="cb17-4"><a href="#cb17-4" tabindex="-1"></a>    bootstrap_intervals<span class="sc">$</span>trials<span class="sc">$</span>EstimatedBoundary, ]</span></code></pre></div>
+<p>Arrows denote <strong>unbounded</strong> endpoints, not finite limits
+at the edge of the plot. Grey ordinary intervals remain a comparison and
+do not replace them. Even a bounded bootstrap interval is not
+automatically well calibrated. The finite/unbounded distinction matters
+when reporting coverage: an interval spanning all real numbers always
+covers but provides no localization. With only 19 planned refits, even
+one unresolved replicate makes both 95% endpoints unbounded under this
+rule. More refits improve tail resolution, but do not remove a genuine
+tendency to estimate zero variance. Inspect the trial table instead of
+treating an unbounded result as a plotting error or discarding the
+boundary replicate.</p>
+<p>This procedure assesses coverage over repeated persons, rater effects
+and scores under the fitted model. It does not promise conditional
+coverage at every fixed true rater severity. It requires a positive
+source SD and positive prediction SEs. Retain an estimated zero-variance
+diagnosis. The separate rater-SD profile can describe population
+variation at a rater boundary, but is unavailable at an estimated
+ability-variance boundary. It does not provide familywise control, rater
+contrasts or a justification for excluding raters. Omitted scores stay
+omitted, so uncertainty about the missingness mechanism is not
+represented. Save the bootstrap object to reuse its roots and plots
+without RTMB or repeated fitting.</p>
+<div id="what-the-bootstrap-comparison-shows" class="section level3">
+<h3>What the bootstrap comparison shows</h3>
+<p>A separate comparison used <strong>24 new datasets</strong>, 12 per
+rater-count condition, under the same 240-person, 1,440-rating
+normal-population design above, with true rater SD 0.7. Ability SD was
+fixed as known at one in generation, source fitting and refits; this is
+not evidence for estimated ability SD. Each source had 99 planned
+bootstrap refits. Both intervals were evaluated on the same dataset and
+realized effects; the earlier 40-dataset results were not reused as the
+ordinary-interval comparator.</p>
+<table>
+<colgroup>
+<col width="21%" />
+<col width="15%" />
+<col width="21%" />
+<col width="21%" />
+<col width="21%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="right">Raters</th>
+<th>Interval</th>
+<th align="right">Coverage</th>
+<th align="right">Mean width (logits)</th>
+<th align="right">Finite intervals</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">6</td>
+<td>Ordinary normal</td>
+<td align="right">91.7%</td>
+<td align="right">1.177</td>
+<td align="right">72/72</td>
+</tr>
+<tr class="even">
+<td align="right">6</td>
+<td>Studentized bootstrap</td>
+<td align="right">100.0%</td>
+<td align="right">1.648</td>
+<td align="right">72/72</td>
+</tr>
+<tr class="odd">
+<td align="right">6</td>
+<td>Unscaled-error bootstrap</td>
+<td align="right">90.3%</td>
+<td align="right">1.227</td>
+<td align="right">72/72</td>
+</tr>
+<tr class="even">
+<td align="right">24</td>
+<td>Ordinary normal</td>
+<td align="right">95.5%</td>
+<td align="right">1.122</td>
+<td align="right">288/288</td>
+</tr>
+<tr class="odd">
+<td align="right">24</td>
+<td>Studentized bootstrap</td>
+<td align="right">95.1%</td>
+<td align="right">1.149</td>
+<td align="right">288/288</td>
+</tr>
+<tr class="even">
+<td align="right">24</td>
+<td>Unscaled-error bootstrap</td>
+<td align="right">93.8%</td>
+<td align="right">1.122</td>
+<td align="right">288/288</td>
+</tr>
+</tbody>
+</table>
+<p>All 24 source fits and 2,376 refits passed numerical/information
+checks. Two refits estimated zero variance; their unresolved studentized
+errors were retained. No interval was unbounded in this comparison. Thus
+the six-rater increase was not obtained by counting infinite intervals
+as successes, but the mean interval was <strong>40% wider</strong>. Its
+improvement occurred in just one of the 12 datasets. The paired coverage
+change was +8.3 percentage points with MCSE 8.3 points; for 24 raters it
+was -0.35 points with MCSE 1.08 points. MCSEs use datasets, not
+individual raters, as independent replications.</p>
+<p>This is a small method comparison, <strong>not coverage
+qualification</strong>. The six-rater bootstrap covered every target in
+every dataset, so its empirical coverage variance is zero; that is not
+evidence of zero Monte Carlo uncertainty or guaranteed coverage. Twelve
+datasets and 99 refits (2.475 expected draws per 95% tail) are too few
+for a precise accuracy assessment. The unscaled comparison did not
+improve coverage here, and 24 raters showed no clear studentized
+improvement. Keep the bootstrap as an explicit comparison rather than an
+automatic correction or a replacement for ordinary output. Nonnormal
+populations, informative assignment and missingness remain
+unqualified.</p>
+</div>
+</div>
+<div id="score-persons-without-treating-raters-as-known" class="section level2">
+<h2>Score Persons without treating raters as known</h2>
+<p>For people already in <code>random_fit</code>,
+<code>score_mfrm_persons(random_fit)</code> is the common scoring entry
+shared with supported ordinary and testlet RSMs. It uses the full source
+rating table. The model-specific <code>score_mfrm_random_rater()</code>
+below also allows a different complete scoring table. Both estimate
+abilities from responses. <code>predict()</code> answers a different
+question: response probabilities at ability values you supply.</p>
+<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a><span class="co"># Keep the complete source roster; request only these output rows.</span></span>
+<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a>selected_persons <span class="ot">&lt;-</span> <span class="fu">as.character</span>(<span class="fu">unique</span>(ratings<span class="sc">$</span>Person)[<span class="dv">1</span><span class="sc">:</span><span class="dv">2</span>])</span></code></pre></div>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a>person_scores <span class="ot">&lt;-</span> <span class="fu">score_mfrm_random_rater</span>(random_fit, <span class="at">persons =</span> selected_persons)</span></code></pre></div>
+<p>For the displayed results, reuse the saved scores for these same two
+Persons:</p>
+<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a>person_scores <span class="ot">&lt;-</span> saved_example<span class="sc">$</span>scores</span>
+<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">identical</span>(person_scores<span class="sc">$</span>table<span class="sc">$</span>Person, selected_persons))</span>
+<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a>person_scores<span class="sc">$</span>table</span>
+<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a><span class="fu">summary</span>(person_scores)<span class="sc">$</span>data_usage</span></code></pre></div>
+<p>The calculation holds fitted calibration, including both population
+variances, fixed. It integrates other Persons’ abilities and the jointly
+uncertain shared raters, using a conditional Laplace approximation for
+the raters. It normalizes a continuous marginal ability density to
+obtain EAP, posterior SD and equal-tail intervals. This is not scoring
+after substituting rater modes as known values, and the rater effects
+are not integrated independently for each Person. The reported
+<code>IntegrationDifference</code> and
+<code>InterpolationDifference</code> assess quadrature and interpolation
+convergence. Small values do not bound the separate rater Laplace error
+or guarantee repeated-calibration coverage. Computation increases with
+the full roster and the number of requested scores. Start with a few
+Person IDs when checking a large roster: the default
+<code>persons = NULL</code> computes every posterior and can be slow.
+Selecting output Persons keeps all of their peers’ responses in the
+calculation.</p>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a><span class="fu">plot</span>(person_scores)</span></code></pre></div>
+<p>Filled points are response-based scores; open points, when present,
+indicate prior-only results. An unavailable row remains labeled without
+a point or interval. Use
+<code>plot_data(plot(person_scores, draw = FALSE))</code> or
+<code>as_ggplot(plot(person_scores, draw = FALSE))</code> to reuse the
+same saved values. These intervals are conditional on calibration and
+use a rater approximation; they are not tests of Person differences or
+automatic performance classifications.</p>
+<p>If you supply <code>newdata</code>, supply the <strong>complete joint
+scoring roster</strong>. It replaces the source responses and is not
+appended to them. Include every response intended to inform the shared
+raters, and use <code>persons</code> to choose which scores to return.
+New Person and rater IDs are allowed under the same normal populations;
+fixed-facet levels must be known. To update existing responses, replace
+them explicitly and include each intended rating event once. Restricting
+the roster to two Persons generally differs from requesting two outputs
+while retaining everybody’s responses.</p>
+<p>An existing rater ID in <code>newdata</code> does
+<strong>not</strong> import that rater’s saved conditional distribution.
+With a new-batch-only table, the rater information comes from that batch
+and the fitted population parameters. If earlier responses should also
+inform scoring, assemble the complete table explicitly, including each
+intended event once. This differs from
+<code>predict(random_fit, ..., rater = &quot;observed&quot;)</code>, which uses
+the calibration responses’ rater distribution at ability values you
+supply.</p>
+<p>Missing assigned scores require <code>missing = &quot;omit&quot;</code>. An
+entirely unobserved Person then retains a <code>prior_only</code> row
+with the population distribution, not a measured average ability. Zero
+fitted ability variance or failed numerical checks produce unavailable
+scores with a reason. No score is imputed.</p>
+<div id="how-close-are-these-scores-to-the-joint-posterior" class="section level3">
+<h3>How close are these scores to the joint posterior?</h3>
+<p>A numerical comparison held calibration fixed and used independent
+joint posterior sampling as a reference. It covered three-category RSMs
+with six or 24 raters, rotating pairs or two weakly linked panels. Eight
+rosters had 240 Persons and 1,440 responses; four reduced scoring
+rosters had 48 Persons and 96 responses, with the original calibration
+retained. These reduced rosters had fewer collected ratings; no missing
+scores were imputed. Four Persons per roster were selected, including
+panel links and low/high observed totals. These 48 scores are selected
+numerical cases, not independent replications for estimating
+coverage.</p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Quantity</th>
+<th>Numerical tolerance</th>
+<th>Result in the selected cases</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>EAP</td>
+<td>0.05 logits</td>
+<td>All 48 met the criterion with Monte Carlo uncertainty included.</td>
+</tr>
+<tr class="even">
+<td>Posterior SD</td>
+<td>0.05 logits</td>
+<td>All 48 met the criterion with Monte Carlo uncertainty included.</td>
+</tr>
+<tr class="odd">
+<td>Lower and upper endpoints</td>
+<td>0.10 logits</td>
+<td>All 96 met the conditional-CDF bracketing criterion.</td>
+</tr>
+</tbody>
+</table>
+<p>The largest differences from the sampled reference were 0.013 logits
+for EAP and 0.015 logits for posterior SD. A raw sample-quantile
+comparison left 24 endpoints unresolved because of reference precision
+or its uncertainty allowance. To assess those endpoints more precisely,
+the same saved joint rater samples were used to integrate each Person’s
+conditional ability distribution. Its averaged CDF bracketed the target
+quantile within 0.10 logits of each reported endpoint, allowing for
+Monte Carlo and numerical error. This reference refinement used all 48
+selected Persons and changed neither the mfrmr scores nor the sampled
+posterior. The original quantile results remain recorded.</p>
+<p>The tolerances are numerical comparison criteria, not assessment
+cutoffs or universal error bounds. These results support the tested
+conditional scoring calculations. They do not establish 95%
+repeated-sampling coverage with estimated calibration, accuracy for
+every sparse design, the calibration likelihood approximation, or
+significance of Person differences. The normal population and assignment
+assumptions still need substantive justification.</p>
+</div>
+</div>
+<div id="distinguish-an-observed-rater-from-a-replacement-rater" class="section level2">
+<h2>Distinguish an observed rater from a replacement rater</h2>
+<p>Specify abilities in logits on the fitted scale (mean zero, Rasch
+slope one). An ability of one is one logit, not one population SD. This
+API does not estimate abilities from new response data.</p>
+<p>A score column in the prediction table is not used to update the
+model or score abilities. Choose <code>score_mfrm_random_rater()</code>
+when the input is observed responses and the desired output is ability
+estimates.</p>
+<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>observed <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a>  <span class="at">Rater =</span> <span class="st">&quot;R01&quot;</span>, <span class="at">Criterion =</span> <span class="st">&quot;Content&quot;</span>, <span class="at">Ability =</span> <span class="fu">c</span>(<span class="sc">-</span><span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">1</span>)</span>
+<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a>)</span>
+<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a>p_observed <span class="ot">&lt;-</span> <span class="fu">predict</span>(random_fit, observed, <span class="at">ability =</span> <span class="st">&quot;Ability&quot;</span>, <span class="at">rater =</span> <span class="st">&quot;observed&quot;</span>)</span>
+<span id="cb22-5"><a href="#cb22-5" tabindex="-1"></a>replacement <span class="ot">&lt;-</span> <span class="fu">transform</span>(observed, <span class="at">Rater =</span> <span class="st">&quot;New rater&quot;</span>)</span>
+<span id="cb22-6"><a href="#cb22-6" tabindex="-1"></a>p_new <span class="ot">&lt;-</span> <span class="fu">predict</span>(random_fit, replacement, <span class="at">ability =</span> <span class="st">&quot;Ability&quot;</span>, <span class="at">rater =</span> <span class="st">&quot;new&quot;</span>)</span>
+<span id="cb22-7"><a href="#cb22-7" tabindex="-1"></a>p_observed<span class="sc">$</span>expected_scores</span>
+<span id="cb22-8"><a href="#cb22-8" tabindex="-1"></a>p_new<span class="sc">$</span>expected_scores</span>
+<span id="cb22-9"><a href="#cb22-9" tabindex="-1"></a>p_new<span class="sc">$</span>probabilities</span></code></pre></div>
+<p>Observed-rater probabilities average over that rater’s approximate
+conditional distribution. Replacement-rater probabilities average over
+the estimated population distribution. Simply setting severity to zero
+generally gives a different answer. Both calculations hold calibration
+and the supplied ability fixed; they do not propagate uncertainty about
+those quantities.</p>
+<p>The returned rows are <strong>marginal probabilities for individual
+ratings</strong>. Rows with the same new rater ID share one latent
+severity in the model. Multiplying their marginal probabilities would
+discard that dependence. This method does not return a joint predictive
+distribution, an interval for an average rating, a scored person ability
+or a response imputation.</p>
+</div>
+<div id="keep-assignment-and-missing-scores-explicit" class="section level2">
+<h2>Keep assignment and missing scores explicit</h2>
+<p>Use one row per assigned rating. Unassigned combinations remain
+absent. A missing assigned score is refused by default.
+<code>missing = &quot;omit&quot;</code> explicitly analyzes only observed scores
+and stores the omitted row numbers; it does not justify ignorability or
+fill missing values. The current route requires a connected Person-rater
+graph, multiple persons per rater, full-rank fixed facets and every
+declared category observed. Connectedness is necessary for this route
+but does not establish adequate information about rater variation.</p>
+<p>The current scope does not include PCM, anchors, informative
+assignment, testlet dependence, multidimensional abilities or nonnormal
+rater populations. The assigned-score MI pooling workflow and portable
+fixed calibration workflow have different model contracts and cannot
+silently accept these fits.</p>
+</div>
+<div id="inspect-posterior-predictive-residuals" class="section level2">
+<h2>Inspect posterior predictive residuals</h2>
+<p>For response-level residuals, uncertainty about ability and
+<strong>all shared raters</strong> must be integrated jointly.
+Substituting a rater mode or using the supplied-ability
+<code>predict()</code> results above would answer a different question.
+<code>mfrm_response_diagnostics()</code> holds calibration fixed and
+obtains each category’s probability from a joint integral with a
+hypothetical replicate sharing the original Person and rater. It then
+calculates the predictive mean and full mixture variance.</p>
+<p>This calculation can be expensive. The example selects all assigned
+ratings for one Person for display; every observed rating in the
+original fit still informs the shared-rater posterior. The resulting
+rater summaries describe <strong>only those selected rows</strong>, not
+the raters’ full workloads. Omit <code>rows</code> to summarize all
+assigned ratings.</p>
+<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a>selected_rows <span class="ot">&lt;-</span> <span class="fu">which</span>(ratings<span class="sc">$</span>Person <span class="sc">==</span> ratings<span class="sc">$</span>Person[<span class="dv">1</span>])</span>
+<span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a>response_review <span class="ot">&lt;-</span> <span class="fu">mfrm_response_diagnostics</span>(random_fit,</span>
+<span id="cb23-3"><a href="#cb23-3" tabindex="-1"></a>  <span class="at">rows =</span> selected_rows, <span class="at">group_by =</span> <span class="st">&quot;Rater&quot;</span>)</span>
+<span id="cb23-4"><a href="#cb23-4" tabindex="-1"></a>response_review<span class="sc">$</span>measures</span>
+<span id="cb23-5"><a href="#cb23-5" tabindex="-1"></a><span class="fu">plot</span>(response_review, <span class="at">style =</span> <span class="st">&quot;paired&quot;</span>)</span></code></pre></div>
+<p>The category-specific Laplace numerator integrals are normalized to
+obtain a probability distribution.
+<code>response_review$rows$NormalizationError</code> retains the
+unnormalized sum minus one. The approximation reoptimizes the joint
+rater mode for each category; fixed calibration is never refitted.
+Agreement between quadrature orders and a small normalization defect do
+<strong>not</strong> prove Laplace accuracy, particularly with few
+raters or sparse data. See
+<code>help(&quot;mfrm_response_diagnostics&quot;)</code> for the equations and
+reference.</p>
+<p>These same-data residual summaries have no established expectation of
+one, ZSTD, p-values or reference cutoffs. They cannot be compared
+directly with ordinary plug-in Infit/Outfit and do not classify rater
+quality. Missing scores, zero/nonfinite predictive variances and
+unresolved integration remain explicit; a group with an unresolved
+observed row has no summary. <code>style = &quot;scatter&quot;</code> offers a
+second view; <code>palette = &quot;mono&quot;</code> retains distinct symbols in
+the paired view. Custom or hidden titles, notes and labels are
+supported, as are <code>as_ggplot()</code> and <code>plot_data()</code>
+without recomputation.</p>
+</div>
+<div id="compare-predictions-on-the-same-definition" class="section level2">
+<h2>Compare predictions on the same definition</h2>
+<p>Does accounting for shared rater uncertainty change expected scores
+and residual summaries? Calculate the ordinary RSM’s posterior
+predictive quantities, then compare them with the saved extension
+results. Both models use the same observed ratings and selected events.
+The ordinary plug-in indices returned by <code>diagnose_mfrm()</code>
+have a different definition and cannot replace this step.</p>
+<div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a>ordinary_response_review <span class="ot">&lt;-</span> <span class="fu">mfrm_response_diagnostics</span>(ordinary_fit,</span>
+<span id="cb24-2"><a href="#cb24-2" tabindex="-1"></a>  <span class="at">rows =</span> selected_rows, <span class="at">group_by =</span> <span class="st">&quot;Rater&quot;</span>)</span>
+<span id="cb24-3"><a href="#cb24-3" tabindex="-1"></a>model_comparison <span class="ot">&lt;-</span> <span class="fu">compare_mfrm</span>(ordinary_fit, random_fit,</span>
+<span id="cb24-4"><a href="#cb24-4" tabindex="-1"></a>  <span class="at">labels =</span> <span class="fu">c</span>(<span class="st">&quot;Ordinary RSM&quot;</span>, <span class="st">&quot;Shared-rater RSM&quot;</span>),</span>
+<span id="cb24-5"><a href="#cb24-5" tabindex="-1"></a>  <span class="at">response_diagnostics =</span> <span class="fu">list</span>(ordinary_response_review, response_review))</span>
+<span id="cb24-6"><a href="#cb24-6" tabindex="-1"></a>model_comparison<span class="sc">$</span>responses<span class="sc">$</span>measures</span>
+<span id="cb24-7"><a href="#cb24-7" tabindex="-1"></a><span class="fu">plot</span>(model_comparison, <span class="at">metric =</span> <span class="st">&quot;infit&quot;</span>, <span class="at">style =</span> <span class="st">&quot;difference&quot;</span>)</span></code></pre></div>
+<p>These differences are descriptive and hold each model’s calibration
+fixed. The zero line means the summaries agree. A smaller Infit does
+<strong>not</strong> show that the model is better or the rater is more
+accurate: these predictions reuse the observations being checked, and
+their mean squares have no established reference value of one. The
+selected Person’s ratings alone contribute to these group summaries,
+while all observed Persons inform the shared-rater posterior.</p>
+<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" tabindex="-1"></a><span class="fu">as_ggplot</span>(model_comparison, <span class="at">metric =</span> <span class="st">&quot;probability&quot;</span>, <span class="at">show_labels =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb25-2"><a href="#cb25-2" tabindex="-1"></a>  <span class="at">palette =</span> <span class="st">&quot;mono&quot;</span>, <span class="at">show_title =</span> <span class="cn">FALSE</span>, <span class="at">show_notes =</span> <span class="cn">FALSE</span>)</span></code></pre></div>
+<p>Use <code>metric = &quot;expected_score&quot;</code>, <code>&quot;variance&quot;</code>
+or <code>&quot;outfit&quot;</code> to change the quantity, and
+<code>category = 4</code> with <code>metric = &quot;probability&quot;</code> to
+focus on one score. Expected scores remain on the original scale;
+variances are in squared score units. <code>responses$rows</code>
+retains both original row numbers and <code>responses$events</code>
+identifies each matched rating. Repeated events retain their
+multiplicity. If one prediction is unavailable, its difference remains
+missing with a reason. Group summaries never silently discard an
+unresolved observed row. Row numbers can differ between fits; matching
+uses event contents.</p>
+<p>The report below saves these comparisons and supports
+<code>plot(res, type = &quot;response_comparison&quot;, metric = &quot;infit&quot;)</code>.
+To collect the ordinary model’s summaries separately without running its
+plug-in diagnostics, use
+<code>mfrm_results(ordinary_fit, response_diagnostics = ordinary_response_review, compute = &quot;never&quot;)</code>.
+Plotting, collecting and exporting saved comparisons performs no new
+integration.</p>
+</div>
+<div id="compare-person-scores-and-inspect-model-aware-maps" class="section level2">
+<h2>Compare Person scores and inspect model-aware maps</h2>
+<p>How do individual scores change when the model accounts for shared
+raters? Use conditional scores computed from the same complete source
+roster. Selecting returned Persons does not remove the other observed
+responses. The ordinary model’s scoring retains its fitted normal mean
+and variance.</p>
+<div class="sourceCode" id="cb26"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" tabindex="-1"></a>source_scores <span class="ot">&lt;-</span> person_scores <span class="co"># Already scored from the complete roster</span></span>
+<span id="cb26-2"><a href="#cb26-2" tabindex="-1"></a>ordinary_person_scores <span class="ot">&lt;-</span> <span class="fu">score_mfrm_persons</span>(ordinary_fit,</span>
+<span id="cb26-3"><a href="#cb26-3" tabindex="-1"></a>  <span class="at">persons =</span> source_scores<span class="sc">$</span>table<span class="sc">$</span>Person)</span>
+<span id="cb26-4"><a href="#cb26-4" tabindex="-1"></a>model_comparison <span class="ot">&lt;-</span> <span class="fu">compare_mfrm</span>(ordinary_fit, random_fit,</span>
+<span id="cb26-5"><a href="#cb26-5" tabindex="-1"></a>  <span class="at">response_diagnostics =</span> <span class="fu">list</span>(ordinary_response_review, response_review),</span>
+<span id="cb26-6"><a href="#cb26-6" tabindex="-1"></a>  <span class="at">person_scores =</span> <span class="fu">list</span>(ordinary_person_scores, source_scores))</span>
+<span id="cb26-7"><a href="#cb26-7" tabindex="-1"></a>model_comparison<span class="sc">$</span>persons<span class="sc">$</span>table</span>
+<span id="cb26-8"><a href="#cb26-8" tabindex="-1"></a><span class="fu">plot</span>(model_comparison, <span class="at">metric =</span> <span class="st">&quot;person&quot;</span>, <span class="at">style =</span> <span class="st">&quot;difference&quot;</span>, <span class="at">show_labels =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+<p>The comparison subtracts each model’s fitted population mean to
+remove its arbitrary origin; it preserves the Rasch logit unit. It
+retains raw scores, origins, posterior SDs and conditional endpoints.
+Shrinkage and population variance can still differ. Separate score
+intervals do not constitute an interval for their difference, a ranking
+of models or a test between Persons. Prior-only and unavailable
+differences remain withheld.</p>
+<div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" tabindex="-1"></a>map_results <span class="ot">&lt;-</span> <span class="fu">mfrm_results</span>(random_fit, <span class="at">scores =</span> source_scores,</span>
+<span id="cb27-2"><a href="#cb27-2" tabindex="-1"></a>  <span class="at">response_diagnostics =</span> response_review, <span class="at">comparison =</span> model_comparison)</span>
+<span id="cb27-3"><a href="#cb27-3" tabindex="-1"></a><span class="fu">plot</span>(map_results, <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>, <span class="at">show_labels =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+<p>The Person column shows the selected source EAPs. Facet positions
+equal the severity coefficient plus the <strong>mean step
+location</strong>: the average adjacent category boundary when other
+effects are zero. The category column shows each step at that zero
+reference. The rater column uses observed-rater conditional modes. It
+does not show replacement-rater marginal predictions. These positions
+are conditional references, not posterior-averaged category crossings. A
+higher reference location means more ability is needed to cross the
+corresponding boundary. Adding several plotted facet locations together
+would count the mean step more than once; use the model equation for a
+specific rating profile.</p>
+<p>Whiskers show only Person intervals conditional on calibration.
+Translating an ordinary facet interval by the step mean would omit the
+covariance and uncertainty of that mean, so no such composite interval
+is drawn. The separate calibration/rater plots retain their original
+uncertainty targets.</p>
+<div class="sourceCode" id="cb28"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" tabindex="-1"></a><span class="fu">as_ggplot</span>(<span class="fu">plot</span>(map_results, <span class="at">type =</span> <span class="st">&quot;fit_pathway&quot;</span>, <span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span>,</span>
+<span id="cb28-2"><a href="#cb28-2" tabindex="-1"></a>  <span class="at">palette =</span> <span class="st">&quot;mono&quot;</span>, <span class="at">show_title =</span> <span class="cn">FALSE</span>, <span class="at">draw =</span> <span class="cn">FALSE</span>))</span></code></pre></div>
+<p>This pathway connects position with the previously defined
+<strong>descriptive</strong> posterior residual index. Here they
+describe only the selected Person’s ratings, although all 768 observed
+source ratings inform the shared-rater posterior. Use
+<code>fit_stat = &quot;Outfit&quot;</code> to change the horizontal index. A large
+or small value is a prompt to inspect the selected data, not a
+rater-quality classification. No ordinary fit cutoff, ZSTD or automatic
+exclusion is supplied.</p>
+<p>Use <code>facet</code>, <code>persons</code>,
+<code>show_steps</code>, <code>show_intervals</code> and
+<code>show_labels</code> to select the display.
+<code>show_title = FALSE</code> and <code>show_notes = FALSE</code> hide
+annotations while retaining their meaning in <code>plot_data()</code>.
+Shapes accompany colour; <code>palette = &quot;mono&quot;</code> supports
+grayscale output. Tables retain unavailable rows and
+original/transformed coordinates. Older saved testlet scores lacking a
+complete <code>scoring_data</code> roster must be regenerated from the
+saved fit before these maps or score comparisons; no refit is needed.
+See <code>?mfrmr_model_maps</code>.</p>
+</div>
+<div id="save-the-complete-analysis" class="section level2">
+<h2>Save the complete analysis</h2>
+<p>Use the common reporting route to keep calibration, observed-rater
+estimates, numerical checks and interval meanings together. Attach
+existing predictions and bootstrap intervals explicitly; reporting does
+not run them automatically.</p>
+<div class="sourceCode" id="cb29"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" tabindex="-1"></a>res <span class="ot">&lt;-</span> <span class="fu">mfrm_results</span>(random_fit, <span class="at">predictions =</span> p_new, <span class="at">scores =</span> person_scores,</span>
+<span id="cb29-2"><a href="#cb29-2" tabindex="-1"></a>                    <span class="at">intervals =</span> bootstrap_intervals, <span class="at">comparison =</span> model_comparison,</span>
+<span id="cb29-3"><a href="#cb29-3" tabindex="-1"></a>                    <span class="at">diagnostics =</span> response_review)</span>
+<span id="cb29-4"><a href="#cb29-4" tabindex="-1"></a>res<span class="sc">$</span>tables<span class="sc">$</span>interval_basis</span>
+<span id="cb29-5"><a href="#cb29-5" tabindex="-1"></a>res<span class="sc">$</span>tables<span class="sc">$</span>person_scores</span>
+<span id="cb29-6"><a href="#cb29-6" tabindex="-1"></a>res<span class="sc">$</span>tables<span class="sc">$</span>bootstrap_availability</span>
+<span id="cb29-7"><a href="#cb29-7" tabindex="-1"></a>res<span class="sc">$</span>tables<span class="sc">$</span>comparison_effects</span>
+<span id="cb29-8"><a href="#cb29-8" tabindex="-1"></a>report <span class="ot">&lt;-</span> <span class="fu">mfrm_report</span>(res)</span>
+<span id="cb29-9"><a href="#cb29-9" tabindex="-1"></a><span class="fu">summary</span>(report, <span class="at">view =</span> <span class="st">&quot;reader&quot;</span>)</span>
+<span id="cb29-10"><a href="#cb29-10" tabindex="-1"></a>archive_dir <span class="ot">&lt;-</span> <span class="fu">tempfile</span>(<span class="st">&quot;random-rater-report-&quot;</span>)</span>
+<span id="cb29-11"><a href="#cb29-11" tabindex="-1"></a>archive <span class="ot">&lt;-</span> <span class="fu">export_mfrm_results</span>(res, archive_dir, <span class="at">preset =</span> <span class="st">&quot;starter&quot;</span>,</span>
+<span id="cb29-12"><a href="#cb29-12" tabindex="-1"></a>  <span class="at">acknowledge_sensitive =</span> <span class="cn">TRUE</span>) <span class="co"># Synthetic example; real exports retain IDs</span></span>
+<span id="cb29-13"><a href="#cb29-13" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">nrow</span>(archive<span class="sc">$</span>plot_errors) <span class="sc">==</span> <span class="dv">0</span>)</span>
+<span id="cb29-14"><a href="#cb29-14" tabindex="-1"></a>restored_results <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="fu">file.path</span>(archive_dir, <span class="st">&quot;mfrmr_results_results.rds&quot;</span>))</span>
+<span id="cb29-15"><a href="#cb29-15" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">identical</span>(restored_results<span class="sc">$</span>tables<span class="sc">$</span>bootstrap_trials,</span>
+<span id="cb29-16"><a href="#cb29-16" tabindex="-1"></a>                    bootstrap_intervals<span class="sc">$</span>trials))</span></code></pre></div>
+<p>The archive’s <code>index.html</code> links to the report and
+available severity plots. Bootstrap limits that extend to infinity stay
+infinite in the tables and are shown with arrows in the plot. Failed or
+unresolved refits remain in the trial table. The replay script reloads
+the RDS; run it from the archive folder. Numerical convergence is not
+evidence of model adequacy or interval coverage. Ordinary residual
+diagnostics and the Shiny viewer are unavailable. The model-aware Wright
+and fit-pathway routes above have their own conditional interpretation.
+Older predictions without matching source metadata must be regenerated
+from their saved fit before attachment; neither refitting nor a new
+bootstrap is needed. The separately calculated population-SD profile
+below remains in the complete saved analysis; it is not the
+observed-rater <code>intervals</code> argument.</p>
+<div class="sourceCode" id="cb30"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" tabindex="-1"></a>path <span class="ot">&lt;-</span> <span class="fu">tempfile</span>(<span class="at">fileext =</span> <span class="st">&quot;.rds&quot;</span>)</span>
+<span id="cb30-2"><a href="#cb30-2" tabindex="-1"></a><span class="fu">saveRDS</span>(<span class="fu">list</span>(<span class="at">ratings =</span> ratings, <span class="at">fit =</span> random_fit, <span class="at">population_interval =</span> sd_interval,</span>
+<span id="cb30-3"><a href="#cb30-3" tabindex="-1"></a>             <span class="at">person_scores =</span> person_scores, <span class="at">rater_intervals =</span> bootstrap_intervals,</span>
+<span id="cb30-4"><a href="#cb30-4" tabindex="-1"></a>             <span class="at">observed =</span> p_observed, <span class="at">replacement =</span> p_new), path)</span>
+<span id="cb30-5"><a href="#cb30-5" tabindex="-1"></a>saved <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(path)</span>
+<span id="cb30-6"><a href="#cb30-6" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">identical</span>(<span class="fu">predict</span>(saved<span class="sc">$</span>fit, replacement, <span class="st">&quot;Ability&quot;</span>, <span class="at">rater =</span> <span class="st">&quot;new&quot;</span>), p_new))</span>
+<span id="cb30-7"><a href="#cb30-7" tabindex="-1"></a><span class="fu">plot_data</span>(<span class="fu">plot</span>(saved<span class="sc">$</span>fit, <span class="at">draw =</span> <span class="cn">FALSE</span>))<span class="sc">$</span>table</span></code></pre></div>
+<p>Retain the model, source data, checks, prediction inputs and
+separately computed profile interval together. Earlier fixed-rater fits
+must be refitted for this model; changing their class or plotting method
+does not turn them into random-rater analyses.</p>
+</div>
+<div id="compare-with-a-fixed-rater-analysis" class="section level2">
+<h2>Compare with a fixed-rater analysis</h2>
+<p>Keep the same observed events, categories, criterion effects and
+ability population. Examine how rater contrasts and predictions at
+common ability values change. A fixed-rater fit centers the observed
+panel, whereas the random-rater fit refers to its assumed population;
+raw severity estimates can therefore have different origins. Shrinkage
+toward zero is not itself evidence that the random model is more
+accurate.</p>
+<p>Setting <code>rater_sd = 0</code> removes all rater differences. It
+does not recover a model with freely estimated fixed rater effects.
+After integrating shared raters, persons remain dependent through those
+raters, so the ordinary Person-count BIC and chi-squared
+likelihood-ratio rules cannot be transferred automatically.
+<code>compare_mfrm()</code> checks matched events and compares centered
+facet effects from one ordinary and one extended fit. Its paired and
+difference views describe changed fitted effects; they do not rank
+models or compare predictive accuracy. For predictive evaluation, first
+decide whether the target is another person, an existing rater or a new
+rater; arbitrary splits of individual rating rows can retain shared
+effects across training and evaluation.</p>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

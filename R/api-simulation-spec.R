@@ -29,7 +29,7 @@
 #' @param step_facet Step facet used when `model = "PCM"` and threshold values
 #'   vary across levels.
 #' @param slope_facet Slope facet used when `model = "GPCM"`. The current
-#'   bounded `GPCM` branch requires `slope_facet == step_facet`.
+#'   `GPCM` branch requires `slope_facet == step_facet`.
 #' @param slopes Optional slope specification for `model = "GPCM"`. Use either
 #'   a numeric vector aligned to the generated slope-facet levels or a data
 #'   frame with columns `SlopeFacet` and `Estimate`. Supplied slopes are treated
@@ -71,6 +71,10 @@
 #'   are also accepted. `TemplatePersonReuse = TRUE` asks
 #'   [simulate_mfrm_data()] to keep the template-person order instead of
 #'   resampling templates, which is used by [build_peer_review_sim_spec()].
+#'   This flag must be uniform across the skeleton. Every row is retained,
+#'   including repeated Person-by-facet cells. Each generates a separate
+#'   conditionally independent response; `Weight` is carried into fitting and
+#'   does not multiply the number of generated responses.
 #' @param sparse_controls Optional named list used when
 #'   `assignment = "sparse_linked"`. Supported entries are `link_fraction`
 #'   (default `0.1`), `link_persons` (overrides `link_fraction`),
@@ -94,7 +98,22 @@
 #'   `population_formula`. Numeric/logical and categorical factor/character
 #'   variables are expanded through the same `stats::model.matrix()` contract
 #'   used by latent-regression fitting. During simulation, template rows are
-#'   resampled to the requested `n_person`.
+#'   resampled with replacement to the requested `n_person`. Transformations
+#'   such as `scale()`, `poly()` and splines retain the basis learned from the
+#'   full template; they are not recomputed for each simulated sample. Stored
+#'   factor levels and contrasts also carry through the study runners' refits.
+#'   A resampled cohort can still have a rank-deficient design and fail fitting;
+#'   that trial remains a failure rather than being redrawn until it succeeds.
+#' @param population_assignment How an active population model is associated
+#'   with `"resampled"` or `"skeleton"` assignments. The default `"matched"`
+#'   draws one template Person jointly for covariates and assignments. Both
+#'   tables must cover the same `TemplatePerson` IDs, with matching `Group`
+#'   labels if present in both. `"independent"` samples covariate rows separately
+#'   and intentionally breaks these associations. In that case both tables
+#'   cannot define `Group`; rename a covariate if it represents a different
+#'   grouping. For other assignment designs this setting has no effect.
+#'   Population-template `Group`, when present, supplies the response group;
+#'   `group_levels` must include all template labels and does not rebalance them.
 #'
 #' @details
 #' `build_mfrm_sim_spec()` creates an explicit, portable simulation
@@ -107,7 +126,7 @@
 #' - latent spread assumptions (`theta_sd`, `rater_sd`, `criterion_sd`)
 #' - optional empirical latent support values for semi-parametric simulation
 #' - threshold structure (`threshold_table`)
-#' - optional discrimination structure for bounded `GPCM` (`slope_table`) and
+#' - optional discrimination structure for `GPCM` (`slope_table`) and
 #'   its identified log-slope spread label (`slope_regime`)
 #' - assignment design (`assignment`)
 #' - optional sparse linked-design controls (`sparse_controls`) when
@@ -188,7 +207,9 @@
 #' @return An object of class `mfrm_sim_spec`.
 #' @seealso [extract_mfrm_sim_spec()], [simulate_mfrm_data()]
 #' @examples
-#' \donttest{
+#' # Supplementary workflow: run explicitly to keep routine checks brief.
+#' # example("build_mfrm_sim_spec", run.dontrun = TRUE)
+#' \dontrun{
 #' spec <- build_mfrm_sim_spec(
 #'   design = list(person = 8, rater = 2, criterion = 2, assignment = 1),
 #'   assignment = "rotating"
@@ -229,10 +250,12 @@ build_mfrm_sim_spec <- function(n_person = 50,
                                 population_formula = NULL,
                                 population_coefficients = NULL,
                                 population_sigma2 = NULL,
-                                population_covariates = NULL) {
+                                population_covariates = NULL,
+                                population_assignment = c("matched", "independent")) {
   model <- match.arg(toupper(as.character(model[1])), c("RSM", "PCM", "GPCM"))
   assignment <- match.arg(tolower(as.character(assignment[1])), c("crossed", "rotating", "sparse_linked", "resampled", "skeleton"))
   latent_distribution <- match.arg(tolower(as.character(latent_distribution[1])), c("normal", "empirical"))
+  population_assignment <- match.arg(population_assignment)
 
   facet_names <- simulation_validate_output_facet_names(facet_names)
   supplied_counts <- intersect(
@@ -386,11 +409,13 @@ build_mfrm_sim_spec <- function(n_person = 50,
       dif_effects = dif_effects,
       interaction_effects = interaction_effects,
       population = population,
+      population_assignment = population_assignment,
       planning_scope = NULL,
       planning_constraints = NULL,
       planning_schema = NULL,
       source = "manual"
     )
+  simulation_person_template_plan(spec)
   spec$planning_scope <- simulation_planning_scope(structure(spec, class = "mfrm_sim_spec"))
   spec$planning_constraints <- simulation_planning_constraints(structure(spec, class = "mfrm_sim_spec"))
   spec$planning_schema <- simulation_planning_schema(structure(spec, class = "mfrm_sim_spec"))
@@ -593,7 +618,6 @@ peer_review_build_design_skeleton <- function(n_submission,
 #' @seealso [simulate_mfrm_data()], [build_mfrm_network_review()],
 #'   [build_mfrm_sim_spec()]
 #' @examples
-#' \donttest{
 #' peer_spec <- build_peer_review_sim_spec(
 #'   n_submission = 12,
 #'   n_criterion = 3,
@@ -601,7 +625,6 @@ peer_review_build_design_skeleton <- function(n_submission,
 #'   anchor_submissions = 2
 #' )
 #' peer_spec$peer_review$overview
-#' }
 #' @export
 build_peer_review_sim_spec <- function(n_submission = 50,
                                        n_criterion = 4,
@@ -771,6 +794,7 @@ build_peer_review_sim_spec <- function(n_submission = 50,
 #'   person column recorded in `fit`.
 #' @param group Optional group column name in `source_data` to merge into the
 #'   returned `design_skeleton` as person-level metadata.
+#' @inheritParams build_mfrm_sim_spec
 #'
 #' @details
 #' `extract_mfrm_sim_spec()` uses a fitted model as a practical starting point
@@ -791,15 +815,28 @@ build_peer_review_sim_spec <- function(n_submission = 50,
 #' claim that the fitted object perfectly recovers the true data-generating
 #' mechanism. Users should review and, if necessary, edit the returned
 #' specification before using it for design planning.
+#' Observed skeleton rows retain repeated rating occasions. Remove accidental
+#' duplicate source rows before fitting; the generator cannot distinguish them
+#' from intentional repeated ratings. Covariates and assignment templates are
+#' linked by `TemplatePerson` under `population_assignment = "matched"`.
 #'
-#' Bounded `GPCM` fits are supported here for direct data generation
+#' Without an active population regression, `theta_sd` is the empirical SD of
+#' the reported Person estimates, including any shrinkage in those estimates.
+#' It is not an estimate of the latent population SD corrected for measurement
+#' error. The empirical option resamples centered estimates independently of
+#' their original IDs; it is not a draw from the source posterior. With an
+#' active population model, its coefficients, residual variance and fitted
+#' transformation basis replace this Person-spread approximation. Neither
+#' route propagates uncertainty in the source fit's generating parameters.
+#'
+#' `GPCM` fits with the same slope and step owner are supported here for direct data generation
 #' and parameter-recovery checks, provided that the returned simulation
 #' specification stores both a threshold table and a parallel slope table.
 #' The same fit-derived specification can feed caveated role-based design
 #' evaluation, population forecasting, and fit-based report/export bundles.
 #' Diagnostic and signal-detection design screening is available with explicit
 #' caveats. Full FACETS score-side contract review, posterior predictive checks,
-#' and MCMC estimation are not available for bounded `GPCM`.
+#' and MCMC estimation are not available for `GPCM`.
 #'
 #' If you want to carry person-level group labels into a fit-derived observed
 #' response skeleton, provide the original `source_data` together with
@@ -814,7 +851,6 @@ build_peer_review_sim_spec <- function(n_submission = 50,
 #' @return An object of class `mfrm_sim_spec`.
 #' @seealso [build_mfrm_sim_spec()], [simulate_mfrm_data()]
 #' @examples
-#' \donttest{
 #' toy <- simulate_mfrm_data(
 #'   n_person = 8,
 #'   n_rater = 3,
@@ -826,25 +862,31 @@ build_peer_review_sim_spec <- function(n_submission = 50,
 #' spec$assignment
 #' spec$model
 #' head(spec$threshold_table)
-#' }
 #' @export
 extract_mfrm_sim_spec <- function(fit,
                                   assignment = c("auto", "crossed", "rotating", "resampled", "skeleton"),
                                   latent_distribution = c("normal", "empirical"),
                                   source_data = NULL,
                                   person = NULL,
-                                  group = NULL) {
+                                  group = NULL,
+                                  population_assignment = c("matched", "independent")) {
+  stop_if_product_slopes(fit, "extract_mfrm_sim_spec()")
   if (!inherits(fit, "mfrm_fit")) {
     stop("`fit` must be output from fit_mfrm().", call. = FALSE)
   }
 
   assignment <- match.arg(tolower(as.character(assignment[1])), c("auto", "crossed", "rotating", "resampled", "skeleton"))
   latent_distribution <- match.arg(tolower(as.character(latent_distribution[1])), c("normal", "empirical"))
+  population_assignment <- match.arg(population_assignment)
   prep <- fit$prep %||% NULL
   if (is.null(prep) || is.null(prep$data) || !is.data.frame(prep$data)) {
     stop("`fit` does not contain the prepared data needed to derive a simulation specification.", call. = FALSE)
   }
   fit_model <- as.character(fit$summary$Model[1] %||% fit$config$model %||% "RSM")
+  if (identical(fit_model, "GPCM") &&
+      !identical(fit$config$slope_facet, fit$config$step_facet)) {
+    stop("extract_mfrm_sim_spec() currently requires `slope_facet == step_facet`; use bootstrap_mfrm_gpcm() for same-design parametric resampling of a separate-owner MML fit.", call. = FALSE)
+  }
 
   facet_names <- as.character(fit$config$facet_names %||% setdiff(names(prep$levels), "Person"))
   facet_names <- facet_names[!is.na(facet_names) & nzchar(facet_names)]
@@ -882,7 +924,6 @@ extract_mfrm_sim_spec <- function(fit,
   if (keep_weight) design_keep <- c(design_keep, "Weight")
   design_skeleton <- prep$data |>
     dplyr::select(dplyr::all_of(design_keep)) |>
-    dplyr::distinct() |>
     dplyr::transmute(
       TemplatePerson = as.character(.data$Person),
       Rater = as.character(.data[[assignment_facet]]),
@@ -936,11 +977,13 @@ extract_mfrm_sim_spec <- function(fit,
     model = fit_model
   )
   slope_input <- if (identical(fit_model, "GPCM")) {
-    slope_match <- match(criterion_levels, slopes$SlopeFacet)
+    slope_owner <- fit$config$slope_facet
+    slope_levels <- as.character(prep$levels[[slope_owner]])
+    slope_match <- match(slope_levels, slopes$SlopeFacet)
     if (anyNA(slope_match)) {
       stop(
         "`extract_mfrm_sim_spec()` could not align fitted `GPCM` slopes to the observed `",
-        criterion_facet,
+        slope_owner,
         "` levels.",
         call. = FALSE
       )
@@ -967,8 +1010,10 @@ extract_mfrm_sim_spec <- function(fit,
     step_facet = simulation_validate_step_facet_name(fit$config$step_facet %||% assignment_facet),
     slope_facet = fit$config$slope_facet %||% NULL,
     slopes = slope_input,
+    facet_names = facet_names,
     assignment = assignment,
     latent_distribution = latent_distribution,
+    population_assignment = population_assignment,
     empirical_person = suppressWarnings(as.numeric(person_tbl$Estimate)),
     empirical_rater = suppressWarnings(as.numeric(other_tbl$Estimate[other_tbl$Facet == assignment_facet])),
     empirical_criterion = suppressWarnings(as.numeric(other_tbl$Estimate[other_tbl$Facet == criterion_facet])),
@@ -999,7 +1044,8 @@ extract_mfrm_sim_spec <- function(fit,
       population_sigma2 = fit_population$sigma2,
       population_covariates = template,
       population_xlevels = fit_population$xlevels,
-      population_contrasts = fit_population$contrasts
+      population_contrasts = fit_population$contrasts,
+      population_terms = prediction_population_terms(fit)
     )
   } else {
     spec$population <- simulation_empty_population_spec()
@@ -1009,8 +1055,19 @@ extract_mfrm_sim_spec <- function(fit,
     observed_raters_per_person = assignment_counts,
     inferred_assignment = inferred_assignment,
     observed_score_values = score_values,
-    facet_names = facet_names
+    facet_names = facet_names,
+    notes = c(
+      if (isTRUE(spec$population$active))
+        "Person generation uses the source population coefficients, residual variance and fitted transformation basis." else
+        "Person spread/support comes from reported estimates, not a measurement-error-corrected population distribution.",
+      "Source generating parameters are treated as fixed; source-fit uncertainty is not propagated.",
+      "Empirical latent effects are resampled independently of their original IDs. An active population model instead links covariates to assignments according to population_assignment."
+    )
   )
+  spec$planning_scope <- simulation_planning_scope(spec)
+  spec$planning_constraints <- simulation_planning_constraints(spec)
+  spec$planning_schema <- simulation_planning_schema(spec)
+  simulation_person_template_plan(spec)
   spec
 }
 
@@ -1221,6 +1278,7 @@ simulation_empty_population_spec <- function() {
   list(
     active = FALSE,
     formula = NULL,
+    terms = NULL,
     coefficients = NULL,
     sigma2 = NULL,
     design_columns = NULL,
@@ -1237,7 +1295,8 @@ simulation_build_population_spec <- function(population_formula = NULL,
                                              population_sigma2 = NULL,
                                              population_covariates = NULL,
                                              population_xlevels = NULL,
-                                             population_contrasts = NULL) {
+                                             population_contrasts = NULL,
+                                             population_terms = NULL) {
   if (is.null(population_formula)) {
     if (!is.null(population_coefficients) || !is.null(population_sigma2) || !is.null(population_covariates)) {
       stop(
@@ -1281,7 +1340,8 @@ simulation_build_population_spec <- function(population_formula = NULL,
     population_policy = "error",
     require_full_rank = TRUE,
     population_xlevels = population_xlevels,
-    population_contrasts = population_contrasts
+    population_contrasts = population_contrasts,
+    population_terms = population_terms
   )
 
   coeff <- suppressWarnings(as.numeric(population_coefficients))
@@ -1315,6 +1375,7 @@ simulation_build_population_spec <- function(population_formula = NULL,
   list(
     active = TRUE,
     formula = scaffold$formula,
+    terms = scaffold$terms,
     coefficients = coeff,
     sigma2 = sigma2,
     design_columns = scaffold$design_columns,
@@ -1324,7 +1385,8 @@ simulation_build_population_spec <- function(population_formula = NULL,
     covariate_template = template,
     notes = c(
       "This simulation specification stores a latent-regression person generator.",
-      "Template person rows are resampled to the requested design size before computing theta = X beta + e."
+      "Template person rows are resampled with replacement before computing theta = X beta + e using the stored transformation basis and contrasts.",
+      "Association with assignment templates follows the specification's population_assignment setting."
     )
   )
 }
@@ -1439,8 +1501,7 @@ simulation_normalize_design_skeleton <- function(design_skeleton,
     ) |>
     dplyr::filter(!is.na(.data$TemplatePerson), nzchar(.data$TemplatePerson),
                   !is.na(.data$Rater), nzchar(.data$Rater),
-                  !is.na(.data$Criterion), nzchar(.data$Criterion)) |>
-    dplyr::distinct()
+                  !is.na(.data$Criterion), nzchar(.data$Criterion))
   if (!keep_group) {
     tbl <- dplyr::select(tbl, -dplyr::all_of("Group"))
   }
@@ -1742,7 +1803,7 @@ simulation_build_slope_table <- function(slopes,
     n_criterion = n_criterion
   )
   if (length(expected_levels) == 0L) {
-    stop("Could not resolve expected slope-facet levels for bounded `GPCM`.", call. = FALSE)
+    stop("Could not resolve expected slope-facet levels for `GPCM`.", call. = FALSE)
   }
 
   normalize_slopes <- function(x) {
@@ -1857,7 +1918,7 @@ simulation_extract_slopes_from_fit <- function(slope_tbl, model) {
   }
   if (!is.data.frame(slope_tbl) || nrow(slope_tbl) == 0) {
     stop(
-      "`extract_mfrm_sim_spec()` requires a non-empty `fit$slopes` table for bounded `GPCM` fits.",
+      "`extract_mfrm_sim_spec()` requires a non-empty `fit$slopes` table for `GPCM` fits.",
       call. = FALSE
     )
   }

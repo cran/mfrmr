@@ -30,7 +30,9 @@ evaluate_mfrm_design(
   sim_spec = NULL,
   seed = NULL,
   progress = interactive(),
-  parallel = c("no", "future")
+  parallel = c("no", "future"),
+  file = NULL,
+  file_refit = c("never", "on_change", "always")
 )
 }
 \arguments{
@@ -69,7 +71,7 @@ variable through both \code{design} and the scalar design-grid arguments.}
 \item{fit_method}{Estimation method passed to \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
 \item{model}{Measurement model passed to \code{\link[=fit_mfrm]{fit_mfrm()}}. \code{RSM} and \code{PCM} use
-the documented Rasch-family design-planning layer. Bounded \code{GPCM} is
+the documented Rasch-family design-planning layer. \code{GPCM} is
 available as a caveated simulation/refit operating-characteristic route.}
 
 \item{step_facet}{Step facet passed to \code{\link[=fit_mfrm]{fit_mfrm()}} when \code{model = "PCM"} or
@@ -81,7 +83,7 @@ When left \code{NULL}, the function inherits the generator step facet from
 \code{model = "GPCM"}. The current bounded branch requires
 \code{slope_facet == step_facet}.}
 
-\item{slopes}{Optional bounded-\code{GPCM} generator slopes used when
+\item{slopes}{Optional \code{GPCM} generator slopes used when
 \code{sim_spec = NULL}. See \code{\link[=build_mfrm_sim_spec]{build_mfrm_sim_spec()}} for accepted formats.}
 
 \item{assignment}{Optional assignment design used when \code{sim_spec = NULL}.
@@ -122,7 +124,22 @@ uses \code{future.apply::future_lapply} and respects whatever
 \code{future::plan()} is currently active. The Suggests package
 \code{future.apply} must be installed for the parallel path to
 activate; otherwise the call falls back to serial execution with a single
-message. Parallel execution applies to replications within each design row.}
+message. A fixed explicit \code{seed} preallocates the same per-cell simulation
+seeds before either route, so serial and future execution receive identical
+stochastic inputs for the same ordered design grid. Parallel dispatch
+applies to replications within each design row; actual worker concurrency
+depends on the active future plan.}
+
+\item{file}{Optional RDS path for saving and reusing the simulation. A missing
+\code{.rds} extension is appended. Its parent directory must already exist.
+\code{NULL} (default) performs no file reads or writes.}
+
+\item{file_refit}{File reuse policy. \code{"never"} (default) loads a matching
+completed result or resumes matching saved trials; incompatible files
+produce an error. \code{"on_change"} restarts when inputs or implementation/
+environment differ. \code{"always"} replaces the file with a new run. Unlike
+\code{brms::brm(file_refit = "never")}, this function checks compatibility even
+under \code{"never"}; it does not silently return a different analysis.}
 }
 \value{
 An object of class \code{mfrm_design_evaluation} with components:
@@ -133,7 +150,15 @@ alongside the standard result columns.
 \item \code{results}: facet-level replicate results, with the same design-variable
 alias columns when applicable.
 \item \code{rep_overview}: run-level status and timing, with the same design-variable
-alias columns when applicable. Failed fits retain the condition class,
+alias columns when applicable. \code{Observations} counts generated rating rows;
+\code{MaxRatingsPerRater} is the largest row count for a single rater-like facet
+level. One row is one person-rater-criterion rating, regardless of \code{Weight}.
+These workload counts are retained even when fitting or diagnostics fail.
+\code{RaterComponents} and \code{CriterionComponents} count connected components
+in each generated Person-facet assignment graph, using the same audit as
+\code{\link[=describe_mfrm_data]{describe_mfrm_data()}}. They refer to the rater-like and criterion-like
+roles even when custom facet names are used, and also survive failures.
+Failed fits retain the condition class,
 failure component, and category-support state/reason codes when available;
 a completely failed design still returns the documented zero-row
 \code{results} schema rather than a zero-column table.
@@ -144,11 +169,13 @@ summaries and plots
 mutable under the current simulation specification
 \item \code{planning_schema}: structured planning metadata bundling the role
 descriptor, scope boundary, and current mutability map
-\item \code{gpcm_boundary}: bounded-\code{GPCM} caveat row when a \code{GPCM} design route is
+\item \code{gpcm_boundary}: \code{GPCM} caveat row when a \code{GPCM} design route is
 used
 \item \code{notes}: short interpretation notes
 \item \code{settings}: simulation settings
 \item \code{ademp}: simulation-study metadata (aims, DGM, estimands, methods, performance measures)
+\item \code{reproducibility}: file identity, original inputs and per-trial seeds when
+\code{file} is supplied.
 }
 }
 \description{
@@ -165,6 +192,23 @@ For each design condition, the function:
 \item computes diagnostics with \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}
 \item stores recovery and precision summaries by facet
 }
+
+Severity recovery compares relative locations after aligning group means
+within each trial. PCM/GPCM generating step means are absorbed into the
+owning facet truth before comparison, consistently with the fitted
+identification. \code{MeanSeverityRMSE} is the mean of available trial RMSEs,
+with MCSE across trials; it differs from a pooled-row RMSE. \code{SeverityBias}
+averages to zero by construction and cannot demonstrate unbiased individual
+estimates. \code{RecoveryAvailableReps} counts finite trial recovery metrics;
+review it alongside all-trial convergence and failures.
+
+Older PCM/GPCM results without this truth-coordinate review retain their
+historical tables. New summaries and recommendations withhold their recovery
+metrics with \code{RecoveryBasis = "legacy_step_location_truth_unverified"}.
+Re-summarizing cannot reconstruct the missing trial-level truth/estimates;
+rerun in a new file for corrected recovery, preserving the old evidence.
+Other saved diagnostics remain available. Numerical agreement and successful
+examples do not establish finite-sample performance or population forecasting.
 
 The result is intended for planning questions such as:
 \itemize{
@@ -190,6 +234,14 @@ When \code{sim_spec} is supplied, the function uses it as the explicit
 data-generating mechanism. This is the recommended route when you want a
 design study to stay close to a previously fitted run while still varying the
 candidate sample sizes or rater-assignment counts.
+The specification supplies the generator, not the analysis settings:
+explicitly match \code{fit_method}, \code{model}, \code{step_facet}, \code{maxit}, and
+\code{quad_points} to the intended analysis. The defaults (\code{JML}, 25 iterations;
+seven quadrature points if \code{MML} is selected) are small exploratory settings,
+not an accuracy recommendation. This helper does not automatically inherit
+anchors, interactions, adaptive integration, or optimizer controls from a
+source fit. If those are essential to the analysis, generate data with
+\code{\link[=simulate_mfrm_data]{simulate_mfrm_data()}} and use the intended \code{\link[=fit_mfrm]{fit_mfrm()}} call in each replicate.
 
 Sparse linked simulation specifications and direct
 \code{assignment = "sparse_linked"} calls are carried into the design-evaluation
@@ -204,13 +256,13 @@ data and refits the MML population-model branch. This remains a scenario
 study under explicit assumptions; it is not a closed-form predictive
 distribution for one future administration.
 
-Bounded \code{GPCM} design evaluation is available with caveats. It repeatedly
+\code{GPCM} design evaluation is available with caveats. It repeatedly
 generates data from the supplied or fit-derived slope-aware specification,
-refits bounded \code{GPCM}, and summarizes facet-level operating characteristics.
+refits \code{GPCM}, and summarizes facet-level operating characteristics.
 The route remains a role-based person x rater-like x criterion-like planner:
 it does not validate diagnostic-screening or signal-detection rules, does
 not provide a fully arbitrary-facet planner, and does not replace
-\code{\link[=evaluate_mfrm_recovery]{evaluate_mfrm_recovery()}} for slope-recovery adequacy review.
+\code{\link[=simulate_mfrm_recovery]{simulate_mfrm_recovery()}} for slope-recovery adequacy review.
 
 Recovery metrics are reported only when the generator and fitted model target
 the same facet-parameter contract. In practice this means the same
@@ -225,8 +277,9 @@ Facet-level simulation results include:
 \itemize{
 \item \code{Separation} (\eqn{G = \mathrm{SD_{adj}} / \mathrm{RMSE}}):
 how many statistically distinct strata the facet resolves.
-\item \code{Reliability} (\eqn{G^2 / (1 + G^2)}): analogous to Cronbach's
-\eqn{\alpha} for the reproducibility of element ordering.
+\item \code{Reliability} (\eqn{G^2 / (1 + G^2)}): model-based separation reliability
+for the facet levels in that fit, not Cronbach's alpha, a G-theory
+coefficient, or the accuracy of an individual pass/fail decision.
 \item \code{Strata} (\eqn{(4G + 1) / 3}): number of distinguishable groups.
 \item Mean \code{Infit} and \code{Outfit}: average fit mean-squares across elements.
 \item \code{MisfitRate}: share of elements with \eqn{|\mathrm{ZSTD}| > 2}.
@@ -250,22 +303,34 @@ generator/fitted-model contract does not align.
 Start with \code{summary(x)$design_summary}, then plot one focal metric at a time
 (for example rater \code{Separation} or criterion \code{SeverityRMSE}).
 
-Higher separation/reliability is generally better, whereas lower
-\code{SeverityRMSE}, \code{MeanMisfitRate}, and \code{MeanElapsedSec} are preferable.
+Person separation/reliability describes how well the design distinguishes
+persons under the model. High rater separation/reliability instead means
+that severity differences are distinguishable; it does not mean agreement
+or better calibration. Low rater separation can reflect similar severity
+or inadequate precision. Interpret each facet against its purpose rather
+than maximizing every separation coefficient. Recovery RMSE and elapsed
+time concern accuracy and cost; a low misfit-screen rate alone does not
+establish useful detection, since sensitivity and false flags differ.
 
 When choosing among designs, look for the point where increasing
 \code{n_person} or \code{raters_per_person} yields diminishing returns in
-separation and RMSE---this identifies the cost-effective design
-frontier.  \code{ConvergedRuns / reps} should be near 1.0; low
-convergence rates indicate the design is too small for the chosen
-estimation method.
+separation and RMSE, then compare the actual rating workload.
+Inspect failed-run reasons when convergence is low: iteration limits,
+weak identification, sparse categories and model mismatch require different
+remedies. Increasing sample size alone does not resolve every failure.
+Read Monte Carlo errors and available-result counts alongside the means;
+passing thresholds on simulation means is not a guarantee for a future sample.
 
 This is a Monte Carlo design-evaluation helper. It can visualize how
 separation, reliability, strata, RMSE, and fit-screen rates change when
 you vary person, rater, criterion, or assignment counts. For analytic
 generalizability-theory planning, pair observed variance-component review
 from \code{\link[=mfrm_generalizability]{mfrm_generalizability()}} with D-study projections from
-\code{\link[=mfrm_d_study]{mfrm_d_study()}}. Read \code{IdentificationStatus}, \code{GStatus}, and \code{PhiStatus}
+\code{\link[=mfrm_d_study]{mfrm_d_study()}}. The complementary multivariate observed-score route is
+\code{\link[=mfrm_g_study]{mfrm_g_study()}} -> \code{\link[=mfrm_d_study]{mfrm_d_study()}}. See
+\link{mfrmr_workflow_methods} for choosing between simulation and G-theory:
+neither is automatically required by the other, and neither replaces the
+other's estimand. Read \code{IdentificationStatus}, \code{GStatus}, and \code{PhiStatus}
 before using the projected coefficients: boundary or singular mixed-model
 fits are design-identification warnings rather than high-stakes-ready
 reliability evidence.
@@ -290,8 +355,48 @@ reporting}. Psychological Methods.
 }
 }
 
+\section{Saving and resuming simulations}{
+
+Pass the same \code{file} and analysis arguments on a subsequent call to reuse
+the completed result without generation or fitting, or to resume an
+interrupted run. The identity includes generator inputs/specification,
+fitting controls, requested replications, seed, RNG kind, package R code
+and native library fingerprints, relevant numerical/diagnostic R options,
+R/platform, numerical libraries and
+dependency versions. Changing \code{reps} starts a different study; extension of
+an existing study is not supported. \code{progress} and \code{parallel} do not change
+the identity. Cached results retain the settings of their original run.
+
+Recovery runs and serial design evaluations save after every finished
+trial. Future design evaluations save after a whole design row returns;
+an interrupted row may need to run again. A partially completed optimizer
+is not resumed. Fit failures are completed attempts and are saved too;
+resuming does not redraw failures until they succeed. An unexpected error
+outside the recorded fit/diagnostic failure routes stops the call and leaves
+earlier checkpoints available. These files do not change the interpretation
+or eligibility of the underlying estimates and intervals.
+
+Per-trial seeds are allocated before computation and retained even when
+\code{seed = NULL}; an explicit seed is preferable for reproducing a new run in
+another file. Each trial controls generation, fitting and diagnostics with
+its own seed. A matching environment is required for automatic reuse;
+recorded seeds alone do not guarantee identical floating-point results on
+other systems. Keep the analysis script and software environment as well.
+
+After completion, \code{readRDS(file)} returns the usual result object with an
+additional \code{reproducibility} component containing identity, inputs and
+trial seeds. Before completion the file is an internal checkpoint; resume
+through the same public function. Writes use a temporary file in the same
+directory and checked replacement. A \code{.lock} directory prevents concurrent
+writers. Normal returns/errors release it; after process termination, remove
+a remaining lock only after checking that no writer is active. Unreadable
+files are never silently reused or replaced by \code{"on_change"}.
+}
+
 \examples{
-\donttest{
+# Long-running workflow; run explicitly when needed.
+# example("evaluate_mfrm_design", run.dontrun = TRUE)
+\dontrun{
 sim_eval <- suppressWarnings(evaluate_mfrm_design(
   design = list(person = c(8, 12), rater = 2, criterion = 2, assignment = 2),
   reps = 1,

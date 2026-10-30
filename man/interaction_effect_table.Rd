@@ -4,14 +4,22 @@
 \alias{interaction_effect_table}
 \title{Extract model-estimated facet interaction effects}
 \usage{
-interaction_effect_table(fit)
+interaction_effect_table(fit, comparison_review = NULL)
 }
 \arguments{
-\item{fit}{An \code{mfrm_fit} object returned by \code{\link[=fit_mfrm]{fit_mfrm()}}.}
+\item{fit}{An \code{mfrm_fit} or \code{mfrm_comparison_fit} returned by \code{\link[=fit_mfrm]{fit_mfrm()}}.}
+
+\item{comparison_review}{Optional result of \code{\link[=describe_mfrm_data]{describe_mfrm_data()}} with
+\code{comparisons}, or its \verb{$comparison_review} component. Returns the declared
+interaction contrasts from a matching joint fit instead of individual cells.}
 }
 \value{
 A tibble with one row per interaction cell. Returns an empty tibble
-when the fit has no model-estimated facet interactions.
+when the fit has no model-estimated facet interactions. With
+\code{comparison_review}, one row per requested contrast with availability,
+numerical and readiness fields; attributes \code{comparison_review},
+\code{fit_checks} and \code{notes} preserve the prospective question, source
+fingerprint and numerical evidence, and interpretation limits.
 }
 \description{
 \code{interaction_effect_table()} returns the fixed-effect interaction block
@@ -30,8 +38,54 @@ additive model; negative values indicate lower-than-expected scores.
 Use this table for confirmatory model review after specifying the facet pair
 of substantive interest. For exploratory screening without adding parameters
 to the fitted model, use \code{\link[=estimate_bias]{estimate_bias()}} or \code{\link[=estimate_all_bias]{estimate_all_bias()}}.
+
+With \code{comparison_review}, first fit the declared model using the review's
+\code{fit_arguments} and the original ratings. The fit must match the retained
+responses, origins, score coding, model, constraints, facet orientation,
+step owner and population design. Only native, unadjusted RSM/PCM fits
+without shrinkage are supported. The contrast is the declared weighted
+sum of Group1-minus-Group2 interaction effects, in logits. Positive means
+a relative shift toward higher coded scores; it is not an absolute school
+effect or evidence of unfairness. Location and step effects are not added.
+
+This route reevaluates the retained likelihood and full gradient without
+optimization. Objective agreement must be within \code{1e-6} and the gradient
+sup norm within \code{max(1e-4, 10 * reltol)}, matching the ordinary numerical
+stopping tolerance. For MML it also evaluates \code{2 * q + 1} quadrature nodes,
+requiring the finer-grid gradient to meet that tolerance and the absolute
+negative-log-likelihood change per Person to be at most \code{1e-6}.
+These are numerical checks, not statistical precision criteria. A failed
+check retains the row with \code{Estimate = NA} and an explanation; the separate
+\code{OptimizerEstimate} is a diagnostic trace. No refit or partial fit is run.
+
+\code{EstimateStatus = "descriptive_only"} requires full conditional-map rank,
+numerical convergence, current readiness information and no recorded
+blocking condition or boundary exclusion. It does not certify finite-MLE
+existence, global marginal identification or sampling performance. MML
+retains \code{State = "not_evaluated"} for positive conditional ranks even when
+a descriptive fitted contrast is available. \code{BoundaryState},
+\code{FitReadiness}, \code{NumericalState} and \code{QuadratureState} remain separate.
+\code{SE}, \code{Lower}, \code{Upper} remain missing and \code{FormalInferenceEligible} remains
+false. A target-only identified contrast in a rejected full model remains
+unavailable through this route. Save the returned table with \code{saveRDS()}
+to preserve its review and checks without recalculation; CSV retains the
+visible columns but not the attributes.
+
+For a \code{mfrm_comparison_fit} created with \code{fit_scope = "comparisons"}, omit
+\code{comparison_review}: the table already contains the declared targets and
+their partial-fit checks. Extraction does not fit again. See \code{\link[=fit_mfrm]{fit_mfrm()}}
+for its likelihood-preserving parameterization, availability requirements
+and limits. For full RSM/PCM MML fits, \code{\link[=mfrm_facet_intervals]{mfrm_facet_intervals()}} with the same
+\code{comparison_review} separately supplies model-information intervals and
+supported population-SD standardization; extraction here stays descriptive.
+CML comparison fits add conditional-information SEs and pointwise
+95 percent Wald limits for identified targets, with \code{conditional_wald} status;
+unidentified rows remain missing. The ordinary full-fit route above remains unchanged.
 }
 \examples{
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("interaction_effect_table", run.dontrun = TRUE)
+\dontrun{
 toy <- load_mfrmr_data("example_operational")
 fit <- fit_mfrm(
   toy, person = "Person", facets = c("Rater", "Criterion"),
@@ -41,6 +95,11 @@ fit <- fit_mfrm(
 )
 head(interaction_effect_table(fit))
 }
+}
 \seealso{
-\code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=estimate_bias]{estimate_bias()}}, \code{\link[=compare_mfrm]{compare_mfrm()}}
+\code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=describe_mfrm_data]{describe_mfrm_data()}}, \code{\link[=summary.mfrm_fit]{summary.mfrm_fit()}},
+\code{\link[=estimate_bias]{estimate_bias()}}, \code{\link[=compare_mfrm]{compare_mfrm()}}, \link{mfrmr_linking_and_dff}
+
+\code{\link[=mfrm_facet_intervals]{mfrm_facet_intervals()}} with \code{interaction} for supported
+fixed-population RSM/PCM MML cell intervals from full joint information.
 }

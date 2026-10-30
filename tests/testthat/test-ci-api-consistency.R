@@ -12,6 +12,10 @@ local({
     fit_mfrm(.toy, "Person", c("Rater", "Criterion"), "Score",
              method = "JML", maxit = 15)
   ))
+  .equivalence_fit <<- fit_mfrm(
+    .toy, "Person", c("Rater", "Criterion"), "Score", method = "MML", maxit = 150
+  )
+  .equivalence_diag <<- diagnose_mfrm(.equivalence_fit, residual_pca = "none")
   .diag <<- suppressMessages(
     diagnose_mfrm(.fit, residual_pca = "none",
                   diagnostic_mode = "legacy")
@@ -24,7 +28,7 @@ test_that("conf_level emits a lifecycle deprecation warning", {
   old_opt <- options(lifecycle_verbosity = "warning")
   on.exit(options(old_opt), add = TRUE)
   w <- testthat::capture_warnings(
-    analyze_facet_equivalence(.fit, diagnostics = .diag,
+    analyze_facet_equivalence(.equivalence_fit, diagnostics = .equivalence_diag,
                               facet = "Rater", conf_level = 0.9)
   )
   expect_true(any(grepl("conf_level", paste(w, collapse = " "))))
@@ -34,7 +38,7 @@ test_that("ci_level is silent and becomes the active bound", {
   old_opt <- options(lifecycle_verbosity = "warning")
   on.exit(options(old_opt), add = TRUE)
   expect_no_warning(
-    eq <- analyze_facet_equivalence(.fit, diagnostics = .diag,
+    eq <- analyze_facet_equivalence(.equivalence_fit, diagnostics = .equivalence_diag,
                                     facet = "Rater", ci_level = 0.9)
   )
   expect_equal(unname(eq$settings$ci_level), 0.9)
@@ -44,7 +48,7 @@ test_that("supplying both routes honors conf_level and warns", {
   old_opt <- options(lifecycle_verbosity = "warning")
   on.exit(options(old_opt), add = TRUE)
   w <- testthat::capture_warnings(
-    eq <- analyze_facet_equivalence(.fit, diagnostics = .diag,
+    eq <- analyze_facet_equivalence(.equivalence_fit, diagnostics = .equivalence_diag,
                                     facet = "Rater",
                                     ci_level = 0.95, conf_level = 0.8)
   )

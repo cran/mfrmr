@@ -10,8 +10,8 @@ plot_facet_quality_dashboard(
   facet = NULL,
   bias_results = NULL,
   severity_warn = 1,
-  misfit_warn = 1.5,
-  central_tendency_max = 0.25,
+  misfit_warn = NULL,
+  central_tendency_max = NULL,
   bias_count_warn = 1L,
   bias_abs_t_warn = 2,
   bias_abs_size_warn = 0.5,
@@ -22,7 +22,8 @@ plot_facet_quality_dashboard(
   palette = NULL,
   label_angle = 45,
   draw = TRUE,
-  ...
+  ...,
+  title = NULL
 )
 }
 \arguments{
@@ -39,8 +40,10 @@ outliers.}
 
 \item{misfit_warn}{Mean-square cutoff used to flag misfit.}
 
-\item{central_tendency_max}{Absolute estimate cutoff used to flag central
-tendency.}
+\item{central_tendency_max}{Legacy opt-in absolute estimate cutoff for
+marking facet estimates near the fitted origin. Default \code{NULL}; use
+\code{\link[=data_quality_report]{data_quality_report()}} for observed category-use screening or
+\code{\link[=rater_centrality_table]{rater_centrality_table()}} for indirect centrality indices.}
 
 \item{bias_count_warn}{Minimum flagged-bias row count required to flag a
 level.}
@@ -58,7 +61,9 @@ from a raw bias bundle.}
 
 \item{top_n}{Number of rows to keep in the plot data.}
 
-\item{main}{Optional plot title.}
+\item{main}{Compatibility title argument. Omitted or \code{NULL} keeps the default
+title. Existing calls remain supported without a deprecation warning.
+For new code, prefer \code{title}; do not supply both arguments.}
 
 \item{palette}{Optional named color overrides.}
 
@@ -67,6 +72,13 @@ from a raw bias bundle.}
 \item{draw}{If \code{TRUE}, draw with base graphics.}
 
 \item{...}{Reserved for generic compatibility.}
+
+\item{title}{Plot title. Omit it to keep the default, supply one character
+string to replace it, or use \code{NULL} (or \code{""}) to suppress it. This changes
+only the heading; numerical results, reference lines, subtitles and
+interpretation notes remain. Both \code{main} and \code{title} explicitly supplied
+is an error, even if equal or \code{NULL}. Positional legacy arguments retain
+their order; use the exact name \code{title}.}
 }
 \value{
 A plotting-data object of class \code{mfrm_plot_data}.
@@ -74,15 +86,33 @@ A plotting-data object of class \code{mfrm_plot_data}.
 \description{
 Plot a facet-quality dashboard
 }
+\details{
+When \code{x} is a dashboard, its stored screening settings define both
+flags and plot guides; threshold arguments apply only when \code{x} is a fit.
+Returned plot data retain those settings, interpretation notes and fit
+readiness. Restricted or older dashboards without readiness are labeled
+\verb{REVIEW ONLY}. Zero observed flags is not a complete diagnostic pass.
+}
+\section{Migration in 0.2.4}{
+
+This renderer is internal. Use the corresponding \code{plot()} route in
+\link{mfrmr_plot_migration}; the former exported name is no longer available.
+}
+
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
-diag <- diagnose_mfrm(fit, residual_pca = "none")
-p <- plot_facet_quality_dashboard(fit, diagnostics = diag, draw = FALSE)
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("plot_facet_quality_dashboard", run.dontrun = TRUE)
+\dontrun{
+# Saved synthetic JML/RSM analysis of example_core.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "core-jml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+diag <- example_fit$diagnostics
+p <- plot(fit, type = "facet_dashboard", diagnostics = diag, draw = FALSE)
 p$data$plot
 }
 }
 \seealso{
 \code{\link[=facet_quality_dashboard]{facet_quality_dashboard()}}, \code{\link[=summary.mfrm_facet_dashboard]{summary.mfrm_facet_dashboard()}}
 }
+\keyword{internal}

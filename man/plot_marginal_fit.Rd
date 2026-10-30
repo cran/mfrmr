@@ -14,7 +14,8 @@ plot_marginal_fit(
   palette = NULL,
   label_angle = 45,
   preset = c("standard", "publication", "compact", "monochrome"),
-  draw = TRUE
+  draw = TRUE,
+  title = NULL
 )
 }
 \arguments{
@@ -30,7 +31,9 @@ plot_marginal_fit(
 When \code{NULL}, the plot uses the mixed top-cell table returned by the strict
 marginal screen.}
 
-\item{main}{Optional custom plot title.}
+\item{main}{Compatibility title argument. Omitted or \code{NULL} keeps the default
+title. Existing calls remain supported without a deprecation warning.
+For new code, prefer \code{title}; do not supply both arguments.}
 
 \item{palette}{Optional named color overrides. Recognized names:
 \code{positive}, \code{negative}, \code{flag}.}
@@ -41,6 +44,13 @@ marginal screen.}
 or \code{"monochrome"}).}
 
 \item{draw}{If \code{TRUE}, draw with base graphics.}
+
+\item{title}{Plot title. Omit it to keep the default, supply one character
+string to replace it, or use \code{NULL} (or \code{""}) to suppress it. This changes
+only the heading; numerical results, reference lines, subtitles and
+interpretation notes remain. Both \code{main} and \code{title} explicitly supplied
+is an error, even if equal or \code{NULL}. Positional legacy arguments retain
+their order; use the exact name \code{title}.}
 }
 \value{
 A plotting-data object of class \code{mfrm_plot_data}.
@@ -55,7 +65,11 @@ This helper visualizes the largest first-order strict marginal-fit cells from
 
 The \code{"std_residual"} view ranks cells by the absolute standardized residual
 from posterior-integrated expected category counts. The \code{"prop_diff"} view
-ranks the same cells by the signed observed-minus-expected proportion gap.
+ranks cells by the absolute observed-minus-expected proportion gap and plots
+their signed gaps. Both views apply the facet filter before ranking all cells.
+The returned \code{full_table} retains all candidate rows; \code{retention} records
+available/unavailable values for the selected metric. Undefined values are
+not zero residuals, and grey bars/labels indicate unavailable values or flags.
 
 Use this plot after \code{summary(diagnostics)} indicates strict marginal flags.
 The display is exploratory: it highlights which facet/category cells deserve
@@ -78,7 +92,7 @@ marginal usage.
 \enumerate{
 \item Fit with \code{\link[=fit_mfrm]{fit_mfrm()}} using \code{method = "MML"} for \code{RSM} / \code{PCM}.
 \item Run \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} with \code{diagnostic_mode = "both"}.
-\item Use \code{plot_marginal_fit()} to inspect the largest strict marginal cells.
+\item Use \code{plot()} to inspect the largest strict marginal cells.
 \item Follow up with \code{\link[=rating_scale_table]{rating_scale_table()}} or substantive design review.
 }
 }
@@ -90,32 +104,64 @@ For a plot-selection guide and a longer walkthrough, see
 \code{vignette("mfrmr-visual-diagnostics", package = "mfrmr")}.
 }
 
+\section{Migration in 0.2.4}{
+
+This renderer is internal. Use the corresponding \code{plot()} route in
+\link{mfrmr_plot_migration}; the former exported name is no longer available.
+}
+
+\section{Session plot defaults}{
+
+Set \code{options(mfrmr.plot_preset = "publication")} to choose a session default
+for plotting functions that expose the common \code{preset} argument. The
+supported values are \code{"standard"}, \code{"publication"}, \code{"compact"} and
+\code{"monochrome"}. Precedence is an explicit call argument, then the session
+option, then \code{"standard"}. For example, \code{preset = "standard"} overrides
+a session set to \code{"monochrome"}. Explicit \code{preset = NULL} retains the
+earlier package-default behavior; it does not read the session option.
+Invalid session values cause an error only when that option is needed.
+
+The category-curve, data-quality, fit-review, connectivity and network
+routes of \code{plot()} for report bundles use the same option through \code{...}.
+Plots without a common \code{preset} argument, including extended-model plots
+with their own \code{palette} controls, keep their own settings. This option
+selects a preset, not a universal theme or a guarantee that all renderers
+implement every appearance control identically.
+
+New plot payloads retain the resolved preset for supported saved-data
+rendering. Converting an existing payload with \code{\link[=as_ggplot]{as_ggplot()}} uses its saved
+appearance, even after the session option changes. A call that creates a
+new plot from a fit or statistical result uses the current default.
+For a reproducible script, supply \code{preset} explicitly or set the option in
+that script. Saving only the fitted model does not save a session option.
+No global ggplot theme is changed.
+
+Restore previous settings with \code{old <- options(mfrmr.plot_preset = "monochrome")} followed by \code{options(old)}. Use
+\code{options(mfrmr.plot_preset = NULL)} to remove the option. The preset changes
+appearance, not estimates, confidence levels or diagnostic thresholds.
+}
+
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(
-  toy,
-  "Person",
-  c("Rater", "Criterion"),
-  "Score",
-  method = "MML",
-  quad_points = 7,
-  maxit = 30
-)
-diag <- diagnose_mfrm(fit, residual_pca = "none", diagnostic_mode = "both")
-p <- plot_marginal_fit(diag, draw = FALSE, preset = "publication")
-p$data$preset
-if (interactive()) {
-  plot_marginal_fit(
-    diag,
-    plot_type = "prop_diff",
-    draw = TRUE,
-    preset = "publication"
-  )
-}
-}
+library(mfrmr)
+
+# Saved synthetic MML/RSM analysis of example_operational.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "operational-mml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+
+# Use the diagnostics saved with this fit
+diagnostics <- example_fit$diagnostics
+
+# Which score categories occur more or less often than the model expects?
+plot(diagnostics, type = "marginal_fit")
+# Positive bars: more frequent than expected; negative bars: less frequent
+
+# Optional: show observed-minus-expected proportions instead
+# Run this command separately to inspect the second figure
+plot(diagnostics, type = "marginal_fit", view = "prop_diff")
 }
 \seealso{
-\code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=rating_scale_table]{rating_scale_table()}}, \code{\link[=plot_marginal_pairwise]{plot_marginal_pairwise()}},
+\code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=rating_scale_table]{rating_scale_table()}}, \link[=plot.mfrm_fit]{plot(x, type = "marginal_pairwise")},
 \link{mfrmr_visual_diagnostics}
 }
+\keyword{internal}

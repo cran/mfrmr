@@ -165,7 +165,8 @@ test_that("fitted JML objects separate boundary estimates from optimizer traces"
   ]
   persons <- persons[match(c("P001", "P002"), persons$Person), , drop = FALSE]
 
-  expect_identical(fit$summary$BoundaryState, "has_exclusions")
+  expect_identical(fit$summary$BoundaryState,
+    if (requireNamespace("lpSolve", quietly = TRUE)) "has_exclusions" else "not_evaluated")
   expect_identical(fit$summary$InputState, "review")
   expect_identical(fit$summary$FitReadiness, "review")
   expect_false(isTRUE(fit$summary$InferenceReady))

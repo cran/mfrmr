@@ -2,69 +2,98 @@
 % Please edit documentation in R/api-estimation.R
 \name{make_anchor_table}
 \alias{make_anchor_table}
-\title{Build an anchor table from fitted estimates}
+\title{Build a candidate direct-anchor table from fitted estimates}
 \usage{
-make_anchor_table(fit, facets = NULL, include_person = FALSE, digits = 6)
+make_anchor_table(
+  fit,
+  facets = NULL,
+  include_person = FALSE,
+  digits = NULL,
+  readiness_policy = c("error", "review")
+)
 }
 \arguments{
 \item{fit}{Output from \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
 \item{facets}{Optional subset of facets to include.}
 
-\item{include_person}{Include person estimates as anchors.}
+\item{include_person}{Include person estimates as candidate anchors. Use only
+when cross-run person identity and the intended longitudinal constraint
+are substantively justified. Fixed Person values are supported only by
+a receiving JML fit; MML rejects Person anchors.}
 
-\item{digits}{Rounding digits for anchor values.}
+\item{digits}{\code{NULL} (default) preserves the fitted numeric values. A
+nonnegative integer explicitly rounds them for display or external use.}
+
+\item{readiness_policy}{How a source fit that is not inference-ready is
+handled. \code{"error"} (default) refuses anchor export or reuse. \code{"review"}
+permits explicit review-only extraction; those values must not be used as
+operational anchors.}
 }
 \value{
 A data.frame with \code{Facet}, \code{Level}, and \code{Anchor}.
 }
 \description{
-Build an anchor table from fitted estimates
+Build a candidate direct-anchor table from fitted estimates
 }
 \details{
-This function exports estimated facet parameters as an anchor table
-for use in subsequent calibrations.  This is the standard approach
-for \strong{linking} across administrations: a reference
-run establishes the measurement scale, and anchored re-analyses
-place new data on that same scale.
+This function performs a mechanical conversion from fitted estimates to the
+\code{Facet}/\code{Level}/\code{Anchor} schema accepted by \code{fit_mfrm()}. The returned rows
+are candidate direct constraints, not an approved anchor set.
+\code{Anchor} uses the internal, untransformed location metric. The table does
+not include category thresholds, GPCM slopes, model settings or source SEs;
+it is not a complete saved calibration. See \code{\link[=extract_mfrm_calibration]{extract_mfrm_calibration()}} for that
+separate workflow. Fixing an estimated value does not propagate its source
+uncertainty into the new fit.
 
-Anchor values should be exported from a well-fitting reference run
-with adequate sample size.  If the reference model has convergence
-issues or large misfit, the exported anchors may propagate
-instability.  Re-run \code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}} on the receiving data
-to verify compatibility before estimation.
+By default, the function refuses export when the source fit is not
+inference-ready under the current readiness contract. Set
+\code{readiness_policy = "review"} only to inspect candidate values; this does not
+make them eligible for reuse. The function cannot verify cross-run element
+identity or invariance. Before reuse, document why selected elements retain
+the same meaning, check the observed design's connectedness, and run
+\code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}} on the receiving data. That review checks schema and
+receiving-data support; it does not validate the source fit or the
+substantive invariance assumption.
 
-The \code{digits} parameter controls rounding precision.  Use at least 4
-digits for research applications; excessive rounding (e.g., 1 digit)
-can introduce avoidable calibration error.
+Keep \code{digits = NULL} for recalibration. Rounding individual anchors can
+break their joint sum or group-mean constraint, even at six decimal places.
+Explicitly rounded values are different constraints and must be reviewed
+before reuse; the fitter does not silently recenter supplied anchors.
 }
 \section{Interpreting output}{
 
 \itemize{
 \item \code{Facet}: facet name to be anchored in later runs.
 \item \code{Level}: specific element/level name inside that facet.
-\item \code{Anchor}: fixed logit value (rounded by \code{digits}).
+\item \code{Anchor}: fixed logit value (rounded only when \code{digits} is supplied).
 }
 }
 
 \section{Typical workflow}{
 
 \enumerate{
-\item Fit a reference run with \code{\link[=fit_mfrm]{fit_mfrm()}}.
-\item Export anchors with \code{make_anchor_table(fit)}.
+\item Fit and diagnose a defensible reference run with \code{\link[=fit_mfrm]{fit_mfrm()}}.
+\item Confirm source readiness, element identity, and the intended link.
+\item Export candidates with \code{make_anchor_table(fit)} and review them.
 \item Pass selected rows back into \code{fit_mfrm(..., anchors = ...)}.
 }
 }
 
 \examples{
-toy <- load_mfrmr_data("example_operational")
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("make_anchor_table", run.dontrun = TRUE)
+\dontrun{
+ratings <- load_mfrmr_data("example_operational")
 fit <- fit_mfrm(
-  toy, "Person", c("Rater", "Criterion"), "Score",
-  method = "MML", quad_points = 7, maxit = 30
+  ratings, "Person", c("Rater", "Criterion"), "Score",
+  method = "MML", rating_min = 1, rating_max = 4,
+  category_policy = "preserve"
 )
-anchors_tbl <- make_anchor_table(fit)
-head(anchors_tbl)
-summary(anchors_tbl$Anchor)
+# Select a facet deliberately; matching labels alone do not prove invariance.
+anchors_tbl <- make_anchor_table(fit, facets = "Rater")
+anchors_tbl
+}
 }
 \seealso{
 \code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}}

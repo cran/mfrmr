@@ -12,6 +12,8 @@ test_that("bundle summaries suppress unexpected-response person identifiers by d
       ),
       summary = data.frame(
         TotalObservations = 20L,
+        EvaluatedObservations = 20L,
+        UnavailableObservations = 0L,
         UnexpectedN = 1L,
         stringsAsFactors = FALSE
       ),

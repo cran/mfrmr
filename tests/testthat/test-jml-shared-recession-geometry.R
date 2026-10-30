@@ -137,7 +137,7 @@ test_that("shared geometry preserves anchored weighted PCM audits exactly", {
   )
 })
 
-test_that("shared geometry preserves interaction RSM and bounded GPCM", {
+test_that("shared geometry preserves interaction RSM and GPCM", {
   skip_if_not_installed("lpSolve")
   data <- make_shared_geometry_data()
   retained <- data[data$Weight > 0 & !is.na(data$Score), , drop = FALSE]

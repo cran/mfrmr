@@ -7,16 +7,17 @@
 plot_unexpected(
   x,
   diagnostics = NULL,
-  abs_z_min = 2,
+  abs_z_min = 3,
   prob_max = 0.3,
   top_n = 100,
-  rule = c("either", "both"),
+  rule = c("residual", "either", "both"),
   plot_type = c("scatter", "severity"),
   main = NULL,
   palette = NULL,
   label_angle = 45,
   preset = c("standard", "publication", "compact", "monochrome"),
-  draw = TRUE
+  draw = TRUE,
+  title = NULL
 )
 }
 \arguments{
@@ -24,17 +25,19 @@ plot_unexpected(
 
 \item{diagnostics}{Optional output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} when \code{x} is \code{mfrm_fit}.}
 
-\item{abs_z_min}{Absolute standardized-residual cutoff.}
+\item{abs_z_min}{Absolute standardized-residual cutoff (default 3).}
 
 \item{prob_max}{Maximum observed-category probability cutoff.}
 
 \item{top_n}{Maximum rows used from the unexpected table.}
 
-\item{rule}{Flagging rule (\code{"either"} or \code{"both"}).}
+\item{rule}{Flagging rule: \code{"residual"} (default), \code{"either"}, or \code{"both"}.}
 
 \item{plot_type}{\code{"scatter"} or \code{"severity"}.}
 
-\item{main}{Optional custom plot title.}
+\item{main}{Compatibility title argument. Omitted or \code{NULL} keeps the default
+title. Existing calls remain supported without a deprecation warning.
+For new code, prefer \code{title}; do not supply both arguments.}
 
 \item{palette}{Optional named color overrides (\code{higher}, \code{lower}, \code{bar}).}
 
@@ -43,6 +46,13 @@ plot_unexpected(
 \item{preset}{Visual preset (\code{"standard"}, \code{"publication"}, \code{"compact"}, or \code{"monochrome"}).}
 
 \item{draw}{If \code{TRUE}, draw with base graphics.}
+
+\item{title}{Plot title. Omit it to keep the default, supply one character
+string to replace it, or use \code{NULL} (or \code{""}) to suppress it. This changes
+only the heading; numerical results, reference lines, subtitles and
+interpretation notes remain. Both \code{main} and \code{title} explicitly supplied
+is an error, even if equal or \code{NULL}. Positional legacy arguments retain
+their order; use the exact name \code{title}.}
 }
 \value{
 A plotting-data object of class \code{mfrm_plot_data}.
@@ -60,8 +70,11 @@ absolute standardised residual \eqn{|Z|} and the negative log
 probability \eqn{-\log_{10} P_{\mathrm{obs}}}.  Higher severity
 indicates responses that are more surprising under the fitted model.
 
+Saved table bundles retain their recorded rule and thresholds. A fully
+evaluated screen with no flags returns an empty display and its summary.
 The \code{rule} parameter controls flagging logic:
 \itemize{
+\item \code{"residual"}: flag by the absolute standardized residual alone.
 \item \code{"either"}: flag if \eqn{|Z| \ge} \code{abs_z_min} \strong{or}
 \eqn{P_{\mathrm{obs}} \le} \code{prob_max}.
 \item \code{"both"}: flag only if \strong{both} conditions hold simultaneously.
@@ -119,27 +132,63 @@ For a plot-selection guide and a longer walkthrough, see
 \code{vignette("mfrmr-visual-diagnostics", package = "mfrmr")}.
 }
 
+\section{Migration in 0.2.4}{
+
+This renderer is internal. Use the corresponding \code{plot()} route in
+\link{mfrmr_plot_migration}; the former exported name is no longer available.
+}
+
+\section{Session plot defaults}{
+
+Set \code{options(mfrmr.plot_preset = "publication")} to choose a session default
+for plotting functions that expose the common \code{preset} argument. The
+supported values are \code{"standard"}, \code{"publication"}, \code{"compact"} and
+\code{"monochrome"}. Precedence is an explicit call argument, then the session
+option, then \code{"standard"}. For example, \code{preset = "standard"} overrides
+a session set to \code{"monochrome"}. Explicit \code{preset = NULL} retains the
+earlier package-default behavior; it does not read the session option.
+Invalid session values cause an error only when that option is needed.
+
+The category-curve, data-quality, fit-review, connectivity and network
+routes of \code{plot()} for report bundles use the same option through \code{...}.
+Plots without a common \code{preset} argument, including extended-model plots
+with their own \code{palette} controls, keep their own settings. This option
+selects a preset, not a universal theme or a guarantee that all renderers
+implement every appearance control identically.
+
+New plot payloads retain the resolved preset for supported saved-data
+rendering. Converting an existing payload with \code{\link[=as_ggplot]{as_ggplot()}} uses its saved
+appearance, even after the session option changes. A call that creates a
+new plot from a fit or statistical result uses the current default.
+For a reproducible script, supply \code{preset} explicitly or set the option in
+that script. Saving only the fitted model does not save a session option.
+No global ggplot theme is changed.
+
+Restore previous settings with \code{old <- options(mfrmr.plot_preset = "monochrome")} followed by \code{options(old)}. Use
+\code{options(mfrmr.plot_preset = NULL)} to remove the option. The preset changes
+appearance, not estimates, confidence levels or diagnostic thresholds.
+}
+
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
-p <- plot_unexpected(fit, abs_z_min = 1.5, prob_max = 0.4, top_n = 10, draw = FALSE)
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("plot_unexpected", run.dontrun = TRUE)
+\dontrun{
+# Saved synthetic JML/RSM analysis of example_core.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "core-jml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+p <- plot(fit, type = "unexpected", abs_z_min = 1.5, prob_max = 0.4, top_n = 10, draw = FALSE)
 if (interactive()) {
-  plot_unexpected(
-    fit,
-    abs_z_min = 1.5,
-    prob_max = 0.4,
-    top_n = 10,
-    plot_type = "severity",
-    preset = "publication",
+  plot(fit, type = "unexpected", abs_z_min = 1.5, prob_max = 0.4,
+    top_n = 10, view = "severity", preset = "publication",
     main = "Unexpected Response Severity (Customized)",
     palette = c(higher = "#d95f02", lower = "#1b9e77", bar = "#2b8cbe"),
-    label_angle = 45
-  )
+    label_angle = 45)
 }
 }
 }
 \seealso{
-\code{\link[=unexpected_response_table]{unexpected_response_table()}}, \code{\link[=plot_fair_average]{plot_fair_average()}}, \code{\link[=plot_displacement]{plot_displacement()}},
-\code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}}, \link{mfrmr_visual_diagnostics}
+\code{\link[=unexpected_response_table]{unexpected_response_table()}}, \link[=plot.mfrm_fit]{plot(x, type = "fair_average")}, \link[=plot.mfrm_fit]{plot(x, type = "displacement")},
+\link[=plot.mfrm_fit]{plot(x, type = "qc")}, \link{mfrmr_visual_diagnostics}
 }
+\keyword{internal}

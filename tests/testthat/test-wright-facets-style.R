@@ -31,6 +31,80 @@ make_wright_ready_fit <- function(...) {
   fit
 }
 
+test_that("named Wright selection adds omitted levels without changing estimates", {
+  fit <- make_wright_ready_fit()
+  original <- serialize(fit, NULL)
+  full <- plot(fit, top_n = Inf, draw = FALSE)
+  compact <- plot(fit, top_n = 1, draw = FALSE)
+  candidates <- subset(full$data$locations, PlotType == "Facet level")
+  omitted <- candidates[!paste(candidates$Group, candidates$Label) %in%
+    paste(compact$data$locations$Group, compact$data$locations$Label), ][1, ]
+  selection <- setNames(list(as.character(omitted$Label)), as.character(omitted$Group))
+  marked <- plot(fit, top_n = 1, highlight = selection, draw = FALSE)
+  key <- function(z) paste(z$Group, z$Label)
+  expect_setequal(key(marked$data$locations), c(key(compact$data$locations), key(omitted)))
+  selected <- subset(marked$data$locations, Highlighted)
+  expect_equal(nrow(selected), 1L)
+  expect_identical(selected$DisplayLabel, paste0("> ", selected$Label))
+  numeric_cols <- c("Estimate", "SE", "CI_Lower", "CI_Upper")
+  expect_equal(as.data.frame(marked$data$locations[numeric_cols]),
+    as.data.frame(full$data$locations[match(key(marked$data$locations),
+      key(full$data$locations)), numeric_cols]))
+  expect_identical(marked$data$y_range, compact$data$y_range)
+  expect_identical(marked$data$y_range, full$data$y_range)
+  expect_equal(marked$data$retention$Shown[1], compact$data$retention$Shown[1] + 1)
+  expect_equal(marked$data$retention$Omitted[1], compact$data$retention$Omitted[1] - 1)
+  expect_match(paste(marked$data$notes$Text, collapse = " "), "not a statistical flag")
+  expect_identical(serialize(fit, NULL), original)
+
+  unified <- plot(fit, view = "unified", top_n = 1, highlight = selection, draw = FALSE)
+  expect_equal(unified$locations, marked$data$locations)
+  bundle <- plot(fit, type = "bundle", top_n = 1, highlight = selection, draw = FALSE)
+  expect_equal(bundle$wright_map$data$locations, marked$data$locations)
+
+  # Compaction must not hide an opposite endpoint of the fitted ruler.
+  fit$facets$others$Estimate[1:2] <- c(100, -99)
+  scale <- build_wright_map_data(fit, top_n = 1, include_steps = FALSE)
+  expect_equal(scale$y_range, c(-99, 100))
+})
+
+test_that("Wright selection survives both layouts and saved ggplot conversion", {
+  fit <- make_wright_ready_fit()
+  levels <- fit$facets$others
+  selection <- lapply(split(as.character(levels$Level), levels$Facet), head, 1)
+  p <- plot(fit, highlight = selection, renderer = "facets", draw = FALSE)
+  ruler <- p$data$facets_style$facet_ruler
+  expect_equal(sum(ruler$Highlighted), length(selection))
+  expect_true(all(startsWith(ruler$DisplayLabel[ruler$Highlighted], "> ")))
+  expect_true(any(grepl("> ", p$data$facets_style$facet_cells$CellLabel, fixed = TRUE)))
+  expect_true(all(p$data$retention$Complete))
+  for (renderer in c("native", "facets")) {
+    p <- plot(fit, highlight = selection, renderer = renderer, draw = FALSE)
+    saved <- unserialize(serialize(p, NULL))
+    expect_identical(saved, p)
+    if (requireNamespace("ggplot2", quietly = TRUE)) {
+      g <- as_ggplot(saved)
+      layers <- ggplot2::ggplot_build(g)$data
+      labels <- unlist(lapply(layers, function(z) z$label), use.names = FALSE)
+      expect_equal(sum(startsWith(labels, "> ")), length(selection))
+      expect_identical(plot_data(g), plot_data(p))
+    }
+  }
+})
+
+test_that("Wright selection rejects unknown or unavailable levels and other routes", {
+  fit <- make_wright_ready_fit()
+  expect_error(plot(fit, highlight = "R01", draw = FALSE), "named list")
+  expect_error(plot(fit, highlight = list(Rater = NA_character_), draw = FALSE), "character level IDs")
+  expect_error(plot(fit, highlight = list(Unknown = "R01"), draw = FALSE), "Unknown highlight facet")
+  expect_error(plot(fit, highlight = list(Rater = "Unknown"), draw = FALSE), "Unknown highlight level")
+  expect_error(plot(fit, type = "ccc", highlight = list(Rater = "R01"), draw = FALSE), "only for Wright")
+  unavailable <- fit$facets$others[1, ]
+  selection <- setNames(list(as.character(unavailable$Level)), as.character(unavailable$Facet))
+  fit$facets$others$Estimate[1] <- NA_real_
+  expect_error(build_wright_map_data(fit, highlight = selection), "finite fitted locations")
+})
+
 test_that("plot readiness preserves a failed numerical state", {
   fit <- make_wright_ready_fit()
   fit$readiness$fit$NumericalState <- "failed"
@@ -165,7 +239,7 @@ test_that("Wright CI payload stores absolute endpoints", {
   expect_true(all(loc$CI_Lower <= loc$Estimate & loc$Estimate <= loc$CI_Upper))
 })
 
-test_that("supplied diagnostics drive Wright SE metadata but not coordinates", {
+test_that("supplied diagnostics drive Wright SE metadata and must match coordinates", {
   fit <- make_wright_ready_fit()
   diagnostics <- make_toy_diagnostics(fit)
   row <- which(as.character(diagnostics$measures$Facet) != "Person")[1]
@@ -176,7 +250,6 @@ test_that("supplied diagnostics drive Wright SE metadata but not coordinates", {
       as.character(fit$facets$others$Level) == level
   ]
   fitted_estimate <- unname(fitted_estimate)
-  diagnostics$measures$Estimate[row] <- 1.2345
   diagnostics$measures$SE[row] <- 0.123
 
   out <- plot(
@@ -211,6 +284,12 @@ test_that("supplied diagnostics drive Wright SE metadata but not coordinates", {
   ]
   expect_equal(unified_loc$Estimate, fitted_estimate)
   expect_equal(unified_loc$SE, 0.123)
+
+  diagnostics$measures$Estimate[row] <- fitted_estimate + 1
+  expect_error(plot(fit, type = "wright", diagnostics = diagnostics, draw = FALSE),
+               "fit/diagnostics mismatch")
+  expect_error(plot_wright_unified(fit, diagnostics = diagnostics, draw = FALSE),
+               "fit/diagnostics mismatch")
 })
 
 test_that("FACETS-style Wright payload is complete and explicitly visual", {

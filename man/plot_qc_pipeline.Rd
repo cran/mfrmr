@@ -20,7 +20,7 @@ Invisible verdicts tibble from the QC pipeline.
 }
 \description{
 Visualizes the output from \code{\link[=run_qc_pipeline]{run_qc_pipeline()}} as either a traffic-light
-bar chart or a detail panel showing values versus thresholds.
+bar chart or a panel containing each check's explanation.
 }
 \details{
 Two plot types are provided for visual triage of QC results:
@@ -28,55 +28,36 @@ Two plot types are provided for visual triage of QC results:
 \item \strong{\code{"traffic_light"}} (default): A horizontal bar chart with one row
 per QC check.  Bars are coloured green (Pass), amber (Warn), or red
 (Fail).  Provides an at-a-glance summary of the current QC review state.
-\item \strong{\code{"detail"}}: A panel showing each check's observed value and its
-pass/warn/fail thresholds.  Useful for understanding how close a
-borderline result is to the next verdict level.
+\item \strong{\code{"detail"}}: A panel showing the saved \code{Detail} text beside each
+verdict. Read this explanation and the returned table to understand
+why a check was flagged or unavailable.
 }
 }
-\section{QC checks performed}{
+\section{Interpretation}{
 
-The pipeline evaluates up to 10 checks (depending on available
-diagnostics):
-\enumerate{
-\item \strong{Convergence}: did the optimizer converge?
-\item \strong{Overall Infit}: global information-weighted mean-square
-\item \strong{Overall Outfit}: global unweighted mean-square
-\item \strong{Misfit rate}: proportion of elements with \eqn{|\mathrm{ZSTD}| > 2}
-\item \strong{Category usage}: minimum observations per score category
-\item \strong{Disordered steps}: whether threshold estimates are monotonic
-\item \strong{Separation} (per facet): element discrimination adequacy
-\item \strong{Residual PCA eigenvalue}: first-component eigenvalue (if computed)
-\item \strong{Displacement}: maximum absolute displacement across elements
-\item \strong{Inter-rater agreement}: minimum pairwise exact agreement
-}
-}
+The rows are the actual checks returned by \code{\link[=run_qc_pipeline]{run_qc_pipeline()}}: convergence,
+global fit, selected-facet reliability and separation, element misfit,
+unexpected responses, category structure, connectivity, inter-rater
+agreement, and the functioning/bias screen. Element misfit uses the
+configured mean-square band; it is not a ZSTD test. PCA and displacement
+are separate diagnostics and are not checks in this pipeline.
 
-\section{Interpreting plots}{
-
-\itemize{
-\item \strong{Green} (Pass): the check meets the current threshold-profile criteria.
-\item \strong{Amber} (Warn): borderline---monitor but not necessarily
-disqualifying.  Review the detail panel to see how close the value
-is to the fail threshold.
-\item \strong{Red} (Fail): requires investigation before strong operational or
-interpretive claims are made from the current run. Common remedies include collapsing categories
-(for disordered steps), removing outlier raters (for misfit), or
-increasing sample size (for low separation).
-\item The detail view shows numeric values, making it easy to communicate
-exact results to stakeholders.
-}
+Green (Pass), amber (Warn), and red (Fail) describe the selected screening
+rules. Grey (Skip) marks unrequested or unavailable checks; \code{AffectsOverall}
+in the returned data distinguishes their contribution to the overall result.
+A missing result is not evidence of acceptable fit. High rater separation
+is not high agreement, and no colour establishes statistical validity or
+justifies deleting raters or collapsing categories without further review.
 }
 
-\examples{
-\donttest{
-toy <- load_mfrmr_data("study1")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 30)
-qc <- run_qc_pipeline(fit)
-plot_qc_pipeline(qc, draw = FALSE)
+\section{Migration in 0.2.4}{
+
+This renderer is internal. Use the corresponding \code{plot()} route in
+\link{mfrmr_plot_migration}; the former exported name is no longer available.
 }
-}
+
 \seealso{
-\code{\link[=run_qc_pipeline]{run_qc_pipeline()}}, \code{\link[=plot_qc_dashboard]{plot_qc_dashboard()}},
+\code{\link[=run_qc_pipeline]{run_qc_pipeline()}}, \link[=plot.mfrm_fit]{plot(x, type = "qc")},
 \code{\link[=build_visual_summaries]{build_visual_summaries()}}, \link{mfrmr_visual_diagnostics}
 }
+\keyword{internal}

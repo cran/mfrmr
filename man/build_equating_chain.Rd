@@ -20,9 +20,12 @@ build_equating_chain(
 \method{plot}{mfrm_equating_chain}(
   x,
   y = NULL,
-  type = c("common_anchors", "graph", "chain"),
+  type = c("common_anchors", "graph", "chain", "links", "anchor_removal",
+    "offset_sensitivity"),
   preset = c("standard", "publication", "compact", "monochrome"),
   draw = TRUE,
+  show_title = FALSE,
+  show_notes = FALSE,
   ...
 )
 
@@ -38,21 +41,32 @@ elements.}
 
 \item{include_person}{Include person estimates in linking.}
 
-\item{drift_threshold}{Threshold for flagging large residuals in links.}
+\item{drift_threshold}{Non-negative scalar threshold for screening and
+flagging large residuals in links. \code{Inf} retains all finite differences
+and disables magnitude flagging.}
 
 \item{x}{An \code{mfrm_equating_chain} object.}
 
-\item{...}{Ignored.}
-
 \item{y}{Unused (S3 plot signature requirement).}
 
-\item{type}{One of \code{"graph"} (bipartite Wave x anchor-element graph;
-requires the \code{igraph} package), \code{"common_anchors"} (default; bar
-chart of common-anchor counts per wave pair), or \code{"chain"}.}
+\item{type}{One of \code{"graph"} (bipartite wave x link-specific common-element
+graph), \code{"common_anchors"} (default; bar
+chart of common-anchor counts per wave pair), \code{"chain"} (cumulative
+offsets), \code{"links"} (recorded wave comparisons), or \code{"anchor_removal"}
+(newly disconnected wave pairs after deleting each common element), or
+\code{"offset_sensitivity"} (conditional rescreened linking-offset changes).}
 
 \item{preset}{Visual preset.}
 
 \item{draw}{If \code{TRUE}, draw the plot with base graphics.}
+
+\item{show_title}{Logical; display the main title.}
+
+\item{show_notes}{Logical; display graph/topology interpretation footers.
+Returned notes and ordinary R warnings are unaffected. Axes, legends and
+data labels remain visible; other chain views have no interpretation footer.}
+
+\item{...}{Ignored.}
 
 \item{object}{An \code{mfrm_equating_chain} object (for \code{summary}).}
 }
@@ -70,9 +84,10 @@ Object of class \code{mfrm_equating_chain} with components:
 Links a series of calibration waves by computing mean offsets between
 adjacent pairs of fits. Common linking elements (e.g., raters or items
 that appear in consecutive administrations) are used to estimate the
-scale shift. Cumulative offsets place all waves on a common metric
-anchored to the first wave. The procedure is intended as a practical
-screened linking aid, not as a full general-purpose equating framework.
+scale shift. Cumulative offsets express all waves relative to the first
+wave, conditional on the common-element assumptions. The procedure is a
+practical screened linking aid, not a full general-purpose equating
+framework or proof of common-scale comparability.
 }
 \details{
 The screened linking chain uses a screened link-offset method.  For each pair of
@@ -93,8 +108,27 @@ indicators of link quality.
 facet as having thin support.
 }
 
+The five-element rule is a package screening convention, not a universal
+adequacy threshold. Matching labels are assumed to identify the same
+invariant elements, and input fits are assumed to use compatible model,
+score, orientation, and population conventions. The helper does not verify
+those assumptions or source-fit readiness. In particular, adjacent label
+overlap and a finite offset do not by themselves establish a common scale.
+
+Each adjacent \code{Offset} is one value pooled across all selected facets. When
+any common rows have finite positive SEs, only those rows contribute to the
+inverse-variance weighted offset; retained/support counts can still include
+rows without usable SEs. If preliminary screening would remove every row,
+the implementation falls back to all finite differences. Prefer one
+substantively coherent \code{anchor_facets} block unless a common shift across
+facets is justified.
+
 Cumulative offsets are computed by chaining link offsets from Wave 1
 forward, placing all waves onto the metric of the first wave.
+\code{Offset_SD} is retained-element residual spread, not the standard error of
+\code{Offset}. No offset SE, confidence interval, cross-fit covariance, or
+cumulative uncertainty propagation is currently returned, so uncertainty
+can compound along the chain without appearing in \code{cumulative}.
 
 Elements whose per-link residual exceeds \code{drift_threshold} are flagged
 in \verb{$element_detail$Flag}.  A high \code{Offset_SD}, many flagged elements, or a
@@ -130,9 +164,135 @@ Flagged elements may indicate DIF or rater re-training effects.
 \item \verb{$common_by_facet}: retained common-element counts by linking facet for
 each adjacent link.
 \item \verb{$config}: records wave names and analysis parameters.
+\item \code{OffsetStatus} / \code{OffsetReason} explain unavailable link offsets.
+\code{ScreeningFallback} records use of all finite differences when no row
+passed preliminary screening. \code{N_Contributing} and the element-level
+\code{Contributing} flag identify the rows actually used in the final average;
+retained rows without usable SEs may not contribute.
+\item \code{OffsetSDStatus} distinguishes available residual spread from fewer than
+two retained elements, unavailable offsets, or a numerical failure.
+A singleton has an undefined sample SD, not an estimated SD of zero.
+Unavailable \code{Max_Residual} and flagged counts stay missing rather than
+representing no drift. Summaries also give the unavailable count and
+the flagged count among available elements.
+\item \code{cumulative$Status} / \code{Reason} distinguish unavailable preceding links
+from an unrepresentable cumulative sum. Later offsets do not become zero
+when a link is unavailable.
 \item Read \code{links} before \code{cumulative}: weak adjacent links can make later
 cumulative offsets less trustworthy.
 }
+}
+
+\section{Common-element graph}{
+
+\code{plot(chain, type = "graph")} displays waves as squares and common elements
+as circles, including waves without retained connections. Each element node
+belongs to one reviewed link: \verb{[L1]} refers to link 1 in the returned links
+table. The same element can have different screening results in different
+comparisons, so it is repeated per link. Solid lines denote retained,
+unflagged elements; dot-dash denotes retained elements with a drift flag or
+an unavailable flag; dashed denotes excluded elements; dotted denotes
+unknown retention. These distinctions also apply in monochrome.
+
+This is a graph of screened common-element comparisons, not an inventory
+of fixed anchors or an all-pairs assessment. Retention does not guarantee
+positive weight in the offset, invariance, adequate support or precision.
+New chains store positional \code{FromID}/\code{ToID} in \code{links} and \code{LinkID} in
+\code{element_detail}; display names may repeat or contain punctuation. Older
+chains are matched by their complete link labels; ambiguous references
+require rebuilding the chain.
+
+With \code{draw = FALSE}, the plot returns an \code{mfrm_plot_data} object. Its
+\verb{$data$data} contains \code{nodes}, \code{edges}, \code{links}, \code{elements}, \code{n_waves},
+\code{n_anchors} (unique facet/level identities), and \code{n_element_nodes}
+(link-specific nodes). Edge \code{from}/\code{to} refer to node \code{NodeId}; \code{AnchorId}
+identifies the same facet/level across links. \code{Retained}, \code{Flag}, \code{Status}
+and \code{Reason} preserve screening information. \code{RetainedDegree} counts
+retained incidences, not statistical information. Interpretation notes
+remain in \verb{$data$notes} and in \code{print()} even when \code{show_notes = FALSE}.
+Full labels remain in the node table if the device is too narrow. Base
+graphics are sufficient; no optional graph package is needed.
+}
+
+\section{Wave links and common-element removal}{
+
+\code{plot(chain, type = "links")} summarizes the recorded wave-to-wave
+comparisons. Numbers count common elements with \code{Retained = TRUE}, including
+flagged retained elements. A dotted comparison has no recorded retained
+element; this is not proof that the original rating design is disconnected.
+Missing retention is counted separately. Dot-dash connections have flagged
+retained elements or inadequate/unknown recorded link support.
+
+\code{plot(chain, type = "anchor_removal")} removes each facet/level identity,
+one at a time, from all recorded comparisons. Other retention decisions stay
+fixed. The horizontal axis counts newly disconnected unordered wave pairs,
+including indirect paths. Pairs already disconnected at baseline are not
+counted. Losing a direct link need not disconnect its endpoints if another
+path remains. Zero means no new graph disconnection, not negligible impact
+on estimates or adequate linking support. No screening, offsets, estimates,
+SEs or confidence intervals are recomputed by either view.
+
+Both views return \verb{$data$data$nodes}, \code{links}, \code{elements} and \code{summary}.
+The removal view additionally returns \code{removal} (one row per common-element
+identity), \code{lost_links} (recorded comparisons losing their last retained
+element), \code{lost_pairs} (newly disconnected wave pairs), and \code{components_after}
+(baseline and post-removal membership for every wave). Use \code{AnchorId} to
+join the removal table to these details; \code{FromID}/\code{ToID} and \code{WaveID} identify
+waves independently of display labels. Component numbers are local to each
+partition: compare membership relations, not numeric labels across Before,
+After or different removal scenarios. Removal counts
+include \code{RetainedOccurrences}, \code{UnknownOccurrences}, \code{LostLinks},
+\code{ComponentsAfter} and \code{NewlyDisconnectedPairs}.
+
+These calculations reuse the recorded common-element graph; they do not
+search for new links or assess statistical influence. The full lost-pair
+table can be large for chains with many waves and common elements. Compact
+plots abbreviate long labels and warn when IDs or a larger device are needed;
+full identities and interpretation notes remain in the returned tables.
+}
+
+\section{Conditional offset sensitivity}{
+
+\code{plot(chain, type = "offset_sensitivity")} removes each common \verb{(Facet, Level)} identity from every adjacent link, then reruns the existing offset
+calculation with its recorded drift threshold. Preliminary offsets,
+screening, final weighted/unweighted offsets and cumulative offsets are
+recomputed. The source wave estimates and SEs remain fixed: this is a
+conditional linking sensitivity calculation, not a refit of item, rater or
+person parameters or a new uncertainty estimate.
+
+The view requires an ordered adjacent chain with the recorded method,
+threshold, support guideline, source estimate/SE columns and offsets.
+Recomputed baseline offsets must agree with recorded offsets within
+\code{1e-8 * max(1, abs(recorded_offset))}; inconsistent or incomplete source
+records require rebuilding the chain. Numerical overflow/underflow that
+prevents a finite preliminary offset is reported as a numerical failure.
+
+The figure shows each deletion's maximum absolute cumulative offset change
+over finite comparisons, excluding the fixed-zero first wave. Shapes
+distinguish complete comparisons, partial comparisons and no finite
+comparison. An unavailable comparison remains \code{NA}, not zero. If one link
+becomes unavailable, later cumulative offsets also become unavailable.
+Read the detailed tables when a figure marks an incomplete comparison.
+
+The \verb{$data$data} payload contains \code{settings}, \code{baseline_links}, \code{baseline_cumulative},
+\code{baseline_elements}, \code{removal}, \code{links}, \code{cumulative}, \code{retention_changes}
+and \code{common_by_facet}. Join \code{RemovedAnchorId} in scenario tables to
+\code{removal$AnchorId}. Signed \code{Change} is recalculated minus baseline offset.
+\code{Status} distinguishes \code{computed}, \code{no_common}, \code{no_finite_differences}
+and \code{numerical_failure}. \code{N_Contributing} and element \code{Contributing} identify
+positive finite weight contributors (or retained rows in an unweighted
+offset). \code{retention_changes} records other elements whose retention,
+contribution or residual flag changes; the deliberately removed element is
+omitted. Facets whose last element is removed remain in support tables with
+zero counts. No support failure is converted into a statement of readiness.
+
+\code{ScreeningFallback} identifies the existing rule that restores all finite
+differences if preliminary screening would remove every one. SEs may be
+missing, in which case the existing unweighted fallback is used. No offset
+SE, confidence interval, cross-fit covariance, or uncertainty propagation
+is supplied. A small conditional change is not evidence of anchor invariance
+or negligible change under a full model refit. Notes remain available when
+figure titles and footers are omitted.
 }
 
 \section{Typical workflow}{
@@ -143,22 +303,60 @@ cumulative offsets less trustworthy.
 \code{fits <- list(Spring23 = fit_s, Fall23 = fit_f, Spring24 = fit_s2)}.
 \item Call \code{chain <- build_equating_chain(fits)}.
 \item Review \code{summary(chain)} for link quality.
-\item Visualize with \code{plot_anchor_drift(chain, type = "chain")}.
+\item Visualize with \code{plot(chain, type = "chain")}.
 \item For problematic links, investigate flagged elements in
 \code{chain$element_detail} and consider removing them from the anchor set.
 }
 }
 
+\section{Session plot defaults}{
+
+Set \code{options(mfrmr.plot_preset = "publication")} to choose a session default
+for plotting functions that expose the common \code{preset} argument. The
+supported values are \code{"standard"}, \code{"publication"}, \code{"compact"} and
+\code{"monochrome"}. Precedence is an explicit call argument, then the session
+option, then \code{"standard"}. For example, \code{preset = "standard"} overrides
+a session set to \code{"monochrome"}. Explicit \code{preset = NULL} retains the
+earlier package-default behavior; it does not read the session option.
+Invalid session values cause an error only when that option is needed.
+
+The category-curve, data-quality, fit-review, connectivity and network
+routes of \code{plot()} for report bundles use the same option through \code{...}.
+Plots without a common \code{preset} argument, including extended-model plots
+with their own \code{palette} controls, keep their own settings. This option
+selects a preset, not a universal theme or a guarantee that all renderers
+implement every appearance control identically.
+
+New plot payloads retain the resolved preset for supported saved-data
+rendering. Converting an existing payload with \code{\link[=as_ggplot]{as_ggplot()}} uses its saved
+appearance, even after the session option changes. A call that creates a
+new plot from a fit or statistical result uses the current default.
+For a reproducible script, supply \code{preset} explicitly or set the option in
+that script. Saving only the fitted model does not save a session option.
+No global ggplot theme is changed.
+
+Restore previous settings with \code{old <- options(mfrmr.plot_preset = "monochrome")} followed by \code{options(old)}. Use
+\code{options(mfrmr.plot_preset = NULL)} to remove the option. The preset changes
+appearance, not estimates, confidence levels or diagnostic thresholds.
+}
+
 \examples{
-\donttest{
+# Long-running workflow; run explicitly when needed.
+# example("build_equating_chain", run.dontrun = TRUE)
+\dontrun{
 toy <- load_mfrmr_data("example_core")
 people <- unique(toy$Person)
-d1 <- toy[toy$Person \%in\% people[1:12], , drop = FALSE]
-d2 <- toy[toy$Person \%in\% people[13:24], , drop = FALSE]
+d1 <- toy[toy$Person \%in\% people[1:24], , drop = FALSE]
+d2 <- toy[toy$Person \%in\% people[25:48], , drop = FALSE]
 fit1 <- fit_mfrm(d1, "Person", c("Rater", "Criterion"), "Score",
-                 method = "JML", maxit = 30)
+                 method = "JML")
 fit2 <- fit_mfrm(d2, "Person", c("Rater", "Criterion"), "Score",
-                 method = "JML", maxit = 30)
+                 method = "JML")
+# Check convergence before using the estimates for linking.
+summary(fit1)
+summary(fit2)
+# The four shared levels per facet trigger a thin-support warning.
+# Inspect that warning; matching labels alone do not establish a common scale.
 chain <- build_equating_chain(list(Form1 = fit1, Form2 = fit2))
 summary(chain)
 chain$cumulative
@@ -166,5 +364,5 @@ chain$cumulative
 }
 \seealso{
 \code{\link[=detect_anchor_drift]{detect_anchor_drift()}}, \code{\link[=anchor_to_baseline]{anchor_to_baseline()}},
-\code{\link[=make_anchor_table]{make_anchor_table()}}, \code{\link[=plot_anchor_drift]{plot_anchor_drift()}}
+\code{\link[=make_anchor_table]{make_anchor_table()}}, \link[=plot.mfrm_anchor_drift]{plot(x)}
 }

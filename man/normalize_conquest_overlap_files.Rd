@@ -51,8 +51,9 @@ identifier as extracted by the user. \code{"auto"} tries aliases such as
 \code{ResponseVar}, \code{ItemID}, \code{Item}, and \code{Label}.}
 
 \item{conquest_item_estimate}{Column in \code{item_file} that stores item
-estimates. \code{"auto"} tries aliases such as \code{Estimate}, \code{Est}, and
-\code{Facility}.}
+estimates. \code{"auto"} tries \code{Estimate} and \code{Est}. \code{Facility} is not an
+automatic alias: establish whether it is a difficulty, easiness, or raw
+proportion and convert it to the required logit difficulty before review.}
 
 \item{conquest_case_person}{Column in \code{case_file} that stores person IDs.
 \code{"auto"} tries conservative aliases such as \code{Person}, \code{PID}, and
@@ -90,8 +91,11 @@ that the files were treated as extracted tables, not raw ConQuest report
 text, and to check duplicate-ID / non-numeric-estimate pre-review flags.
 }
 \examples{
-\donttest{
-bundle <- build_conquest_overlap_bundle()
+# Reuse the synthetic fit; normalize the extracted tables below.
+# Regeneration recipe: examples/measurement-fits.R in the package.
+fit <- readRDS(system.file("examples", "measurement-fits.rds",
+  package = "mfrmr", mustWork = TRUE))$conquest_quick
+bundle <- build_conquest_overlap_bundle(fit = fit)
 tmp_dir <- tempdir()
 pop_path <- file.path(tmp_dir, "cq_pop.csv")
 item_path <- file.path(tmp_dir, "cq_item.tsv")
@@ -135,7 +139,6 @@ normalized <- normalize_conquest_overlap_files(
 summary(normalized)$normalization_scope
 review <- review_conquest_overlap(bundle, normalized)
 summary(review)$summary
-}
 }
 \seealso{
 \code{\link[=normalize_conquest_overlap_tables]{normalize_conquest_overlap_tables()}}, \code{\link[=review_conquest_overlap]{review_conquest_overlap()}}

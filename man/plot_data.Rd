@@ -4,7 +4,14 @@
 \alias{plot_data}
 \title{Extract reusable data from an mfrmr plot object}
 \usage{
-plot_data(x, component = NULL, type = NULL, ...)
+plot_data(
+  x,
+  component = NULL,
+  type = NULL,
+  ...,
+  format = c("native", "long"),
+  value_cols = NULL
+)
 }
 \arguments{
 \item{x}{An \code{mfrm_plot_data} object, or a fitted/report/review object with a
@@ -18,6 +25,17 @@ data. When \code{NULL}, the full plot-data list is returned.}
 
 \item{...}{Additional arguments passed to \code{plot(..., draw = FALSE)} when
 \code{x} is not already an \code{mfrm_plot_data} object.}
+
+\item{format}{\code{"native"} (default) returns the saved component unchanged.
+\code{"long"} reshapes a selected table or matrix without dropping missing cells.}
+
+\item{value_cols}{Explicit table columns to gather into \code{Variable} and \code{Value}.
+Other columns, and an added \code{SourceRow}, remain identifiers/metadata.
+Select compatible value types and comparable units; estimates, standard
+errors and interval bounds are distinct quantities, not replicate draws.
+Matrices instead yield Row, Column, RowLabel, ColumnLabel and Value, with
+indices retaining identity even if labels repeat. Already-long tables
+(including cluster-profile \code{observations}) need no reshaping.}
 }
 \value{
 The full reusable plot-data list, or the selected component.
@@ -29,42 +47,45 @@ It accepts an existing \code{mfrm_plot_data} object, or any mfrmr object whose
 \code{plot()} method supports \code{draw = FALSE}. Use \code{\link[=plot_data_components]{plot_data_components()}} first
 when you want to inspect which components are available before extracting
 one.
+
+Titles, subtitles, and explanatory footnotes are omitted from figures by
+default. Use \code{plot_data(p, "title")} for the suggested title and
+\code{plot_data(p, "notes")} for a \code{Type}/\code{Text} table of descriptions and cautions.
+This works for returned base-graphics payloads and mfrmr-generated ggplots,
+including after \code{saveRDS()}/\code{readRDS()}. Printing an \code{mfrm_plot_data} object
+also displays its notes in the console. Axes, legends, panel headings and
+data/status symbols remain in the figure. Removing figure text does not
+remove numerical warnings or strengthen the interpretation of a result.
 }
+\section{Custom distribution plots}{
+
+A cluster profile's \code{observations} component contains one row per original
+entity and selected feature, with ID, Feature, Value, Cluster, Included and
+MissingReason. Missing values and omitted entities remain. Use Included to
+select the plotted population explicitly. \code{table} is the summary, not raw
+observations. Export either with write.csv; use the observations for custom
+box/violin/raincloud plots. Feature units are the original units, supplied by
+the study. A smooth density is usually inappropriate for a few ordinal bins.
+\code{vignette("mfrmr-networks-and-reporting")} demonstrates custom plots and CSVs.
+}
+
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-# A balanced slice retains every Rater and Criterion while running quickly.
-toy <- toy[toy$Person \%in\% unique(toy$Person)[1:12], , drop = FALSE]
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", maxit = 30)
+library(mfrmr)
 
-wright_plot_data <- plot_data(fit, type = "wright")
-names(wright_plot_data)
+# Saved synthetic MML/RSM analysis of example_operational.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "operational-mml.rds", package = "mfrmr"))
+fit <- example_fit$fit
 
-wright_table <- plot_data(fit, type = "wright", component = "locations")
-head(wright_table)
+# Draw the Wright map and keep its reusable data
+wright <- plot(fit)
+plot_data(wright, "notes")
 
-curves <- category_curves_report(fit, theta_points = 51)
-curve_long <- plot_data(curves, component = "plot_long")
-head(curve_long[, c("PlotType", "Theta", "Series", "Value")])
+# Extract the plotted locations as a table
+locations <- plot_data(wright, component = "locations")
+head(locations)
 
-pathway_long <- plot_data(fit, type = "pathway", component = "pathway_long")
-head(pathway_long[, c("Layer", "CurveGroup", "Theta", "Value")])
-pathway_fit <- plot_data(fit, type = "pathway", component = "fit_measures")
-head(pathway_fit[, c("Facet", "Level", "Infit", "Outfit", "FitStatus")])
-
-# Re-render one component with your own styling while keeping the
-# package-generated data and interpretation metadata.
-expected <- pathway_long[pathway_long$Layer == "expected_score", , drop = FALSE]
-plot(expected$Theta, expected$Value, type = "l",
-     xlab = "Theta", ylab = "Expected score",
-     main = "Custom expected-score pathway")
-abline(v = 0, lty = 2, col = "grey60")
-
-info <- compute_information(fit, theta_points = 51)
-sem_long <- plot_data(
-  plot_information(info, type = "sem", draw = FALSE),
-  component = "plot_long"
-)
-head(sem_long[, c("Metric", "Theta", "Value", "DisplayedByDefault")])
-}
+# For table extraction alone, no graphics device is needed
+locations_only <- plot_data(fit, component = "locations")
+head(locations_only)
 }

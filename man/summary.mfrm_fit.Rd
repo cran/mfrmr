@@ -13,7 +13,8 @@
   detail = NULL,
   diagnostics = NULL,
   compute = c("auto", "never"),
-  include_person = FALSE
+  include_person = FALSE,
+  comparison_review = NULL
 )
 }
 \arguments{
@@ -28,7 +29,9 @@ follow \code{...} must be supplied by name.}
 
 \item{profile}{Summary profile. \code{"fit"} preserves the lightweight fit-only
 contract and does not compute diagnostics. \code{"facets"} adds a
-FACETS-organized measurement review, while \code{"reporting"} adds the
+comprehensive measurement review using familiar FACETS-style section
+organization; it does not require FACETS knowledge or software.
+\code{"reporting"} adds the
 reporting-oriented results profile.}
 
 \item{detail}{Printed detail. When \code{NULL} (the default), the lightweight
@@ -49,11 +52,19 @@ diagnostics.}
 \item{include_person}{Logical. Whether person identifiers may be printed in
 extreme-person tables and requested by the fit-pathway route. The default
 is \code{FALSE} for privacy-safe console output.}
+
+\item{comparison_review}{Optional prospective interaction review from
+\code{\link[=describe_mfrm_data]{describe_mfrm_data()}}. Explicitly requests fitted contrasts and retained-
+point numerical checks through \code{\link[=interaction_effect_table]{interaction_effect_table()}}, saved as
+\verb{$interaction_comparisons}. It does not fit a model or supply intervals.}
 }
 \value{
 An object of class \code{summary.mfrm_fit} with:
 \itemize{
-\item \code{overview}: global model/fit indicators
+\item \code{overview}: global model/fit indicators. For MML, \code{MMLEngineUsed} records
+the actual algorithm, \code{IterationsBasis} explains what is counted, and
+\code{ConvergenceBasis} identifies the numerical stopping rule. Numerical
+convergence does not establish identification or interval eligibility
 \item \code{status}: concise front-door status block for quick review
 \item \code{decision}: plain-language interpretation, formal-inference status,
 reason, and highest-priority next action derived from the stored readiness
@@ -62,7 +73,7 @@ yields \code{FormalInference = "Yes"}
 \item \code{readiness}: the stored fit-level state plus numerical, data, design,
 stability, diagnostic, and reporting workflow states
 \item \code{data_review}: structured connectivity and facet-support evidence used by
-the non-numerical readiness gates
+the non-numerical readiness requirements
 \item \code{key_warnings}: highest-priority warnings to review first
 \item \code{next_actions}: recommended follow-up helpers
 \item \code{population_overview}: current population-model basis, residual variance,
@@ -82,15 +93,33 @@ use
 \item \code{step_overview}: threshold/step diagnostics by PCM/GPCM \code{StepFacet}
 ladder, or for the common RSM ladder
 \item \code{slope_overview}: parameter-readiness and explicitly labelled optimizer-
-trace summary for \code{GPCM} discriminations
+trace summary for \code{GPCM} discriminations. \code{SlopeOwner} identifies the facet
+whose levels carry slopes. \code{Min}, \code{Max} and \code{GeometricMean} summarize
+primary estimates; the \verb{Optimizer*} fields retain numerical iterates when
+primary estimates are unavailable. The scale reference is an identification
+constraint, not evidence that estimates or intervals are reliable
 \item \code{inference_evidence}: for \code{GPCM} MML, a compact separation of optimizer
 stationarity, retained-point local rank, observed-information curvature,
 slope-boundary screening, and the final readiness decision. Supportive
 local evidence does not override an inconclusive boundary audit
 \item \code{interaction_overview}: model-estimated facet-interaction summary
 when the fit was specified with \code{facet_interactions}
+\item \code{interaction_comparisons}: explicitly requested joint-fit contrasts,
+retaining unavailable rows, the prospective review and numerical checks;
+absent unless \code{comparison_review} is supplied
 \item \code{settings_overview}: estimation-settings overview that pins the
-configuration that affects identification/scoring
+configuration that affects identification/scoring. \code{CenteringScope}
+distinguishes whole-facet (\code{"facet"}) from legacy remainder centering
+(\code{"remainder"}), separately from \code{NoncenterFacet}. Native fits saved before
+convention metadata retain the legacy interpretation. Recreate this
+summary from the fit to obtain new fields; reading an old summary does
+not update it or refit the model
+\item \code{numerical_review}: separate optimization, curvature, starting-value,
+integration and reproducible-refit evidence with specific next actions.
+Missing checks remain unassessed; this table does not change readiness
+\item \code{starting_values}, \code{starting_value_notes}: all attempted starts, numerical
+outcomes, selection and interpretation limits when \code{fit_mfrm(mml_starts = ...)}
+was requested. These describe numerical sensitivity, not sampling uncertainty
 \item \code{attached_diagnostics}: logical flag indicating whether the
 \code{mfrm_fit} was returned with diagnostics already attached
 \item \code{attached_diagnostics_cols}: character vector of diagnostic
@@ -127,6 +156,18 @@ FACETS-organization interpretation boundary
 Summarize an \code{mfrm_fit} object in a user-friendly format
 }
 \details{
+Start with \code{results <- summary(fit)}. Use \code{results$person_overview} for
+the distribution of person ability estimates and \code{results$facet_overview}
+for the distribution of estimates within each non-person facet. These are
+aggregate summaries; use \code{as.data.frame(fit)} for individual person and
+facet-level estimates. Read \code{results$decision} before interpreting results.
+Assignment with \verb{<-} saves the summary without printing it; enter \code{results}
+to print the full summary or use \code{$} to display a selected table.
+In the example, \code{person_overview} has one row for all persons and
+\code{facet_overview} has one row for raters and one for criteria. Each non-person
+facet's mean is constrained to zero in this fit; use its SD and range or
+individual estimates to inspect differences among its levels.
+
 This method provides a compact, human-readable summary oriented to reporting.
 The expanded profiles use FACETS-style organization for navigation, but do
 not claim that FACETS was executed or that estimates are numerically
@@ -147,6 +188,12 @@ measures
 }
 \section{Interpreting output}{
 
+Corrected JML has a separate summary of saved \code{tables} and numerical
+\code{attempts}, with the correction order and the meaning of RootSE. All profiles
+show the same saved summary and never compute ordinary diagnostics. Use
+\code{include_person = TRUE} for conditional Person profiles without Person SEs.
+See the \strong{Corrected JML} section of \code{\link[=fit_mfrm]{fit_mfrm()}}. The entries below describe
+the ordinary, uncorrected fitting routes.
 \itemize{
 \item \code{overview}: convergence plus the versioned information-criterion contract.
 For eligible fixed-facet MML fits, BIC/SABIC use unique Persons, not
@@ -160,10 +207,16 @@ Design, Stability, Diagnostics, and Reporting workflow states.
 \code{InferenceReady} is a conservative compatibility scalar and is \code{TRUE}
 only when the stored \code{FitReadiness} is \code{ready}; numerical convergence
 cannot override input, estimability, category, or boundary review.
-\item \code{decision}: separates that fit gate from formal precision support. A
+\item \code{decision}: separates fit readiness from formal precision support. A
 fit-only summary returns \code{FormalInference = "No"} until a matching
 \code{mfrm_diagnostics} object is supplied through \verb{diagnostics =}; use
 \code{summary(diagnostics)$decision} for the equivalent precision-aware view.
+The console uses this single decision throughout; a converged optimizer
+or a passed fit check does not independently authorize formal inference.
+Printed workflow, population and GPCM descriptions use readable labels.
+The returned tables retain their numerical values and structured status
+fields for programmatic use. Reprinting an existing summary updates its
+display without refitting or changing its stored results.
 \item \code{data_review}: overall multi-facet connectivity, facet-level score
 support, boundary-constant levels, single-level facets, and retained
 preparation notes behind the readiness rows.
@@ -175,6 +228,14 @@ records its distribution denominator, exclusion count, and estimate use.
 \item \code{step_overview}: threshold spread and monotonicity checks, reported by
 \code{StepFacet} ladder for PCM/GPCM fits and as one common ladder for RSM fits.
 \item \code{settings_overview}: estimation settings that affect interpretation.
+\code{CategoryPolicy} records \code{"preserve"} or \code{"collapse"}; \code{ScoreRecoded}
+states whether the stored original-to-internal score map changes values.
+A collapse policy need not recode a complete contiguous scale. For older
+saved fits, absent policy or mapping records give \code{"not_recorded"} or \code{NA},
+respectively; an unchanged score map does not identify the chosen policy.
+For MML fits, the printed fit and summary also state the engine, fixed or
+adaptive Gauss--Hermite rule and order, one-dimensional latent
+structure, population identification, and discrimination constraint.
 \item \code{population_coding}: fitted categorical levels and contrasts that must be
 reused when scoring new persons under the population-model posterior.
 \item \code{key_warnings} / \code{notes}: short triage subset of retained zero-count score
@@ -204,59 +265,38 @@ relative directions under the fitted identification constraints.
 \item Review data and score support with \code{\link[=describe_mfrm_data]{describe_mfrm_data()}}.
 \item Fit with \code{\link[=fit_mfrm]{fit_mfrm()}} and read \code{summary(fit, profile = "fit")}.
 \item Request \code{summary(fit, profile = "facets")} for the comprehensive
-FACETS-organized review.
+measurement review. The historical profile name does not mean that
+FACETS is run.
 \item Draw the required native Wright map with
 \code{plot(fit, type = "wright", show_ci = TRUE)}; add the FACETS renderer or
 Infit pathway only when they answer a specific follow-up question.
 \item For \code{RSM} / \code{PCM}, continue with \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} for element-level fit
-checks. For bounded \code{GPCM}, continue with \code{\link[=compute_information]{compute_information()}} /
-\code{\link[=plot_information]{plot_information()}} or the fixed-calibration posterior scoring helpers.
+checks. For \code{GPCM}, continue with \code{\link[=compute_information]{compute_information()}} /
+\link[=plot.mfrm_information]{plot(x)} or the fitted-object posterior scoring helpers.
 }
 }
 
 \examples{
-toy <- load_mfrmr_data("example_operational")
-# Seven quadrature points keep this executable example short. For a final
-# analysis, restore the default or a prespecified grid and review sensitivity.
-fit <- fit_mfrm(
-  toy, "Person", c("Rater", "Criterion"), "Score",
-  method = "MML", model = "RSM", quad_points = 7, maxit = 30
-)
-s <- summary(fit)
-s$overview[, c(
-  "Model", "Method", "Converged", "FitReadiness", "InferenceReady",
-  "ConvergenceSeverity"
-)]
-s$readiness
-# `InferenceReady = TRUE` means all five stored fit components passed.
-# It does not, by itself, support formal SE/CI or reliability.
-diag <- diagnose_mfrm(fit, residual_pca = "none")
-summary(fit, diagnostics = diag)$decision
-# Design, Stability, Diagnostics, and Reporting remain purpose-specific
-# workflow reviews rather than alternative fit-readiness derivations.
-# If Numerical is not a pass, inspect the retained polish stages; increasing
-# `maxit` alone may not resolve the review.
-s$person_overview
-# Interpret location and spread on the fitted logit scale together with the
-# score distribution and extreme-score counts.
-s$targeting
-# Targeting and spread are descriptive. Their practical importance depends
-# on the assessment purpose, sample, and facet orientation.
-facets_summary <- summary(fit, profile = "facets", compute = "never")
-res <- facets_summary$results
-native_map <- plot(
-  fit, type = "wright", renderer = "native", show_ci = TRUE, draw = FALSE
-)
-facets_map <- plot(
-  fit, type = "wright", renderer = "facets", show_ci = FALSE,
-  category_labels = c(
-    `1` = "Beginning", `2` = "Developing",
-    `3` = "Secure", `4` = "Advanced"
-  ),
-  draw = FALSE
-)
-# For fit statistics and the optional person-inclusive pathway, rerun the
-# FACETS profile with diagnostics available, then use its `results` object.
+library(mfrmr)
+
+# Saved synthetic MML/RSM analysis of example_operational.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "operational-mml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+
+# Save the summary, then display its tables
+results <- summary(fit)
+results$person_overview # One row summarizing person ability estimates
+results$facet_overview  # One row per facet: number of levels, mean, SD, range
+
+# Check the interpretation status and recommended next step
+results$decision
+
+# Extract estimates and select the rows to display
+estimates <- as.data.frame(fit)
+head(subset(estimates, Facet == "Person")) # First six persons
+subset(estimates, Facet == "Rater")       # All raters
+subset(estimates, Facet == "Criterion")   # All criteria
 }
 \seealso{
 \code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}

@@ -75,6 +75,8 @@ An object of class \code{mfrm_population_prediction} with components:
 \item \code{forecast}: facet-level forecast table
 \item \code{overview}: run-level overview
 \item \code{simulation}: underlying \code{\link[=evaluate_mfrm_design]{evaluate_mfrm_design()}} result
+\item \code{fit_identity}: source-fit metadata for fit-derived forecasts; \code{NULL} for
+an explicitly supplied simulation specification
 \item \code{sim_spec}: simulation specification used for the forecast
 \item \code{facet_names}: public non-person facet names carried by the simulation
 specification
@@ -87,7 +89,7 @@ including a \code{facet_manifest}
 \item \code{planning_constraints}: explicit record of mutable/locked design variables
 \item \code{planning_schema}: structured planning metadata carrying the role
 table, supported boundary, mutability map, and facet manifest
-\item \code{gpcm_boundary}: bounded-\code{GPCM} caveat row when a \code{GPCM} forecast route is
+\item \code{gpcm_boundary}: \code{GPCM} caveat row when a \code{GPCM} forecast route is
 used
 \item \code{settings}: forecasting settings
 \item \code{ademp}: simulation-study metadata
@@ -115,6 +117,10 @@ starting point with \code{\link[=extract_mfrm_sim_spec]{extract_mfrm_sim_spec()}
 requested future design under that explicit data-generating mechanism. This
 should be interpreted as a fit-based forecast under modeling assumptions, not
 as a guaranteed out-of-sample prediction.
+Generating parameters are held fixed at the values in that specification.
+Monte Carlo SEs describe simulation precision conditional on these values;
+they do not include source-fit uncertainty or uncertainty about whether the
+generating assumptions describe a future administration.
 
 When that fit-derived or manually built simulation specification stores an
 active latent-regression population generator, the helper still operates at
@@ -123,7 +129,7 @@ person-level covariates and responses, refits the MML population-model
 branch, and summarizes the resulting facet-level behavior. This is distinct
 from the fitted-model posterior scoring provided by \code{\link[=predict_mfrm_units]{predict_mfrm_units()}}.
 
-Bounded \code{GPCM} forecasts are available with caveats through the same
+\code{GPCM} forecasts are available with caveats through the same
 repeated simulation/refit design route used by \code{\link[=evaluate_mfrm_design]{evaluate_mfrm_design()}}.
 They summarize design-level operating characteristics under the supplied or
 fit-derived slope-aware specification; they do not validate operational
@@ -176,8 +182,22 @@ reporting}. Psychological Methods.
 }
 }
 
+\section{Saved-result reuse}{
+
+Fit-derived forecasts must match the source fit when supplied to archive or
+replay helpers. Explicit \code{sim_spec} forecasts remain separate scenarios;
+attaching them does not establish that their assumptions match the fit.
+Fit-derived forecasts with a fixed \code{population_sd} are unavailable: the
+design-simulation refits do not preserve that variance constraint or an
+anchor-defined origin. An explicit \code{sim_spec} can describe a separate
+forecasting scenario, but does not reproduce those source-fit constraints.
+See \link{mfrmr_compatibility_layer} for migration and replay behavior.
+}
+
 \examples{
-\donttest{
+# Long-running workflow; run explicitly when needed.
+# example("predict_mfrm_population", run.dontrun = TRUE)
+\dontrun{
 spec <- build_mfrm_sim_spec(
   n_person = 16,
   n_rater = 3,

@@ -56,7 +56,7 @@ response-row review, active person estimates, and replay provenance.
 bundle for the latent-regression synthetic case, round-trips package tables
 through the normalization/review helpers, and confirms the package-side
 workflow without claiming that ConQuest itself was executed.
-\item \code{synthetic_gpcm}: checks whether the bounded \code{GPCM} branch recovers
+\item \code{synthetic_gpcm}: checks whether the \code{GPCM} branch recovers
 known criterion-specific slopes, row-centered step parameters, and
 criterion ordering from a synthetic overlap case. This case
 currently requires \code{model = "GPCM"} and is intended for \code{method = "MML"}.
@@ -89,7 +89,9 @@ latent-regression population-model/posterior-basis fields, including
 categorical-coding details when present).
 \item \code{design_checks}: exact design recovery checks for each dataset.
 \item \code{recovery_checks}: known-truth recovery metrics for the synthetic cases,
-including the latent-regression reference case.
+including the latent-regression reference case. If a benchmark fit is not
+scoring-ready, its posterior-shift row is retained as \code{Warn} and is not
+calculated from a review-only score.
 \item \code{bias_checks}: source-backed bias/local-measure identity checks.
 \item \code{pair_checks}: paired-dataset stability screens for the iterated cases.
 \item \code{linking_checks}: common-element reviews for paired calibration datasets.
@@ -103,7 +105,9 @@ model reference data.
 }
 
 \examples{
-\donttest{
+# Long-running workflow; run explicitly when needed.
+# example("reference_case_benchmark", run.dontrun = TRUE)
+\dontrun{
 bench <- reference_case_benchmark(
   cases = "synthetic_truth",
   method = "JML",

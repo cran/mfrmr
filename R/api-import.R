@@ -7,9 +7,8 @@
 # statistics. Bias, DIF, anchor-review, and replay components are outside this
 # adapter contract when the source package does not expose the underlying data.
 #
-# All importers refuse to claim the `mfrm_fit` class outright; they
-# return an `mfrm_imported_fit` object that downstream helpers can
-# detect and handle conservatively.
+# Imported bundles retain `mfrm_fit` inheritance for measurement displays,
+# with a distinct first class and source-scale metadata for restricted dispatch.
 
 #' Import an `mirt` fit to an mfrmr-compatible bundle
 #'
@@ -17,25 +16,24 @@
 #' fit and returns an `mfrm_imported_fit` object. The returned
 #' object has the public slots `summary`, `facets$person`,
 #' `facets$others`, `steps`, `config`, and `source` that the mfrmr
-#' plot and table helpers expect. With `compute_fit = TRUE` the
-#' importer also runs [mirt::itemfit()] and [mirt::personfit()] so
-#' Infit / Outfit columns are populated, and synthesises a
-#' `mfrm_diagnostics`-shape `diagnostics` slot consumable by
-#' downstream plot helpers (Wright map, QC dashboard, etc.).
+#' plot and table helpers expect. Only unidimensional Rasch and partial-credit
+#' response models with positive slopes and ordinary category scores are
+#' supported. Graded-response, guessing and multidimensional models are refused.
+#' With `compute_fit = TRUE`, source Infit / Outfit statistics are attached.
 #'
 #' @param fit An object returned by [mirt::mirt()] (a
 #'   `SingleGroupClass`).
 #' @param model One of `"RSM"`, `"PCM"`, `"GPCM"`. The importer
-#'   does not infer the model from the mirt object; pass the model
-#'   that was estimated.
+#'   does not reconstruct all source constraints; pass the model that was
+#'   estimated. Non-unit slopes require `"GPCM"`. A polytomous `"RSM"`
+#'   import requires source item type `"rsm"`.
 #' @param item_facet Name to assign to the item facet in the
 #'   imported bundle (default `"Item"`).
 #' @param compute_fit Logical. When `TRUE`, run [mirt::itemfit()]
 #'   and [mirt::personfit()] to populate Infit / Outfit / OutfitZSTD
 #'   columns on the returned facet tables, plus build a
-#'   measurement-side `mfrm_diagnostics` bundle consumable by
-#'   `summary()`, `plot.mfrm_fit()`, `plot_qc_dashboard()`, etc.
-#'   Default `FALSE` keeps the importer fast (skeleton only).
+#'   measurement-side diagnostics bundle. Person fit uses source EAP scores.
+#'   Default `FALSE` extracts parameters without calculating fit statistics.
 #'
 #' @return An `mfrm_imported_fit` object. Slots:
 #' \describe{
@@ -43,11 +41,11 @@
 #'   \item{`facets$person`}{Person ID, Estimate, SE, Extreme, plus
 #'     Infit / Outfit / OutfitZSTD / Zh when `compute_fit = TRUE`.}
 #'   \item{`facets$others`}{Item-level estimates and slopes; with
-#'     `compute_fit = TRUE`, also Infit / Outfit / S_X2 / RMSEA / df
-#'     from `mirt::itemfit()`.}
-#'   \item{`steps`}{Per-item threshold parameters extracted from the
-#'     IRT parameterisation (`b1`, ..., `b(K-1)`).}
-#'   \item{`config`}{List with the resolved `model` and `item_facet`
+#'     `compute_fit = TRUE`, also available Infit / Outfit statistics.}
+#'   \item{`steps`}{Absolute adjacent-category thresholds on the source ability
+#'     scale, labelled in `Parameterization`; these are not centered step
+#'     deviations. Rating-scale offsets are included.}
+#'   \item{`config`}{List with the declared `model` and facet names
 #'     used for the import; downstream plot and table helpers consult
 #'     this to dispatch correctly on the imported bundle.}
 #'   \item{`diagnostics`}{`mfrm_diagnostics`-shape bundle when
@@ -55,18 +53,49 @@
 #'   \item{`source`}{Imported-from metadata.}
 #' }
 #'
+#' @section Source scale:
+#' Item difficulty is the mean of its absolute adjacent-category thresholds.
+#' Source identification and slopes are retained without rescaling. For mirt
+#' `gpcmIRT` and `rsm`, the category offset is included as `b - c / a`.
+#' Binary and polytomous items may be mixed; thresholds are read using each
+#' item's response model and category count. Inapplicable padding columns in
+#' the source coefficient table are not missing estimated thresholds.
+#' Person estimates are EAP; the `SE` column contains conditional posterior
+#' SDs, not sampling SEs. Person labels use retained source row names or
+#' P-prefixed row positions. Original identifiers discarded by mirt cannot be
+#' recovered. Imported summaries describe these conventions without assuming
+#' a native mfrmr population distribution or slope normalization.
+#'
+#' @section Imported uncertainty:
+#' Imported SEs retain the source package's interpretation. The measurement-side
+#' diagnostics do not reconstruct the joint parameter covariance, so joint facet
+#' chi-square statistics, degrees of freedom and p-values are unavailable.
+#' Posterior SDs do not supply sampling SEs for separation reliability.
+#' Other separation summaries require valid SEs for every finite estimate and
+#' remain descriptive. Imported Wright maps show points only: source uncertainty
+#' conventions do not establish one common confidence-interval calculation.
+#' Re-import older saved bundles from the existing source-package fit to update
+#' difficulties, thresholds and uncertainty labels. The mirt and TAM importers
+#' accept `compute_fit = TRUE` when source fit statistics are needed; no model
+#' re-estimation is required.
+#'
 #' @section Scope:
-#' Bundles bias / DIF / anchor / replay slots are explicitly not
-#' populated. This helper provides a one-way fitted-object import for the
-#' documented core fields, not a bidirectional interchange format.
+#' Use `summary()` for source-scale tables and `plot()` for a point-only Wright
+#' map. Available source fit statistics remain in the facet and diagnostic
+#' tables. Native model curves, comprehensive [mfrm_results()] reports,
+#' response-level diagnostics, [run_qc_pipeline()], bias/DIF analysis, anchoring
+#' and portable calibration are unavailable for imported bundles. This is a
+#' one-way fitted-object import of the documented fields.
 #' @seealso [import_tam_fit()], [import_erm_fit()]
 #' @examples
-#' \donttest{
+#' # Optional integration example (loads additional modelling or rendering packages).
+#' # example("import_mirt_fit", run.dontrun = TRUE)
+#' \dontrun{
 #' if (requireNamespace("mirt", quietly = TRUE)) {
-#'   response_matrix <- matrix(sample(0:3, 60, replace = TRUE), nrow = 20)
+#'   response_matrix <- matrix(sample(0:1, 120, replace = TRUE), nrow = 40)
 #'   colnames(response_matrix) <- paste0("Item", seq_len(ncol(response_matrix)))
-#'   fit <- mirt::mirt(response_matrix, 1, itemtype = "gpcm", verbose = FALSE)
-#'   imported <- import_mirt_fit(fit, model = "GPCM")
+#'   fit <- mirt::mirt(response_matrix, 1, itemtype = "Rasch", verbose = FALSE)
+#'   imported <- import_mirt_fit(fit, model = "RSM")
 #'   imported$summary
 #' }
 #' }
@@ -83,7 +112,33 @@ import_mirt_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
   }
   model <- match.arg(model)
 
+  if (!identical(as.integer(mirt::extract.mirt(fit, "nfact")), 1L)) {
+    stop("Only unidimensional mirt fits can be imported; additional factor scores are not standard errors.",
+         call. = FALSE)
+  }
+  item_types <- as.character(mirt::extract.mirt(fit, "itemtype"))
+  if (!length(item_types) ||
+      any(!item_types %in% c("Rasch", "2PL", "gpcm", "gpcmIRT", "rsm"))) {
+    stop("Import supports Rasch and partial-credit item models only; graded, guessing and custom response models are not interchangeable with them.",
+         call. = FALSE)
+  }
+  scoring_matrices <- mirt::extract.mirt(fit, "gpcm_mats")
+  if (length(scoring_matrices) && any(vapply(scoring_matrices, function(x) {
+    !is.null(x) && (ncol(as.matrix(x)) != 1L ||
+      !isTRUE(all.equal(as.numeric(x), seq_len(nrow(as.matrix(x))) - 1,
+                        check.attributes = FALSE)))
+  }, logical(1L)))) {
+    stop("Custom mirt category scoring cannot be imported as ordinary partial credit.", call. = FALSE)
+  }
+
   items <- .mirt_extract_items(fit)
+  if (model != "GPCM" && any(abs(items$Slope - 1) > 1e-8)) {
+    stop("Non-unit source item slopes require model = 'GPCM'; importing does not rescale the source model.", call. = FALSE)
+  }
+  if (model == "RSM" && any(mirt::extract.mirt(fit, "K") > 2L) &&
+      !all(item_types == "rsm")) {
+    stop("A polytomous RSM import requires a source rating-scale model; use model = 'PCM' or 'GPCM' for item-specific thresholds.", call. = FALSE)
+  }
   steps <- .mirt_extract_steps(items, item_facet = item_facet)
   persons <- .mirt_extract_persons(fit)
 
@@ -97,7 +152,7 @@ import_mirt_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
 
   fit_attached <- list(person = NULL, item = NULL)
   if (isTRUE(compute_fit)) {
-    fit_attached <- .mirt_compute_fit_stats(fit)
+    fit_attached <- .mirt_compute_fit_stats(fit, persons)
     if (!is.null(fit_attached$item) && nrow(fit_attached$item) > 0L) {
       m <- match(facet_others$Level, fit_attached$item$Level)
       ok <- !is.na(m)
@@ -140,7 +195,7 @@ import_mirt_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
       facet_others = facet_others,
       persons = persons,
       facet_names = item_facet,
-      n_obs = nrow(persons) * nrow(facet_others),
+      n_obs = sum(!is.na(mirt::extract.mirt(fit, "data"))),
       source = "mirt"
     )
   }
@@ -154,7 +209,13 @@ import_mirt_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
                   facet_names = item_facet,
                   source = "mirt"),
     source = list(package = "mirt",
+                  package_version = as.character(utils::packageVersion("mirt")),
                   source_object_class = class(fit)[1],
+                  metric_version = 1L,
+                  metric = "Item difficulty and adjacent-category thresholds on the source ability scale; source identification and item slopes retained.",
+                  person_scoring = "EAP with conditional posterior SD; calibration uncertainty excluded.",
+                  person_identification = "Person labels use retained source row names or P-prefixed row positions; original identifiers discarded by mirt cannot be recovered.",
+                  item_types = item_types,
                   compute_fit = isTRUE(compute_fit))
   )
   class(out) <- c("mfrm_imported_fit", "mfrm_fit", "list")
@@ -165,85 +226,95 @@ import_mirt_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
 
 .mirt_extract_items <- function(fit) {
   irt_pars <- tryCatch(
-    mirt::coef(fit, simplify = TRUE, IRTpars = TRUE)$items,
+    .mfrm_mirt_coef(fit, simplify = TRUE, IRTpars = TRUE)$items,
     error = function(e) NULL
   )
-  if (is.null(irt_pars)) {
-    irt_pars <- mirt::coef(fit, simplify = TRUE, IRTpars = FALSE)$items
+  if (is.null(irt_pars) || !is.matrix(irt_pars)) {
+    stop("Source IRT difficulties could not be extracted; raw intercepts cannot be substituted for thresholds.", call. = FALSE)
   }
   items_mat <- as.data.frame(irt_pars, stringsAsFactors = FALSE)
   items_mat$Level <- rownames(items_mat)
   rownames(items_mat) <- NULL
-  # Slope (1PL / Rasch returns no slope column; populate as 1).
-  slope_col <- intersect(c("a", "a1"), names(items_mat))[1]
-  items_mat$Slope <- if (!is.na(slope_col)) {
-    suppressWarnings(as.numeric(items_mat[[slope_col]]))
-  } else {
-    rep(1, nrow(items_mat))
+  # Keep the source discrimination without normalizing it to a native scale.
+  slope_cols <- intersect(c("a", "a1"), names(items_mat))
+  items_mat$Slope <- vapply(seq_len(nrow(items_mat)), function(i) {
+    values <- as.numeric(unlist(items_mat[i, slope_cols, drop = FALSE], use.names = FALSE))
+    values <- values[is.finite(values)]
+    if (length(values) == 1L) values else NA_real_
+  }, numeric(1L))
+  if (any(!is.finite(items_mat$Slope) | items_mat$Slope <= 0)) {
+    stop("Every imported item must have a finite positive source slope.", call. = FALSE)
   }
-  # Item difficulty: the average of the b-thresholds for graded /
-  # gpcm models, or the single `b` for binary Rasch.
-  b_cols <- grep("^b[0-9]*$", names(items_mat), value = TRUE)
-  if (length(b_cols) == 0L) {
-    items_mat$Difficulty <- NA_real_
-  } else {
-    b_mat <- vapply(b_cols, function(col) {
-      suppressWarnings(as.numeric(items_mat[[col]]))
-    }, numeric(nrow(items_mat)))
-    if (is.matrix(b_mat) && ncol(b_mat) > 1L) {
-      items_mat$Difficulty <- rowMeans(b_mat, na.rm = TRUE)
-    } else {
-      items_mat$Difficulty <- as.numeric(b_mat)
+  counts <- as.integer(mirt::extract.mirt(fit, "K")) - 1L
+  types <- as.character(mirt::extract.mirt(fit, "itemtype"))
+  if (length(counts) != nrow(items_mat) || length(types) != nrow(items_mat) ||
+      anyNA(counts) || any(counts < 1L)) {
+    stop("Source item category counts cannot be aligned with their thresholds.", call. = FALSE)
+  }
+  # Mixed source tables use b for dichotomous items and b1, b2, ... for
+  # partial-credit items; their other columns contain inapplicable NA padding.
+  items_mat$Thresholds <- lapply(seq_len(nrow(items_mat)), function(i) {
+    columns <- if (types[i] %in% c("Rasch", "2PL") && counts[i] == 1L) "b" else
+      paste0("b", seq_len(counts[i]))
+    if (!all(columns %in% names(items_mat)))
+      stop("Source adjacent-category thresholds are unavailable.", call. = FALSE)
+    values <- as.numeric(items_mat[i, columns, drop = TRUE])
+    if (types[i] %in% c("gpcmIRT", "rsm")) {
+      if (!"c" %in% names(items_mat) || !is.finite(items_mat$c[i]))
+        stop("Source rating-scale offsets are unavailable.", call. = FALSE)
+      values <- values - items_mat$c[i] / items_mat$Slope[i]
     }
+    if (any(!is.finite(values)))
+      stop("Every imported item must have finite source adjacent-category thresholds.", call. = FALSE)
+    values
+  })
+  items_mat$Difficulty <- vapply(items_mat$Thresholds, mean, numeric(1L))
+  if (any(!is.finite(items_mat$Difficulty))) {
+    stop("Every imported item must have finite source adjacent-category thresholds.", call. = FALSE)
   }
   items_mat
 }
 
 .mirt_extract_steps <- function(items_mat, item_facet) {
-  b_cols <- grep("^b[0-9]+$", names(items_mat), value = TRUE)
-  b_cols <- b_cols[order(as.integer(sub("^b", "", b_cols)))]
-  if (length(b_cols) == 0L) {
-    # Single-threshold Rasch: emit one step per item.
-    if ("b" %in% names(items_mat)) {
-      return(data.frame(
-        StepFacet = item_facet,
-        Level = items_mat$Level,
-        Step = 1L,
-        Estimate = suppressWarnings(as.numeric(items_mat$b)),
-        stringsAsFactors = FALSE
-      ))
-    }
-    return(data.frame(
-      StepFacet = character(0), Level = character(0),
-      Step = integer(0), Estimate = numeric(0),
-      stringsAsFactors = FALSE
-    ))
-  }
-  rows <- lapply(seq_along(b_cols), function(k) {
+  rows <- lapply(seq_len(nrow(items_mat)), function(i) {
     data.frame(
       StepFacet = item_facet,
-      Level = items_mat$Level,
-      Step = k,
-      Estimate = suppressWarnings(as.numeric(items_mat[[b_cols[k]]])),
+      Level = items_mat$Level[i],
+      Step = seq_along(items_mat$Thresholds[[i]]),
+      Estimate = items_mat$Thresholds[[i]],
+      Parameterization = "Absolute adjacent-category threshold on source ability scale",
       stringsAsFactors = FALSE
     )
   })
-  do.call(rbind, rows)
+  out <- do.call(rbind, rows)
+  # Preserve the historical step-major ordering for homogeneous imports.
+  out <- out[order(out$Step, match(out$Level, items_mat$Level)), , drop = FALSE]
+  rownames(out) <- NULL
+  out
 }
 
 .mirt_extract_persons <- function(fit) {
-  fscores <- mirt::fscores(fit, full.scores.SE = TRUE, verbose = FALSE)
+  fscores <- mirt::fscores(fit, method = "EAP", full.scores.SE = TRUE, verbose = FALSE)
+  if (ncol(fscores) != 2L || !startsWith(colnames(fscores)[2L], "SE_")) {
+    stop("The source EAP score and posterior-SD columns cannot be identified safely.", call. = FALSE)
+  }
+  ids <- rownames(mirt::extract.mirt(fit, "data"))
+  if (is.null(ids) || identical(ids, as.character(seq_len(nrow(fscores))))) {
+    ids <- paste0("P", seq_len(nrow(fscores)))
+  }
   person_tbl <- data.frame(
-    Person = paste0("P", seq_len(nrow(fscores))),
+    Person = ids,
     Estimate = as.numeric(fscores[, 1]),
     SE = if (ncol(fscores) >= 2L) as.numeric(fscores[, 2]) else NA_real_,
     Extreme = "none",
+    EstimateBasis = "Source EAP",
+    UncertaintyBasis = "Conditional posterior SD; calibration uncertainty excluded",
     stringsAsFactors = FALSE
   )
   person_tbl
 }
 
-.mirt_compute_fit_stats <- function(fit) {
+.mirt_compute_fit_stats <- function(fit, persons) {
   item_fit <- tryCatch(
     suppressMessages(suppressWarnings(
       mirt::itemfit(fit, fit_stats = c("infit"),
@@ -253,7 +324,7 @@ import_mirt_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
   )
   person_fit <- tryCatch(
     suppressMessages(suppressWarnings(
-      mirt::personfit(fit, method = "MAP")
+      mirt::personfit(fit, method = "EAP")
     )),
     error = function(e) NULL
   )
@@ -272,7 +343,7 @@ import_mirt_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
   } else NULL
   person_df <- if (!is.null(person_fit)) {
     df <- as.data.frame(person_fit, stringsAsFactors = FALSE)
-    df$Person <- paste0("P", seq_len(nrow(df)))
+    df$Person <- persons$Person
     keep <- intersect(c("Person", "infit", "outfit", "z.infit", "z.outfit", "Zh"),
                        names(df))
     df <- df[, keep, drop = FALSE]
@@ -288,24 +359,46 @@ import_mirt_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
 #' Import a `TAM` fit to an mfrmr-compatible bundle
 #'
 #' Extracts item / step / person parameters from a unidimensional
-#' [TAM::tam.mml()] or [TAM::tam.mml.mfr()] fit. The multi-facet
-#' `tam.mml.mfr()` path is detected automatically and each
-#' non-person facet is mapped onto a row of `fit$facets$others`
-#' so downstream MFRM helpers (e.g. `plot_qc_dashboard()`) work
-#' on the imported object.
+#' [TAM::tam.mml()] or [TAM::tam.mml.mfr()] fit. Difficulties and absolute
+#' adjacent-category thresholds are derived from the source category logits,
+#' rather than inferred from coefficient names. Source slopes and scale
+#' identification are retained.
 #'
 #' @param fit An object returned by `TAM::tam.mml()` or
 #'   `TAM::tam.mml.mfr()`.
-#' @param model Same as [import_mirt_fit()].
+#' @param model Declared response model: `"RSM"`, `"PCM"`, or `"GPCM"`.
+#'   Non-unit source slopes require `"GPCM"`; import does not reconstruct
+#'   all source constraints or certify equivalence to a native mfrmr model.
 #' @param item_facet Name to assign to the item facet for the
 #'   single-facet path. Ignored when the input is a multi-facet
-#'   `tam.mml.mfr` fit (the original facet names are preserved).
-#' @param compute_fit Logical. When `TRUE`, run [TAM::tam.fit()]
+#'   `tam.mml.mfr` fit, whose combined response conditions are labelled
+#'   `"DesignCell"`.
+#' @param compute_fit Logical. When `TRUE`, run [TAM::msq.itemfit()]
 #'   and [TAM::tam.personfit()] to populate Infit / Outfit columns
 #'   on the returned facet tables, plus build a measurement-side
 #'   `mfrm_diagnostics` bundle. Default `FALSE`.
 #'
 #' @details
+#' Each item difficulty is the mean of its absolute adjacent-category thresholds.
+#' Positive constant adjacent-category slopes are required. For multi-facet
+#' fits, each returned difficulty combines all facet effects for that response
+#' condition. Separate facet coordinates are not reconstructed; the original
+#' coefficient table remains in `source$native_parameters`.
+#'
+#' A transformed item SE is retained only when the location is a scalar multiple
+#' of one source coefficient and its slope is fixed. Otherwise it is missing:
+#' marginal coefficient SEs cannot replace the required joint covariance.
+#' Persons retain source EAP and conditional posterior SD. Item fit is averaged
+#' over source posteriors; `TAM::tam.personfit()` uses WLE scores. `FitBasis`
+#' records this distinction without replacing the imported EAP estimates.
+#' Person `Extreme` flags use observed responses and each item's fitted category
+#' support, including unobserved categories. `NObserved` counts responses used
+#' for this check. `ResponseStatus` distinguishes observed, entirely missing,
+#' and unavailable response information. Entirely missing or unverifiable rows
+#' have `Extreme = NA`; finite posterior scores do not imply nonextreme data.
+#' Re-import older TAM objects to recover these flags; saved imported objects
+#' without the source responses cannot reconstruct them.
+#'
 #' The public imported-fit surface is deliberately unidimensional and MML-only.
 #' A `tam.jml` object is not silently relabelled as MML, and a TAM fit with
 #' `ndim > 1` is rejected rather than flattened into one mfrmr scale. Keep
@@ -320,19 +413,20 @@ import_mirt_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
 #' metadata also retains the TAM version, dimension count, iterations, and
 #' iteration ceiling used for the conservative imported convergence status.
 #'
+#' @inheritSection import_mirt_fit Imported uncertainty
+#' @inheritSection import_mirt_fit Scope
+#'
 #' @return An `mfrm_imported_fit` object. Slots mirror
 #'   [import_mirt_fit()], with explicit TAM-native IC provenance in `summary`
 #'   and `source`.
 #' @seealso [import_mirt_fit()], [import_erm_fit()]
 #' @examples
-#' \donttest{
 #' if (requireNamespace("TAM", quietly = TRUE)) {
 #'   response_matrix <- matrix(sample(0:3, 60, replace = TRUE), nrow = 20)
 #'   colnames(response_matrix) <- paste0("Item", seq_len(ncol(response_matrix)))
 #'   fit <- TAM::tam.mml(resp = response_matrix, irtmodel = "PCM")
 #'   imported <- import_tam_fit(fit, model = "PCM")
 #'   imported$summary
-#' }
 #' }
 #' @export
 import_tam_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
@@ -362,8 +456,7 @@ import_tam_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
   persons <- .tam_extract_persons(fit)
 
   if (is_mfr) {
-    extracted <- .tam_extract_mfr(fit, persons = persons,
-                                    fallback_facet = item_facet)
+    extracted <- .tam_extract_single(fit, item_facet = "DesignCell")
     facet_others <- extracted$others
     steps <- extracted$steps
     facet_names <- extracted$facet_names
@@ -372,6 +465,9 @@ import_tam_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
     facet_others <- extracted$others
     steps <- extracted$steps
     facet_names <- item_facet
+  }
+  if (model != "GPCM" && any(abs(facet_others$Slope - 1) > 1e-8)) {
+    stop("Non-unit TAM item slopes require model = 'GPCM'; importing does not rescale the source model.", call. = FALSE)
   }
 
   fit_attached <- list(person = NULL, item = NULL)
@@ -443,7 +539,7 @@ import_tam_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
       facet_others = facet_others,
       persons = persons,
       facet_names = facet_names,
-      n_obs = nrow(persons) * nrow(facet_others),
+      n_obs = sum(persons$NObserved),
       source = "TAM"
     )
   }
@@ -462,6 +558,14 @@ import_tam_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
                   package_version = native_ic$TAMVersion,
                   source_object_class = class(fit)[1],
                   dimensions = import_scope$Dimensions,
+                  metric_version = 1L,
+                  metric = if (is_mfr) {
+                    "Response-design cell difficulties include all source facet effects; separate facet coordinates are not reconstructed."
+                  } else {
+                    "Mean adjacent-category thresholds on the source ability scale; source identification and item slopes retained."
+                  },
+                  person_scoring = "Source EAP with conditional posterior SD; calibration uncertainty excluded.",
+                  native_parameters = fit$xsi.facets %||% fit$xsi,
                   ic_contract = "external_native_tam_v1",
                   convergence = convergence,
                   multi_facet = is_mfr,
@@ -597,150 +701,121 @@ import_tam_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
     Person = person_id,
     Estimate = as.numeric(person_eap),
     SE = as.numeric(person_se),
-    Extreme = "none",
+    .tam_person_response_status(fit, person_id),
+    EstimateBasis = "Source EAP",
+    UncertaintyBasis = "Conditional posterior SD; calibration uncertainty excluded",
     stringsAsFactors = FALSE
   )
+}
+
+.tam_person_response_status <- function(fit, person_id) {
+  out <- data.frame(NObserved = rep(NA_integer_, length(person_id)),
+    Extreme = rep(NA_character_, length(person_id)),
+    ResponseStatus = rep("unavailable", length(person_id)), stringsAsFactors = FALSE)
+  if (is.null(fit$resp) || is.null(fit$AXsi)) return(out)
+  response <- as.matrix(fit$resp)
+  intercepts <- as.matrix(fit$AXsi)
+  ids <- as.character(fit$pid)
+  items <- as.character(fit$item$item)
+  if (!(is.numeric(response) || is.logical(response)) || !is.numeric(intercepts) ||
+      nrow(response) != length(ids) || anyNA(ids) || anyDuplicated(ids) ||
+      anyNA(person_id) || anyDuplicated(person_id) ||
+      !all(person_id %in% ids) || ncol(response) != length(items) ||
+      nrow(intercepts) != length(items) || anyNA(items) || anyDuplicated(items) ||
+      is.null(colnames(response)) || anyDuplicated(colnames(response)) ||
+      !setequal(colnames(response), items)) return(out)
+  support <- is.finite(intercepts)
+  maximum <- rowSums(support) - 1L
+  if (any(maximum < 1L) ||
+      !all(support == outer(maximum, seq_len(ncol(intercepts)) - 1L, `>=`))) return(out)
+  observed <- fit$resp.ind
+  if (is.null(observed)) observed <- !is.na(response)
+  if (!is.matrix(observed) || !identical(dim(observed), dim(response)) ||
+      anyNA(observed) || !all(observed %in% c(0, 1))) return(out)
+  row <- match(person_id, ids)
+  column <- match(items, colnames(response))
+  response <- response[row, column, drop = FALSE]
+  observed <- observed[row, column, drop = FALSE] != 0
+  ceiling <- matrix(maximum, nrow(response), ncol(response), byrow = TRUE)
+  valid <- is.finite(response) & response >= 0 & response <= ceiling &
+    response == floor(response)
+  verified <- rowSums(observed & !valid) == 0L
+  count <- rowSums(observed)
+  out$NObserved[verified] <- as.integer(count[verified])
+  out$ResponseStatus[verified & count == 0L] <- "no_observed_responses"
+  used <- verified & count > 0L
+  out$ResponseStatus[used] <- "observed"
+  out$Extreme[used] <- "none"
+  out$Extreme[used & rowSums(observed & (is.na(response) | response != 0)) == 0L] <- "low"
+  out$Extreme[used & rowSums(observed & (is.na(response) | response != ceiling)) == 0L] <- "high"
+  out
 }
 
 .tam_extract_single <- function(fit, item_facet) {
-  xsi <- as.data.frame(fit$xsi, stringsAsFactors = FALSE)
-  xsi$Level <- rownames(xsi)
-  rownames(xsi) <- NULL
-  facet_others <- data.frame(
-    Facet = item_facet,
-    Level = xsi$Level,
-    Estimate = suppressWarnings(as.numeric(xsi$xsi)),
-    SE = suppressWarnings(as.numeric(xsi$se.xsi %||% NA_real_)),
-    stringsAsFactors = FALSE
-  )
-  # Step parameters: TAM stores per-item-step thresholds in $A and
-  # $xsi together. We approximate by detecting `_Cat` suffix in the
-  # parameter name (TAM convention) and parsing the step index.
-  steps <- .tam_steps_from_xsi(xsi, step_facet = item_facet)
-  list(others = facet_others, steps = steps,
-       facet_names = item_facet)
-}
-
-.tam_extract_mfr <- function(fit, persons, fallback_facet = "Item") {
-  # `tam.mml.mfr()` exposes a tidy `xsi.facets` table that tells us
-  # which facet each parameter belongs to. Each row has columns
-  # `parameter` (xsi name like "I1" or "raterR1"), `facet`
-  # ("item" / "rater" / ...), `xsi`, `se.xsi`.
-  xf <- as.data.frame(fit$xsi.facets, stringsAsFactors = FALSE)
-  if (nrow(xf) == 0L) {
-    return(list(others = data.frame(Facet = character(0),
-                                     Level = character(0),
-                                     Estimate = numeric(0),
-                                     SE = numeric(0),
-                                     stringsAsFactors = FALSE),
-                steps = data.frame(StepFacet = character(0),
-                                    Level = character(0),
-                                    Step = integer(0),
-                                    Estimate = numeric(0),
-                                    stringsAsFactors = FALSE),
-                facet_names = fallback_facet))
+  intercepts <- as.matrix(fit$AXsi)
+  loadings <- fit$B
+  design <- fit$A
+  item_ids <- as.character(fit$item$item)
+  if (!is.numeric(intercepts) || !is.array(loadings) ||
+      length(dim(loadings)) != 3L || dim(loadings)[3L] != 1L ||
+      !identical(dim(intercepts), dim(loadings)[1:2]) ||
+      !is.array(design) || length(dim(design)) != 3L ||
+      !identical(dim(design)[1:2], dim(intercepts)) ||
+      length(item_ids) != nrow(intercepts) || anyNA(item_ids) ||
+      any(!nzchar(item_ids)) || anyDuplicated(item_ids) ||
+      ncol(intercepts) < 2L || ncol(as.matrix(fit$xsi)) < 1L ||
+      dim(design)[3L] != nrow(fit$xsi)) {
+    stop("The TAM item labels, category intercepts, loadings and parameter design are not aligned; a common-scale import is unavailable.", call. = FALSE)
   }
-  xf$facet <- as.character(xf$facet)
-  xf$parameter <- as.character(xf$parameter)
-  xf$xsi <- suppressWarnings(as.numeric(xf$xsi))
-  xf$se <- suppressWarnings(as.numeric(xf$se.xsi %||% NA_real_))
-
-  # Polytomous step parameters carry a `_Cat<k>` suffix on the
-  # parameter name. Split into main effects vs steps so the
-  # `mfrm_fit` shape (others + steps) is preserved. We use
-  # `grepl()` for the boolean mask (`regexpr()` + `regmatches()`
-  # would silently drop non-matching positions, leaving us with a
-  # zero-length boolean for binary models).
-  is_step <- grepl("_Cat[0-9]+$", xf$parameter)
-  step_idx <- ifelse(
-    is_step,
-    suppressWarnings(as.integer(sub(".*_Cat([0-9]+)$", "\\1", xf$parameter))),
-    NA_integer_
-  )
-
-  # Strip the facet prefix from the parameter name to recover the
-  # human-readable level. TAM names parameters as
-  # `<facet><level>` (no separator) for facets other than `item`,
-  # and `<level>` for `item`.
-  level_label <- xf$parameter
-  for (idx in seq_len(nrow(xf))) {
-    fct <- xf$facet[idx]
-    if (!identical(fct, "item") && nzchar(fct) &&
-        startsWith(level_label[idx], fct)) {
-      level_label[idx] <- substr(level_label[idx],
-                                  nchar(fct) + 1L,
-                                  nchar(level_label[idx]))
+  estimates <- standard_errors <- slopes <- rep(NA_real_, length(item_ids))
+  step_rows <- vector("list", length(item_ids))
+  for (i in seq_along(item_ids)) {
+    available <- which(is.finite(intercepts[i, ]))
+    if (length(available) < 2L ||
+        !identical(available, seq_len(length(available)))) {
+      stop("Each TAM item must retain consecutive categories starting at zero.", call. = FALSE)
     }
-  }
-  # Strip the `_Cat<k>` suffix from the step parameter labels so
-  # they share the level name with their main-effect partner.
-  level_no_step <- level_label
-  level_no_step[is_step] <- sub("_Cat[0-9]+$", "",
-                                  level_label[is_step])
-
-  facet_others <- data.frame(
-    Facet = xf$facet[!is_step],
-    Level = level_no_step[!is_step],
-    Estimate = xf$xsi[!is_step],
-    SE = xf$se[!is_step],
-    stringsAsFactors = FALSE
-  )
-  facet_others <- unique(facet_others)
-  # Capitalise the facet label so it matches the package's typical
-  # `Rater` / `Item` / `Criterion` casing.
-  facet_others$Facet <- vapply(facet_others$Facet, function(s) {
-    if (nchar(s) == 0L) return(s)
-    paste0(toupper(substr(s, 1, 1)), substr(s, 2, nchar(s)))
-  }, character(1))
-
-  steps_df <- if (any(is_step)) {
-    df <- data.frame(
-      StepFacet = xf$facet[is_step],
-      Level = level_no_step[is_step],
-      Step = step_idx[is_step],
-      Estimate = xf$xsi[is_step],
+    count <- length(available) - 1L
+    slope_steps <- diff(loadings[i, available, 1L])
+    slope <- slope_steps[1L]
+    if (!all(is.finite(slope_steps)) || slope <= 0 ||
+        any(abs(slope_steps - slope) > 1e-8)) {
+      stop("TAM import requires a positive constant adjacent-category slope per item; nominal or custom category scoring cannot be treated as partial credit.", call. = FALSE)
+    }
+    thresholds <- -diff(intercepts[i, available]) / slope
+    estimates[i] <- mean(thresholds)
+    slopes[i] <- slope
+    # Without joint covariance, a transformed SE is retained only for a
+    # single source coefficient and a fixed slope.
+    weights <- -(design[i, count + 1L, ] - design[i, 1L, ]) / (count * slope)
+    used <- which(abs(weights) > 1e-12)
+    slope_se <- fit$se.B
+    slope_fixed <- is.array(slope_se) && identical(dim(slope_se), dim(loadings)) &&
+      all(is.finite(slope_se[i, available, 1L])) &&
+      all(slope_se[i, available, 1L] == 0)
+    if (length(used) == 1L && slope_fixed &&
+        "se.xsi" %in% names(fit$xsi)) {
+      se <- as.numeric(fit$xsi$se.xsi[used])
+      if (is.finite(se) && se >= 0) standard_errors[i] <- abs(weights[used]) * se
+    }
+    step_rows[[i]] <- data.frame(
+      StepFacet = item_facet, Level = item_ids[i], Step = seq_len(count),
+      Estimate = thresholds,
+      Parameterization = "Absolute adjacent-category threshold on source ability scale",
       stringsAsFactors = FALSE
     )
-    df$StepFacet <- vapply(df$StepFacet, function(s) {
-      if (nchar(s) == 0L) return(s)
-      paste0(toupper(substr(s, 1, 1)), substr(s, 2, nchar(s)))
-    }, character(1))
-    df
-  } else {
-    data.frame(StepFacet = character(0), Level = character(0),
-               Step = integer(0), Estimate = numeric(0),
-               stringsAsFactors = FALSE)
   }
-
-  facet_names <- unique(facet_others$Facet)
-  if (length(facet_names) == 0L) facet_names <- fallback_facet
-  list(others = facet_others, steps = steps_df,
-       facet_names = facet_names)
-}
-
-.tam_steps_from_xsi <- function(xsi, step_facet) {
-  is_step <- grepl("_Cat[0-9]+$", xsi$Level)
-  if (!any(is_step)) {
-    return(data.frame(StepFacet = character(0), Level = character(0),
-                      Step = integer(0), Estimate = numeric(0),
-                      stringsAsFactors = FALSE))
-  }
-  level <- sub("_Cat[0-9]+$", "", xsi$Level[is_step])
-  step_idx <- suppressWarnings(as.integer(
-    sub(".*_Cat([0-9]+)$", "\\1", xsi$Level[is_step])
-  ))
-  data.frame(
-    StepFacet = step_facet,
-    Level = level,
-    Step = step_idx,
-    Estimate = suppressWarnings(as.numeric(xsi$xsi[is_step])),
-    stringsAsFactors = FALSE
+  list(
+    others = data.frame(Facet = item_facet, Level = item_ids,
+      Estimate = estimates, SE = standard_errors, Slope = slopes,
+      stringsAsFactors = FALSE),
+    steps = do.call(rbind, step_rows), facet_names = item_facet
   )
 }
 
 .tam_compute_fit_stats <- function(fit, persons) {
   item_fit <- tryCatch(
-    suppressMessages(suppressWarnings(TAM::tam.fit(fit))),
+    suppressMessages(suppressWarnings(TAM::msq.itemfit(fit))),
     error = function(e) NULL
   )
   person_fit <- tryCatch(
@@ -762,6 +837,7 @@ import_tam_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
     df <- raw[, keep, drop = FALSE]
     if ("Outfit_t" %in% names(df)) names(df)[names(df) == "Outfit_t"] <- "OutfitZSTD"
     if ("Infit_t" %in% names(df)) names(df)[names(df) == "Infit_t"] <- "InfitZSTD"
+    df$FitBasis <- "Source posterior-averaged item fit"
     df
   } else NULL
   person_df <- if (!is.null(person_fit)) {
@@ -776,6 +852,7 @@ import_tam_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
     if ("infitPerson" %in% names(df)) names(df)[names(df) == "infitPerson"] <- "Infit"
     if ("outfitPerson_t" %in% names(df)) names(df)[names(df) == "outfitPerson_t"] <- "OutfitZSTD"
     if ("infitPerson_t" %in% names(df)) names(df)[names(df) == "infitPerson_t"] <- "InfitZSTD"
+    df$FitBasis <- "Source WLE person fit; estimates remain EAP"
     df
   } else NULL
   list(item = item_df, person = person_df)
@@ -783,8 +860,11 @@ import_tam_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
 
 #' Import an `eRm` fit to an mfrmr-compatible bundle
 #'
-#' Extracts item / person parameters from an [eRm::PCM()] /
-#' [eRm::RM()] fit. Current `eRm` person tables use `Person Parameter` and
+#' Extracts item / person parameters from an [eRm::PCM()],
+#' [eRm::RM()] or [eRm::RSM()] fit. Source cumulative easiness coefficients
+#' are converted to absolute adjacent-category difficulties. One item location
+#' is returned per item: the mean of its thresholds. Source identification is
+#' retained. Current `eRm` person tables use `Person Parameter` and
 #' `Std.Error`; historical `theta` / `thetapar` estimate labels are also
 #' accepted. Unknown or internally misaligned person-table schemas stop with an
 #' explicit error rather than silently recycling rows. Same caveats as
@@ -792,20 +872,26 @@ import_tam_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
 #'
 #' @param fit An object returned by `eRm::PCM()`, `eRm::RM()`, or
 #'   `eRm::RSM()`.
-#' @param model Same as [import_mirt_fit()].
+#' @param model Matching `"PCM"` or `"RSM"` label; either is accepted for a
+#'   binary `RM`. `"GPCM"` and linear extensions are unsupported.
 #' @param item_facet Name to assign to the item facet.
 #'
 #' @return An `mfrm_imported_fit` object.
+#' @details
+#' Item-location SEs use the corresponding scalar transformation of the source
+#' cumulative coefficient SE. Person maximum-likelihood estimates and conditional
+#' SEs retain source conventions, including labelled extreme-score extrapolations.
+#' The original coefficient table is retained in `source$native_parameters`.
+#' @inheritSection import_mirt_fit Imported uncertainty
+#' @inheritSection import_mirt_fit Scope
 #' @seealso [import_mirt_fit()], [import_tam_fit()]
 #' @examples
-#' \donttest{
 #' if (requireNamespace("eRm", quietly = TRUE)) {
 #'   response_matrix <- matrix(sample(0:3, 60, replace = TRUE), nrow = 20)
 #'   colnames(response_matrix) <- paste0("Item", seq_len(ncol(response_matrix)))
 #'   fit <- eRm::PCM(response_matrix)
 #'   imported <- import_erm_fit(fit, model = "PCM")
 #'   imported$summary
-#' }
 #' }
 #' @export
 import_erm_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
@@ -819,14 +905,36 @@ import_erm_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
          call. = FALSE)
   }
   model <- match.arg(model)
+  if (!inherits(fit, "eRm") || !fit$model %in% c("RM", "PCM", "RSM") ||
+      model == "GPCM" || (fit$model == "PCM" && model != "PCM") ||
+      (fit$model == "RSM" && model != "RSM")) {
+    stop("eRm import requires an RM, PCM or RSM fit and its matching model label; linear extensions and GPCM are not supported.", call. = FALSE)
+  }
   beta <- fit$betapar
+  counts <- apply(fit$X, 2L, max, na.rm = TRUE)
+  if (any(!is.finite(counts) | counts < 1 | counts != floor(counts)) ||
+      sum(counts) != length(beta) || is.null(colnames(fit$X))) {
+    stop("The eRm cumulative category coefficients cannot be aligned to source items.", call. = FALSE)
+  }
+  last <- cumsum(counts)
+  se_beta <- as.numeric(fit$se.beta %||% rep(NA_real_, length(beta)))
+  if (length(se_beta) != length(beta)) {
+    stop("The eRm coefficient and standard-error rows are not aligned.", call. = FALSE)
+  }
   facet_others <- data.frame(
     Facet = item_facet,
-    Level = names(beta),
-    Estimate = as.numeric(beta),
-    SE = as.numeric(fit$se.beta %||% NA_real_),
+    Level = colnames(fit$X),
+    Estimate = -as.numeric(beta[last]) / counts,
+    SE = se_beta[last] / counts,
     stringsAsFactors = FALSE
   )
+  steps <- do.call(rbind, lapply(seq_along(counts), function(i) {
+    positions <- seq.int(last[i] - counts[i] + 1L, last[i])
+    data.frame(StepFacet = item_facet, Level = colnames(fit$X)[i],
+      Step = seq_len(counts[i]), Estimate = -diff(c(0, beta[positions])),
+      Parameterization = "Absolute adjacent-category threshold on source ability scale",
+      stringsAsFactors = FALSE)
+  }))
   pp <- tryCatch(eRm::person.parameter(fit), error = function(e) NULL)
   if (!is.null(pp)) {
     person_tbl <- .erm_extract_person_table(pp)
@@ -846,7 +954,7 @@ import_erm_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
     LogLik = as.numeric(fit$loglik %||% NA_real_),
     AIC = NA_real_,
     BIC = NA_real_,
-    Converged = TRUE,
+    Converged = if (length(fit$convergence) == 1L && !is.na(fit$convergence)) fit$convergence %in% c(1L, 2L) else NA,
     ConvergenceStatus = "imported",
     stringsAsFactors = FALSE
   )
@@ -854,14 +962,18 @@ import_erm_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
   out <- list(
     summary = summary_tbl,
     facets = list(person = person_tbl, others = facet_others),
-    steps = data.frame(StepFacet = character(0), Step = integer(0),
-                       Level = character(0), Estimate = numeric(0),
-                       stringsAsFactors = FALSE),
+    steps = steps,
     config = list(model = model, method = "CML",
                   facet_names = item_facet,
                   source = "eRm"),
     source = list(package = "eRm",
-                  source_object_class = class(fit)[1])
+                  package_version = as.character(utils::packageVersion("eRm")),
+                  source_object_class = class(fit)[1],
+                  metric_version = 1L,
+                  metric = "Item difficulties and adjacent-category thresholds on the source ability scale; easiness signs and cumulative category coefficients converted.",
+                  person_scoring = "Source maximum likelihood; extreme-response extrapolations retain their labels. Person SEs condition on the fitted items.",
+                  native_parameters = data.frame(Parameter = names(beta),
+                    Estimate = as.numeric(beta), SE = se_beta))
   )
   class(out) <- c("mfrm_imported_fit", "mfrm_fit", "list")
   out
@@ -969,7 +1081,9 @@ import_erm_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
     Person = person_ids,
     Estimate = estimates,
     SE = standard_errors,
-    Extreme = "none",
+    Extreme = ifelse(as.logical(theta_table$Interpolated %||% FALSE),
+                     "source_extrapolated", "none"),
+    Interpolated = as.logical(theta_table$Interpolated %||% FALSE),
     stringsAsFactors = FALSE
   )
 }
@@ -1008,6 +1122,7 @@ import_erm_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
     if ("Outfit" %in% names(facet_others)) df$Outfit <- facet_others$Outfit
     if ("InfitZSTD" %in% names(facet_others)) df$InfitZSTD <- facet_others$InfitZSTD
     if ("OutfitZSTD" %in% names(facet_others)) df$OutfitZSTD <- facet_others$OutfitZSTD
+    if ("FitBasis" %in% names(facet_others)) df$FitBasis <- facet_others$FitBasis
     df
   } else data.frame()
   measures_persons <- if (nrow(persons) > 0L) {
@@ -1023,6 +1138,9 @@ import_erm_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
     if ("Outfit" %in% names(persons)) df$Outfit <- persons$Outfit
     if ("InfitZSTD" %in% names(persons)) df$InfitZSTD <- persons$InfitZSTD
     if ("OutfitZSTD" %in% names(persons)) df$OutfitZSTD <- persons$OutfitZSTD
+    if ("EstimateBasis" %in% names(persons)) df$EstimateBasis <- persons$EstimateBasis
+    if ("UncertaintyBasis" %in% names(persons)) df$UncertaintyBasis <- persons$UncertaintyBasis
+    if ("FitBasis" %in% names(persons)) df$FitBasis <- persons$FitBasis
     df
   } else data.frame()
   measures <- if (nrow(measures_facets) == 0L) measures_persons else
@@ -1032,7 +1150,7 @@ import_erm_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
   fit_tbl <- if (nrow(measures) > 0L &&
                  all(c("Infit", "Outfit") %in% names(measures))) {
     measures[, c("Facet", "Level", "Infit", "Outfit",
-                  intersect(c("InfitZSTD", "OutfitZSTD"), names(measures))),
+                  intersect(c("InfitZSTD", "OutfitZSTD", "FitBasis"), names(measures))),
              drop = FALSE]
   } else data.frame()
 
@@ -1066,6 +1184,8 @@ import_erm_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
     precision_profile = data.frame(
       Method = "imported",
       PrecisionTier = "imported",
+      SupportsFormalInference = FALSE,
+      RecommendedUse = "Imported estimates and SEs retain their source-package interpretation; no native uncertainty or joint facet test is established by import.",
       stringsAsFactors = FALSE
     ),
     precision_review = data.frame(),
@@ -1073,6 +1193,7 @@ import_erm_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
     diagnostic_mode = "legacy",
     residual_pca_mode = "none",
     n_obs = as.integer(n_obs),
+    metric_version = 1L,
     imported = TRUE,
     source = source
   )
@@ -1087,32 +1208,19 @@ import_erm_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
   }
   facets <- split(measures, measures$Facet)
   rows <- lapply(names(facets), function(fct) {
-    rows_f <- facets[[fct]]
-    est <- suppressWarnings(as.numeric(rows_f$Estimate))
-    se <- suppressWarnings(as.numeric(rows_f$SE))
-    if (sum(is.finite(est)) < 2L) {
-      return(data.frame(
-        Facet = fct, Levels = sum(is.finite(est)),
-        Separation = NA_real_, Strata = NA_real_, Reliability = NA_real_,
-        stringsAsFactors = FALSE
-      ))
+    stats <- summarize_precision_basis(facets[[fct]], "SE", "sample")
+    posterior_sd <- "UncertaintyBasis" %in% names(facets[[fct]]) &&
+      any(grepl("Conditional posterior SD", facets[[fct]]$UncertaintyBasis, fixed = TRUE))
+    if (posterior_sd) {
+      stats$Separation <- stats$Strata <- stats$Reliability <- NA_real_
+      stats$SummaryNote <- "Posterior SD is conditional scoring uncertainty, not a sampling SE for separation reliability."
     }
-    obs_var <- stats::var(est, na.rm = TRUE)
-    err_var <- if (any(is.finite(se))) {
-      mean(se[is.finite(se)]^2, na.rm = TRUE)
-    } else NA_real_
-    true_var <- if (is.finite(err_var)) max(obs_var - err_var, 0) else NA_real_
-    rmse <- if (is.finite(err_var)) sqrt(err_var) else NA_real_
-    sep <- if (is.finite(rmse) && rmse > 0 && is.finite(true_var)) {
-      sqrt(true_var) / rmse
-    } else NA_real_
-    rel <- if (is.finite(obs_var) && obs_var > 0 && is.finite(true_var)) {
-      true_var / obs_var
-    } else NA_real_
-    strata <- if (is.finite(sep)) (4 * sep + 1) / 3 else NA_real_
     data.frame(
-      Facet = fct, Levels = nrow(rows_f),
-      Separation = sep, Strata = strata, Reliability = rel,
+      Facet = fct, Levels = nrow(facets[[fct]]),
+      EstimateAvailable = stats$EstimateAvailable, SEAvailable = stats$SEAvailable,
+      ExcludedEstimates = stats$ExcludedEstimates, SummaryNote = stats$SummaryNote,
+      Separation = stats$Separation, Strata = stats$Strata, Reliability = stats$Reliability,
+      SupportsFormalInference = FALSE,
       stringsAsFactors = FALSE
     )
   })
@@ -1128,24 +1236,17 @@ import_erm_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
   rows <- lapply(names(facets), function(fct) {
     rows_f <- facets[[fct]]
     est <- suppressWarnings(as.numeric(rows_f$Estimate))
-    se <- suppressWarnings(as.numeric(rows_f$SE))
-    n_lev <- length(est)
-    df <- max(0L, n_lev - 1L)
-    chi <- if (df > 0L && any(is.finite(se) & se > 0)) {
-      mean_est <- mean(est, na.rm = TRUE)
-      sum(((est - mean_est) / se)^2, na.rm = TRUE)
-    } else NA_real_
-    pval <- if (is.finite(chi) && df > 0) {
-      stats::pchisq(chi, df, lower.tail = FALSE)
-    } else NA_real_
+    est <- est[is.finite(est)]
     data.frame(
       Facet = fct,
-      Levels = n_lev,
-      MeanMeasure = mean(est, na.rm = TRUE),
-      SD = stats::sd(est, na.rm = TRUE),
-      FixedChiSq = chi,
-      FixedDF = df,
-      FixedProb = pval,
+      Levels = nrow(rows_f),
+      MeanMeasure = if (length(est)) mean(est) else NA_real_,
+      SD = if (length(est) > 1L) stats::sd(est) else NA_real_,
+      FixedChiSq = NA_real_,
+      FixedDF = NA_real_,
+      FixedProb = NA_real_,
+      SupportsFormalInference = FALSE,
+      TestNote = "A joint facet test is unavailable: imported marginal SEs do not supply the required covariance and estimation assumptions.",
       stringsAsFactors = FALSE
     )
   })
@@ -1154,6 +1255,7 @@ import_erm_fit <- function(fit, model = c("RSM", "PCM", "GPCM"),
 
 #' @export
 print.mfrm_imported_fit <- function(x, ...) {
+  .validate_imported_metric(x)
   cat("Imported measurement results (limited functionality)\n")
   cat(sprintf("  Source: %s (%s)\n",
               x$source$package %||% "unknown",
@@ -1163,7 +1265,54 @@ print.mfrm_imported_fit <- function(x, ...) {
     cat(sprintf("  Model: %s | Method: %s | Persons: %s\n",
                 ov$Model, ov$Method, ov$Persons))
   }
-  cat("  Use mfrmr plot helpers for available measurement views.\n")
+  print_wrapped_line(x$source$metric)
+  print_wrapped_line(x$source$person_scoring)
+  if (!is.null(x$source$person_identification)) print_wrapped_line(x$source$person_identification)
+  cat("  Use summary(x) for source-scale tables or plot(x) for a point-only Wright map.\n")
+  cat("  SEs retain source-package conventions; joint facet tests and native QC are unavailable.\n")
   cat("  Bias, DIF, anchoring, and reproducibility workflows require a native fit_mfrm() object.\n")
+  invisible(x)
+}
+
+.validate_imported_metric <- function(x) {
+  if (!identical(x$source$metric_version, 1L)) {
+    stop("Re-import the existing source-package fit to update item difficulties, thresholds and uncertainty labels; no re-estimation is needed.", call. = FALSE)
+  }
+  invisible(x)
+}
+
+#' @rdname import_mirt_fit
+#' @param object,x An imported measurement bundle.
+#' @param digits Number of digits for displayed estimates.
+#' @param ... Additional arguments (unused by imported summaries).
+#' @export
+summary.mfrm_imported_fit <- function(object, digits = 3L, ...) {
+  .validate_imported_metric(object)
+  digits <- mfrmr_calibration_score_digits(digits)
+  display <- function(table) {
+    columns <- intersect(c("Estimate", "SE", "Slope"), names(table))
+    table[columns] <- lapply(table[columns], round, digits = digits)
+    table
+  }
+  structure(list(
+    overview = object$summary, facets = lapply(object$facets, display),
+    steps = display(object$steps), source = object$source,
+    scale_contract = mfrm_fit_scale_contract(object)
+  ), class = c("summary.mfrm_imported_fit", "list"))
+}
+
+#' @rdname import_mirt_fit
+#' @export
+print.summary.mfrm_imported_fit <- function(x, ...) {
+  cat("Imported measurement summary\n")
+  cat("  Source: ", x$source$package, "; Persons: ", nrow(x$facets$person),
+      "; item/design-cell measures: ", nrow(x$facets$others), "\n", sep = "")
+  print_wrapped_line(x$source$metric)
+  print_wrapped_line(x$source$person_scoring)
+  if (!is.null(x$source$person_identification)) print_wrapped_line(x$source$person_identification)
+  cat("\nItem/design-cell measures (first 10)\n")
+  print(utils::head(x$facets$others, 10L), row.names = FALSE)
+  print_wrapped_line("SEs retain source conventions; unavailable transformed SEs remain missing. Import does not establish joint facet tests or the model's suitability for inference.")
+  cat("Person and absolute threshold tables are retained in $facets$person and $steps.\n")
   invisible(x)
 }

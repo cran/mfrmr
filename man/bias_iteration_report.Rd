@@ -71,10 +71,14 @@ exposing the iteration table, convergence summary, and orientation review in
 one bundle.
 }
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_bias")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
-diag <- diagnose_mfrm(fit, residual_pca = "none")
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("bias_iteration_report", run.dontrun = TRUE)
+\dontrun{
+# Saved synthetic JML/RSM analysis of example_bias.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "bias-jml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+diag <- example_fit$diagnostics
 out <- bias_iteration_report(fit, diagnostics = diag, facet_a = "Rater", facet_b = "Criterion")
 summary(out)
 }

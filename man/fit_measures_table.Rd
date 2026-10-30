@@ -14,19 +14,24 @@ fit_measures_table(
   zstd_cut = 2,
   ci_level = 0.95,
   threshold_profiles = c("literature", "active", "all", "none"),
-  fit_df_method = c("engine", "facets", "both"),
+  fit_df_method = "facets",
   df_zstd_tolerance = 0.05,
   df_zstd_large_shift = 0.5,
   df_ratio_tolerance = 0.05,
   sort_by = c("status", "abs_zstd", "facet", "level"),
-  top_n = Inf
+  top_n = Inf,
+  flag_basis = c("mnsq", "mnsq_or_zstd")
 )
 }
 \arguments{
 \item{x}{Output from \code{\link[=fit_mfrm]{fit_mfrm()}} or \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.}
 
 \item{diagnostics}{Optional diagnostics object. If supplied, \code{x} may be the
-fitted object used only for provenance.}
+matching supported fitted object; mismatched or outdated diagnostics are
+rejected. Alternatively, pass diagnostics alone as \code{x}. Supplying diagnostics
+does not enable ordinary fit measures for corrected JML, two-family GPCM,
+testlet or shared-rater models. Use \code{\link[=mfrm_response_diagnostics]{mfrm_response_diagnostics()}} for their
+separately supported descriptive response residuals.}
 
 \item{facet}{Optional facet-name filter, for example \code{"Rater"}.}
 
@@ -37,7 +42,8 @@ facet so operational facet elements are shown first.}
 \code{\link[=mfrm_misfit_thresholds]{mfrm_misfit_thresholds()}}.}
 
 \item{zstd_cut}{Absolute ZSTD cutoff used for directional underfit/overfit
-flags. Default \code{2}.}
+flags when \code{flag_basis = "mnsq_or_zstd"}; also used for the separate
+ZSTD and df-sensitivity columns. Default \code{2}.}
 
 \item{ci_level}{Confidence level used to add approximate Wald intervals for
 facet measures. Default \code{0.95}.}
@@ -49,7 +55,8 @@ commonly cited bands from Linacre, Bond & Fox, and Wright & Linacre;
 suppresses profile summaries.}
 
 \item{fit_df_method}{Degrees-of-freedom convention used when \code{diagnostics}
-is computed inside the helper. \code{"engine"} keeps the package-native fit df,
+is computed inside the helper. \code{"facets"} is the default, matching
+\code{\link[=diagnose_mfrm]{diagnose_mfrm()}}. \code{"engine"} keeps the former package-native fit df,
 \code{"facets"} makes primary ZSTD columns use the FACETS/Wright-Masters
 fourth-moment df convention, and \code{"both"} keeps engine columns primary
 while adding FACETS-style companion df/ZSTD columns for comparison.}
@@ -71,10 +78,16 @@ engine-vs-FACETS-style df difference. Default \code{0.05}.}
 sort alphabetically.}
 
 \item{top_n}{Optional maximum number of rows in the returned main table.}
+
+\item{flag_basis}{\code{"mnsq"} (default) bases directional status on Infit/Outfit
+mean squares. \code{"mnsq_or_zstd"} also flags either large positive or negative
+ZSTD, reproducing the previous combined rule when all indices are available.}
 }
 \value{
 A bundle of class \code{mfrm_fit_measures} with:
 \itemize{
+\item \code{fit_basis}: calculation target and interpretation by facet
+\item \code{diagnostic_basis}: saved diagnostic-path guide, when present
 \item \code{table}: R-friendly fit-measure table with status columns
 \item \code{facets_table}: FACETS-style column labels for reporting/review
 \item \code{status_summary}: counts by facet and fit status
@@ -97,12 +110,40 @@ Build a FACETS-style fit-measures review table
 This helper gives users a direct table route for the common FACETS-style
 question: which raters, criteria, or other facet elements show underfit or
 overfit? It uses the fit statistics already computed by \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.
+\code{Fixed} identifies values supplied by anchors or identification constraints.
+Their sampling SEs and intervals are not applicable; response-fit statistics
+remain available. Recompute older diagnostics to obtain these labels.
+The table also retains \code{SE_Method}, \code{PrecisionTier}, \code{SEUse}, \code{CIBasis},
+\code{CIUse}, \code{CIEligible}, \code{CILabel}, \code{CI_Method} and \code{SupportsFormalInference}
+from the diagnostics. For JML, normal bands remain exploratory screening
+summaries, not qualified confidence intervals for the true parameter.
+Changing \code{ci_level} changes their width, not their inferential status.
+Older inputs without this metadata are labelled as having an unrecorded
+basis; finite SEs alone do not establish formal inference.
 
-Directional labels are based on both mean-square and ZSTD evidence:
-high MnSq or positive large ZSTD is labeled \code{underfit}; low MnSq or negative
-large ZSTD is labeled \code{overfit}. Rows with conflicting directions are labeled
-\code{mixed}. Treat the table as a review screen and inspect substantive context
-before removing raters or changing an instrument.
+After \code{fm <- fit_measures_table(x)}, use
+\code{p <- plot(fm, type = "measure_ci", draw = FALSE)} to inspect the bands.
+\code{plot_data(p, "caption")} retains the explanation and
+\code{plot_data(p, "table")} retains the interpretation fields. Titles and notes
+are not drawn by default; \code{show_notes = TRUE} explicitly adds the note.
+Fixed values use open diamonds without intervals; other finite estimates
+without intervals use crosses.
+
+Directional labels use the selected \code{flag_basis}. By default, high mean
+squares are labeled \code{underfit} and low mean squares \code{overfit}; conflicting
+directions are \code{mixed}. ZSTD values remain visible, and \code{ZSTDOnly} identifies
+combined-rule flags when the mean-square screen is known negative. These
+standardized values are sample-size and df-convention dependent. A ZSTD-only
+departure is not automatically a substantively important misfit.
+
+Missing indices cannot establish a negative screen: one positive is retained,
+but no positive plus an unavailable index is \code{not_available}. \code{ScreenComplete}
+records whether all indices required by the selected rule were available.
+Low mean squares indicate less residual variability than expected. They do
+not diagnose misconduct, poor rater quality or machine-learning overfitting,
+and are not an automatic reason for exclusion. Investigate high mean squares
+and substantive consequences first. Published bands are contextual heuristics,
+not calibrated error probabilities or universal thresholds for all facets.
 
 FACETS-style ZSTD comparison is controlled by \code{fit_df_method}. MnSq values
 should be compared first; df and ZSTD columns explain how the same MnSq values
@@ -112,9 +153,20 @@ conventions. The \code{df_zstd_tolerance}, \code{df_zstd_large_shift}, and
 \code{df_ratio_tolerance} arguments make the df-sensitivity screen explicit so
 the same table can be reproduced under stricter or more permissive review
 rules.
+
+Saved calculation definitions remain beside the fit values: \code{FitBasis} and
+\code{FitInterpretation} distinguish residuals at saved EAPs, JML optimizer
+coordinates, and imported source statistics. EAP plug-in MnSq is descriptive;
+it is not posterior-averaged or posterior-predictive fit, and same-response
+EAP scoring does not guarantee expectation one. Missing definitions are
+marked as not recorded, without discarding finite values. \code{diagnostic_basis}
+preserves the original guide to other diagnostic paths; marginal category
+counts are not posterior-averaged MnSq.
 }
 \examples{
-\donttest{
+# Long-running workflow; run explicitly when needed.
+# example("fit_measures_table", run.dontrun = TRUE)
+\dontrun{
 toy <- load_mfrmr_data("example_operational")
 fit <- fit_mfrm(
   toy, "Person", c("Rater", "Criterion"), "Score",
@@ -129,9 +181,17 @@ fm_facets <- fit_measures_table(fit, facet = "Rater", fit_df_method = "both")
 fm_facets$df_conversion_guide$decision_guide
 }
 }
+\references{
+Linacre, J. M. (2003). Size vs. significance: standardized
+chi-square fit statistic. \emph{Rasch Measurement Transactions}, 17(1), 918.
+\url{https://www.rasch.org/rmt/rmt171n.htm}.
+Wright, B. D. and Linacre, J. M. (1994). Reasonable mean-square fit values.
+\emph{Rasch Measurement Transactions}, 8(3), 370.
+\url{https://www.rasch.org/rmt/rmt83b.htm}.
+}
 \seealso{
-\code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=facets_fit_review]{facets_fit_review()}}, \code{\link[=plot_bubble]{plot_bubble()}},
-\code{\link[=mfrm_misfit_thresholds]{mfrm_misfit_thresholds()}}
+\code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=facets_fit_review]{facets_fit_review()}}, \link[=plot.mfrm_fit]{plot(x, type = "bubble")},
+\code{\link[=mfrm_misfit_thresholds]{mfrm_misfit_thresholds()}}, \code{\link[=mfrm_screening_sensitivity]{mfrm_screening_sensitivity()}}
 }
 \concept{confidence intervals}
 \concept{fit statistics}

@@ -7,7 +7,7 @@
 # or from a finite numerical proxy for an unbounded parameter.
 
 mfrmr_readiness_contract_version <- function() {
-  "mfrmr-readiness-0.2.3-v3"
+  "mfrmr-readiness-0.2.4-v1"
 }
 
 mfrmr_readiness_contract_states <- function() {
@@ -141,7 +141,7 @@ mfrmr_readiness_component_row <- function(component, state, complete,
   )
 }
 
-mfrmr_readiness_input_component <- function(prep, data_review) {
+mfrmr_readiness_input_component <- function(prep, data_review, config) {
   notes <- as.data.frame(
     prep$preparation_notes %||% data_review$preparation_notes %||% data.frame(),
     stringsAsFactors = FALSE
@@ -177,13 +177,23 @@ mfrmr_readiness_input_component <- function(prep, data_review) {
     if (duplicate) "duplicate_cell_dependence_unmodelled",
     if (other_review) "input_review_required"
   )
+  weight_policy <- mfrm_ic_weight_policy(prep, config)
+  unit_weights <- weight_policy %in% c("unweighted", "explicit_unit")
+  reasons <- c(reasons, if (!unit_weights) {
+    if (weight_policy == "invalid") "invalid_observation_weights" else
+      "nonunit_observation_weights_inference_unvalidated"
+  })
   mfrmr_readiness_component_row(
     "input",
-    if (review) "review" else "pass",
-    complete = TRUE,
+    if (weight_policy == "invalid") "blocked" else
+      if (review || !unit_weights) "review" else "pass",
+    complete = weight_policy != "invalid",
     reason_codes = reasons,
-    audit_state = if (is.na(data_status)) "not_recorded" else data_status,
-    provenance = "prepare_mfrm_data_preparation_notes_v1"
+    audit_state = paste0(if (is.na(data_status)) "not_recorded" else data_status,
+                         ";weights=", weight_policy,
+                         if (identical(prep$repeated_ratings, "independent"))
+                           ";repeated_ratings=conditionally_independent_declared" else ""),
+    provenance = "prepare_mfrm_data_preparation_notes_v1;observation_weight_policy_v1"
   )
 }
 
@@ -299,14 +309,22 @@ mfrmr_readiness_gpcm_slope_parameters <- function(config,
   if (!identical(as.character(config$model %||% ""), "GPCM")) {
     return(mfrmr_readiness_empty_parameter_table())
   }
-  levels <- as.character(config$gpcm_spec$levels %||% character(0))
+  product <- !is.null(config$gpcm_spec$component_levels)
+  metadata <- if (product) mfrm_gpcm_product_metadata(config$gpcm_spec) else NULL
+  levels <- if (product) metadata$Level else as.character(config$gpcm_spec$levels %||% character(0))
   if (length(levels) == 0L) {
     return(mfrmr_readiness_empty_parameter_table())
   }
-  slope_facet <- as.character(config$slope_facet %||% NA_character_)
+  slope_facet <- if (product) metadata$Owner else
+    rep(as.character(config$slope_facet %||% NA_character_), length(levels))
   method <- as.character(config$method %||% NA_character_)
   audit <- config$boundary_audit$gpcm_slope_boundary %||% list()
   joint_audit <- config$boundary_audit$gpcm_joint_boundary %||% list()
+  if (product) {
+    # Existing boundary certificates concern one slope family. They cannot
+    # qualify either component of the internal product model.
+    audit <- joint_audit <- list(state = "not_evaluated_for_product_slopes")
+  }
   targets <- as.data.frame(audit$target_status %||% data.frame(),
                            stringsAsFactors = FALSE)
   joint_targets <- as.data.frame(
@@ -327,7 +345,7 @@ mfrmr_readiness_gpcm_slope_parameters <- function(config,
   }
   table_index <- if (nrow(slope_table) > 0L &&
                      "SlopeFacet" %in% names(slope_table)) {
-    match(levels, as.character(slope_table$SlopeFacet))
+    mfrm_match_slope_table(slope_facet, levels, slope_table)
   } else {
     rep(NA_integer_, length(levels))
   }
@@ -445,7 +463,7 @@ mfrmr_readiness_gpcm_slope_parameters <- function(config,
     ReadinessScope = rep("parameter", length(levels)),
     ParameterId = paste0("Slope:", slope_facet, ":", levels),
     ParameterClass = rep("gpcm_slope", length(levels)),
-    Facet = rep(slope_facet, length(levels)),
+    Facet = slope_facet,
     Level = levels,
     OptimizerLogEstimate = optimizer_log,
     OptimizerEstimate = optimizer_slope,
@@ -482,11 +500,16 @@ apply_mfrm_slope_readiness <- function(slope_table, readiness_record) {
   parameters <- parameters[
     parameters$ParameterClass %in% "gpcm_slope", , drop = FALSE
   ]
-  parameter_id <- paste0(
-    "Slope:", as.character(parameters$Facet[1] %||% ""), ":",
-    as.character(slope_table$SlopeFacet)
-  )
-  index <- match(parameter_id, as.character(parameters$ParameterId))
+  if (nrow(parameters) && !identical(as.character(parameters$ParameterId),
+      paste0("Slope:", parameters$Facet, ":", parameters$Level))) {
+    stop("The GPCM slope-readiness identities do not match their owners and levels.", call. = FALSE)
+  }
+  if (is.null(slope_table[["SlopeOwner"]]) && length(unique(parameters$Facet)) > 1L) {
+    stop("Multiple slope owners require an explicit SlopeOwner column.", call. = FALSE)
+  }
+  owners <- slope_table[["SlopeOwner"]] %||% rep(parameters$Facet[1] %||% "", nrow(slope_table))
+  index <- mfrm_match_slope_table(owners, slope_table$SlopeFacet,
+    data.frame(SlopeOwner = parameters$Facet, SlopeFacet = parameters$Level))
   if (nrow(parameters) == 0L || anyNA(index)) {
     stop(
       "The GPCM slope-readiness record did not match the fitted slope table.",
@@ -635,7 +658,9 @@ mfrmr_readiness_boundary_component <- function(config) {
         reasons,
         if (free_gpcm_slopes) {
           c("boundary_audit_incomplete",
-            "mml_gpcm_slope_boundary_not_evaluated")
+            if (!is.null(config$gpcm_spec$component_levels))
+              "mml_gpcm_product_boundary_not_evaluated" else
+              "mml_gpcm_slope_boundary_not_evaluated")
         }
       ),
       audit_state = paste0(
@@ -798,7 +823,7 @@ mfrmr_readiness_numerical_component <- function(opt) {
 build_mfrm_readiness_record <- function(prep, data_review, config, opt,
                                         slope_table = data.frame()) {
   components <- rbind(
-    mfrmr_readiness_input_component(prep, data_review),
+    mfrmr_readiness_input_component(prep, data_review, config),
     mfrmr_readiness_estimability_component(config, prep),
     mfrmr_readiness_category_component(config),
     mfrmr_readiness_boundary_component(config),
@@ -848,6 +873,12 @@ build_mfrm_readiness_record <- function(prep, data_review, config, opt,
 }
 
 mfrmr_get_readiness_record <- function(fit) {
+  # Detached diagnostic tables carry the same versioned record. Old records
+  # predate the observation-weight gate and must not retain inference approval.
+  if (is.data.frame(fit) || inherits(fit, "mfrm_diagnostics")) {
+    fit <- structure(list(fit = if (is.data.frame(fit)) fit else fit$fit_readiness),
+                     class = "mfrmr_readiness_record")
+  }
   if (inherits(fit, "mfrmr_readiness_record") &&
       is.data.frame(fit$fit) && nrow(fit$fit) == 1L &&
       "ReadinessContractVersion" %in% names(fit$fit) &&

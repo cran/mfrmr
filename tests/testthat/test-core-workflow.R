@@ -40,7 +40,7 @@ test_that("core fit/diagnostics workflow runs", {
   expect_true(any(grepl("Key warnings", printed_summary, fixed = TRUE)))
   expect_true(any(grepl("Next actions", printed_summary, fixed = TRUE)))
   expect_true(any(grepl("Status:", printed_summary, fixed = TRUE)))
-  expect_true(any(grepl("Basis:", printed_summary, fixed = TRUE)))
+  expect_true(any(grepl("Optimizer code 0:", printed_summary, fixed = TRUE)))
   expect_true(any(grepl("Facet overview", printed_summary, fixed = TRUE)))
   # Default plot(fit) now returns the Wright map alone; the 3-plot
   # bundle remains available via `type = "bundle"`.
@@ -373,12 +373,12 @@ test_that("core fit/diagnostics workflow runs", {
   expect_true(is.data.frame(t13_alias$ranked_table))
   expect_equal(names(t13_alias), names(t13))
 
-  p13 <- mfrmr::plot_bias_interaction(t13, plot = "scatter", draw = FALSE)
-  p13_pub <- mfrmr::plot_bias_interaction(t13, plot = "scatter", draw = FALSE, preset = "publication")
+  p13 <- plot(t13, type = "bias", view = "scatter", draw = FALSE)
+  p13_pub <- plot(t13, type = "bias", view = "scatter", draw = FALSE, preset = "publication")
   expect_s3_class(p13, "mfrm_plot_data")
   expect_identical(as.character(p13_pub$data$preset), "publication")
   expect_equal(p13$name, "table13_bias")
-  p13_alias <- mfrmr::plot_bias_interaction(t13, plot = "scatter", draw = FALSE)
+  p13_alias <- plot(t13, type = "bias", view = "scatter", draw = FALSE)
   expect_s3_class(p13_alias, "mfrm_plot_data")
   expect_equal(p13_alias$name, "table13_bias")
 
@@ -429,7 +429,7 @@ test_that("core fit/diagnostics workflow runs", {
   expect_true(is.data.frame(t13_3$facet_profile))
   expect_true(all(c("Facet", "Level", "MeanAbsBias", "FlagRate") %in% names(t13_3$facet_profile)))
 
-  p13_profile <- mfrmr::plot_bias_interaction(t13_3, plot = "facet_profile", draw = FALSE)
+  p13_profile <- plot(t13_3, type = "bias", view = "facet_profile", draw = FALSE)
   expect_s3_class(p13_profile, "mfrm_plot_data")
   expect_equal(p13_profile$data$plot, "facet_profile")
 
@@ -475,21 +475,21 @@ test_that("core fit/diagnostics workflow runs", {
   chi_plot <- plot(chi, draw = FALSE)
   expect_s3_class(chi_plot, "mfrm_plot_data")
 
-  p_unexp <- mfrmr::plot_unexpected(fit, diagnostics = diag, abs_z_min = 1.5, prob_max = 0.4, top_n = 10, draw = FALSE)
-  p_unexp2 <- mfrmr::plot_unexpected(t4, draw = FALSE)
-  p_unexp_pub <- mfrmr::plot_unexpected(fit, diagnostics = diag, abs_z_min = 1.5, prob_max = 0.4, top_n = 10, draw = FALSE, preset = "publication")
-  p_fair <- mfrmr::plot_fair_average(fit, diagnostics = diag, draw = FALSE)
-  p_fair2 <- mfrmr::plot_fair_average(t12, draw = FALSE)
-  p_disp <- mfrmr::plot_displacement(fit, diagnostics = diag, anchored_only = FALSE, draw = FALSE)
-  p_disp2 <- mfrmr::plot_displacement(disp, draw = FALSE)
-  p_disp_pub <- mfrmr::plot_displacement(fit, diagnostics = diag, anchored_only = FALSE, draw = FALSE, preset = "publication")
-  p_ir <- mfrmr::plot_interrater_agreement(fit, diagnostics = diag, rater_facet = "Rater", draw = FALSE)
-  p_ir2 <- mfrmr::plot_interrater_agreement(ir, draw = FALSE)
-  p_ir_pub <- mfrmr::plot_interrater_agreement(fit, diagnostics = diag, rater_facet = "Rater", draw = FALSE, preset = "publication")
-  p_chi <- mfrmr::plot_facets_chisq(fit, diagnostics = diag, draw = FALSE)
-  p_chi2 <- mfrmr::plot_facets_chisq(chi, draw = FALSE)
-  p_chi_pub <- mfrmr::plot_facets_chisq(fit, diagnostics = diag, draw = FALSE, preset = "publication")
-  p_qc <- mfrmr::plot_qc_dashboard(fit, diagnostics = diag, draw = FALSE, top_n = 10)
+  p_unexp <- plot(fit, type = "unexpected", diagnostics = diag, abs_z_min = 1.5, prob_max = 0.4, top_n = 10, draw = FALSE)
+  p_unexp2 <- plot(t4, type = "unexpected", draw = FALSE)
+  p_unexp_pub <- plot(fit, type = "unexpected", diagnostics = diag, abs_z_min = 1.5, prob_max = 0.4, top_n = 10, draw = FALSE, preset = "publication")
+  p_fair <- plot(fit, type = "fair_average", diagnostics = diag, draw = FALSE)
+  p_fair2 <- plot(t12, type = "fair_average", draw = FALSE)
+  p_disp <- plot(fit, type = "displacement", diagnostics = diag, anchored_only = FALSE, draw = FALSE)
+  p_disp2 <- plot(disp, type = "displacement", draw = FALSE)
+  p_disp_pub <- plot(fit, type = "displacement", diagnostics = diag, anchored_only = FALSE, draw = FALSE, preset = "publication")
+  p_ir <- plot(fit, type = "agreement", diagnostics = diag, rater_facet = "Rater", draw = FALSE)
+  p_ir2 <- plot(ir, type = "agreement", draw = FALSE)
+  p_ir_pub <- plot(fit, type = "agreement", diagnostics = diag, rater_facet = "Rater", draw = FALSE, preset = "publication")
+  p_chi <- plot(fit, type = "facets_chisq", diagnostics = diag, draw = FALSE)
+  p_chi2 <- plot(chi, type = "facets_chisq", draw = FALSE)
+  p_chi_pub <- plot(fit, type = "facets_chisq", diagnostics = diag, draw = FALSE, preset = "publication")
+  p_qc <- plot(fit, type = "qc", diagnostics = diag, draw = FALSE, top_n = 10)
   expect_s3_class(p_unexp, "mfrm_plot_data")
   expect_s3_class(p_unexp2, "mfrm_plot_data")
   expect_identical(as.character(p_unexp_pub$data$preset), "publication")
@@ -518,10 +518,10 @@ test_that("core fit/diagnostics workflow runs", {
   expect_true(is.data.frame(pca_from_fit$overall_table))
   expect_gt(nrow(pca_from_fit$overall_table), 0)
 
-  p1 <- mfrmr::plot_residual_pca(pca, mode = "overall", plot_type = "scree", draw = FALSE)
-  p2 <- mfrmr::plot_residual_pca(pca, mode = "facet", facet = "Rater", plot_type = "loadings", top_n = 5, draw = FALSE)
-  p3 <- mfrmr::plot_residual_pca(fit, mode = "overall", plot_type = "scree", draw = FALSE)
-  p1_pub <- mfrmr::plot_residual_pca(pca, mode = "overall", plot_type = "scree", draw = FALSE, preset = "publication")
+  p1 <- plot(pca, type = "residual_pca", mode = "overall", view = "scree", draw = FALSE)
+  p2 <- plot(pca, type = "residual_pca", mode = "facet", facet = "Rater", view = "loadings", top_n = 5, draw = FALSE)
+  p3 <- plot(fit, type = "residual_pca", mode = "overall", view = "scree", draw = FALSE)
+  p1_pub <- plot(pca, type = "residual_pca", mode = "overall", view = "scree", draw = FALSE, preset = "publication")
   expect_s3_class(p1, "mfrm_plot_data")
   expect_s3_class(p2, "mfrm_plot_data")
   expect_s3_class(p3, "mfrm_plot_data")
@@ -576,7 +576,7 @@ test_that("core fit/diagnostics workflow runs", {
   expect_match(apa$report_text, "Optimization", fixed = TRUE)
   expect_match(apa$report_text, "Terminal gradient\\s+sup-norm")
   expect_match(apa$report_text, "Constraint settings:", fixed = TRUE)
-  expect_match(apa$report_text, "Step/threshold summary:", fixed = TRUE)
+  expect_match(apa$report_text, "Adjacent threshold comparisons:", fixed = TRUE)
   # Wrap-insensitive: the wrapped report text may hard-break inside the
   # sentence, so match across whitespace instead of a fixed string.
   expect_match(apa$report_text, "Largest\\s+misfit", perl = TRUE)
@@ -725,7 +725,8 @@ test_that("descriptive and anchor-review helpers run", {
     Facet = c("Rater", "Rater", "Rater"),
     Level = c("R2", "R2", "R3"),
     Group = c("G1", "G2", "G1"),
-    GroupValue = c(0, NA, 0.2),
+    # After duplicate resolution, R1 = .1, R2 = 0 and R3 = -.1 satisfy centering.
+    GroupValue = c(0, NA, -0.1),
     stringsAsFactors = FALSE
   )
 
@@ -788,7 +789,10 @@ test_that("descriptive and anchor-review helpers run", {
   expect_true("anchor_review" %in% names(fit$config))
   expect_false("anchor_audit" %in% names(fit$config))
 
-  anchor_tbl <- mfrmr::make_anchor_table(fit)
+  anchor_tbl <- mfrmr::make_anchor_table(
+    fit,
+    readiness_policy = "review"
+  )
   expect_true(is.data.frame(anchor_tbl))
   expect_true(all(c("Facet", "Level", "Anchor") %in% names(anchor_tbl)))
   expect_gt(nrow(anchor_tbl), 0)

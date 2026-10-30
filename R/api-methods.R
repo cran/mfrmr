@@ -104,6 +104,7 @@ summarize_bias_count_bundle <- function(object, digits = 3, top_n = 10) {
 
 summarize_fixed_reports_bundle <- function(object, digits = 3, top_n = 10) {
   pair_tbl <- as.data.frame(object$pairwise_table %||% data.frame(), stringsAsFactors = FALSE)
+  validate_bias_pairwise_table(pair_tbl)
   n_bias_lines <- length(strsplit(as.character(object$bias_fixed %||% ""), "\n", fixed = TRUE)[[1]])
   n_pair_lines <- length(strsplit(as.character(object$pairwise_fixed %||% ""), "\n", fixed = TRUE)[[1]])
 
@@ -682,6 +683,7 @@ summarize_measurable_bundle <- function(object, digits = 3, top_n = 10) {
 }
 
 summarize_unexpected_after_bias_bundle <- function(object, digits = 3, top_n = 10) {
+  validate_unexpected_coverage(object)
   facet_note <- if (!is.null(object$facets) && length(object$facets) > 0) {
     paste("Bias interaction:", paste(as.character(object$facets), collapse = " x "))
   } else {
@@ -727,6 +729,7 @@ summarize_output_bundle <- function(object, digits = 3, top_n = 10) {
 }
 
 summarize_residual_pca_bundle <- function(object, digits = 3, top_n = 10) {
+  validate_residual_pca_bundle(object)
   mode <- as.character(object$mode %||% "unknown")
   facet_names <- as.character(object$facet_names %||% character(0))
   summary_tbl <- data.frame(
@@ -743,21 +746,50 @@ summarize_residual_pca_bundle <- function(object, digits = 3, top_n = 10) {
     ),
     stringsAsFactors = FALSE
   )
-  summarize_known_bundle(
+  issues <- character(0)
+  bundles <- c(list(Overall = object$overall), object$by_facet)
+  for (label in names(bundles)) {
+    bundle <- bundles[[label]]
+    detail <- c(bundle$error, bundle$warning,
+                if (is.null(bundle$error)) c(bundle$parallel$error, bundle$parallel$warning))
+    detail <- detail[!is.na(detail) & nzchar(detail)]
+    if (length(detail)) issues <- c(issues, paste0(label, ": ", detail))
+  }
+  out <- summarize_known_bundle(
     object = object,
     obj_class = "mfrm_residual_pca",
     summary_candidates = character(0),
     preview_candidates = c("overall_table", "by_facet_table"),
     settings_candidates = character(0),
-    notes = paste(
+    notes = c(paste(
       "Residual PCA is exploratory residual-structure screening",
       "(overall and/or by facet), not a standalone dimensionality test or",
       "an automatic decision about dimensions or subscores."
-    ),
+    ), if (isTRUE(object$parallel_settings$Enabled)) {
+      if (identical(object$parallel_settings$Method, "model_bootstrap")) paste(
+        "The model reference regenerates ratings and refits the model, holding the analyzed assignment fixed.",
+        "It is exploratory, not a calibrated dimensionality test. Inspect bootstrap_trials for every attempted replicate.",
+        sprintf("Reference quantile: %g%%; %d model replicates requested.",
+                100 * object$parallel_settings$Quantile, object$parallel_settings$Reps)
+      ) else paste(
+        "The permutation comparison conditions on the fitted residuals and their missingness.",
+        "It omits fitted-model uncertainty and is not a calibrated dimensionality test.",
+        sprintf("Reference quantile: %g%%; %d permutations requested per analysis.",
+                100 * object$parallel_settings$Quantile, object$parallel_settings$Reps)
+      )
+    }, if (isTRUE(object$parallel_settings$Enabled)) paste(
+      "Cutoffs apply separately to each component; scanning all components or facets",
+      "does not control the chance of any false flag. A missing flag does not establish model adequacy."
+    ), issues),
     digits = digits,
     top_n = top_n,
     summary_override = summary_tbl
   )
+  preview <- bundle_first_table(object, c("overall_table", "by_facet_table"), top_n = top_n)
+  out$preview <- preview$table
+  out$preview_name <- preview$name
+  out$calculation_version <- object$calculation_version
+  out
 }
 
 summarize_specifications_bundle <- function(object, digits = 3, top_n = 10) {
@@ -869,6 +901,7 @@ summarize_subset_connectivity_bundle <- function(object, digits = 3, top_n = 10)
 summarize_network_analysis_bundle <- function(object, digits = 3, top_n = 10) {
   summary_tbl <- as.data.frame(object$summary %||% data.frame(), stringsAsFactors = FALSE)
   notes <- "Network metrics summarize design connectedness and linking vulnerability, not person ability or rater quality."
+  notes <- c(notes, network_review_status(summary_tbl)$NetworkReviewReason)
   if (nrow(summary_tbl) > 0L) {
     components <- suppressWarnings(as.integer(summary_tbl$Components[1]))
     cut_n <- suppressWarnings(as.integer(summary_tbl$ArticulationPoints[1]))
@@ -895,6 +928,7 @@ summarize_network_analysis_bundle <- function(object, digits = 3, top_n = 10) {
 }
 
 summarize_rater_network_bundle <- function(object, digits = 3, top_n = 10) {
+  validate_descriptive_bundle(object, "mfrm_rater_network")
   summary_tbl <- as.data.frame(object$summary %||% data.frame(), stringsAsFactors = FALSE)
   notes <- "Rater-network metrics summarize observed pairwise rater relationships; they are not Rasch logit estimates or formal fit statistics."
   if (nrow(summary_tbl) > 0L) {
@@ -903,7 +937,7 @@ summarize_rater_network_bundle <- function(object, digits = 3, top_n = 10) {
       paste0(
         "Graph: ", summary_tbl$Raters[1], " rater node(s), ",
         summary_tbl$Edges[1], " edge(s), mode = ",
-        summary_tbl$Mode[1], "."
+        if (identical(summary_tbl$Mode[1], "severity_direction")) "observed score direction" else summary_tbl$Mode[1], "."
       )
     )
   }
@@ -911,7 +945,7 @@ summarize_rater_network_bundle <- function(object, digits = 3, top_n = 10) {
     object = object,
     obj_class = "mfrm_rater_network",
     summary_candidates = "summary",
-    preview_candidates = c("node_metrics", "edge_metrics", "pair_metrics", "caveats"),
+    preview_candidates = c("network_fit", "node_metrics", "edge_metrics", "pair_metrics", "caveats"),
     settings_candidates = "settings",
     notes = notes,
     digits = digits,
@@ -920,6 +954,7 @@ summarize_rater_network_bundle <- function(object, digits = 3, top_n = 10) {
 }
 
 summarize_halo_network_bundle <- function(object, digits = 3, top_n = 10) {
+  validate_descriptive_bundle(object, "mfrm_halo_network")
   summary_tbl <- as.data.frame(object$summary %||% data.frame(), stringsAsFactors = FALSE)
   notes <- "Halo-network metrics summarize rater-by-criterion score-profile similarity; they are screening diagnostics, not causal halo evidence by themselves."
   if (nrow(summary_tbl) > 0L) {
@@ -937,9 +972,9 @@ summarize_halo_network_bundle <- function(object, digits = 3, top_n = 10) {
     object = object,
     obj_class = "mfrm_halo_network",
     summary_candidates = "summary",
-    preview_candidates = c("halo_summary_by_rater", "edge_metrics", "node_metrics", "caveats"),
+    preview_candidates = c("halo_contrast", "halo_summary_by_rater", "edge_metrics", "node_metrics", "caveats"),
     settings_candidates = "settings",
-    notes = notes,
+    notes = c(notes, object$caveats$Message),
     digits = digits,
     top_n = top_n
   )
@@ -979,6 +1014,7 @@ summarize_facet_statistics_bundle <- function(object, digits = 3, top_n = 10) {
 
 summarize_precision_review_bundle <- function(object, digits = 3, top_n = 10) {
   profile_tbl <- bundle_component_table(object, "profile")
+  validate_precision_review_profile(profile_tbl)
   checks_tbl <- bundle_component_table(object, "checks")
   fit_sep_tbl <- bundle_component_table(object, "fit_separation_basis")
   notes_tbl <- bundle_component_table(object, "approximation_notes")
@@ -1002,13 +1038,11 @@ summarize_precision_review_bundle <- function(object, digits = 3, top_n = 10) {
     stringsAsFactors = FALSE
   )
 
-  notes <- if (nrow(profile_tbl) > 0 && identical(as.character(profile_tbl$PrecisionTier[1]), "exploratory")) {
-    "Exploratory precision path detected; use this run for screening and calibration triage, not as the package's primary inferential summary."
-  } else if (nrow(profile_tbl) > 0 && identical(as.character(profile_tbl$PrecisionTier[1]), "hybrid")) {
-    "Hybrid precision path detected; at least one level fell back to observation-table information, so formal inference should be limited to the model-based rows."
-  } else {
-    "Model-based precision path detected for the current run."
-  }
+  notes <- mfrm_precision_reporting_note(
+    as.character(profile_tbl$Method[1]),
+    as.character(profile_tbl$PrecisionTier[1]),
+    isTRUE(profile_tbl$InferenceReady[1])
+  )
 
   out <- summarize_known_bundle(
     object = object,
@@ -1016,7 +1050,7 @@ summarize_precision_review_bundle <- function(object, digits = 3, top_n = 10) {
     summary_candidates = character(0),
     preview_candidates = c("checks", "fit_separation_basis", "approximation_notes", "profile"),
     settings_candidates = "settings",
-    notes = c(notes, "Fit/separation basis rows state source grounding and validation-use boundaries."),
+    notes = notes,
     digits = digits,
     top_n = top_n,
     summary_override = summary_tbl
@@ -1162,7 +1196,13 @@ summarize_fit_measures_bundle <- function(object, digits = 3, top_n = 10) {
   df_summary <- bundle_component_table(object, "df_sensitivity_summary")
   df_sensitive <- bundle_component_table(object, "df_sensitive")
 
-  notes <- "Fit-measures table with directional underfit/overfit screening."
+  calculation_basis <- bundle_component_table(object, "fit_basis")
+  basis <- object$settings$flag_basis %||% "mnsq_or_zstd"
+  notes <- c(paste0("Fit-measures directional screen: ", basis, "."),
+    "Low mean squares describe low residual variability; they do not establish poor rater quality or justify automatic exclusion.",
+    fit_measure_interval_note(bundle_component_table(object, "table")))
+  notes <- c(notes, unique(calculation_basis$FitInterpretation %||%
+    "Calculation basis was not recorded in this saved fit-measures bundle."))
   if (nrow(df_summary) > 0L) {
     changed <- suppressWarnings(as.integer(df_summary$FlagChangedByDfRows[1] %||% 0L))
     sensitive <- nrow(df_sensitive)
@@ -1184,6 +1224,8 @@ summarize_fit_measures_bundle <- function(object, digits = 3, top_n = 10) {
     top_n = top_n,
     summary_override = summary_tbl
   )
+  out$fit_basis <- calculation_basis
+  out$diagnostic_basis <- object$diagnostic_basis %||% data.frame()
   out$table <- bundle_component_table(object, "table")
   out$facets_table <- bundle_component_table(object, "facets_table")
   out$status_summary <- bundle_component_table(object, "status_summary")
@@ -1304,7 +1346,7 @@ conquest_overlap_command_scope <- function(object) {
     Evidence = c(
       "bundle$conquest_command",
       if (comment_free) {
-        "no prose or C-style comment markers precede the datafile command"
+        "executable commands only, with no prose or C-style comment markers"
       } else {
         "comment markers require runtime review"
       },
@@ -1418,31 +1460,40 @@ conquest_overlap_normalization_scope <- function(object) {
   duplicate_n <- first_numeric_sum(c("PopulationDuplicateIDs", "ItemDuplicateIDs", "CaseDuplicateIDs"))
   non_numeric_n <- first_numeric_sum(c("PopulationNonNumeric", "ItemNonNumeric", "CaseNonNumeric"))
   review_n <- duplicate_n + non_numeric_n
+  settings <- bundle_component_table(object, "settings")
+  run_status <- if (all(c("Setting", "Value") %in% names(settings))) {
+    as.character(settings$Value[settings$Setting == "conquest_external_status"])
+  } else character()
+  if (length(run_status) != 1L || is.na(run_status)) run_status <- "unknown"
 
   data.frame(
     Area = c(
       "Extracted table normalization",
       "Raw ConQuest text parsing",
       "Bundle matching",
-      "Pre-review table check"
+      "Pre-review table check",
+      "Generated estimation metadata"
     ),
     Status = c(
       "active",
       "not performed",
       "deferred to review",
-      if (review_n > 0L) "review required" else "none detected"
+      if (review_n > 0L) "review required" else "none detected",
+      run_status
     ),
     Evidence = c(
       paste0(row_n, " standardized row(s)"),
-      "already extracted CSV/TSV/TXT or data.frame inputs only",
+      "estimates are extracted from CSV/TSV/TXT or data.frame inputs",
       "review_conquest_overlap() matches rows against the exported bundle",
-      paste0(duplicate_n, " duplicate ID(s); ", non_numeric_n, " non-numeric estimate cell(s)")
+      paste0(duplicate_n, " duplicate ID(s); ", non_numeric_n, " non-numeric estimate cell(s)"),
+      "optional report_file in normalize_conquest_overlap_exports()"
     ),
     Interpretation = c(
       "Population, item, and case tables have been converted to the mfrmr review contract.",
-      "This object does not prove that raw ConQuest report text was parsed correctly.",
+      "No general report parser is used; optional generated estimation metadata are described separately below.",
       "Identifier matching and numerical comparison are intentionally handled by the review step.",
-      "Resolve duplicate IDs or non-numeric estimates before treating the review as clean."
+      "Resolve duplicate IDs or non-numeric estimates before treating the review as clean.",
+      "Stopping/model metadata are separate from estimate extraction; they do not establish numerical precision or common input data."
     ),
     stringsAsFactors = FALSE
   )
@@ -1478,25 +1529,33 @@ conquest_overlap_review_scope <- function(object) {
       "User-supplied table review",
       "Raw ConQuest text parsing",
       "External comparison scope",
-      "Attention items"
+      "Attention items",
+      "External stopping status",
+      "Location alignment"
     ),
     Status = c(
       "active",
       "not performed",
       "not claimed",
-      if (attention_n > 0L) "review required" else "none detected"
+      if (attention_n > 0L) "review required" else "none detected",
+      as.character(overall$ExternalEstimationStatus[1] %||% "not recorded"),
+      as.character(overall$LocationStatus[1] %||% "not recorded")
     ),
     Evidence = c(
       "population, item, and case comparison tables",
       "use normalize_conquest_overlap_exports() for generated native CSVs, or the generic table normalizers for other extracted tables",
       "inspect differences, attention items, extraction steps, and tolerances",
-      paste0(attention_n, " attention item(s)")
+      paste0(attention_n, " attention item(s)"),
+      "optional generated estimation report supplied during normalization",
+      "reported common constraint or user-supplied external-minus-native shift"
     ),
     Interpretation = c(
       "The review compares supplied normalized tables against the mfrmr overlap bundle.",
       "This helper does not parse raw ConQuest report text.",
       "Numerical agreement is limited to the documented overlap and supplied tables.",
-      "Nonzero attention items indicate missing, duplicate, non-numeric, or unmatched rows to resolve."
+      "Nonzero attention items include row mismatches, unknown origins and failed external stopping.",
+      "A met stopping criterion does not establish numerical precision or inferential validity.",
+      "Unknown origins withhold aligned EAP/intercept errors; raw differences remain descriptive."
     ),
     stringsAsFactors = FALSE
   )
@@ -1518,6 +1577,7 @@ summarize_conquest_overlap_review_bundle <- function(object, digits = 3, top_n =
 }
 
 summarize_unexpected_bundle <- function(object, digits = 3, top_n = 10) {
+  validate_unexpected_coverage(object)
   summarize_known_bundle(
     object = object,
     obj_class = "mfrm_unexpected",
@@ -1531,11 +1591,28 @@ summarize_unexpected_bundle <- function(object, digits = 3, top_n = 10) {
 }
 
 summarize_fair_average_bundle <- function(object, digits = 3, top_n = 10) {
+  if (identical(object$settings$estimator, "jeffreys_canonical_joint")) {
+    out <- summarize_known_bundle(object, "mfrm_fair_average",
+      summary_candidates = character(), preview_candidates = "reference_scores",
+      settings_candidates = "settings", notes = object$notes, digits = digits, top_n = top_n)
+    out$reference_scores <- object$reference_scores
+    out$reference_plan <- object$reference_plan
+    out$point_estimator <- "jeffreys_canonical_joint"
+    return(out)
+  }
+  validate_fair_measure_basis(object)
   top_n <- max(1L, as.integer(top_n))
   stacked <- bundle_component_table(object, "stacked")
+  zero_reference <- identical(object$settings$reference, "zero") ||
+    (!any(c("AdjustedAverage", "Fair(M) Average") %in% names(stacked)) &&
+       any(c("StandardizedAdjustedAverage", "Fair(Z) Average") %in% names(stacked)))
 
   first_present <- function(candidates) {
     candidates <- as.character(candidates %||% character(0))
+    if (zero_reference) {
+      candidates <- sub("AdjustedAverage", "StandardizedAdjustedAverage", candidates, fixed = TRUE)
+      candidates <- sub("Fair(M)", "Fair(Z)", candidates, fixed = TRUE)
+    }
     hit <- candidates[candidates %in% names(stacked)]
     if (length(hit) == 0L) NA_character_ else hit[1]
   }
@@ -1590,12 +1667,12 @@ summarize_fair_average_bundle <- function(object, digits = 3, top_n = 10) {
     if (length(dif) > 0) mean_abs_gap <- mean(dif)
   }
 
-  has_fair_se_columns <- any(c(
+  has_fair_se_columns <- !is.na(first_present(c(
     "AdjustedAverageSE", "Fair(M) S.E.",
     "AdjustedAverageCI_Lower", "Fair(M) CI Lower",
     "AdjustedAverageCI_Upper", "Fair(M) CI Upper",
     "AdjustedAverageSEStatus", "Fair(M) S.E. Status"
-  ) %in% names(stacked))
+  )))
   fair_se_requested <- isTRUE(object$settings$fair_se %||% FALSE) || has_fair_se_columns
   status_values <- fair_m_status[!is.na(fair_m_status) & nzchar(fair_m_status)]
   method_values <- fair_m_method[!is.na(fair_m_method) & nzchar(fair_m_method)]
@@ -1620,6 +1697,8 @@ summarize_fair_average_bundle <- function(object, digits = 3, top_n = 10) {
     Facets = if ("Facet" %in% names(stacked)) length(unique(as.character(stacked$Facet))) else length(object$by_facet %||% list()),
     Levels = nrow(stacked),
     MeanAbsObservedFairM = mean_abs_gap,
+    FairMetric = if (zero_reference) "FairZ" else "FairM",
+    FairCIEligible = FALSE,
     FairSERequested = fair_se_requested,
     FairSEAvailableRows = sum(is.finite(fair_m_se)),
     FairSEUnavailableRows = if (fair_se_requested) sum(!is.finite(fair_m_se)) else 0L,
@@ -1645,6 +1724,7 @@ summarize_fair_average_bundle <- function(object, digits = 3, top_n = 10) {
       preview_tbl$AdjustedAverageCI_Lower <- fair_m_ci_lower
       preview_tbl$AdjustedAverageCI_Upper <- fair_m_ci_upper
       preview_tbl$AdjustedAverageSEStatus <- fair_m_status
+      preview_tbl$FairCIEligible <- FALSE
     }
     abs_gap <- abs(obs_avg - fair_m)
     if (fair_se_requested && any(is.finite(fair_m_se))) {
@@ -1656,11 +1736,34 @@ summarize_fair_average_bundle <- function(object, digits = 3, top_n = 10) {
     preview_tbl <- utils::head(preview_tbl, n = top_n)
   }
 
+  if (zero_reference) {
+    names(summary_tbl) <- sub("AdjustedAverage", "StandardizedAdjustedAverage", names(summary_tbl), fixed = TRUE)
+    names(summary_tbl) <- sub("MeanAbsObservedFairM", "MeanAbsObservedFairZ", names(summary_tbl), fixed = TRUE)
+    names(preview_tbl) <- sub("AdjustedAverage", "StandardizedAdjustedAverage", names(preview_tbl), fixed = TRUE)
+  }
   notes <- "Adjusted-score reference summary by facet level."
+  if (any(grepl("mean Person measure is unbounded", stacked$FairMReference, fixed = TRUE))) {
+    notes <- c(notes, paste(
+      "FairM is unavailable for non-Person rows because the mean JML Person measure is unbounded.",
+      "FairZ uses a zero reference and does not require that mean."
+    ))
+  }
+  if (isTRUE((object$settings$xtreme %||% 0) > 0)) {
+    notes <- c(notes, if (identical(object$settings$xtreme_method, "facets")) paste(
+      "FACETS total-score extrapolation uses the minimum positive weight within each extreme element and its administered calibration.",
+      "PrimaryMeasure and fixed anchors are retained. Extrapolated locations are used in that element's fair scores.",
+      "Reported measure SEs are conditional information at the adjusted total, not original-MLE uncertainty or a coverage guarantee.",
+      "This does not reproduce unexplained re-centering in partially anchored FACETS runs or correct JML bias."
+    ) else paste(
+      "Extreme-score adjustments change the displayed Measure only; PrimaryMeasure retains the fitted value.",
+      "These replacements do not correct JML bias, change anchors or refit the model.",
+      "Measure SEs are unavailable on replaced rows; fair-score calculations do not use the display replacement."
+    ))
+  }
   if (fair_se_requested) {
     notes <- c(
       notes,
-      "Fair-average SE columns summarize structural delta-method uncertainty when available; unavailable rows are reported explicitly."
+      "Fair-score intervals are approximate transformations of the available parameter uncertainty. They do not account for every source of estimation uncertainty and should not be used as confidence intervals for decisions."
     )
   } else {
     notes <- c(
@@ -1680,6 +1783,15 @@ summarize_fair_average_bundle <- function(object, digits = 3, top_n = 10) {
     top_n = top_n,
     summary_override = summary_tbl
   )
+  out$fair_measure_basis_recorded <- TRUE
+  if (!is.null(object$reference_scores)) {
+    out$reference_scores <- object$reference_scores
+    out$reference_plan <- object$reference_plan
+    out$notes <- c(out$notes, paste(
+      "reference_scores contains Person expected averages on one common declared plan, in internal score units.",
+      "This target retains the plan's fitted facet locations and is distinct from FairM/FairZ.",
+      "Use confint(object, nsim = ..., seed = ...) for the experimental refit procedure."))
+  }
   if (nrow(preview_tbl) > 0L) {
     out$preview_name <- "stacked"
     out$preview <- preview_tbl
@@ -1705,13 +1817,14 @@ summarize_displacement_bundle <- function(object, digits = 3, top_n = 10) {
 }
 
 summarize_interrater_bundle <- function(object, digits = 3, top_n = 10) {
+  validate_descriptive_bundle(object, "mfrm_interrater")
   summarize_known_bundle(
     object = object,
     obj_class = "mfrm_interrater",
     summary_candidates = "summary",
     preview_candidates = "pairs",
     settings_candidates = "settings",
-    notes = "Inter-rater agreement summary across matched scoring contexts; severity spread is reported separately from agreement when available.",
+    notes = c("Inter-rater agreement compares matched scoring contexts; severity spread is distinct from agreement.", object$notes),
     digits = digits,
     top_n = top_n
   )
@@ -1743,7 +1856,18 @@ summarize_bias_interaction_bundle <- function(object, digits = 3, top_n = 10) {
   )
 }
 
+validate_category_coverage <- function(object, thresholds = FALSE) {
+  validate_marginal_coverage(object$marginal_fit)
+  if (is.null(object$category_usage) || (thresholds && is.null(object$threshold_coverage))) {
+    helper <- if (thresholds) "rating_scale_table()" else "category_structure_report()"
+    stop(paste("This saved result lacks category or threshold availability counts.",
+               "Recreate it with", helper, "from the original fit and diagnostics."), call. = FALSE)
+  }
+  invisible(object)
+}
+
 summarize_rating_scale_bundle <- function(object, digits = 3, top_n = 10) {
+  validate_category_coverage(object, thresholds = TRUE)
   summary_tbl <- bundle_component_table(object, "summary")
   base_note <- if ("MarginalFitAvailable" %in% names(summary_tbl) &&
     isTRUE(summary_tbl$MarginalFitAvailable[1] %||% FALSE)) {
@@ -1754,9 +1878,14 @@ summarize_rating_scale_bundle <- function(object, digits = 3, top_n = 10) {
   caveats <- as.data.frame(object$caveats %||% data.frame(), stringsAsFactors = FALSE)
   notes <- c(
     base_note,
+    object$notes %||% character(),
+    category_usage_note(object$category_usage),
+    threshold_order_note(object$threshold_coverage),
+    marginal_coverage_notes(object$marginal_fit$coverage),
+    "Threshold ordering describes point estimates; it does not establish category adequacy.",
     if (nrow(caveats) > 0 && "Message" %in% names(caveats)) as.character(caveats$Message) else character(0)
   )
-  summarize_known_bundle(
+  out <- summarize_known_bundle(
     object = object,
     obj_class = "mfrm_rating_scale",
     summary_candidates = "summary",
@@ -1766,32 +1895,48 @@ summarize_rating_scale_bundle <- function(object, digits = 3, top_n = 10) {
     digits = digits,
     top_n = top_n
   )
+  out$category_usage <- object$category_usage
+  out$threshold_coverage <- object$threshold_coverage
+  out
+}
+
+validate_category_structure_calculation <- function(x) {
+  if (!identical(x$calculation_version, 2L))
+    stop("This saved category structure predates corrected cumulative and half-score boundaries. Recreate category_structure_report() from the saved fit; no calibration refit is needed.", call. = FALSE)
+  invisible(TRUE)
 }
 
 summarize_category_structure_bundle <- function(object, digits = 3, top_n = 10) {
+  validate_category_structure_calculation(object)
+  validate_category_coverage(object)
+  usage <- object$category_usage
   cat_tbl <- bundle_component_table(object, "category_table")
   marginal_available <- is.list(object$marginal_fit) && isTRUE(object$marginal_fit$available)
   marginal_summary <- as.data.frame(object$marginal_fit$summary %||% data.frame(), stringsAsFactors = FALSE)
-  flags <- integer(0)
-  for (nm in c("LowCount", "InfitFlag", "OutfitFlag", "ZSTDFlag")) {
-    if (nm %in% names(cat_tbl)) {
-      v <- as.logical(cat_tbl[[nm]])
-      flags <- c(flags, sum(v, na.rm = TRUE))
-    }
+  flags <- logical(0)
+  for (nm in c("LowCount")) {
+    flags <- c(flags, as.logical(cat_tbl[[nm]] %||% rep(NA, nrow(cat_tbl))))
   }
   summary_tbl <- data.frame(
-    Categories = nrow(cat_tbl),
-    UsedCategories = if ("Count" %in% names(cat_tbl)) sum(suppressWarnings(as.numeric(cat_tbl$Count)) > 0, na.rm = TRUE) else NA_integer_,
-    FlaggedStats = if (length(flags) > 0) sum(flags, na.rm = TRUE) else NA_integer_,
+    Categories = usage$Categories,
+    DisplayedCategories = nrow(cat_tbl),
+    AvailableCategoryCounts = usage$AvailableCounts,
+    UnavailableCategoryCounts = usage$UnavailableCounts,
+    UsedCategories = usage$UsedCategories,
+    FlaggedStats = if (any(!is.na(flags))) sum(flags, na.rm = TRUE) else NA_integer_,
+    AvailableFlagDecisions = sum(!is.na(flags)),
+    UnavailableFlagDecisions = sum(is.na(flags)),
     ModeBoundaries = nrow(bundle_component_table(object, "mode_boundaries")),
     MeanHalfscorePoints = nrow(bundle_component_table(object, "mean_halfscore_points")),
     DiagnosticMode = as.character(object$diagnostic_mode %||% "legacy"),
     MarginalFitAvailable = marginal_available,
     MarginalFlaggedCategories = if ("MarginalFitFlag" %in% names(cat_tbl)) {
-      sum(as.logical(cat_tbl$MarginalFitFlag), na.rm = TRUE)
+      marginal_flag_coverage(cat_tbl$MarginalFitFlag, "Displayed categories")$Flagged
     } else {
       NA_integer_
     },
+    MarginalClassifiedCategories = sum(!is.na(cat_tbl$MarginalFitFlag)),
+    MarginalUnclassifiedCategories = sum(is.na(cat_tbl$MarginalFitFlag)),
     MarginalOverallRMSD = if (marginal_available) marginal_summary$OverallRMSD[1] %||% NA_real_ else NA_real_,
     MarginalMaxAbsStdResidual = if (marginal_available) marginal_summary$OverallMaxAbsStdResidual[1] %||% NA_real_ else NA_real_,
     stringsAsFactors = FALSE
@@ -1804,9 +1949,13 @@ summarize_category_structure_bundle <- function(object, digits = 3, top_n = 10) 
   caveats <- as.data.frame(object$caveats %||% data.frame(), stringsAsFactors = FALSE)
   notes <- c(
     base_note,
+    object$notes %||% character(),
+    category_usage_note(usage),
+    marginal_coverage_notes(object$marginal_fit$coverage),
+    "Flag counts describe available decisions in the displayed rows; unavailable decisions do not indicate an absence of warnings.",
     if (nrow(caveats) > 0 && "Message" %in% names(caveats)) as.character(caveats$Message) else character(0)
   )
-  summarize_known_bundle(
+  out <- summarize_known_bundle(
     object = object,
     obj_class = "mfrm_category_structure",
     summary_candidates = character(0),
@@ -1817,6 +1966,8 @@ summarize_category_structure_bundle <- function(object, digits = 3, top_n = 10) 
     top_n = top_n,
     summary_override = summary_tbl
   )
+  out$category_usage <- usage
+  out
 }
 
 summarize_category_curves_bundle <- function(object, digits = 3, top_n = 10) {
@@ -1901,7 +2052,7 @@ summarize_category_curves_bundle <- function(object, digits = 3, top_n = 10) {
     notes = c(
       "Category-curve bundle with probabilities, cumulative probabilities, total information, and category-specific information.",
       "Category-specific information contributions sum to total information at the same curve and theta point.",
-      boundary_note
+      boundary_note, object$notes
     ),
     digits = digits,
     top_n = top_n,
@@ -1975,7 +2126,9 @@ summarize_category_curves_bundle <- function(object, digits = 3, top_n = 10) {
 #' @return An object of class `summary.mfrm_bundle`.
 #' @seealso [unexpected_response_table()], [fair_average_table()], `plot()`
 #' @examples
-#' \donttest{
+#' # Long-running workflow; run explicitly when needed.
+#' # example("summary.mfrm_bundle", run.dontrun = TRUE)
+#' \dontrun{
 #' toy_full <- load_mfrmr_data("example_core")
 #' toy_people <- unique(toy_full$Person)[1:12]
 #' toy <- toy_full[toy_full$Person %in% toy_people, , drop = FALSE]
@@ -2015,6 +2168,25 @@ summary_mfrm_bundle_impl <- function(object,
                                      ...) {
   if (!is.list(object)) {
     stop("`object` must be a bundle-like list output.")
+  }
+  if (inherits(object, "mfrm_bias_pairwise")) {
+    validate_bias_pairwise_table(as.data.frame(object$table %||% data.frame()))
+  }
+  if (inherits(object, "mfrm_facet_equivalence")) {
+    validate_facet_equivalence_bundle(object)
+    out <- summarize_known_bundle(
+      object, obj_class = "mfrm_facet_equivalence",
+      preview_candidates = "pairwise", settings_candidates = character(0),
+      notes = c(
+        "Each pair uses two one-sided normal-reference tests at 5%, with its 90% interval and the stated bound in logits.",
+        "Individual pair decisions are unadjusted for multiple comparisons. The all-pairs conclusion requires every pair to meet the bound.",
+        "The mean-deviation plots describe proximity to the facet mean; they do not show pairwise equivalence or posterior probabilities.",
+        object$notes,
+        object$cautions
+      ), digits = digits, top_n = top_n
+    )
+    out$covariance_verified <- TRUE
+    return(out)
   }
   digits <- max(0L, as.integer(digits))
   top_n <- max(1L, as.integer(top_n))
@@ -2434,8 +2606,138 @@ population_coding_summary_table <- function(population) {
 
 #' @export
 print.summary.mfrm_bundle <- function(x, ...) {
+  if (isTRUE(x$summary_kind %in% c("mfrm_interrater", "mfrm_network_analysis", "mfrm_rater_network", "mfrm_halo_network"))) {
+    if (!identical(x$summary_kind, "mfrm_network_analysis")) validate_descriptive_bundle(x, x$summary_kind)
+    cat(if (identical(x$summary_kind, "mfrm_interrater")) "mfrmr Agreement Summary\n" else "mfrmr Descriptive Network Summary\n")
+    print_bundle_section("Overview", mfrm_descriptive_display(x$summary), digits = x$digits %||% 3L)
+    print_bundle_section("Selected rows", mfrm_descriptive_display(x$preview), digits = x$digits %||% 3L)
+    for (line in x$notes) print_wrapped_line(line)
+    return(invisible(x))
+  }
+  if (isTRUE(x$summary_kind %in% c("mfrm_unexpected", "mfrm_unexpected_after_bias"))) {
+    validate_unexpected_coverage(x)
+  }
+  if (identical(x$summary_kind, "mfrm_precision_review")) {
+    validate_precision_review_profile(x$profile)
+    cat("mfrmr Precision Review\n")
+    print_wrapped_line(paste0("Estimator: ", x$profile$Method[1]))
+    print_wrapped_line(mfrm_precision_reporting_note(
+      as.character(x$profile$Method[1]),
+      as.character(x$profile$PrecisionTier[1]),
+      isTRUE(x$profile$InferenceReady[1])
+    ))
+    cat("\nReview checks\n")
+    for (i in which(x$checks$Check != "Precision tier")) {
+      label <- switch(as.character(x$checks$Check[i]),
+        "Optimizer convergence" = "Numerical convergence",
+        "ModelSE availability" = "SE availability",
+        "Facet precision coverage" = "Available precision summaries",
+        "SE source labels" = "SE basis",
+        as.character(x$checks$Check[i]))
+      print_wrapped_line(paste0(label, ": ", x$checks$Status[i],
+                                ". ", x$checks$Detail[i]))
+    }
+    return(invisible(x))
+  }
   digits <- as.integer(x$digits %||% 3L)
   if (!is.finite(digits)) digits <- 3L
+
+  if (isTRUE(x$summary_kind %in% c("mfrm_rating_scale", "mfrm_category_structure"))) {
+    rating <- identical(x$summary_kind, "mfrm_rating_scale")
+    validate_category_coverage(x, thresholds = rating)
+    cat(if (rating) "mfrmr Rating Scale Summary\n" else "mfrmr Category Structure Summary\n")
+    columns <- c(Categories = "Categories", DisplayedCategories = "Displayed",
+      UsedCategories = "Used", AvailableCategoryCounts = "Counts available",
+      UnavailableCategoryCounts = "Counts unavailable", FlaggedStats = "Flags",
+      AvailableFlagDecisions = "Decisions available", UnavailableFlagDecisions = "Decisions unavailable")
+    keep <- intersect(names(columns), names(x$summary))
+    overview <- x$summary[, keep, drop = FALSE]
+    names(overview) <- unname(columns[keep])
+    print_bundle_section("Category coverage", overview, digits = digits)
+    columns <- c(Category = "Category", Count = "Count", Percent = "Percent",
+      ExpectedCount = "Expected count", Infit = "Infit", Outfit = "Outfit",
+      InfitZSTD = "Infit ZSTD", OutfitZSTD = "Outfit ZSTD")
+    keep <- intersect(names(columns), names(x$preview))
+    preview <- x$preview[, keep, drop = FALSE]
+    names(preview) <- unname(columns[keep])
+    print_bundle_section("Category rows", preview, digits = digits)
+    for (line in x$notes) print_wrapped_line(line)
+    return(invisible(x))
+  }
+
+  if (identical(x$summary_kind, "mfrm_residual_pca")) {
+    validate_residual_pca_bundle(x)
+    cat("Residual PCA summary\n")
+    overview <- x$summary[, c("Mode", "Facets", "OverallComponents", "FacetComponentRows"), drop = FALSE]
+    names(overview) <- c("Analysis", "Facets", "Overall components", "Facet component rows")
+    print_bundle_section("Overview", overview, digits = digits)
+    preview <- as.data.frame(x$preview)
+    columns <- c(Facet = "Facet", Component = "PC", Eigenvalue = "Eigenvalue",
+                 Proportion = "Proportion", ParallelCutoff = "Reference",
+                 ExcessOverParallelCutoff = "Excess", ExceedsParallelCutoff = "Above reference")
+    keep <- intersect(names(columns), names(preview))
+    preview <- preview[, keep, drop = FALSE]
+    names(preview) <- unname(columns[keep])
+    print_bundle_section("Residual eigenvalues", preview, digits = digits)
+    for (line in x$notes) cat(line, "\n")
+    return(invisible(x))
+  }
+
+  if (identical(x$summary_kind, "mfrm_facet_equivalence") ||
+      identical(as.character(x$overview$Class[1]), "mfrm_facet_equivalence")) {
+    if (!isTRUE(x$covariance_verified)) {
+      stop("Recreate this summary from analyze_facet_equivalence(fit, ...) to verify its covariance basis.", call. = FALSE)
+    }
+    cat("Facet equivalence summary\n")
+    overview <- x$summary[, c("Facet", "Elements", "EquivalenceBound", "PairwiseComparisons", "PairwiseEquivalent"), drop = FALSE]
+    names(overview) <- c("Facet", "Levels", "Bound (logits)", "Pairs", "Pairs meeting bound")
+    print_bundle_section("Overview", overview, digits = digits)
+    cat(if (isTRUE(x$summary$AllPairsEquivalent[1]))
+      "Equivalence within the stated bound was established for all pairs.\n" else
+      "Equivalence within the stated bound was not established for all pairs.\n")
+    pairs <- x$preview[, c("ElementA", "ElementB", "Diff", "SE_Diff", "CI90_Lower", "CI90_Upper", "P_TOST", "Equivalent"), drop = FALSE]
+    names(pairs) <- c("Level A", "Level B", "Difference", "SE", "90% lower", "90% upper", "TOST p", "Equivalent")
+    print_bundle_section("Pairwise differences and 90% intervals", pairs, digits = digits)
+    for (line in x$notes) cat(line, "\n")
+    return(invisible(x))
+  }
+
+  if (identical(x$summary_kind, "mfrm_fair_average")) {
+    if (identical(x$point_estimator, "jeffreys_canonical_joint")) {
+      cat("Common-plan Jeffreys expected scores (experimental)\n")
+      print_bundle_section("Person expected scores",
+        utils::head(x$reference_scores, x$top_n %||% 10L), digits = digits)
+      for (line in x$notes %||% character()) cat(line, "\n")
+      return(invisible(x))
+    }
+    if (!isTRUE(x$fair_measure_basis_recorded)) {
+      stop(paste(
+        "This saved summary does not retain the fitted-measure and mean-reference basis.",
+        "Recreate summary(fair_average_table(fit, ...)) with the original settings."
+      ), call. = FALSE)
+    }
+    cat("Adjusted score summary\n")
+    ov <- as.data.frame(x$summary)
+    keep <- intersect(c("Facets", "Levels", "FairMetric", "FairSEAvailableRows", "FairSEUnavailableRows"), names(ov))
+    ov <- ov[, keep, drop = FALSE]
+    names(ov) <- sub("FairSEAvailableRows", "Rows with SE", names(ov), fixed = TRUE)
+    names(ov) <- sub("FairSEUnavailableRows", "Rows without SE", names(ov), fixed = TRUE)
+    names(ov) <- sub("FairMetric", "Reference", names(ov), fixed = TRUE)
+    print_bundle_section("Overview", ov, digits = digits)
+    preview <- as.data.frame(x$preview %||% data.frame())
+    keep <- !grepl("Eligible|Method|Status|ReportingUse", names(preview)) &
+      !vapply(preview, function(col) all(is.na(col)), logical(1))
+    preview <- preview[, keep, drop = FALSE]
+    names(preview) <- sub("StandardizedAdjustedAverage", "FairZ", names(preview), fixed = TRUE)
+    names(preview) <- sub("AdjustedAverage", "FairM", names(preview), fixed = TRUE)
+    names(preview) <- sub("ObservedAverage", "Observed", names(preview), fixed = TRUE)
+    print_bundle_section("Facet scores", preview, digits = digits)
+    if (!is.null(x$reference_scores))
+      print_bundle_section("Common-plan Person expected scores",
+        utils::head(x$reference_scores, x$top_n %||% 10L), digits = digits)
+    for (line in x$notes %||% character()) cat(line, "\n")
+    return(invisible(x))
+  }
 
   if (identical(x$summary_kind, "bias_count")) {
     cat("mfrmr Bias Count Summary\n")
@@ -2677,12 +2979,12 @@ print.summary.mfrm_bundle <- function(x, ...) {
     next_steps <- if (inference_ready) {
       c(
         "Run the generated command locally with ConQuest using MML.",
-        "Return the required CSV outputs to the normalization and comparison review workflow."
+        "Normalize the CSV outputs with the generated report_file, then review stopping status, origin and numerical precision."
       )
     } else {
       c(
-        "Resolve the mfrmr convergence issue and refit before running the ConQuest comparison.",
-        "Regenerate this bundle after the fit is inference-ready, then run the external ConQuest workflow."
+        "Inspect why the mfrmr fit is not inference-ready; this need not mean optimizer failure.",
+        "Descriptive external comparison remains available. Do not infer sampling validity from numerical agreement."
       )
     }
     print_bullet_section(
@@ -2996,6 +3298,8 @@ draw_category_structure_bundle <- function(x,
                                            main = NULL,
                                            palette = NULL,
                                            label_angle = 45) {
+  validate_category_structure_calculation(x)
+  validate_category_coverage(x)
   type <- match.arg(tolower(type), c("counts", "mode_boundaries", "mean_halfscore"))
   pal <- resolve_palette(
     palette = palette,
@@ -3011,10 +3315,26 @@ draw_category_structure_bundle <- function(x,
   half_tbl <- as.data.frame(x$mean_halfscore_points %||% data.frame(), stringsAsFactors = FALSE)
 
   if (isTRUE(draw)) {
+    if (type != "counts") {
+      groups <- if (type == "mode_boundaries") mode_tbl$CurveGroup else half_tbl$CurveGroup
+      labels <- unique(as.character(groups[!is.na(groups)]))
+      if (length(labels)) {
+        old_mar <- graphics::par("mar")
+        on.exit(graphics::par(mar = old_mar), add = TRUE)
+        label_lines <- max(graphics::strwidth(labels, units = "inches",
+          cex = graphics::par("cex.axis"))) / (graphics::par("csi") * graphics::par("mex"))
+        new_mar <- old_mar
+        new_mar[2] <- max(old_mar[2], label_lines + 2)
+        graphics::par(mar = new_mar)
+      }
+    }
     if (type == "counts") {
       if (nrow(cat_tbl) == 0 || !all(c("Category", "Count") %in% names(cat_tbl))) stop("No category count data available.")
+      obs_ct <- suppressWarnings(as.numeric(cat_tbl$Count))
+      exp_ct <- suppressWarnings(as.numeric(cat_tbl$ExpectedCount))
       bp <- barplot_rot45(
-        height = suppressWarnings(as.numeric(cat_tbl$Count)),
+        height = obs_ct,
+        ylim = range(0, 1, obs_ct, exp_ct, finite = TRUE) * c(1, 1.08),
         labels = as.character(cat_tbl$Category),
         col = pal["counts"],
         main = if (is.null(main)) "Category counts" else as.character(main[1]),
@@ -3022,11 +3342,13 @@ draw_category_structure_bundle <- function(x,
         label_angle = label_angle,
         mar_bottom = 8.2
       )
+      if (any(!is.finite(obs_ct))) {
+        text(bp[!is.finite(obs_ct)], 0, labels = "Unavailable", pos = 3, cex = 0.7)
+      }
       if ("ExpectedCount" %in% names(cat_tbl)) {
-        exp_ct <- suppressWarnings(as.numeric(cat_tbl$ExpectedCount))
         if (any(is.finite(exp_ct))) {
-          graphics::points(bp, exp_ct, pch = 21, bg = "white", col = pal["expected"])
-          graphics::lines(bp, exp_ct, col = pal["expected"], lwd = 1.4)
+          points(bp, exp_ct, pch = 21, bg = "white", col = pal["expected"])
+          lines(bp, exp_ct, col = pal["expected"], lwd = 1.4)
         }
       }
     } else if (type == "mode_boundaries") {
@@ -3035,7 +3357,7 @@ draw_category_structure_bundle <- function(x,
       }
       grp <- as.factor(mode_tbl$CurveGroup)
       y <- as.numeric(grp)
-      graphics::plot(
+      plot(
         x = suppressWarnings(as.numeric(mode_tbl$ModeBoundaryTheta)),
         y = y,
         pch = 16,
@@ -3043,16 +3365,18 @@ draw_category_structure_bundle <- function(x,
         xlab = "Theta / Logit",
         ylab = "",
         yaxt = "n",
-        main = if (is.null(main)) "Mode boundaries" else as.character(main[1])
+        main = ""
       )
-      graphics::axis(side = 2, at = seq_along(levels(grp)), labels = levels(grp), las = 2)
+      axis(side = 2, at = seq_along(levels(grp)), labels = levels(grp), las = 2)
     } else {
       if (nrow(half_tbl) == 0 || !all(c("CurveGroup", "MeanBoundaryTheta") %in% names(half_tbl))) {
         stop("No mean half-score data available.")
       }
+      if (!any(is.finite(half_tbl$MeanBoundaryTheta)))
+        stop("No finite mean half-score crossings in the requested theta range.", call. = FALSE)
       grp <- as.factor(half_tbl$CurveGroup)
       y <- as.numeric(grp)
-      graphics::plot(
+      plot(
         x = suppressWarnings(as.numeric(half_tbl$MeanBoundaryTheta)),
         y = y,
         pch = 16,
@@ -3060,9 +3384,9 @@ draw_category_structure_bundle <- function(x,
         xlab = "Theta / Logit",
         ylab = "",
         yaxt = "n",
-        main = if (is.null(main)) "Mean half-score boundaries" else as.character(main[1])
+        main = ""
       )
-      graphics::axis(side = 2, at = seq_along(levels(grp)), labels = levels(grp), las = 2)
+      axis(side = 2, at = seq_along(levels(grp)), labels = levels(grp), las = 2)
     }
   }
 
@@ -3070,7 +3394,14 @@ draw_category_structure_bundle <- function(x,
     "category_structure",
     list(
       plot = type,
+      palette = pal,
+      label_angle = label_angle,
       category_table = cat_tbl,
+      owner_category_table = x$owner_category_table,
+      threshold_table = x$threshold_table,
+      model_context = x$model_context,
+      curve_profiles = x$curve_profiles,
+      notes = x$notes,
       mode_boundaries = mode_tbl,
       mean_halfscore_points = half_tbl
     )
@@ -3167,11 +3498,15 @@ draw_category_curves_bundle <- function(x,
         !all(c("CumulativeDirection", "ThurstonianThreshold") %in% names(cumulative_boundaries))) {
       return(empty)
     }
-    out <- cumulative_boundaries[
-      cumulative_boundaries$CumulativeDirection == cumulative_direction,
-      ,
-      drop = FALSE
-    ]
+    out <- cumulative_boundaries
+    if (identical(cumulative_direction, "at_or_above")) {
+      # P(X <= k) = .5 and P(X >= k+1) = .5 share the same ability boundary.
+      below <- out$CumulativeDirection == "at_or_below"
+      out$CumulativeDirection[below] <- "at_or_above"
+      label <- if ("UpperCategoryLabel" %in% names(out)) out$UpperCategoryLabel else out$AboveCategory
+      out$BoundaryLabel[below] <- paste0("P(X >= ", label[below], ") = 0.5")
+    }
+    out <- out[out$CumulativeDirection == cumulative_direction, , drop = FALSE]
     if (identical(boundary_status, "in_range")) {
       if ("InThetaRange" %in% names(out)) {
         out <- out[out$InThetaRange %in% TRUE, , drop = FALSE]
@@ -3224,6 +3559,9 @@ draw_category_curves_bundle <- function(x,
   character_col <- function(tbl, col, default = NA_character_) {
     n <- nrow(tbl)
     if (n == 0L) return(character(0))
+    if (col %in% c("Category", "BoundaryCategory") && "CategoryLabel" %in% names(tbl)) {
+      return(as.character(tbl$CategoryLabel))
+    }
     if (col %in% names(tbl)) return(as.character(tbl[[col]]))
     rep(default, n)
   }
@@ -3395,21 +3733,21 @@ draw_category_curves_bundle <- function(x,
     groups <- unique(as.character(ogive$CurveGroup))
     cols <- line_palette(groups)
     ltys <- line_types(groups)
-    graphics::plot(
+    plot(
       x = finite_range(ogive$Theta),
       y = finite_range(ogive$ExpectedScore),
       type = "n",
       xlab = "Theta / Logit",
       ylab = "Expected score",
-      main = main_title
+      main = ""
     )
     graphics::grid(col = style$grid)
     for (i in seq_along(groups)) {
       sub <- ogive[ogive$CurveGroup == groups[i], , drop = FALSE]
-      graphics::lines(sub$Theta, sub$ExpectedScore, col = cols[groups[i]], lwd = 2, lty = ltys[groups[i]])
+      lines(sub$Theta, sub$ExpectedScore, col = cols[groups[i]], lwd = 2, lty = ltys[groups[i]])
     }
     if (length(groups) <= 8L) {
-      graphics::legend("topleft", legend = groups, col = cols[groups], lty = ltys[groups], lwd = 2, bty = "n", cex = 0.8)
+      legend("topleft", legend = groups, col = cols[groups], lty = ltys[groups], lwd = 2, bty = "n", cex = 0.8)
     }
   }
   draw_ccc_panel <- function(main_title) {
@@ -3417,22 +3755,22 @@ draw_category_curves_bundle <- function(x,
       stop("No category-curve data available.")
     }
     plot_tbl <- probs
-    plot_tbl$Trace <- paste(plot_tbl$CurveGroup, plot_tbl$Category, sep = " | Cat ")
+    plot_tbl$Trace <- paste(plot_tbl$CurveGroup, character_col(plot_tbl, "Category"), sep = " | Cat ")
     traces <- unique(plot_tbl$Trace)
     cols <- line_palette(traces)
     ltys <- line_types(traces)
-    graphics::plot(
+    plot(
       x = finite_range(plot_tbl$Theta),
       y = c(0, 1),
       type = "n",
       xlab = "Theta / Logit",
       ylab = "Probability",
-      main = main_title
+      main = ""
     )
     graphics::grid(col = style$grid)
     for (i in seq_along(traces)) {
       sub <- plot_tbl[plot_tbl$Trace == traces[i], , drop = FALSE]
-      graphics::lines(sub$Theta, sub$Probability, col = cols[traces[i]], lwd = 1.4, lty = ltys[traces[i]])
+      lines(sub$Theta, sub$Probability, col = cols[traces[i]], lwd = 1.4, lty = ltys[traces[i]])
     }
   }
   draw_cumulative_panel <- function(main_title) {
@@ -3451,26 +3789,26 @@ draw_category_curves_bundle <- function(x,
     traces <- unique(cumulative_plot$Trace)
     cols <- line_palette(traces)
     ltys <- line_types(traces)
-    graphics::plot(
+    plot(
       x = finite_range(cumulative_plot$Theta),
       y = c(0, 1),
       type = "n",
       xlab = "Theta / Logit",
       ylab = "Cumulative probability",
-      main = main_title
+      main = ""
     )
     graphics::grid(col = style$grid)
-    graphics::abline(h = 0.5, lty = 3, col = style$neutral)
+    abline(h = 0.5, lty = 3, col = style$neutral)
     if (nrow(boundary_line_tbl) > 0L) {
       boundary_x <- unique(suppressWarnings(as.numeric(boundary_line_tbl$ThurstonianThreshold)))
       boundary_x <- boundary_x[is.finite(boundary_x)]
       if (length(boundary_x) > 0L) {
-        graphics::abline(v = boundary_x, lty = 3, col = if (identical(style$name, "monochrome")) "gray55" else "gray75")
+        abline(v = boundary_x, lty = 3, col = if (identical(style$name, "monochrome")) "gray55" else "gray75")
       }
     }
     for (i in seq_along(traces)) {
       sub <- cumulative_plot[cumulative_plot$Trace == traces[i], , drop = FALSE]
-      graphics::lines(sub$Theta, sub$CumulativeProbability, col = cols[traces[i]], lwd = 1.4, lty = ltys[traces[i]])
+      lines(sub$Theta, sub$CumulativeProbability, col = cols[traces[i]], lwd = 1.4, lty = ltys[traces[i]])
     }
   }
   draw_information_panel <- function(main_title) {
@@ -3480,21 +3818,21 @@ draw_category_curves_bundle <- function(x,
     groups <- unique(as.character(ogive$CurveGroup))
     cols <- line_palette(groups)
     ltys <- line_types(groups)
-    graphics::plot(
+    plot(
       x = finite_range(ogive$Theta),
       y = finite_range(ogive$Information),
       type = "n",
       xlab = "Theta / Logit",
       ylab = "Information",
-      main = main_title
+      main = ""
     )
     graphics::grid(col = style$grid)
     for (i in seq_along(groups)) {
       sub <- ogive[ogive$CurveGroup == groups[i], , drop = FALSE]
-      graphics::lines(sub$Theta, sub$Information, col = cols[groups[i]], lwd = 2, lty = ltys[groups[i]])
+      lines(sub$Theta, sub$Information, col = cols[groups[i]], lwd = 2, lty = ltys[groups[i]])
     }
     if (length(groups) <= 8L) {
-      graphics::legend("topleft", legend = groups, col = cols[groups], lty = ltys[groups], lwd = 2, bty = "n", cex = 0.8)
+      legend("topleft", legend = groups, col = cols[groups], lty = ltys[groups], lwd = 2, bty = "n", cex = 0.8)
     }
   }
   draw_category_information_panel <- function(main_title) {
@@ -3503,41 +3841,35 @@ draw_category_curves_bundle <- function(x,
       stop("No category-specific information data available.")
     }
     plot_tbl <- cat_info
-    plot_tbl$Trace <- paste(plot_tbl$CurveGroup, plot_tbl$Category, sep = " | Cat ")
+    plot_tbl$Trace <- paste(plot_tbl$CurveGroup, character_col(plot_tbl, "Category"), sep = " | Cat ")
     traces <- unique(plot_tbl$Trace)
     cols <- line_palette(traces)
     ltys <- line_types(traces)
-    graphics::plot(
+    plot(
       x = finite_range(plot_tbl$Theta),
       y = finite_range(plot_tbl$CategoryInformation),
       type = "n",
       xlab = "Theta / Logit",
       ylab = "Category information",
-      main = main_title
+      main = ""
     )
     graphics::grid(col = style$grid)
     for (i in seq_along(traces)) {
       sub <- plot_tbl[plot_tbl$Trace == traces[i], , drop = FALSE]
-      graphics::lines(sub$Theta, sub$CategoryInformation, col = cols[traces[i]], lwd = 1.4, lty = ltys[traces[i]])
+      lines(sub$Theta, sub$CategoryInformation, col = cols[traces[i]], lwd = 1.4, lty = ltys[traces[i]])
     }
   }
 
   if (isTRUE(draw)) {
     apply_plot_preset(style)
     if (type == "overview") {
-      old_par <- graphics::par(no.readonly = TRUE)
+      old_par <- graphics::par()[c("mfrow", "cex", "mex", "mar", "oma")]
       on.exit(graphics::par(old_par), add = TRUE)
       graphics::par(mfrow = c(2, 2), mar = c(4.2, 4.2, 3.2, 1.2), oma = c(0, 0, 2.2, 0))
       draw_ccc_panel("Category probability")
       draw_cumulative_panel("Cumulative probability")
       draw_information_panel("Total information")
       draw_category_information_panel("Category information")
-      graphics::mtext(
-        if (is.null(main)) "Category curve overview" else as.character(main[1]),
-        outer = TRUE,
-        cex = 1.1,
-        font = 2
-      )
     } else if (type == "ogive") {
       draw_ogive_panel(if (is.null(main)) "Expected-score ogive" else as.character(main[1]))
     } else if (type == "ccc") {
@@ -3555,6 +3887,11 @@ draw_category_curves_bundle <- function(x,
     "category_curves",
     list(
       plot = type,
+      model_context = x$model_context,
+      curve_profiles = x$curve_profiles,
+      newdata = x$newdata,
+      fit_readiness = x$fit_readiness,
+      notes = x$notes,
       expected_ogive = ogive,
       probabilities = probs,
       cumulative_probabilities = cumulative,
@@ -3624,6 +3961,7 @@ draw_rating_scale_bundle <- function(x,
                                      main = NULL,
                                      palette = NULL,
                                      label_angle = 45) {
+  validate_category_coverage(x, thresholds = TRUE)
   type <- match.arg(tolower(type), c("counts", "thresholds"))
   pal <- resolve_palette(
     palette = palette,
@@ -3641,8 +3979,11 @@ draw_rating_scale_bundle <- function(x,
       if (nrow(cat_tbl) == 0 || !all(c("Category", "Count") %in% names(cat_tbl))) {
         stop("No category count data available.")
       }
+      obs_ct <- suppressWarnings(as.numeric(cat_tbl$Count))
+      exp_ct <- suppressWarnings(as.numeric(cat_tbl$ExpectedCount))
       bp <- barplot_rot45(
-        height = suppressWarnings(as.numeric(cat_tbl$Count)),
+        height = obs_ct,
+        ylim = range(0, 1, obs_ct, exp_ct, finite = TRUE) * c(1, 1.08),
         labels = as.character(cat_tbl$Category),
         col = pal["counts"],
         main = if (is.null(main)) "Rating-scale category counts" else as.character(main[1]),
@@ -3650,11 +3991,13 @@ draw_rating_scale_bundle <- function(x,
         label_angle = label_angle,
         mar_bottom = 8.2
       )
+      if (any(!is.finite(obs_ct))) {
+        text(bp[!is.finite(obs_ct)], 0, labels = "Unavailable", pos = 3, cex = 0.7)
+      }
       if ("ExpectedCount" %in% names(cat_tbl)) {
-        exp_ct <- suppressWarnings(as.numeric(cat_tbl$ExpectedCount))
         if (any(is.finite(exp_ct))) {
-          graphics::points(bp, exp_ct, pch = 21, bg = "white", col = pal["expected"])
-          graphics::lines(bp, exp_ct, col = pal["expected"], lwd = 1.3)
+          points(bp, exp_ct, pch = 21, bg = "white", col = pal["expected"])
+          lines(bp, exp_ct, col = pal["expected"], lwd = 1.3)
         }
       }
     } else {
@@ -3663,7 +4006,7 @@ draw_rating_scale_bundle <- function(x,
       }
       draw_step_plot(
         thr_tbl,
-        title = if (is.null(main)) "Rating-scale thresholds" else as.character(main[1]),
+        title = if (is.null(main)) "" else as.character(main[1]),
         palette = c(step_line = pal["step_line"]),
         label_angle = label_angle
       )
@@ -3672,7 +4015,11 @@ draw_rating_scale_bundle <- function(x,
 
   new_mfrm_plot_data(
     "rating_scale",
-    list(plot = type, category_table = cat_tbl, threshold_table = thr_tbl)
+    list(plot = type, palette = pal, label_angle = label_angle,
+         category_table = cat_tbl, threshold_table = thr_tbl,
+         owner_category_table = x$owner_category_table, model_context = x$model_context,
+         notes = x$notes,
+         category_usage = x$category_usage, threshold_coverage = x$threshold_coverage)
   )
 }
 
@@ -3770,6 +4117,7 @@ draw_unexpected_after_bias_bundle <- function(x,
                                               main = NULL,
                                               palette = NULL,
                                               label_angle = 45) {
+  validate_unexpected_coverage(x)
   type <- match.arg(tolower(as.character(type[1])), c("scatter", "severity", "comparison"))
   top_n <- max(1L, as.integer(top_n))
   pal <- resolve_palette(
@@ -3788,21 +4136,25 @@ draw_unexpected_after_bias_bundle <- function(x,
 
   if (type == "comparison") {
     if (nrow(summary_tbl) == 0) stop("No summary table available.")
+    if (!isTRUE(summary_tbl$UnavailableObservations[1] == 0) ||
+        !isTRUE(summary_tbl$BaselineUnavailableObservations[1] == 0)) {
+      stop("The before/after comparison is unavailable because some responses could not be classified.", call. = FALSE)
+    }
     base_n <- suppressWarnings(as.numeric(summary_tbl$BaselineUnexpectedN[1] %||% NA_real_))
     after_n <- suppressWarnings(as.numeric(summary_tbl$AfterBiasUnexpectedN[1] %||% NA_real_))
     vals <- c(base_n, after_n)
     if (!all(is.finite(vals))) stop("Baseline/after-bias counts are not available.")
     labels <- c("Baseline", "After bias")
     if (isTRUE(draw)) {
-      mids <- graphics::barplot(
+      mids <- barplot(
         height = vals,
         col = c(pal["baseline"], pal["after"]),
         names.arg = labels,
         ylab = "Unexpected responses",
-        main = if (is.null(main)) "Unexpected responses: baseline vs after bias" else as.character(main[1]),
+        main = "",
         border = "white"
       )
-      graphics::text(mids, vals, labels = as.integer(vals), pos = 3, cex = 0.85)
+      text(mids, vals, labels = as.integer(vals), pos = 3, cex = 0.85)
     }
     return(invisible(new_mfrm_plot_data(
       "unexpected_after_bias",
@@ -3819,20 +4171,20 @@ draw_unexpected_after_bias_bundle <- function(x,
     cols <- ifelse(dirs == "Higher than expected", pal["higher"], pal["lower"])
     cols[!is.finite(x_vals) | !is.finite(y_vals)] <- "gray60"
     if (isTRUE(draw)) {
-      graphics::plot(
+      plot(
         x = x_vals,
         y = y_vals,
         xlab = "Standardized residual",
         ylab = expression(-log[10](P[obs])),
-        main = if (is.null(main)) "Unexpected responses after bias adjustment" else as.character(main[1]),
+        main = "",
         pch = 16,
         col = cols
       )
       z_thr <- as.numeric(thr$abs_z_min %||% 2)
       p_thr <- as.numeric(thr$prob_max %||% 0.30)
-      graphics::abline(v = c(-z_thr, z_thr), lty = 2, col = "gray45")
-      graphics::abline(h = -log10(p_thr), lty = 2, col = "gray45")
-      graphics::legend(
+      abline(v = c(-z_thr, z_thr), lty = 2, col = "gray45")
+      abline(h = -log10(p_thr), lty = 2, col = "gray45")
+      legend(
         "topleft",
         legend = c("Higher than expected", "Lower than expected"),
         col = c(pal["higher"], pal["lower"]),
@@ -3893,21 +4245,21 @@ draw_output_bundle <- function(x,
     defaults <- stats::setNames(grDevices::hcl.colors(max(3L, length(groups)), "Dark 3")[seq_along(groups)], groups)
     cols <- resolve_palette(palette = palette, defaults = defaults)
     if (isTRUE(draw)) {
-      graphics::plot(
+      plot(
         x = range(graph_tbl$Measure, finite = TRUE),
         y = range(graph_tbl$Expected, finite = TRUE),
         type = "n",
         xlab = "Theta / Logit",
         ylab = "Expected score",
-        main = if (is.null(main)) "Graphfile expected-score curves" else as.character(main[1])
+        main = ""
       )
       for (g in groups) {
         sub <- graph_tbl[as.character(graph_tbl$CurveGroup) == g, , drop = FALSE]
         sub <- sub[order(sub$Measure), , drop = FALSE]
-        graphics::lines(sub$Measure, sub$Expected, col = cols[g], lwd = 1.8)
+        lines(sub$Measure, sub$Expected, col = cols[g], lwd = 1.8)
       }
       if (length(groups) > 1) {
-        graphics::legend("topleft", legend = groups, col = cols[groups], lty = 1, lwd = 2, bty = "n", cex = 0.85)
+        legend("topleft", legend = groups, col = cols[groups], lty = 1, lwd = 2, bty = "n", cex = 0.85)
       }
     }
     return(invisible(new_mfrm_plot_data(
@@ -3924,16 +4276,16 @@ draw_output_bundle <- function(x,
     vals <- vals[is.finite(vals)]
     if (length(vals) == 0) stop("No finite residual values available.")
     if (isTRUE(draw)) {
-      graphics::hist(
+      hist(
         x = vals,
         breaks = "FD",
         col = "#9ecae1",
         border = "white",
-        main = if (is.null(main)) "Scorefile residual distribution" else as.character(main[1]),
+        main = "",
         xlab = "Residual",
         ylab = "Count"
       )
-      graphics::abline(v = 0, lty = 2, col = "gray45")
+      abline(v = 0, lty = 2, col = "gray45")
     }
     return(invisible(new_mfrm_plot_data(
       "output_bundle",
@@ -3958,12 +4310,12 @@ draw_output_bundle <- function(x,
     vals <- vals[is.finite(vals)]
     if (length(vals) == 0) stop("No finite scorefile SE values available.")
     if (isTRUE(draw)) {
-      graphics::hist(
+      hist(
         x = vals,
         breaks = "FD",
         col = "#fdd49e",
         border = "white",
-        main = if (is.null(main)) paste0(se_col, " distribution") else as.character(main[1]),
+        main = "",
         xlab = se_col,
         ylab = "Count"
       )
@@ -3979,12 +4331,12 @@ draw_output_bundle <- function(x,
   vals <- vals[is.finite(vals)]
   if (length(vals) == 0) stop("No finite observed-probability values available.")
   if (isTRUE(draw)) {
-    graphics::hist(
+    hist(
       x = vals,
       breaks = "FD",
       col = "#c7e9c0",
       border = "white",
-      main = if (is.null(main)) "Observed probability distribution" else as.character(main[1]),
+      main = "",
       xlab = "Observed probability",
       ylab = "Count"
     )
@@ -4073,14 +4425,14 @@ draw_specifications_bundle <- function(x,
         Grouped = base_tbl$Grouped,
         Free = ifelse(is.finite(base_tbl$Free), base_tbl$Free, 0)
       )
-      mids <- graphics::barplot(
+      mids <- barplot(
         height = mat,
         beside = FALSE,
         names.arg = FALSE,
         col = c(pal["anchor"], pal["group"], pal["free"]),
         border = "white",
         ylab = "Levels",
-        main = if (is.null(main)) "Anchor constraints by facet" else as.character(main[1])
+        main = ""
       )
       draw_rotated_x_labels(
         at = mids,
@@ -4089,7 +4441,7 @@ draw_specifications_bundle <- function(x,
         cex = 0.82,
         line_offset = 0.085
       )
-      graphics::legend(
+      legend(
         "topright",
         legend = c("Anchored", "Grouped", "Free"),
         fill = c(pal["anchor"], pal["group"], pal["free"]),
@@ -4329,9 +4681,8 @@ draw_data_quality_bundle <- function(x,
           mar_bottom = 7.8
         )
       } else {
-        graphics::plot.new()
-        graphics::title(if (is.null(main)) "Data quality flags" else as.character(main[1]))
-        graphics::text(0.5, 0.5, "No priority QC flags")
+        plot.new()
+        text(0.5, 0.5, "No priority QC flags")
       }
     }
     return(invisible(new_mfrm_plot_data(
@@ -4407,7 +4758,7 @@ draw_data_quality_bundle <- function(x,
     if (any(!is.finite(y))) y <- seq_len(nrow(plot_tbl))
     if (isTRUE(draw)) {
       apply_plot_preset(style)
-      graphics::plot(
+      plot(
         seq_len(nrow(plot_tbl)),
         y,
         type = "b",
@@ -4416,11 +4767,11 @@ draw_data_quality_bundle <- function(x,
         xaxt = "n",
         xlab = "Original score",
         ylab = "Internal score",
-        main = if (is.null(main)) "Score-map review" else as.character(main[1])
+        main = ""
       )
-      graphics::axis(1, at = seq_len(nrow(plot_tbl)), labels = as.character(plot_tbl$OriginalScore), las = 2)
+      axis(1, at = seq_len(nrow(plot_tbl)), labels = as.character(plot_tbl$OriginalScore), las = 2)
       if (any(plot_tbl$MappingStatus == "recoded", na.rm = TRUE)) {
-        graphics::legend(
+        legend(
           "topleft",
           legend = c("Identity", "Recoded"),
           col = c(pal["ok"], pal["recoded"]),
@@ -4454,7 +4805,7 @@ draw_data_quality_bundle <- function(x,
         label_angle = label_angle,
         mar_bottom = 9.0
       )
-      graphics::abline(h = 95, lty = 2, col = "gray50")
+      abline(h = 95, lty = 2, col = "gray50")
     }
     return(invisible(new_mfrm_plot_data(
       "data_quality",
@@ -4469,21 +4820,23 @@ draw_data_quality_bundle <- function(x,
 
     if (isTRUE(draw)) {
       apply_plot_preset(style)
+      old_par <- graphics::par()[c("mfrow", "cex", "mex")]
+      on.exit(graphics::par(old_par), add = TRUE)
       graphics::par(mfrow = c(2, 2))
       if (nrow(row_tbl) > 0 && all(c("Status", "N") %in% names(row_tbl))) {
         barplot_rot45(
           height = suppressWarnings(as.numeric(row_tbl$N)),
           labels = as.character(row_tbl$Status),
           col = pal["row_review"],
-          main = if (is.null(main)) "Data quality dashboard: row review" else as.character(main[1]),
+          main = if (is.null(main)) "Data quality dashboard: row review" else as.character(main[1]), show_title = TRUE,
           ylab = "Rows",
           label_angle = label_angle,
           mar_bottom = 7.2
         )
       } else {
-        graphics::plot.new()
-        graphics::title("Row review")
-        graphics::text(0.5, 0.5, "No row-review table")
+        plot.new()
+        title("Row review")
+        text(0.5, 0.5, "No row-review table")
       }
 
       if (nrow(support_plot_tbl) > 0 && all(c("Score", "Count") %in% names(support_plot_tbl))) {
@@ -4491,15 +4844,15 @@ draw_data_quality_bundle <- function(x,
           height = suppressWarnings(as.numeric(support_plot_tbl$Count)),
           labels = as.character(support_plot_tbl$Score),
           col = score_support_colors(support_plot_tbl),
-          main = "Score support",
+          main = "Score support", show_title = TRUE,
           ylab = "Count",
           label_angle = label_angle,
           mar_bottom = 6.8
         )
       } else {
-        graphics::plot.new()
-        graphics::title("Score support")
-        graphics::text(0.5, 0.5, "No score-support table")
+        plot.new()
+        title("Score support")
+        text(0.5, 0.5, "No score-support table")
       }
 
       if (nrow(facet_plot_tbl) > 0 && all(c("Facet", "Level", "IssueCategories") %in% names(facet_plot_tbl))) {
@@ -4507,15 +4860,15 @@ draw_data_quality_bundle <- function(x,
           height = suppressWarnings(as.numeric(facet_plot_tbl$IssueCategories)),
           labels = paste(facet_plot_tbl$Facet, facet_plot_tbl$Level, sep = ": "),
           col = facet_usage_colors(facet_plot_tbl),
-          main = "Facet category use",
+          main = "Facet category use", show_title = TRUE,
           ylab = "Issues",
           label_angle = label_angle,
           mar_bottom = 8.0
         )
       } else {
-        graphics::plot.new()
-        graphics::title("Facet category use")
-        graphics::text(0.5, 0.5, "No facet category summary")
+        plot.new()
+        title("Facet category use")
+        text(0.5, 0.5, "No facet category summary")
       }
 
       if (nrow(missing_tbl) > 0) {
@@ -4523,15 +4876,15 @@ draw_data_quality_bundle <- function(x,
           height = suppressWarnings(as.numeric(missing_tbl$Count)),
           labels = as.character(missing_tbl$Field),
           col = pal["missing"],
-          main = "Missing/invalid rows",
+          main = "Missing/invalid rows", show_title = TRUE,
           ylab = "Rows",
           label_angle = label_angle,
           mar_bottom = 8.0
         )
       } else {
-        graphics::plot.new()
-        graphics::title("Missing/invalid rows")
-        graphics::text(0.5, 0.5, "No row-count fields")
+        plot.new()
+        title("Missing/invalid rows")
+        text(0.5, 0.5, "No row-count fields")
       }
     }
     return(invisible(new_mfrm_plot_data(
@@ -4617,7 +4970,11 @@ draw_fit_measures_bundle <- function(x,
                                      label_angle = 45,
                                      preset = c("standard", "publication", "compact", "monochrome"),
                                      ci_level = NULL,
-                                     top_n = 30L) {
+                                     top_n = 30L,
+                                     show_notes = FALSE) {
+  if (!is.logical(show_notes) || length(show_notes) != 1L || is.na(show_notes)) {
+    stop("`show_notes` must be TRUE or FALSE.", call. = FALSE)
+  }
   type <- match.arg(tolower(as.character(type[1])), c("status", "infit_outfit", "measure_ci", "df_sensitivity"))
   style <- resolve_plot_preset(preset)
   pal <- resolve_palette(
@@ -4680,37 +5037,51 @@ draw_fit_measures_bundle <- function(x,
     active_ci <- fit_measure_validate_ci_level(active_ci)
     measure <- suppressWarnings(as.numeric(tbl$Measure))
     se <- suppressWarnings(as.numeric(tbl$SE))
-    z_ci <- stats::qnorm(1 - (1 - active_ci) / 2)
+    z_ci <- stats::qnorm((1 - active_ci) / 2, lower.tail = FALSE)
     tbl$CI_Lower <- ifelse(is.finite(measure) & is.finite(se) & se >= 0, measure - z_ci * se, NA_real_)
     tbl$CI_Upper <- ifelse(is.finite(measure) & is.finite(se) & se >= 0, measure + z_ci * se, NA_real_)
     tbl$CI_Level <- active_ci
+    fixed <- tbl[["Fixed"]] %in% TRUE
+    if (length(fixed) != nrow(tbl)) fixed <- rep(FALSE, nrow(tbl))
+    tbl$CI_Lower[fixed] <- tbl$CI_Upper[fixed] <- NA_real_
     ok <- is.finite(measure) & is.finite(tbl$CI_Lower) & is.finite(tbl$CI_Upper)
-    if (!any(ok)) stop("No finite measure confidence intervals are available for plotting.", call. = FALSE)
+    shown <- is.finite(measure)
+    if (!any(shown)) stop("No finite measure estimates are available for plotting.", call. = FALSE)
+    title <- if (is.null(main)) paste0("Fit-measure estimates with ",
+      round(100 * active_ci), "% normal bands") else as.character(main[1])
+    note <- fit_measure_interval_note(tbl)
+    if (any(fixed)) note <- paste(note, "Open diamonds: fixed values.")
+    if (any(shown & !fixed & !ok)) note <- paste(note, "Crosses: no interval.")
+    shape <- ifelse(fixed, 5, ifelse(ok, 21, 4))
     labels <- paste(tbl$Facet, tbl$Level, sep = ": ")
     y <- seq_len(nrow(tbl))
     cols <- unname(pal[match(tbl$FitStatus, names(pal))])
     cols[is.na(cols)] <- pal["point"]
     if (isTRUE(draw)) {
+      old_par <- graphics::par(no.readonly = TRUE)
+      on.exit(graphics::par(old_par), add = TRUE)
       apply_plot_preset(style)
-      xr <- range(c(tbl$CI_Lower[ok], tbl$CI_Upper[ok], measure[ok]), finite = TRUE)
-      graphics::plot(
-        x = measure[ok],
-        y = y[ok],
-        pch = 21,
-        bg = cols[ok],
-        col = style$background,
+      note_lines <- strwrap(note, width = 88)
+      mar <- graphics::par("mar")
+      if (show_notes) mar[1] <- max(mar[1], 5 + length(note_lines) * .7)
+      mar[2] <- max(mar[2], max(graphics::strwidth(labels[shown],
+        units = "inches", cex = .76)) / graphics::par("csi") + 3)
+      graphics::par(mar = mar)
+      xr <- range(c(tbl$CI_Lower[ok], tbl$CI_Upper[ok], measure[shown]), finite = TRUE)
+      plot(
+        x = measure[shown],
+        y = y[shown],
+        pch = shape[shown],
+        bg = cols[shown],
+        col = cols[shown],
         xlim = xr,
-        ylim = rev(range(y[ok])),
+        ylim = rev(range(y[shown])),
         yaxt = "n",
         xlab = "Measure (logits)",
         ylab = "",
-        main = if (is.null(main)) {
-          paste0("Fit-measure estimates with ", round(100 * active_ci), "% CI")
-        } else {
-          as.character(main[1])
-        }
+        main = ""
       )
-      graphics::segments(
+      segments(
         x0 = tbl$CI_Lower[ok],
         y0 = y[ok],
         x1 = tbl$CI_Upper[ok],
@@ -4718,21 +5089,26 @@ draw_fit_measures_bundle <- function(x,
         col = pal["ci"],
         lwd = 1.6
       )
-      graphics::points(
-        x = measure[ok],
-        y = y[ok],
-        pch = 21,
-        bg = cols[ok],
-        col = style$background
+      points(
+        x = measure[shown],
+        y = y[shown],
+        pch = shape[shown],
+        bg = cols[shown],
+        col = cols[shown]
       )
-      graphics::axis(2, at = y[ok], labels = labels[ok], las = 2, cex.axis = 0.76)
-      graphics::abline(v = 0, lty = 3, col = pal["reference"])
+      axis(2, at = y[shown], labels = labels[shown], las = 2, cex.axis = 0.76)
+      abline(v = 0, lty = 3, col = pal["reference"])
+      if (show_notes) mtext(note_lines, side = 1,
+        line = 3 + seq_along(note_lines) * .7, cex = .7)
     }
     return(invisible(new_mfrm_plot_data(
       "fit_measures",
       list(
         plot = "measure_ci",
         table = tbl,
+        title = title,
+        caption = note,
+        display = list(show_notes = show_notes),
         ci_level = active_ci,
         preset = style$name
       )
@@ -4774,17 +5150,17 @@ draw_fit_measures_bundle <- function(x,
     if (isTRUE(draw)) {
       apply_plot_preset(style)
       ylim <- range(c(0, z_shift, thresholds), finite = TRUE)
-      bars <- graphics::barplot(
+      bars <- barplot(
         height = z_shift,
         names.arg = FALSE,
         col = cols,
         border = "white",
         ylim = ylim,
         ylab = "Max |ZSTD difference|",
-        main = if (is.null(main)) "FACETS-style df sensitivity" else as.character(main[1])
+        main = ""
       )
       if (length(thresholds) > 0L) {
-        graphics::abline(h = thresholds, lty = c(3, 2)[seq_along(thresholds)], col = pal["reference"])
+        abline(h = thresholds, lty = c(3, 2)[seq_along(thresholds)], col = pal["reference"])
       }
       draw_rotated_x_labels(
         at = bars,
@@ -4821,7 +5197,7 @@ draw_fit_measures_bundle <- function(x,
     apply_plot_preset(style)
     xr <- range(c(xv[ok], lower, 1, upper), finite = TRUE)
     yr <- range(c(yv[ok], lower, 1, upper), finite = TRUE)
-    graphics::plot(
+    plot(
       x = xv[ok],
       y = yv[ok],
       pch = 21,
@@ -4831,10 +5207,10 @@ draw_fit_measures_bundle <- function(x,
       ylim = yr,
       xlab = "Infit MnSq",
       ylab = "Outfit MnSq",
-      main = if (is.null(main)) "Infit vs Outfit by fit status" else as.character(main[1])
+      main = ""
     )
-    graphics::abline(v = c(lower, 1, upper), lty = c(3, 2, 3), col = pal["reference"])
-    graphics::abline(h = c(lower, 1, upper), lty = c(3, 2, 3), col = pal["reference"])
+    abline(v = c(lower, 1, upper), lty = c(3, 2, 3), col = pal["reference"])
+    abline(h = c(lower, 1, upper), lty = c(3, 2, 3), col = pal["reference"])
   }
   invisible(new_mfrm_plot_data(
     "fit_measures",
@@ -4878,7 +5254,7 @@ draw_iteration_report_bundle <- function(x,
     }
     if (isTRUE(draw)) {
       yr <- range(c(y1, y2), finite = TRUE)
-      graphics::plot(
+      plot(
         x = it,
         y = y1,
         type = "b",
@@ -4887,10 +5263,10 @@ draw_iteration_report_bundle <- function(x,
         ylim = yr,
         xlab = "Iteration",
         ylab = "Residual metric",
-        main = if (is.null(main)) "Iteration residual trajectory" else as.character(main[1])
+        main = ""
       )
-      graphics::lines(it, y2, type = "b", pch = 17, col = pal["residual_category"])
-      graphics::legend(
+      lines(it, y2, type = "b", pch = 17, col = pal["residual_category"])
+      legend(
         "topright",
         legend = c("Elements", "Categories"),
         col = c(pal["residual_element"], pal["residual_category"]),
@@ -4914,7 +5290,7 @@ draw_iteration_report_bundle <- function(x,
     }
     if (isTRUE(draw)) {
       yr <- range(c(y1, y2), finite = TRUE)
-      graphics::plot(
+      plot(
         x = it,
         y = y1,
         type = "b",
@@ -4923,10 +5299,10 @@ draw_iteration_report_bundle <- function(x,
         ylim = yr,
         xlab = "Iteration",
         ylab = "Max absolute change",
-        main = if (is.null(main)) "Iteration logit-change trajectory" else as.character(main[1])
+        main = ""
       )
-      graphics::lines(it, y2, type = "b", pch = 17, col = pal["change_step"])
-      graphics::legend(
+      lines(it, y2, type = "b", pch = 17, col = pal["change_step"])
+      legend(
         "topright",
         legend = c("Elements", "Steps"),
         col = c(pal["change_element"], pal["change_step"]),
@@ -4947,7 +5323,7 @@ draw_iteration_report_bundle <- function(x,
   if (length(vals) == 0) stop("No objective values available.")
   it2 <- it[is.finite(suppressWarnings(as.numeric(tbl$Objective)))]
   if (isTRUE(draw)) {
-    graphics::plot(
+    plot(
       x = it2,
       y = vals,
       type = "b",
@@ -4955,7 +5331,7 @@ draw_iteration_report_bundle <- function(x,
       col = pal["objective"],
       xlab = "Iteration",
       ylab = "Objective (log-likelihood proxy)",
-      main = if (is.null(main)) "Iteration objective trajectory" else as.character(main[1])
+      main = ""
     )
   }
   invisible(new_mfrm_plot_data(
@@ -5030,6 +5406,7 @@ draw_network_analysis_bundle <- function(x,
         plot = "centrality",
         table = tbl,
         metric = metric,
+        notes = x$caveats$Message,
         title = main %||% paste("Design-network", metric),
         subtitle = "Node-level graph metric; interpret as design-link dependence",
         legend = new_plot_legend(metric, "node_metric", "bar", pal["centrality"]),
@@ -5076,7 +5453,7 @@ draw_network_analysis_bundle <- function(x,
 }
 
 draw_rater_network_bundle <- function(x,
-                                      type = c("network", "centrality", "severity", "matrix"),
+                                      type = c("network", "centrality", "severity", "matrix", "fit"),
                                       metric = NULL,
                                       top_n = 20,
                                       draw = TRUE,
@@ -5084,8 +5461,9 @@ draw_rater_network_bundle <- function(x,
                                       palette = NULL,
                                       label_angle = 45,
                                       preset = c("standard", "publication", "compact", "monochrome")) {
+  validate_descriptive_bundle(x, "mfrm_rater_network")
   type <- match.arg(tolower(as.character(type[1])),
-                    c("network", "centrality", "severity", "matrix"))
+                    c("network", "centrality", "severity", "matrix", "fit"))
   style <- resolve_plot_preset(preset)
   pal <- resolve_palette(
     palette = palette,
@@ -5103,7 +5481,13 @@ draw_rater_network_bundle <- function(x,
   mode <- as.character(x$settings$mode %||% x$summary$Mode %||% "network")[1L]
   directed <- isTRUE(x$settings$directed %||% identical(mode, "severity_direction"))
 
-  if (identical(type, "centrality")) {
+  if (identical(type, "fit")) {
+    nodes <- as.data.frame(x$network_fit %||% data.frame())
+    if (!nrow(nodes)) stop("Network fit requires DirectionalMagnitude.", call. = FALSE)
+    metric <- metric %||% "SWS"
+    if (!metric %in% c("SWS", "PUS")) stop("Network fit metric must be SWS or PUS.", call. = FALSE)
+  }
+  if (type %in% c("centrality", "fit")) {
     if (nrow(nodes) == 0L) stop("No rater node metrics are available.", call. = FALSE)
     metric <- as.character(metric %||% if (directed) "Strength" else "Strength")[1L]
     numeric_cols <- names(nodes)[vapply(nodes, is.numeric, logical(1))]
@@ -5114,13 +5498,17 @@ draw_rater_network_bundle <- function(x,
     tbl <- nodes |>
       dplyr::arrange(dplyr::desc(.data[[metric]]), .data$Rater) |>
       dplyr::slice_head(n = top_n)
+    available <- is.finite(tbl[[metric]])
     if (isTRUE(draw)) {
       apply_plot_preset(style)
-      barplot_rot45(
+      if (!any(available)) {
+        plot.new()
+        text(.5, .5, paste(metric, "unavailable"))
+      } else barplot_rot45(
         height = suppressWarnings(as.numeric(tbl[[metric]])),
         labels = truncate_axis_label(as.character(tbl$Rater), width = 24L),
         col = pal["agreement"],
-        main = main %||% paste("Rater-network", metric),
+        main = if (type == "fit") "" else main %||% paste("Rater-network", metric),
         ylab = metric,
         label_angle = label_angle,
         mar_bottom = 8
@@ -5133,6 +5521,8 @@ draw_rater_network_bundle <- function(x,
         table = tbl,
         metric = metric,
         title = main %||% paste("Rater-network", metric),
+        available = available,
+        notes = x$caveats$Message,
         subtitle = "Node-level network metric based on observed rater-pair relationships",
         legend = new_plot_legend(metric, "node_metric", "bar", pal["agreement"]),
         reference_lines = new_reference_lines(),
@@ -5165,7 +5555,7 @@ draw_rater_network_bundle <- function(x,
         label_angle = label_angle,
         mar_bottom = 8
       )
-      graphics::abline(h = 0, lty = 2,
+      abline(h = 0, lty = 2,
                        col = grDevices::adjustcolor(style$foreground, alpha.f = 0.65))
     }
     return(invisible(new_mfrm_plot_data(
@@ -5202,9 +5592,17 @@ draw_rater_network_bundle <- function(x,
         if (!directed) mat[to, from] <- w
       }
     }
+    if (identical(x$settings$weight_metric, "KrippendorffAlpha")) {
+      pairs <- x$pair_metrics
+      mat[] <- NA_real_
+      for (i in which(pairs$EligiblePair)) {
+        mat[pairs$Rater1[i], pairs$Rater2[i]] <- pairs$KrippendorffAlpha[i]
+        mat[pairs$Rater2[i], pairs$Rater1[i]] <- pairs$KrippendorffAlpha[i]
+      }
+    }
     if (isTRUE(draw) && length(raters) > 0L) {
       apply_plot_preset(style)
-      graphics::image(
+      image(
         x = seq_along(raters),
         y = seq_along(raters),
         z = t(mat[nrow(mat):1, , drop = FALSE]),
@@ -5212,12 +5610,12 @@ draw_rater_network_bundle <- function(x,
         col = grDevices::colorRampPalette(c(style$fill_soft, pal["agreement"], pal["disagreement"]))(64),
         xlab = "Rater",
         ylab = "Rater",
-        main = main %||% paste("Rater-network", mode, "matrix")
+        main = ""
       )
-      graphics::axis(1, at = seq_along(raters),
+      axis(1, at = seq_along(raters),
                      labels = truncate_axis_label(raters, width = 14L),
                      las = 2, cex.axis = style$axis_cex)
-      graphics::axis(2, at = seq_along(raters),
+      axis(2, at = seq_along(raters),
                      labels = rev(truncate_axis_label(raters, width = 14L)),
                      las = 2, cex.axis = style$axis_cex)
       graphics::box()
@@ -5228,8 +5626,10 @@ draw_rater_network_bundle <- function(x,
         plot = "matrix",
         matrix = mat,
         edges = edges,
-        title = main %||% paste("Rater-network", mode, "matrix"),
-        subtitle = "Edge-weight matrix for custom heatmap or graph visualization",
+        title = main %||% paste("Rater-network", gsub("_", " ", mode), "matrix"),
+        subtitle = if (identical(x$settings$weight_metric, "KrippendorffAlpha"))
+          "Signed alpha for all eligible pairs before graph filtering; zero and unavailable remain distinct" else
+          "Edge-weight matrix for custom heatmap or graph visualization",
         legend = new_plot_legend("Edge weight", "edge_weight", "fill", pal["agreement"]),
         reference_lines = new_reference_lines(),
         preset = style$name
@@ -5237,65 +5637,8 @@ draw_rater_network_bundle <- function(x,
     )))
   }
 
-  if (!requireNamespace("igraph", quietly = TRUE)) {
-    stop("`plot(..., type = 'network')` requires the `igraph` package.",
-         call. = FALSE)
-  }
-  vertices <- data.frame(
-    name = sort(unique(c(as.character(nodes$Rater), as.character(edges$From), as.character(edges$To)))),
-    stringsAsFactors = FALSE
-  )
-  graph_edges <- edges |>
-    dplyr::select("From", "To", dplyr::everything())
-  graph <- igraph::graph_from_data_frame(
-    d = graph_edges,
-    directed = directed,
-    vertices = vertices
-  )
-  if (isTRUE(draw)) {
-    apply_plot_preset(style)
-    weights <- suppressWarnings(as.numeric(igraph::E(graph)$Weight))
-    edge_width <- if (length(weights) > 0L && any(is.finite(weights) & weights > 0)) {
-      1 + 5 * weights / max(weights, na.rm = TRUE)
-    } else {
-      1
-    }
-    sev <- nodes$SeverityIndex[match(igraph::V(graph)$name, nodes$Rater)]
-    vertex_col <- if (directed && length(sev) == igraph::vcount(graph)) {
-      ifelse(is.finite(sev) & sev > 0, pal["severe"],
-             ifelse(is.finite(sev) & sev < 0, pal["lenient"], pal["neutral"]))
-    } else {
-      pal["agreement"]
-    }
-    igraph::plot.igraph(
-      graph,
-      layout = igraph::layout_nicely(graph),
-      vertex.label = truncate_axis_label(igraph::V(graph)$name, width = 16L),
-      vertex.color = vertex_col,
-      vertex.frame.color = style$foreground,
-      vertex.label.color = style$foreground,
-      vertex.size = 18,
-      edge.width = edge_width,
-      edge.color = grDevices::adjustcolor(style$axis, alpha.f = 0.55),
-      edge.arrow.size = if (directed) 0.35 else 0,
-      main = main %||% paste("Rater-network", mode)
-    )
-  }
-  invisible(new_mfrm_plot_data(
-    "rater_network",
-    list(
-      plot = "network",
-      nodes = nodes,
-      edges = edges,
-      mode = mode,
-      directed = directed,
-      title = main %||% paste("Rater-network", mode),
-      subtitle = "Graph of observed pairwise rater relationships",
-      legend = new_plot_legend("Edge weight", "edge_weight", "edge_width", pal["agreement"]),
-      reference_lines = new_reference_lines(),
-      preset = style$name
-    )
-  ))
+  .mfrm_network_display(x, draw = draw, main = main, palette = palette,
+    label_angle = label_angle, preset = preset)
 }
 
 draw_halo_network_bundle <- function(x,
@@ -5307,6 +5650,7 @@ draw_halo_network_bundle <- function(x,
                                      palette = NULL,
                                      label_angle = 45,
                                      preset = c("standard", "publication", "compact", "monochrome")) {
+  validate_descriptive_bundle(x, "mfrm_halo_network")
   type <- match.arg(tolower(as.character(type[1])),
                     c("edge_distribution", "halo_summary", "network", "matrix"))
   style <- resolve_plot_preset(preset)
@@ -5322,6 +5666,13 @@ draw_halo_network_bundle <- function(x,
       neutral = style$neutral
     )
   )
+  finish <- function(payload) new_mfrm_plot_data("halo_network", c(payload, list(
+    settings = x$settings, summary = x$summary, caveats = x$caveats,
+    palette = pal, label_angle = label_angle,
+    notes = c(x$caveats$Message,
+      "These are observed-score profile correlations, not model residual correlations or severity estimates. Graph centrality is not rater centrality (middle-category use).",
+      "Distribution and MeanHaloWeight summaries use available pairs meeting min_pair_n before edge filters; the network and matrix show only retained edges. Missing or filtered edges do not mean zero correlation or absence of halo.",
+      "Review labels are descriptive package screens. A missing comparison is unassessed, not a no-flag result."))))
   top_n <- max(1L, as.integer(top_n))
   nodes <- as.data.frame(x$node_metrics %||% data.frame(), stringsAsFactors = FALSE)
   edges <- as.data.frame(x$edge_metrics %||% data.frame(), stringsAsFactors = FALSE)
@@ -5342,11 +5693,12 @@ draw_halo_network_bundle <- function(x,
       graphics::boxplot(
         AbsEstimate ~ EdgeType,
         data = tbl,
+        names = c("Same rater", "Other raters"),
         col = c(pal["halo"], pal["non_halo"]),
         border = style$foreground,
         ylab = "Absolute correlation",
         xlab = "",
-        main = main %||% "Halo vs non-halo edge weights"
+        main = ""
       )
       graphics::stripchart(
         AbsEstimate ~ EdgeType,
@@ -5358,8 +5710,7 @@ draw_halo_network_bundle <- function(x,
         add = TRUE
       )
     }
-    return(invisible(new_mfrm_plot_data(
-      "halo_network",
+    return(invisible(finish(
       list(
         plot = "edge_distribution",
         table = tbl,
@@ -5394,25 +5745,29 @@ draw_halo_network_bundle <- function(x,
       ifelse(
         tbl$ReviewStatus == "warning",
         pal["warning"],
-        ifelse(tbl$ReviewStatus == "review", pal["review"], pal["ok"])
+        ifelse(tbl$ReviewStatus == "review", pal["review"],
+          ifelse(tbl$ReviewStatus == "ok", pal["ok"], pal["neutral"]))
       )
     } else {
       pal["halo"]
     }
     if (isTRUE(draw)) {
       apply_plot_preset(style)
-      barplot_rot45(
-        height = suppressWarnings(as.numeric(tbl[[metric]])),
+      values <- suppressWarnings(as.numeric(tbl[[metric]]))
+      bp <- barplot_rot45(
+        height = values,
+        ylim = range(0, 1, values, finite = TRUE),
         labels = truncate_axis_label(as.character(tbl$Rater), width = 24L),
         col = status_cols,
         main = main %||% paste("Rater halo", metric),
         ylab = metric,
         label_angle = label_angle,
-        mar_bottom = 8
+        mar_bottom = 4
       )
+      if (any(!is.finite(values))) text(bp[!is.finite(values)], 0,
+        "Unavailable", pos = 3, cex = 0.7)
     }
-    return(invisible(new_mfrm_plot_data(
-      "halo_network",
+    return(invisible(finish(
       list(
         plot = "halo_summary",
         table = tbl,
@@ -5420,10 +5775,10 @@ draw_halo_network_bundle <- function(x,
         title = main %||% paste("Rater halo", metric),
         subtitle = "Same-rater cross-criterion edge summary by rater",
         legend = new_plot_legend(
-          label = c("Warning", "Review", "OK"),
-          role = c("status", "status", "status"),
-          aesthetic = c("bar", "bar", "bar"),
-          value = c(pal["warning"], pal["review"], pal["ok"])
+          label = c("Flagged for review", "Review needed", "No configured flag", "Insufficient information"),
+          role = rep("status", 4),
+          aesthetic = rep("bar", 4),
+          value = c(pal["warning"], pal["review"], pal["ok"], pal["neutral"])
         ),
         reference_lines = new_reference_lines(),
         preset = style$name
@@ -5447,26 +5802,38 @@ draw_halo_network_bundle <- function(x,
     }
     if (isTRUE(draw) && length(node_names) > 0L) {
       apply_plot_preset(style)
-      graphics::image(
+      labels <- truncate_axis_label(node_names, width = 24L)
+      old_mar <- graphics::par("mar")
+      on.exit(graphics::par(mar = old_mar), add = TRUE)
+      label_lines <- max(graphics::strwidth(labels, units = "inches", cex = style$axis_cex)) /
+        (graphics::par("csi") * graphics::par("mex"))
+      mar <- c(max(old_mar[1], label_lines + 2.5), max(old_mar[2], label_lines + 2.5), 1, 1)
+      graphics::par(mar = mar)
+      shown <- t(mat[nrow(mat):1, , drop = FALSE])
+      image(
         x = seq_along(node_names),
         y = seq_along(node_names),
-        z = t(mat[nrow(mat):1, , drop = FALSE]),
+        z = 1 * is.na(shown),
         axes = FALSE,
-        col = grDevices::colorRampPalette(c(style$fill_soft, pal["non_halo"], pal["halo"]))(64),
-        xlab = "Rater x criterion node",
-        ylab = "Rater x criterion node",
-        main = main %||% "Halo-network edge matrix"
+        col = c("white", "grey90"), zlim = c(0, 1),
+        xlab = "",
+        ylab = "",
+        main = ""
       )
-      graphics::axis(1, at = seq_along(node_names),
-                     labels = truncate_axis_label(node_names, width = 14L),
+      image(x = seq_along(node_names), y = seq_along(node_names),
+        z = shown, add = TRUE, zlim = c(-1, 1),
+        col = grDevices::colorRampPalette(c(pal["non_halo"], "white", pal["halo"]))(64))
+      axis(1, at = seq_along(node_names),
+                     labels = labels,
                      las = 2, cex.axis = style$axis_cex)
-      graphics::axis(2, at = seq_along(node_names),
-                     labels = rev(truncate_axis_label(node_names, width = 14L)),
+      axis(2, at = seq_along(node_names),
+                     labels = rev(labels),
                      las = 2, cex.axis = style$axis_cex)
+      mtext("Rater x criterion node", side = 1, line = mar[1] - 1)
+      mtext("Rater x criterion node", side = 2, line = mar[2] - 1)
       graphics::box()
     }
-    return(invisible(new_mfrm_plot_data(
-      "halo_network",
+    return(invisible(finish(
       list(
         plot = "matrix",
         matrix = mat,
@@ -5480,70 +5847,8 @@ draw_halo_network_bundle <- function(x,
     )))
   }
 
-  if (!requireNamespace("igraph", quietly = TRUE)) {
-    stop("`plot(..., type = 'network')` requires the `igraph` package.",
-         call. = FALSE)
-  }
-  vertices <- if (nrow(nodes) > 0L) {
-    data.frame(
-      name = as.character(nodes$Node),
-      Rater = as.character(nodes$Rater),
-      Criterion = as.character(nodes$Criterion),
-      stringsAsFactors = FALSE
-    )
-  } else {
-    data.frame(name = character(), stringsAsFactors = FALSE)
-  }
-  graph_edges <- edges |>
-    dplyr::select("From", "To", dplyr::everything())
-  graph <- igraph::graph_from_data_frame(
-    d = graph_edges,
-    directed = FALSE,
-    vertices = vertices
-  )
-  if (isTRUE(draw)) {
-    apply_plot_preset(style)
-    weights <- suppressWarnings(as.numeric(igraph::E(graph)$Weight))
-    edge_width <- if (length(weights) > 0L && any(is.finite(weights) & weights > 0)) {
-      1 + 5 * weights / max(weights, na.rm = TRUE)
-    } else {
-      1
-    }
-    edge_type <- as.character(igraph::E(graph)$EdgeType)
-    edge_col <- ifelse(edge_type == "halo",
-                       grDevices::adjustcolor(pal["halo"], alpha.f = 0.75),
-                       grDevices::adjustcolor(pal["non_halo"], alpha.f = 0.45))
-    igraph::plot.igraph(
-      graph,
-      layout = igraph::layout_nicely(graph),
-      vertex.label = truncate_axis_label(igraph::V(graph)$name, width = 16L),
-      vertex.color = pal["node"],
-      vertex.frame.color = style$foreground,
-      vertex.label.color = style$foreground,
-      vertex.size = 15,
-      edge.width = edge_width,
-      edge.color = edge_col,
-      main = main %||% "Rater-by-criterion halo network"
-    )
-  }
-  invisible(new_mfrm_plot_data(
-    "halo_network",
-    list(
-      plot = "network",
-      nodes = nodes,
-      edges = edges,
-      title = main %||% "Rater-by-criterion halo network",
-      subtitle = "Halo edges connect criteria scored by the same rater",
-      legend = new_plot_legend(
-        label = c("Halo edge", "Non-halo edge"),
-        role = c("edge_type", "edge_type"),
-        aesthetic = c("edge", "edge"),
-        value = c(pal["halo"], pal["non_halo"])
-      ),
-      reference_lines = new_reference_lines(),
-      preset = style$name
-    )
-  ))
+  .mfrm_network_display(x, draw = draw, main = main, palette = palette,
+    label_angle = label_angle, preset = preset)
 }
 
 draw_subset_connectivity_bundle <- function(x,
@@ -5604,85 +5909,8 @@ draw_subset_connectivity_bundle <- function(x,
   }
 
   if (identical(type, "network")) {
-    if (nrow(nodes_tbl) == 0 || nrow(edges_tbl) == 0 ||
-        !all(c("Node", "Facet", "Level", "Subset") %in% names(nodes_tbl)) ||
-        !all(c("From", "To", "Weight", "Subset") %in% names(edges_tbl))) {
-      stop("Subset connectivity node/edge tables are not available. Rebuild with subset_connectivity_report() from a fitted object.", call. = FALSE)
-    }
-    node_order <- nodes_tbl |>
-      dplyr::mutate(
-        Subset = suppressWarnings(as.integer(.data$Subset)),
-        Facet = as.character(.data$Facet),
-        Level = as.character(.data$Level)
-      ) |>
-      dplyr::arrange(.data$Subset, .data$Facet, .data$Level)
-    edge_order <- edges_tbl |>
-      dplyr::mutate(
-        Subset = suppressWarnings(as.integer(.data$Subset)),
-        Weight = suppressWarnings(as.numeric(.data$Weight))
-      ) |>
-      dplyr::arrange(.data$Subset, dplyr::desc(.data$Weight), .data$From, .data$To)
-    if (isTRUE(draw)) {
-      if (!requireNamespace("igraph", quietly = TRUE)) {
-        message("`plot(..., type = \"network\")` requires the `igraph` package for drawing. Returning plot data only.")
-      } else {
-        apply_plot_preset(style)
-        vertices <- node_order
-        row.names(vertices) <- vertices$Node
-        g <- igraph::graph_from_data_frame(
-          d = edge_order[, c("From", "To", "Weight"), drop = FALSE],
-          directed = FALSE,
-          vertices = vertices
-        )
-        facet_levels <- sort(unique(as.character(igraph::V(g)$Facet)))
-        facet_cols <- stats::setNames(
-          grDevices::hcl.colors(max(3L, length(facet_levels)), palette = "Dark 3")[seq_along(facet_levels)],
-          facet_levels
-        )
-        igraph::V(g)$color <- facet_cols[as.character(igraph::V(g)$Facet)]
-        igraph::V(g)$size <- ifelse(as.character(igraph::V(g)$Facet) == "Person", 4.5, 7)
-        igraph::V(g)$label <- if (igraph::vcount(g) <= 80L) as.character(igraph::V(g)$Level) else NA_character_
-        igraph::V(g)$label.cex <- 0.65
-        igraph::V(g)$frame.color <- grDevices::adjustcolor(style$foreground, alpha.f = 0.35)
-        igraph::E(g)$width <- pmax(0.4, log1p(as.numeric(igraph::E(g)$Weight)))
-        igraph::E(g)$color <- grDevices::adjustcolor(style$grid, alpha.f = 0.55)
-        layout <- igraph::layout_with_fr(g, weights = sqrt(pmax(1, as.numeric(igraph::E(g)$Weight))))
-        graphics::plot(
-          g,
-          layout = layout,
-          main = if (is.null(main)) "Connectivity network" else as.character(main[1]),
-          vertex.label.color = style$foreground,
-          vertex.label.family = "sans"
-        )
-        graphics::legend(
-          "topleft",
-          legend = names(facet_cols),
-          pch = 21,
-          pt.bg = unname(facet_cols),
-          col = grDevices::adjustcolor(style$foreground, alpha.f = 0.35),
-          bty = "n",
-          cex = 0.8
-        )
-      }
-    }
-    return(invisible(new_mfrm_plot_data(
-      "subset_connectivity",
-      list(
-        plot = "network",
-        nodes = as.data.frame(node_order, stringsAsFactors = FALSE),
-        edges = as.data.frame(edge_order, stringsAsFactors = FALSE),
-        title = main %||% "Connectivity network",
-        subtitle = "Facet-level co-observation network; edge width is observation count",
-        legend = new_plot_legend(
-          label = sort(unique(as.character(node_order$Facet))),
-          role = "facet",
-          aesthetic = "node_color",
-          value = sort(unique(as.character(node_order$Facet)))
-        ),
-        reference_lines = new_reference_lines(),
-        preset = style$name
-      )
-    )))
+    return(.mfrm_network_display(x, draw = draw, main = main, palette = palette,
+      label_angle = label_angle, preset = preset))
   }
 
   if (nrow(listing_tbl) == 0 || !all(c("Subset", "Facet", "LevelsN") %in% names(listing_tbl))) {
@@ -5743,24 +5971,24 @@ draw_subset_connectivity_bundle <- function(x,
     }
     if (isTRUE(draw)) {
       apply_plot_preset(style)
-      old_par <- graphics::par(no.readonly = TRUE)
+      old_par <- graphics::par()[c("mfrow", "cex", "mex", "mar", "oma")]
       on.exit(graphics::par(old_par), add = TRUE)
       graphics::layout(matrix(c(1, 2), nrow = 2), heights = c(0.8, 2.7))
       graphics::par(mar = c(1.2, 7.5, 2.5, 2.2))
       obs_vals <- subset_summary$ObservationPercent
-      mids <- graphics::barplot(
+      mids <- barplot(
         height = obs_vals,
         col = grDevices::adjustcolor(pal["subset"], alpha.f = 0.72),
         border = NA,
         axes = FALSE,
         space = 0.2,
         ylim = c(0, max(c(obs_vals, 1), na.rm = TRUE) * 1.15),
-        main = if (is.null(main)) "Linking design matrix" else as.character(main[1])
+        main = ""
       )
-      graphics::axis(2, las = 1)
-      graphics::mtext("Observation share (%)", side = 2, line = 5.2)
-      graphics::abline(h = pretty(obs_vals, n = 4), col = grDevices::adjustcolor(style$grid, alpha.f = 0.8), lty = 1)
-      graphics::text(
+      axis(2, las = 1)
+      mtext("Observation share (%)", side = 2, line = 5.2)
+      abline(h = pretty(obs_vals, n = 4), col = grDevices::adjustcolor(style$grid, alpha.f = 0.8), lty = 1)
+      text(
         x = mids,
         y = obs_vals,
         labels = paste0(round(obs_vals, 1), "%"),
@@ -5771,7 +5999,7 @@ draw_subset_connectivity_bundle <- function(x,
 
       graphics::par(mar = c(6.5, 7.5, 1.2, 4.4))
       cols <- grDevices::colorRampPalette(c(pal["low"], pal["high"]))(21)
-      graphics::image(
+      image(
         x = seq_len(ncol(cov_wide)),
         y = seq_len(nrow(cov_wide)),
         z = t(cov_wide[nrow(cov_wide):1, , drop = FALSE]),
@@ -5783,14 +6011,14 @@ draw_subset_connectivity_bundle <- function(x,
         zlim = c(0, 1),
         main = ""
       )
-      graphics::axis(1, at = seq_len(ncol(cov_wide)), labels = colnames(cov_wide), las = 2)
-      graphics::axis(2, at = seq_len(nrow(cov_wide)), labels = rev(rownames(cov_wide)), las = 1)
-      graphics::abline(v = seq(0.5, ncol(cov_wide) + 0.5, by = 1), col = grDevices::adjustcolor("white", alpha.f = 0.7))
-      graphics::abline(h = seq(0.5, nrow(cov_wide) + 0.5, by = 1), col = grDevices::adjustcolor("white", alpha.f = 0.7))
+      axis(1, at = seq_len(ncol(cov_wide)), labels = colnames(cov_wide), las = 2)
+      axis(2, at = seq_len(nrow(cov_wide)), labels = rev(rownames(cov_wide)), las = 1)
+      abline(v = seq(0.5, ncol(cov_wide) + 0.5, by = 1), col = grDevices::adjustcolor("white", alpha.f = 0.7))
+      abline(h = seq(0.5, nrow(cov_wide) + 0.5, by = 1), col = grDevices::adjustcolor("white", alpha.f = 0.7))
       if (!is.null(label_wide)) {
         for (i in seq_len(nrow(cov_wide))) {
           for (j in seq_len(ncol(cov_wide))) {
-            graphics::text(
+            text(
               x = j,
               y = nrow(cov_wide) - i + 1,
               labels = label_wide[i, j],
@@ -5800,15 +6028,15 @@ draw_subset_connectivity_bundle <- function(x,
           }
         }
       }
-      graphics::mtext("Facet", side = 2, line = 6)
-      graphics::axis(
+      mtext("Facet", side = 2, line = 6)
+      axis(
         4,
         at = seq_len(nrow(cov_wide)),
         labels = rev(sprintf("%.0f%%", 100 * facet_summary$MeanCoverage)),
         las = 1,
         cex.axis = 0.82
       )
-      graphics::mtext("Mean coverage", side = 4, line = 3)
+      mtext("Mean coverage", side = 4, line = 3)
     }
     return(invisible(new_mfrm_plot_data(
       "subset_connectivity",
@@ -5936,122 +6164,22 @@ draw_facet_statistics_bundle <- function(x,
   md <- suppressWarnings(as.numeric(sub$Mean))
   if (isTRUE(draw)) {
     xr <- range(c(mn, mx), finite = TRUE)
-    graphics::plot(
+    plot(
       x = xr,
       y = c(1, nrow(sub)),
       type = "n",
       yaxt = "n",
       xlab = metric,
       ylab = "",
-      main = if (is.null(main)) paste0("Facet ranges (", metric, ")") else as.character(main[1])
+      main = ""
     )
-    graphics::segments(x0 = mn, y0 = y, x1 = mx, y1 = y, col = pal["range"], lwd = 2)
-    graphics::points(md, y, pch = 16, col = pal["mean"])
-    graphics::axis(side = 2, at = y, labels = as.character(sub$Facet), las = 2, cex.axis = 0.8)
+    segments(x0 = mn, y0 = y, x1 = mx, y1 = y, col = pal["range"], lwd = 2)
+    points(md, y, pch = 16, col = pal["mean"])
+    axis(side = 2, at = y, labels = as.character(sub$Facet), las = 2, cex.axis = 0.8)
   }
   invisible(new_mfrm_plot_data(
     "facet_statistics",
     list(plot = "ranges", metric = metric, table = sub)
-  ))
-}
-
-draw_residual_pca_bundle <- function(x,
-                                     type = c("overall_scree", "facet_scree",
-                                              "overall_parallel_scree", "facet_parallel_scree",
-                                              "overall_parallel_excess", "facet_parallel_excess",
-                                              "overall_loadings", "facet_loadings"),
-                                     facet = NULL,
-                                     component = 1L,
-                                     top_n = 20L,
-                                     draw = TRUE) {
-  type <- match.arg(
-    tolower(as.character(type[1])),
-    c("overall_scree", "facet_scree",
-      "overall_parallel_scree", "facet_parallel_scree",
-      "overall_parallel_excess", "facet_parallel_excess",
-      "overall_loadings", "facet_loadings")
-  )
-  if (type == "overall_scree") {
-    return(invisible(plot_residual_pca(
-      x,
-      mode = "overall",
-      plot_type = "scree",
-      component = component,
-      top_n = top_n,
-      draw = draw
-    )))
-  }
-  if (type == "facet_scree") {
-    return(invisible(plot_residual_pca(
-      x,
-      mode = "facet",
-      facet = facet,
-      plot_type = "scree",
-      component = component,
-      top_n = top_n,
-      draw = draw
-    )))
-  }
-  if (type == "overall_parallel_scree") {
-    return(invisible(plot_residual_pca(
-      x,
-      mode = "overall",
-      plot_type = "parallel_scree",
-      component = component,
-      top_n = top_n,
-      draw = draw
-    )))
-  }
-  if (type == "facet_parallel_scree") {
-    return(invisible(plot_residual_pca(
-      x,
-      mode = "facet",
-      facet = facet,
-      plot_type = "parallel_scree",
-      component = component,
-      top_n = top_n,
-      draw = draw
-    )))
-  }
-  if (type == "overall_parallel_excess") {
-    return(invisible(plot_residual_pca(
-      x,
-      mode = "overall",
-      plot_type = "parallel_excess",
-      component = component,
-      top_n = top_n,
-      draw = draw
-    )))
-  }
-  if (type == "facet_parallel_excess") {
-    return(invisible(plot_residual_pca(
-      x,
-      mode = "facet",
-      facet = facet,
-      plot_type = "parallel_excess",
-      component = component,
-      top_n = top_n,
-      draw = draw
-    )))
-  }
-  if (type == "overall_loadings") {
-    return(invisible(plot_residual_pca(
-      x,
-      mode = "overall",
-      plot_type = "loadings",
-      component = component,
-      top_n = top_n,
-      draw = draw
-    )))
-  }
-  invisible(plot_residual_pca(
-    x,
-    mode = "facet",
-    facet = facet,
-    plot_type = "loadings",
-    component = component,
-    top_n = top_n,
-    draw = draw
   ))
 }
 
@@ -6102,7 +6230,7 @@ draw_facets_contract_bundle <- function(x,
         label_angle = label_angle,
         mar_bottom = 9.2
       )
-      graphics::abline(h = 1, lty = 3, col = "#999999")
+      abline(h = 1, lty = 3, col = "#999999")
     }
     return(invisible(new_mfrm_plot_data(
       "facets_contract_review",
@@ -6129,7 +6257,7 @@ draw_facets_contract_bundle <- function(x,
         label_angle = label_angle,
         mar_bottom = 7.8
       )
-      graphics::abline(h = 1, lty = 3, col = "#999999")
+      abline(h = 1, lty = 3, col = "#999999")
     }
     return(invisible(new_mfrm_plot_data(
       "facets_contract_review",
@@ -6147,13 +6275,13 @@ draw_facets_contract_bundle <- function(x,
     labels <- names(cnt)
     cols <- c(pal["pass"], pal["fail"], pal["missing"])
     if (isTRUE(draw)) {
-      graphics::barplot(
+      barplot(
         height = vals,
         names.arg = labels,
         col = cols,
         las = 2,
         ylab = "Checks",
-        main = if (is.null(main)) "Metric-check status counts" else as.character(main[1])
+        main = ""
       )
     }
     return(invisible(new_mfrm_plot_data(
@@ -6180,7 +6308,7 @@ draw_facets_contract_bundle <- function(x,
       label_angle = label_angle,
       mar_bottom = 7.8
     )
-    graphics::abline(h = 1, lty = 3, col = "#999999")
+    abline(h = 1, lty = 3, col = "#999999")
   }
   invisible(new_mfrm_plot_data(
     "facets_contract_review",
@@ -6298,7 +6426,7 @@ plot_bias_count_bundle <- function(x,
       label_angle = label_angle,
       mar_bottom = 9.0
     )
-    graphics::abline(h = 0, col = pal["grid"], lty = 1)
+    abline(h = 0, col = pal["grid"], lty = 1)
   }
   invisible(new_mfrm_plot_data(
     "bias_count",
@@ -6316,6 +6444,7 @@ plot_fixed_reports_bundle <- function(x,
   plot_type <- match.arg(tolower(as.character(plot_type[1])), c("contrast", "pvalue"))
   top_n <- max(1L, as.integer(top_n))
   pair_tbl <- as.data.frame(x$pairwise_table %||% data.frame(), stringsAsFactors = FALSE)
+  validate_bias_pairwise_table(pair_tbl)
   pal <- resolve_palette(
     palette = palette,
     defaults = c(
@@ -6326,13 +6455,8 @@ plot_fixed_reports_bundle <- function(x,
   )
   no_data_plot <- function(message) {
     if (isTRUE(draw)) {
-      graphics::plot.new()
-      graphics::title(main = if (is.null(main)) {
-        if (identical(plot_type, "contrast")) "Pairwise contrasts" else "Pairwise p-value distribution"
-      } else {
-        as.character(main[1])
-      })
-      graphics::text(0.5, 0.5, "No data")
+      plot.new()
+      text(0.5, 0.5, "No data")
     }
     payload <- list(plot = plot_type, message = message)
     if (identical(plot_type, "contrast")) {
@@ -6375,7 +6499,7 @@ plot_fixed_reports_bundle <- function(x,
         label_angle = label_angle,
         mar_bottom = 9.2
       )
-      graphics::abline(h = 0, lty = 2, col = "gray50")
+      abline(h = 0, lty = 2, col = "gray50")
     }
     return(invisible(new_mfrm_plot_data(
       "fixed_reports",
@@ -6393,16 +6517,16 @@ plot_fixed_reports_bundle <- function(x,
     return(no_data_plot("No finite p-values available."))
   }
   if (isTRUE(draw)) {
-    graphics::hist(
+    hist(
       x = p_vals,
       breaks = "FD",
       col = pal["hist"],
       border = "white",
-      main = if (is.null(main)) "Pairwise p-value distribution" else as.character(main[1]),
+      main = "",
       xlab = "p-value",
       ylab = "Count"
     )
-    graphics::abline(v = 0.05, lty = 2, col = "gray45")
+    abline(v = 0.05, lty = 2, col = "gray45")
   }
   invisible(new_mfrm_plot_data(
     "fixed_reports",
@@ -6474,13 +6598,13 @@ plot_visual_summaries_bundle <- function(x,
     mar <- old_mar
     mar[1] <- max(mar[1], 9.0)
     graphics::par(mar = mar)
-    mids <- graphics::barplot(
+    mids <- barplot(
       height = mat,
       beside = TRUE,
       names.arg = FALSE,
       col = c(pal["warning"], pal["summary"]),
       ylab = "Messages",
-      main = if (is.null(main)) "Warning vs summary counts by visual" else as.character(main[1]),
+      main = "",
       border = "white"
     )
     centers <- vapply(split(as.numeric(mids), rep(seq_along(vis), each = 2L)), mean, numeric(1))
@@ -6491,7 +6615,7 @@ plot_visual_summaries_bundle <- function(x,
       cex = 0.82,
       line_offset = 0.085
     )
-    graphics::legend(
+    legend(
       "topright",
       legend = c("Warning", "Summary"),
       fill = c(pal["warning"], pal["summary"]),
@@ -6514,12 +6638,12 @@ plot_visual_summaries_bundle <- function(x,
 #'
 #' @details
 #' `plot()` dispatches by bundle class:
-#' - `mfrm_unexpected` -> [plot_unexpected()]
-#' - `mfrm_fair_average` -> [plot_fair_average()]
-#' - `mfrm_displacement` -> [plot_displacement()]
-#' - `mfrm_interrater` -> [plot_interrater_agreement()]
-#' - `mfrm_facets_chisq` -> [plot_facets_chisq()]
-#' - `mfrm_bias_interaction` -> [plot_bias_interaction()]
+#' - `mfrm_unexpected` -> [plot(x, type = "unexpected")][plot.mfrm_fit]
+#' - `mfrm_fair_average` -> [plot(x, type = "fair_average")][plot.mfrm_fit]
+#' - `mfrm_displacement` -> [plot(x, type = "displacement")][plot.mfrm_fit]
+#' - `mfrm_interrater` -> [plot(x, type = "agreement")][plot.mfrm_fit]
+#' - `mfrm_facets_chisq` -> [plot(x, type = "facets_chisq")][plot.mfrm_fit]
+#' - `mfrm_bias_interaction` -> [plot(x, type = "bias")][plot.mfrm_fit]
 #' - `mfrm_bias_count` -> bias-count plots (cell counts / low-count rates)
 #' - `mfrm_fixed_reports` -> pairwise-contrast diagnostics
 #' - `mfrm_visual_summaries` -> warning/summary message count plots
@@ -6533,13 +6657,18 @@ plot_visual_summaries_bundle <- function(x,
 #' - `mfrm_output_bundle` -> graph/score output-file diagnostics,
 #'   including `type = "score_se"` when scorefile SE columns are available
 #' - `mfrm_residual_pca` -> residual PCA scree, parallel-analysis, or
-#'   loadings views via [plot_residual_pca()]
+#'   loadings views via [plot(x, type = "residual_pca")][plot.mfrm_fit]
 #' - `mfrm_specifications` -> facet/anchor/convergence plots
 #' - `mfrm_data_quality` -> dashboard, quality-flag, score-map, facet-pattern,
 #'   and row/category/missing-row plots
 #' - `mfrm_facets_fit_review` -> FACETS-style df-sensitivity plot
 #' - `mfrm_fit_measures` -> fit-status counts, Infit/Outfit scatter, measure
-#'   intervals, and FACETS-style df-sensitivity plots
+#'   normal bands, and FACETS-style df-sensitivity plots. For `type = "measure_ci"`,
+#'   the caption retains the source interval interpretation (including exploratory
+#'   JML bands); fixed values use open diamonds and finite estimates without
+#'   intervals use crosses. `main = ""` omits the title and `show_notes = FALSE`
+#'   hides the caption without removing it from saved data. Changing `ci_level`
+#'   does not change inferential eligibility. See [fit_measures_table()].
 #' - `mfrm_iteration_report` -> replayed-iteration trajectories
 #' - `mfrm_subset_connectivity` -> subset-observation/connectivity plots
 #' - `mfrm_facet_statistics` -> facet statistic profile plots
@@ -6561,6 +6690,11 @@ plot_visual_summaries_bundle <- function(x,
 #' suppress those vertical boundary lines. Use
 #' `plot_data(x, component = "plot_long")` on a category-curve bundle when
 #' you want one ggplot2/plotly-friendly table across all curve families.
+#' Keep curve families and groups separate in custom figures. Automatic
+#' [as_ggplot()] conversion supports rating-scale counts/thresholds and
+#' category-structure counts; it is unavailable for category-curve bundles and
+#' category-structure boundary views. Step displays use point estimates and
+#' do not turn stored step SEs into crossing, gap or curve intervals.
 #'
 #' @section Interpreting output:
 #' The returned object is plotting data (`mfrm_plot_data`) that captures
@@ -6572,9 +6706,11 @@ plot_visual_summaries_bundle <- function(x,
 #' 3. Call `plot(bundle, type = ..., draw = FALSE)` to obtain reusable plot data.
 #'
 #' @return A plotting-data object of class `mfrm_plot_data`.
-#' @seealso `summary()`, [plot_unexpected()], [plot_fair_average()], [plot_displacement()]
+#' @seealso `summary()`, [plot(x, type = "unexpected")][plot.mfrm_fit], [plot(x, type = "fair_average")][plot.mfrm_fit], [plot(x, type = "displacement")][plot.mfrm_fit]
 #' @examples
-#' \donttest{
+#' # Long-running workflow; run explicitly when needed.
+#' # example("plot.mfrm_bundle", run.dontrun = TRUE)
+#' \dontrun{
 #' toy_full <- load_mfrmr_data("example_core")
 #' toy_people <- unique(toy_full$Person)[1:12]
 #' toy <- toy_full[toy_full$Person %in% toy_people, , drop = FALSE]
@@ -6606,9 +6742,57 @@ plot_visual_summaries_bundle <- function(x,
 #'   )
 #' }
 #' }
+#' @inheritSection mfrmr_visual_diagnostics Session plot defaults
+#' @section Network display controls:
+#' For subset, design, rater and halo bundles with `type = "network"`, use
+#' `layout` (a two-column coordinate matrix, optionally row-named by all node IDs,
+#' or a function of the displayed igraph), `display_min_weight` (absolute edge
+#' weight for the picture only), and `graphical` (a named list of plot.igraph
+#' arguments, such as vertex.size, vertex.label, vertex.color, edge.curved).
+#' Unnamed vectors and coordinates follow the returned `nodes` order. All nodes,
+#' including isolates, remain. Edge vectors in `graphical` follow the displayed
+#' `edges` order, after any display filter. The default is a deterministic circle; positions
+#' do not estimate anything. Labels are hidden by default above 80 nodes;
+#' set vertex.label explicitly to override. Supply the same named layout to compare views.
+#' Constructor filters such as `min_weight` change calculated metrics;
+#' `display_min_weight` does not. Returned `source_edges` retain the calculated
+#' graph, `edges` the displayed graph, and `coordinates` the actual positions.
+#' Titles are metadata by default; add a title explicitly via `graphical`.
+#' See `vignette("mfrmr-networks-and-reporting")` for bipartite assignment,
+#' directional disagreement and rater-by-criterion examples inspired by Lamprianou.
+#' With [rater_network_analysis()] and `weight_metric = "DirectionalMagnitude"`,
+#' `type = "fit", metric = "SWS"` (or `"PUS"`) shows the published network
+#' inconsistency index. The returned table retains unavailable rows/statuses;
+#' there are no calibrated reference cutoffs. An entirely unavailable index
+#' draws an unavailable message and retains the original rows/statuses in the
+#' returned table, rather than substituting zero. For signed alpha,
+#' `type = "matrix"` returns all eligible signed pair coefficients before graph filtering, retaining
+#' zero and undefined values separately. Network drawings use magnitude for
+#' edge width and dashed lines for negative agreement. Use
+#' [plot.mfrm_network_ergm()] for ERGM coefficient intervals and simulated GOF.
 #' @export
 plot.mfrm_bundle <- function(x, y = NULL, type = NULL, ...) {
   dots <- list(...)
+  if ((identical(type, "network") || (is.null(type) && inherits(x, "mfrm_rater_network"))) &&
+      inherits(x, c("mfrm_subset_connectivity", "mfrm_network_analysis",
+                    "mfrm_rater_network", "mfrm_halo_network"))) {
+    return(do.call(.mfrm_network_display, c(list(x = x), dots)))
+  }
+  family <- c(mfrm_unexpected = "unexpected", mfrm_fair_average = "fair_average",
+    mfrm_displacement = "displacement", mfrm_interrater = "agreement",
+    mfrm_facets_chisq = "facets_chisq", mfrm_bias_interaction = "bias")
+  selected_family <- intersect(class(x), names(family))
+  if (length(selected_family) && identical(type, unname(family[selected_family[1L]]))) {
+    type <- NULL
+    if (inherits(x, "mfrm_interrater")) {
+      if (!is.null(dots$view) && !identical(dots$view, "pairs"))
+        stop("Saved agreement results support the pairs view; use a fitted model for the heatmap.", call. = FALSE)
+      dots$view <- NULL
+      dots <- .mfrm_plot_rename(dots, "metric", "plot_type")
+      if (identical(dots$plot_type, "correlation")) dots$plot_type <- "corr"
+    } else dots <- .mfrm_plot_rename(dots, "view",
+      if (inherits(x, "mfrm_bias_interaction")) "plot" else "plot_type")
+  }
 
   if (inherits(x, "mfrm_unexpected")) {
     args <- c(list(x = x), dots)
@@ -6673,6 +6857,7 @@ plot.mfrm_bundle <- function(x, y = NULL, type = NULL, ...) {
     )))
   }
   if (inherits(x, "mfrm_category_structure")) {
+    validate_category_structure_calculation(x)
     draw <- if ("draw" %in% names(dots)) isTRUE(dots$draw) else TRUE
     ptype <- if (is.null(type)) "counts" else as.character(type[1])
     main <- dots$main %||% NULL
@@ -6693,7 +6878,7 @@ plot.mfrm_bundle <- function(x, y = NULL, type = NULL, ...) {
     main <- dots$main %||% NULL
     palette <- dots$palette %||% NULL
     cumulative_direction <- dots$cumulative_direction %||% "at_or_below"
-    preset <- dots$preset %||% "standard"
+    preset <- if ("preset" %in% names(dots)) dots[["preset"]] else .mfrm_default_plot_preset()
     show_cumulative_boundaries <- dots$show_cumulative_boundaries %||% TRUE
     boundary_status <- dots$boundary_status %||% "in_range"
     return(invisible(draw_category_curves_bundle(
@@ -6769,19 +6954,8 @@ plot.mfrm_bundle <- function(x, y = NULL, type = NULL, ...) {
     )))
   }
   if (inherits(x, "mfrm_residual_pca")) {
-    draw <- if ("draw" %in% names(dots)) isTRUE(dots$draw) else TRUE
-    ptype <- if (is.null(type)) "overall_scree" else as.character(type[1])
-    facet <- dots$facet %||% NULL
-    component <- if ("component" %in% names(dots)) dots$component else 1L
-    top_n <- if ("top_n" %in% names(dots)) dots$top_n else 20L
-    return(invisible(draw_residual_pca_bundle(
-      x,
-      type = ptype,
-      facet = facet,
-      component = component,
-      top_n = top_n,
-      draw = draw
-    )))
+    return(do.call(plot.mfrm_residual_pca,
+      c(list(x = x, type = type %||% "scree"), dots)))
   }
   if (inherits(x, "mfrm_specifications")) {
     draw <- if ("draw" %in% names(dots)) isTRUE(dots$draw) else TRUE
@@ -6804,7 +6978,7 @@ plot.mfrm_bundle <- function(x, y = NULL, type = NULL, ...) {
     main <- dots$main %||% NULL
     palette <- dots$palette %||% NULL
     label_angle <- as.numeric(dots$label_angle %||% 45)
-    preset <- dots$preset %||% "standard"
+    preset <- if ("preset" %in% names(dots)) dots[["preset"]] else .mfrm_default_plot_preset()
     top_n <- if ("top_n" %in% names(dots)) dots$top_n else 30L
     return(invisible(draw_data_quality_bundle(
       x,
@@ -6826,7 +7000,7 @@ plot.mfrm_bundle <- function(x, y = NULL, type = NULL, ...) {
     main <- dots$main %||% NULL
     palette <- dots$palette %||% NULL
     label_angle <- as.numeric(dots$label_angle %||% 45)
-    preset <- dots$preset %||% "standard"
+    preset <- if ("preset" %in% names(dots)) dots[["preset"]] else .mfrm_default_plot_preset()
     top_n <- if ("top_n" %in% names(dots)) dots$top_n else 30L
     return(invisible(draw_fit_measures_bundle(
       x,
@@ -6845,7 +7019,7 @@ plot.mfrm_bundle <- function(x, y = NULL, type = NULL, ...) {
     main <- dots$main %||% NULL
     palette <- dots$palette %||% NULL
     label_angle <- as.numeric(dots$label_angle %||% 45)
-    preset <- dots$preset %||% "standard"
+    preset <- if ("preset" %in% names(dots)) dots[["preset"]] else .mfrm_default_plot_preset()
     ci_level <- dots$ci_level %||% NULL
     top_n <- if ("top_n" %in% names(dots)) dots$top_n else 30L
     return(invisible(draw_fit_measures_bundle(
@@ -6857,7 +7031,8 @@ plot.mfrm_bundle <- function(x, y = NULL, type = NULL, ...) {
       label_angle = label_angle,
       preset = preset,
       ci_level = ci_level,
-      top_n = top_n
+      top_n = top_n,
+      show_notes = if ("show_notes" %in% names(dots)) dots$show_notes else FALSE
     )))
   }
   if (inherits(x, "mfrm_iteration_report")) {
@@ -6879,7 +7054,7 @@ plot.mfrm_bundle <- function(x, y = NULL, type = NULL, ...) {
     main <- dots$main %||% NULL
     palette <- dots$palette %||% NULL
     label_angle <- as.numeric(dots$label_angle %||% 45)
-    preset <- dots$preset %||% "standard"
+    preset <- if ("preset" %in% names(dots)) dots[["preset"]] else .mfrm_default_plot_preset()
     return(invisible(draw_subset_connectivity_bundle(
       x,
       type = ptype,
@@ -6898,7 +7073,7 @@ plot.mfrm_bundle <- function(x, y = NULL, type = NULL, ...) {
     main <- dots$main %||% NULL
     palette <- dots$palette %||% NULL
     label_angle <- as.numeric(dots$label_angle %||% 45)
-    preset <- dots$preset %||% "standard"
+    preset <- if ("preset" %in% names(dots)) dots[["preset"]] else .mfrm_default_plot_preset()
     return(invisible(draw_network_analysis_bundle(
       x,
       type = ptype,
@@ -6919,7 +7094,7 @@ plot.mfrm_bundle <- function(x, y = NULL, type = NULL, ...) {
     main <- dots$main %||% NULL
     palette <- dots$palette %||% NULL
     label_angle <- as.numeric(dots$label_angle %||% 45)
-    preset <- dots$preset %||% "standard"
+    preset <- if ("preset" %in% names(dots)) dots[["preset"]] else .mfrm_default_plot_preset()
     return(invisible(draw_rater_network_bundle(
       x,
       type = ptype,
@@ -6940,7 +7115,7 @@ plot.mfrm_bundle <- function(x, y = NULL, type = NULL, ...) {
     main <- dots$main %||% NULL
     palette <- dots$palette %||% NULL
     label_angle <- as.numeric(dots$label_angle %||% 45)
-    preset <- dots$preset %||% "standard"
+    preset <- if ("preset" %in% names(dots)) dots[["preset"]] else .mfrm_default_plot_preset()
     return(invisible(draw_halo_network_bundle(
       x,
       type = ptype,
@@ -6990,7 +7165,7 @@ plot.mfrm_bundle <- function(x, y = NULL, type = NULL, ...) {
 
   stop(
     "No default plot method for class `", class(x)[1], "`.\n",
-    "Use a dedicated plot helper (for example, `plot_unexpected()`, `plot_fair_average()`, or `plot_bias_interaction()`)."
+    "Use a dedicated plot helper (for example, `plot(x, type = \"unexpected\")`, `plot(x, type = \"fair_average\")`, or `plot(x, type = \"bias\")`)."
   )
 }
 
@@ -7026,6 +7201,10 @@ plot.mfrm_bundle <- function(x, y = NULL, type = NULL, ...) {
 #'   real bounds when available.
 #' - `top_fit`: highest `|ZSTD|` elements for immediate inspection.
 #' - `flags`: compact counts for key warning domains.
+#' - `fit_screening`: available classifications and unclassified elements for
+#'   each mean-square/ZSTD rule. A known threshold crossing remains flagged
+#'   even if the other statistic is missing. Recreate older summaries and
+#'   reports from existing diagnostics; no MFRM refit is required.
 #'
 #' @section Typical workflow:
 #' 1. Run diagnostics with [diagnose_mfrm()], using `diagnostic_mode = "both"`
@@ -7056,13 +7235,19 @@ plot.mfrm_bundle <- function(x, y = NULL, type = NULL, ...) {
 #'   screen across non-person facets
 #' - `interrater`: inter-rater agreement / pairwise correlation / rater
 #'   separation overview when a Rater facet is present
-#' - `misfit_flagged`: rows flagged by the Infit / Outfit / ZSTD
-#'   misfit thresholds active for this fit
+#' - `misfit_flagged`: rows flagged by the Infit / Outfit mean-square band
+#' - `fit_screening`: counts of all, classified and unclassified elements for
+#'   the mean-square band and each ZSTD cutoff. Either available statistic
+#'   crossing a cutoff flags the element; otherwise a missing statistic leaves
+#'   it unclassified. Rates require every element to be classified. Nonfinite
+#'   statistics and negative mean squares are unavailable, not passing values.
 #' - `misfit_thresholds`: named numeric vector with the misfit
 #'   `lower` / `upper` thresholds used to populate `misfit_flagged`
 #' - `category_usage`: per-category response-frequency summary used
 #'   to flag empty / collapsed categories
-#' - `top_fit`: top `|ZSTD|` rows
+#' - `top_fit`: top maximum `|ZSTD|` rows with both statistics available
+#' - `marginal_coverage`: classified, unclassified and flagged category cells,
+#'   groups and level pairs; counts of available flags do not describe missing results
 #' - `marginal_fit`: optional strict marginal-fit overview when requested
 #' - `top_marginal_cells`: largest strict marginal residual cells when requested
 #' - `marginal_pairwise`: optional strict pairwise local-dependence overview
@@ -7076,23 +7261,23 @@ plot.mfrm_bundle <- function(x, y = NULL, type = NULL, ...) {
 #'   `print.summary.mfrm_diagnostics()`
 #' @seealso [diagnose_mfrm()], [summary.mfrm_fit()]
 #' @examples
-#' \donttest{
-#' toy <- load_mfrmr_data("example_core")
-#' toy <- toy[toy$Person %in% unique(toy$Person)[1:4], ]
-#' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
-#' diag <- diagnose_mfrm(fit, residual_pca = "none")
-#' s <- summary(diag, top_n = 3)
-#' s$key_warnings
-#' # Look for: lines beginning with "MnSq misfit:" name the worst
-#' #   element + Infit / Outfit values; "Unexpected responses flagged"
-#' #   counts how many cell-level surprises the screen returned.
-#' s$top_fit
-#' # Large absolute standardized values identify rows for follow-up; they do
-#' # not create a universal accept/reject rule.
-#' s$facets_chisq
-#' # Read the fixed-effect chi-square as a heterogeneity screen in the context
-#' # of the design and intended score use.
-#' }
+#' library(mfrmr)
+#'
+#' # Saved synthetic MML/RSM analysis of example_operational.
+#' # For your own data, fit a model first; see ?fit_mfrm.
+#' example_fit <- readRDS(system.file("examples", "operational-mml.rds", package = "mfrmr"))
+#' fit <- example_fit$fit
+#'
+#' # Check model fit and the support for standard errors and intervals
+#' diagnostics <- example_fit$diagnostics
+#' diagnostic_summary <- summary(diagnostics)
+#' diagnostic_summary$decision
+#'
+#' diagnostic_summary$key_warnings # Issues to investigate, if present
+#' diagnostic_summary$top_fit      # Most unusual residual-based fit statistics
+#'
+#' # Distinguish residual-based checks from marginal model checks
+#' diagnostic_summary$diagnostic_basis[, c("DiagnosticPath", "Status", "Basis")]
 #' @export
 summary.mfrm_diagnostics <- function(object,
                                      digits = 3,
@@ -7103,6 +7288,8 @@ summary.mfrm_diagnostics <- function(object,
   if (!is.list(object) || is.null(object$obs)) {
     stop("`object` must be output from diagnose_mfrm().")
   }
+  validate_diagnostics_precision(object)
+  validate_marginal_coverage(object$marginal_fit)
 
   digits <- max(0L, as.integer(digits))
   top_n <- max(1L, as.integer(top_n))
@@ -7111,6 +7298,7 @@ summary.mfrm_diagnostics <- function(object,
 
   obs_tbl <- tibble::as_tibble(object$obs)
   fit_tbl <- tibble::as_tibble(object$fit %||% tibble::tibble())
+  fit_screening <- fit_screening_summary(fit_tbl)
   reliability_tbl <- tibble::as_tibble(object$reliability %||% tibble::tibble())
   precision_profile_tbl <- tibble::as_tibble(object$precision_profile %||% tibble::tibble())
   precision_review_tbl <- tibble::as_tibble(precision_review(object, required = FALSE) %||% tibble::tibble())
@@ -7120,6 +7308,7 @@ summary.mfrm_diagnostics <- function(object,
   diagnostic_basis_tbl <- tibble::as_tibble(object$diagnostic_basis %||% tibble::tibble())
   fit_standardization_tbl <- tibble::as_tibble(object$fit_standardization %||% tibble::tibble())
   marginal_fit_tbl <- tibble::as_tibble(object$marginal_fit$summary %||% tibble::tibble())
+  marginal_coverage <- object$marginal_fit$coverage %||% data.frame()
   marginal_step_summary <- tibble::as_tibble(object$marginal_fit$step_or_scale$summary_stats %||% tibble::tibble())
   marginal_facet_summary <- tibble::as_tibble(object$marginal_fit$facet_level$summary_stats %||% tibble::tibble())
   marginal_top_cells <- tibble::as_tibble(object$marginal_fit$top_cells %||% tibble::tibble())
@@ -7139,7 +7328,7 @@ summary.mfrm_diagnostics <- function(object,
   )[1L]
   diagnostic_mode <- as.character(object$diagnostic_mode %||% "legacy")
   fit_readiness_tbl <- tibble::as_tibble(
-    object$fit_readiness %||% data.frame()
+    mfrmr_get_readiness_record(object)$fit
   )
   fit_readiness_components_tbl <- tibble::as_tibble(
     object$fit_readiness_components %||% data.frame()
@@ -7156,9 +7345,18 @@ summary.mfrm_diagnostics <- function(object,
   }
   source_inference_ready <- fit_readiness_known &&
     isTRUE(fit_readiness_tbl$InferenceReady[1])
+  if (!source_inference_ready && nrow(precision_profile_tbl) > 0L &&
+      !inherits(object, "mfrm_imported_diagnostics")) {
+    precision_profile_tbl$InferenceReady <- FALSE
+    precision_profile_tbl$SupportsFormalInference <- FALSE
+    precision_profile_tbl$RecommendedUse <-
+      "Diagnostic review only; ordinary inference is unavailable under the fit-readiness contract."
+    precision_profile_tbl$CIBasis <- "Diagnostic normal bands only"
+    precision_profile_tbl$ReliabilityBasis <- "Descriptive variance decomposition only"
+  }
   source_fit_label <- switch(
     source_fit_state,
-    ready = "ready; fit gates passed, with formal precision evaluated separately",
+    ready = "ready; fit-readiness requirements satisfied, with formal precision evaluated separately",
     ready_with_exclusions = "ready with exclusions; review parameter eligibility",
     review = "review required; formal inference is not ready",
     blocked = "blocked; formal inference is not ready",
@@ -7183,16 +7381,19 @@ summary.mfrm_diagnostics <- function(object,
       summary_method = precision_profile_tbl$Method[1] %||% NA_character_
     ),
     PrecisionTier = as.character(precision_profile_tbl$PrecisionTier[1] %||% NA_character_),
-    MarginalFit = if (marginal_available) "available" else "not_available",
+    MarginalFit = if (marginal_available && any(marginal_coverage$Unclassified > 0L)) "partly_classified" else
+      if (marginal_available) "available" else "not_available",
     FairAverage = fair_average_status
   )
 
   reliability_overview <- tibble::tibble()
   keep_rel <- c(
-    "Facet", "Levels",
+    "Facet", "Levels", "EstimateAvailable", "SEAvailable", "ModelSEAvailable", "RealSEAvailable",
     "Separation", "Strata", "Reliability",
     "RealSeparation", "RealStrata", "RealReliability",
-    "MeanInfit", "MeanOutfit"
+    "MeanInfit", "MeanOutfit", "ModelSeparation", "ModelReliability", "ModelStrata",
+    "ReliabilityBasis", "ReliabilityUse", "SupportsFormalInference", "SourceSupportsFormalInference",
+    "ModelSummaryNote", "RealSummaryNote", "SummaryNote"
   )
   if (nrow(reliability_tbl) > 0) {
     keep <- intersect(keep_rel, names(reliability_tbl))
@@ -7215,8 +7416,9 @@ summary.mfrm_diagnostics <- function(object,
     )
     top_fit <- fit_tbl |>
       dplyr::mutate(
-        AbsZ = pmax(abs(.data$InfitZSTD), abs(.data$OutfitZSTD), na.rm = TRUE)
+        AbsZ = fit_screening$max_abs_z
       ) |>
+      dplyr::filter(is.finite(.data$AbsZ)) |>
       dplyr::arrange(dplyr::desc(.data$AbsZ)) |>
       dplyr::slice_head(n = top_n) |>
       dplyr::select(dplyr::all_of(top_keep), "AbsZ")
@@ -7232,10 +7434,7 @@ summary.mfrm_diagnostics <- function(object,
   misfit_flagged <- tibble::tibble()
   if (nrow(fit_tbl) > 0 && all(c("Facet", "Level", "Infit", "Outfit") %in% names(fit_tbl))) {
     misfit_flagged <- fit_tbl |>
-      dplyr::filter(
-        (is.finite(.data$Infit) & (.data$Infit < misfit_lower | .data$Infit > misfit_upper)) |
-          (is.finite(.data$Outfit) & (.data$Outfit < misfit_lower | .data$Outfit > misfit_upper))
-      )
+      dplyr::filter(fit_screening$flags$MeanSquare %in% TRUE)
   }
 
   # Category usage table: count per observed score, average person measure
@@ -7299,7 +7498,7 @@ summary.mfrm_diagnostics <- function(object,
   if (nrow(marginal_top_pairs_src) > 0) {
     keep_pairwise <- intersect(
       c(
-        "Facet", "Level1", "Level2", "LevelPairCount", "OpportunityWeight",
+        "Facet", "Level1", "Level2", "LevelPairCount", "AvailableContextPairs", "UnavailableContextPairs", "OpportunityWeight",
         "ExactAgreement", "ExpectedExactAgreement", "ExactGap", "ExactStdResidual",
         "AdjacentAgreement", "ExpectedAdjacentAgreement", "AdjacentGap", "AdjacentStdResidual",
         "Flagged"
@@ -7316,13 +7515,12 @@ summary.mfrm_diagnostics <- function(object,
   interaction_n <- if (!is.null(object$interactions)) nrow(object$interactions) else NA_integer_
   interrater_pairs <- suppressWarnings(as.integer(object$interrater$summary$Pairs[1] %||% NA_integer_))
   marginal_flagged_groups <- if (marginal_available) {
-    sum(as.logical(marginal_step_summary$Flagged %||% logical(0)), na.rm = TRUE) +
-      sum(as.logical(marginal_facet_summary$Flagged %||% logical(0)), na.rm = TRUE)
+    marginal_flag_coverage(c(marginal_step_summary$Flagged, marginal_facet_summary$Flagged), "Groups")$Flagged
   } else {
     NA_integer_
   }
   marginal_flagged_pairs <- if (marginal_pairwise_available) {
-    sum(as.logical(object$marginal_fit$pairwise$pair_stats$Flagged %||% logical(0)), na.rm = TRUE)
+    marginal_flag_coverage(object$marginal_fit$pairwise$pair_stats$Flagged, "Level pairs")$Flagged
   } else {
     NA_integer_
   }
@@ -7341,7 +7539,7 @@ summary.mfrm_diagnostics <- function(object,
 
   precision_tier <- as.character(precision_profile_tbl$PrecisionTier[1] %||% NA_character_)
   strict_path_status <- if (marginal_available) {
-    "available"
+    if (any(marginal_coverage$Unclassified > 0L)) "partly_classified" else "available"
   } else if (identical(diagnostic_mode, "legacy")) {
     "not_requested"
   } else {
@@ -7349,9 +7547,9 @@ summary.mfrm_diagnostics <- function(object,
   }
   primary_screen <- dplyr::case_when(
     identical(diagnostic_mode, "both") && marginal_available ~
-      "Read strict marginal fit first; use legacy residuals for continuity and follow-up.",
+      "Review marginal classification coverage alongside the available residual diagnostics.",
     identical(diagnostic_mode, "marginal_fit") && marginal_available ~
-      "Use strict marginal fit as the primary screen for first-order and pairwise follow-up.",
+      "Review category and pairwise residuals together with their classification coverage.",
     identical(diagnostic_mode, "legacy") ~
       "Legacy residual diagnostics only; no strict marginal screen was requested.",
     TRUE ~
@@ -7363,14 +7561,14 @@ summary.mfrm_diagnostics <- function(object,
     key_warnings <- c(
       key_warnings,
       paste0(
-        "The source fit is ", source_fit_state,
-        " and is not inference-ready; all diagnostic outputs remain review-only."
+        "Source fit review: ", source_fit_label,
+        ". Ordinary inference is unavailable; diagnostic outputs require review."
       )
     )
   } else if (!fit_readiness_known) {
     key_warnings <- c(
       key_warnings,
-      "Source-fit readiness is unavailable; do not use diagnostics to infer that the fit passed its numerical and identification gates."
+      "Source-fit readiness is unavailable; do not use diagnostics to infer that the fit satisfied its numerical and identification criteria."
     )
   }
   if (nrow(precision_review_tbl) > 0 && "Status" %in% names(precision_review_tbl)) {
@@ -7407,13 +7605,15 @@ summary.mfrm_diagnostics <- function(object,
     }
     worst <- warning_rows |>
       dplyr::mutate(
+        UnderfitPriority = (is.finite(.data$Infit) & .data$Infit > misfit_upper) |
+          (is.finite(.data$Outfit) & .data$Outfit > misfit_upper),
         WorstMnSq = pmax(
           ifelse(is.finite(.data$Outfit), abs(log(pmax(.data$Outfit, 1e-6))), 0),
           ifelse(is.finite(.data$Infit), abs(log(pmax(.data$Infit, 1e-6))), 0),
           na.rm = TRUE
         )
       ) |>
-      dplyr::arrange(dplyr::desc(.data$WorstMnSq)) |>
+      dplyr::arrange(dplyr::desc(.data$UnderfitPriority), dplyr::desc(.data$WorstMnSq)) |>
       dplyr::slice_head(n = 3L)
     msgs <- if (nrow(worst) > 0L) vapply(seq_len(nrow(worst)), function(i) {
       sprintf(
@@ -7455,6 +7655,16 @@ summary.mfrm_diagnostics <- function(object,
   if (!marginal_available && !identical(diagnostic_mode, "legacy") && nrow(marginal_fit_tbl) > 0 && "Reason" %in% names(marginal_fit_tbl)) {
     key_warnings <- c(key_warnings, as.character(marginal_fit_tbl$Reason[1]))
   }
+  if (nrow(marginal_coverage) && any(marginal_coverage$Unclassified > 0L)) {
+    key_warnings <- c("Some marginal classifications are unavailable; inspect the coverage counts before interpreting flags.", key_warnings)
+  }
+  incomplete_screens <- which(fit_screening$counts$IncompleteStatistics > 0L |
+                               fit_screening$counts$Elements == 0L)
+  if (length(incomplete_screens)) {
+    key_warnings <- c(vapply(incomplete_screens, function(i) {
+      fit_screening_note(fit_screening$counts[i, ])
+    }, character(1)), key_warnings)
+  }
   key_warnings <- clean_summary_lines(key_warnings, max_n = 5L)
   if (length(key_warnings) == 0) {
     key_warnings <- "No immediate warnings from diagnostics summary."
@@ -7465,14 +7675,14 @@ summary.mfrm_diagnostics <- function(object,
   )
   if (!source_inference_ready) {
     next_actions <- c(
-      "Inspect `summary(fit)$readiness` and resolve the source-fit gate before interpreting diagnostic magnitudes substantively.",
+      "Inspect `summary(fit)$readiness` and resolve the source-fit readiness issues before interpreting diagnostic magnitudes substantively.",
       next_actions
     )
   }
   if (!identical(as.character(precision_profile_tbl$Method[1] %||% NA_character_), "MML")) {
     next_actions <- c(
       next_actions,
-      "Re-fit with `method = \"MML\"` if strict marginal diagnostics or formal SE/CI are required."
+      "MML provides marginal diagnostics; review the resulting fit and uncertainty assumptions before using its SEs or intervals."
     )
   }
   if (marginal_available) {
@@ -7490,7 +7700,7 @@ summary.mfrm_diagnostics <- function(object,
   if (isTRUE(!is.na(unexpected_n) && unexpected_n > 0L) || isTRUE(!is.na(displacement_flagged) && displacement_flagged > 0L)) {
     next_actions <- c(
       next_actions,
-      "Use `unexpected_response_table()` / `plot_unexpected()` and `displacement_table()` / `plot_displacement()` for case-level follow-up."
+      "Use `unexpected_response_table()` / `plot(x, type = \"unexpected\")` and `displacement_table()` / `plot(x, type = \"displacement\")` for case-level follow-up."
     )
   }
   if (!identical(as.character(object$residual_pca_mode %||% "none"), "none")) {
@@ -7579,16 +7789,17 @@ summary.mfrm_diagnostics <- function(object,
 
   notes <- character(0)
   if (nrow(precision_profile_tbl) > 0 && identical(as.character(precision_profile_tbl$PrecisionTier[1]), "exploratory")) {
-    notes <- c(notes, "Precision outputs are exploratory for this run; prefer MML for formal SE, CI, and reliability reporting.")
+    notes <- c(notes, mfrm_precision_reporting_note("JML", "exploratory", FALSE))
   }
   if (nrow(precision_profile_tbl) > 0 && identical(as.character(precision_profile_tbl$PrecisionTier[1]), "hybrid")) {
-    notes <- c(notes, "Precision outputs are hybrid for this run; inspect levels that fell back to observation-table information before treating the run as fully inferential.")
+    notes <- c(notes, mfrm_precision_reporting_note("MML", "hybrid",
+      isTRUE(precision_profile_tbl$InferenceReady[1])))
   }
   if (identical(fair_average_status, "available_direct_only")) {
     notes <- c(
       notes,
       paste0(
-        "The embedded fair-average dashboard panel is disabled for bounded GPCM; ",
+        "The embedded fair-average dashboard panel is disabled for GPCM; ",
         "use `fair_average_table(fit, diagnostics = diagnostics)` for the ",
         "supported slope-aware element-conditional table."
       )
@@ -7702,10 +7913,12 @@ summary.mfrm_diagnostics <- function(object,
     facets_chisq = facets_chisq_overview,
     interrater = interrater_overview,
     misfit_flagged = misfit_flagged,
+    fit_screening = fit_screening$counts,
     misfit_thresholds = c(lower = misfit_lower, upper = misfit_upper),
     category_usage = category_usage,
     top_fit = top_fit,
     marginal_fit = marginal_fit_tbl,
+    marginal_coverage = marginal_coverage,
     top_marginal_cells = top_marginal_cells,
     marginal_pairwise = marginal_pairwise_tbl,
     top_marginal_pairs = top_marginal_pairs,
@@ -7718,11 +7931,38 @@ summary.mfrm_diagnostics <- function(object,
     include_person = include_person
   )
   class(out) <- "summary.mfrm_diagnostics"
+  if (inherits(object, "mfrm_imported_diagnostics")) {
+    out$imported_source <- object$source
+    out$notes <- c(
+      "Imported fit statistics and SEs retain their source-package definitions.",
+      if (identical(object$source, "TAM")) "TAM Person estimates are EAP; person fit statistics use source WLE scores.",
+      "Posterior SDs are not sampling SEs for separation reliability.",
+      "Joint facet tests and native response-level diagnostics are unavailable."
+    )
+    out$next_actions <- "Inspect the source-package fit and its uncertainty assumptions."
+    out$key_warnings <- out$notes
+  }
   out
 }
 
 #' @export
 print.summary.mfrm_diagnostics <- function(x, ...) {
+  if (!is.data.frame(x$fit_screening) ||
+      ("Available" %in% names(x$marginal_fit) &&
+       isTRUE(x$marginal_fit$Available[1]) && is.null(x$marginal_coverage))) {
+    stop("Recreate this diagnostic summary with summary(diagnostics) to retain fit-screening coverage; no model refit is needed.", call. = FALSE)
+  }
+  if (!is.null(x$imported_source)) {
+    cat("Imported measurement diagnostics: ", x$imported_source, "\n", sep = "")
+    for (note in x$notes) print_wrapped_line(note)
+    if (nrow(x$reliability)) {
+      columns <- intersect(c("Facet", "Levels", "EstimateAvailable", "SEAvailable",
+                             "Separation", "Reliability"), names(x$reliability))
+      print(as.data.frame(x$reliability[columns]), row.names = FALSE)
+    }
+    cat("Source fit statistics and classification counts remain in the summary tables.\n")
+    return(invisible(x))
+  }
   digits <- as.integer(x$digits %||% 3L)
   if (!is.finite(digits)) digits <- 3L
   detail <- as.character(x$detail %||% "brief")
@@ -7736,18 +7976,28 @@ print.summary.mfrm_diagnostics <- function(x, ...) {
       model_based = "Model-based precision",
       hybrid = "Mixed model-based and fallback precision",
       exploratory = "Exploratory precision",
+      approximate_summary = "Approximate summary",
+      review_before_reporting = "Review before reporting",
+      screening_only = "Screening only",
       available = "Available",
       embedded_available = "Available in diagnostics",
       available_direct_only = "Available via direct table only",
       not_available = "Not available",
+      partly_classified = "Computed; some classifications unavailable",
       not_requested = "Not requested",
       requested_not_available = "Requested but not available",
+      available_but_not_requested = "Available but not requested",
+      not_available_for_run = "Not available for this analysis",
       both = "Legacy and strict marginal",
       legacy = "Legacy residual diagnostics",
       marginal_fit = "Strict marginal diagnostics"
     )
     hit <- unname(labels[value])
     ifelse(is.na(hit), value, hit)
+  }
+  reliability_print <- as.data.frame(x$reliability %||% data.frame(), stringsAsFactors = FALSE)
+  if ("ReliabilityUse" %in% names(reliability_print)) {
+    reliability_print$ReliabilityUse <- display_value(reliability_print$ReliabilityUse)
   }
   key_warning_lines <- if (summary_lines_are_default(
     x$key_warnings,
@@ -7790,10 +8040,28 @@ print.summary.mfrm_diagnostics <- function(x, ...) {
   }
   print_bullet_section("Key warnings", key_warning_lines)
   print_bullet_section("Next actions", x$next_actions)
+  print_bullet_section("Element-fit screening", vapply(seq_len(nrow(x$fit_screening)), function(i) {
+    fit_screening_note(x$fit_screening[i, ])
+  }, character(1)))
+  print_wrapped_line("Mean-square bands and ZSTD cutoffs are descriptive review rules, without calibrated individual or multiple-element error rates. Rankings use complete paired statistics.")
 
+  print_bullet_section("Marginal classification coverage", marginal_coverage_notes(x$marginal_coverage))
+  if (isTRUE(x$marginal_fit$Available[1])) {
+    print_wrapped_line("Expected counts condition on the same responses through Person posteriors, with fitted calibration fixed. Residual scales omit cross-response covariance and calibration uncertainty; cutoffs are descriptive review rules.")
+  }
   if (!is.null(x$overall_fit) && nrow(x$overall_fit) > 0) {
     cat("\nOverall fit\n")
-    print(round_numeric_df(as.data.frame(x$overall_fit), digits = digits), row.names = FALSE)
+    overall_fit <- as.data.frame(x$overall_fit)
+    print(round_numeric_df(overall_fit[, setdiff(names(overall_fit), "FitReason"),
+                                      drop = FALSE], digits = digits), row.names = FALSE)
+    for (reason in unique(overall_fit$FitReason)) print_wrapped_line(reason)
+  }
+  if (!is.null(x$reliability) && nrow(x$reliability) > 0L) {
+    print_wrapped_line(paste(
+      mfrm_separation_interpretation(),
+      "Fit-adjusted values are not confidence bounds; Person values using EAP are not posterior-variance EAP reliability.",
+      "Counts show finite estimates and their available SEs; indices are withheld when those SEs are incomplete."
+    ))
   }
   if (identical(detail, "brief")) {
     if (!is.null(x$flags) && nrow(x$flags) > 0) {
@@ -7802,7 +8070,7 @@ print.summary.mfrm_diagnostics <- function(x, ...) {
     }
     if (!is.null(x$reliability) && nrow(x$reliability) > 0) {
       cat("\nFacet precision and spread\n")
-      print(round_numeric_df(as.data.frame(x$reliability), digits = digits), row.names = FALSE)
+      print(round_numeric_df(reliability_print, digits = digits), row.names = FALSE)
     }
     top_fit_print <- as.data.frame(x$top_fit %||% data.frame(), stringsAsFactors = FALSE)
     if (!include_person && nrow(top_fit_print) > 0L && "Facet" %in% names(top_fit_print)) {
@@ -7824,7 +8092,9 @@ print.summary.mfrm_diagnostics <- function(x, ...) {
   }
   if (!is.null(x$diagnostic_basis) && nrow(x$diagnostic_basis) > 0) {
     cat("\nDiagnostic basis guide\n")
-    print(as.data.frame(x$diagnostic_basis), row.names = FALSE)
+    basis <- as.data.frame(x$diagnostic_basis)
+    guide <- data.frame(Statistics = basis$PrimaryStatistics, Availability = display_value(basis$Status), Note = basis$InterpretationNote)
+    print(guide, row.names = FALSE)
   }
   if (!is.null(x$precision_profile) && nrow(x$precision_profile) > 0) {
     cat("\nPrecision basis\n")
@@ -7843,7 +8113,7 @@ print.summary.mfrm_diagnostics <- function(x, ...) {
   }
   if (!is.null(x$reliability) && nrow(x$reliability) > 0) {
     cat("\nFacet precision and spread\n")
-    print(round_numeric_df(as.data.frame(x$reliability), digits = digits), row.names = FALSE)
+    print(round_numeric_df(reliability_print, digits = digits), row.names = FALSE)
   }
   if (!is.null(x$facets_chisq) && nrow(x$facets_chisq) > 0) {
     cat("\nFacet variability (fixed-effect chi-square; null = all elements equal)\n")
@@ -7896,7 +8166,8 @@ print.summary.mfrm_diagnostics <- function(x, ...) {
   }
   if (!is.null(x$marginal_fit) && nrow(x$marginal_fit) > 0) {
     cat("\nStrict marginal fit\n")
-    print(round_numeric_df(as.data.frame(x$marginal_fit), digits = digits), row.names = FALSE)
+    keep <- intersect(c("Method", "Model", "ObservationCount", "CategoryCount", "OverallRMSD", "OverallMaxAbsStdResidual", "Reason"), names(x$marginal_fit))
+    print(round_numeric_df(as.data.frame(x$marginal_fit)[, keep, drop = FALSE], digits = digits), row.names = FALSE)
   }
   if (!is.null(x$top_marginal_cells) && nrow(x$top_marginal_cells) > 0) {
     cat("\nLargest marginal residual cells\n")
@@ -7904,7 +8175,8 @@ print.summary.mfrm_diagnostics <- function(x, ...) {
   }
   if (!is.null(x$marginal_pairwise) && nrow(x$marginal_pairwise) > 0) {
     cat("\nStrict pairwise local dependence\n")
-    print(round_numeric_df(as.data.frame(x$marginal_pairwise), digits = digits), row.names = FALSE)
+    keep <- intersect(c("Facet", "LevelPairs", "ContextPairs", "AvailableContextPairs", "UnavailableContextPairs", "ClassifiedLevelPairs", "UnclassifiedLevelPairs", "FlaggedLevelPairs"), names(x$marginal_pairwise))
+    print(round_numeric_df(as.data.frame(x$marginal_pairwise)[, keep, drop = FALSE], digits = digits), row.names = FALSE)
   }
   if (!is.null(x$top_marginal_pairs) && nrow(x$top_marginal_pairs) > 0) {
     cat("\nLargest marginal pairwise residuals\n")
@@ -7912,7 +8184,7 @@ print.summary.mfrm_diagnostics <- function(x, ...) {
   }
   if (!is.null(x$marginal_guidance) && nrow(x$marginal_guidance) > 0) {
     cat("\nStrict marginal guidance\n")
-    print(as.data.frame(x$marginal_guidance), row.names = FALSE)
+    for (line in unique(x$marginal_guidance$InterpretationNote)) print_wrapped_line(line)
   }
   if (!is.null(x$reporting_map) && nrow(x$reporting_map) > 0) {
     cat("\nPaper reporting map\n")
@@ -7931,43 +8203,42 @@ print.summary.mfrm_diagnostics <- function(x, ...) {
   invisible(x)
 }
 
-#' Summarize an `mfrm_bias` object in a user-friendly format
-#'
+#' @rdname estimate_bias
+#' @details `summary()` method: Summarize an `mfrm_bias` object in a user-friendly format
 #' @param object Output from [estimate_bias()].
 #' @param digits Number of digits for printed numeric values.
 #' @param top_n Number of strongest bias rows to keep.
 #' @param p_cut Tail-area cutoff used for counting screen-positive rows.
-#' @param ... Reserved for generic compatibility.
-#'
-#' @details
-#' This method returns a compact interaction-bias summary:
+#' @details For `summary()`: This method returns a compact interaction-bias summary:
 #' - interaction facets/order and analyzed cell counts
 #' - effect-size profile (`|bias|` mean/max, screen-positive cell count)
 #' - fixed-effect chi-square block
 #' - iteration-end convergence indicators
 #' - top rows ranked by absolute t
-#'
 #' @section Interpreting output:
+#' For `summary()`:
+#'
 #' - `overview`: interaction order, analyzed cells, and effect-size profile.
 #' - `chi_sq`: fixed-effect test block.
 #' - `final_iteration`: end-of-loop status from the bias routine.
-#' - `top_rows`: strongest bias contrasts by `|t|`; bounded `GPCM`
+#' - `top_rows`: strongest bias contrasts by `|t|`; `GPCM`
 #'   summaries also retain the profile-likelihood review columns when present.
-#'
 #' @section Typical workflow:
+#' For `summary()`:
+#'
 #' 1. Estimate interactions with [estimate_bias()].
 #' 2. Check `summary(bias)` for screen-positive and unstable cells.
-#' 3. Use [bias_interaction_report()] or [plot_bias_interaction()] for details.
-#'
-#' @return An object of class `summary.mfrm_bias` with:
+#' 3. Use [bias_interaction_report()] or [plot(x, type = "bias")][plot.mfrm_fit] for details.
+#' @return For `summary()`: An object of class `summary.mfrm_bias` with:
 #' - `overview`: interaction facets/order, cell counts, and effect-size profile
 #' - `chi_sq`: fixed-effect chi-square block
 #' - `final_iteration`: end-of-iteration status row
 #' - `top_rows`: highest-`|t|` interaction rows
 #' - `notes`: short interpretation notes
 #' @seealso [estimate_bias()], [bias_interaction_report()]
-#' @examples
-#' \donttest{
+#' @examples # Supplementary workflow: run explicitly to keep routine checks brief.
+#' # example("summary.mfrm_bias", run.dontrun = TRUE)
+#' \dontrun{
 #' toy <- load_mfrmr_data("example_bias")
 #' toy <- toy[toy$Person %in% unique(toy$Person)[1:8], ]
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
@@ -8001,33 +8272,35 @@ summary.mfrm_bias <- function(object, digits = 3, top_n = 10, p_cut = 0.05, ...)
 
   abs_bias <- abs(suppressWarnings(as.numeric(bias_tbl$`Bias Size`)))
   p_vals <- suppressWarnings(as.numeric(bias_tbl$`Prob.`))
-  sig_n <- sum(is.finite(p_vals) & p_vals <= p_cut, na.rm = TRUE)
+  screen_n <- sum(is.finite(p_vals))
+  sig_n <- if (screen_n) sum(p_vals <= p_cut, na.rm = TRUE) else NA_integer_
   lr_p_vals <- if ("LR Prob." %in% names(bias_tbl)) {
     suppressWarnings(as.numeric(bias_tbl$`LR Prob.`))
   } else {
     numeric(0)
   }
-  lr_sig_n <- sum(is.finite(lr_p_vals) & lr_p_vals <= p_cut, na.rm = TRUE)
+  lr_sig_n <- if (any(is.finite(lr_p_vals))) sum(lr_p_vals <= p_cut, na.rm = TRUE) else NA_integer_
 
-  # Multiple-testing corrected significant counts. We report Bonferroni and
-  # Holm because they are the two corrections most commonly reported in
-  # MFRM-bias screens; FDR is sometimes used in larger DIF-style
-  # applications but is rarely reported in bias-by-rater contexts.
+  # Retain the whole cell family even when some screening tail areas are missing.
+  # These adjustments do not turn plug-in screening into formal inference.
   finite_p <- p_vals[is.finite(p_vals)]
   bonferroni_n <- if (length(finite_p) > 0L) {
-    sum(p.adjust(finite_p, method = "bonferroni") <= p_cut, na.rm = TRUE)
-  } else 0L
+    sum(p.adjust(finite_p, method = "bonferroni", n = nrow(bias_tbl)) <= p_cut)
+  } else NA_integer_
   holm_n <- if (length(finite_p) > 0L) {
-    sum(p.adjust(finite_p, method = "holm") <= p_cut, na.rm = TRUE)
-  } else 0L
+    sum(p.adjust(finite_p, method = "holm", n = nrow(bias_tbl)) <= p_cut)
+  } else NA_integer_
 
   overview <- tibble::tibble(
     FacetPair = interaction_label,
     InteractionOrder = interaction_order,
     InteractionMode = interaction_mode,
     Cells = nrow(bias_tbl),
-    MeanAbsBias = mean(abs_bias, na.rm = TRUE),
-    MaxAbsBias = max(abs_bias, na.rm = TRUE),
+    Points = sum(is.finite(abs_bias)),
+    ScreenAvailable = screen_n,
+    ScreenUnavailable = nrow(bias_tbl) - screen_n,
+    MeanAbsBias = if (any(is.finite(abs_bias))) mean(abs_bias[is.finite(abs_bias)]) else NA_real_,
+    MaxAbsBias = if (any(is.finite(abs_bias))) max(abs_bias[is.finite(abs_bias)]) else NA_real_,
     ScreenPositive = sig_n,
     ScreeningCut = p_cut,
     BonferroniScreenPositive = bonferroni_n,
@@ -8043,7 +8316,7 @@ summary.mfrm_bias <- function(object, digits = 3, top_n = 10, p_cut = 0.05, ...)
     BonferroniSignificant = bonferroni_n,
     HolmSignificant = holm_n
   )
-  if (any(is.finite(lr_p_vals))) {
+  if (length(lr_p_vals)) {
     overview$LRScreenPositive <- lr_sig_n
   }
 
@@ -8067,7 +8340,9 @@ summary.mfrm_bias <- function(object, digits = 3, top_n = 10, p_cut = 0.05, ...)
       "Profile CI Status"),
     names(bias_tbl)
   )
-  keep <- c(base_keep, likelihood_keep)
+  keep <- c(base_keep, likelihood_keep, intersect(c("d.f.", "DFUnrounded",
+    "ProbabilityReference", "ProbabilityStatus", "ProbabilityReason",
+    "BiasStatus", "ScreenStatus", "ScreenReason", "FitStatus", "FitReason"), names(bias_tbl)))
   if (all(base_keep %in% names(bias_tbl))) {
     top_rows <- bias_tbl |>
       dplyr::mutate(AbsT = abs(.data$t)) |>
@@ -8085,6 +8360,19 @@ summary.mfrm_bias <- function(object, digits = 3, top_n = 10, p_cut = 0.05, ...)
   }
 
   notes <- character(0)
+  if (!all(c("BiasStatus", "ScreenStatus", "FitStatus") %in% names(bias_tbl)))
+    notes <- c(notes, "This saved table predates the boundary and complete-cell information/fit checks. Recompute estimate_bias() from the saved fit and matching diagnostics; these values have not been recalculated.")
+  if (screen_n < nrow(bias_tbl)) notes <- c(notes,
+    if (all(c("ProbabilityStatus", "ProbabilityReason") %in% names(bias_tbl)))
+      "Some cell screening tail areas are unavailable. Missing results are not negative screens; inspect ProbabilityStatus and ProbabilityReason."
+    else "Some cell screening tail areas are unavailable. Missing results are not negative screens; inspect ScreenStatus and ScreenReason.")
+  if ("BiasStatus" %in% names(bias_tbl) &&
+      any(bias_tbl$BiasStatus == "extreme_adjusted", na.rm = TRUE)) notes <- c(notes,
+    "Extreme cells use a corrected total for finite reporting values and conditional SEs. PrimaryBias retains the infinite cell MLE. These extrapolated tail areas, summaries and pairwise contrasts are not regular-MLE inference or fairness decisions.")
+  notes <- c(notes, paste(
+    "Conditional plug-in screening holds calibration and Person estimates fixed.",
+    "Bonferroni/Holm summaries retain all reported cells in this pair's family;",
+    "they do not establish formal family-wise error control or collection-wide multiplicity control."))
   if (nrow(iter_tbl) > 0) {
     tail_row <- iter_tbl[nrow(iter_tbl), , drop = FALSE]
     tail_cells <- suppressWarnings(as.numeric(tail_row$BiasCells[1]))
@@ -8174,7 +8462,9 @@ print.summary.mfrm_bias <- function(x, ...) {
 #'   follow `...` must be supplied by name.
 #' @param profile Summary profile. `"fit"` preserves the lightweight fit-only
 #'   contract and does not compute diagnostics. `"facets"` adds a
-#'   FACETS-organized measurement review, while `"reporting"` adds the
+#'   comprehensive measurement review using familiar FACETS-style section
+#'   organization; it does not require FACETS knowledge or software.
+#'   `"reporting"` adds the
 #'   reporting-oriented results profile.
 #' @param detail Printed detail. When `NULL` (the default), the lightweight
 #'   `"fit"` profile retains the legacy `"full"` print while expanded profiles
@@ -8191,8 +8481,24 @@ print.summary.mfrm_bias <- function(x, ...) {
 #' @param include_person Logical. Whether person identifiers may be printed in
 #'   extreme-person tables and requested by the fit-pathway route. The default
 #'   is `FALSE` for privacy-safe console output.
+#' @param comparison_review Optional prospective interaction review from
+#'   [describe_mfrm_data()]. Explicitly requests fitted contrasts and retained-
+#'   point numerical checks through [interaction_effect_table()], saved as
+#'   `$interaction_comparisons`. It does not fit a model or supply intervals.
 #'
 #' @details
+#' Start with `results <- summary(fit)`. Use `results$person_overview` for
+#' the distribution of person ability estimates and `results$facet_overview`
+#' for the distribution of estimates within each non-person facet. These are
+#' aggregate summaries; use `as.data.frame(fit)` for individual person and
+#' facet-level estimates. Read `results$decision` before interpreting results.
+#' Assignment with `<-` saves the summary without printing it; enter `results`
+#' to print the full summary or use `$` to display a selected table.
+#' In the example, `person_overview` has one row for all persons and
+#' `facet_overview` has one row for raters and one for criteria. Each non-person
+#' facet's mean is constrained to zero in this fit; use its SD and range or
+#' individual estimates to inspect differences among its levels.
+#'
 #' This method provides a compact, human-readable summary oriented to reporting.
 #' The expanded profiles use FACETS-style organization for navigation, but do
 #' not claim that FACETS was executed or that estimates are numerically
@@ -8210,6 +8516,13 @@ print.summary.mfrm_bias <- function(x, ...) {
 #'   measures
 #'
 #' @section Interpreting output:
+#' Corrected JML has a separate summary of saved `tables` and numerical
+#' `attempts`, with the correction order and the meaning of RootSE. All profiles
+#' show the same saved summary and never compute ordinary diagnostics. Use
+#' `include_person = TRUE` for conditional Person profiles without Person SEs.
+#' See the **Corrected JML** section of [fit_mfrm()]. The entries below describe
+#' the ordinary, uncorrected fitting routes.
+#'
 #' - `overview`: convergence plus the versioned information-criterion contract.
 #'   For eligible fixed-facet MML fits, BIC/SABIC use unique Persons, not
 #'   response rows; JML, non-unit observation weights, and legacy objects do
@@ -8222,10 +8535,16 @@ print.summary.mfrm_bias <- function(x, ...) {
 #'   `InferenceReady` is a conservative compatibility scalar and is `TRUE`
 #'   only when the stored `FitReadiness` is `ready`; numerical convergence
 #'   cannot override input, estimability, category, or boundary review.
-#' - `decision`: separates that fit gate from formal precision support. A
+#' - `decision`: separates fit readiness from formal precision support. A
 #'   fit-only summary returns `FormalInference = "No"` until a matching
 #'   `mfrm_diagnostics` object is supplied through `diagnostics =`; use
 #'   `summary(diagnostics)$decision` for the equivalent precision-aware view.
+#'   The console uses this single decision throughout; a converged optimizer
+#'   or a passed fit check does not independently authorize formal inference.
+#'   Printed workflow, population and GPCM descriptions use readable labels.
+#'   The returned tables retain their numerical values and structured status
+#'   fields for programmatic use. Reprinting an existing summary updates its
+#'   display without refitting or changing its stored results.
 #' - `data_review`: overall multi-facet connectivity, facet-level score
 #'   support, boundary-constant levels, single-level facets, and retained
 #'   preparation notes behind the readiness rows.
@@ -8237,6 +8556,14 @@ print.summary.mfrm_bias <- function(x, ...) {
 #' - `step_overview`: threshold spread and monotonicity checks, reported by
 #'   `StepFacet` ladder for PCM/GPCM fits and as one common ladder for RSM fits.
 #' - `settings_overview`: estimation settings that affect interpretation.
+#'   `CategoryPolicy` records `"preserve"` or `"collapse"`; `ScoreRecoded`
+#'   states whether the stored original-to-internal score map changes values.
+#'   A collapse policy need not recode a complete contiguous scale. For older
+#'   saved fits, absent policy or mapping records give `"not_recorded"` or `NA`,
+#'   respectively; an unchanged score map does not identify the chosen policy.
+#'   For MML fits, the printed fit and summary also state the engine, fixed or
+#'   adaptive Gauss--Hermite rule and order, one-dimensional latent
+#'   structure, population identification, and discrimination constraint.
 #' - `population_coding`: fitted categorical levels and contrasts that must be
 #'   reused when scoring new persons under the population-model posterior.
 #' - `key_warnings` / `notes`: short triage subset of retained zero-count score
@@ -8262,16 +8589,20 @@ print.summary.mfrm_bias <- function(x, ...) {
 #' 1. Review data and score support with [describe_mfrm_data()].
 #' 2. Fit with [fit_mfrm()] and read `summary(fit, profile = "fit")`.
 #' 3. Request `summary(fit, profile = "facets")` for the comprehensive
-#'    FACETS-organized review.
+#'    measurement review. The historical profile name does not mean that
+#'    FACETS is run.
 #' 4. Draw the required native Wright map with
 #'    `plot(fit, type = "wright", show_ci = TRUE)`; add the FACETS renderer or
 #'    Infit pathway only when they answer a specific follow-up question.
 #' 5. For `RSM` / `PCM`, continue with [diagnose_mfrm()] for element-level fit
-#'    checks. For bounded `GPCM`, continue with [compute_information()] /
-#'    [plot_information()] or the fixed-calibration posterior scoring helpers.
+#'    checks. For `GPCM`, continue with [compute_information()] /
+#'    [plot(x)][plot.mfrm_information] or the fitted-object posterior scoring helpers.
 #'
 #' @return An object of class `summary.mfrm_fit` with:
-#' - `overview`: global model/fit indicators
+#' - `overview`: global model/fit indicators. For MML, `MMLEngineUsed` records
+#'   the actual algorithm, `IterationsBasis` explains what is counted, and
+#'   `ConvergenceBasis` identifies the numerical stopping rule. Numerical
+#'   convergence does not establish identification or interval eligibility
 #' - `status`: concise front-door status block for quick review
 #' - `decision`: plain-language interpretation, formal-inference status,
 #'   reason, and highest-priority next action derived from the stored readiness
@@ -8280,7 +8611,7 @@ print.summary.mfrm_bias <- function(x, ...) {
 #' - `readiness`: the stored fit-level state plus numerical, data, design,
 #'   stability, diagnostic, and reporting workflow states
 #' - `data_review`: structured connectivity and facet-support evidence used by
-#'   the non-numerical readiness gates
+#'   the non-numerical readiness requirements
 #' - `key_warnings`: highest-priority warnings to review first
 #' - `next_actions`: recommended follow-up helpers
 #' - `population_overview`: current population-model basis, residual variance,
@@ -8300,15 +8631,33 @@ print.summary.mfrm_bias <- function(x, ...) {
 #' - `step_overview`: threshold/step diagnostics by PCM/GPCM `StepFacet`
 #'   ladder, or for the common RSM ladder
 #' - `slope_overview`: parameter-readiness and explicitly labelled optimizer-
-#'   trace summary for `GPCM` discriminations
+#'   trace summary for `GPCM` discriminations. `SlopeOwner` identifies the facet
+#'   whose levels carry slopes. `Min`, `Max` and `GeometricMean` summarize
+#'   primary estimates; the `Optimizer*` fields retain numerical iterates when
+#'   primary estimates are unavailable. The scale reference is an identification
+#'   constraint, not evidence that estimates or intervals are reliable
 #' - `inference_evidence`: for `GPCM` MML, a compact separation of optimizer
 #'   stationarity, retained-point local rank, observed-information curvature,
 #'   slope-boundary screening, and the final readiness decision. Supportive
 #'   local evidence does not override an inconclusive boundary audit
 #' - `interaction_overview`: model-estimated facet-interaction summary
 #'   when the fit was specified with `facet_interactions`
+#' - `interaction_comparisons`: explicitly requested joint-fit contrasts,
+#'   retaining unavailable rows, the prospective review and numerical checks;
+#'   absent unless `comparison_review` is supplied
 #' - `settings_overview`: estimation-settings overview that pins the
-#'   configuration that affects identification/scoring
+#'   configuration that affects identification/scoring. `CenteringScope`
+#'   distinguishes whole-facet (`"facet"`) from legacy remainder centering
+#'   (`"remainder"`), separately from `NoncenterFacet`. Native fits saved before
+#'   convention metadata retain the legacy interpretation. Recreate this
+#'   summary from the fit to obtain new fields; reading an old summary does
+#'   not update it or refit the model
+#' - `numerical_review`: separate optimization, curvature, starting-value,
+#'   integration and reproducible-refit evidence with specific next actions.
+#'   Missing checks remain unassessed; this table does not change readiness
+#' - `starting_values`, `starting_value_notes`: all attempted starts, numerical
+#'   outcomes, selection and interpretation limits when `fit_mfrm(mml_starts = ...)`
+#'   was requested. These describe numerical sensitivity, not sampling uncertainty
 #' - `attached_diagnostics`: logical flag indicating whether the
 #'   `mfrm_fit` was returned with diagnostics already attached
 #' - `attached_diagnostics_cols`: character vector of diagnostic
@@ -8341,55 +8690,42 @@ print.summary.mfrm_bias <- function(x, ...) {
 #'   `NULL` for the lightweight `"fit"` profile
 #' @seealso [fit_mfrm()], [diagnose_mfrm()]
 #' @examples
-#' toy <- load_mfrmr_data("example_operational")
-#' # Seven quadrature points keep this executable example short. For a final
-#' # analysis, restore the default or a prespecified grid and review sensitivity.
-#' fit <- fit_mfrm(
-#'   toy, "Person", c("Rater", "Criterion"), "Score",
-#'   method = "MML", model = "RSM", quad_points = 7, maxit = 30
-#' )
-#' s <- summary(fit)
-#' s$overview[, c(
-#'   "Model", "Method", "Converged", "FitReadiness", "InferenceReady",
-#'   "ConvergenceSeverity"
-#' )]
-#' s$readiness
-#' # `InferenceReady = TRUE` means all five stored fit components passed.
-#' # It does not, by itself, support formal SE/CI or reliability.
-#' diag <- diagnose_mfrm(fit, residual_pca = "none")
-#' summary(fit, diagnostics = diag)$decision
-#' # Design, Stability, Diagnostics, and Reporting remain purpose-specific
-#' # workflow reviews rather than alternative fit-readiness derivations.
-#' # If Numerical is not a pass, inspect the retained polish stages; increasing
-#' # `maxit` alone may not resolve the review.
-#' s$person_overview
-#' # Interpret location and spread on the fitted logit scale together with the
-#' # score distribution and extreme-score counts.
-#' s$targeting
-#' # Targeting and spread are descriptive. Their practical importance depends
-#' # on the assessment purpose, sample, and facet orientation.
-#' facets_summary <- summary(fit, profile = "facets", compute = "never")
-#' res <- facets_summary$results
-#' native_map <- plot(
-#'   fit, type = "wright", renderer = "native", show_ci = TRUE, draw = FALSE
-#' )
-#' facets_map <- plot(
-#'   fit, type = "wright", renderer = "facets", show_ci = FALSE,
-#'   category_labels = c(
-#'     `1` = "Beginning", `2` = "Developing",
-#'     `3` = "Secure", `4` = "Advanced"
-#'   ),
-#'   draw = FALSE
-#' )
-#' # For fit statistics and the optional person-inclusive pathway, rerun the
-#' # FACETS profile with diagnostics available, then use its `results` object.
+#' library(mfrmr)
+#'
+#' # Saved synthetic MML/RSM analysis of example_operational.
+#' # For your own data, fit a model first; see ?fit_mfrm.
+#' example_fit <- readRDS(system.file("examples", "operational-mml.rds", package = "mfrmr"))
+#' fit <- example_fit$fit
+#'
+#' # Save the summary, then display its tables
+#' results <- summary(fit)
+#' results$person_overview # One row summarizing person ability estimates
+#' results$facet_overview  # One row per facet: number of levels, mean, SD, range
+#'
+#' # Check the interpretation status and recommended next step
+#' results$decision
+#'
+#' # Extract estimates and select the rows to display
+#' estimates <- as.data.frame(fit)
+#' head(subset(estimates, Facet == "Person")) # First six persons
+#' subset(estimates, Facet == "Rater")       # All raters
+#' subset(estimates, Facet == "Criterion")   # All criteria
 #' @export
 summary.mfrm_fit <- function(object, digits = 3, top_n = 5, ...,
                              profile = c("fit", "facets", "reporting"),
                              detail = NULL,
                              diagnostics = NULL,
                              compute = c("auto", "never"),
-                             include_person = FALSE) {
+                             include_person = FALSE,
+                             comparison_review = NULL) {
+  if (mfrm_has_jml_adjustment(object)) {
+    rlang::check_dots_empty()
+    if (!is.null(comparison_review)) stop_if_jml_adjustment(object, "Interaction comparisons")
+    if (!is.null(diagnostics)) stop_if_jml_adjustment(object, "Attaching ordinary diagnostics")
+    match.arg(profile); match.arg(compute)
+    if (!is.null(detail)) match.arg(detail,c("brief","full"))
+    return(mfrm_jml_summary(object, digits, include_person))
+  }
   profile <- match.arg(tolower(as.character(profile[1])),
                        c("fit", "facets", "reporting"))
   if (is.null(detail) || length(detail) == 0L) {
@@ -8403,7 +8739,14 @@ summary.mfrm_fit <- function(object, digits = 3, top_n = 5, ...,
   }
   include_person <- isTRUE(include_person)
 
+  if (!is.null(diagnostics)) {
+    mfrm_results_validate_diagnostics_identity(object, diagnostics,
+                                               helper = "summary.mfrm_fit()")
+  }
   out <- mfrm_fit_summary_core(object, digits = digits, top_n = top_n)
+  if (!is.null(comparison_review)) {
+    out$interaction_comparisons <- interaction_effect_table(object, comparison_review)
+  }
   mfrm_fit_summary_workflow(
     out = out,
     fit = object,
@@ -8627,7 +8970,9 @@ mfrm_gpcm_mml_inference_evidence <- function(object) {
     Interpretation = c(
       "Necessary numerical condition; not an inference decision.",
       "Supportive retained-point local rank; not global identification.",
-      paste(
+      if (mfrm_has_product_slopes(object)) {
+        "Recorded curvature is numerical evidence only. Inspect the saved checks from separately requested experimental confint(fit, parm = 'slopes') slope intervals."
+      } else paste(
         "Diagnostic local curvature only; inspect Optimizer*SE in",
         "diagnose_mfrm(fit)$parameter_uncertainty."
       ),
@@ -8677,14 +9022,24 @@ mfrm_fit_scale_contract <- function(object) {
     population_sd <- NA_real_
   }
 
-  coordinate_basis <- if (identical(method, "MML") && population_active) {
+  coordinate_basis <- if (identical(method, "MML") && population_active &&
+                          !is.null(population$fixed_sd)) {
+    "estimated_population_mean_fixed_sd"
+  } else if (identical(method, "MML") && population_active) {
     "estimated_population_scale"
   } else if (identical(method, "MML")) {
     "fixed_standard_normal"
   } else {
     "joint_person_coordinate_scale"
   }
-  slope_basis <- if (identical(model, "GPCM")) {
+  product_slopes <- identical(model, "GPCM") && !is.null(config$gpcm_spec$component_levels)
+  if (product_slopes) {
+    mfrm_gpcm_slope_roles(config)
+    if (population_active) stop("Product-slope summaries require the fitted fixed population scale.", call. = FALSE)
+  }
+  slope_basis <- if (product_slopes) {
+    "owner_specific_product_discrimination"
+  } else if (identical(model, "GPCM")) {
     "geometric_mean_one_relative_discrimination"
   } else {
     "unit_discrimination"
@@ -8703,22 +9058,22 @@ mfrm_fit_scale_contract <- function(object) {
   } else {
     "posterior_eap_under_population_model"
   }
-  gpcm_identity <- mfrmr_gpcm_model_identity(model)
+  gpcm_identity <- mfrmr_gpcm_model_identity(model, config$gpcm_spec)
 
-  tibble::tibble(
+  out <- tibble::tibble(
     Model = model,
     Method = method,
     CoordinateBasis = coordinate_basis,
     PopulationSD = population_sd,
     SlopeBasis = slope_basis,
     GpcmModelFamily = as.character(
-      config$gpcm_model_family %||% gpcm_identity$model_family
+      if (product_slopes) gpcm_identity$model_family else config$gpcm_model_family %||% gpcm_identity$model_family
     ),
     GpcmSlopeAction = as.character(
       config$gpcm_slope_action %||% gpcm_identity$slope_action
     ),
     GpcmSlopeComposition = as.character(
-      config$gpcm_slope_composition %||%
+      if (product_slopes) gpcm_identity$slope_composition else config$gpcm_slope_composition %||%
         gpcm_identity$slope_composition
     ),
     GpcmLatentDimensionCount = as.integer(
@@ -8726,7 +9081,7 @@ mfrm_fit_scale_contract <- function(object) {
         gpcm_identity$latent_dimension_count
     ),
     GpcmMmlIdentification = as.character(
-      config$gpcm_mml_identification %||% "not_applicable"
+      if (product_slopes) "fixed_population_first_family_gm1" else config$gpcm_mml_identification %||% "not_applicable"
     ),
     GpcmEstimatorFamily = as.character(
       config$gpcm_estimator_family %||% estimator_family
@@ -8745,14 +9100,136 @@ mfrm_fit_scale_contract <- function(object) {
     ),
     FixedLatentSDSlopeField = if (identical(model, "GPCM") &&
                                      identical(method, "MML")) {
-      "FixedLatentSDOptimizerEstimate"
+      if (product_slopes) "OptimizerEstimate" else "FixedLatentSDOptimizerEstimate"
     } else {
       NA_character_
     }
   )
+  if (inherits(object, "mfrm_imported_fit")) {
+    .validate_imported_metric(object)
+    out$CoordinateBasis <- "source_package_scale"
+    out$PopulationSD <- NA_real_
+    out$SlopeBasis <- "source_item_discrimination"
+    columns <- grepl("^Gpcm|^FixedLatentSD", names(out))
+    out[columns] <- lapply(out[columns], function(value) { value[] <- NA; value })
+  }
+  out
+}
+
+# Shared by ordinary fit summaries and the internal product-slope result.
+# Do not pool different owners or infer readiness from finite optimizer traces.
+mfrm_fit_slope_overview <- function(config, slopes) {
+  if (!nrow(slopes) || !"Estimate" %in% names(slopes)) return(tibble::tibble())
+  roles <- mfrm_gpcm_slope_roles(config)
+  product <- !is.null(config$gpcm_spec$component_levels)
+  if (product) {
+    metadata <- mfrm_gpcm_product_metadata(config$gpcm_spec)
+    index <- mfrm_match_slope_table(metadata$Owner, metadata$Level, slopes)
+    if (anyNA(index) || nrow(slopes) != length(index)) {
+      stop("Slope summaries require every fitted owner and level exactly once.", call. = FALSE)
+    }
+    slopes <- slopes[index, , drop = FALSE]
+  }
+  rows <- lapply(seq_len(nrow(roles)), function(i) {
+    slope_tbl <- if (product) slopes[slopes$SlopeOwner == roles$SlopeOwner[i], , drop = FALSE] else slopes
+    optimizer_slope <- if ("OptimizerEstimate" %in% names(slope_tbl)) {
+      as.numeric(slope_tbl$OptimizerEstimate)
+    } else {
+      as.numeric(slope_tbl$Estimate)
+    }
+    primary_slope <- if ("PrimaryEstimate" %in% names(slope_tbl)) {
+      as.numeric(slope_tbl$PrimaryEstimate)
+    } else {
+      as.numeric(slope_tbl$Estimate)
+    }
+    slope_range_value <- function(x, fun) {
+      x <- x[is.finite(x)]
+      if (length(x) == 0L) return(NA_real_)
+      fun(x)
+    }
+    slope_geometric_mean <- function(x) {
+      x <- x[is.finite(x) & x > 0]
+      if (length(x) == 0L) return(NA_real_)
+      exp(mean(log(x)))
+    }
+    parameter_status <- if ("ParameterStatus" %in% names(slope_tbl)) {
+      paste(sort(unique(as.character(slope_tbl$ParameterStatus))), collapse = ",")
+    } else {
+      "legacy_unknown"
+    }
+    primary_ready <- length(primary_slope) > 0L &&
+      all(is.finite(primary_slope) & primary_slope > 0)
+    value_basis <- if (primary_ready) {
+      "primary"
+    } else if ("OptimizerEstimate" %in% names(slope_tbl)) {
+      "optimizer_trace"
+    } else {
+      "legacy_estimate"
+    }
+    out <- tibble::tibble(
+      SlopeOwner = roles$SlopeOwner[i],
+      StepOwner = as.character(config$step_facet %||% NA_character_)[1],
+      OwnerInterpretation =
+        "model_conditional_discrimination_not_rater_consistency",
+      Slopes = nrow(slope_tbl),
+      ValueBasis = value_basis,
+      ParameterStatus = parameter_status,
+      PrimaryReady = primary_ready,
+      PrimaryFinite = sum(is.finite(primary_slope)),
+      Min = slope_range_value(primary_slope, min),
+      Max = slope_range_value(primary_slope, max),
+      GeometricMean = slope_geometric_mean(primary_slope),
+      Positive = if (primary_ready) TRUE else NA,
+      OptimizerMin = slope_range_value(optimizer_slope, min),
+      OptimizerMax = slope_range_value(optimizer_slope, max),
+      OptimizerGeometricMean = slope_geometric_mean(optimizer_slope),
+      OptimizerPositive = all(is.finite(optimizer_slope) & optimizer_slope > 0),
+      PopulationSD = if ("PopulationSD" %in% names(slope_tbl)) {
+        as.numeric(slope_tbl$PopulationSD[1])
+      } else {
+        NA_real_
+      },
+      FixedLatentSDOptimizerGeometricMean = if (
+        "FixedLatentSDOptimizerEstimate" %in% names(slope_tbl)
+      ) {
+        slope_geometric_mean(slope_tbl$FixedLatentSDOptimizerEstimate)
+      } else {
+        NA_real_
+      },
+      FixedLatentSDBasis = if ("FixedLatentSDBasis" %in% names(slope_tbl)) {
+        as.character(slope_tbl$FixedLatentSDBasis[1])
+      } else {
+        "not_available"
+      },
+      SEEligible = if ("SEEligible" %in% names(slope_tbl)) {
+        sum(as.logical(slope_tbl$SEEligible), na.rm = TRUE)
+      } else {
+        NA_integer_
+      },
+      CIEligible = if ("CIEligible" %in% names(slope_tbl)) {
+        sum(as.logical(slope_tbl$CIEligible), na.rm = TRUE)
+      } else {
+        NA_integer_
+      },
+      ComparisonEligible = if ("ComparisonEligibility" %in% names(slope_tbl)) {
+        sum(as.character(slope_tbl$ComparisonEligibility) == "eligible", na.rm = TRUE)
+      } else {
+        NA_integer_
+      }
+    )
+    if (product) {
+      out$ScaleReference <- roles$ScaleReference[i]
+      out$Identification <- roles$Identification[i]
+    }
+    out
+  })
+  dplyr::bind_rows(rows)
 }
 
 mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
+  if (inherits(object, "mfrm_imported_fit")) {
+    return(summary.mfrm_imported_fit(object, digits = digits))
+  }
   if (is.null(object$summary) || nrow(object$summary) == 0) {
     stop("`object` does not contain fit summary information.")
   }
@@ -8830,6 +9307,8 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
       population_raw$converged_basis %||% "legacy_unspecified"
     ),
     ResidualVariance = as.numeric(population_raw$sigma2 %||% NA_real_),
+    ResidualVarianceStatus = if (!isTRUE(population_raw$active)) "not_estimated" else
+      if (is.null(population_raw$fixed_sd)) "estimated" else "fixed",
     OmittedPersons = length(population_raw$omitted_persons %||% character(0)),
     OmittedRows = as.integer(population_raw$response_rows_omitted %||% NA_integer_)
   )
@@ -9039,94 +9518,7 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
     }
   }
 
-  slope_overview <- tibble::tibble()
-  if (nrow(slope_tbl) > 0 && "Estimate" %in% names(slope_tbl)) {
-    optimizer_slope <- if ("OptimizerEstimate" %in% names(slope_tbl)) {
-      as.numeric(slope_tbl$OptimizerEstimate)
-    } else {
-      as.numeric(slope_tbl$Estimate)
-    }
-    primary_slope <- if ("PrimaryEstimate" %in% names(slope_tbl)) {
-      as.numeric(slope_tbl$PrimaryEstimate)
-    } else {
-      as.numeric(slope_tbl$Estimate)
-    }
-    slope_range_value <- function(x, fun) {
-      x <- x[is.finite(x)]
-      if (length(x) == 0L) return(NA_real_)
-      fun(x)
-    }
-    slope_geometric_mean <- function(x) {
-      x <- x[is.finite(x) & x > 0]
-      if (length(x) == 0L) return(NA_real_)
-      exp(mean(log(x)))
-    }
-    parameter_status <- if ("ParameterStatus" %in% names(slope_tbl)) {
-      paste(sort(unique(as.character(slope_tbl$ParameterStatus))), collapse = ",")
-    } else {
-      "legacy_unknown"
-    }
-    primary_ready <- length(primary_slope) > 0L &&
-      all(is.finite(primary_slope) & primary_slope > 0)
-    value_basis <- if (primary_ready) {
-      "primary"
-    } else if ("OptimizerEstimate" %in% names(slope_tbl)) {
-      "optimizer_trace"
-    } else {
-      "legacy_estimate"
-    }
-    slope_overview <- tibble::tibble(
-      SlopeOwner = as.character(config$slope_facet %||% NA_character_)[1],
-      StepOwner = as.character(config$step_facet %||% NA_character_)[1],
-      OwnerInterpretation =
-        "model_conditional_discrimination_not_rater_consistency",
-      Slopes = nrow(slope_tbl),
-      ValueBasis = value_basis,
-      ParameterStatus = parameter_status,
-      PrimaryReady = primary_ready,
-      PrimaryFinite = sum(is.finite(primary_slope)),
-      Min = slope_range_value(primary_slope, min),
-      Max = slope_range_value(primary_slope, max),
-      GeometricMean = slope_geometric_mean(primary_slope),
-      Positive = if (primary_ready) TRUE else NA,
-      OptimizerMin = slope_range_value(optimizer_slope, min),
-      OptimizerMax = slope_range_value(optimizer_slope, max),
-      OptimizerGeometricMean = slope_geometric_mean(optimizer_slope),
-      OptimizerPositive = all(is.finite(optimizer_slope) & optimizer_slope > 0),
-      PopulationSD = if ("PopulationSD" %in% names(slope_tbl)) {
-        as.numeric(slope_tbl$PopulationSD[1])
-      } else {
-        NA_real_
-      },
-      FixedLatentSDOptimizerGeometricMean = if (
-        "FixedLatentSDOptimizerEstimate" %in% names(slope_tbl)
-      ) {
-        slope_geometric_mean(slope_tbl$FixedLatentSDOptimizerEstimate)
-      } else {
-        NA_real_
-      },
-      FixedLatentSDBasis = if ("FixedLatentSDBasis" %in% names(slope_tbl)) {
-        as.character(slope_tbl$FixedLatentSDBasis[1])
-      } else {
-        "not_available"
-      },
-      SEEligible = if ("SEEligible" %in% names(slope_tbl)) {
-        sum(as.logical(slope_tbl$SEEligible), na.rm = TRUE)
-      } else {
-        NA_integer_
-      },
-      CIEligible = if ("CIEligible" %in% names(slope_tbl)) {
-        sum(as.logical(slope_tbl$CIEligible), na.rm = TRUE)
-      } else {
-        NA_integer_
-      },
-      ComparisonEligible = if ("ComparisonEligibility" %in% names(slope_tbl)) {
-        sum(as.character(slope_tbl$ComparisonEligibility) == "eligible", na.rm = TRUE)
-      } else {
-        NA_integer_
-      }
-    )
-  }
+  slope_overview <- mfrm_fit_slope_overview(config, slope_tbl)
 
   inference_evidence <- mfrm_gpcm_mml_inference_evidence(object)
 
@@ -9144,6 +9536,7 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
       )
   }
 
+  # One settings row per slope owner for a product model; other settings repeat.
   settings_overview <- tibble::tibble(
     StepFacet = as.character(config$step_facet %||% NA_character_),
     StepFacetSource = as.character(config$step_facet_source %||% "unknown"),
@@ -9152,6 +9545,9 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
     GpcmMmlIdentification = as.character(
       config$gpcm_mml_identification %||% "not_recorded"
     ),
+    GpcmMmlInitialization = as.character(config$estimation_control$gpcm_mml_start %||%
+      if (mfrm_has_product_slopes(object) && mfrmr_adaptive_integration(config)) "neutral (legacy)" else "not_applicable"),
+    GpcmMmlSelectedStart = as.character(object$opt$mml_initialization$selected %||% NA_character_),
     GpcmCommonDiscrimination = as.character(
       config$gpcm_common_discrimination %||% "not_recorded"
     ),
@@ -9172,8 +9568,13 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
       scale_contract$GpcmExtremePersonPolicy[1]
     ),
     NoncenterFacet = as.character(config$noncenter_facet %||% "Person"),
+    CenteringScope = mfrm_centering_scope(config),
     WeightColumn = as.character(config$weight_col %||% NA_character_),
     QuadPoints = as.integer(config$estimation_control$quad_points %||% NA_integer_),
+    MMLIntegration = if (identical(config$method, "MML")) {
+      as.character(config$estimation_control$mml_integration %||% "fixed")
+    } else "not_applicable_jml",
+    MMLAccuracyStatus = config$mml_accuracy$status %||% "not_requested",
     RatingMin = as.numeric(config$rating_min %||% prep$rating_min %||% NA_real_),
     RatingMax = as.numeric(config$rating_max %||% prep$rating_max %||% NA_real_),
     RatingRangeSource = as.character(
@@ -9202,7 +9603,8 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
     },
     UnusedScoreCategories = "",
     UnusedScoreCategoryCount = 0L,
-    UnusedScoreCategoryType = "none"
+    UnusedScoreCategoryType = "none",
+    !!!mfrm_category_settings(prep, config)
   )
 
   score_category_profile <- score_category_support_profile(prep = prep)
@@ -9228,9 +9630,9 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
       any(internal_unused) ~ "internal",
       TRUE ~ "boundary"
     )
-    settings_overview$UnusedScoreCategories[1] <- paste(unused_score_categories, collapse = ", ")
-    settings_overview$UnusedScoreCategoryCount[1] <- length(unused_score_categories)
-    settings_overview$UnusedScoreCategoryType[1] <- unused_score_category_type
+    settings_overview$UnusedScoreCategories[] <- paste(unused_score_categories, collapse = ", ")
+    settings_overview$UnusedScoreCategoryCount[] <- length(unused_score_categories)
+    settings_overview$UnusedScoreCategoryType[] <- unused_score_category_type
   }
 
   reporting_map <- tibble::tibble(
@@ -9356,7 +9758,13 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
   if (nrow(slope_overview) > 0) {
     notes <- c(
       notes,
-      paste(
+      if (!is.null(config$gpcm_spec$component_levels)) paste(
+        "GPCM slopes multiply across the two declared facets. Only the first",
+        "family has geometric mean one; the second is free on the fixed",
+        "standard-normal ability scale. A second-family slope of one is not",
+        "the average of that family. Primary summaries remain unavailable until",
+        "parameter readiness is established; optimizer traces do not supply inference."
+      ) else paste(
         "GPCM discriminations use positive log-slope identification with",
         "geometric-mean-one scaling; primary summaries remain missing until",
         "parameter readiness is established, while finite optimizer traces",
@@ -9614,7 +10022,7 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
 
   key_warnings <- clean_summary_lines(c(fit_caveat_messages, preparation_review_messages, notes), max_n = 4L)
   next_actions <- c(
-    "After reviewing convergence, run `review <- summary(fit, profile = \"facets\", detail = \"brief\")` for the comprehensive FACETS-organized result surface.",
+    "After reviewing convergence, run `review <- summary(fit, profile = \"facets\", detail = \"brief\")` for the comprehensive measurement review; FACETS software is not required.",
     "Then draw the complete native Wright map with `plot(fit, type = \"wright\", show_ci = TRUE, top_n = Inf, preset = \"publication\")`."
   )
   if (!identical(numerical_status, "pass")) {
@@ -9622,10 +10030,10 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
       paste(
         "Do not interpret or select estimates from this iteration-limited fit.",
         "Refit the same data, model, method, anchors, optimizer, tolerance, and quadrature rule",
-        "with the next ceiling in a prespecified `maxit` sequence; accept a result only after the Numerical gate passes."
+        "with the next ceiling in a prespecified `maxit` sequence; accept a result only after the Numerical criteria are satisfied."
       )
     } else {
-      "Inspect `fit$opt$optimizer_polish$Stages` before changing controls; compare the retained objective, terminal gradient, and maximum parameter change, and keep the fit on review if bounded polishing did not clear the numerical gate."
+      "Inspect `fit$opt$optimizer_polish$Stages` before changing controls; compare the retained objective, terminal gradient, and maximum parameter change, and keep the fit on review if bounded polishing did not satisfy the numerical-readiness criteria."
     }
     next_actions <- c(numerical_action, next_actions)
   }
@@ -9644,7 +10052,7 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
   if (!identical(method_label, "MML")) {
     next_actions <- c(
       next_actions,
-      "If formal SE/CI or strict marginal diagnostics are needed, re-fit with `method = \"MML\"`."
+      "MML provides marginal diagnostics; review the resulting fit and uncertainty assumptions before using its SEs or intervals."
     )
   }
   if (nrow(population_overview) > 0 && isTRUE(population_overview$PopulationModel[1])) {
@@ -9661,7 +10069,7 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
           identical(numerical_status, "pass") &&
           !mfrm_inference_ready(object)) {
         paste(
-          "The optimizer already passed its numerical gate; inspect",
+          "The optimizer already satisfied its numerical-readiness criteria; inspect",
           "`summary(fit)$inference_evidence` and",
           "`diagnose_mfrm(fit)$parameter_uncertainty` before changing",
           "optimizer controls. Optimizer*SE remains diagnostic until",
@@ -9669,7 +10077,7 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
         )
       },
       next_actions,
-      "Use `compute_information()` / `plot_information()` for reporting-oriented precision follow-up."
+      "Use `compute_information()` / `plot(x)` for reporting-oriented precision follow-up."
     )
   }
   if (nrow(interaction_overview) > 0) {
@@ -9684,6 +10092,17 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
     "Use `reporting_checklist(fit, diagnostics = review$results$diagnostics)` for reporting readiness."
   )
   next_actions <- clean_summary_lines(next_actions, max_n = 6L)
+  if (!is.null(config$gpcm_spec$component_levels)) {
+    next_actions <- c(
+      "Review numerical convergence separately from parameter and interval readiness.",
+      "Read each slope facet on its stated reference scale; retain unavailable primary estimates.",
+      "Use mfrm_curve_intervals(fit, newdata) for provisional response curves without intervals; ordinary diagnostics and Wright/Pathway plots are not available.",
+      "Separately request confint(fit, parm = 'slopes') for experimental component-slope intervals; numerical checks do not establish sampling coverage."
+    )
+    reporting_map$CompanionOutput <- "Two-family diagnostics are not available"
+    reporting_map$CompanionOutput[reporting_map$Area == "Model identification / convergence"] <-
+      "Stored model and per-facet slope summaries"
+  }
   decision <- mfrm_fit_decision_summary(
     stored_readiness,
     next_action = next_actions[1L] %||% NA_character_
@@ -9697,6 +10116,12 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
     status = status,
     readiness = readiness,
     decision = decision,
+    estimation_note = if (identical(method_label, "JML") &&
+                           !inherits(object, "mfrm_imported_fit")) paste(
+      "JML uses observed scores without an extreme-score adjustment or finite-item bias correction.",
+      "Independently free Person measures are infinite for all-minimum/all-maximum responses; finite optimizer values are computational traces.",
+      "JML SEs and normal bands remain exploratory."
+    ) else character(0),
     data_review = data_review,
     key_warnings = key_warnings,
     next_actions = next_actions,
@@ -9726,6 +10151,14 @@ mfrm_fit_summary_core <- function(object, digits = 3, top_n = 5) {
     notes = notes,
     digits = digits
   )
+  if (!is.null(object$opt$start_review)) {
+    out$starting_values <- object$opt$start_review$table
+    out$starting_value_notes <- object$opt$start_review$notes
+  }
+  out$numerical_review <- .mfrm_numerical_review(object)
+  if (!identical(numerical_status, "pass")) out$next_actions <- c(
+    "Read summary(fit)$numerical_review for separate optimization, curvature, starting-value, integration and reproducible-refit actions.",
+    out$next_actions)
   class(out) <- "summary.mfrm_fit"
   out
 }
@@ -9941,6 +10374,10 @@ mfrm_fit_summary_analysis <- function(out, results = NULL, digits = 3L,
 
 mfrm_fit_summary_workflow <- function(out, fit, profile, detail,
                                       diagnostics, compute, include_person) {
+  product_slopes <- !is.null(fit$config$gpcm_spec$component_levels)
+  if (product_slopes && !identical(profile, "fit")) {
+    stop("Two-family slope models currently support only the fit summary; diagnostic and reporting profiles are not available.", call. = FALSE)
+  }
   results <- NULL
   if (!identical(profile, "fit")) {
     include <- if (identical(profile, "facets")) "facets" else "standard"
@@ -9962,6 +10399,18 @@ mfrm_fit_summary_workflow <- function(out, fit, profile, detail,
     results = results,
     include_person = include_person
   )
+  if (product_slopes) {
+    unavailable <- out$section_status$Section != "fit_summary"
+    out$section_status$Status[unavailable] <- "not_available"
+    out$section_status$Detail[unavailable] <-
+      "This summary does not provide two-family diagnostics or route to single-family helpers."
+    out$required_visual$Required <- FALSE
+    out$required_visual$Available <- FALSE
+    out$required_visual$InterpretationReady <- FALSE
+    out$required_visual$InterpretationStatus <- "not_available"
+    out$required_visual$Route <- NA_character_
+    out$required_visual$Detail <- "This figure has not been adapted to the two-family slope model."
+  }
   out$provenance <- mfrm_fit_summary_provenance(
     profile = profile,
     detail = detail,
@@ -10053,7 +10502,7 @@ mfrm_fit_summary_workflow <- function(out, fit, profile, detail,
           out$readiness$Status[readiness_reporting_row] <-
             "review_diagnostics_before_reporting"
           out$readiness$Detail[readiness_reporting_row] <-
-            "Numerical and design gates passed, but diagnostic findings require follow-up."
+            "Numerical and design criteria were satisfied, but diagnostic findings require follow-up."
         }
       }
     }
@@ -10193,7 +10642,9 @@ mfrm_fit_decision_summary <- function(readiness,
     "InputState", "EstimabilityState", "CategoryState", "BoundaryState",
     "NumericalState", "FitReadiness", "InferenceReady"
   )
-  if (nrow(readiness) != 1L || !all(required %in% names(readiness))) {
+  if (nrow(readiness) != 1L || !all(required %in% names(readiness)) ||
+      !identical(as.character(readiness$ReadinessContractVersion),
+                 mfrmr_readiness_contract_version())) {
     return(data.frame(
       Interpretation = "Re-audit or refit before interpretation",
       FormalInference = "No",
@@ -10217,9 +10668,9 @@ mfrm_fit_decision_summary <- function(readiness,
     ready = if (formal_supported) {
       "Ready for formal inference"
     } else if (precision_known) {
-      "Fit gates passed; formal inference is not supported"
+      "Fit-readiness requirements satisfied; formal inference is not supported"
     } else {
-      "Fit gates passed; formal precision review required"
+      "Fit-readiness requirements satisfied; formal precision review required"
     },
     ready_with_exclusions = "Usable only with the recorded exclusions",
     review = "Review before reporting or inference",
@@ -10228,6 +10679,9 @@ mfrm_fit_decision_summary <- function(readiness,
     "Review before reporting or inference"
   )
   reasons <- c(
+    if ("nonunit_observation_weights_inference_unvalidated" %in%
+        mfrmr_readiness_split_codes(readiness$ReasonCodes))
+      "Ordinary inference for non-unit observation weights is not validated",
     if (value("InputState") == "review")
       "Input preparation requires review",
     if (value("InputState") == "blocked")
@@ -10278,6 +10732,18 @@ mfrm_fit_decision_summary <- function(readiness,
   } else {
     reasons <- paste0(paste(reasons, collapse = "; "), ".")
   }
+  if (any(c("mml_gpcm_slope_boundary_not_evaluated",
+            "jml_gpcm_joint_boundary_not_evaluated",
+            "jml_gpcm_joint_boundary_candidate") %in%
+          mfrmr_readiness_split_codes(readiness$ReasonCodes))) {
+    reasons <- paste(
+      reasons,
+      "For GPCM MML, confint(fit, parm = 'slopes') separately checks approximate relative-slope intervals.",
+      "This does not certify global boundary absence or authorize other parameter intervals.",
+      "MML information-criterion comparison and matched PCM/GPCM tests have separate checks;",
+      "inspect ICComparable and the LRT status from compare_mfrm()."
+    )
+  }
   data.frame(
     Interpretation = interpretation,
     FormalInference = if (formal_supported) "Yes" else "No",
@@ -10301,19 +10767,82 @@ print_fit_decision_section <- function(decision) {
   if (nrow(decision) != 1L || !all(required %in% names(decision))) {
     return(invisible(NULL))
   }
+  why <- as.character(decision$Why[1L])
+  tiers <- c(model_based = "model-based precision",
+             hybrid = "mixed model-based and fallback precision",
+             exploratory = "exploratory precision")
+  for (tier in names(tiers)) {
+    why <- gsub(paste0("(tier: ", tier, ")"), paste0("(", tiers[[tier]], ")"), why, fixed = TRUE)
+  }
+  why <- gsub("\\(tier: [^)]*\\)", "(precision assumptions require review)", why)
   print_bullet_section("Decision", c(
     paste0("Interpretation: ", decision$Interpretation[1L]),
-    paste0(
-      "Formal inference: ", decision$FormalInference[1L],
-      " (fit readiness: ", decision$FitReadiness[1L], ")"
-    ),
-    paste0("Why: ", decision$Why[1L]),
+    paste0("Formal inference: ", decision$FormalInference[1L]),
+    paste0("Why: ", why),
     if (!is.na(decision$NextAction[1L]) &&
         nzchar(decision$NextAction[1L])) {
       paste0("Next: ", decision$NextAction[1L])
     }
   ))
   invisible(NULL)
+}
+
+mfrm_mml_integration_console_lines <- function(summary_object) {
+  overview <- as.data.frame(
+    summary_object$overview %||% data.frame(), stringsAsFactors = FALSE
+  )
+  if (nrow(overview) == 0L ||
+      !identical(as.character(overview$Method[1] %||% ""), "MML")) {
+    return(character(0))
+  }
+  settings <- as.data.frame(
+    summary_object$settings_overview %||% data.frame(),
+    stringsAsFactors = FALSE
+  )
+  population <- as.data.frame(
+    summary_object$population_overview %||% data.frame(),
+    stringsAsFactors = FALSE
+  )
+  engine_used <- as.character(overview$MMLEngineUsed[1] %||% "unknown")
+  engine_requested <- as.character(
+    overview$MMLEngineRequested[1] %||% engine_used
+  )
+  quad_points <- suppressWarnings(as.integer(
+    settings$QuadPoints[1] %||% overview$ICQuadraturePoints[1] %||% NA_integer_
+  ))
+  integration <- paste0(
+    "MML engine: ", engine_used, " (requested: ", engine_requested, ") | ",
+    "Integration: ",
+    if (identical(as.character(settings$MMLIntegration[1] %||% overview$MMLIntegration[1]), "adaptive")) {
+      "adaptive Gauss-Hermite"
+    } else "fixed non-adaptive Gauss-Hermite",
+    ", q=",
+    if (is.finite(quad_points)) quad_points else "unknown",
+    " | latent dimensions=1"
+  )
+  population_text <- if (isTRUE(population$PopulationModel[1] %||% FALSE)) {
+    formula <- gsub("[[:space:]]+", "", as.character(
+      population$Formula[1] %||% ""
+    ))
+    if (identical(formula, "~1")) {
+      "Population identification: estimated N(beta0,sigma^2)"
+    } else {
+      "Population identification: estimated N(X beta,sigma^2)"
+    }
+  } else {
+    "Population identification: fixed N(0,1)"
+  }
+  scale_text <- if (identical(settings$GpcmSlopeComposition[1], "two_owner_product_first_gm1")) {
+    "product slopes: first family geometric mean=1; second family free"
+  } else if (identical(as.character(overview$Model[1] %||% ""), "GPCM")) {
+    "relative slopes: geometric mean=1"
+  } else {
+    "discrimination=1"
+  }
+  accuracy <- if (identical(settings$MMLAccuracyStatus[1], "criteria_met")) {
+    "Automatic integration checks: criteria met; inference readiness is assessed separately."
+  } else character()
+  c(integration, accuracy, paste(population_text, scale_text, sep = " | "))
 }
 
 mfrm_console_width <- function() {
@@ -10331,9 +10860,29 @@ print_wrapped_line <- function(line, prefix = "  ") {
   if (!length(line)) return(invisible(NULL))
   console_width <- mfrm_console_width()
   content_width <- max(30L, console_width - nchar(prefix))
+  split_overlong <- function(value) {
+    pieces <- character(0)
+    remaining <- value
+    while (nzchar(remaining)) {
+      piece <- strtrim(remaining, content_width)
+      if (!nzchar(piece)) piece <- substr(remaining, 1L, 1L)
+      pieces <- c(pieces, piece)
+      remaining <- substring(
+        remaining, nchar(piece, type = "chars") + 1L
+      )
+    }
+    pieces
+  }
   for (value in line) {
     wrapped <- strwrap(value, width = content_width)
     if (!length(wrapped)) next
+    wrapped <- unlist(lapply(wrapped, function(part) {
+      if (nchar(part, type = "width") > content_width) {
+        split_overlong(part)
+      } else {
+        part
+      }
+    }), use.names = FALSE)
     for (part in wrapped) cat(prefix, part, "\n", sep = "")
   }
   invisible(NULL)
@@ -10395,8 +10944,74 @@ print_preparation_section <- function(notes, title = "Data preparation notes") {
   invisible(NULL)
 }
 
+mfrm_fit_display_status <- function(value) {
+  labels <- c(
+    ready = "Checks passed", pass = "Checks passed", available = "Available",
+    ready_with_exclusions = "Use only with recorded exclusions",
+    review = "Review required", review_only = "Exploratory review only",
+    blocked = "Do not interpret", failed = "Failed", fail = "Failed", legacy_unknown = "Not established",
+    not_assessed = "Not assessed", not_evaluated = "Not assessed",
+    not_available = "Unavailable", not_requested = "Not requested",
+    not_computed = "Not computed", error = "Computation failed",
+    not_applicable = "Not applicable", pass_linked = "Connectivity checked",
+    review_before_reporting = "Review before reporting",
+    ready_for_diagnostics_and_reporting_follow_up = "Ready for diagnostic review",
+    ready_for_diagnostic_interpretation = "Diagnostic interpretation available",
+    review_disconnected_with_anchors = "Disconnected design; justify anchor linking",
+    hold_for_design_review = "Resolve design restrictions first",
+    hold_for_stability_review = "Resolve boundary restrictions first",
+    stationary_candidate = "Numerical stationarity checked",
+    optimizer_review = "Numerical convergence requires review",
+    optimizer_failed = "Numerical convergence failed",
+    optimizer_not_evaluated = "Numerical convergence not assessed",
+    locally_positive_definite_at_recorded_tolerances = "Locally positive curvature at tested tolerances",
+    locally_full_rank_sufficient = "Full local rank at the retained point",
+    locally_first_order_rank_deficient = "Local first-order rank deficient",
+    indeterminate_tolerance_sensitive = "Rank depends on numerical tolerance",
+    not_evaluated_adaptive_quadrature = "Boundary check unavailable for adaptive integration",
+    source_fit_ready = "Subject to the fit's interpretation decision",
+    review_only_source_fit_not_ready = "Exploratory; source fit requires review",
+    review_only_blocked_extreme_eap_excluded = "Exploratory; unsupported extreme scores excluded",
+    primary = "Reported estimates", optimizer_trace = "Optimizer traces only",
+    legacy_estimate = "Older estimates; interpretation requires review",
+    unbounded_low = "Unbounded below", unbounded_high = "Unbounded above",
+    unbounded_both = "Unbounded in both directions",
+    structural_fixed_person = "Facet parameters with Person measures held fixed",
+    joint_person_structural = "Person and facet parameters jointly"
+  )
+  out <- unname(labels[as.character(value)])
+  out[is.na(out)] <- "Review the stored result before interpretation"
+  out
+}
+
+mfrm_fit_display_person_overview <- function(table) {
+  table <- as.data.frame(table)
+  if ("EstimateUse" %in% names(table)) {
+    table$Interpretation <- mfrm_fit_display_status(table$EstimateUse)
+    table$EstimateUse <- NULL
+  }
+  table
+}
+
+mfrm_gpcm_console_lines <- function(settings) {
+  estimator <- switch(as.character(settings$GpcmEstimatorFamily[1]),
+    marginal_maximum_likelihood = "marginal maximum likelihood",
+    unpenalized_identified_jml = "unpenalized joint maximum likelihood",
+    "not established; inspect the stored fitting settings")
+  penalty <- if (identical(settings$GpcmStatisticalPenalty[1], "none")) "none" else
+    "inspect the stored fitting settings"
+  finite_box <- if (is.na(settings$GpcmFiniteParameterBox[1] %||% NA)) "not recorded" else
+    if (isTRUE(settings$GpcmFiniteParameterBox[1])) "yes" else "no"
+  c(sprintf("GPCM estimator: %s | Statistical penalty: %s | Finite parameter box: %s",
+      estimator, penalty, finite_box),
+    if (identical(settings$GpcmSlopeAction[1], "complete_adjacent_predictor")) {
+      "GPCM slopes multiply the complete adjacent-category predictor, including thresholds; they describe model-conditional discrimination, not rater consistency."
+    } else "The recorded slope action requires review before interpreting discrimination.")
+}
+
 #' @export
 print.summary.mfrm_fit <- function(x, ...) {
+  if (isTRUE(x$jml_adjustment)) return(mfrm_jml_print_summary(x))
   digits <- x$digits
   if (is.null(digits) || !is.finite(digits)) digits <- 3L
   profile <- as.character(x$profile %||% "fit")
@@ -10435,6 +11050,18 @@ print.summary.mfrm_fit <- function(x, ...) {
   }
 
   cat("Many-Facet Measurement Model Summary\n")
+  if (nrow(x$starting_values %||% data.frame())) {
+    cat("\nStarting-value review (same model and integration rule)\n")
+    columns <- c("Start", "LogLikLoss", "TerminalGradientSupNorm", "NumericalStatus", "Selected")
+    print(round_numeric_df(x$starting_values[columns], digits), row.names = FALSE)
+    print_wrapped_line("Inspect $starting_values for warnings/failures and $starting_value_notes for scope. Agreement does not certify a global optimum or valid inference.")
+  }
+  if (nrow(x$interaction_comparisons %||% data.frame()) > 0L) {
+    cat("\nRequested joint-fit interaction comparisons\n")
+    columns <- c("Comparison", "Group1", "Group2", "Estimate", "EstimateStatus", "State")
+    print(round_numeric_df(as.data.frame(x$interaction_comparisons[columns]), digits = digits), row.names = FALSE)
+    print_wrapped_line("Descriptive contrasts only; no formal uncertainty. Review `$interaction_comparisons` and its attributes for unavailable values, assumptions and numerical checks.")
+  }
   if (nrow(overview) > 0) {
     ov <- overview[1, , drop = FALSE]
     print_wrapped_line(sprintf(
@@ -10442,6 +11069,7 @@ print.summary.mfrm_fit <- function(x, ...) {
       ov$Model, ov$Method, ov$N, ov$Persons, ov$Facets, ov$Categories
     ))
     print_fit_decision_section(x$decision)
+    print_wrapped_line(x$estimation_note %||% character(0))
     if (isTRUE(x$attached_diagnostics)) {
       attached_cols <- as.character(x$attached_diagnostics_cols %||% character(0))
       if (length(attached_cols) > 0L) {
@@ -10457,15 +11085,14 @@ print.summary.mfrm_fit <- function(x, ...) {
     if (!is.na(ov$MethodUsed %||% NA_character_) &&
         nzchar(as.character(ov$MethodUsed %||% "")) &&
         !identical(as.character(used_public), as.character(ov$Method))) {
-      print_wrapped_line(paste0("Resolved estimator: ", ov$MethodUsed))
+      print_wrapped_line(paste0("Resolved estimator: ", used_public))
+    }
+    mml_contract_lines <- mfrm_mml_integration_console_lines(x)
+    if (length(mml_contract_lines) > 0L) {
+      print_wrapped_line(mml_contract_lines)
     }
     if (identical(as.character(ov$Method %||% NA_character_), "MML") &&
         !is.na(ov$MMLEngineUsed %||% NA_character_)) {
-      print_wrapped_line(sprintf(
-        "MML engine: %s (requested: %s)",
-        ov$MMLEngineUsed %||% NA_character_,
-        ov$MMLEngineRequested %||% NA_character_
-      ))
       if (is.finite(ov$EMIterations %||% NA_real_)) {
         print_wrapped_line(sprintf(
           "EM iterations: %s | EM converged: %s | Last relative change: %s",
@@ -10476,20 +11103,16 @@ print.summary.mfrm_fit <- function(x, ...) {
       }
     }
     settings <- as.data.frame(x$settings_overview %||% data.frame())
+    if (nrow(settings) > 0L && "CenteringScope" %in% names(settings)) {
+      print_wrapped_line(switch(settings$CenteringScope[1],
+        facet = "Centering: whole declared facet, including anchors and group totals.",
+        remainder = "Centering: legacy ungrouped, unanchored remainder.",
+        anchor_origin = "Centering: direct or group anchors set their facet's origin; no additional zero sum is imposed on that facet.",
+        "Centering convention: not recorded."))
+    }
     if (identical(as.character(ov$Model %||% NA_character_), "GPCM") &&
         nrow(settings) > 0L && "GpcmEstimatorFamily" %in% names(settings)) {
-      finite_box <- if (isTRUE(settings$GpcmFiniteParameterBox[1])) "yes" else "no"
-      print_wrapped_line(sprintf(
-        "GPCM estimator: %s | Statistical penalty: %s | Finite parameter box: %s",
-        settings$GpcmEstimatorFamily[1],
-        settings$GpcmStatisticalPenalty[1],
-        finite_box
-      ))
-      print_wrapped_line(sprintf(
-        "GPCM kernel: %s | Slope action: %s",
-        settings$GpcmModelFamily[1],
-        settings$GpcmSlopeAction[1]
-      ))
+      print_wrapped_line(mfrm_gpcm_console_lines(settings))
     }
     if (identical(detail, "brief")) {
       ic_lines <- mfrm_ic_console_lines(overview_raw, digits = digits)
@@ -10512,11 +11135,16 @@ print.summary.mfrm_fit <- function(x, ...) {
     keep <- intersect(
       c(
         "Priority", "Visual", "Required", "Available",
-        "InterpretationStatus", "InterpretationReady"
+        "InterpretationStatus"
       ),
       names(visual)
     )
-    print(visual[, keep, drop = FALSE], row.names = FALSE)
+    visual <- visual[, keep, drop = FALSE]
+    if ("InterpretationStatus" %in% names(visual)) {
+      visual$Interpretation <- mfrm_fit_display_status(visual$InterpretationStatus)
+      visual$InterpretationStatus <- NULL
+    }
+    print(visual, row.names = FALSE)
     cat("  Plot commands are stored in `$required_visual$Route`.\n")
   }
   if (nrow(x$status %||% data.frame()) > 0) {
@@ -10555,6 +11183,7 @@ print.summary.mfrm_fit <- function(x, ...) {
     cat("\nWorkflow readiness\n")
     readiness <- as.data.frame(x$readiness, stringsAsFactors = FALSE)
     keep <- intersect(c("Domain", "Status"), names(readiness))
+    readiness$Status <- mfrm_fit_display_status(readiness$Status)
     print(readiness[, keep, drop = FALSE], row.names = FALSE)
   }
   print_bullet_section("Key warnings", key_warning_lines)
@@ -10597,10 +11226,12 @@ print.summary.mfrm_fit <- function(x, ...) {
     keep <- intersect(
       c(
         "Facet", "Level", "BoundaryStatus", "OptimizerEstimate",
-        "AuditScope", "AuditComplete", "StatusBasis"
+        "AuditScope", "AuditComplete"
       ),
       names(recession)
     )
+    recession$BoundaryStatus <- mfrm_fit_display_status(recession$BoundaryStatus)
+    recession$AuditScope <- mfrm_fit_display_status(recession$AuditScope)
     print(
       round_numeric_df(recession[, keep, drop = FALSE], digits = digits),
       row.names = FALSE
@@ -10618,7 +11249,7 @@ print.summary.mfrm_fit <- function(x, ...) {
     }
     if (nrow(x$person_overview %||% data.frame()) > 0L) {
       cat("\nPerson measure distribution (aggregate; no identifiers)\n")
-      print(round_numeric_df(as.data.frame(x$person_overview), digits = digits), row.names = FALSE)
+      print(round_numeric_df(mfrm_fit_display_person_overview(x$person_overview), digits = digits), row.names = FALSE)
     }
     if (nrow(x$step_overview %||% data.frame()) > 0L) {
       cat("\nStep parameter summary\n")
@@ -10644,6 +11275,13 @@ print.summary.mfrm_fit <- function(x, ...) {
 
       reliability <- as.data.frame(diagnostics$reliability %||% data.frame(), stringsAsFactors = FALSE)
       if (nrow(reliability) > 0L) {
+        if ("PrecisionTier" %in% names(reliability)) {
+          labels <- c(model_based = "Model-based", hybrid = "Mixed precision",
+                      exploratory = "Exploratory")
+          value <- unname(labels[as.character(reliability$PrecisionTier)])
+          value[is.na(value)] <- "Requires review"
+          reliability$PrecisionTier <- value
+        }
         keep <- intersect(
           c(
             "Facet", "Levels", "PrecisionTier", "Reliability", "RealReliability",
@@ -10675,7 +11313,9 @@ print.summary.mfrm_fit <- function(x, ...) {
           c(
             "Categories", "UsedCategories", "UnusedScoreCategories",
             "WeaklyIdentifiedThresholds", "MinCategoryCount", "MeanCategoryInfit",
-            "MeanCategoryOutfit", "ThresholdMonotonic", "MarginalFitAvailable",
+            "MeanCategoryOutfit", "AvailableCategoryCounts", "UnavailableCategoryCounts",
+            "ThresholdMonotonic", "AvailableThresholdComparisons", "UnavailableThresholdComparisons",
+            "ThresholdOrderNotApplicable", "MarginalFitAvailable",
             "MarginalFlaggedCategories"
           ),
           names(rating_summary)
@@ -10730,8 +11370,13 @@ print.summary.mfrm_fit <- function(x, ...) {
         !section_status$Status %in% c("ok", "available", "not_computed_by_summary"),
         , drop = FALSE
       ]
+      # These decisions already appear in the decision and workflow sections.
+      review <- review[!review$Section %in% c("fit_readiness", "plot_interpretation",
+                                            "reporting_readiness"), , drop = FALSE]
       if (nrow(review) > 0L) {
         cat("\nSection availability requiring attention\n")
+        review$Section <- tools::toTitleCase(gsub("_", " ", review$Section, fixed = TRUE))
+        review$Status <- mfrm_fit_display_status(review$Status)
         keep <- intersect(c("Section", "Status", "Detail"), names(review))
         print(review[, keep, drop = FALSE], row.names = FALSE)
       }
@@ -10745,7 +11390,7 @@ print.summary.mfrm_fit <- function(x, ...) {
         profile
       ))
     } else {
-      cat(" - Use `summary(fit, profile = \"facets\")` for the computed FACETS-organized review.\n")
+      cat(" - Use `summary(fit, profile = \"facets\")` for the comprehensive measurement review; FACETS software is not required.\n")
       cat(" - Use `summary(fit, detail = \"full\")` for legacy fit-level detail.\n")
     }
     return(invisible(x))
@@ -10770,16 +11415,11 @@ print.summary.mfrm_fit <- function(x, ...) {
       cat(paste0("  ", ic_lines, "\n"), sep = "")
     }
     cat(sprintf(
-      "  Optimizer code 0: %s | Status: %s | Basis: %s | Fn evals: %s | Gr evals: %s\n",
-      ifelse(isTRUE(ov$Converged), "Yes", "No"),
+      "  Optimizer code 0: %s | Status: %s | Fn evals: %s | Gr evals: %s\n",
+      if (is.na(raw_ov$ConvergenceCode %||% NA)) "Not recorded" else if (raw_ov$ConvergenceCode == 0) "Yes" else "No",
       full_status,
-      ov$ConvergenceBasis %||% NA_character_,
       ov$FunctionEvaluations %||% ov$Iterations %||% NA,
       ov$GradientEvaluations %||% NA
-    ))
-    cat(sprintf(
-      "  Formal inference: %s\n",
-      ifelse(mfrm_inference_ready(overview_raw), "Ready", "Not ready")
     ))
     if (is.finite(raw_ov$TerminalGradientSupNorm %||% NA_real_)) {
       format_gradient <- function(value) {
@@ -10801,11 +11441,29 @@ print.summary.mfrm_fit <- function(x, ...) {
 
   if (nrow(x$population_overview) > 0) {
     cat("\nPopulation basis\n")
-    print(round_numeric_df(as.data.frame(x$population_overview), digits = digits), row.names = FALSE)
+    population <- as.data.frame(x$population_overview)
+    if (identical(as.character(overview$Method[1]), "JML")) {
+      print_wrapped_line("JML estimates Person measures jointly with calibration parameters; it does not estimate a normal population distribution.")
+    } else if (isTRUE(population$PopulationModel[1])) {
+      print_wrapped_line(if (identical(population$ResidualVarianceStatus[1], "fixed"))
+        "Conditional normal Person distribution with estimated coefficients and fixed residual variance. Posterior Person scoring conditions on the fitted calibration and population parameters." else
+        "Estimated conditional normal Person distribution. Population coefficients and residual variance are point estimates; their uncertainty is not included in posterior Person scoring.")
+      keep <- intersect(c("Formula", "PersonRows", "DesignColumns", "ResidualVariance", "ResidualVarianceStatus",
+                          "OmittedPersons", "OmittedRows"), names(population))
+      print(round_numeric_df(population[keep], digits = digits), row.names = FALSE)
+    } else {
+      print_wrapped_line("MML calibration uses a fixed standard normal Person distribution, N(0,1).")
+    }
   }
   if (nrow(x$inference_evidence %||% data.frame()) > 0L) {
     cat("\nGPCM-MML inference evidence\n")
     evidence <- as.data.frame(x$inference_evidence, stringsAsFactors = FALSE)
+    areas <- c(optimizer_stationarity = "Numerical stationarity",
+      local_estimability = "Local identification", observed_information_curvature = "Local curvature",
+      slope_boundary_screen = "Slope boundaries", fit_readiness = "Fit interpretation")
+    evidence$EvidenceArea <- unname(areas[evidence$EvidenceArea])
+    evidence$EvidenceArea[is.na(evidence$EvidenceArea)] <- "Additional diagnostic check"
+    evidence$State <- mfrm_fit_display_status(evidence$State)
     keep <- intersect(
       c(
         "EvidenceArea", "State", "Complete", "Rank", "Dimension",
@@ -10843,7 +11501,7 @@ print.summary.mfrm_fit <- function(x, ...) {
 
   if (nrow(x$person_overview) > 0) {
     cat("\nPerson measure distribution\n")
-    print(round_numeric_df(as.data.frame(x$person_overview), digits = digits), row.names = FALSE)
+    print(round_numeric_df(mfrm_fit_display_person_overview(x$person_overview), digits = digits), row.names = FALSE)
   }
 
   if (nrow(x$targeting %||% data.frame()) > 0) {
@@ -10857,7 +11515,21 @@ print.summary.mfrm_fit <- function(x, ...) {
   }
   if (nrow(x$slope_overview %||% data.frame()) > 0) {
     cat("\nSlope parameter readiness and optimizer trace\n")
-    print(round_numeric_df(as.data.frame(x$slope_overview), digits = digits), row.names = FALSE)
+    slopes <- as.data.frame(x$slope_overview)
+    slopes <- slopes[setdiff(names(slopes), c("OwnerInterpretation", "ParameterStatus",
+      "PrimaryReady", "FixedLatentSDBasis", "Identification"))]
+    if ("ScaleReference" %in% names(slopes)) {
+      slopes$ScaleReference <- ifelse(slopes$ScaleReference == "geometric_mean_one",
+        "Within-facet geometric mean 1", ifelse(slopes$ScaleReference == "fixed_standard_normal",
+          "Fixed standard-normal ability scale", "Reference not recorded"))
+    }
+    if ("ValueBasis" %in% names(slopes)) slopes$ValueBasis <- mfrm_fit_display_status(slopes$ValueBasis)
+    print(round_numeric_df(slopes, digits = digits), row.names = FALSE)
+    if (nrow(x$slope_overview) > 1L) {
+      print_wrapped_line("Each row describes one slope facet and its own scale reference. Use confint(fit, parm = 'slopes') for separately checked experimental component-slope intervals. These summaries do not qualify intervals, global identification or model comparisons; sampling coverage remains unestablished.")
+    } else {
+      print_wrapped_line("Use confint(fit, parm = 'slopes') or diagnose_mfrm(fit) for separately checked MML relative-slope intervals. Their CIEligible decision does not certify global boundary absence. Use confint(fit, parm = 'slopes', scale = 'standardized') for intervals on population-SD times slope, including estimated-scale uncertainty. With covariates, this is the residual population SD.")
+    }
   }
   if (nrow(x$interaction_overview %||% data.frame()) > 0) {
     cat("\nFacet interaction summary\n")
@@ -10865,7 +11537,14 @@ print.summary.mfrm_fit <- function(x, ...) {
   }
   if (nrow(x$settings_overview %||% data.frame()) > 0) {
     cat("\nEstimation settings\n")
-    print(round_numeric_df(as.data.frame(x$settings_overview), digits = digits), row.names = FALSE)
+    settings <- as.data.frame(x$settings_overview)
+    keep <- intersect(c("StepFacet", "SlopeFacet", "NoncenterFacet", "WeightColumn",
+      "RatingMin", "RatingMax", "CategoryPolicy", "ScoreRecoded",
+      "DummyFacets", "PositiveFacets", "FacetInteractions",
+      "UnusedScoreCategories", "UnusedScoreCategoryCount"), names(settings))
+    print(round_numeric_df(settings[keep], digits = digits), row.names = FALSE)
+    print_wrapped_line(settings$StepFacetNote %||% character(0))
+    print_wrapped_line("Full fitting settings are retained in `$settings_overview`.")
   }
 
   if (nrow(x$facet_extremes) > 0) {

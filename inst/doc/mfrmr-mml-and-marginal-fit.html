@@ -39,6 +39,108 @@ ul.task-list{list-style: none;}
 
 
 
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
 
 
 
@@ -240,8 +342,11 @@ diagnostics</h1>
 
 
 
-<p>This vignette explains how <code>mfrmr</code> fits <code>MML</code>
-models and how to interpret the newer strict marginal diagnostics.</p>
+<p>This vignette explains how <code>mfrmr</code> fits ordinary RSM/PCM
+and one-family GPCM models by <code>MML</code>, and how to interpret
+their marginal diagnostic screens. The two-family GPCM route has
+separate engines and response diagnostics, noted below and in
+<code>vignette(&quot;mfrmr-gpcm-scope&quot;, package = &quot;mfrmr&quot;)</code>.</p>
 <div id="why-the-mml-calculations-are-shared" class="section level2">
 <h2>Why the MML calculations are shared</h2>
 <p>Earlier versions computed closely related quantities multiple times
@@ -264,46 +369,162 @@ targets the marginal likelihood</p>
 L(\beta) = \prod_{n=1}^{N} \int p(\mathbf{x}_n \mid \theta, \beta)
 g(\theta) \, d\theta
 \approx
-\prod_{n=1}^{N} \sum_{q=1}^{Q} w_q \, p(\mathbf{x}_n \mid \theta_q,
-\beta),
+\prod_{n=1}^{N} \sum_{q=1}^{Q} w_{nq}(\beta) \, p(\mathbf{x}_n \mid
+\theta_{nq}(\beta), \beta),
 \]</span></p>
-<p>where <span class="math inline">\((\theta_q, w_q)\)</span> are
-Gauss-Hermite nodes and weights. In <code>mfrmr</code>, the integral is
+<p>where <span class="math inline">\((\theta_{nq}, w_{nq})\)</span> are
+the integration nodes and weights for Person <span class="math inline">\(n\)</span>. In <code>mfrmr</code>, the integral is
 approximated with Gauss-Hermite quadrature, the marginal log-likelihood
 is optimized from the same shared kernel, and person summaries are
 computed post hoc from the posterior bundle. When a latent-regression
 population model is active, the package uses person-specific transformed
 nodes derived from the same quadrature basis rather than one
-unconditional fixed grid.</p>
+unconditional fixed grid. With
+<code>mml_integration = &quot;adaptive&quot;</code>, nodes also follow each
+Person’s posterior mode and width at every proposed parameter vector.
+Adjusted weights include the normal-density ratio and change of scale,
+so the approximation still targets the original integral. The gradient
+includes changes in the nodes and weights.</p>
 <p>The posterior weight for person <span class="math inline">\(n\)</span> at node <span class="math inline">\(q\)</span> is</p>
 <p><span class="math display">\[
 \omega_{nq} =
-\frac{w_q \, p(\mathbf{x}_n \mid \theta_q, \hat{\beta})}
-{\sum_{r=1}^{Q} w_r \, p(\mathbf{x}_n \mid \theta_r, \hat{\beta})}.
+\frac{w_{nq} \, p(\mathbf{x}_n \mid \theta_{nq}, \hat{\beta})}
+{\sum_{r=1}^{Q} w_{nr} \, p(\mathbf{x}_n \mid \theta_{nr},
+\hat{\beta})}.
 \]</span></p>
 <p>Expected a posteriori (EAP) scoring then uses</p>
 <p><span class="math display">\[
-\hat{\theta}_n^{\mathrm{EAP}} = \sum_{q=1}^{Q} \theta_q \, \omega_{nq}.
+\hat{\theta}_n^{\mathrm{EAP}} = \sum_{q=1}^{Q} \theta_{nq} \,
+\omega_{nq}.
 \]</span></p>
 <p>This is the kernel that now feeds <code>logLik</code>, the gradient,
 EAP summaries, and strict marginal expected values.</p>
 </div>
 <div id="current-mml-scope" class="section level2">
 <h2>Current MML scope</h2>
-<p>For the <code>RSM</code> / <code>PCM</code> MML branch:</p>
-<ul>
-<li>the person distribution is integrated with Gauss-Hermite
-quadrature</li>
-<li><code>mml_engine = &quot;direct&quot;</code> uses gradient-based direct
-optimization of the marginal log-likelihood</li>
-<li><code>mml_engine = &quot;em&quot;</code> and
-<code>mml_engine = &quot;hybrid&quot;</code> are also available for
-<code>RSM</code> / <code>PCM</code>; bounded <code>GPCM</code> uses the
-direct engine regardless of that option</li>
-<li>person summaries are reported post-hoc from the integrated
-posterior</li>
-</ul>
-<p>This is the implemented MML-engine scope.</p>
+<p>All these routes integrate a declared ability distribution and
+compute Person summaries from the fitted posterior, but their engine
+support differs:</p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Response model</th>
+<th>Numerical route</th>
+<th>Important boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Ordinary RSM/PCM</td>
+<td>Direct optimization with fixed or adaptive quadrature; EM/hybrid for
+the supported fixed-integration, fixed-population additive models</td>
+<td>Adaptive integration uses direct optimization without
+checkpoints</td>
+</tr>
+<tr class="even">
+<td>One-family GPCM</td>
+<td>Direct optimization with fixed or adaptive quadrature</td>
+<td>EM/hybrid requests fall back to direct; inspect the recorded
+engine</td>
+</tr>
+<tr class="odd">
+<td>Experimental two-family GPCM</td>
+<td>Explicit <code>mml_engine = &quot;em&quot;</code>, with fixed or adaptive
+integration and fixed N(0,1)</td>
+<td>Direct/hybrid are unavailable; there are exactly two non-Person
+facets</td>
+</tr>
+</tbody>
+</table>
+<p>The model, marginal-likelihood estimand and numerical algorithm are
+separate choices. Numerical convergence does not qualify interval
+coverage or resolve all nonlinear identification/boundary questions.
+Consult <code>gpcm_capability_matrix()</code> for output-specific
+restrictions. The ordinary <code>diagnose_mfrm()</code> screens below do
+not apply to two-family GPCM; use its
+<code>mfrm_response_diagnostics()</code> route, which has no calibrated
+fit cutoffs.</p>
+</div>
+<div id="when-estimates-change-with-quadrature-order" class="section level2">
+<h2>When estimates change with quadrature order</h2>
+<p>A small optimizer gradient shows that the fitted approximation is
+near a stationary point. It does not establish the accuracy of the
+integral. When estimates or posterior SDs move as the order increases,
+one available option is to refit using adaptive integration and check
+its order sensitivity too:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>toy <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_operational&quot;</span>)</span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>fit_adaptive <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>  <span class="at">data =</span> toy, <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>, <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>),</span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>  <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>, <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>, <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>,</span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>  <span class="at">mml_integration =</span> <span class="st">&quot;adaptive&quot;</span>, <span class="at">quad_points =</span> <span class="dv">31</span></span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a>)</span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a>quadrature_review <span class="ot">&lt;-</span> <span class="fu">mml_quadrature_sensitivity</span>(</span>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>  fit_adaptive, toy, <span class="at">quad_points =</span> <span class="fu">c</span>(<span class="dv">31</span>, <span class="dv">61</span>)</span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>)</span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a><span class="fu">summary</span>(quadrature_review)</span></code></pre></div>
+<p>The review refits the same data with the same integration mode. Keep
+every candidate and inspect changes in calibration parameters and Person
+scoring; two nearby orders alone are not an accuracy certificate. For an
+external comparison, also check the other program’s integration range
+and density, the population distribution, constraints, and response
+weights.</p>
+<p>Scoring can have separate numerical controls. For example, ConQuest
+uses <code>p_nodes</code> for its Monte Carlo approximation of Person
+posterior means and SDs; its estimation <code>nodes</code> setting does
+not control that calculation. Record <code>p_nodes</code> and the random
+seed when comparing these scores, and examine sensitivity to both. See
+the <a href="https://conquestmanual.acer.org/s4-00.html">ConQuest
+command reference (<code>set</code> and <code>show</code>)</a>.</p>
+<p><code>build_conquest_overlap_bundle()</code> gives ConQuest
+independent controls through <code>conquest_control</code>, with
+calibration defaults of 31 nodes over -6 to 6 and posterior defaults
+<code>p_nodes=2000</code>, <code>seed=2</code>. Native
+<code>quad_points</code> does not select ConQuest nodes. Check
+calibration refinement and range sensitivity separately from posterior
+accuracy; these defaults do not certify precision. The command resets
+earlier analysis settings, so run it in a fresh ConQuest session. Its
+narrow binary item-only comparison requires unanchored, centered
+difficulty parameters, unit weights and an intercept plus one numeric
+population covariate. Unsupported settings are rejected rather than
+silently fitted as a different model.</p>
+<p>The wide input uses safe person and covariate aliases. Retain
+<code>person_map</code>, <code>covariate_map</code> and the bundle so
+<code>normalize_conquest_overlap_exports()</code> can restore original
+person IDs. The maps and original tables mean the bundle is not
+deidentified. IDs are read as text, preserving leading zeros and long
+numeric identifiers. Generic table import no longer guesses that a
+column named <code>Facility</code> contains difficulty logits.</p>
+<p>Pass the generated <code>parameters_review.txt</code> as
+<code>report_file</code> when normalizing the CSVs. It supplies external
+stopping status and checks the model and common ITEMS constraint.
+Without a report, stopping status remains unknown. For other extracted
+tables, supply <code>conquest_location_shift</code> only when the
+external-minus- native location offset is known (zero for a confirmed
+common origin). Unknown origins withhold aligned EAP/intercept
+comparisons; raw differences remain available. Surplus external rows and
+failed stopping are flagged. Recreate saved reviews to apply these
+rules. Neither a met stopping criterion nor matching labels establishes
+that inputs were identical or precision adequate.</p>
+<p>The overlap review compares points and EAPs, not diagnostic
+equivalence. Native MML row residual MnSq at EAP differs from ConQuest’s
+design-based parameter residuals averaged over posterior distributions.
+Marginal category counts are also a separate diagnostic. ConQuest
+Thurstonian thresholds are cumulative probability crossings, not
+adjacent step parameters. Neither a shared label nor agreement in
+calibration estimates makes these quantities interchangeable; see the <a href="https://conquestmanual.acer.org/s3-00.html">technical
+manual</a>.</p>
+<p>In a paper, report the integration mode and order, population
+assumptions, optimizer settings and termination evidence, and the
+sensitivity analysis. Calibration-parameter standard errors and Person
+posterior SDs answer different questions. Stable numerical results or
+agreement between programs do not establish confidence-interval coverage
+or remove stored readiness limitations.</p>
 </div>
 <div id="numerical-readiness-and-bounded-polishing" class="section level2">
 <h2>Numerical readiness and bounded polishing</h2>
@@ -321,14 +542,16 @@ parameter change, and evaluation counts. For L-BFGS-B, the stage table
 also records the actual <code>factr</code> and <code>pgtol</code>
 controls; <code>EffectiveReltol</code> is not itself a native L-BFGS-B
 argument. EM retains its relative log-likelihood stopping result but
-must also pass the same terminal-gradient gate; use the direct engine
+must also pass the same terminal-gradient check; use the direct engine
 for bounded gradient polishing when an EM fit remains under numerical
 review.</p>
-<p>Read <code>summary(fit)$readiness</code> as separate gates.
-<code>InferenceReady</code> and the Numerical row describe numerical
-optimization, not the design, stability, diagnostic, or reporting
-decision. A small gradient cannot repair a disconnected measurement
-graph or a boundary-separated facet level.</p>
+<p>Read <code>summary(fit)$readiness</code> as separate criteria. The
+Numerical row describes numerical optimization;
+<code>InferenceReady</code> requires all stored fit-readiness components
+to pass. Formal precision support is assessed separately through
+<code>diagnose_mfrm()</code> and the summary’s decision table. A small
+gradient cannot repair a disconnected measurement graph or a
+boundary-separated facet level.</p>
 <div id="choosing-the-iteration-ceiling" class="section level3">
 <h3>Choosing the iteration ceiling</h3>
 <p><code>maxit</code> limits computation; it does not define
@@ -354,7 +577,7 @@ expectations. For a grouped summary <span class="math inline">\(g\)</span> and c
 <p><span class="math display">\[
 \mathbb{E}_{\hat{\beta}}(N_{gc}) =
 \sum_{n=1}^{N} \sum_{q=1}^{Q}
-\omega_{nq} \, I(n \in g) \, P(X_n = c \mid \theta_q, \hat{\beta}).
+\omega_{nq} \, I(n \in g) \, P(X_n = c \mid \theta_{nq}, \hat{\beta}).
 \]</span></p>
 <p>The corresponding residual compares the observed count to that
 latent-integrated expectation rather than to an <code>EAP</code> plug-in
@@ -442,24 +665,34 @@ accept/reject rule. That design choice follows the broader review logic
 in Sinharay and Monroe (2025): use several complementary diagnostics,
 match them to the intended use of the scores, and examine practical
 significance before making strong claims.</p>
-<div id="assumption-independent-bernoulli-variance-for-grouped-counts" class="section level3">
-<h3>Assumption: independent-Bernoulli variance for grouped counts</h3>
-<p>The <code>marginal_fit</code> grid sums per-observation
-posterior-integrated variances as
-<code>VarianceCount = sum_i w_i^2 * p_i * (1 - p_i)</code>, which treats
-observations within a cell as independent Bernoulli draws given the
-fitted parameters. This is the same independence assumption that
-underlies conditional independence in the MFRM specification (Linacre,
-1989). When the rating design violates it - e.g. multiple ratings by the
-same rater on the same person-criterion combination - cell-level
-posterior variances can be underestimated, which in turn makes the
-reported standard errors and screening t-statistics slightly optimistic.
-The documented follow-up is
-<code>diagnose_mfrm(..., diagnostic_mode = &quot;both&quot;)</code> combined with
-<code>strict_pairwise_local_dependence</code>, which surfaces evidence
-of dependence at the pair level. See Haberman and Sinharay (2013) for a
-generalized-residual framework that models such dependence explicitly;
-that path is not included in the documented diagnostic scope.</p>
+<div id="grouped-count-variance-is-a-screening-approximation" class="section level3">
+<h3>Grouped-count variance is a screening approximation</h3>
+<p>The <code>marginal_fit</code> grid uses
+<code>VarianceCount = sum_i w_i^2 * p_i * (1 - p_i)</code>, where
+<code>p_i</code> is the posterior-averaged probability of the selected
+category. Its standardized residual divides the observed-minus-expected
+count by the square root of this quantity. This is a diagonal Bernoulli
+variance approximation, not the full repeated-sample variance of the
+fitted residual.</p>
+<p>Conditional independence <strong>given ability</strong> does not
+imply independence after integrating over a shared uncertain ability.
+Even for conditionally independent replicate ratings from one Person,
+their category indicators can have covariance
+<code>Cov_theta(p_i(theta), p_j(theta))</code>. A joint count variance
+would include these cross-observation terms. The implemented
+approximation also omits the effects of estimating calibration and
+conditioning probabilities on the observed responses. Extra local
+dependence or repeated rating events require further care; neither the
+direction nor size of the variance discrepancy is guaranteed.</p>
+<p>Use <code>diagnose_mfrm(..., diagnostic_mode = &quot;both&quot;)</code> and
+inspect <code>strict_pairwise_local_dependence</code> as complementary
+screening evidence. That screen does not correct
+<code>VarianceCount</code> or calibrate its residual as a normal test
+statistic. Haberman and Sinharay (2013) provide a related generalized-
+residual model-checking framework; citing it does not make this
+approximation an implementation of their formal test. The package
+reports these quantities for exploratory review, not as
+structural-parameter SEs or a dependence model.</p>
 <p>For many-facet reporting, one additional boundary matters.
 Facet-level separation/reliability and inter-rater agreement answer
 different questions. High rater separation reliability can coexist with
@@ -478,11 +711,11 @@ why <code>mfrmr</code> reports <code>diagnostics$reliability</code> and
 <li>latent distribution misspecification</li>
 <li>step-structure misspecification</li>
 </ul>
-<p>These checks target <code>RSM</code> and <code>PCM</code>.
-<code>GPCM</code> is now supported only within a bounded core route:
-fitting, slope summaries, posterior scoring, information curves, direct
-curve/category reports, exploratory residual-based follow-up, direct
-recovery checks, and the slope-aware element-conditional
+<p>These checks target <code>RSM</code> and <code>PCM</code>. The
+<strong>ordinary one-family GPCM</strong> route has a separate, limited
+scope: fitting, slope summaries, posterior scoring, information curves,
+direct curve/category reports, exploratory residual-based follow-up,
+direct recovery checks, and the slope-aware element-conditional
 <code>fair_average_table()</code> and <code>estimate_bias()</code>.
 Historical fair-average SE columns remain scaled facet-measure SEs
 rather than delta-method SEs of the fair-average value;
@@ -490,31 +723,41 @@ rather than delta-method SEs of the fair-average value;
 delta-method fair-average SEs for non-person rows when the MML
 observed-information Hessian is available. Bias SE / <code>t</code> /
 <code>Prob.</code> columns are conditional plug-in screening quantities,
-and bounded-GPCM rows also carry profile-likelihood follow-up columns.
+and GPCM rows also carry profile-likelihood follow-up columns.
 Summary-table appendix export is available for supported direct outputs.
 The APA writer, fit-based report/export bundles, package-native
 scorefile export, QC pass/fail pipelines, linking synthesis, role-based
 design forecasting, and diagnostic/signal-detection design screening are
-available only as caveated bounded-<code>GPCM</code> surfaces with
-explicit boundary output. Full FACETS-style score-side contract review,
-posterior predictive checks, and MCMC estimation are not available for
-bounded <code>GPCM</code>. See <code>gpcm_capability_matrix()</code> for
-the status and recommended alternative for each helper group.</p>
+available only as caveated <code>GPCM</code> surfaces with explicit
+boundary output. Full FACETS-style score-side contract review, posterior
+predictive checks, and MCMC estimation are not available for
+<code>GPCM</code>. See <code>gpcm_capability_matrix()</code> for the
+status and recommended alternative for each helper group. These
+permissions do not extend to the experimental two-family route described
+above.</p>
 </div>
-<div id="why-bounded-gpcm-is-the-current-limit" class="section level2">
-<h2>Why bounded GPCM is the current limit</h2>
-<p><code>GPCM</code> is the current upper supported scope for three
-reasons.</p>
-<ol style="list-style-type: decimal">
-<li>The bounded slope model uses the documented <code>MML</code>
-probability framework under the stated restriction.</li>
-<li>Direct verification checks are available for that model.</li>
-<li>Score-side and reporting helpers that rely on Rasch-family semantics
-remain unavailable or carry explicit caveats.</li>
-</ol>
-<p>This is a narrower but more defensible claim than saying the whole
-package is uniformly generalized to free-discrimination many-facet
-work.</p>
+<div id="gpcm-model-and-inference-limits" class="section level2">
+<h2>GPCM model and inference limits</h2>
+<p>For <strong>one-family GPCM</strong>, one selected facet supplies
+positive relative discriminations. With MML, another facet may supply
+category steps: for example,
+<code>slope_facet = &quot;Criterion&quot;, step_facet = &quot;Rater&quot;</code> combines
+criterion discrimination with rater-specific category use. JML still
+requires <code>slope_facet == step_facet</code>. These one-family routes
+do not jointly estimate task and rater discriminations. The separate
+experimental two-family MML route estimates their product structure; it
+does not inherit the ordinary diagnostics or the one-family comparison
+and interval qualifications. Separate-owner weighting reviews and
+general simulation/design workflows remain unavailable; same-design
+<code>bootstrap_mfrm_gpcm()</code> preserves both owners.</p>
+<p>Numerical fitting and descriptive sensitivity analysis are available.
+<code>confint(fit, parm = &quot;slopes&quot;)</code> separately checks approximate
+pointwise MML relative-slope intervals. MML IC ranking uses separate
+checks of the retained likelihood, gradient and positive unregularized
+information, alongside the common comparison requirements. Score-side
+and reporting helpers that rely on Rasch-family semantics also retain
+their documented limits. See <code>vignette(&quot;mfrmr-gpcm-scope&quot;)</code>
+for the output-specific distinctions.</p>
 </div>
 <div id="equal-weighting-as-a-model-choice-principle" class="section level2">
 <h2>Equal weighting as a model-choice principle</h2>
@@ -531,23 +774,23 @@ scoring question.</li>
 items and raters, then the Rasch-family route remains substantively
 attractive even when a slope-aware model fits better. <code>mfrmr</code>
 therefore treats <code>RSM</code> / <code>PCM</code> as the
-equal-weighting reference models and bounded <code>GPCM</code> as a
-supported alternative for users who explicitly want to inspect or allow
+equal-weighting reference models and <code>GPCM</code> as a supported
+alternative for users who explicitly want to inspect or allow
 discrimination-based reweighting.</p>
 <p>This is also why full FACETS output-contract score-side review is not
-provided for bounded <code>GPCM</code>: its published form is a
-Rasch-family score transformation, and the slope-aware analogue that
-would replace it in a free-discrimination context requires careful
-score-side uncertainty handling. Package-native scorefile export,
-manuscript-draft APA text, and fit-based report/export bundles are
-available only as caveated sensitivity-reporting surfaces, not as
-FACETS-equivalent or operational score transformations.
-<code>fair_average_table()</code> and <code>estimate_bias()</code>
-themselves are now available under bounded <code>GPCM</code> via the
-slope-aware element-conditional kernel. For fair averages,
-<code>fair_average_table(fair_se = TRUE)</code> adds structural
-delta-method SEs for non-person rows when the MML Hessian is available;
-the historical <code>SE</code> columns remain measure-level SEs.</p>
+provided for <code>GPCM</code>: its published form is a Rasch-family
+score transformation, and the slope-aware analogue that would replace it
+in a free-discrimination context requires careful score-side uncertainty
+handling. Package-native scorefile export, manuscript-draft APA text,
+and fit-based report/export bundles are available only as caveated
+sensitivity-reporting surfaces, not as FACETS-equivalent or operational
+score transformations. <code>fair_average_table()</code> and
+<code>estimate_bias()</code> themselves are now available under
+<code>GPCM</code> via the slope-aware element-conditional kernel. For
+fair averages, <code>fair_average_table(fair_se = TRUE)</code> adds
+structural delta-method SEs for non-person rows when the MML Hessian is
+available; the historical <code>SE</code> columns remain measure-level
+SEs.</p>
 <p>One additional distinction matters for implementation. The
 <code>weight</code> argument in <code>fit_mfrm()</code> is an
 observation-weight column. It changes how rating events enter estimation
@@ -557,7 +800,7 @@ versus discrimination-weighting question discussed above.</p>
 <div id="practical-reading-order" class="section level2">
 <h2>Practical Reading Order</h2>
 <p>For users deciding among <code>RSM</code>, <code>PCM</code>, and
-bounded <code>GPCM</code>, use this reading order:</p>
+<code>GPCM</code>, use this reading order:</p>
 <ol style="list-style-type: decimal">
 <li>Start with the score claim. If category thresholds should be common,
 begin with <code>RSM</code>; if thresholds may vary by a designated step
@@ -565,24 +808,26 @@ facet, begin with <code>PCM</code>.</li>
 <li>Fit the Rasch-family reference model with
 <code>method = &quot;MML&quot;</code> and read <code>summary(fit)</code> plus
 <code>summary(diagnose_mfrm(fit, diagnostic_mode = &quot;both&quot;))</code>.</li>
-<li>Fit bounded <code>GPCM</code> only when discrimination-based
-reweighting is a meaningful sensitivity question, not as a routine
-replacement for the equal-weighting model.</li>
-<li>If bounded <code>GPCM</code> fits better, report what changed:
-slopes, information redistribution, bias-screening rows, fair averages,
-or conclusions. Do not let fit improvement alone decide the operational
-model.</li>
+<li>Fit <code>GPCM</code> only when discrimination-based reweighting is
+a meaningful sensitivity question, not as a routine replacement for the
+equal-weighting model.</li>
+<li>For the descriptive <code>GPCM</code> comparison, report what
+changed: slopes, information redistribution, bias-screening rows, fair
+averages, or conclusions. Do not let fit improvement alone decide the
+operational model.</li>
 </ol>
 <p>After fitting candidates, <code>build_model_choice_review()</code>
 places the reported step/slope coordinate counts, identified
 free-parameter counts, and each fit’s stored readiness decision in
-<code>review$model_roles</code>. Read those fields before the
-information criteria: a more flexible fit that is not inference-ready
-cannot become the selected operational model through AIC or BIC
-alone.</p>
+<code>review$model_roles</code>. IC comparison has a separate
+<code>ICFitEligible</code> solution check and final
+<code>ICComparable</code> decision. Passing them does not authorize
+slope intervals; a PCM/GPCM LRT additionally needs verified nesting and
+an explicit <code>nested = TRUE</code> request. A preferred IC candidate
+does not by itself determine an operational scoring policy.</p>
 <p>This sequence keeps the interpretation aligned with the validation
 boundary: <code>RSM</code>/<code>PCM</code> support the full
-manuscript/reporting route, while bounded <code>GPCM</code> supports the
+manuscript/reporting route, while <code>GPCM</code> supports the
 documented direct and caveated routes.</p>
 </div>
 <div id="analyses-not-provided-by-mfrmr" class="section level2">
@@ -590,8 +835,8 @@ documented direct and caveated routes.</p>
 <p>Posterior-predictive checks and <code>MCMC</code> estimation are not
 provided by mfrmr. Use external Bayesian software when those analyses
 are required. They are not needed for the quadrature-based
-<code>MML</code> route or for the bounded <code>GPCM</code> workflows
-described here.</p>
+<code>MML</code> route or for the <code>GPCM</code> workflows described
+here.</p>
 </div>
 <div id="recommended-expert-reading-of-package-output" class="section level2">
 <h2>Recommended Expert Reading Of Package Output</h2>
@@ -622,7 +867,7 @@ algorithm</em>. Psychometrika, 46, 443-459.</li>
 <li>Haberman, S. J., &amp; Sinharay, S. (2013). <em>Generalized
 residuals for general models for contingency tables with application to
 item response theory</em>. Journal of the American Statistical
-Association, 108, 1435-1444.</li>
+Association, 108, 1435-1444. <a href="https://doi.org/10.1080/01621459.2013.835660" class="uri">https://doi.org/10.1080/01621459.2013.835660</a>.</li>
 <li>Eckes, T. (2005). <em>Examining rater effects in TestDaF writing and
 speaking performance assessments: A many-facet Rasch analysis</em>.
 Language Assessment Quarterly, 2, 197-221.</li>

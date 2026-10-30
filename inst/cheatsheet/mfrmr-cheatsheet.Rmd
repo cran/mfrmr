@@ -6,7 +6,7 @@ output:
     latex_engine: xelatex
     fig_width: 5
     fig_height: 3
-geometry: landscape, margin=0.4in
+geometry: landscape, margin=0.4in, footskip=0.2in
 ---
 
 ```{r setup, include=FALSE}
@@ -20,8 +20,15 @@ knitr::opts_chunk$set(
 
 A compact reference for the data review / fit / summary / plot / diagnose /
 report loop in mfrmr.
+Use `plot()` on fitted models or saved analysis results. For old `plot_*()`
+calls, use `help("mfrmr_plot_migration")`; the 33 drawing helpers are internal
+in 0.2.4.
 Every snippet assumes `library(mfrmr)` and a long-format
 `data.frame` with `Person`, one or more facet columns, and `Score`.
+The main route below is ordinary RSM/PCM; optional snippets require their
+named study inputs. For a complete first analysis, use
+`vignette("mfrmr-workflow", package = "mfrmr")`; for equations and references,
+open `help("mfrmr_methods_reference")`.
 
 ## 1. Check data roles, score support, and missing codes
 
@@ -30,20 +37,23 @@ toy <- load_mfrmr_data("example_operational")
 
 data_review <- describe_mfrm_data(
   toy, person = "Person", facets = c("Rater", "Criterion"),
-  score = "Score", rating_min = 1, rating_max = 4
+  score = "Score", rating_min = 1, rating_max = 4, category_policy = "preserve"
 )
 summary(data_review)
 
-# Declare only codes that mean missing in the study.
+# Declare missing SCORE codes; preserve IDs with the same text.
+clean_data <- recode_missing_codes(dirty_data, columns = "Score",
+                                 codes = c(99, 999, -1, "N/A", ""))
 dirty_review <- describe_mfrm_data(
-  dirty_data, "Person", c("Rater", "Criterion"), "Score",
-  missing_codes = c(99, 999, -1, "N/A", "")
+  clean_data, "Person", c("Rater", "Criterion"), "Score",
+  rating_min = 1, rating_max = 4, category_policy = "preserve"
 )
 ```
 
 Confirm retained and zero-count categories and inspect the score map. Use the
-same `rating_min`, `rating_max`, `keep_original`, and `missing_codes` decisions
-in `fit_mfrm()`.
+same cleaned data, rubric bounds and `category_policy` in `fit_mfrm()`.
+Supply your own `expected_design` when the assignment roster is known;
+missing rows cannot be counted from column missingness alone.
 
 \newpage
 
@@ -58,15 +68,18 @@ fit <- fit_mfrm(
   method = "MML",          # recommended starting method
   model  = "RSM",          # use PCM/GPCM only with a model rationale
   rating_min = 1,
-  rating_max = 4
+  rating_max = 4, category_policy = "preserve"
 )
 ```
 
-For PCM, set the step facet explicitly when its role is not unambiguous. Treat
-bounded GPCM as a slope-aware sensitivity extension and read
-`gpcm_capability_matrix()` before using downstream helpers.
+For PCM, choose an explicit `step_facet` from the rubric and question.
+For GPCM, read `gpcm_capability_matrix()` before using downstream helpers:
+one slope owner and two slope families have different estimation and output
+routes. The former "bounded GPCM" label described implementation scope,
+not a distinct model or a finite slope box. Two-family GPCM and corrected JML
+do not support the ordinary diagnostic and Wright-map calls below.
 
-## 3. Read summaries, then draw the required Wright map
+## 3. Read summaries, then choose the Wright display
 
 ```{r inspect}
 fit_summary <- summary(fit, profile = "fit", detail = "brief")
@@ -83,7 +96,10 @@ plot(res, type = "wright", renderer = "native",
 
 Read optimizer status and terminal-gradient guidance before interpreting
 estimates. The native map is the primary result because it keeps facet
-uncertainty and fitted step locations visible.
+uncertainty and fitted step locations visible. MML Person uncertainty is
+posterior SD; facet SEs describe structural parameters. High rater separation
+reliability means distinguishable severities, not agreement. Low separation
+can also reflect poor precision; strata is not a set of discovered groups.
 
 ## 4. Add only the diagnostics needed for the question
 
@@ -113,16 +129,26 @@ ft   <- as_flextable(tbl)   # Word / PowerPoint via flextable
 ```{r bias}
 bias <- estimate_bias(fit, diag, facet_a = "Rater", facet_b = "Criterion")
 summary(bias)
-plot_bias_interaction(bias, plot = "ranked", show_ci = TRUE)
+plot(bias, type = "bias", view = "ranked", show_ci = TRUE)
 
 # Requires a study data frame containing the named grouping column.
 dff <- analyze_dff(fit, diagnostics = diag,
                    facet = "Rater", group = "Group", data = your_data)
-plot_dif_summary(dff)
+plot(dff, type = "summary")
 
-eq <- analyze_facet_equivalence(fit, facet = "Rater", ci_level = 0.95)
-plot_facet_equivalence(eq, type = "forest")
+# Requires inference-ready MML and unregularized joint covariance.
+# Choose the practical bound before inspecting equivalence results.
+eq <- analyze_facet_equivalence(fit, facet = "Rater",
+                                equivalence_bound = 0.5, ci_level = 0.95)
+plot(eq, type = "facet_equivalence", view = "forest")
 ```
+
+Bias screens hold calibration fixed; their displayed intervals do not
+propagate structural-parameter uncertainty. Equivalence uses its separate
+joint-covariance checks. A flag or overlapping individual intervals is not
+a test that two raters are interchangeable.
+
+\newpage
 
 ## 7. Hierarchical structure and small-N review
 
@@ -133,14 +159,19 @@ summary(review)
 icc <- compute_facet_icc(
   toy, facets = c("Rater", "Criterion"),
   score = "Score", person = "Person",
-  ci_method = "profile"      # "boot" for parametric bootstrap CI
+  ci_method = "boot", ci_boot_seed = 2026
 )
 
 h <- analyze_hierarchical_structure(
   toy, facets = c("Rater", "Criterion"),
-  ci_method = "profile"
+  ci_method = "boot", ci_boot_seed = 2026
 )
 ```
+
+Read `ICC_CI_Status` and `attr(icc, "icc_ci")` before reporting intervals.
+Bootstrap intervals require the fitted Gaussian model and complete, converged
+refits without warnings. The former `"profile"` method is no longer supported;
+rerun saved interval analyses with the original data and settings.
 
 ## 8. Empirical-Bayes shrinkage for small-N facets
 
@@ -154,23 +185,66 @@ shrinkage_report(fit_eb)
 fit_eb2 <- apply_empirical_bayes_shrinkage(fit)
 ```
 
-## 9. Plot surface (selected)
+\newpage
+
+## 9. G theory: components, future plans and plots
+
+G/D studies analyze observed scores and their assignment design; they do not
+require an MFRM fit. Here V and W are two fixed score components, and Task is
+random. Choose weights before comparing plans.
+
+```{r gtheory}
+tasks <- read.csv(system.file("extdata", "mgenova-table12.csv", package = "mfrmr"))
+g <- mfrm_multivariate_gstudy(tasks, scores = c("V", "W"),
+                            person = "Person", task = "Task", rater = NULL)
+plot(g, score = c("V", "W"), ncol = 2, preset = "monochrome")
+d <- mfrm_multivariate_d_study(g, design_grid = data.frame(Tasks = c(6, 12)),
+                              weights = c(V = .5, W = .5))
+summary(d) # Read G/Phi and SEM status columns as well as their values
+p <- plot(d, type = "coefficients", preset = "monochrome")
+plot_data(p, "notes")
+saveRDS(list(gstudy = g, dstudy = d, figure = p), "g-study.rds")
+saved_g <- readRDS("g-study.rds")
+summary(saved_g$dstudy)
+```
+
+G concerns relative ordering; Phi concerns absolute score levels. SEMs are
+in original score units. The highest interaction and residual share a
+component when they cannot be separated. Raw negative components remain
+visible. Component plots have no component SEs or confidence intervals;
+paired plan-difference intervals have a separate normal-theory scope.
+See `vignette("mfrmr-gtheory", package = "mfrmr")` for crossed/nested designs,
+covariance heatmaps, color, D-study curves and facet-count panels. The older
+`mfrm_generalizability()` route uses a different main-effects decomposition.
+
+\newpage
+
+## 10. Plot surface (selected)
 
 | Function | Purpose |
 |---|---|
 | `plot(fit)` | Wright map (default) |
-| `plot_wright_unified(fit, renderer="facets")` | Optional FACETS-style `*` ruler; visual convention only |
+| `plot(fit_rsm, comparison = fit_pcm, type = "ccc", view = "difference")` | Conditional probability differences; paired Wright views also available |
+| `plot(fit, type = "wright", view = "unified", renderer="facets")` | Optional FACETS-style `*` ruler; visual convention only |
 | `plot(fit, type="fit_pathway", diagnostics=diag, include_person=TRUE)` | Infit-vs-measure pathway; person rows opt-in |
-| `plot_threshold_ladder(fit)` | Category threshold ordering |
-| `plot_person_fit(fit, diag)` | Per-person Infit/Outfit bubble |
-| `plot_rater_severity_profile(fit, diag)` | Rater ranking + CI bands |
-| `plot_bias_interaction(bias, plot="heatmap")` | Bias cell heatmap |
-| `plot_displacement(fit, show_ci=TRUE)` | Anchor displacement lollipop |
-| `plot_fair_average(fit, show_ci=TRUE)` | Fair averages; CIs for Rasch-family fits |
-| `plot_anchor_drift(drift, type="forest")` | Wave-level anchor CI forest |
-| `plot(chain, type="graph")` | Bipartite wave/anchor graph |
+| `plot(fit, type = "thresholds")` | Category threshold ordering |
+| `plot(fit, type = "person_fit", diagnostics = diag)` | Per-person Infit/Outfit bubble |
+| `plot(fit, type = "rater_severity", diagnostics = diag)` | Rater ranking + CI bands |
+| `plot(bias, type = "bias", view ="heatmap")` | Bias cell heatmap |
+| `plot(fit, type = "displacement", show_ci=TRUE)` | Anchor displacement lollipop |
+| `plot(fit, type = "fair_average", show_ci=TRUE)` | Fair-score diagnostic intervals; full-refit coverage unverified |
+| `plot(drift, type="forest")` | Wave-level anchor CI forest |
+| `plot(chain, type="graph")` | Wave/common-element graph with per-link screening |
+| `plot(chain, type="links")` | Recorded wave links; counts of retained elements |
+| `plot(chain, type="anchor_removal")` | Newly disconnected wave pairs after each common-element deletion; no refitting |
+| `plot(chain, type="offset_sensitivity")` | Rescreened offset changes after deletion; source estimates/SEs fixed |
 
-## 10. Reproducibility and export
+Titles and cautions are returned as metadata by default. Save the plot object
+and read `plot_data(p, "notes")`; keep its caveats with the figure when exporting.
+
+\newpage
+
+## 11. Reproducibility and export
 
 ```{r export}
 # The default warning reminds you that this does not deidentify the files.
@@ -186,7 +260,7 @@ manifest <- build_mfrm_manifest(fit, diagnostics = diag)
 replay_script <- build_mfrm_replay_script(fit, path = "replay_mfrmr.R")
 ```
 
-## 11. FACETS and ConQuest users
+## 12. FACETS and ConQuest users
 
 - Keep the native Wright map with available facet uncertainty as the primary
   mfrmr display. Use
@@ -198,10 +272,7 @@ rubric_labels <- setNames(
   your_rubric_labels,
   fit$prep$score_map$OriginalScore
 )
-plot_wright_unified(
-  fit, renderer = "facets", show_ci = FALSE,
-  category_labels = rubric_labels
-)
+plot(fit, type = "wright", view = "unified", renderer = "facets", show_ci = FALSE, category_labels = rubric_labels)
 ```
 
 - Use `facets_feature_coverage()` for feature-by-feature alternatives.

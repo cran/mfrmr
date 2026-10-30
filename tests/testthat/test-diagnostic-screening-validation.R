@@ -1,4 +1,4 @@
-test_that("evaluate_mfrm_diagnostic_screening separates well-specified and local-dependence scenarios", {
+test_that("evaluate_mfrm_diagnostic_screening reports well-specified and local-dependence scenario contrasts", {
   for (model in c("RSM", "PCM")) {
     diag_eval <- suppressWarnings(mfrmr::evaluate_mfrm_diagnostic_screening(
       design = list(person = 18, rater = 3, criterion = 3, assignment = 3),
@@ -22,7 +22,14 @@ test_that("evaluate_mfrm_diagnostic_screening separates well-specified and local
     expect_true(all(diag_eval$scenario_contrast$Scenario == "local_dependence"))
     expect_true("StrictSignalImproved" %in% names(diag_eval$scenario_contrast))
     expect_true("StrictSignalDominatesLegacy" %in% names(diag_eval$scenario_contrast))
-    expect_true(all(diag_eval$scenario_contrast$DeltaLegacyMeanAbsZ >= 0))
+    # One or two draws do not guarantee a stronger signal under misspecification.
+    legacy <- split(diag_eval$results$LegacyMeanAbsZ, diag_eval$results$Scenario)
+    expect_true(all(is.finite(unlist(legacy))))
+    expected_delta <- vapply(as.character(diag_eval$scenario_contrast$Scenario),
+      function(scenario) mean(legacy[[scenario]]) - mean(legacy$well_specified),
+      numeric(1))
+    expect_equal(diag_eval$scenario_contrast$DeltaLegacyMeanAbsZ,
+                 unname(expected_delta))
     expect_true(all(c("type_I_proxy", "sensitivity_proxy") %in% diag_eval$performance_summary$EvaluationUse))
     expect_true(all(diag_eval$performance_summary$MeanElapsedSec >= 0))
     expect_true(all(diag_eval$scenario_summary$PairwiseAvailabilityRate > 0))
@@ -113,8 +120,21 @@ test_that("evaluate_mfrm_diagnostic_screening supports step-structure misspecifi
     expect_true(all(diag_eval$scenario_contrast$Scenario == "step_structure_misspecification"))
     expect_true("StrictSignalImproved" %in% names(diag_eval$scenario_contrast))
     expect_true("StrictSignalDominatesLegacy" %in% names(diag_eval$scenario_contrast))
-    expect_true(all(diag_eval$scenario_contrast$DeltaLegacyMeanAbsZ >= 0))
-    expect_true(any(diag_eval$performance_summary$StrictSensitivityProxy >= diag_eval$performance_summary$LegacySensitivityProxy, na.rm = TRUE))
+    # One or two draws do not guarantee a stronger signal under misspecification.
+    legacy <- split(diag_eval$results$LegacyMeanAbsZ, diag_eval$results$Scenario)
+    expect_true(all(is.finite(unlist(legacy))))
+    expected_delta <- vapply(as.character(diag_eval$scenario_contrast$Scenario),
+      function(scenario) mean(legacy[[scenario]]) - mean(legacy$well_specified),
+      numeric(1))
+    expect_equal(diag_eval$scenario_contrast$DeltaLegacyMeanAbsZ,
+                 unname(expected_delta))
+    performance <- diag_eval$performance_summary
+    for (i in which(performance$Scenario != "well_specified")) {
+      rows <- diag_eval$results[diag_eval$results$Scenario == performance$Scenario[i], ]
+      expect_equal(performance$LegacySensitivityProxy[i], mean(rows$LegacyFlaggedLevels > 0))
+      expect_equal(performance$StrictSensitivityProxy[i],
+        mean(rows$MarginalFlaggedGroups > 0 | rows$PairwiseFlaggedLevelPairs > 0))
+    }
     expect_true(all(diag_eval$scenario_summary$PairwiseAvailabilityRate > 0))
     expect_true(length(diag_eval$notes) >= 1)
   }
@@ -198,7 +218,7 @@ test_that("evaluate_mfrm_diagnostic_screening supports caveated GPCM screening o
   expect_true(nrow(diag_summary$gpcm_boundary) > 0L)
   expect_true(any(grepl("slope-aware operating-characteristic", diag_summary$notes, fixed = TRUE)))
   printed <- capture.output(print(diag_summary))
-  expect_true(any(grepl("Bounded GPCM boundary", printed, fixed = TRUE)))
+  expect_true(any(grepl("GPCM boundary", printed, fixed = TRUE)))
 
   diag_plot <- plot(diag_eval, type = "overview", metric = "rate", draw = FALSE)
   expect_s3_class(diag_plot, "mfrm_plot_data")

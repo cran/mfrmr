@@ -2,7 +2,7 @@
 % Please edit documentation in R/datasets.R
 \name{load_mfrmr_data}
 \alias{load_mfrmr_data}
-\title{Load a packaged simulation dataset}
+\title{Load a packaged ordered-response MFRM dataset}
 \usage{
 load_mfrmr_data(
   name = c("example_core", "example_bias", "example_operational", "study1", "study2",
@@ -15,14 +15,21 @@ omitted, the backward-compatible default is \code{"example_core"}; new code
 should pass a key explicitly.}
 }
 \value{
-A data.frame in long format.
+A data.frame in long format: each row is one rating, not one Person.
 }
 \description{
-Load a packaged simulation dataset
+Load a packaged ordered-response MFRM dataset
 }
 \details{
-\code{load_mfrmr_data("<key>")} is the canonical loader for the packaged
-datasets and the entry point used across the package help and
+For a first MFRM analysis, run
+\code{ratings <- load_mfrmr_data("example_operational")}. This reads data already
+included in mfrmr; no CSV, download or data-generation code is needed.
+\code{ratings} is a name you choose for the returned table. It is not a second
+dataset to create. Older examples may name the same object \code{toy} or \code{d}.
+Start by reading \code{head(ratings)}, \code{names(ratings)} and \code{table(ratings$Score)}.
+
+\code{load_mfrmr_data("<key>")} is the canonical loader for packaged
+ordered-response MFRM datasets and the entry point used across the package help and
 vignettes. The equivalent base-R alternative
 \code{data("<object-name>", package = "mfrmr")} remains available for users
 who prefer the full \code{data()} spelling; both paths return identical
@@ -32,6 +39,11 @@ All returned datasets include the core long-format columns
 \code{Study}, \code{Person}, \code{Rater}, \code{Criterion}, and \code{Score}.
 Some datasets, such as the packaged documentation examples, also include
 auxiliary variables like \code{Group} for DIF/bias demonstrations.
+The supplied ratings are synthetic teaching data, not empirical records.
+For observed-score G-theory examples with multiple score columns, see
+\link{mfrmr_gtheory_data}; for agreement examples, see \link{mfrmr_agreement_data}.
+Those datasets use \code{data()} because their row/column roles differ from the
+ordered-response MFRM tables returned here.
 }
 \section{Interpreting output}{
 
@@ -53,12 +65,17 @@ fit is interpretable.
 }
 
 \examples{
-data("mfrmr_example_operational", package = "mfrmr")
-head(mfrmr_example_operational)
+library(mfrmr)
 
-d <- load_mfrmr_data("example_operational")
-table(d$Rater)
-table(d$Criterion, d$Score)
+# Load synthetic ratings and inspect their columns and score frequencies
+ratings <- load_mfrmr_data("example_operational")
+head(ratings)
+names(ratings)
+table(ratings$Score)
+
+# Optional: base R's data() loads the same dataset under its full name
+data("mfrmr_example_operational", package = "mfrmr")
+identical(ratings, mfrmr_example_operational) # TRUE: both contain the same data
 }
 \seealso{
 \code{\link[=list_mfrmr_data]{list_mfrmr_data()}}, \link{ej2021_data}

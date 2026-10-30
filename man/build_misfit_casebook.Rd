@@ -2,6 +2,7 @@
 % Please edit documentation in R/api-advanced.R
 \name{build_misfit_casebook}
 \alias{build_misfit_casebook}
+\alias{summary.mfrm_misfit_casebook}
 \title{Build a case-level misfit review bundle}
 \usage{
 build_misfit_casebook(
@@ -13,11 +14,15 @@ build_misfit_casebook(
   wave_id = NULL,
   top_n = 25
 )
+
+\method{summary}{mfrm_misfit_casebook}(object, digits = 3, top_n = 10, ...)
 }
 \arguments{
 \item{fit}{Output from \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
-\item{diagnostics}{Optional output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.}
+\item{diagnostics}{Optional output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.
+Must match this fitted analysis; see \link{mfrmr_compatibility_layer} for
+migration of saved diagnostics.}
 
 \item{unexpected}{Optional output from \code{\link[=unexpected_response_table]{unexpected_response_table()}}.}
 
@@ -30,10 +35,20 @@ outputs when supplied.}
 \item{wave_id}{Optional scalar identifier for the current wave or occasion.
 It is stored in row-level provenance and summary outputs when supplied.}
 
-\item{top_n}{Maximum number of rows to keep in compact summary outputs.}
+\item{top_n}{For \code{build_misfit_casebook()}: Maximum number of rows to keep in compact summary outputs.
+
+For \code{summary()}: Number of top case rows to keep in the compact summary.}
+
+\item{object}{Output from \code{\link[=build_misfit_casebook]{build_misfit_casebook()}}.}
+
+\item{digits}{Number of digits for printed numeric values.}
+
+\item{...}{Reserved for generic compatibility.}
 }
 \value{
 An object of class \code{mfrm_misfit_casebook}.
+
+For \code{summary()}: An object of class \code{summary.mfrm_misfit_casebook}.
 }
 \description{
 Build a case-level misfit review bundle
@@ -59,6 +74,8 @@ includes stable grouping views such as \code{by_person}, \code{by_facet_level},
 \code{by_source_family}, and \code{by_wave} to support operational triage. The
 \code{source_support} component records which evidence families are currently
 supported, caveated, or deferred under the active model.
+
+\code{summary()} method: Summarize a misfit-casebook object
 }
 \section{Recommended input route}{
 
@@ -72,13 +89,23 @@ yourself when you want custom thresholds before synthesizing the casebook.
 
 \section{GPCM boundary}{
 
-For bounded \code{GPCM}, the helper is available with caveat. The casebook inherits
+For \code{GPCM}, the helper is available with caveat. The casebook inherits
 exploratory screening semantics from the underlying residual and strict
 marginal sources; it should not be read as a formal inferential case test.
 }
 
+\section{Saved-result reuse}{
+
+Supplied screening results must describe this fitted analysis. Results from
+another fit or older results without identity metadata are refused. See
+\link{mfrmr_compatibility_layer} to recreate them from the saved fit and matching
+diagnostics without refitting the model.
+}
+
 \examples{
-\donttest{
+# Long-running workflow; run explicitly when needed.
+# example("build_misfit_casebook", run.dontrun = TRUE)
+\dontrun{
 toy <- load_mfrmr_data("example_core")
 # A balanced slice retains every Rater and Criterion while running quickly.
 toy <- toy[toy$Person \%in\% unique(toy$Person)[1:12], , drop = FALSE]
@@ -92,6 +119,8 @@ casebook$top_cases
 }
 \seealso{
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=unexpected_response_table]{unexpected_response_table()}},
-\code{\link[=displacement_table]{displacement_table()}}, \code{\link[=plot_unexpected]{plot_unexpected()}}, \code{\link[=plot_displacement]{plot_displacement()}},
-\code{\link[=plot_marginal_fit]{plot_marginal_fit()}}, \code{\link[=plot_marginal_pairwise]{plot_marginal_pairwise()}}
+\code{\link[=displacement_table]{displacement_table()}}, \link[=plot.mfrm_fit]{plot(x, type = "unexpected")}, \link[=plot.mfrm_fit]{plot(x, type = "displacement")},
+\link[=plot.mfrm_fit]{plot(x, type = "marginal_fit")}, \link[=plot.mfrm_fit]{plot(x, type = "marginal_pairwise")}
+
+\code{\link[=build_misfit_casebook]{build_misfit_casebook()}}
 }

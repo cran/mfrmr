@@ -84,7 +84,7 @@ and for inspecting incomplete but connected assignment.
 \item Use \code{mfrmr_example_core} for fast, idealized checks and examples that
 specifically require complete crossing.
 \item Use \code{mfrmr_example_bias} for \code{\link[=analyze_dff]{analyze_dff()}}, \code{\link[=analyze_dif]{analyze_dif()}}, \code{\link[=dif_interaction_table]{dif_interaction_table()}},
-\code{\link[=plot_dif_heatmap]{plot_dif_heatmap()}}, and \code{\link[=estimate_bias]{estimate_bias()}}.
+\link[=plot.mfrm_dif]{plot(x, type = "heatmap")}, and \code{\link[=estimate_bias]{estimate_bias()}}.
 }
 
 All three objects can be loaded either with \code{\link[=load_mfrmr_data]{load_mfrmr_data()}} or directly

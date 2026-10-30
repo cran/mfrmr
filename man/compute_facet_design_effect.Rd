@@ -2,49 +2,66 @@
 % Please edit documentation in R/api-hierarchical-audit.R
 \name{compute_facet_design_effect}
 \alias{compute_facet_design_effect}
-\title{Compute Kish design effects for each facet}
+\title{Compute descriptive design-effect approximations for each facet}
 \usage{
 compute_facet_design_effect(
   data,
   facets,
   icc_table = NULL,
   score = NULL,
-  person = NULL
+  person = NULL,
+  missing = c("error", "omit")
 )
 }
 \arguments{
-\item{data}{Data frame in long format.}
+\item{data}{Data frame in long format, used to fit the ICC model when
+\code{icc_table} is \code{NULL}. With a supplied ICC table, sample sizes come from
+its retained row accounting, not from \code{data}.}
 
 \item{facets}{Character vector of facet column names.}
 
 \item{icc_table}{Output from \code{\link[=compute_facet_icc]{compute_facet_icc()}} (optional; will be
-computed on the fly when \code{NULL}).}
+computed on the fly when \code{NULL}). Must retain its \code{data_usage} attribute.
+Rerun older saved ICC results from their original data and settings before
+calculating design effects; their analysis sample cannot be reconstructed
+from the ICC table alone.}
 
 \item{score}{Score column name; required when \code{icc_table} is \code{NULL}.}
 
 \item{person}{Person column; passed through to compute_facet_icc().}
+
+\item{missing}{Missing-value policy passed to \code{\link[=compute_facet_icc]{compute_facet_icc()}} when
+\code{icc_table} is \code{NULL}. A supplied table retains its original policy.}
 }
 \value{
 A data.frame of class \code{mfrm_facet_design_effect} with columns
-\code{Facet}, \code{AvgClusterSize}, \code{ICC}, \code{DesignEffect}, and \code{EffectiveN}.
+\code{Facet}, \code{AvgClusterSize}, \code{ICC}, \code{DesignEffect}, \code{EffectiveN}, \code{InputRows},
+\code{UsedRows}, and \code{ExcludedRows}. Its \code{data_usage} attribute is retained
+from the ICC result. Cluster sizes and effective sample sizes use only
+rows included in that model.
 }
 \description{
 Combines per-facet average cluster size with ICC estimates to return
-the Kish (1965) design effect \code{Deff = 1 + (m - 1) * rho}, where \code{m}
+the Kish-style approximation \code{Deff = 1 + (m - 1) * rho}, where \code{m}
 is the average number of observations per facet element and \code{rho} is
-the ICC.
+the ICC variance share. Each facet is evaluated separately.
 }
 \section{Interpreting output}{
 
+The formula describes the variance inflation of an unweighted mean under
+a single clustering factor with equal cluster sizes, independent clusters,
+and common within-cluster correlation. This helper substitutes the average
+cluster size and one fitted facet variance share. It does not calculate
+the variance of a specified estimator under the full sampling design.
 \itemize{
-\item \code{Deff = 1}: facet behaves like simple random sampling; no
-clustering-induced variance inflation.
-\item \code{Deff > 1}: variance of the mean estimate is inflated by a factor
-of \code{Deff} relative to SRS. \code{EffectiveN = N / Deff} is the sample
-size one would need under SRS to achieve the same precision. For
-rater-mediated designs, \code{Deff} well above 1 on the Rater facet
-means rater-level clustering is noticeable; consider whether
-rater generalisation is warranted.
+\item \code{Deff = 1} means this approximation adds no inflation for that facet;
+it does not establish independence of observations or adequate precision.
+\item \code{Deff > 1} signals potential clustering influence under this approximation.
+\code{EffectiveN = UsedRows / Deff} is a descriptive equivalent row count,
+not a count of independent Persons or an assurance of matching precision.
+\item Unequal cluster sizes, crossed or nested dependencies, sampling weights,
+and finite-population corrections are not accounted for. Per-facet values
+must not be added or multiplied to obtain an overall design effect.
 \item Reported \code{ICC} is pulled from \code{icc_table$ICC} (the variance share);
 interpretation is the same as in \code{\link[=compute_facet_icc]{compute_facet_icc()}}.
 }
@@ -56,14 +73,16 @@ interpretation is the same as in \code{\link[=compute_facet_icc]{compute_facet_i
 \item Run \code{\link[=compute_facet_icc]{compute_facet_icc()}} to get the variance-component shares.
 \item Feed the result and the data into
 \code{compute_facet_design_effect(data, facets, icc_table = icc)}.
-\item Use \code{Deff} as part of the Methods discussion when generalising
-over raters or sites. Large \code{Deff} values argue for reporting
-robust SEs or moving to a hierarchical model.
+\item Use these values to flag facets for design review. For standard errors,
+sample-size planning, or comparisons of precision, use an estimator
+and variance calculation that represent the actual design.
 }
 }
 
 \examples{
-\donttest{
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("compute_facet_design_effect", run.dontrun = TRUE)
+\dontrun{
 toy <- load_mfrmr_data("example_core")
 if (requireNamespace("lme4", quietly = TRUE)) {
   icc <- compute_facet_icc(toy, facets = c("Rater", "Criterion"),
@@ -72,16 +91,16 @@ if (requireNamespace("lme4", quietly = TRUE)) {
                                       facets = c("Rater", "Criterion"),
                                       icc_table = icc)
   print(deff)
-  # Large DesignEffect -> modest EffectiveN relative to raw N.
+  # Review clustering influence; EffectiveN is a descriptive row count.
 }
 }
 }
 \references{
 Kish, L. (1965). \emph{Survey Sampling}. New York: Wiley.
 
-Park, I., & Lee, H. (2001). The design effect: Do we know all about
-it? In \emph{Proceedings of the American Statistical Association, Survey
-Research Methods Section} (pp. 143-148).
+Park, I., & Lee, H. (2004). Design effects for the weighted mean and total
+estimators under complex survey sampling. \emph{Survey Methodology, 30}(2),
+183-193. \url{https://www150.statcan.gc.ca/n1/pub/12-001-x/2004002/article/7751-eng.pdf}
 }
 \seealso{
 \code{\link[=compute_facet_icc]{compute_facet_icc()}}, \code{\link[=analyze_hierarchical_structure]{analyze_hierarchical_structure()}}.

@@ -3,19 +3,71 @@
 # ---------- shared fixtures (computed once) ----------
 d1   <- load_mfrmr_data("study1")
 d2   <- load_mfrmr_data("study2")
-fit1 <- fit_mfrm(d1, person = "Person", facets = c("Rater", "Criterion"),
-                 score = "Score", method = "JML")
-fit2 <- fit_mfrm(d2, person = "Person", facets = c("Rater", "Criterion"),
-                 score = "Score", method = "JML")
+fit1 <- suppressWarnings(fit_mfrm(
+  d1, person = "Person", facets = c("Rater", "Criterion"),
+  score = "Score", method = "MML", quad_points = 7,
+  maxit = 100, reltol = 1e-9
+))
+fit2 <- suppressWarnings(fit_mfrm(
+  d2, person = "Person", facets = c("Rater", "Criterion"),
+  score = "Score", method = "MML", quad_points = 7,
+  maxit = 100, reltol = 1e-9
+))
 audit1 <- review_mfrm_anchors(d1, "Person", c("Rater", "Criterion"), "Score")
 
 # ================================================================
 # anchor_to_baseline
 # ================================================================
 
+test_that("MML refuses Person constraints rather than silently ignoring them", {
+  ratings <- load_mfrmr_data("example_core")
+  person_id <- unique(ratings$Person)[1]
+  for (model in c("RSM", "PCM", "GPCM")) {
+    args <- list(data = ratings, person = "Person", facets = c("Rater", "Criterion"),
+                 score = "Score", model = model, method = "MML", anchor_policy = "silent")
+    if (model != "RSM") args$step_facet <- "Criterion"
+    if (model == "GPCM") args$slope_facet <- "Rater"
+    # Use aliases accepted by the normalizer as well as the canonical schema.
+    direct <- data.frame(facet = "Person", element = person_id, value = 10)
+    grouped <- data.frame(Facet = "Person", Level = unique(ratings$Person),
+                          Group = "cohort", GroupValue = 10)
+    expect_error(do.call(fit_mfrm, c(args, list(anchors = direct))),
+                 "Person anchors and Person group anchors are not supported with MML")
+    expect_error(do.call(fit_mfrm, c(args, list(group_anchors = grouped))),
+                 "Person anchors and Person group anchors are not supported with MML")
+  }
+})
+
+test_that("JML still enforces direct and group Person constraints", {
+  ratings <- load_mfrmr_data("example_core")
+  people <- unique(ratings$Person)[1:3]
+  fit <- suppressWarnings(fit_mfrm(
+    ratings, "Person", c("Rater", "Criterion"), "Score", method = "JML",
+    anchors = data.frame(Facet = "Person", Level = people[1], Anchor = 0.4),
+    group_anchors = data.frame(Facet = "Person", Level = people[2:3],
+                              Group = "pair", GroupValue = 0.2)
+  ))
+  estimates <- setNames(fit$facets$person$Estimate, fit$facets$person$Person)
+  expect_equal(unname(estimates[people[1]]), 0.4, tolerance = 1e-12)
+  expect_equal(mean(estimates[people[2:3]]), 0.2, tolerance = 1e-12)
+})
+
+test_that("MML location anchors contribute to the whole-facet zero sum", {
+  ratings <- load_mfrmr_data("example_core")
+  fixed_rater <- unique(ratings$Rater)[1]
+  fit <- suppressWarnings(fit_mfrm(
+    ratings, "Person", c("Rater", "Criterion"), "Score", method = "MML",
+    anchors = data.frame(Facet = "Rater", Level = fixed_rater, Anchor = 0.7)
+  ))
+  raters <- subset(fit$facets$others, Facet == "Rater")
+  expect_equal(unname(raters$Estimate[raters$Level == fixed_rater]), 0.7,
+               tolerance = 1e-12)
+  expect_equal(sum(raters$Estimate[raters$Level != fixed_rater]), -0.7, tolerance = 1e-12)
+})
+
 test_that("anchor_to_baseline returns correct class and structure", {
   res <- suppressWarnings(
-    anchor_to_baseline(d2, fit1, person = "Person",
+    anchor_to_baseline(d2, fit2, person = "Person",
                        facets = c("Rater", "Criterion"),
                        score = "Score")
   )
@@ -41,8 +93,8 @@ test_that("anchor_to_baseline returns correct class and structure", {
 })
 
 test_that("anchor_to_baseline self-anchoring yields near-zero drift", {
-  # Anchor fit1 data to fit1 itself -> drift should be ~0
-  res <- anchor_to_baseline(d1, fit1, person = "Person",
+  # Anchor fit2 data to fit2 itself -> drift should be ~0
+  res <- anchor_to_baseline(d2, fit2, person = "Person",
                             facets = c("Rater", "Criterion"),
                             score = "Score")
 
@@ -62,54 +114,36 @@ test_that("anchor_to_baseline rejects non-mfrm_fit input", {
   )
 })
 
-test_that("fit_mfrm surfaces malformed anchor schemas instead of silently dropping them", {
-  toy <- load_mfrmr_data("example_core")
-  bad_anchors <- data.frame(
-    WrongFacet = "Rater",
-    WrongLevel = "R1",
-    WrongValue = 0,
-    stringsAsFactors = FALSE
-  )
-
-  expect_warning(
-    withCallingHandlers(
-      fit_mfrm(
-        toy,
-        person = "Person",
-        facets = c("Rater", "Criterion"),
-        score = "Score",
-        method = "JML",
-        maxit = 15,
-        anchors = bad_anchors,
-        anchor_policy = "warn"
-      ),
-      warning = function(w) {
-        if (grepl("Optimization convergence review did not produce", conditionMessage(w), fixed = TRUE)) {
-          invokeRestart("muffleWarning")
-        }
-      }
-    ),
-    "anchor_schema_mismatch"
-  )
+test_that("anchor_to_baseline refuses a nonready baseline fit", {
+  nonready <- fit2
+  nonready$readiness$fit$FitReadiness[1] <- "review"
+  nonready$readiness$fit$InferenceReady[1] <- FALSE
 
   expect_error(
-    fit_mfrm(
-      toy,
+    anchor_to_baseline(
+      d2,
+      nonready,
       person = "Person",
       facets = c("Rater", "Criterion"),
-      score = "Score",
-      method = "JML",
-      maxit = 15,
-      anchors = bad_anchors,
-      anchor_policy = "error"
+      score = "Score"
     ),
-    "anchor_schema_mismatch"
+    "not eligible for anchor export or reuse"
   )
+})
+
+test_that("fit_mfrm surfaces malformed anchor schemas instead of silently dropping them", {
+  toy <- load_mfrmr_data("example_core")
+  bad_anchors <- data.frame(WrongFacet = "Rater", WrongLevel = "R1", WrongValue = 0)
+  for (policy in c("warn", "error", "silent")) {
+    expect_error(fit_mfrm(toy, person = "Person", facets = c("Rater", "Criterion"),
+      score = "Score", method = "JML", maxit = 15, anchors = bad_anchors,
+      anchor_policy = policy), "Malformed anchor schema")
+  }
 })
 
 test_that("anchor_to_baseline S3 methods produce output", {
   res <- suppressWarnings(
-    anchor_to_baseline(d2, fit1, person = "Person",
+    anchor_to_baseline(d2, fit2, person = "Person",
                        facets = c("Rater", "Criterion"),
                        score = "Score")
   )
@@ -124,6 +158,7 @@ test_that("anchor_to_baseline S3 methods produce output", {
   # print methods produce output without error
   expect_output(print(res), "Anchored Fit Summary")
   expect_output(print(s), "Anchored Fit Summary")
+  expect_output(print(s), "check constraints, not stability")
 })
 
 # ================================================================
@@ -251,6 +286,9 @@ test_that("detect_anchor_drift S3 methods produce output", {
 
   expect_output(print(drift), "Anchor Drift Screen")
   expect_output(print(s), "Anchor Drift Screen")
+  printed <- paste(capture.output(print(s)), collapse = "\n")
+  expect_match(printed, "not tests of anchor invariance", fixed = TRUE)
+  expect_false(grepl("screened_common_element_alignment|review_screen", printed))
 })
 
 # ================================================================
@@ -273,6 +311,12 @@ test_that("build_equating_chain returns correct class and structure", {
                  "Offset_Method")
   expect_true(all(link_cols %in% names(chain$links)))
   expect_equal(nrow(chain$links), 1)  # 2 fits -> 1 link
+  expect_equal(chain$links$FromID, 1L)
+  expect_equal(chain$links$ToID, 2L)
+  expect_true(all(chain$element_detail$LinkID == 1L))
+  graph <- plot(chain, type = "graph", draw = FALSE)
+  expect_equal(graph$data$data$elements$Retained, chain$element_detail$Retained)
+  expect_equal(graph$data$data$elements$Flag, chain$element_detail$Flag)
 
   # cumulative has one row per wave
   expect_true(is.data.frame(chain$cumulative))
@@ -357,6 +401,9 @@ test_that("build_equating_chain S3 methods produce output", {
 
   expect_output(print(chain), "Screened Linking Chain")
   expect_output(print(s), "Screened Linking Chain")
+  printed <- paste(capture.output(print(s)), collapse = "\n")
+  expect_match(printed, "Offset_SD is residual spread", fixed = TRUE)
+  expect_false(grepl("screened_common_element_alignment|screened_linking_aid", printed))
 })
 
 # ================================================================
@@ -431,6 +478,9 @@ test_that("build_linking_review summary methods produce front-door output", {
   expect_output(print(review), "Linking Review Summary")
   expect_output(print(s), "Linking Review Summary")
   expect_output(print(s), "Plot Follow-up")
+  printed <- paste(capture.output(print(s)), collapse = "\n")
+  expect_match(gsub("\\s+", " ", printed), "covariance are not fully propagated", fixed = TRUE)
+  expect_false(grepl("insufficient_anchor_evidence|pre_fit_anchor_adequacy|supported_with_caveat|synthesis layer|package-native|opaque composite", printed))
 })
 
 test_that("build_linking_review rejects malformed inputs", {
@@ -444,7 +494,7 @@ test_that("build_linking_review rejects malformed inputs", {
   )
 })
 
-test_that("build_linking_review returns exploratory bounded GPCM source reviews", {
+test_that("build_linking_review returns exploratory GPCM source reviews", {
   toy <- load_mfrmr_data("example_core")
   gpcm_fit1 <- suppressWarnings(fit_mfrm(
     toy,
@@ -477,7 +527,7 @@ test_that("build_linking_review returns exploratory bounded GPCM source reviews"
   review <- build_linking_review(drift = drift_gpcm)
   expect_s3_class(review, "mfrm_linking_review")
   expect_identical(review$settings$intended_use, "exploratory_gpcm_linking_review")
-  expect_true(any(review$support_status$Scope == "bounded GPCM" &
+  expect_true(any(review$support_status$Scope == "GPCM" &
                     review$support_status$Status == "supported_with_caveat"))
   expect_true(any(grepl("exploratory", review$notes, ignore.case = TRUE)))
 })

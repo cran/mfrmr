@@ -173,6 +173,42 @@ test_that("data_quality_report flags facet-level category usage gaps", {
   expect_equal(p$data$top_n, 5L)
 })
 
+test_that("data_quality_report separates local range restriction from global score support", {
+  d <- mfrmr:::sample_mfrm_data(seed = 42)
+  r1 <- which(d$Rater == "R1")
+  other <- which(d$Rater != "R1")
+  d$Score[r1] <- rep(3:8, length.out = length(r1))
+  d$Score[other] <- rep(1:10, length.out = length(other))
+
+  fit <- suppressWarnings(
+    fit_mfrm(
+      d, "Person", c("Rater", "Task", "Criterion"), "Score",
+      method = "JML", maxit = 8,
+      rating_min = 1, rating_max = 10,
+      keep_original = TRUE
+    )
+  )
+  dq <- data_quality_report(
+    fit,
+    data = d,
+    person = "Person",
+    facets = c("Rater", "Task", "Criterion"),
+    score = "Score"
+  )
+  r1_summary <- dq$category_usage_summary[
+    dq$category_usage_summary$Facet == "Rater" &
+      dq$category_usage_summary$Level == "R1",
+    ,
+    drop = FALSE
+  ]
+
+  expect_false(any(dq$category_counts$ZeroCount))
+  expect_equal(r1_summary$ObservedCategories, 6L)
+  expect_equal(r1_summary$ZeroCategories, 4L)
+  expect_equal(r1_summary$IntermediateZeroCategories, 2L)
+  expect_identical(r1_summary$ReviewStatus, "warning")
+})
+
 test_that("data_quality_report flags facet levels with restricted response patterns", {
   d <- mfrmr:::sample_mfrm_data(seed = 42)
   d$Score[d$Rater == "R1"] <- 1L
@@ -895,18 +931,19 @@ test_that("bias_pairwise_report produces valid output", {
     expect_true(all(c("ContrastBasis", "SEBasis", "StatisticLabel", "ProbabilityMetric", "DFBasis") %in% names(bp$table)))
     expect_true(all(bp$table$StatisticLabel == "Bias-contrast Welch screening t"))
 
-    tgt_se_sq <- bp$table$`Target S.E.`^2
-    bias1 <- bp$table$`Local Measure1` - bp$table$`Target Measure`
-    bias2 <- bp$table$`Local Measure2` - bp$table$`Target Measure`
-    bias_se1_sq <- pmax(bp$table$SE1^2 - tgt_se_sq, 0)
-    bias_se2_sq <- pmax(bp$table$SE2^2 - tgt_se_sq, 0)
-    expected_contrast <- bias1 - bias2
-    expected_se <- sqrt(bias_se1_sq + bias_se2_sq)
-    naive_se <- sqrt(bp$table$SE1^2 + bp$table$SE2^2)
+    # Cell uncertainty is conditional on the baseline calibration. Match the
+    # original cells instead of subtracting target calibration variance.
+    key <- paste(.bias$table$FacetA_Level, .bias$table$FacetB_Level)
+    first <- match(paste(bp$table$Target, bp$table$Context1), key)
+    second <- match(paste(bp$table$Target, bp$table$Context2), key)
+    expected_contrast <- (.bias$table$`Bias Size`[first] -
+      .bias$table$`Bias Size`[second]) / bp$table$TargetSign
+    expected_se <- sqrt(.bias$table$`S.E.`[first]^2 + .bias$table$`S.E.`[second]^2)
 
     expect_equal(bp$table$Contrast, expected_contrast, tolerance = 1e-8)
+    expect_equal(bp$table$SE1, .bias$table$`S.E.`[first])
+    expect_equal(bp$table$SE2, .bias$table$`S.E.`[second])
     expect_equal(bp$table$SE, expected_se, tolerance = 1e-8)
-    expect_true(all(bp$table$SE <= naive_se + 1e-10, na.rm = TRUE))
   }
   s <- summary(bp)
   expect_s3_class(s, "summary.mfrm_bundle")
@@ -922,7 +959,7 @@ test_that("estimate_bias surfaces optimization failures instead of using zero-bi
 
   testthat::local_mocked_bindings(
     optimize = function(...) stop("forced optimize failure"),
-    .package = "stats"
+    .package = "mfrmr"
   )
 
   bias <- estimate_bias(
@@ -934,7 +971,11 @@ test_that("estimate_bias surfaces optimization failures instead of using zero-bi
 
   expect_true(all(bias$table$OptimizationStatus == "failed"))
   expect_true(all(grepl("forced optimize failure", bias$table$OptimizationDetail, fixed = TRUE)))
-  expect_true(all(is.na(bias$table$`Obs-Exp Average`)))
+  # A failed shift does not invalidate expectations from the baseline fit.
+  expect_true(all(is.finite(bias$table$`Obs-Exp Average`)))
+  expect_equal(bias$table$`Obs-Exp Average`,
+    (bias$table$`Observd Score` - bias$table$`Expctd Score`) / bias$table$`Observd Count`)
+  expect_true(all(is.na(bias$table$AfterBiasObsExpAverage)))
   expect_true(all(is.na(bias$table$`S.E.`)))
   expect_true(is.data.frame(bias$optimization_failures))
   expect_true(nrow(bias$optimization_failures) > 0)
@@ -1041,6 +1082,7 @@ test_that("APA precision cannot override blocked fit readiness", {
 })
 
 test_that("APA formal-inference decision requires precision support after fit gates pass", {
+  skip_if_not_installed("lpSolve")
   data <- load_mfrmr_data("example_core")
   fit <- suppressWarnings(fit_mfrm(
     data,
@@ -1295,13 +1337,17 @@ test_that("plot_qc_dashboard returns a plot bundle", {
 # ---- make_anchor_table ----
 
 test_that("make_anchor_table extracts anchors from fitted model", {
-  at <- make_anchor_table(.fit)
+  at <- make_anchor_table(.fit, readiness_policy = "review")
   expect_true(is.data.frame(at))
   expect_true(all(c("Facet", "Level") %in% names(at)))
 })
 
 test_that("make_anchor_table includes persons when requested", {
-  at <- make_anchor_table(.fit, include_person = TRUE)
+  at <- make_anchor_table(
+    .fit,
+    include_person = TRUE,
+    readiness_policy = "review"
+  )
   expect_true("Person" %in% at$Facet || nrow(at) > 0)
 })
 

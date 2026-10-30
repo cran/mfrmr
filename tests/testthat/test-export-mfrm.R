@@ -1,6 +1,6 @@
 # --------------------------------------------------------------------------
 # test-export-mfrm.R
-# Tests for export_mfrm(), as.data.frame.mfrm_fit()
+# Tests for export_mfrm_tables(), as.data.frame.mfrm_fit()
 # --------------------------------------------------------------------------
 
 # ---- Helper fit object ---------------------------------------------------
@@ -38,16 +38,16 @@ test_that("as.data.frame.mfrm_fit Level column is character", {
   expect_type(df$Level, "character")
 })
 
-# ---- 2. export_mfrm writes CSV files ------------------------------------
+# ---- 2. export_mfrm_tables writes CSV files ------------------------------------
 
-test_that("export_mfrm writes person and facet CSVs", {
+test_that("export_mfrm_tables writes person and facet CSVs", {
   fit <- local_fit()
   tmpdir <- tempfile("export_test_")
   dir.create(tmpdir)
   on.exit(unlink(tmpdir, recursive = TRUE), add = TRUE)
 
   expect_warning(
-    result <- export_mfrm(fit, output_dir = tmpdir, prefix = "test",
+    result <- export_mfrm_tables(fit, output_dir = tmpdir, prefix = "test",
                           tables = c("person", "facets")),
     "not a deidentified"
   )
@@ -68,13 +68,13 @@ test_that("export_mfrm writes person and facet CSVs", {
   expect_true("Estimate" %in% names(person_csv))
 })
 
-test_that("export_mfrm writes summary CSV", {
+test_that("export_mfrm_tables writes summary CSV", {
   fit <- local_fit()
   tmpdir <- tempfile("export_test_")
   dir.create(tmpdir)
   on.exit(unlink(tmpdir, recursive = TRUE), add = TRUE)
 
-  result <- export_mfrm(fit, output_dir = tmpdir, prefix = "test",
+  result <- export_mfrm_tables(fit, output_dir = tmpdir, prefix = "test",
                          tables = "summary", acknowledge_sensitive = TRUE)
   expect_equal(nrow(result), 1)
   expect_true(file.exists(result$Path[1]))
@@ -83,29 +83,29 @@ test_that("export_mfrm writes summary CSV", {
   expect_true(nrow(summary_csv) >= 1)
 })
 
-test_that("export_mfrm writes step CSV", {
+test_that("export_mfrm_tables writes step CSV", {
   fit <- local_fit()
   tmpdir <- tempfile("export_test_")
   dir.create(tmpdir)
   on.exit(unlink(tmpdir, recursive = TRUE), add = TRUE)
 
-  result <- export_mfrm(fit, output_dir = tmpdir, prefix = "test",
+  result <- export_mfrm_tables(fit, output_dir = tmpdir, prefix = "test",
                          tables = "steps", acknowledge_sensitive = TRUE)
   # Steps may or may not exist depending on model
   # but the function should not error
   expect_s3_class(result, "data.frame")
 })
 
-# ---- 3. export_mfrm with diagnostics ------------------------------------
+# ---- 3. export_mfrm_tables with diagnostics ------------------------------------
 
-test_that("export_mfrm enriches facets when diagnostics provided", {
+test_that("export_mfrm_tables enriches facets when diagnostics provided", {
   fit <- local_fit()
   diag <- suppressWarnings(diagnose_mfrm(fit, residual_pca = "none"))
   tmpdir <- tempfile("export_test_")
   dir.create(tmpdir)
   on.exit(unlink(tmpdir, recursive = TRUE), add = TRUE)
 
-  result <- export_mfrm(fit, diagnostics = diag, output_dir = tmpdir,
+  result <- export_mfrm_tables(fit, diagnostics = diag, output_dir = tmpdir,
                          prefix = "enriched", tables = c("facets", "measures"),
                          acknowledge_sensitive = TRUE)
   expect_true(nrow(result) >= 2)
@@ -120,30 +120,30 @@ test_that("export_mfrm enriches facets when diagnostics provided", {
 
 # ---- 4. overwrite protection --------------------------------------------
 
-test_that("export_mfrm refuses to overwrite by default", {
+test_that("export_mfrm_tables refuses to overwrite by default", {
   fit <- local_fit()
   tmpdir <- tempfile("export_test_")
   dir.create(tmpdir)
   on.exit(unlink(tmpdir, recursive = TRUE), add = TRUE)
 
-  export_mfrm(fit, output_dir = tmpdir, prefix = "ow", tables = "person",
+  export_mfrm_tables(fit, output_dir = tmpdir, prefix = "ow", tables = "person",
               acknowledge_sensitive = TRUE)
   expect_error(
-    export_mfrm(fit, output_dir = tmpdir, prefix = "ow", tables = "person",
+    export_mfrm_tables(fit, output_dir = tmpdir, prefix = "ow", tables = "person",
                 acknowledge_sensitive = TRUE),
     "already exists"
   )
 })
 
-test_that("export_mfrm overwrites when overwrite = TRUE", {
+test_that("export_mfrm_tables overwrites when overwrite = TRUE", {
   fit <- local_fit()
   tmpdir <- tempfile("export_test_")
   dir.create(tmpdir)
   on.exit(unlink(tmpdir, recursive = TRUE), add = TRUE)
 
-  export_mfrm(fit, output_dir = tmpdir, prefix = "ow", tables = "person",
+  export_mfrm_tables(fit, output_dir = tmpdir, prefix = "ow", tables = "person",
               acknowledge_sensitive = TRUE)
-  result <- export_mfrm(fit, output_dir = tmpdir, prefix = "ow",
+  result <- export_mfrm_tables(fit, output_dir = tmpdir, prefix = "ow",
                           tables = "person", overwrite = TRUE,
                           acknowledge_sensitive = TRUE)
   expect_equal(nrow(result), 1)
@@ -151,11 +151,11 @@ test_that("export_mfrm overwrites when overwrite = TRUE", {
 
 # ---- 5. Input validation ------------------------------------------------
 
-test_that("export_mfrm rejects non-mfrm_fit input", {
-  expect_error(export_mfrm("not_a_fit"), "mfrm_fit")
+test_that("export_mfrm_tables rejects non-mfrm_fit input", {
+  expect_error(export_mfrm_tables("not_a_fit"), "mfrm_fit")
 })
 
-test_that("export_mfrm rejects unknown table names", {
+test_that("export_mfrm_tables rejects unknown table names", {
   fit <- local_fit()
-  expect_error(export_mfrm(fit, tables = "invalid_table"), "Unknown table")
+  expect_error(export_mfrm_tables(fit, tables = "invalid_table"), "Unknown table")
 })

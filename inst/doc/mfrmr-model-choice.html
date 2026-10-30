@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Choose a model and estimator for your assessment</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Choose a model and estimator for your
+assessment</h1>
+
+
+<div id="TOC">
+<ul>
+<li><a href="#start-with-the-decision-you-need-to-make" id="toc-start-with-the-decision-you-need-to-make">Start with the
+decision you need to make</a></li>
+<li><a href="#choose-what-the-response-model-needs-to-explain" id="toc-choose-what-the-response-model-needs-to-explain">Choose what the
+response model needs to explain</a></li>
+<li><a href="#choose-how-person-ability-enters-estimation" id="toc-choose-how-person-ability-enters-estimation">Choose how Person
+ability enters estimation</a></li>
+<li><a href="#why-not-start-with-the-most-complex-model" id="toc-why-not-start-with-the-most-complex-model">Why not start with
+the most complex model?</a></li>
+<li><a href="#compare-conclusions-not-just-fit-statistics" id="toc-compare-conclusions-not-just-fit-statistics">Compare
+conclusions, not just fit statistics</a></li>
+<li><a href="#continue-to-the-analysis-and-reporting" id="toc-continue-to-the-analysis-and-reporting">Continue to the analysis
+and reporting</a></li>
+</ul>
+</div>
+
+<p>A useful model answers the assessment question with assumptions that
+the rating design and data can support. There is no single model that is
+best for every dataset, and the most flexible model is not automatically
+the safest. This guide explains the choices before you look up
+individual function arguments. For a runnable first analysis, follow the
+<a href="mfrmr-workflow.html">workflow tutorial</a>.</p>
+<p>Two choices matter. The <strong>model</strong> describes how ability,
+severity, category use and dependence generate ratings. The
+<strong>estimator</strong> determines how its parameters are estimated
+and how Person ability is handled. RSM, PCM and GPCM are model choices;
+JML, corrected JML, MML and CML are estimation choices. Changing the
+estimator does not repair an inappropriate response model.</p>
+<div id="start-with-the-decision-you-need-to-make" class="section level2">
+<h2>Start with the decision you need to make</h2>
+<p>Suppose judges rate performances using an ordered rubric. Decide
+whether the target is the severity of these judges, ability scores for
+performers, or the dependability of a future assessment. Those questions
+can require different analyses even when the input ratings are
+identical.</p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Your question</th>
+<th>Route to consider</th>
+<th>What makes it appropriate</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>How much stricter are these particular judges, after allowing for
+the tasks?</td>
+<td>Fixed-facet RSM or PCM; consider CML if structural comparisons are
+the main target.</td>
+<td>Estimates named effects or identified differences. CML avoids
+specifying an ability distribution, but supplies no Person scores.</td>
+</tr>
+<tr class="even">
+<td>What are the performers’ abilities, and how do they vary in the
+target population?</td>
+<td>A suitable response model estimated by MML; explicitly choose fixed
+or estimated population parameters.</td>
+<td>MML uses a population distribution for calibration and posterior
+scoring. Its distributional assumptions are part of the analysis.</td>
+</tr>
+<tr class="odd">
+<td>Do different criteria or judges use the rubric categories
+differently?</td>
+<td>PCM with the relevant <code>step_facet</code>.</td>
+<td>Allows separate category-step patterns for that facet. A common
+pattern may be preferable when substantively credible and separate
+patterns are poorly informed.</td>
+</tr>
+<tr class="even">
+<td>Does the relationship between ability and ratings differ across
+criteria or judges?</td>
+<td>One-family GPCM with an explicit <code>slope_facet</code>; use MML
+for structural inference.</td>
+<td>Estimates relative discriminations. A high slope is not, by itself,
+evidence of a better or fairer judge.</td>
+</tr>
+<tr class="odd">
+<td>Are several ratings of the same performance related beyond the
+modeled ability and fixed effects?</td>
+<td>Person-specific testlet RSM, when its block structure matches the
+design.</td>
+<td>Models dependence within a Person’s block. Free GPCM slopes alone do
+not model that dependence.</td>
+</tr>
+<tr class="even">
+<td>Are the judges sampled from a population to which I want to
+generalize?</td>
+<td>Shared random-rater RSM, when that sampling and distribution model
+is credible.</td>
+<td>Estimates rater-population variation and shrunken effects for
+observed raters. These differ from fixed-judge severities.</td>
+</tr>
+<tr class="odd">
+<td>Would more judges or tasks improve the dependability of our reported
+score?</td>
+<td><a href="mfrmr-gtheory.html">G-study and D-study</a>.</td>
+<td>Studies variation in observed scores and specified future plans; no
+MFRM fit is required.</td>
+</tr>
+<tr class="even">
+<td>Did judges actually assign the same scores to the same
+performances?</td>
+<td><a href="mfrmr-rating-agreement.html">Rating agreement and score
+comparisons</a>.</td>
+<td>Agreement concerns observed scores. Small estimated severity
+differences do not establish agreement.</td>
+</tr>
+</tbody>
+</table>
+<p>These are starting choices, not automatic rules based on the number
+of rows. Use <code>describe_mfrm_data()</code> to inspect score
+categories and rating assignments. For example, if each judge works on a
+different task and no observations separate the two effects, a richer
+model cannot invent the missing comparison. More Persons can improve
+precision in supported directions while leaving that confounding intact.
+Missing or unassigned ratings are not zero scores.</p>
+<p>The package does not impose one minimum Person count for every task.
+Full RSM/PCM JML, CML and fixed-population MML can accept a single
+Person if their checks pass; other calibration routes retain an
+at-least-two-Person support limit. One-Person JML/MML requires
+<code>lpSolve</code> for a pre-fit recession check. Independent repeated
+ratings can sometimes identify a comparison within that Person, but
+copying the same rating does not create information. The results retain
+a single-Person caution: a finite point or model-information interval
+does not establish coverage or empirical between-Person variation.
+Person- cluster sandwich uncertainty is unavailable. Scoring a new
+Person against an existing calibration is a different task; see the <a href="mfrmr-portable-calibration.html">portable calibration
+tutorial</a>.</p>
+</div>
+<div id="choose-what-the-response-model-needs-to-explain" class="section level2">
+<h2>Choose what the response model needs to explain</h2>
+<p>Here, a <strong>facet</strong> is a modeled role such as Rater,
+Criterion or Task; its <strong>levels</strong> are the individual
+raters, criteria or tasks. The <strong>step owner</strong> is the facet
+whose levels receive separate transitions between adjacent categories.
+The <strong>slope owner</strong> supplies separate discriminations: how
+strongly the rating probabilities change with ability. Several facets
+still describe one latent ability dimension in these models.</p>
+<p>Severity and category use are different effects. A judge can be
+stricter overall while using the same relative step pattern as other
+judges; RSM already allows that severity difference. PCM is relevant
+when the step pattern itself differs after allowing for the modeled
+locations.</p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Model in mfrmr</th>
+<th>What it allows</th>
+<th>When the extra structure helps, and what it costs</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>RSM: rating-scale model</td>
+<td>Additive fixed facet locations and a shared category-step pattern;
+discrimination fixed at one.</td>
+<td>A useful starting model when the same rubric transitions and
+discrimination are credible. It pools information about steps, but can
+miss systematic differences in category use.</td>
+</tr>
+<tr class="even">
+<td>PCM: partial-credit model</td>
+<td>Separate step patterns for one selected facet; discrimination
+remains one.</td>
+<td>Useful when, for example, criteria have genuinely different
+transitions. Each separate pattern needs information; sparse category
+use can make it unstable or unestimable.</td>
+</tr>
+<tr class="odd">
+<td>One-family GPCM: generalized partial-credit model</td>
+<td>PCM structure plus positive relative slopes for one selected
+facet.</td>
+<td>Useful for a substantive discrimination question. Free slopes add
+uncertainty and affect score interpretation; ordinary total-score CML is
+unavailable. MML permits distinct step and slope owners; JML requires
+the same owner.</td>
+</tr>
+<tr class="even">
+<td>Two-family GPCM</td>
+<td>Two ordered slope families for exactly two non-Person facets, under
+the documented constraints.</td>
+<td>A provisional MML route for questions requiring both families. It
+needs a design that separates them and has a narrower set of supported
+outputs; it is still unidimensional.</td>
+</tr>
+<tr class="odd">
+<td>Person-specific testlet RSM</td>
+<td>An additional normally distributed effect shared by ratings in a
+block within a Person.</td>
+<td>Useful for the supported nonoverlapping block design. It adds a
+variance component and does not represent a rater effect shared across
+different Persons.</td>
+</tr>
+<tr class="even">
+<td>Shared random-rater RSM</td>
+<td>A normally distributed rater effect shared across Persons.</td>
+<td>Useful for a credible sampled-rater population. It changes the
+target and introduces shrinkage and a variance component. Current
+estimation uses a Laplace approximation for the shared rater
+effects.</td>
+</tr>
+</tbody>
+</table>
+<p>The extensions are not interchangeable. PCM step variation, GPCM
+discrimination variation, testlet dependence and random-rater variation
+answer different questions. The current testlet and random-rater
+functions fit their specified RSM extensions; they are not switches that
+can be added to every PCM or GPCM. See the <a href="mfrmr-gpcm-scope.html">GPCM scope guide</a>, <a href="mfrmr-testlets.html">testlet tutorial</a> and <a href="mfrmr-random-raters.html">random-rater tutorial</a> for the exact
+fitted models.</p>
+</div>
+<div id="choose-how-person-ability-enters-estimation" class="section level2">
+<h2>Choose how Person ability enters estimation</h2>
+<p>The main distinction is whether ability is estimated separately for
+each Person, integrated over a population distribution, or removed by
+conditioning. None of these choices guarantees valid uncertainty in an
+arbitrary small or sparse sample.</p>
+<table>
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Estimator</th>
+<th>Handling of Person ability</th>
+<th>Useful for</th>
+<th>Main limitation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>JML: joint maximum likelihood</td>
+<td>Estimates Person and structural parameters jointly.</td>
+<td>Joint point estimates and carefully matched FACETS comparisons.</td>
+<td>With a fixed number of ratings per Person, adding Persons also adds
+nuisance parameters. Structural bias need not disappear. Approximate
+location SEs do not supply generally valid structural confidence
+intervals.</td>
+</tr>
+<tr class="even">
+<td>Corrected JML</td>
+<td>Adjusts profile estimating equations at a specified finite
+correction order.</td>
+<td>The experimental shared-owner one-family GPCM point-estimation
+workflow.</td>
+<td>This is not a general RSM/PCM correction. Remaining bias can persist
+with fixed exposure; <code>RootSE</code> describes local root
+uncertainty, not a qualified interval for the true structural
+parameter.</td>
+</tr>
+<tr class="odd">
+<td>MML: marginal maximum likelihood</td>
+<td>Integrates over a declared ability-population model.</td>
+<td>Population parameters, latent regression, posterior Person scoring
+and supported structural inference, including GPCM.</td>
+<td>Misspecification of the population or response model can affect
+results. Numerical integration, identification, information and boundary
+checks also matter.</td>
+</tr>
+<tr class="even">
+<td>CML: conditional maximum likelihood</td>
+<td>Conditions on each Person’s observed total for the modeled response
+set, eliminating ability.</td>
+<td>RSM/PCM structural comparisons when an ability-distribution
+assumption is undesirable, especially with few ratings per Person.</td>
+<td>Does not estimate Person abilities or a population SD. All-minimum
+or all-maximum totals contribute no conditional structural information;
+sparse assignments can leave comparisons unidentified.</td>
+</tr>
+</tbody>
+</table>
+<p>For example, a Person with only maximum scores can have an infinite
+unanchored JML ability estimate. MML posterior scoring can give a finite
+score because it also uses the assumed population distribution; the CML
+calibration receives no conditional information from that extreme total.
+These different outputs do not show that one program found extra
+observations. They reflect different treatments of ability and different
+questions.</p>
+<p>CML’s distribution-free advantage concerns the <strong>ability
+distribution</strong>; it does not remove the response-model
+assumptions. Under a correct conditional model, independent Persons, an
+identified fixed-dimensional structural target and growing informative
+data, regular consistency and asymptotic normality can hold with the
+number of ratings per Person fixed. Conditional-information Wald
+intervals rely on those conditions and an interior finite solution. They
+are not exact small-sample intervals. Ability-dependent assignments or
+response-dependent stopping need separate justification; conditioning is
+not a blanket correction for an informative observation process. See <a href="https://doi.org/10.1111/j.2517-6161.1970.tb00842.x">Andersen
+(1970)</a> and <a href="https://doi.org/10.18637/jss.v020.i09">Mair and
+Hatzinger (2007)</a>.</p>
+<p>Why does this CML route stop at RSM/PCM? With unequal GPCM slopes,
+two response patterns with the same total can still have different
+relationships to ability. For example, scoring 1 then 0 and scoring 0
+then 1 both total one, but the probability of each pattern depends on
+which rating has the steeper slope. Conditioning on that total therefore
+does not remove ability. This is a limit of ordinary total-score
+conditioning, not a claim that no sufficient statistic can exist in any
+GPCM submodel; the <a href="mfrmr-gpcm-scope.html#why-total-score-conditioning-does-not-remove-ability">GPCM
+guide gives the calculation</a>.</p>
+<p>If the ability distribution may be skewed, CML is an attractive
+option for RSM/PCM structural comparisons when their conditional
+response assumptions are credible. If the question requires GPCM slopes
+or population ability parameters, switching to CML is not an available
+substitute. The MML distributional assumptions and sensitivity of the
+intended conclusion then need attention. More optimizer iterations or
+quadrature points improve numerical approximation; they do not remove
+distributional misspecification or fixed-exposure JML bias.</p>
+<div id="which-combinations-are-currently-implemented" class="section level3">
+<h3>Which combinations are currently implemented?</h3>
+<p>This table concerns estimation routes, not a promise that every
+diagnostic, interval or export is available for each route. A dash means
+the combination is not implemented, rather than that an attempted fit
+failed.</p>
+<table>
+<colgroup>
+<col width="20%" />
+<col width="20%" />
+<col width="20%" />
+<col width="20%" />
+<col width="20%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Model</th>
+<th>JML</th>
+<th>Corrected JML</th>
+<th>MML</th>
+<th>CML</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>RSM</td>
+<td>Yes</td>
+<td>–</td>
+<td>Yes</td>
+<td>Structural parameters</td>
+</tr>
+<tr class="even">
+<td>PCM</td>
+<td>Yes</td>
+<td>–</td>
+<td>Yes</td>
+<td>Structural parameters</td>
+</tr>
+<tr class="odd">
+<td>One-family GPCM</td>
+<td>Shared step/slope owner</td>
+<td>Experimental; shared owner</td>
+<td>Yes</td>
+<td>–</td>
+</tr>
+<tr class="even">
+<td>Two-family GPCM</td>
+<td>–</td>
+<td>–</td>
+<td>Provisional</td>
+<td>–</td>
+</tr>
+<tr class="odd">
+<td>Testlet RSM</td>
+<td>–</td>
+<td>–</td>
+<td>Dedicated route</td>
+<td>–</td>
+</tr>
+<tr class="even">
+<td>Random-rater RSM</td>
+<td>–</td>
+<td>–</td>
+<td>Dedicated approximate route</td>
+<td>–</td>
+</tr>
+</tbody>
+</table>
+<p>Use <code>fit_mfrm()</code> for the first four rows,
+<code>fit_mfrm_testlet()</code> for testlets and
+<code>fit_mfrm_random_rater()</code> for shared random raters. For
+native CML, keep the declared rubric with
+<code>category_policy = &quot;preserve&quot;</code>, use unit response weights and
+specify <code>step_facet</code> explicitly for PCM. Use
+<code>gpcm_capability_matrix()</code> and
+<code>mfrmr_interval_guide()</code> to check the required output before
+committing to a workflow. Corrected JML is requested explicitly with
+<code>jml_correction_order</code>; it is not selected automatically by
+increasing iterations. Its adjustment is related to <a href="https://doi.org/10.1007/s13209-023-00283-1">Dhaene and Weidner
+(2023)</a>; the package’s plug-in implementation and limits are
+explained in the GPCM guide.</p>
+</div>
+<div id="check-the-population-scale-before-comparing-results" class="section level3">
+<h3>Check the population scale before comparing results</h3>
+<p>The defaults are not identical across model families. Ordinary
+RSM/PCM MML with <code>population_formula = NULL</code> fixes the
+ability distribution to normal with mean zero and SD one.
+<code>population_formula = ~ 1</code> instead estimates its mean and SD
+under the package’s identification constraints. Default one-family GPCM
+MML estimates the normal population mean and SD, with geometric-mean-one
+relative slopes. Its fixed-standard-normal option imposes an additional
+restriction; it is not merely a harmless relabeling of the same fit. The
+current two-family route fixes the standard-normal ability distribution.
+The testlet and shared random-rater functions instead fix the normal
+ability mean at zero and estimate its SD by default.</p>
+<p>For a contrast standardized by the <strong>same fit’s estimated
+population SD</strong>, the target is the fitted difference divided by
+that SD. Its delta-method SE must include uncertainty in both quantities
+and their covariance. CML supplies no such SD, and the empirical SD of
+JML Person estimates is not a replacement. With latent regression, the
+estimated SD is the conditional residual ability SD, not automatically
+the total marginal population SD. See
+<code>mfrm_facet_intervals()</code> for supported standardized
+contrasts.</p>
+</div>
+</div>
+<div id="why-not-start-with-the-most-complex-model" class="section level2">
+<h2>Why not start with the most complex model?</h2>
+<p><strong>A larger model can contain a simpler model, but estimating
+the larger model does not impose the simpler model’s
+restrictions.</strong> At the response-model level, PCM reduces to RSM
+when its centered step patterns are equal, and one-family GPCM reduces
+to PCM when every relative slope is one, with the other structures and
+scale matched. These relationships motivate comparisons; they do not
+establish that the larger model always yields better estimates. The
+original <a href="https://doi.org/10.1007/BF02296272">PCM</a> and <a href="https://www.ets.org/research/policy_research_reports/publications/article/1992/hqbx.html">GPCM</a>
+papers describe these response-model families.</p>
+<p>Consider three criteria that truly use the same category transitions.
+In a finite sample, separate PCM estimates will generally differ just
+through sampling variation. RSM pools the information through the
+common-step restriction. PCM can detect real differences when they
+exist, but spends information estimating differences even when they do
+not. This is a conceptual example, not an empirical finding about the
+user’s rubric.</p>
+<p>There are five practical consequences:</p>
+<ol style="list-style-type: decimal">
+<li><strong>Additional effects need additional information.</strong>
+Sparse categories, few observations per level or weak crossing can make
+extra slopes or steps imprecise, strongly correlated or unidentified.
+Convergence alone does not show that the data distinguish them.
+Conversely, pooling genuinely different effects can introduce bias;
+fewer parameters are not always better. For example, with the same two
+binary items answered once by each Person, the default GPCM has more
+free parameters than the response distribution can identify. Increasing
+the number of Persons alone cannot resolve this problem; see the <a href="mfrmr-gpcm-scope.html#how-uncertain-is-a-relative-slope">GPCM
+inference explanation</a>.</li>
+<li><strong>Flexibility in one respect leaves other assumptions
+unchanged.</strong> GPCM slopes do not automatically handle local
+dependence, multiple ability dimensions, informative missingness or a
+misspecified ability distribution. A known same-performance dependency
+may justify a testlet model from the outset, even if a simpler
+independent-response model converges.</li>
+<li><strong>The target and available methods may change.</strong>
+Random-rater modes and population variance answer different questions
+from fixed-rater severities. Free GPCM discrimination also removes the
+ordinary total-score CML route. These changes concern interpretation and
+inference, not just fit quality.</li>
+<li><strong>Better fit to the observed data is not guaranteed better
+inference.</strong> For genuinely nested models on the same likelihood
+and data, the larger model’s maximized likelihood cannot be smaller if
+optimization reaches the global maximum. That algebraic fact does not
+guarantee better prediction, less estimation error or valid
+confidence-interval coverage. The nesting statement concerns complete
+models, including population assumptions, not their names.</li>
+<li><strong>Boundary and selection uncertainty need attention.</strong>
+A random-effect variance of zero is a boundary, so an ordinary
+chi-squared likelihood-ratio reference or symmetric normal variance
+interval is not automatically valid (<a href="https://doi.org/10.1080/01621459.1987.10478472">Self and Liang,
+1987</a>). Intervals from a selected model also generally condition on
+that model; they do not automatically include uncertainty from trying
+many alternatives.</li>
+</ol>
+<p>Thus, there is no requirement to begin with RSM and add complexity
+one step at a time. Begin with the structure justified by the assessment
+question and design. Estimate additional effects when they answer a
+needed question and the design can distinguish them; use a simpler
+structure when its restrictions are defensible. If known dependencies
+cannot be supported by the available data or package, acknowledge that
+limitation instead of assuming independence just to obtain output.</p>
+</div>
+<div id="compare-conclusions-not-just-fit-statistics" class="section level2">
+<h2>Compare conclusions, not just fit statistics</h2>
+<p>A practical comparison asks whether a particular modeling choice
+changes the decision: for example, whether judge severity differences
+remain substantively similar when criteria have separate category steps.
+State that question before adding candidate models. A sensitivity
+analysis should preserve the intended target and explain any changed
+assumptions.</p>
+<p>For information criteria or likelihood-ratio comparisons, match
+retained ratings, category coding, weights, anchors, identification and
+population assumptions. <code>compare_mfrm()</code> checks supported MML
+comparisons; an explicit <code>nested = TRUE</code> requests a supported
+nested comparison. For RSM versus PCM, the PCM must retain every
+interaction in the RSM; additional category-step parameters alone do not
+establish nesting. Information criteria can still compare eligible
+nonnested models. Default RSM and default GPCM fits do not automatically
+form a matched pair because their population defaults differ. Do not
+rank CML, JML and MML by putting their different likelihoods into one
+AIC table. A converged fit, a small SE or the lowest AIC alone does not
+settle the assessment question. If evaluating prediction, choose
+validation units that match the intended use, such as new Persons rather
+than randomly held-out rows from the same Persons, while preserving
+required linking.</p>
+<p>Read the estimate, its uncertainty and its availability reason
+separately. An unavailable interval can accompany a useful finite point;
+an unidentified contrast is a different problem. An extreme Person
+score, an empty category and a near-zero variance component also call
+for different responses. Do not replace missing intervals by zero-width
+intervals or numerical optimizer limits. With limited information,
+consider substantively justified pooling, additional linking
+observations or a narrower claim. Changing the rubric or target solely
+to force a successful fit changes the question.</p>
+</div>
+<div id="continue-to-the-analysis-and-reporting" class="section level2">
+<h2>Continue to the analysis and reporting</h2>
+<p>For ordinary RSM/PCM MML, start with the <a href="mfrmr-workflow.html">workflow tutorial</a>. For CML structural
+comparisons and model-specific uncertainty, use <a href="mfrmr-facet-intervals.html">facet intervals</a>. For GPCM or
+either dependence extension, follow the dedicated guides linked above.
+In an R installation without vignettes,
+<code>help(&quot;mfrmr_workflow_methods&quot;)</code> gives the workflow and
+<code>help(&quot;mfrmr_methods_reference&quot;)</code> links questions to methods
+and references.</p>
+<p>When reporting, explain <strong>what you wanted to compare, why the
+chosen response and population model suit the design, and how the result
+answers that question</strong>. Name the estimator, scale constraints,
+retained rating/category definitions, uncertainty method and relevant
+limitations. Report a sensitivity result as evidence about that specific
+choice, not as proof that every assumption is correct. A readable
+decision rationale is more useful than a list of all the models that
+happened to converge.</p>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

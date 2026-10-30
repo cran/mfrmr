@@ -21,6 +21,13 @@ A data.frame with columns \code{Facet}, \code{Level},
 is populated for person rows from the extreme-score flag
 (\code{"Min"} / \code{"Max"} / \code{NA}); non-person
 facet rows carry \code{NA} in that column by design.
+Corrected-JML fits additionally retain estimator, correction order,
+point/covariance status, uncertainty target and structural \code{RootSE}
+columns. Person \code{RootSE} is missing; extreme Person flags are
+\code{"low"} / \code{"high"} / \code{"none"}. The \code{estimation_note}
+attribute explains the local-root uncertainty and remaining bias. Ordinary
+diagnostic attachments do not apply to this estimator; see the Corrected
+JML section of \code{\link{fit_mfrm}}.
 }
 \description{
 Returns all facet-level estimates (person and others) in a single
@@ -49,12 +56,23 @@ All non-person facets are stacked underneath in the same schema.
 }
 
 \examples{
-toy <- load_mfrmr_data("example_operational")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "MML", model = "RSM",
-                quad_points = 7, maxit = 30)
-head(as.data.frame(fit))
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("as.data.frame.mfrm_fit", run.dontrun = TRUE)
+\dontrun{
+library(mfrmr)
+
+# Saved synthetic MML/RSM analysis of example_operational.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "operational-mml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+
+# Extract estimates and select the rows to display
+estimates <- as.data.frame(fit)
+head(subset(estimates, Facet == "Person")) # First six persons
+subset(estimates, Facet == "Rater")       # All raters
+subset(estimates, Facet == "Criterion")   # All criteria
+}
 }
 \seealso{
-\code{\link{fit_mfrm}}, \code{\link{export_mfrm}}
+\code{\link{fit_mfrm}}, \code{\link{export_mfrm_tables}}
 }

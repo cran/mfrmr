@@ -3,37 +3,12 @@
 # ==============================================================================
 #
 # Internal helpers for reading anchor / group-anchor tables, normalizing
-# their structure, and generating the connectivity / overlap audit
+# their structure, and generating the constraint / overlap audit
 # bundle consumed by `fit_mfrm()`. Split out of `mfrm_core.R` for
 # so the anchor-table layer lives in a single file. All
 # functions here are internal (no @export); they are called from the
 # preparation phase of `mfrm_estimate()` before the optimizer runs.
 
-read_flexible_table <- function(text_value, file_input) {
-  if (!is.null(file_input) && !is.null(file_input$datapath)) {
-    sep <- ifelse(grepl("\\.tsv$|\\.txt$", file_input$name, ignore.case = TRUE), "\t", ",")
-    return(read.csv(file_input$datapath,
-                    sep = sep,
-                    header = TRUE,
-                    stringsAsFactors = FALSE,
-                    check.names = FALSE))
-  }
-  if (is.null(text_value)) return(tibble())
-  text_value <- trimws(text_value)
-  if (!nzchar(text_value)) return(tibble())
-  sep <- if (grepl("\t", text_value)) {
-    "\t"
-  } else if (grepl(";", text_value)) {
-    ";"
-  } else {
-    ","
-  }
-  read.csv(text = text_value,
-           sep = sep,
-           header = TRUE,
-           stringsAsFactors = FALSE,
-           check.names = FALSE)
-}
 
 normalize_anchor_df <- function(df) {
   if (is.null(df) || nrow(df) == 0) {
@@ -107,7 +82,8 @@ build_anchor_recommendations <- function(facet_summary,
                                          min_obs_per_element = 30,
                                          min_obs_per_category = 10,
                                          noncenter_facet = "Person",
-                                         dummy_facets = character(0)) {
+                                         dummy_facets = character(0),
+                                         centering_scope = "remainder") {
   rec <- character(0)
 
   if (!is.null(issue_counts) && nrow(issue_counts) > 0) {
@@ -118,7 +94,7 @@ build_anchor_recommendations <- function(facet_summary,
     n_group_conf <- issue_counts$N[issue_counts$Issue == "group_value_conflicts"]
 
     if (length(n_overlap) > 0 && n_overlap > 0) {
-      rec <- c(rec, "Levels listed in both anchor and group-anchor tables are directly anchored (fixed anchors take precedence).")
+      rec <- c(rec, "Levels listed in both direct- and group-anchor tables retain both constraints; verify that the fixed value and group mean are jointly compatible.")
     }
     if (length(n_missing) > 0 && n_missing > 0) {
       rec <- c(rec, "Some group anchors had missing GroupValue; default 0 was applied using the legacy-compatible group-centering rule.")
@@ -141,8 +117,8 @@ build_anchor_recommendations <- function(facet_summary,
       rec <- c(
         rec,
         paste0(
-          "FACETS linking guideline: consider >= ", min_common_anchors,
-          " common anchor levels per linking facet. Low-anchor facets: ",
+          "Package count screen: consider >= ", min_common_anchors,
+          " directly anchored levels per facet. This does not verify cross-run identity or empirical connectedness. Low-count facets: ",
           paste(link_tbl$Facet, collapse = ", "), "."
         )
       )
@@ -154,9 +130,9 @@ build_anchor_recommendations <- function(facet_summary,
       rec <- c(
         rec,
         paste0(
-          "Some facets are fully constrained (no free levels): ",
+          "All levels are covered by direct or group constraints in: ",
           paste(fixed_tbl$Facet, collapse = ", "),
-          ". Verify this is intentional."
+          ". Group members can still vary subject to their mean constraint; coverage is not a count of free parameters."
         )
       )
     }
@@ -168,8 +144,8 @@ build_anchor_recommendations <- function(facet_summary,
       rec <- c(
         rec,
         paste0(
-          "Linacre guideline: about ", fmt_count(min_obs_per_element),
-          " observations per element are desirable. Low-observation facets: ",
+          "Package observation-count screen: about ", fmt_count(min_obs_per_element),
+          " observations per element are used for review. Low-observation facets: ",
           paste(low_facets, collapse = ", "), "."
         )
       )
@@ -179,8 +155,8 @@ build_anchor_recommendations <- function(facet_summary,
       rec <- c(
         rec,
         paste0(
-          "Linacre guideline: about ", fmt_count(min_obs_per_category),
-          " observations per rating category are desirable. Low categories: ", cats, "."
+          "Package observation-count screen: about ", fmt_count(min_obs_per_category),
+          " observations per rating category are used for review. Low categories: ", cats, "."
         )
       )
     }
@@ -188,11 +164,58 @@ build_anchor_recommendations <- function(facet_summary,
 
   rec <- c(
     rec,
-    "For linked analyses, keep Umean/Uscale from the source calibration so reporting origin and scaling stay consistent.",
-    paste0("Current noncenter facet is '", noncenter_facet, "'. Other facets are centered unless constrained by anchors/group anchors.")
+    "Supply anchors in internal logit coordinates, not Umean/Uscale display units. Use compatible score coding, orientation and reporting scales across linked analyses.",
+    paste0("Current noncenter facet is '", noncenter_facet, "'. ",
+      if (identical(centering_scope, "facet")) {
+        "Other facets sum to zero across all levels, including anchors and group totals. The ungrouped remainder balances those contributions; a single remaining level is fixed by that balance."
+      } else if (identical(centering_scope, "anchor_origin")) {
+        "Direct or group anchors set their facet's origin, replacing its zero-sum constraint. Other facets are centered except the declared unanchored noncenter facet. This convention is available for ordinary additive RSM/PCM JML."
+      } else {
+        "Legacy remainder centering: in other facets, levels outside direct and group constraints sum to zero; a single remaining level is fixed at zero."
+      })
   )
 
   unique(rec)
+}
+
+# Empty constraint tables are immutable R values; reuse their schemas without
+# running joins and grouped summaries for the usual unanchored fit.
+.mfrmr_empty_anchor_audit <- local({
+  anchors <- tibble(Facet = character(), Level = character(), Anchor = numeric())
+  groups <- tibble(Facet = character(), Level = character(), Group = character(),
+                   GroupValue = numeric())
+  list(
+    anchors = anchors,
+    group_anchors = tibble(Facet = character(), Level = character(),
+      Group = character(), GroupValue = logical()),
+    issues = list(
+      anchor_schema_mismatch = tibble(),
+      group_anchor_schema_mismatch = tibble(),
+      unknown_anchor_facets = anchors,
+      unknown_anchor_levels = anchors,
+      invalid_anchor_values = anchors,
+      duplicate_anchors = tibble(Facet = character(), Level = character(),
+        Rows = integer(), DistinctValues = integer(), Values = character()),
+      unknown_group_facets = groups,
+      unknown_group_levels = groups,
+      invalid_group_labels = groups,
+      duplicate_group_assignments = tibble(Facet = character(), Level = character(),
+        Rows = integer(), DistinctGroups = integer(), Groups = character()),
+      missing_group_values = tibble(Facet = character(), Group = character()),
+      group_value_conflicts = tibble(Facet = character(), Group = character(),
+        DistinctFiniteValues = integer(), FiniteValues = character()),
+      overlap_anchor_group = tibble(Facet = character(), Level = character())
+    )
+  )
+})
+
+# Radix order matches dplyr's C-locale grouping, including an NA group last.
+.mfrmr_anchor_observation_counts <- function(value, weight) {
+  levels <- sort(unique(value), method = "radix", na.last = TRUE)
+  index <- match(value, levels)
+  groups <- factor(index, levels = seq_along(levels))
+  list(level = levels, raw = tabulate(index, nbins = length(levels)),
+    weighted = unname(vapply(split(weight, groups), sum, numeric(1), na.rm = TRUE)))
 }
 
 audit_anchor_tables <- function(prep,
@@ -202,188 +225,204 @@ audit_anchor_tables <- function(prep,
                                 min_obs_per_element = 30,
                                 min_obs_per_category = 10,
                                 noncenter_facet = "Person",
-                                dummy_facets = character(0)) {
+                                dummy_facets = character(0),
+                                centering_scope = "remainder") {
   all_facets <- c("Person", prep$facet_names)
   level_df <- collect_anchor_levels(prep)
-  valid_keys <- safe_join_key(level_df$Facet, level_df$Level)
-  anchor_schema_issue <- if (!is.null(anchor_df) && nrow(anchor_df) > 0) {
-    nm <- tolower(names(anchor_df))
-    has_facet <- any(nm %in% c("facet", "facets"))
-    has_level <- any(nm %in% c("level", "element", "label"))
-    has_anchor <- any(nm %in% c("anchor", "value", "measure"))
-    if (!(has_facet && has_level && has_anchor)) {
-      tibble::tibble(
-        Columns = paste(names(anchor_df), collapse = ", "),
-        Required = "facet + level + anchor/value/measure"
-      )
+  no_anchors <- (is.null(anchor_df) || nrow(anchor_df) == 0L) &&
+    (is.null(group_anchor_df) || nrow(group_anchor_df) == 0L)
+  if (no_anchors) {
+    anchors_clean <- .mfrmr_empty_anchor_audit$anchors
+    groups_clean <- .mfrmr_empty_anchor_audit$group_anchors
+    issues <- .mfrmr_empty_anchor_audit$issues
+    facet_summary <- level_df |>
+      group_by(Facet) |>
+      summarize(Levels = n_distinct(Level), .groups = "drop") |>
+      mutate(AnchoredLevels = 0L, GroupedLevels = 0L, GroupCount = 0L,
+             ConstrainedLevels = 0L, OverlapLevels = 0L)
+  } else {
+    valid_keys <- safe_join_key(level_df$Facet, level_df$Level)
+    anchor_schema_issue <- if (!is.null(anchor_df) && nrow(anchor_df) > 0) {
+      nm <- tolower(names(anchor_df))
+      has_facet <- any(nm %in% c("facet", "facets"))
+      has_level <- any(nm %in% c("level", "element", "label"))
+      has_anchor <- any(nm %in% c("anchor", "value", "measure"))
+      if (!(has_facet && has_level && has_anchor)) {
+        tibble::tibble(
+          Columns = paste(names(anchor_df), collapse = ", "),
+          Required = "facet + level + anchor/value/measure"
+        )
+      } else {
+        tibble::tibble()
+      }
     } else {
       tibble::tibble()
     }
-  } else {
-    tibble::tibble()
-  }
-  group_schema_issue <- if (!is.null(group_anchor_df) && nrow(group_anchor_df) > 0) {
-    nm <- tolower(names(group_anchor_df))
-    has_facet <- any(nm %in% c("facet", "facets"))
-    has_level <- any(nm %in% c("level", "element", "label"))
-    has_group <- any(nm %in% c("group", "subset"))
-    has_value <- any(nm %in% c("groupvalue", "value", "anchor"))
-    if (!(has_facet && has_level && has_group && has_value)) {
-      tibble::tibble(
-        Columns = paste(names(group_anchor_df), collapse = ", "),
-        Required = "facet + level + group/subset + groupvalue/value/anchor"
-      )
+    group_schema_issue <- if (!is.null(group_anchor_df) && nrow(group_anchor_df) > 0) {
+      nm <- tolower(names(group_anchor_df))
+      has_facet <- any(nm %in% c("facet", "facets"))
+      has_level <- any(nm %in% c("level", "element", "label"))
+      has_group <- any(nm %in% c("group", "subset"))
+      has_value <- any(nm %in% c("groupvalue", "value", "anchor"))
+      if (!(has_facet && has_level && has_group && has_value)) {
+        tibble::tibble(
+          Columns = paste(names(group_anchor_df), collapse = ", "),
+          Required = "facet + level + group/subset + groupvalue/value/anchor"
+        )
+      } else {
+        tibble::tibble()
+      }
     } else {
       tibble::tibble()
     }
-  } else {
-    tibble::tibble()
-  }
 
-  anchor_in <- normalize_anchor_df(anchor_df) |>
-    mutate(
-      .Row = row_number(),
-      Facet = trimws(as.character(Facet)),
-      Level = trimws(as.character(Level)),
-      .Key = safe_join_key(Facet, Level),
-      .ValidFacet = Facet %in% all_facets,
-      .ValidLevel = .Key %in% valid_keys,
-      .ValidValue = is.finite(Anchor)
+    anchor_in <- normalize_anchor_df(anchor_df) |>
+      mutate(
+        .Row = row_number(),
+        Facet = trimws(as.character(Facet)),
+        Level = trimws(as.character(Level)),
+        .Key = safe_join_key(Facet, Level),
+        .ValidFacet = Facet %in% all_facets,
+        .ValidLevel = .Key %in% valid_keys,
+        .ValidValue = is.finite(Anchor)
+      )
+
+    group_in <- normalize_group_anchor_df(group_anchor_df) |>
+      mutate(
+        .Row = row_number(),
+        Facet = trimws(as.character(Facet)),
+        Level = trimws(as.character(Level)),
+        Group = trimws(as.character(Group)),
+        .Key = safe_join_key(Facet, Level),
+        .ValidFacet = Facet %in% all_facets,
+        .ValidLevel = .Key %in% valid_keys,
+        .ValidGroup = nzchar(Group),
+        .FiniteGroupValue = is.finite(GroupValue)
+      )
+
+    issues <- list(
+      anchor_schema_mismatch = anchor_schema_issue,
+      group_anchor_schema_mismatch = group_schema_issue,
+      unknown_anchor_facets = anchor_in |>
+        filter(!.ValidFacet) |>
+        select(Facet, Level, Anchor),
+      unknown_anchor_levels = anchor_in |>
+        filter(.ValidFacet, !.ValidLevel) |>
+        select(Facet, Level, Anchor),
+      invalid_anchor_values = anchor_in |>
+        filter(.ValidFacet, .ValidLevel, !.ValidValue) |>
+        select(Facet, Level, Anchor),
+      duplicate_anchors = anchor_in |>
+        filter(.ValidFacet, .ValidLevel, .ValidValue) |>
+        group_by(Facet, Level) |>
+        summarize(
+          Rows = n(),
+          DistinctValues = n_distinct(Anchor),
+          Values = paste(unique(round(Anchor, 6)), collapse = ", "),
+          .groups = "drop"
+        ) |>
+        filter(Rows > 1 | DistinctValues > 1),
+      unknown_group_facets = group_in |>
+        filter(!.ValidFacet) |>
+        select(Facet, Level, Group, GroupValue),
+      unknown_group_levels = group_in |>
+        filter(.ValidFacet, !.ValidLevel) |>
+        select(Facet, Level, Group, GroupValue),
+      invalid_group_labels = group_in |>
+        filter(.ValidFacet, .ValidLevel, !.ValidGroup) |>
+        select(Facet, Level, Group, GroupValue),
+      duplicate_group_assignments = group_in |>
+        filter(.ValidFacet, .ValidLevel, .ValidGroup) |>
+        group_by(Facet, Level) |>
+        summarize(
+          Rows = n(),
+          DistinctGroups = n_distinct(Group),
+          Groups = paste(unique(Group), collapse = ", "),
+          .groups = "drop"
+        ) |>
+        filter(Rows > 1 | DistinctGroups > 1)
     )
 
-  group_in <- normalize_group_anchor_df(group_anchor_df) |>
-    mutate(
-      .Row = row_number(),
-      Facet = trimws(as.character(Facet)),
-      Level = trimws(as.character(Level)),
-      Group = trimws(as.character(Group)),
-      .Key = safe_join_key(Facet, Level),
-      .ValidFacet = Facet %in% all_facets,
-      .ValidLevel = .Key %in% valid_keys,
-      .ValidGroup = nzchar(Group),
-      .FiniteGroupValue = is.finite(GroupValue)
-    )
-
-  issues <- list(
-    anchor_schema_mismatch = anchor_schema_issue,
-    group_anchor_schema_mismatch = group_schema_issue,
-    unknown_anchor_facets = anchor_in |>
-      filter(!.ValidFacet) |>
-      select(Facet, Level, Anchor),
-    unknown_anchor_levels = anchor_in |>
-      filter(.ValidFacet, !.ValidLevel) |>
-      select(Facet, Level, Anchor),
-    invalid_anchor_values = anchor_in |>
-      filter(.ValidFacet, .ValidLevel, !.ValidValue) |>
-      select(Facet, Level, Anchor),
-    duplicate_anchors = anchor_in |>
+    anchors_clean <- anchor_in |>
       filter(.ValidFacet, .ValidLevel, .ValidValue) |>
+      arrange(.Row) |>
       group_by(Facet, Level) |>
-      summarize(
-        Rows = n(),
-        DistinctValues = n_distinct(Anchor),
-        Values = paste(unique(round(Anchor, 6)), collapse = ", "),
-        .groups = "drop"
-      ) |>
-      filter(Rows > 1 | DistinctValues > 1),
-    unknown_group_facets = group_in |>
-      filter(!.ValidFacet) |>
-      select(Facet, Level, Group, GroupValue),
-    unknown_group_levels = group_in |>
-      filter(.ValidFacet, !.ValidLevel) |>
-      select(Facet, Level, Group, GroupValue),
-    invalid_group_labels = group_in |>
-      filter(.ValidFacet, .ValidLevel, !.ValidGroup) |>
-      select(Facet, Level, Group, GroupValue),
-    duplicate_group_assignments = group_in |>
+      slice_tail(n = 1) |>
+      ungroup() |>
+      select(Facet, Level, Anchor)
+
+    groups_clean <- group_in |>
       filter(.ValidFacet, .ValidLevel, .ValidGroup) |>
+      arrange(.Row) |>
       group_by(Facet, Level) |>
+      slice_tail(n = 1) |>
+      ungroup() |>
+      select(Facet, Level, Group, GroupValue, .FiniteGroupValue)
+
+    group_value_tbl <- groups_clean |>
+      arrange(Facet, Group) |>
+      group_by(Facet, Group) |>
       summarize(
-        Rows = n(),
-        DistinctGroups = n_distinct(Group),
-        Groups = paste(unique(Group), collapse = ", "),
+        .NFinite = sum(.FiniteGroupValue, na.rm = TRUE),
+        ChosenGroupValue = if (any(.FiniteGroupValue)) dplyr::last(GroupValue[.FiniteGroupValue]) else 0,
+        DistinctFiniteValues = n_distinct(GroupValue[.FiniteGroupValue]),
+        FiniteValues = paste(unique(round(GroupValue[.FiniteGroupValue], 6)), collapse = ", "),
         .groups = "drop"
-      ) |>
-      filter(Rows > 1 | DistinctGroups > 1)
-  )
+      )
 
-  anchors_clean <- anchor_in |>
-    filter(.ValidFacet, .ValidLevel, .ValidValue) |>
-    arrange(.Row) |>
-    group_by(Facet, Level) |>
-    slice_tail(n = 1) |>
-    ungroup() |>
-    select(Facet, Level, Anchor)
+    issues$missing_group_values <- group_value_tbl |>
+      filter(.NFinite == 0) |>
+      select(Facet, Group)
 
-  groups_clean <- group_in |>
-    filter(.ValidFacet, .ValidLevel, .ValidGroup) |>
-    arrange(.Row) |>
-    group_by(Facet, Level) |>
-    slice_tail(n = 1) |>
-    ungroup() |>
-    select(Facet, Level, Group, GroupValue, .FiniteGroupValue)
+    issues$group_value_conflicts <- group_value_tbl |>
+      filter(DistinctFiniteValues > 1) |>
+      select(Facet, Group, DistinctFiniteValues, FiniteValues)
 
-  group_value_tbl <- groups_clean |>
-    arrange(Facet, Group) |>
-    group_by(Facet, Group) |>
-    summarize(
-      .NFinite = sum(.FiniteGroupValue, na.rm = TRUE),
-      ChosenGroupValue = if (any(.FiniteGroupValue)) dplyr::last(GroupValue[.FiniteGroupValue]) else 0,
-      DistinctFiniteValues = n_distinct(GroupValue[.FiniteGroupValue]),
-      FiniteValues = paste(unique(round(GroupValue[.FiniteGroupValue], 6)), collapse = ", "),
-      .groups = "drop"
+    groups_clean <- groups_clean |>
+      select(Facet, Level, Group) |>
+      left_join(group_value_tbl |> select(Facet, Group, ChosenGroupValue), by = c("Facet", "Group")) |>
+      rename(GroupValue = ChosenGroupValue) |>
+      mutate(GroupValue = ifelse(is.finite(GroupValue), GroupValue, 0))
+
+    overlap_tbl <- inner_join(
+      anchors_clean |> select(Facet, Level),
+      groups_clean |> select(Facet, Level),
+      by = c("Facet", "Level")
     )
+    issues$overlap_anchor_group <- overlap_tbl
 
-  issues$missing_group_values <- group_value_tbl |>
-    filter(.NFinite == 0) |>
-    select(Facet, Group)
+    constrained_counts <- bind_rows(
+      anchors_clean |> select(Facet, Level),
+      groups_clean |> select(Facet, Level)
+    ) |>
+      distinct(Facet, Level) |>
+      group_by(Facet) |>
+      summarize(ConstrainedLevels = n_distinct(Level), .groups = "drop")
 
-  issues$group_value_conflicts <- group_value_tbl |>
-    filter(DistinctFiniteValues > 1) |>
-    select(Facet, Group, DistinctFiniteValues, FiniteValues)
+    facet_counts <- level_df |>
+      group_by(Facet) |>
+      summarize(Levels = n_distinct(Level), .groups = "drop")
 
-  groups_clean <- groups_clean |>
-    select(Facet, Level, Group) |>
-    left_join(group_value_tbl |> select(Facet, Group, ChosenGroupValue), by = c("Facet", "Group")) |>
-    rename(GroupValue = ChosenGroupValue) |>
-    mutate(GroupValue = ifelse(is.finite(GroupValue), GroupValue, 0))
+    anchor_counts <- anchors_clean |>
+      group_by(Facet) |>
+      summarize(AnchoredLevels = n_distinct(Level), .groups = "drop")
 
-  overlap_tbl <- inner_join(
-    anchors_clean |> select(Facet, Level),
-    groups_clean |> select(Facet, Level),
-    by = c("Facet", "Level")
-  )
-  issues$overlap_anchor_group <- overlap_tbl
+    group_counts <- groups_clean |>
+      group_by(Facet) |>
+      summarize(GroupedLevels = n_distinct(Level), GroupCount = n_distinct(Group), .groups = "drop")
 
-  constrained_counts <- bind_rows(
-    anchors_clean |> select(Facet, Level),
-    groups_clean |> select(Facet, Level)
-  ) |>
-    distinct(Facet, Level) |>
-    group_by(Facet) |>
-    summarize(ConstrainedLevels = n_distinct(Level), .groups = "drop")
+    overlap_counts <- overlap_tbl |>
+      group_by(Facet) |>
+      summarize(OverlapLevels = n_distinct(Level), .groups = "drop")
 
-  facet_counts <- level_df |>
-    group_by(Facet) |>
-    summarize(Levels = n_distinct(Level), .groups = "drop")
+    facet_summary <- facet_counts |>
+      left_join(anchor_counts, by = "Facet") |>
+      left_join(group_counts, by = "Facet") |>
+      left_join(constrained_counts, by = "Facet") |>
+      left_join(overlap_counts, by = "Facet")
+  }
 
-  anchor_counts <- anchors_clean |>
-    group_by(Facet) |>
-    summarize(AnchoredLevels = n_distinct(Level), .groups = "drop")
-
-  group_counts <- groups_clean |>
-    group_by(Facet) |>
-    summarize(GroupedLevels = n_distinct(Level), GroupCount = n_distinct(Group), .groups = "drop")
-
-  overlap_counts <- overlap_tbl |>
-    group_by(Facet) |>
-    summarize(OverlapLevels = n_distinct(Level), .groups = "drop")
-
-  facet_summary <- facet_counts |>
-    left_join(anchor_counts, by = "Facet") |>
-    left_join(group_counts, by = "Facet") |>
-    left_join(constrained_counts, by = "Facet") |>
-    left_join(overlap_counts, by = "Facet") |>
+  facet_summary <- facet_summary |>
     mutate(
       AnchoredLevels = tidyr::replace_na(AnchoredLevels, 0L),
       GroupedLevels = tidyr::replace_na(GroupedLevels, 0L),
@@ -392,7 +431,21 @@ audit_anchor_tables <- function(prep,
       OverlapLevels = tidyr::replace_na(OverlapLevels, 0L),
       FreeLevels = pmax(Levels - ConstrainedLevels, 0L),
       Noncenter = Facet == noncenter_facet,
-      DummyFacet = Facet %in% dummy_facets
+      DummyFacet = Facet %in% dummy_facets,
+      Centered = !Noncenter & !DummyFacet &
+        !(identical(centering_scope, "anchor_origin") & ConstrainedLevels > 0L),
+      OriginBasis = case_when(
+        DummyFacet ~ "fixed_zero",
+        identical(centering_scope, "anchor_origin") & AnchoredLevels > 0L &
+          GroupedLevels > 0L ~ "direct_and_group_anchors",
+        identical(centering_scope, "anchor_origin") & AnchoredLevels > 0L ~ "direct_anchors",
+        identical(centering_scope, "anchor_origin") & GroupedLevels > 0L ~ "group_anchors",
+        Noncenter & AnchoredLevels > 0L ~ "direct_anchors",
+        Noncenter & GroupedLevels > 0L ~ "group_anchors",
+        Noncenter ~ "estimated_origin",
+        identical(centering_scope, "remainder") ~ "remainder_zero_sum",
+        TRUE ~ "zero_sum"
+      )
     ) |>
     arrange(match(Facet, all_facets))
 
@@ -406,14 +459,10 @@ audit_anchor_tables <- function(prep,
 
   level_obs <- bind_rows(lapply(all_facets, function(facet) {
     if (!facet %in% names(design_df)) return(tibble())
-    design_df |>
-      mutate(Level = as.character(.data[[facet]])) |>
-      group_by(Facet = facet, Level) |>
-      summarize(
-        RawN = n(),
-        WeightedN = sum(Weight, na.rm = TRUE),
-        .groups = "drop"
-      )
+    counts <- .mfrmr_anchor_observation_counts(
+      as.character(design_df[[facet]]), design_df$Weight)
+    tibble(Facet = rep(facet, length(counts$level)), Level = counts$level,
+           RawN = counts$raw, WeightedN = counts$weighted)
   }))
 
   level_obs_summary <- if (nrow(level_obs) == 0) {
@@ -439,16 +488,11 @@ audit_anchor_tables <- function(prep,
       arrange(Facet, WeightedN, Level)
   }
 
-  category_counts <- design_df |>
-    group_by(Category = Score) |>
-    summarize(
-      RawN = n(),
-      WeightedN = sum(Weight, na.rm = TRUE),
-      RecommendedMinObs = as.numeric(min_obs_per_category),
-      PassMinObs = WeightedN >= min_obs_per_category,
-      .groups = "drop"
-    ) |>
-    arrange(Category)
+  counts <- .mfrmr_anchor_observation_counts(design_df$Score, design_df$Weight)
+  category_counts <- tibble(Category = counts$level, RawN = counts$raw,
+    WeightedN = counts$weighted,
+    RecommendedMinObs = rep(as.numeric(min_obs_per_category), length(counts$level)),
+    PassMinObs = counts$weighted >= min_obs_per_category)
 
   low_categories <- category_counts |>
     filter(!PassMinObs)
@@ -469,7 +513,8 @@ audit_anchor_tables <- function(prep,
     min_obs_per_element = min_obs_per_element,
     min_obs_per_category = min_obs_per_category,
     noncenter_facet = noncenter_facet,
-    dummy_facets = dummy_facets
+    dummy_facets = dummy_facets,
+    centering_scope = centering_scope
   )
 
   thresholds <- list(
@@ -481,6 +526,7 @@ audit_anchor_tables <- function(prep,
   list(
     anchors = anchors_clean,
     group_anchors = groups_clean,
+    centering_scope = centering_scope,
     facet_summary = facet_summary,
     design_checks = design_checks,
     thresholds = thresholds,

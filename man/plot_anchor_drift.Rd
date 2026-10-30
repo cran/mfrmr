@@ -49,15 +49,19 @@ Creates base-R plots for inspecting anchor drift across calibration waves
 or visualising the cumulative offset in a screened linking chain.
 }
 \details{
-Three plot types are supported:
+Four plot types are supported:
 \itemize{
 \item \strong{\code{"drift"}} (for \code{mfrm_anchor_drift} objects): A dot plot of each
-element's drift value, grouped by facet.  Horizontal reference lines
-mark the drift threshold.  Red points indicate flagged elements.
+element's drift value. Vertical reference lines mark the drift threshold.
+The preset's warning colour indicates flagged elements.
 \item \strong{\code{"heatmap"}} (for \code{mfrm_anchor_drift} objects): A wave-by-element
 heat matrix showing drift magnitude.  Darker cells represent larger
 absolute drift.  Useful for spotting systematic patterns (e.g., all
 criteria shifting in the same direction).
+\item \strong{\code{"forest"}} (for \code{mfrm_anchor_drift} objects): Per-wave estimates
+with approximate normal whiskers from their available SEs. These are
+not intervals for between-wave differences; linking-offset uncertainty
+and cross-wave covariance are not included.
 \item \strong{\code{"chain"}} (for \code{mfrm_equating_chain} objects): A line plot of
 cumulative offsets across the screened linking chain. A flatter line
 indicates smaller between-wave shifts; steep segments suggest larger
@@ -83,13 +87,14 @@ calibration waves, after accounting for the screened common-element link
 offset. An
 element is flagged when its absolute drift exceeds a threshold
 (typically 0.5 logits) \strong{and} the drift-to-SE ratio exceeds a
-secondary criterion (typically 2.0), ensuring that only
-practically noticeable and relatively precise shifts are flagged.
+secondary criterion (typically 2.0). These are heuristic screening rules,
+not a calibrated test of change. Subtracting a common offset can remove
+a panel-wide shift; unflagged elements do not establish absence of annual drift.
 \itemize{
-\item In drift and heatmap plots, red or dark-shaded elements exceed
-both thresholds.  Common causes include rater drift over time,
-item exposure effects, or curriculum changes.
-\item In chain plots, uneven spacing between waves suggests differential
+\item Drift dots distinguish flagged elements. Heatmap shading shows magnitude,
+not whether both screening thresholds were exceeded. Possible explanations
+require substantive review, including changes in scoring or exposure.
+\item In chain plots, uneven changes between waves indicate differential
 shifts in the screened linking offsets. The \eqn{y}-axis shows cumulative
 logit-scale offsets; flatter segments indicate more stable adjacent links.
 Steep segments should be checked alongside \code{LinkSupportAdequate} and the
@@ -118,32 +123,48 @@ For a plot-selection guide and a longer walkthrough, see
 \code{vignette("mfrmr-visual-diagnostics", package = "mfrmr")}.
 }
 
-\examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-people <- unique(toy$Person)
-d1 <- toy[toy$Person \%in\% people[1:12], , drop = FALSE]
-d2 <- toy[toy$Person \%in\% people[13:24], , drop = FALSE]
-fit1 <- fit_mfrm(d1, "Person", c("Rater", "Criterion"), "Score",
-                 method = "JML", maxit = 30)
-fit2 <- fit_mfrm(d2, "Person", c("Rater", "Criterion"), "Score",
-                 method = "JML", maxit = 30)
-drift <- detect_anchor_drift(list(W1 = fit1, W2 = fit2))
-drift_plot <- plot_anchor_drift(drift, type = "drift", draw = FALSE)
-class(drift_plot)
-names(drift_plot$data)
-chain <- build_equating_chain(list(F1 = fit1, F2 = fit2))
-chain_plot <- plot_anchor_drift(chain, type = "chain", draw = FALSE)
-head(chain_plot$data$table)
-if (interactive()) {
-  plot_anchor_drift(drift, type = "heatmap", preset = "publication")
+\section{Migration in 0.2.4}{
+
+This renderer is internal. Use the corresponding \code{plot()} route in
+\link{mfrmr_plot_migration}; the former exported name is no longer available.
 }
+
+\section{Session plot defaults}{
+
+Set \code{options(mfrmr.plot_preset = "publication")} to choose a session default
+for plotting functions that expose the common \code{preset} argument. The
+supported values are \code{"standard"}, \code{"publication"}, \code{"compact"} and
+\code{"monochrome"}. Precedence is an explicit call argument, then the session
+option, then \code{"standard"}. For example, \code{preset = "standard"} overrides
+a session set to \code{"monochrome"}. Explicit \code{preset = NULL} retains the
+earlier package-default behavior; it does not read the session option.
+Invalid session values cause an error only when that option is needed.
+
+The category-curve, data-quality, fit-review, connectivity and network
+routes of \code{plot()} for report bundles use the same option through \code{...}.
+Plots without a common \code{preset} argument, including extended-model plots
+with their own \code{palette} controls, keep their own settings. This option
+selects a preset, not a universal theme or a guarantee that all renderers
+implement every appearance control identically.
+
+New plot payloads retain the resolved preset for supported saved-data
+rendering. Converting an existing payload with \code{\link[=as_ggplot]{as_ggplot()}} uses its saved
+appearance, even after the session option changes. A call that creates a
+new plot from a fit or statistical result uses the current default.
+For a reproducible script, supply \code{preset} explicitly or set the option in
+that script. Saving only the fitted model does not save a session option.
+No global ggplot theme is changed.
+
+Restore previous settings with \code{old <- options(mfrmr.plot_preset = "monochrome")} followed by \code{options(old)}. Use
+\code{options(mfrmr.plot_preset = NULL)} to remove the option. The preset changes
+appearance, not estimates, confidence levels or diagnostic thresholds.
 }
-}
+
 \seealso{
 \code{\link[=detect_anchor_drift]{detect_anchor_drift()}}, \code{\link[=build_equating_chain]{build_equating_chain()}},
-\code{\link[=plot_dif_heatmap]{plot_dif_heatmap()}}, \code{\link[=plot_bubble]{plot_bubble()}}, \link{mfrmr_visual_diagnostics}
+\link[=plot.mfrm_dif]{plot(x, type = "heatmap")}, \link[=plot.mfrm_fit]{plot(x, type = "bubble")}, \link{mfrmr_visual_diagnostics}
 }
 \concept{confidence intervals}
 \concept{linking}
 \concept{visual diagnostics}
+\keyword{internal}

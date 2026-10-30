@@ -592,6 +592,10 @@ build_facets_style_wright_data <- function(fit,
     paste0("(", facet_ruler$Level, ")"),
     facet_ruler$Level
   )
+  highlighted <- facet_ruler$Highlighted %in% TRUE
+  facet_ruler$DisplayLabel[highlighted] <- paste0(
+    "> ", facet_ruler$DisplayLabel[highlighted]
+  )
   facet_ruler <- add_wright_ci_display_metadata(
     facet_ruler,
     lower = lower,
@@ -691,8 +695,8 @@ draw_wright_facets_style <- function(plot_data,
   pal <- resolve_palette(
     palette = palette,
     defaults = c(
-      facet_level = "#1b9e77",
-      step_threshold = "#d95f02",
+      facet_level = "#0072B2",
+      step_threshold = "#D55E00",
       person_hist = "gray25",
       person_star = "gray20",
       grid = "#e5e7eb",
@@ -705,30 +709,26 @@ draw_wright_facets_style <- function(plot_data,
   n_col <- nrow(headers)
   settings <- facets_data$settings
   yr <- c(settings$LowerLogit[1], settings$UpperLogit[1])
-  old_par <- graphics::par(no.readonly = TRUE)
+  old_par <- graphics::par()[c("mar", "mgp", "xpd")]
   on.exit(graphics::par(old_par), add = TRUE)
-  auto_range_policy <- as.character(
-    settings$AutoRangePolicy[1L] %||% "all_fitted_locations"
-  )
-  ci_clipped_count <- suppressWarnings(as.integer(
-    settings$CIClippedCount[1L] %||% 0L
-  ))
-  boundary_ci_count <- suppressWarnings(as.integer(
-    settings$BoundaryCIEndpointCount[1L] %||% 0L
-  ))
-  extra_footer <- isTRUE(show_ci) ||
-    identical(auto_range_policy, "boundary_levels_at_ends")
+  footer_lines <- if (identical(plot_data$display$show_notes, FALSE)) character() else {
+    unlist(lapply(.wright_footer_notes(plot_data, show_ci = show_ci), strwrap,
+                  width = max(30L, floor((graphics::par("fin")[1] - 1.4) * 17))),
+           use.names = FALSE)
+  }
   graphics::par(
-    mar = c(if (extra_footer) 7 else 5.4, 4.8, 5.4, 2.2),
+    mar = c(if (!length(footer_lines)) 2.8 else max(5.4, 2 + 0.75 * length(footer_lines)),
+            4.8, if (identical(plot_data$display$show_title, FALSE)) 3.6 else 5.4, 2.2),
     mgp = c(2.6, 0.8, 0),
     xpd = FALSE
   )
-  graphics::plot(
+  plot(
     NA_real_, NA_real_,
     xlim = c(0.45, n_col + 0.55),
     ylim = yr,
     xaxt = "n", yaxt = "n", xlab = "", ylab = "Logit ruler",
-    main = title %||% "FACETS-style Wright map"
+    main = .mfrm_plot_display_title(plot_data, title = title,
+      fallback = "FACETS-style Wright map")
   )
   rows <- facets_data$ruler_rows
   major <- !is.na(rows$Major) & rows$Major
@@ -741,19 +741,29 @@ draw_wright_facets_style <- function(plot_data,
     axis_labels <- format(axis_at, trim = TRUE)
   }
   grid_at <- if (nrow(rows) <= 30L) rows$Logit else axis_at
-  graphics::abline(h = grid_at, col = grDevices::adjustcolor(pal["grid"], alpha.f = 0.38), lty = 1)
+  abline(h = grid_at, col = grDevices::adjustcolor(pal["grid"], alpha.f = 0.38), lty = 1)
   if (nrow(rows) <= 30L) {
-    graphics::abline(h = rows$Logit[major], col = grDevices::adjustcolor(pal["range"], alpha.f = 0.75), lwd = 1.1)
+    abline(h = rows$Logit[major], col = grDevices::adjustcolor(pal["range"], alpha.f = 0.75), lwd = 1.1)
   }
-  graphics::abline(v = seq(0.5, n_col + 0.5, by = 1), col = grDevices::adjustcolor(pal["grid"], alpha.f = 0.9))
-  graphics::axis(2, at = axis_at, labels = axis_labels, las = 1, cex.axis = 0.78)
-  graphics::axis(4, at = axis_at, labels = axis_labels, las = 1, cex.axis = 0.78)
-  graphics::axis(3, at = seq_len(n_col), labels = headers$Header, tick = FALSE, line = 0.25, cex.axis = 0.78)
+  abline(v = seq(0.5, n_col + 0.5, by = 1), col = grDevices::adjustcolor(pal["grid"], alpha.f = 0.9))
+  axis(2, at = axis_at, labels = axis_labels, las = 1, cex.axis = 0.78)
+  axis(4, at = axis_at, labels = axis_labels, las = 1, cex.axis = 0.78)
+  header_labels <- sub("^Scale:", "Scale:\n", headers$Header)
+  header_cex <- min(0.78, 0.78 * 0.9 / max(graphics::strwidth(
+    header_labels, cex = 0.78 / graphics::par("cex"))))
+  mtext(header_labels, side = 3, at = seq_len(n_col),
+                  line = 0.8, cex = max(0.6, header_cex))
+  if (header_cex < 0.6) warning(
+    "FACETS-style column headings need more space; use a wider device.", call. = FALSE)
 
   person_x <- which(headers$ColumnType == "person")[1]
   person_freq <- facets_data$person_frequency
   if (is.finite(person_x) && nrow(person_freq) > 0L) {
-    graphics::text(
+    if (any(graphics::strwidth(person_freq$Stars, cex = 0.78, font = 1,
+                              family = "mono") > 0.9)) warning(
+      "FACETS-style frequency stars exceed their column; increase `persons_per_star` or use a wider device.",
+      call. = FALSE)
+    text(
       x = person_x,
       y = person_freq$RulerValue,
       labels = person_freq$Stars,
@@ -790,15 +800,23 @@ draw_wright_facets_style <- function(plot_data,
     if (nrow(cell) > 0L && !isTRUE(show_ci)) {
       cell_labels <- vapply(
         as.character(cell$CellLabel),
-        function(value) paste(strwrap(value, width = 22L), collapse = "\n"),
+        function(value) paste(strwrap(value, width = max(3L, min(22L,
+          floor(0.9 / graphics::strwidth("M", cex = 0.68))))), collapse = "\n"),
         character(1)
       )
-      graphics::text(
+      label_order <- order(cell$RulerValue)
+      label_heights <- graphics::strheight(cell_labels, cex = 0.68)[label_order]
+      if (any(graphics::strwidth(cell_labels, cex = 0.68) > 0.9) ||
+          (length(label_order) > 1L && any(diff(cell$RulerValue[label_order]) <
+            (head(label_heights, -1L) + tail(label_heights, -1L)) / 2))) {
+        warning("FACETS-style facet labels need more space; use a taller or wider device, increase `rows_per_logit`, or use `renderer = 'native'`.", call. = FALSE)
+      }
+      text(
         x = x_pos,
         y = cell$RulerValue,
         labels = cell_labels,
         cex = 0.68,
-        col = pal["facet_level"]
+        col = "gray15"
       )
     }
     if (isTRUE(show_ci) && all(c("SE", "Estimate") %in% names(facet_ruler))) {
@@ -813,7 +831,7 @@ draw_wright_facets_style <- function(plot_data,
       moved <- is.finite(raw_label_y) & is.finite(label_y) &
         abs(raw_label_y - label_y) > sqrt(.Machine$double.eps)
       if (any(moved)) {
-        graphics::segments(
+        segments(
           x0 = x_pos - 0.04,
           y0 = raw_label_y[moved],
           x1 = x_pos + 0.04,
@@ -822,12 +840,12 @@ draw_wright_facets_style <- function(plot_data,
           lwd = 0.8
         )
       }
-      graphics::text(
+      text(
         x = x_pos,
         y = label_y,
         labels = as.character(sub$DisplayLabel),
         cex = 0.64,
-        col = pal["facet_level"]
+        col = "gray15"
       )
       ci_ok <- is.finite(sub$OriginalCI_Lower) &
         is.finite(sub$OriginalCI_Upper)
@@ -842,36 +860,36 @@ draw_wright_facets_style <- function(plot_data,
           ci_x <- ci_x_all[regular]
           lo <- sub$DisplayCI_Lower[regular]
           hi <- sub$DisplayCI_Upper[regular]
-          graphics::segments(
+          segments(
             x0 = ci_x, y0 = lo,
             x1 = ci_x, y1 = hi,
             col = grDevices::adjustcolor(pal["facet_level"], alpha.f = 0.65), lwd = 1
           )
-          graphics::segments(
+          segments(
             x0 = ci_x - 0.035, y0 = lo,
             x1 = ci_x + 0.035, y1 = lo,
             col = grDevices::adjustcolor(pal["facet_level"], alpha.f = 0.65)
           )
-          graphics::segments(
+          segments(
             x0 = ci_x - 0.035, y0 = hi,
             x1 = ci_x + 0.035, y1 = hi,
             col = grDevices::adjustcolor(pal["facet_level"], alpha.f = 0.65)
           )
           if (any(sub$CIClippedLower[regular])) {
             lower_marker <- regular & sub$CIClippedLower
-            graphics::points(
+            points(
               x = ci_x_all[lower_marker], y = yr[1],
               pch = 25, bg = "white", col = pal["facet_level"], cex = 0.62
             )
           }
           if (any(sub$CIClippedUpper[regular])) {
             upper_marker <- regular & sub$CIClippedUpper
-            graphics::points(
+            points(
               x = ci_x_all[upper_marker], y = yr[2],
               pch = 24, bg = "white", col = pal["facet_level"], cex = 0.62
             )
           }
-          graphics::points(
+          points(
             x = ci_x,
             y = sub$DisplayEstimate[regular],
             pch = 16,
@@ -886,7 +904,7 @@ draw_wright_facets_style <- function(plot_data,
             25,
             ifelse(sub$BoundaryEnd[boundary_interval] == "upper", 24, 23)
           )
-          graphics::points(
+          points(
             x = ci_x_all[boundary_interval],
             y = sub$DisplayEstimate[boundary_interval],
             pch = boundary_pch,
@@ -911,7 +929,7 @@ draw_wright_facets_style <- function(plot_data,
     ]
     if (nrow(step_sub) > 0L) {
       step_y <- suppressWarnings(as.numeric(step_sub$DrawValue))
-      graphics::segments(
+      segments(
         x0 = x_pos - 0.34, y0 = step_y,
         x1 = x_pos + 0.34, y1 = step_y,
         col = pal["step_threshold"], lwd = 1.5
@@ -933,12 +951,12 @@ draw_wright_facets_style <- function(plot_data,
         function(value) paste(strwrap(value, width = 20L), collapse = "\n"),
         character(1)
       )
-      graphics::text(
+      text(
         x = x_pos,
         y = step_y,
         labels = draw_labels,
         pos = label_pos, offset = 0.16, cex = 0.54,
-        col = pal["step_threshold"]
+        col = "gray15"
       )
     }
     half_sub <- half_ruler[
@@ -946,7 +964,7 @@ draw_wright_facets_style <- function(plot_data,
       , drop = FALSE
     ]
     if (nrow(half_sub) > 0L) {
-      graphics::segments(
+      segments(
         x0 = x_pos - 0.22, y0 = half_sub$DrawValue,
         x1 = x_pos + 0.22, y1 = half_sub$DrawValue,
         col = grDevices::adjustcolor(pal["step_threshold"], alpha.f = 0.55),
@@ -955,42 +973,9 @@ draw_wright_facets_style <- function(plot_data,
     }
   }
 
-  graphics::mtext(
-    sprintf("* = %s person(s); rows/logit = %d", format(settings$PersonsPerStar[1], trim = TRUE), settings$RowsPerLogit[1]),
-    side = 1, line = 2.7, adj = 0, cex = 0.75
+  if (length(footer_lines)) mtext(
+    footer_lines, side = 1, line = 1.5 + 0.75 * seq_along(footer_lines),
+    adj = 0, cex = 0.67, col = "gray35"
   )
-  graphics::mtext(
-    "FACETS Table 6-style visual layout; estimates remain mfrmr estimates (not numerical equivalence).",
-    side = 1, line = 3.7, adj = 0, cex = 0.67, col = "gray35"
-  )
-  if (isTRUE(show_ci)) {
-    graphics::mtext(
-      sprintf(
-        "Whiskers show %g%% mfrmr confidence intervals; triangles mark bounds beyond the displayed ruler.",
-        round(100 * ci_level)
-      ),
-      side = 1, line = 4.6, adj = 0, cex = 0.64,
-      col = pal["facet_level"]
-    )
-  }
-  if (identical(auto_range_policy, "boundary_levels_at_ends")) {
-    graphics::mtext(
-      if (isTRUE(show_ci) && boundary_ci_count > 0L) {
-        paste0(
-          "Boundary-separated levels use end triangles and their intervals are omitted from the ruler; ",
-          "inspect OriginalEstimate and CI_Lower/CI_Upper."
-        )
-      } else {
-        "Boundary-separated levels are placed at ruler ends; inspect OriginalEstimate for their untruncated values."
-      },
-      side = 1, line = if (isTRUE(show_ci)) 5.4 else 4.6,
-      adj = 0, cex = 0.58, col = "#9A3412"
-    )
-  } else if (isTRUE(show_ci) && ci_clipped_count > 0L) {
-    graphics::mtext(
-      "CI endpoint triangles identify clipping; exact bounds remain in CI_Lower/CI_Upper.",
-      side = 1, line = 5.4, adj = 0, cex = 0.6, col = "#9A3412"
-    )
-  }
   invisible(NULL)
 }

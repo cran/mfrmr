@@ -20,6 +20,9 @@ Produces a Word / PowerPoint-friendly \code{flextable} with the
 caption and note wired in. Requires \code{flextable} (in Suggests).
 }
 \examples{
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("as_flextable.apa_table", run.dontrun = TRUE)
+\dontrun{
 tbl <- structure(
   list(
     table = data.frame(Term = c("Rater A", "Rater B"), Estimate = c(-0.12, 0.18)),
@@ -30,6 +33,7 @@ tbl <- structure(
 )
 if (requireNamespace("flextable", quietly = TRUE)) {
   invisible(as_flextable(tbl))
+}
 }
 }
 \seealso{

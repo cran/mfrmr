@@ -23,7 +23,7 @@ the \code{cell_table} element
 is used (requires \code{method = "residual"}).}
 
 \item{metric}{Which metric to plot: \code{"obs_exp"} for observed-minus-expected
-average (default), \code{"t"} for the standardized residual / t-statistic,
+average (default), \code{"t"} for the descriptive scaled residual (not a t-test),
 or \code{"contrast"} for pairwise differential-functioning contrast (only for \code{mfrm_dff}
 objects with \code{dif_table}).}
 
@@ -77,31 +77,18 @@ summaries, whereas
 \enumerate{
 \item Compute interaction with \code{\link[=dif_interaction_table]{dif_interaction_table()}} or differential-
 functioning contrasts with \code{\link[=analyze_dff]{analyze_dff()}}.
-\item Plot with \code{plot_dif_heatmap(...)}.
+\item Plot with \code{plot(..., type = "heatmap")}.
 \item Identify extreme cells or contrasts for follow-up.
 }
 }
 
-\examples{
-\donttest{
-toy <- load_mfrmr_data("example_bias")
+\section{Migration in 0.2.4}{
 
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                 method = "JML", model = "RSM", maxit = 30)
-diag <- diagnose_mfrm(fit, residual_pca = "none")
-int <- dif_interaction_table(fit, diag, facet = "Rater",
-                             group = "Group", data = toy, min_obs = 2)
-heat <- plot_dif_heatmap(int, metric = "obs_exp", draw = FALSE)
-dim(heat$data$matrix)
-# Look for (`metric = "obs_exp"`): cells near 0 are aligned with
-#   model expectation; |Obs - Exp| > 0.5 logits is a substantive
-#   gap. With `metric = "t"` the cell scale becomes a standardized
-#   residual where |t| > 2 is a screening flag, not a standalone
-#   hypothesis test. With `metric = "contrast"` the layout switches
-#   to Level x GroupPair and reads as the pairwise differential-
-#   functioning contrast (use `analyze_dff()`).
+This renderer is internal. Use the corresponding \code{plot()} route in
+\link{mfrmr_plot_migration}; the former exported name is no longer available.
 }
-}
+
 \seealso{
 \code{\link[=dif_interaction_table]{dif_interaction_table()}}, \code{\link[=analyze_dff]{analyze_dff()}}, \code{\link[=analyze_dif]{analyze_dif()}}, \code{\link[=dif_report]{dif_report()}}
 }
+\keyword{internal}

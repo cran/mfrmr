@@ -5,11 +5,17 @@
 \title{Analyze the MFRM design network}
 \usage{
 mfrm_network_analysis(
-  fit,
+  fit = NULL,
   diagnostics = NULL,
   top_n_subsets = NULL,
   min_observations = 0,
-  include_graph = FALSE
+  include_graph = FALSE,
+  data = NULL,
+  person = NULL,
+  facets = NULL,
+  score = NULL,
+  basis = c("observed", "planned"),
+  weight = NULL
 )
 }
 \arguments{
@@ -25,12 +31,30 @@ retain before constructing the graph.}
 \item{include_graph}{Logical; if \code{TRUE}, include the underlying \code{igraph}
 object in the returned bundle. Defaults to \code{FALSE} so outputs remain easy
 to serialize.}
+
+\item{data}{Optional raw assignment/rating data, supplied instead of \code{fit}.}
+
+\item{person, facets}{Names of the person column and one or more facet columns
+in \code{data}. Include only Rater in \code{facets} to inspect person-rater links
+without a common Criterion node obscuring separate panels.}
+
+\item{score}{Numeric score column for \code{basis = "observed"}. Recode study-specific
+missing markers to \code{NA} first; no category recoding or estimation is done.}
+
+\item{basis}{\code{"observed"} includes rows with complete identifiers and nonmissing
+finite scores; \code{"planned"} includes complete assignment rows without scores.
+Planned networks require \code{score = NULL} and \code{weight = NULL}.}
+
+\item{weight}{Optional numeric weight column for observed raw data. Missing
+and zero-weight rows do not create edges. Edge weights still count rows,
+not sampling weights. Negative or infinite weights are refused.}
 }
 \value{
 A bundle of class \code{mfrm_network_analysis} containing:
 \itemize{
 \item \code{summary}: graph-level connectedness and vulnerability metrics
-\item \code{node_metrics}: node-level degree, strength, centrality, and cutpoint flags
+\item \code{node_metrics}: node-level degree, strength, graph-theoretic centrality,
+and cutpoint flags
 \item \code{edge_metrics}: edge-level weights, betweenness, and bridge flags
 \item \code{facet_summary}: facet-level aggregation of node/bridge indicators
 \item \code{cut_nodes}: articulation-point rows from \code{node_metrics}
@@ -45,15 +69,23 @@ Analyze the MFRM design network
 an undirected weighted graph. Nodes are person or facet levels; edges connect
 levels that co-occur in at least one observed rating; edge weights are
 co-observation counts. The resulting network metrics are design diagnostics,
-not psychometric measures of person ability or rater quality.
+not psychometric measures of person ability or rater quality. This is the
+package's assignment/co-observation network: unlike the score-relation
+networks returned by \code{\link[=rater_network_analysis]{rater_network_analysis()}} and
+\code{\link[=rater_halo_network_analysis]{rater_halo_network_analysis()}}, it exposes disconnected co-observation
+components. Graph connectedness alone does not establish model identification.
+\code{SourceSubsets}, \code{RetainedSubsets} and \code{ScopeComplete} record whether subset
+filters retained the full observed design. Connectedness of selected subsets
+cannot be generalized to omitted subsets. Recreate older design reviews
+from the existing fit and matching diagnostics to record this coverage.
 \code{plot(net, type = "centrality")}, \code{plot(net, type = "facet_summary")}, and
 \code{plot(net, type = "network")} provide immediate visual checks; use
 \code{draw = FALSE} to extract reusable plot data.
 
 The most useful review columns are:
 \itemize{
-\item \code{Components}: more than one component means the design has disconnected
-measurement subsets.
+\item \code{Components}: more than one component means separate co-observation
+regions, including known levels without observed links.
 \item \code{IsArticulationPoint}: a node whose removal would increase disconnectedness.
 \item \code{IsBridge}: an edge whose removal would increase disconnectedness.
 \item \code{Betweenness}: a routing-dependence indicator; high values identify levels
@@ -75,18 +107,30 @@ Muller, K. (2026). \emph{igraph: Network Analysis and Visualization}.
 }
 }
 
+\section{Before fitting}{
+
+Supply \code{data}, \code{person}, \code{facets} and \code{score} instead of \code{fit}. Known levels
+from incomplete/unscored rows remain as nodes, including isolates. A planned
+assignment roster can be examined with \code{basis = "planned"}; absent assignments
+cannot be reconstructed from an observed-only file. \code{row_usage} records each
+input row's inclusion and first exclusion reason. With a fit, only its retained
+rows are available here; review original missing assignments before fitting.
+No prefit result supplies an identification audit or model-readiness decision.
+\code{settings$is_disjoint} describes the source graph, even when subset filters
+omit components; compare source/retained subset counts. Filters do not establish
+linking. See \code{vignette("mfrmr-networks-and-reporting")} for a panel example.
+}
+
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-  method = "JML", maxit = 30
-)
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("mfrm_network_analysis", run.dontrun = TRUE)
+\dontrun{
+ratings <- load_mfrmr_data("example_operational")
 if (requireNamespace("igraph", quietly = TRUE)) {
-  net <- mfrm_network_analysis(fit)
+  net <- mfrm_network_analysis(data = ratings, person = "Person",
+    facets = "Rater", score = "Score")
   net$summary
-  head(net$node_metrics)
-  net$cut_nodes
-  plot(net, type = "centrality", draw = FALSE)
+  plot(net, type = "network", draw = FALSE)
 }
 }
 }

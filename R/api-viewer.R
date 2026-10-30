@@ -130,16 +130,7 @@ mfrm_results_viewer_tab_statuses <- function(x) {
 }
 
 mfrm_results_viewer_response_time_boundary <- function() {
-  data.frame(
-    Area = c("Source", "Use", "Do not use as", "Next route"),
-    Detail = c(
-      "Response-time metadata supplied outside the fitted MFRM likelihood.",
-      "Descriptive QC for rapid/slow timing patterns by event, person, facet, or score.",
-      "A fitted speed parameter, joint speed-accuracy model, modified logit estimate, or automatic exclusion rule.",
-      "Use response_time_review(), plot_response_time_review(..., draw = FALSE), and plot_data_components() for reusable timing QC tables."
-    ),
-    stringsAsFactors = FALSE
-  )
+  .mfrmr_table_mfrm_results_viewer_response_time_boundary_data
 }
 
 mfrm_results_viewer_payload <- function(x, top_n = 100L) {
@@ -150,6 +141,7 @@ mfrm_results_viewer_payload <- function(x, top_n = 100L) {
       call. = FALSE
     )
   }
+  x <- mfrm_results_restore_response_overview(x)
   top_n <- max(1L, as.integer(top_n[1] %||% 100L))
   sx <- summary(x, top_n = top_n)
   tables <- x$tables %||% list()
@@ -655,6 +647,10 @@ mfrm_results_shiny_app <- function(x, top_n = 100L) {
 #'   `return_app = FALSE`.
 #'
 #' @details
+#' Testlet and random-rater results are not supported by this viewer. Use
+#' `mfrm_report(res, output = "html")` or [export_mfrm_results()] for their
+#' static results and model-specific figures.
+#'
 #' The viewer assumes that fitting, diagnostics, and section selection have
 #' already happened through [mfrm_results()]. This keeps GUI exploration
 #' separate from reproducible analysis setup: the Replay tab displays the
@@ -699,6 +695,9 @@ launch_mfrmr_viewer <- function(x,
                                 display.mode = c("auto", "normal", "showcase"),
                                 return_app = FALSE,
                                 ...) {
+  if (inherits(x, "mfrm_results") && mfrm_extended_fit(x$fit)) {
+    stop("The Shiny viewer does not support testlet or random-rater results; use mfrm_report(res, output = 'html') or export_mfrm_results().", call. = FALSE)
+  }
   if (!inherits(x, "mfrm_results")) {
     stop(
       "`x` must be an mfrm_results object. Call `mfrm_results()` first, ",

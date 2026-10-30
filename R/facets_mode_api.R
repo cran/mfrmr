@@ -90,6 +90,9 @@ infer_facets_mode_mapping <- function(dat, person = NULL, facets = NULL, score =
 #' @param anchors Optional anchor table (data.frame).
 #' @param group_anchors Optional group-anchor table (data.frame).
 #' @param noncenter_facet Non-centered facet passed to [fit_mfrm()].
+#' @param centering_scope Whole-facet (default), legacy remainder, or explicit
+#'   direct/group-anchor-origin centering for ordinary additive RSM/PCM JML;
+#'   passed to [fit_mfrm()].
 #' @param dummy_facets Optional dummy facets fixed at zero.
 #' @param positive_facets Optional facets with positive orientation.
 #' @param quad_points Quadrature points for MML; passed to [fit_mfrm()].
@@ -131,7 +134,7 @@ infer_facets_mode_mapping <- function(dat, person = NULL, facets = NULL, score =
 #' @section Visualization:
 #' - `plot(out, type = "fit")` delegates to [plot.mfrm_fit()] and returns
 #'   fit-level visual bundles (e.g., Wright/pathway/CCC).
-#' - `plot(out, type = "qc")` delegates to [plot_qc_dashboard()] and returns
+#' - `plot(out, type = "qc")` delegates to [plot(x, type = "qc")][plot.mfrm_fit] and returns
 #'   a QC dashboard plot object.
 #'
 #' @section Interpreting output:
@@ -162,7 +165,9 @@ infer_facets_mode_mapping <- function(dat, person = NULL, facets = NULL, score =
 #'   [mfrmr_workflow_methods], [mfrmr_compatibility_layer]
 #'
 #' @examples
-#' \donttest{
+#' # Long-running workflow; run explicitly when needed.
+#' # example("run_mfrm_facets", run.dontrun = TRUE)
+#' \dontrun{
 #' toy <- load_mfrmr_data("example_core")
 #' toy_small <- toy[toy$Person %in% unique(toy$Person)[1:12], , drop = FALSE]
 #'
@@ -194,7 +199,11 @@ infer_facets_mode_mapping <- function(dat, person = NULL, facets = NULL, score =
 #'   out_mml$fit$summary[, c("Model", "Method", "MethodUsed")]
 #' }
 #' }
+#' @param mml_integration MML integration mode passed to [fit_mfrm()]:
+#'   `"fixed"` (default) or `"adaptive"`. Adaptive integration requires the
+#'   direct MML engine.
 #' @export
+#' @order 1
 run_mfrm_facets <- function(data,
                             person = NULL,
                             facets = NULL,
@@ -214,11 +223,15 @@ run_mfrm_facets <- function(data,
                             reltol = 1e-9,
                             optimizer = c("auto", "BFGS", "L-BFGS-B"),
                             mml_engine = c("direct", "em", "hybrid"),
-                            top_n_interactions = 20L) {
+                            top_n_interactions = 20L,
+                            mml_integration = c("fixed", "adaptive"),
+                            centering_scope = c("facet", "remainder", "anchor_origin")) {
   model <- toupper(match.arg(model))
   method <- toupper(match.arg(method))
   optimizer <- match.arg(optimizer)
   mml_engine <- tolower(match.arg(mml_engine))
+  mml_integration <- match.arg(mml_integration)
+  centering_scope <- match.arg(centering_scope)
 
   dat <- normalize_facets_mode_data(data)
   mapping <- infer_facets_mode_mapping(
@@ -245,13 +258,15 @@ run_mfrm_facets <- function(data,
     anchors = anchor_df,
     group_anchors = group_anchor_df,
     noncenter_facet = noncenter_facet,
+    centering_scope = match.arg(centering_scope),
     dummy_facets = dummy_facets,
     positive_facets = positive_facets,
     quad_points = as.integer(quad_points),
     maxit = as.integer(maxit),
     reltol = as.numeric(reltol),
     optimizer = optimizer,
-    mml_engine = mml_engine
+    mml_engine = mml_engine,
+    mml_integration = mml_integration
   )
 
   diagnostics <- diagnose_mfrm(fit, top_n_interactions = as.integer(top_n_interactions))
@@ -262,9 +277,9 @@ run_mfrm_facets <- function(data,
   run_info <- data.frame(
     key = c(
       "person", "score", "facets", "weight",
-      "model", "method_input", "method_used", "step_facet", "noncenter_facet",
+      "model", "method_input", "method_used", "step_facet", "noncenter_facet", "centering_scope",
       "dummy_facets", "positive_facets", "keep_original", "quad_points",
-      "maxit", "reltol", "optimizer", "mml_engine", "top_n_interactions"
+      "maxit", "reltol", "optimizer", "mml_engine", "mml_integration", "top_n_interactions"
     ),
     value = c(
       mapping$person,
@@ -276,6 +291,7 @@ run_mfrm_facets <- function(data,
       as.character(fit$config$method %||% fit$summary$MethodUsed[[1]] %||% fit$summary$Method[[1]]),
       if (is.null(step_facet)) "" else as.character(step_facet),
       noncenter_facet,
+      centering_scope,
       paste(if (is.null(dummy_facets)) character(0) else dummy_facets, collapse = ","),
       paste(if (is.null(positive_facets)) character(0) else positive_facets, collapse = ","),
       as.character(isTRUE(keep_original)),
@@ -284,6 +300,7 @@ run_mfrm_facets <- function(data,
       as.character(as.numeric(reltol)),
       optimizer,
       mml_engine,
+      mml_integration,
       as.character(as.integer(top_n_interactions))
     ),
     stringsAsFactors = FALSE
@@ -325,7 +342,9 @@ mfrmRFacets <- function(data,
                         maxit = 400,
                         reltol = 1e-9,
                         mml_engine = c("direct", "em", "hybrid"),
-                        top_n_interactions = 20L) {
+                        top_n_interactions = 20L,
+                        mml_integration = c("fixed", "adaptive"),
+                            centering_scope = c("facet", "remainder", "anchor_origin")) {
   run_mfrm_facets(
     data = data,
     person = person,
@@ -339,12 +358,14 @@ mfrmRFacets <- function(data,
     anchors = anchors,
     group_anchors = group_anchors,
     noncenter_facet = noncenter_facet,
+    centering_scope = match.arg(centering_scope),
     dummy_facets = dummy_facets,
     positive_facets = positive_facets,
     quad_points = quad_points,
     maxit = maxit,
     reltol = reltol,
     mml_engine = mml_engine,
+    mml_integration = mml_integration,
     top_n_interactions = top_n_interactions
   )
 }

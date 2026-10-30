@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Dependent ratings within a person: testlet models</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Dependent ratings within a person: testlet
+models</h1>
+
+
+
+<p>A judge scores several criteria for one performance. The judge’s
+impression of that particular performance may affect all of those
+scores, even after accounting for the performer’s ability, criterion
+difficulty and the judge’s usual severity. Treating the scores as
+conditionally independent can count that shared impression several
+times. A <strong>testlet</strong> identifies ratings that share an
+additional local effect within a person.</p>
+<p>The grouping could describe criteria scored by one language examiner,
+ratings within a clinical station, or dimensions of a music performance.
+Choose the group from the assessment process, not simply because scores
+correlate. This model is appropriate only when one ability, the declared
+fixed facets and the specified independent normal local effects are a
+defensible account of the assessment.</p>
+<p>For decisions about adding tasks versus criteria, unequal rubric
+lengths, possible halo and task-specific dependence, see <a href="mfrmr-testlet-applications.html">Tasks, rubric criteria and
+testlet dependence</a>. That article includes runnable allocation and
+score-sensitivity examples. A large local variance does not identify
+halo, and accounting for dependence does not enforce equal task weights.
+The current API estimates one common local variance, not a separate
+variance for each task.</p>
+<div id="declare-what-shares-an-effect" class="section level2">
+<h2>Declare what shares an effect</h2>
+<p>In this example, <code>Rater</code> has two distinct roles. Its
+<strong>fixed effect</strong> describes that rater’s severity across
+persons. Its <strong>testlet membership</strong> groups that rater’s
+criteria within each person. The local effect for Person P01 and Rater
+R01 is independent of the local effect for Person P02 and Rater R01. It
+is not one random rater effect shared across both persons. For the
+latter model, see
+<code>vignette(&quot;mfrmr-random-raters&quot;, package = &quot;mfrmr&quot;)</code>.</p>
+<p>This example corresponds most directly to the distinction between
+fixed rater severity and Person-by-rater local effects in <a href="https://doi.org/10.1177/0146621605276281">Wang and Wilson’s
+random-effects facet model (2005)</a>, equations 14–15. Their <a href="https://doi.org/10.1177/0146621604271053">Rasch testlet model</a>
+provides the broader block-dependence formulation. The implementation
+here uses one common local variance; it does not estimate a separate
+inconsistency parameter for each rater.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>ratings <span class="ot">&lt;-</span> <span class="fu">load_mfrmr_data</span>(<span class="st">&quot;example_core&quot;</span>)</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="fu">head</span>(ratings[<span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>, <span class="st">&quot;Score&quot;</span>)], <span class="dv">8</span>)</span></code></pre></div>
+<p>Every row belongs to exactly one testlet. A separate
+<code>Session</code> or <code>Station</code> column can be used instead
+of <code>Rater</code>; it need not also be a fixed facet. Labels may be
+reused across persons. If two sittings within the same person have
+independent local effects, give them distinct testlet labels. The model
+does not infer membership or support overlapping groups.</p>
+</div>
+<div id="fit-and-check-the-calibration" class="section level2">
+<h2>Fit and check the calibration</h2>
+<p>The following call fits the model. To avoid repeating this
+calculation whenever the tutorial is rendered, the displayed results use
+the packaged synthetic example fitted with these data and settings. Run
+the call yourself to estimate a new calibration; reading the saved
+example is not a new estimation check.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>testlet_fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm_testlet</span>(</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>  ratings, <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>, <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>, <span class="at">testlet =</span> <span class="st">&quot;Rater&quot;</span>,</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>  <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="at">score_levels =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>,</span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>  <span class="at">quad_points =</span> <span class="dv">121</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>saved_example <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="fu">system.file</span>(<span class="st">&quot;examples&quot;</span>, <span class="st">&quot;extended-models.rds&quot;</span>,</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>                                      <span class="at">package =</span> <span class="st">&quot;mfrmr&quot;</span>, <span class="at">mustWork =</span> <span class="cn">TRUE</span>))<span class="sc">$</span>testlet</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>testlet_fit <span class="ot">&lt;-</span> saved_example<span class="sc">$</span>fit</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>testlet_fit<span class="sc">$</span>checks</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="fu">summary</span>(testlet_fit)<span class="sc">$</span>data_usage</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>testlet_fit<span class="sc">$</span>calibration<span class="sc">$</span>variance</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>testlet_fit<span class="sc">$</span>calibration<span class="sc">$</span>person_variance</span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="fu">stopifnot</span>(testlet_fit<span class="sc">$</span>checks<span class="sc">$</span>NumericalReady,</span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>          testlet_fit<span class="sc">$</span>checks<span class="sc">$</span>InformationPositive)</span></code></pre></div>
+<p>The model uses adjacent-category RSM probabilities, a mean-zero
+normal ability population with estimated variance, and independent
+zero-mean normal testlet effects with a common estimated variance.
+Fixed-facet effects sum to zero; free category steps set the overall
+location. Estimation is frequentist marginal maximum likelihood, with
+both ability and local effects integrated using Gaussian quadrature.
+There are no calibration priors and no additional fitting
+dependency.</p>
+<p><code>person_sd = NULL</code>, the default, estimates ability
+variance as well as local variance. Mean-zero ability and free step
+location avoid estimating two interchangeable locations. Supply
+<code>person_sd = 1</code> to fit the earlier N(0,1) model, or another
+positive SD only when treating it as known is justified. With a unit
+Rasch slope, fixing ability variance is a population restriction, not
+merely choosing units. Estimating it still assumes a common normal
+population independent of assignment; it does not repair skewness or
+different ability populations across rater panels.</p>
+<p>After integrating ability and local effects, <strong>different
+persons are independent under this model</strong>. Their individual
+ratings are not independent replications. More persons can provide
+information about the common variances when the design separates ability
+from local dependence; adding criteria in one block is not equivalent.
+Normal calibration intervals require an identified interior model with
+adequate information. Their information matrix includes both estimated
+variances, rather than treating fitted variances as known.</p>
+<p><code>NumericalReady</code> checks optimization, search boundaries,
+and agreement with a higher integration order.
+<code>InformationPositive</code> checks usable local curvature. The
+default order is 31; this example uses 121. Inspect the individual
+differences when a check fails; increasing <code>quad_points</code> can
+resolve integration errors, but cannot repair an unidentified or
+unsuitable model. No order is universally sufficient. Failed checks
+withhold intervals and block Person scoring. Passing checks does not
+establish model fit or frequentist coverage.</p>
+<p>The variance can be exactly zero. Such a result does not prove that
+the assessment has no local dependence. Ordinary calibration intervals
+are withheld at an estimated zero variance; a regular variance interval
+is not provided. <code>testlet_variance = 0</code> is a different
+decision: it specifies zero as known and estimates under that restricted
+model. A known positive variance can also be supplied; it should not be
+treated as known merely because another analysis estimated it.</p>
+<p>Ability variance can also be estimated at zero. Both the population
+estimate and its boundary status remain visible, but
+<code>predict()</code> then returns all requested Persons as
+<code>unavailable</code>, with an explanation. It does not report
+zero-width ability intervals. <code>variance_max</code> and
+<code>person_variance_max</code> bound the searches for local and
+ability variance, respectively; hitting either upper bound requires
+numerical review.</p>
+<p>For comparison with ordinary MFRM, preserve the observed events,
+category coding, fixed Rater and Criterion effects, and the ability
+population and location convention. With <code>person_sd = 1</code>, use
+the fixed N(0,1) ordinary model; with estimated ability variance, the
+ordinary model must also estimate its population and its location must
+be aligned. A known zero local variance gives the corresponding ordinary
+RSM; an estimated zero is a variance-boundary result. Standard
+chi-squared likelihood-ratio calibration is not automatic.
+<code>compare_mfrm()</code> checks these conditions and compares
+centered fixed-facet effects. Separately supplied source-roster scores
+add Person comparisons; no preferred model is chosen. Changes in scores
+or interval widths alone do not demonstrate better accuracy when the
+true abilities are unknown.</p>
+</div>
+<div id="review-fixed-rater-feedback" class="section level2">
+<h2>Review fixed-rater feedback</h2>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">subset</span>(testlet_fit<span class="sc">$</span>calibration_table, Facet <span class="sc">==</span> <span class="st">&quot;Rater&quot;</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="co"># Bounds require an explicit choice of approximation and nominal level.</span></span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="fu">confint</span>(testlet_fit, <span class="at">parm =</span> <span class="st">&quot;calibration&quot;</span>, <span class="at">level =</span> .<span class="dv">95</span>)</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="fu">plot</span>(testlet_fit, <span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">intervals =</span> <span class="st">&quot;normal&quot;</span>, <span class="at">level =</span> .<span class="dv">95</span>)</span></code></pre></div>
+<p>Positive severity means lower expected scores at the same ability and
+other facet levels. Default tables retain estimates and approximate SEs
+with missing bounds; default plots show points only. The explicitly
+requested whiskers above are 95% observed-information normal
+approximations for the fixed effects. Their finite-sample coverage
+remains unresolved in the estimated-population comparison below. They
+are not intervals for a newly sampled rater, tests of rater quality, or
+simultaneous pairwise comparisons. Missing whiskers remain missing.
+<code>plot(testlet_fit, facet = &quot;Criterion&quot;)</code> reviews criterion
+effects.</p>
+</div>
+<div id="score-persons-and-interpret-their-intervals" class="section level2">
+<h2>Score persons and interpret their intervals</h2>
+<p>For people already in the fit, use
+<code>score_mfrm_persons(testlet_fit)</code> to reuse the source
+ratings. This is the common entry for supported ordinary, shared-rater
+and testlet RSMs. The example below uses the testlet-specific
+<code>predict()</code> method to supply an explicit rating table. For a
+shared-rater model, <code>predict()</code> instead needs supplied
+abilities and returns response probabilities.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>first <span class="ot">&lt;-</span> ratings[ratings<span class="sc">$</span>Person <span class="sc">%in%</span> <span class="fu">unique</span>(ratings<span class="sc">$</span>Person)[<span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>], ]</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>scores <span class="ot">&lt;-</span> <span class="fu">predict</span>(testlet_fit, first)</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>scores<span class="sc">$</span>table</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="fu">plot</span>(scores)</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">all</span>(scores<span class="sc">$</span>table<span class="sc">$</span>Status <span class="sc">==</span> <span class="st">&quot;available_conditional&quot;</span>))</span></code></pre></div>
+<p><code>Estimate</code> is the posterior mean (EAP).
+<code>ConditionalSD</code> describes the Person posterior spread.
+<code>Lower</code> and <code>Upper</code> delimit a continuous
+equal-tail posterior interval. The plot therefore labels them
+<strong>conditional intervals</strong>: all calibration values,
+including ability and local variances, are held fixed. These intervals
+exclude calibration-estimation uncertainty. They are neither
+calibration-adjusted confidence intervals nor tests of differences
+between persons. A 95% conditional interval does not guarantee 95%
+coverage at every fixed ability.</p>
+<p>A simulation compared ordinary and testlet RSMs on the same observed
+ratings, with both models estimating normal ability variance. There were
+120 independent datasets per condition, with 12 prespecified Persons
+scored from each complete calibration sample. True ability SD was 1.3;
+positive local variance was .8. The balanced design had two tasks with
+three criteria each.</p>
+<p>The table reports <strong>marginal coverage</strong>, averaging over
+generated abilities and ratings, after correcting a numerical
+start-selection issue. Bracketed ranges are 95% Monte Carlo intervals
+for the simulation result, calculated with datasets as the independent
+units. They are not Person intervals.</p>
+<table>
+<colgroup>
+<col width="27%" />
+<col width="36%" />
+<col width="36%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Condition</th>
+<th align="right">Testlet coverage [95% MC interval]</th>
+<th align="right">Ordinary RSM coverage</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>120 Persons, no local dependence</td>
+<td align="right">95.1% [93.9, 96.4]</td>
+<td align="right">95.1%</td>
+</tr>
+<tr class="even">
+<td>120 Persons, positive local dependence</td>
+<td align="right">94.4% [93.1, 95.8]</td>
+<td align="right">84.9%</td>
+</tr>
+<tr class="odd">
+<td>24 Persons, positive local dependence</td>
+<td align="right">91.7% [89.7, 93.7]</td>
+<td align="right">83.3%</td>
+</tr>
+<tr class="even">
+<td>120 Persons, sparse unequal blocks</td>
+<td align="right">93.3% [91.9, 94.7]</td>
+<td align="right">85.7%</td>
+</tr>
+</tbody>
+</table>
+<p>All 120 panels per condition were available in the corrected replay.
+In the original run, 115, 113, 119 and 119 panels were available:
+fourteen cases selected an abnormally terminated optimization start even
+though a converged start had the same likelihood within floating-point
+precision. All fourteen passed after the selection repair, with
+unchanged numerical tolerances. The selection rule leaves 466 of the 480
+fits unchanged; four of these successful controls were refitted and
+retained identical estimates and scores. This replay reuses the
+generated data; it is not an independent confirmation study. The
+original outcomes remain recorded. Fitting used 61 quadrature points,
+with a prespecified 121-point refit for unresolved grid agreement; the
+results do not establish that the default order of 31 suffices.</p>
+<p>Accounting for local dependence improved interval coverage relative
+to the ordinary model in these three positive-dependence conditions.
+<strong>Point-score accuracy did not consistently improve.</strong> Mean
+squared error measures distance from the generated abilities; smaller is
+better. On the matched datasets, testlet minus ordinary EAP mean squared
+error was .00665 [95% MC interval .00190, .01140] with 120 Persons and
+.05174 [.02582, .07766] with 24 Persons in the balanced design. Thus
+point errors were larger in those two conditions even though coverage
+improved. Differences in the null and sparse conditions were
+inconclusive. Mean conditional interval widths increased by .78, .76 and
+.67 logits in the three positive-dependence conditions; a wider interval
+alone does not establish better scoring.</p>
+<p>The known-calibration reference had coverage of 94.2–95.7%. In the
+balanced positive-dependence conditions, fitted-calibration testlet
+coverage was 1.25 percentage points lower [95% MC interval -2.02, -.48]
+with 120 Persons and 2.50 points lower [-4.35, -.65] with 24 Persons.
+This compares all calibration parameters together; it does not isolate
+the effect of estimating ability variance. The small-sample testlet
+coverage MCSE was 1.01 percentage points. There was no increase in
+replication after seeing the outcomes.</p>
+<p>The sparse condition retained a common three-criterion task for every
+Person, plus either two criteria on a second task or one on a third. It
+changes workload and block length together; it does not test
+weak/disconnected linking or informative assignment. Unassigned ratings
+were absent, not imputed. These results concern same-source conditional
+scores, not new-Person transport, calibration-adjusted intervals, or 95%
+coverage at every fixed ability. The small and sparse conditions did not
+establish nominal 95% marginal coverage. Earlier fixed-N(0,1) results
+remain specific to that population assumption. No sample-size threshold
+or automatic choice of model follows.</p>
+<p>For each person, local-effect integration is checked at two orders,
+and the interval endpoints invert a continuous ability CDF. A numerical
+failure retains an <code>unavailable</code> row with a
+<code>Reason</code>; it does not silently remove the person or replace
+the score. Use <code>summary(scores)$status_counts</code> to inspect all
+statuses. Successful numerical integration alone does not validate the
+ability prior or the local-dependence assumptions.</p>
+</div>
+<div id="missing-assigned-scores-and-sparse-designs" class="section level2">
+<h2>Missing assigned scores and sparse designs</h2>
+<p>An unassigned rating is absent from the table. An assigned rating
+whose score was not recorded has an explicit <code>NA</code>. The
+default rejects missing assigned scores. Use
+<code>missing = &quot;omit&quot;</code> only after deciding that analyzing the
+observed ratings is appropriate; it records omissions without imputing
+scores or correcting informative nonresponse.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>incomplete <span class="ot">&lt;-</span> first</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>last_person <span class="ot">&lt;-</span> <span class="fu">tail</span>(<span class="fu">unique</span>(incomplete<span class="sc">$</span>Person), <span class="dv">1</span>)</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>incomplete<span class="sc">$</span>Score[incomplete<span class="sc">$</span>Person <span class="sc">==</span> last_person] <span class="ot">&lt;-</span> <span class="cn">NA_real_</span></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>incomplete<span class="sc">$</span>Score[<span class="dv">1</span>] <span class="ot">&lt;-</span> <span class="cn">NA_real_</span></span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>review <span class="ot">&lt;-</span> <span class="fu">predict</span>(testlet_fit, incomplete, <span class="at">missing =</span> <span class="st">&quot;omit&quot;</span>)</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>review<span class="sc">$</span>table</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>review<span class="sc">$</span>data_usage</span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a><span class="fu">plot</span>(review)</span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">sum</span>(review<span class="sc">$</span>table<span class="sc">$</span>Status <span class="sc">==</span> <span class="st">&quot;prior_only&quot;</span>) <span class="sc">==</span> <span class="dv">1</span>)</span></code></pre></div>
+<p>The entirely missing person has status <code>prior_only</code>, mean
+zero and the SD stored in
+<code>testlet_fit$calibration$person_sd</code>. These are population
+values, not measured average performance. The plot uses an open circle
+for this case. The partially missing person is scored from the remaining
+ratings, with the omission count retained.</p>
+<p>Unequal testlet sizes and absent testlets are allowed. For fitting,
+at least two persons must have multiple observed testlets, and at least
+two must have repeated ratings within a testlet. Fixed-facet levels must
+be observed and the fixed design must have full rank. These are initial
+requirements, not a proof of estimability. Sparse assignments can still
+provide little information about the local variance. Ability, local
+effects and assignment are assumed independent; choosing assignments
+based on unmodeled ability can violate that assumption even without
+missing scores. Omission and sparse assignment are therefore different
+issues.</p>
+</div>
+<div id="reuse-and-save-the-result" class="section level2">
+<h2>Reuse and save the result</h2>
+<p><code>predict(testlet_fit)</code> reuses the source assignment and
+its omission policy. For new data, new Person and testlet labels are
+allowed; fixed-facet levels must already exist in the calibration.
+Supply <strong>all ratings to use for each Person in one call</strong>.
+The function neither appends to cached responses nor conditions on a
+saved local-effect estimate. To score additional ratings for an existing
+person, supply that person’s complete set with the correct shared
+memberships. Do not duplicate the old rows when assembling it.</p>
+<p>The fixed-facet restriction still applies when a column has two
+roles. Here <code>Rater</code> is both the testlet label and a fixed
+facet. A new Person rated by the known raters can be scored, but a new
+rater label has no fitted fixed severity and is refused. A separate
+testlet column that is not a fixed facet may use new labels. Changing
+labels is not a substitute for choosing which ratings actually share a
+local effect.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>path <span class="ot">&lt;-</span> <span class="fu">tempfile</span>(<span class="at">fileext =</span> <span class="st">&quot;.rds&quot;</span>)</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="fu">saveRDS</span>(testlet_fit, path)</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>restored <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(path)</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">identical</span>(restored<span class="sc">$</span>parameters, testlet_fit<span class="sc">$</span>parameters))</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>saved_plot <span class="ot">&lt;-</span> <span class="fu">plot</span>(scores, <span class="at">draw =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="fu">plot_data</span>(saved_plot)<span class="sc">$</span>table</span></code></pre></div>
+</div>
+<div id="connect-to-the-common-graphics-and-table-workflow" class="section level2">
+<h2>Connect to the common graphics and table workflow</h2>
+<p>The ordinary fixed-facet model, shared random raters and
+Person-specific testlets answer different questions. Use
+<code>mfrmr_output_guide(&quot;models&quot;)</code> to choose the route, then
+consult <code>help(&quot;mfrmr_workflow_methods&quot;)</code> and
+<code>mfrmr_interval_guide()</code> for its supported outputs. In
+particular, <code>predict()</code> for a shared-rater fit returns score
+probabilities at supplied abilities, whereas <code>predict()</code> for
+a testlet fit estimates Person abilities from ratings.</p>
+<p>The shared plot accessors work directly on the testlet results. They
+return the stored results without drawing or refitting:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">plot_data_components</span>(scores)</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>score_table <span class="ot">&lt;-</span> <span class="fu">plot_data</span>(scores, <span class="at">component =</span> <span class="st">&quot;table&quot;</span>)</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="fu">plot_data</span>(testlet_fit, <span class="at">component =</span> <span class="st">&quot;table&quot;</span>, <span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span>)</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">identical</span>(score_table, scores<span class="sc">$</span>table))</span></code></pre></div>
+<p>Optional <code>ggplot2</code> conversion retains all labeled rows,
+prior-only symbols, missing whiskers and the interpretation note. It
+does not change the model or recalculate an interval. The
+incomplete-data result makes those distinctions visible:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">requireNamespace</span>(<span class="st">&quot;ggplot2&quot;</span>, <span class="at">quietly =</span> <span class="cn">TRUE</span>)) {</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>  figure <span class="ot">&lt;-</span> <span class="fu">as_ggplot</span>(review)</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>  <span class="fu">print</span>(figure <span class="sc">+</span> ggplot2<span class="sc">::</span><span class="fu">theme_minimal</span>(<span class="at">base_size =</span> <span class="dv">12</span>))</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>  <span class="co"># For a file: ggplot2::ggsave(&quot;person-scores.png&quot;, figure,</span></span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>  <span class="co">#                            width = 7, height = 5, dpi = 300)</span></span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>}</span></code></pre></div>
+<p><code>as_ggplot(testlet_fit, facet = &quot;Rater&quot;)</code> uses the same
+route for fixed-rater effects. For another question,
+<code>plot(scores, style = &quot;precision&quot;)</code> shows estimates against
+conditional interval width; <code>style = &quot;distribution&quot;</code> shows
+the empirical cumulative distribution of response-based point estimates,
+excluding prior-only and unavailable scores. This is not the latent
+population distribution. Shrinkage and Person selection affect it.</p>
+<p>The extended-model plots share <code>sort = &quot;estimate&quot;</code> or
+<code>&quot;uncertainty&quot;</code>, <code>palette = &quot;mono&quot;</code>,
+<code>show_labels</code>, <code>reference</code>,
+<code>text_scale</code> and <code>point_size</code>. Replace
+<code>title</code> or <code>caption</code>, use <code>&quot;&quot;</code> to
+remove either, or set
+<code>show_title = FALSE, show_notes = FALSE</code> when preparing a
+figure with a separate caption. These controls also pass through
+<code>plot(res, type = &quot;scores&quot;, ...)</code>. Explain the conditional
+interval target in that caption or the surrounding text.
+<code>plot_data(scores)$alt_text</code> and <code>$display_data</code>
+provide a text alternative and row inclusion/reasons; supply them
+alongside images for accessible output. The <a href="mfrmr-random-raters.html">shared-rater tutorial</a> shows these
+views and presentation controls with saved estimates.
+<code>plot_data(scores)$settings</code> and
+<code>plot_data(scores)$notes</code> retain the basis for custom
+displays. Plot data saved by earlier versions can be converted without
+refitting; recreating a plot from the saved fit or scores also refreshes
+its display metadata.</p>
+<p>For table export, keep <code>Status</code> and <code>Reason</code>
+rather than selecting only finite scores. An RDS object preserves
+settings that a CSV table alone cannot:</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>csv_path <span class="ot">&lt;-</span> <span class="fu">tempfile</span>(<span class="at">fileext =</span> <span class="st">&quot;.csv&quot;</span>)</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>utils<span class="sc">::</span><span class="fu">write.csv</span>(review<span class="sc">$</span>table, csv_path, <span class="at">row.names =</span> <span class="cn">FALSE</span>, <span class="at">na =</span> <span class="st">&quot;NA&quot;</span>)</span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>score_path <span class="ot">&lt;-</span> <span class="fu">tempfile</span>(<span class="at">fileext =</span> <span class="st">&quot;.rds&quot;</span>)</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="fu">saveRDS</span>(review, score_path)</span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">identical</span>(<span class="fu">readRDS</span>(score_path), review))</span></code></pre></div>
+</div>
+<div id="compare-fixed-effects-with-an-ordinary-rsm" class="section level2">
+<h2>Compare fixed effects with an ordinary RSM</h2>
+<p>For the same rating events, compare the usual rater and criterion
+effects with an ordinary model that estimates a common normal ability
+SD. This asks how modeling local dependence changes the fitted fixed
+effects; it does not test whether the local variance is zero or select a
+preferred model.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>ordinary_fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>  ratings, <span class="at">person =</span> <span class="st">&quot;Person&quot;</span>, <span class="at">facets =</span> <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>, <span class="at">method =</span> <span class="st">&quot;MML&quot;</span>, <span class="at">rating_min =</span> <span class="dv">1</span>, <span class="at">rating_max =</span> <span class="dv">4</span>,</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>  <span class="at">keep_original =</span> <span class="cn">TRUE</span>, <span class="at">population_formula =</span> <span class="sc">~</span><span class="dv">1</span>,</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>  <span class="at">person_data =</span> <span class="fu">unique</span>(ratings[<span class="st">&quot;Person&quot;</span>]), <span class="at">quad_points =</span> <span class="dv">121</span></span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>model_comparison <span class="ot">&lt;-</span> <span class="fu">compare_mfrm</span>(</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>  ordinary_fit, testlet_fit, <span class="at">labels =</span> <span class="fu">c</span>(<span class="st">&quot;Ordinary RSM&quot;</span>, <span class="st">&quot;Testlet RSM&quot;</span>)</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>)</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>model_comparison<span class="sc">$</span>checks</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>model_comparison<span class="sc">$</span>effects</span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a><span class="fu">plot</span>(model_comparison, <span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">style =</span> <span class="st">&quot;difference&quot;</span>)</span></code></pre></div>
+<p>The comparison retains both models’ population and numerical-check
+metadata. Within each facet it subtracts the unweighted mean over the
+same complete set of levels; the raw values, centers and differences
+remain available. Missing level estimates or failed numerical checks
+remain unavailable. No difference SEs, limits of agreement, automatic
+AIC/BIC preference or chi-squared LRT are computed. The equality or zero
+line is an orientation aid. Person scores, step locations and predictive
+Infit/Outfit are not compared by this facet output. Use
+<code>style = &quot;paired&quot;</code> for an equality-line display, or
+<code>as_ggplot()</code> for further styling; title/caption and
+accessibility controls are shared.</p>
+<p>Observed events, category coding and omitted identities must agree.
+New ordinary fits retain <code>prep$omitted_data</code>; old fits that
+omitted scores without this provenance need refitting from the complete
+assigned roster. Do not match datasets by counts alone. Zero known
+testlet variance retains the fixed rater effects, unlike zero
+shared-rater variance, which removes rater differences.</p>
+</div>
+<div id="inspect-posterior-predictive-residuals" class="section level2">
+<h2>Inspect posterior predictive residuals</h2>
+<p>Do some raters have more residual variability under the testlet
+model? Compute the predicted category distribution by integrating both
+ability and the Person-specific local effect. Its variance includes
+uncertainty in the conditional mean, not just the conditional rating
+variance. The resulting Infit and Outfit are <strong>descriptive
+summaries of the same data used for fitting</strong>. An expected value
+of one and ordinary-model cutoffs are not established; a lower value is
+not evidence that a rater should be removed.</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>response_review <span class="ot">&lt;-</span> <span class="fu">mfrm_response_diagnostics</span>(testlet_fit, <span class="at">group_by =</span> <span class="st">&quot;Rater&quot;</span>)</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>response_review<span class="sc">$</span>measures</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a><span class="fu">plot</span>(response_review, <span class="at">style =</span> <span class="st">&quot;paired&quot;</span>)</span></code></pre></div>
+<p>Use <code>style = &quot;scatter&quot;</code> to compare the two indices on
+separate axes. <code>palette = &quot;mono&quot;</code>,
+<code>show_title = FALSE</code>, <code>show_notes = FALSE</code>,
+<code>show_labels = FALSE</code> and custom
+<code>title</code>/<code>caption</code> control the presentation.
+<code>as_ggplot(response_review, style = &quot;scatter&quot;)</code> preserves the
+definition and text alternative. <code>plot_data()</code> retains
+unavailable groups and their reasons.</p>
+<p><code>response_review$rows</code> contains original row numbers,
+predicted means, predictive variances and residuals.
+<code>response_review$probabilities</code> contains category
+probabilities on the declared score scale. Assigned missing scores have
+no residual and are not imputed; absent assignments are never added.
+Groups with any unresolved observed row have unavailable summaries.
+<code>rows = ...</code> selects original rows for output, while the full
+observed roster still informs the posterior. This is not held-out
+validation or a formal test; ordinary plug-in Infit/Outfit cannot be
+compared directly with these values.</p>
+</div>
+<div id="compare-predictions-on-the-same-definition" class="section level2">
+<h2>Compare predictions on the same definition</h2>
+<p>Does accounting for Person-local dependence change expected scores
+and residual summaries? Calculate the ordinary RSM’s posterior
+predictive quantities, then compare them with the saved extension
+results. Both models use the same observed ratings and selected events.
+The ordinary plug-in indices returned by <code>diagnose_mfrm()</code>
+have a different definition and cannot replace this step.</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>ordinary_response_review <span class="ot">&lt;-</span> <span class="fu">mfrm_response_diagnostics</span>(ordinary_fit,</span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>  <span class="at">group_by =</span> <span class="st">&quot;Rater&quot;</span>)</span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>model_comparison <span class="ot">&lt;-</span> <span class="fu">compare_mfrm</span>(ordinary_fit, testlet_fit,</span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>  <span class="at">labels =</span> <span class="fu">c</span>(<span class="st">&quot;Ordinary RSM&quot;</span>, <span class="st">&quot;Testlet RSM&quot;</span>),</span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>  <span class="at">response_diagnostics =</span> <span class="fu">list</span>(ordinary_response_review, response_review))</span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a>model_comparison<span class="sc">$</span>responses<span class="sc">$</span>measures</span>
+<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a><span class="fu">plot</span>(model_comparison, <span class="at">metric =</span> <span class="st">&quot;infit&quot;</span>, <span class="at">style =</span> <span class="st">&quot;difference&quot;</span>)</span></code></pre></div>
+<p>These differences are descriptive and hold each model’s calibration
+fixed. The zero line means the summaries agree. A smaller Infit does
+<strong>not</strong> show that the model is better or the rater is more
+accurate: these predictions reuse the observations being checked, and
+their mean squares have no established reference value of one.</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="fu">as_ggplot</span>(model_comparison, <span class="at">metric =</span> <span class="st">&quot;probability&quot;</span>, <span class="at">show_labels =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>  <span class="at">palette =</span> <span class="st">&quot;mono&quot;</span>, <span class="at">show_title =</span> <span class="cn">FALSE</span>, <span class="at">show_notes =</span> <span class="cn">FALSE</span>)</span></code></pre></div>
+<p>Use <code>metric = &quot;expected_score&quot;</code>, <code>&quot;variance&quot;</code>
+or <code>&quot;outfit&quot;</code> to change the quantity, and
+<code>category = 4</code> with <code>metric = &quot;probability&quot;</code> to
+focus on one score. Expected scores remain on the original scale;
+variances are in squared score units. <code>responses$rows</code>
+retains both original row numbers and <code>responses$events</code>
+identifies each matched rating. Repeated events retain their
+multiplicity. If one prediction is unavailable, its difference remains
+missing with a reason. Group summaries never silently discard an
+unresolved observed row. Row numbers can differ between fits; matching
+uses event contents.</p>
+<p>The report below saves these comparisons and supports
+<code>plot(res, type = &quot;response_comparison&quot;, metric = &quot;infit&quot;)</code>.
+To collect the ordinary model’s summaries separately without running its
+plug-in diagnostics, use
+<code>mfrm_results(ordinary_fit, response_diagnostics = ordinary_response_review, compute = &quot;never&quot;)</code>.
+Plotting, collecting and exporting saved comparisons performs no new
+integration.</p>
+</div>
+<div id="compare-person-scores-and-inspect-model-aware-maps" class="section level2">
+<h2>Compare Person scores and inspect model-aware maps</h2>
+<p>How do individual scores change when the model accounts for local
+dependence? Use conditional scores computed from the same complete
+source roster. Selecting returned Persons does not remove the other
+observed responses. The ordinary model’s scoring retains its fitted
+normal mean and variance.</p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>source_scores <span class="ot">&lt;-</span> <span class="fu">score_mfrm_persons</span>(testlet_fit, <span class="at">persons =</span> scores<span class="sc">$</span>table<span class="sc">$</span>Person)</span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a>ordinary_person_scores <span class="ot">&lt;-</span> <span class="fu">score_mfrm_persons</span>(ordinary_fit,</span>
+<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a>  <span class="at">persons =</span> source_scores<span class="sc">$</span>table<span class="sc">$</span>Person)</span>
+<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a>model_comparison <span class="ot">&lt;-</span> <span class="fu">compare_mfrm</span>(ordinary_fit, testlet_fit,</span>
+<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a>  <span class="at">response_diagnostics =</span> <span class="fu">list</span>(ordinary_response_review, response_review),</span>
+<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a>  <span class="at">person_scores =</span> <span class="fu">list</span>(ordinary_person_scores, source_scores))</span>
+<span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a>model_comparison<span class="sc">$</span>persons<span class="sc">$</span>table</span>
+<span id="cb16-8"><a href="#cb16-8" tabindex="-1"></a><span class="fu">plot</span>(model_comparison, <span class="at">metric =</span> <span class="st">&quot;person&quot;</span>, <span class="at">style =</span> <span class="st">&quot;difference&quot;</span>, <span class="at">show_labels =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+<p>The comparison subtracts each model’s fitted population mean to
+remove its arbitrary origin; it preserves the Rasch logit unit. It
+retains raw scores, origins, posterior SDs and conditional endpoints.
+Shrinkage and population variance can still differ. Separate score
+intervals do not constitute an interval for their difference, a ranking
+of models or a test between Persons. Prior-only and unavailable
+differences remain withheld.</p>
+<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a>map_results <span class="ot">&lt;-</span> <span class="fu">mfrm_results</span>(testlet_fit, <span class="at">scores =</span> source_scores,</span>
+<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a>  <span class="at">response_diagnostics =</span> response_review, <span class="at">comparison =</span> model_comparison)</span>
+<span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a><span class="fu">plot</span>(map_results, <span class="at">type =</span> <span class="st">&quot;wright&quot;</span>, <span class="at">show_labels =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+<p>The Person column shows the selected source EAPs. Facet positions
+equal the severity coefficient plus the <strong>mean step
+location</strong>: the average adjacent category boundary when other
+effects are zero. The category column shows each step at that zero
+reference. The Person-local testlet effect is set to zero for these
+reference locations; it has no global facet column. These positions are
+conditional references, not posterior-averaged category crossings. A
+higher reference location means more ability is needed to cross the
+corresponding boundary. Adding several plotted facet locations together
+would count the mean step more than once; use the model equation for a
+specific rating profile.</p>
+<p>Whiskers show only Person intervals conditional on calibration.
+Translating an ordinary facet interval by the step mean would omit the
+covariance and uncertainty of that mean, so no such composite interval
+is drawn. The separate calibration/rater plots retain their original
+uncertainty targets.</p>
+<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a><span class="fu">as_ggplot</span>(<span class="fu">plot</span>(map_results, <span class="at">type =</span> <span class="st">&quot;fit_pathway&quot;</span>, <span class="at">facet =</span> <span class="st">&quot;Rater&quot;</span>,</span>
+<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a>  <span class="at">palette =</span> <span class="st">&quot;mono&quot;</span>, <span class="at">show_title =</span> <span class="cn">FALSE</span>, <span class="at">draw =</span> <span class="cn">FALSE</span>))</span></code></pre></div>
+<p>This pathway connects position with the previously defined
+<strong>descriptive</strong> posterior residual index. Here the
+summaries include every observed source rating. Use
+<code>fit_stat = &quot;Outfit&quot;</code> to change the horizontal index. A large
+or small value is a prompt to inspect the selected data, not a
+rater-quality classification. No ordinary fit cutoff, ZSTD or automatic
+exclusion is supplied.</p>
+<p>Use <code>facet</code>, <code>persons</code>,
+<code>show_steps</code>, <code>show_intervals</code> and
+<code>show_labels</code> to select the display.
+<code>show_title = FALSE</code> and <code>show_notes = FALSE</code> hide
+annotations while retaining their meaning in <code>plot_data()</code>.
+Shapes accompany colour; <code>palette = &quot;mono&quot;</code> supports
+grayscale output. Tables retain unavailable rows and
+original/transformed coordinates. Older saved testlet scores lacking a
+complete <code>scoring_data</code> roster must be regenerated from the
+saved fit before these maps or score comparisons; no refit is needed.
+See <code>?mfrmr_model_maps</code>.</p>
+</div>
+<div id="build-a-report-from-saved-results" class="section level2">
+<h2>Build a report from saved results</h2>
+<p>The common reporting route accepts the fit and <strong>separately
+computed</strong> scores. It never runs <code>predict()</code>, refits
+the model or adds ordinary-model diagnostics. The scoring table retains
+every requested Person, including prior-only and unavailable rows with
+their reasons.</p>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a>res <span class="ot">&lt;-</span> <span class="fu">mfrm_results</span>(testlet_fit, <span class="at">scores =</span> source_scores, <span class="at">comparison =</span> model_comparison,</span>
+<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a>                    <span class="at">diagnostics =</span> response_review)</span>
+<span id="cb19-3"><a href="#cb19-3" tabindex="-1"></a>res<span class="sc">$</span>tables<span class="sc">$</span>interval_basis</span>
+<span id="cb19-4"><a href="#cb19-4" tabindex="-1"></a>res<span class="sc">$</span>tables<span class="sc">$</span>scoring_status</span>
+<span id="cb19-5"><a href="#cb19-5" tabindex="-1"></a>report <span class="ot">&lt;-</span> <span class="fu">mfrm_report</span>(res)</span>
+<span id="cb19-6"><a href="#cb19-6" tabindex="-1"></a><span class="fu">summary</span>(report, <span class="at">view =</span> <span class="st">&quot;reader&quot;</span>)</span>
+<span id="cb19-7"><a href="#cb19-7" tabindex="-1"></a>archive_dir <span class="ot">&lt;-</span> <span class="fu">tempfile</span>(<span class="st">&quot;testlet-report-&quot;</span>)</span>
+<span id="cb19-8"><a href="#cb19-8" tabindex="-1"></a>archive <span class="ot">&lt;-</span> <span class="fu">export_mfrm_results</span>(res, archive_dir, <span class="at">preset =</span> <span class="st">&quot;starter&quot;</span>,</span>
+<span id="cb19-9"><a href="#cb19-9" tabindex="-1"></a>  <span class="at">acknowledge_sensitive =</span> <span class="cn">TRUE</span>) <span class="co"># Synthetic example; real exports retain IDs</span></span>
+<span id="cb19-10"><a href="#cb19-10" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">nrow</span>(archive<span class="sc">$</span>plot_errors) <span class="sc">==</span> <span class="dv">0</span>)</span>
+<span id="cb19-11"><a href="#cb19-11" tabindex="-1"></a>restored_results <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="fu">file.path</span>(archive_dir, <span class="st">&quot;mfrmr_results_results.rds&quot;</span>))</span>
+<span id="cb19-12"><a href="#cb19-12" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">identical</span>(restored_results<span class="sc">$</span>tables<span class="sc">$</span>person_scores, source_scores<span class="sc">$</span>table))</span></code></pre></div>
+<p>Open <code>index.html</code> in <code>archive_dir</code> for the
+model-specific figures and report. CSV files keep all rows; RDS
+preserves the fit, scores and their settings. Run the replay script from
+that folder to reload the report without fitting or scoring. Scores made
+before prediction-source metadata was introduced must be regenerated
+with <code>predict()</code> from their saved fit before attachment;
+refitting is unnecessary. Matching checks prevent mixing different
+column roles, facet levels, calibrations or model settings.</p>
+<p>Saved fits can score in a new R session without a live optimizer.
+Scores and plot data can also be saved separately. The result is a
+distinct <code>mfrm_testlet</code> object: ordinary
+<code>mfrm_fit</code> diagnostics, response-MI pooling, portable
+calibration objects and random-rater methods do not accept it. Numerical
+checks are not model-fit diagnostics. The Shiny viewer, ordinary Wright
+map and ordinary plug-in Infit/Outfit diagnostics are unavailable for
+this class. The separate posterior predictive summaries above do not
+supply formal fit tests or ordinary-model thresholds. An earlier
+ordinary model needs a new fit with explicit testlet membership;
+changing its saved class does not convert the model.</p>
+<p>Earlier saved testlet fits retain their fixed N(0,1) population when
+rescored or reported. A new fit estimates ability variance by default;
+specify <code>person_sd = 1</code> to reproduce the earlier model. Keep
+a new fit and its newly computed scores together when changing this
+assumption; do not attach scores from a different population fit to a
+report.</p>
+<p>The supported scope is one ability, RSM, unit weights, additive fixed
+facets and one common variance for independent Person-specific testlets.
+PCM, heterogeneous or correlated local effects, shared random raters and
+joint multidimensional abilities need other models. The testlet modeling
+idea is described by <a href="https://doi.org/10.1177/0146621604271053">Wang and Wilson (2005),
+<em>The Rasch Testlet Model</em></a>.</p>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

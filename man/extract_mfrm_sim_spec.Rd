@@ -10,7 +10,8 @@ extract_mfrm_sim_spec(
   latent_distribution = c("normal", "empirical"),
   source_data = NULL,
   person = NULL,
-  group = NULL
+  group = NULL,
+  population_assignment = c("matched", "independent")
 )
 }
 \arguments{
@@ -35,6 +36,17 @@ person column recorded in \code{fit}.}
 
 \item{group}{Optional group column name in \code{source_data} to merge into the
 returned \code{design_skeleton} as person-level metadata.}
+
+\item{population_assignment}{How an active population model is associated
+with \code{"resampled"} or \code{"skeleton"} assignments. The default \code{"matched"}
+draws one template Person jointly for covariates and assignments. Both
+tables must cover the same \code{TemplatePerson} IDs, with matching \code{Group}
+labels if present in both. \code{"independent"} samples covariate rows separately
+and intentionally breaks these associations. In that case both tables
+cannot define \code{Group}; rename a covariate if it represents a different
+grouping. For other assignment designs this setting has no effect.
+Population-template \code{Group}, when present, supplies the response group;
+\code{group_levels} must include all template labels and does not rebalance them.}
 }
 \value{
 An object of class \code{mfrm_sim_spec}.
@@ -63,15 +75,28 @@ This is intended as a \strong{fit-derived parametric starting point}, not as a
 claim that the fitted object perfectly recovers the true data-generating
 mechanism. Users should review and, if necessary, edit the returned
 specification before using it for design planning.
+Observed skeleton rows retain repeated rating occasions. Remove accidental
+duplicate source rows before fitting; the generator cannot distinguish them
+from intentional repeated ratings. Covariates and assignment templates are
+linked by \code{TemplatePerson} under \code{population_assignment = "matched"}.
 
-Bounded \code{GPCM} fits are supported here for direct data generation
+Without an active population regression, \code{theta_sd} is the empirical SD of
+the reported Person estimates, including any shrinkage in those estimates.
+It is not an estimate of the latent population SD corrected for measurement
+error. The empirical option resamples centered estimates independently of
+their original IDs; it is not a draw from the source posterior. With an
+active population model, its coefficients, residual variance and fitted
+transformation basis replace this Person-spread approximation. Neither
+route propagates uncertainty in the source fit's generating parameters.
+
+\code{GPCM} fits with the same slope and step owner are supported here for direct data generation
 and parameter-recovery checks, provided that the returned simulation
 specification stores both a threshold table and a parallel slope table.
 The same fit-derived specification can feed caveated role-based design
 evaluation, population forecasting, and fit-based report/export bundles.
 Diagnostic and signal-detection design screening is available with explicit
 caveats. Full FACETS score-side contract review, posterior predictive checks,
-and MCMC estimation are not available for bounded \code{GPCM}.
+and MCMC estimation are not available for \code{GPCM}.
 
 If you want to carry person-level group labels into a fit-derived observed
 response skeleton, provide the original \code{source_data} together with
@@ -86,7 +111,6 @@ design and estimated spread in the fitted run.
 }
 
 \examples{
-\donttest{
 toy <- simulate_mfrm_data(
   n_person = 8,
   n_rater = 3,
@@ -98,7 +122,6 @@ spec <- extract_mfrm_sim_spec(fit, latent_distribution = "empirical")
 spec$assignment
 spec$model
 head(spec$threshold_table)
-}
 }
 \seealso{
 \code{\link[=build_mfrm_sim_spec]{build_mfrm_sim_spec()}}, \code{\link[=simulate_mfrm_data]{simulate_mfrm_data()}}

@@ -127,7 +127,7 @@ test_that("read_facets_fit_table parses fixed-field FACETS score files", {
     paste(chars, collapse = "")
   }
   writeLines(c(
-    "FACETS fixed-field score file",
+    "   T.Score   T.Count  Obs.Avge FairMAvge   Measure      S.E.   InfitMS    InfitZ  OutfitMS   OutfitZ     PtMea   PtMeExp   Discrim  Displace    Status     Group    Weight      Sign InfChiSqu   Infitdf   InfPr2s OutfChiSq  Outfitdf  OutfPr2s         1Element",
     fixed_row("9.7", "18.0", "-0.38", "1.04", "1.00", "-0.2",
               "0.70", "1.0", "16.5", "17.5", "1", "Rater_A"),
     fixed_row("10.0", "19.0", "0.25", "0.06", "1.04", "0.5",

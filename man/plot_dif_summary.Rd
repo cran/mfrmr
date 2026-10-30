@@ -29,7 +29,8 @@ plot_dif_summary(
 
 \item{ci_level}{Optional confidence level for approximate normal
 intervals drawn from \verb{Effect +/- z * SE} when finite standard errors are
-available. Use \code{NULL} (default) to omit intervals.}
+available for linked refits. Residual comparisons require \code{NULL} (default)
+because their interval uncertainty is not established.}
 
 \item{effect_thresholds}{Optional numeric vector of absolute effect-size
 guide lines to draw at \verb{+/- threshold}. These are display aids, not ETS
@@ -45,37 +46,61 @@ columns \code{Pair}, \code{Effect}, \code{SE}, \code{Classification}, \code{Colo
 \description{
 Compact effect-size summary for a \code{\link[=analyze_dff]{analyze_dff()}} / \code{\link[=analyze_dif]{analyze_dif()}}
 result. Shows each contrast's signed effect size as a horizontal bar
-with a vertical reference at zero, coloured by the method-appropriate
-classification. Current residual and refit screening labels use the
-neutral colour; refit output does not receive ETS A/B/C labels.
+with a vertical reference at zero and a neutral colour. Residual comparisons
+do not provide differential-functioning tests or classifications.
 }
 \section{Interpreting output}{
 
 Bars are anchored at zero. Width corresponds to effect size on the
 contrast's native scale. For \code{method = "residual"}, this is the
-observed-minus-expected average screening contrast between groups. For
+observed-minus-expected average difference between groups, in score units. For
 \code{method = "refit"}, this is the subgroup parameter difference on the
 fitted logit scale when linking support allows a comparable contrast.
-Current DFF/DIF classifications are screening-only, so bars use the
-preset's neutral colour.
+Residual differences do not isolate differential functioning. Linked refit
+intervals omit estimated-anchor uncertainty and cross-refit covariance.
 }
 
-\examples{
-\donttest{
-toy <- load_mfrmr_data("example_bias")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 30)
-diag <- diagnose_mfrm(fit, residual_pca = "none")
-dff <- analyze_dff(fit, diagnostics = diag,
-                   facet = "Rater", group = "Group", data = toy)
-unique(dff$dif_table$ClassificationSystem)
-p <- plot_dif_summary(dff, draw = FALSE)
-head(p$data$data)
+\section{Migration in 0.2.4}{
+
+This renderer is internal. Use the corresponding \code{plot()} route in
+\link{mfrmr_plot_migration}; the former exported name is no longer available.
 }
+
+\section{Session plot defaults}{
+
+Set \code{options(mfrmr.plot_preset = "publication")} to choose a session default
+for plotting functions that expose the common \code{preset} argument. The
+supported values are \code{"standard"}, \code{"publication"}, \code{"compact"} and
+\code{"monochrome"}. Precedence is an explicit call argument, then the session
+option, then \code{"standard"}. For example, \code{preset = "standard"} overrides
+a session set to \code{"monochrome"}. Explicit \code{preset = NULL} retains the
+earlier package-default behavior; it does not read the session option.
+Invalid session values cause an error only when that option is needed.
+
+The category-curve, data-quality, fit-review, connectivity and network
+routes of \code{plot()} for report bundles use the same option through \code{...}.
+Plots without a common \code{preset} argument, including extended-model plots
+with their own \code{palette} controls, keep their own settings. This option
+selects a preset, not a universal theme or a guarantee that all renderers
+implement every appearance control identically.
+
+New plot payloads retain the resolved preset for supported saved-data
+rendering. Converting an existing payload with \code{\link[=as_ggplot]{as_ggplot()}} uses its saved
+appearance, even after the session option changes. A call that creates a
+new plot from a fit or statistical result uses the current default.
+For a reproducible script, supply \code{preset} explicitly or set the option in
+that script. Saving only the fitted model does not save a session option.
+No global ggplot theme is changed.
+
+Restore previous settings with \code{old <- options(mfrmr.plot_preset = "monochrome")} followed by \code{options(old)}. Use
+\code{options(mfrmr.plot_preset = NULL)} to remove the option. The preset changes
+appearance, not estimates, confidence levels or diagnostic thresholds.
 }
+
 \seealso{
-\code{\link[=analyze_dff]{analyze_dff()}}, \code{\link[=analyze_dif]{analyze_dif()}}, \code{\link[=plot_dif_heatmap]{plot_dif_heatmap()}}.
+\code{\link[=analyze_dff]{analyze_dff()}}, \code{\link[=analyze_dif]{analyze_dif()}}, \link[=plot.mfrm_dif]{plot(x, type = "heatmap")}.
 }
 \concept{DFF DIF}
 \concept{confidence intervals}
 \concept{visual diagnostics}
+\keyword{internal}

@@ -34,6 +34,38 @@ test_that("example datasets are available through utils::data", {
   expect_false("Score" %in% names(env$mfrmr_example_operational_design))
 })
 
+test_that("G-theory and agreement teaching data retain their declared designs", {
+  env <- new.env(parent = emptyenv())
+  utils::data(list = c("mfrmr_example_gtheory_crossed",
+    "mfrmr_example_gtheory_nested", "mfrmr_example_agreement"),
+    package = "mfrmr", envir = env)
+  crossed <- env$mfrmr_example_gtheory_crossed
+  nested <- env$mfrmr_example_gtheory_nested
+  agreement <- env$mfrmr_example_agreement
+
+  expect_equal(nrow(crossed), 1920L)
+  expect_true(all(with(crossed, table(Person, Rater, Task)) == 1L))
+  expect_equal(nrow(nested), 540L)
+  expect_equal(nrow(unique(nested[c("Task", "Rater")])), 18L)
+  expect_length(unique(nested$Rater), 3L) # Local labels, not three shared raters.
+  for (dat in list(crossed, nested)) {
+    expect_false(anyNA(dat))
+    expect_true(all(vapply(dat[c("Content", "Organization")], is.numeric, TRUE)))
+  }
+
+  expect_equal(nrow(agreement), 35L)
+  expect_equal(sum(is.na(agreement$Score)), 1L)
+  expect_equal(sum(!is.na(agreement$Score)), 34L)
+  expect_true(all(na.omit(agreement$Score) %in% 0:3))
+  r1 <- subset(agreement, Rater == "R1")
+  r2 <- subset(agreement, Rater == "R2")
+  paired <- merge(r1, r2, by = c("Person", "Task"))
+  expect_equal(nrow(paired), 12L)
+  expect_true(all(paired$Score.y == paired$Score.x + 1))
+  expect_equal(nrow(subset(agreement,
+    Rater == "R3" & Person == "P02" & Task == "T2")), 0L)
+})
+
 test_that("operational example has a connected incomplete assignment", {
   dat <- load_mfrmr_data("example_operational")
   env <- new.env(parent = emptyenv())

@@ -11,8 +11,11 @@ local_dif_fixtures <- function(env = parent.frame()) {
   )
   toy$Group <- grp_map[toy$Person]
 
-  fit <- fit_mfrm(toy, person = "Person", facets = c("Rater", "Criterion"),
-                  score = "Score", method = "JML")
+  expect_warning(
+    fit <- fit_mfrm(toy, person = "Person", facets = c("Rater", "Criterion"),
+                    score = "Score", method = "JML"),
+    "^Category support is retained but requires review:")
+  expect_identical(fit$summary$CategoryState, "weak_information")
   diag <- diagnose_mfrm(fit, residual_pca = "none")
 
   assign("toy",  toy,  envir = env)
@@ -101,13 +104,22 @@ test_that("analyze_dff residual method returns expected structure", {
 
   # Method must be "residual"
   expect_true(all(dif$dif_table$Method == "residual"))
-  expect_true(all(dif$dif_table$ClassificationSystem == "screening"))
-  expect_true(all(dif$dif_table$StatisticLabel == "Welch screening t"))
-  expect_true(all(dif$dif_table$DFBasis == "Welch-Satterthwaite approximation"))
+  expect_true(all(dif$dif_table$ClassificationSystem == "descriptive"))
+  expect_true(all(dif$dif_table$StatisticLabel == "residual mean difference"))
+  expect_true(all(dif$dif_table$DFBasis == "not applicable"))
   expect_true(all(is.na(dif$dif_table$ETS)))
-  expect_true(all(dif$dif_table$ReportingUse == "screening_only"))
+  expect_true(all(dif$dif_table$ReportingUse == "descriptive"))
   expect_true(all(!dif$dif_table$PrimaryReportingEligible))
   expect_equal(dif$config$method, "residual")
+
+  summarized <- summary(dif)
+  expect_s3_class(summarized, "summary.mfrm_dff")
+  expect_s3_class(summarized, "summary.mfrm_dif")
+  printed <- NULL
+  lines <- capture.output(printed <- withVisible(print(summarized)))
+  expect_false(printed$visible)
+  expect_identical(printed$value, summarized)
+  expect_true(any(grepl("Group residual comparisons", lines, fixed = TRUE)))
 })
 
 test_that("analyze_dff alias is backward compatible with analyze_dif", {
@@ -197,6 +209,7 @@ test_that("analyze_dif refit replays baseline score and estimation controls", {
     expect_identical(args$reltol, fit$config$replay_inputs$reltol)
     expect_identical(args$optimizer, fit$config$replay_inputs$optimizer)
     expect_identical(args$mml_engine, fit$config$replay_inputs$mml_engine)
+    expect_identical(args$repeated_ratings, fit$config$replay_inputs$repeated_ratings)
   }
   expect_true(all(vapply(
     dif$group_fits,
@@ -207,6 +220,12 @@ test_that("analyze_dif refit replays baseline score and estimation controls", {
 
 test_that("analyze_dif refit fails closed for unreplayable baseline structures", {
   local_dif_fixtures()
+  # Deliberately altered model settings test the replay guards; identity
+  # mismatches are checked independently at the public diagnostics boundary.
+  testthat::local_mocked_bindings(
+    mfrm_results_validate_diagnostics_identity = function(...) invisible(NULL),
+    .package = "mfrmr"
+  )
 
   population_fit <- fit
   population_fit$config$population_active <- TRUE
@@ -328,7 +347,7 @@ test_that("analyze_dif refit keeps linked model-based MML contrasts exploratory"
   refit_report <- dif_report(dif_mml)
   expect_identical(nrow(refit_report$large_dif), 0L)
   expect_false(any(c("A", "B", "C") %in% names(refit_report$counts)))
-  expect_match(refit_report$narrative, "No ETS A/B/C labels", fixed = TRUE)
+  expect_match(refit_report$narrative, "do not provide formal tests", fixed = TRUE)
 })
 
 test_that("analyze_dif refit demotes ETS when subgroup refits lack linking facets", {
@@ -425,28 +444,69 @@ test_that("analyze_dif handles missing and empty group values explicitly", {
   )
 })
 
-test_that("residual method uses screening labels instead of ETS categories", {
+test_that("residual method describes availability without testing differential functioning", {
   local_dif_fixtures()
 
   dif <- analyze_dif(fit, diag, facet = "Criterion", group = "Group",
                      data = toy, method = "residual")
-  expect_true(all(dif$summary$Classification %in% c("Screen positive", "Screen negative", "Unclassified")))
+  expect_true(all(dif$summary$Classification %in% c("Residual contrast", "Unavailable")))
   expect_true(all(is.na(dif$dif_table$ETS)))
 })
 
-test_that("residual method uses Welch-Satterthwaite degrees of freedom", {
+test_that("residual differences retain values and withhold tests across saved output routes", {
   local_dif_fixtures()
-
-  dif <- analyze_dif(fit, diag, facet = "Criterion", group = "Group",
-                     data = toy, method = "residual")
-  first_row <- dif$dif_table[1, , drop = FALSE]
-  c1 <- subset(dif$cell_table, Level == first_row$Level & GroupValue == first_row$Group1)
-  c2 <- subset(dif$cell_table, Level == first_row$Level & GroupValue == first_row$Group2)
-  comp1 <- c1$Var_sum[1] / c1$N[1]^2
-  comp2 <- c2$Var_sum[1] / c2$N[1]^2
-  expected_df <- (comp1 + comp2)^2 / ((comp1^2) / (c1$N[1] - 1) + (comp2^2) / (c2$N[1] - 1))
-
-  expect_equal(first_row$df, expected_df, tolerance = 1e-8)
+  dif <- analyze_dff(fit, diag, facet = "Criterion", group = "Group", data = toy)
+  row <- dif$dif_table[1, , drop = FALSE]
+  cells <- dif$cell_table
+  expect_equal(row$Contrast,
+    cells$ObsExpAvg[cells$Level == row$Level & cells$GroupValue == row$Group1] -
+    cells$ObsExpAvg[cells$Level == row$Level & cells$GroupValue == row$Group2])
+  expect_true(all(is.na(dif$dif_table[c("SE", "t", "df", "p_value", "p_adjusted")])))
+  expect_true(all(is.na(cells[c("t", "df", "p_value")])))
+  expect_true(all(!dif$dif_table$FormalInferenceEligible))
+  expect_true(all(is.finite(cells$StdResidual[!cells$sparse])))
+  int <- dif_interaction_table(fit, diag, facet = "Criterion", group = "Group", data = toy)
+  expect_true(all(is.na(int$table[c("t", "df", "p_value", "p_adjusted", "flag_t")])))
+  expect_equal(int$table$flag_bias[!int$table$sparse],
+               abs(int$table$ObsExpAvg[!int$table$sparse]) > 0.5)
+  rpt <- dif_report(dif)
+  expect_equal(nrow(rpt$large_dif), 0L)
+  expect_equal(unname(rpt$counts["Available"]), sum(is.finite(dif$dif_table$Contrast)))
+  expect_match(rpt$narrative, "do not isolate differential functioning")
+  expect_false(grepl("screening-positive|screening-negative|uncertainty contract", rpt$narrative))
+  expect_match(dif_report(int)$narrative, "score units")
+  expect_false(grepl("logit threshold|t-based classifications are produced", dif_report(int)$narrative))
+  plot <- plot_dif_summary(dif, draw = FALSE)
+  expect_true(all(is.na(plot$data$data$CI_Lower)))
+  expect_false(any(grepl("A:|B:|C:", plot$data$legend$label)))
+  expect_error(plot_dif_summary(dif, ci_level = .95, draw = FALSE), "Confidence intervals are unavailable")
+  for (obj in list(dif, int, rpt, summary(dif), summary(int), summary(rpt))) {
+    printed <- capture.output(print(obj))
+    expect_false(any(grepl("ReportingUse|PrimaryReportingEligible|screening_only|residual_output_version|InferenceTier", printed)))
+    saved <- tempfile(fileext = ".rds")
+    saveRDS(obj, saved)
+    expect_identical(readRDS(saved), obj)
+    unlink(saved)
+  }
+  csv <- tempfile(fileext = ".csv")
+  write.csv(summary(dif)$dif_table, csv, row.names = FALSE)
+  exported <- read.csv(csv)
+  expect_true(all(is.na(exported$p_value)))
+  expect_identical(exported$Interpretation, dif$dif_table$Interpretation)
+  unlink(csv)
+  for (obj in list(dif, int, rpt)) {
+    old <- obj
+    old$config$residual_output_version <- NULL
+    expect_error(summary(old), "Recompute it")
+    expect_error(print(old), "Recompute it")
+    if (!inherits(old, "mfrm_dif_report")) {
+      expect_error(dif_report(old), "Recompute it")
+      expect_error(plot_dif_heatmap(old, draw = FALSE), "Recompute it")
+    }
+  }
+  old <- dif
+  old$config$residual_output_version <- NULL
+  expect_error(plot_dif_summary(old, draw = FALSE), "Recompute it")
 })
 
 test_that("refit method never promotes screening contrasts to ETS", {
@@ -585,7 +645,7 @@ test_that("dif_report produces interpretable output", {
   expect_s3_class(rpt, "mfrm_dif_report")
   expect_true(is.character(rpt$narrative))
   expect_true(nchar(rpt$narrative) > 0)
-  expect_match(rpt$narrative, "screening", ignore.case = TRUE)
+  expect_match(rpt$narrative, "residual", ignore.case = TRUE)
 })
 
 test_that("print and summary S3 methods work for DIF objects", {
@@ -911,7 +971,7 @@ test_that("compare_mfrm records why boundary LRTs are not reported", {
   expect_null(comp_neg$lrt)
   expect_identical(comp_neg$comparison_basis$lrt_status, "not_computed")
   expect_match(comp_neg$comparison_basis$lrt_reason, "negative likelihood-ratio statistic")
-  expect_output(print(summary(comp_neg)), "LRT status")
+  expect_output(print(summary(comp_neg)), "negative likelihood-ratio statistic")
 
   fit_pcm_bad <- fit_pcm
   fit_pcm_bad$opt$value <- NA_real_
@@ -956,15 +1016,40 @@ test_that("compare_mfrm suppresses IC ranking when a fit is marked unconverged",
   fit <- mark_test_inference_ready(fit)
   fit2 <- mark_test_inference_review(fit2)
 
-  expect_warning(
-    comp <- compare_mfrm(RSM = fit, PCM = fit2),
-    "optimizer or convergence review"
-  )
+  warnings <- character(0)
+  comp <- withCallingHandlers(compare_mfrm(RSM = fit, PCM = fit2), warning = function(w) {
+    warnings <<- c(warnings, conditionMessage(w))
+    invokeRestart("muffleWarning")
+  })
+  expect_true(any(grepl("^Information-criterion ranking is limited to converged MML fits", warnings)))
+  expect_true(any(grepl("IC solution checks are not satisfied: PCM/JML: .*Numerical convergence requires review", warnings)))
 
   expect_false(isTRUE(comp$comparison_basis$ic_comparable))
   expect_false(isTRUE(comp$comparison_basis$all_converged))
   expect_true(all(is.na(comp$table$Delta_AIC)))
   expect_true(all(is.na(comp$table$AkaikeWeight)))
+
+  # Numerical convergence cannot clear a separate estimability restriction.
+  fit2 <- mark_test_inference_ready(fit2)
+  fit2$readiness$fit$InferenceReady[1] <- FALSE
+  fit2$readiness$fit$EstimabilityState[1] <- "not_evaluated"
+  fit2$readiness$fit$ReasonCodes[1] <- "design_rank_not_evaluated"
+  expect_warning(
+    comp_lrt <- compare_mfrm(RSM = fit, PCM = fit2, nested = TRUE),
+    "Inference readiness is not satisfied: PCM/JML: .*Identifiability evidence is incomplete"
+  )
+  printed <- paste(capture.output(print(comp_lrt)), collapse = " ")
+  expect_match(printed, "Identifiability evidence is incomplete", fixed = TRUE)
+  expect_false(grepl("design_rank_not_evaluated|ICContractState|not_computed", printed))
+  expect_match(comp_lrt$table$ReadinessReasonCodes[2],
+               "design_rank_not_evaluated", fixed = TRUE)
+  expect_true(all(comp_lrt$table$Converged))
+  expect_false(comp_lrt$comparison_basis$all_inference_ready)
+  expect_identical(comp_lrt$comparison_basis$lrt_status, "not_computed")
+  expect_null(comp_lrt$lrt)
+  expect_match(comp_lrt$comparison_basis$lrt_reason, "Identifiability evidence is incomplete", fixed = TRUE)
+  expect_equal(comp_lrt$table$LogLik, comp$table$LogLik)
+  expect_equal(comp_lrt$table$AIC, comp$table$AIC)
 })
 
 test_that("compare_mfrm requires the same prepared response data for IC ranking", {

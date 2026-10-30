@@ -63,7 +63,7 @@ test_that("boundary separation is a stability hold, not a numerical pass", {
   dat$Score[dat$Rater == "R02"] <- 4L
 
   expect_warning(
-    fit <- fit_mfrm(
+    expect_warning(fit <- fit_mfrm(
       dat,
       person = "Person",
       facets = c("Rater", "Criterion"),
@@ -71,7 +71,7 @@ test_that("boundary separation is a stability hold, not a numerical pass", {
       rating_min = 1,
       rating_max = 4,
       method = "MML"
-    ),
+    ), "^Category support is retained but requires review:"),
     "Boundary-constant"
   )
 

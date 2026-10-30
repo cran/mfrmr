@@ -24,6 +24,11 @@ test_that("fit pathway keeps fit on x and logits on y", {
   expect_true(is.data.frame(out$data$uncertainty_basis))
   expect_true(all(c("WhiskerDefinition", "CI_Level") %in%
                     names(out$data$uncertainty_basis)))
+  notes <- paste(plot_data(out, "notes")$Text, collapse = "\n")
+  expect_match(notes, "expectation (1)", fixed = TRUE)
+  expect_match(notes, "lower values indicate overfit, higher values underfit", fixed = TRUE)
+  expect_match(notes, "do not by themselves imply overfit", fixed = TRUE)
+  expect_match(notes, "higher coded scores need not mean better", fixed = TRUE)
 })
 
 test_that("fit pathway defaults to Infit on the horizontal axis", {

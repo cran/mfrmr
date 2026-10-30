@@ -25,7 +25,7 @@ An object of class \code{summary.mfrm_population_prediction} with:
 \item \code{planning_scope}: explicit record of the current planning contract
 \item \code{planning_constraints}: explicit record of mutable/locked design variables
 \item \code{planning_schema}: structured planning metadata
-\item \code{gpcm_boundary}: bounded-\code{GPCM} caveat row when present
+\item \code{gpcm_boundary}: \code{GPCM} caveat row when present
 \item \code{structural_design_review}: deterministic structural review of the
 named-facet design grid; it is not
 a forecast-uncertainty result
@@ -37,21 +37,15 @@ a forecast-uncertainty result
 Summarize a population-level design forecast
 }
 \examples{
-\donttest{
-spec <- build_mfrm_sim_spec(
-  n_person = 16,
-  n_rater = 3,
-  n_criterion = 2,
-  raters_per_person = 2,
-  assignment = "rotating"
-)
-pred <- predict_mfrm_population(
-  sim_spec = spec,
-  design = list(person = 18),
-  reps = 1,
-  maxit = 30,
-  seed = 123
-)
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("summary.mfrm_population_prediction", run.dontrun = TRUE)
+\dontrun{
+# One saved replication illustrates output structure, not precise rates.
+# Regeneration recipe: examples/simulation-results.R in the package.
+saved <- readRDS(system.file("examples", "simulation-population.rds",
+  package = "mfrmr", mustWork = TRUE))
+# Inspect saved$generation_warnings and the result's run/status tables.
+pred <- saved$result
 s <- summary(pred)
 s$overview
 s$forecast[, c("Facet", "MeanSeparation", "McseSeparation")]

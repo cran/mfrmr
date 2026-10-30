@@ -75,7 +75,7 @@ active public facet name. Defaults to the criterion-like facet.}
 
 \item{step_span}{Spread of step thresholds on the logit scale.}
 
-\item{model}{Measurement model passed to \code{\link[=fit_mfrm]{fit_mfrm()}}. Bounded \code{GPCM} is
+\item{model}{Measurement model passed to \code{\link[=fit_mfrm]{fit_mfrm()}}. \code{GPCM} is
 supported with caveats as slope-aware screening sensitivity evidence.}
 
 \item{step_facet}{Step facet passed to \code{\link[=fit_mfrm]{fit_mfrm()}} when \code{model = "PCM"} or
@@ -84,7 +84,7 @@ supported with caveats as slope-aware screening sensitivity evidence.}
 \item{slope_facet}{Slope facet passed to \code{\link[=fit_mfrm]{fit_mfrm()}} when
 \code{model = "GPCM"}. Defaults to the fitted step facet.}
 
-\item{slopes}{Optional bounded-\code{GPCM} slope specification used by direct
+\item{slopes}{Optional \code{GPCM} slope specification used by direct
 simulation calls when \code{sim_spec = NULL}.}
 
 \item{maxit}{Maximum iterations passed to \code{\link[=fit_mfrm]{fit_mfrm()}}.}
@@ -127,7 +127,7 @@ well-specified baseline when the baseline scenario was evaluated
 \item \code{planning_scope}: explicit record of the current planning contract
 \item \code{planning_constraints}: explicit record of mutable/locked design variables
 \item \code{planning_schema}: structured planning metadata
-\item \code{gpcm_boundary}: bounded-\code{GPCM} caveat row when present
+\item \code{gpcm_boundary}: \code{GPCM} caveat row when present
 \item \code{settings}: simulation and fitting settings
 \item \code{ademp}: simulation-study metadata
 \item \code{notes}: short interpretation notes
@@ -159,23 +159,25 @@ facet-level mean effect contract. The \code{"latent_misspecification"} scenario
 keeps the same marginal spread targets but replaces the normal person
 distribution with a centered bimodal empirical support distribution, while
 leaving the non-person facets on the original scale contract. The
-\code{"step_structure_misspecification"} scenario uses a \code{PCM} or bounded-\code{GPCM}
+\code{"step_structure_misspecification"} scenario uses a \code{PCM} or \code{GPCM}
 generator with facet-specific threshold tables that intentionally mismatch
 the fitted step contract: \code{RSM} fits receive criterion-specific thresholds,
 and \code{PCM} / \code{GPCM} fits receive threshold structures indexed by the opposite
-non-person facet. For bounded \code{GPCM}, the generator and fit each keep
+non-person facet. For \code{GPCM}, the generator and fit each keep
 \code{slope_facet == step_facet}; the misspecification is the generator-versus-fit
 step/slope facet mismatch.
 
 This function is intentionally screening-oriented. The strict marginal branch
 remains exploratory, so the returned summaries should
 be used to compare relative sensitivity across scenarios rather than to claim
-calibrated inferential power. Bounded-\code{GPCM} rows add explicit
+calibrated inferential power. \code{GPCM} rows add explicit
 \code{gpcm_boundary} caveats and should be read as slope-aware operating
 characteristics under the evaluated role-based design.
 }
 \examples{
-\donttest{
+# Long-running workflow; run explicitly when needed.
+# example("evaluate_mfrm_diagnostic_screening", run.dontrun = TRUE)
+\dontrun{
 diag_eval <- evaluate_mfrm_diagnostic_screening(
   design = list(person = 10, rater = 2, criterion = 2, assignment = 2),
   reps = 1,

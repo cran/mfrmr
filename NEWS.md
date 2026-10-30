@@ -1,17 +1,106 @@
+# mfrmr 0.2.4
+
+**Unreleased.** This release connects rating analysis, assessment
+planning and reporting. You can move from a fitted model or rating plan to
+figures, tables and an editable report while keeping its assumptions visible.
+
+## What is easier now?
+
+- **Turn an analysis into a report.** `mfrm_report()` now brings generalizability
+  and decision studies (G/D studies),
+  anchor/linking reviews, individual or batch bias screens and model-choice reviews into
+  the shared reporting workflow. Editable templates help you write the Methods
+  and Results, and exports keep the underlying tables and analysis. You can
+  record what high scores mean alongside the results.
+  See [reporting examples](https://ryuya-dot-com.github.io/mfrmr/articles/mfrmr-reporting-and-apa.html).
+- **Compare plans before collecting more ratings.** Examine how specified
+  rater/task counts affect the precision of a score, weighted composite or
+  difference. G/D-study reports connect sources of variation to plan tables,
+  figures and supported intervals. Simulation recommendations now show their
+  target, criteria and candidate outcomes in summaries, plots and reports.
+  See [assessment planning](https://ryuya-dot-com.github.io/mfrmr/articles/mfrmr-gtheory.html).
+- **Find rating patterns that need attention.** Check assignment links before
+  fitting, examine observed agreement, and prepare supported rater feedback.
+  Network and residual analyses connect to tables, plots and reports; their
+  exploratory findings prompt investigation, not automatic rater exclusion.
+  See [agreement](https://ryuya-dot-com.github.io/mfrmr/articles/mfrmr-rating-agreement.html)
+  and [networks and reporting](https://ryuya-dot-com.github.io/mfrmr/articles/mfrmr-networks-and-reporting.html).
+
+Continue a default single-family GPCM analysis in Stan while retaining its
+estimated normal population and supported fixed anchors. `export_mfrm_model()`
+writes the code, data and parameter maps with explicit priors.
+RSM/PCM and fixed-population single-family GPCM also support brms;
+two-family GPCM supports Stan. `read_mfrm_posterior()` brings saved summaries,
+including population mean/SD, back to figures and reports with credible
+intervals and sampling review. Population regression remains unsupported.
+See [model export](https://ryuya-dot-com.github.io/mfrmr/reference/export_mfrm_model.html).
+
+Supported MML models can show fitting progress and automatically increase
+numerical integration accuracy up to a user-set maximum. Two-family GPCM
+retains experimental inference limits.
+The [GPCM guide](https://ryuya-dot-com.github.io/mfrmr/articles/mfrmr-gpcm-scope.html)
+and [detailed changes](https://github.com/Ryuya-dot-com/mfrmr/blob/main/inst/NEWS-0.2.4-details.md) explain these features,
+calibration reuse, external-software comparisons and numerical improvements.
+
+The [visual gallery](https://ryuya-dot-com.github.io/mfrmr/articles/visual-gallery.html)
+adds ggplot2 examples with interactive Plotly views, static figures and the
+underlying values for rater feedback, assessment planning and score probabilities.
+
+Source installation requires cpp11 0.5.4 or later for compatible C++ headers.
+
+Complete worked examples remain in the help pages. Short primary workflows run
+normally; supplementary examples show how to execute them explicitly with
+`example("topic", run.dontrun = TRUE)`, including their printed results. Related short summary and plot methods are
+documented with their generating function; their existing help aliases remain.
+
+Model setup, residual PCA, Q3, residual plots, halo analyses and agreement
+summaries avoid calculations that their requested results do not use. The same
+input checks, numerical settings and interpretation limits apply.
+Simulation specifications and design reviews also avoid repeated calculations,
+with unchanged design tables, recommendation rules and numerical settings.
+Testlet fitting and scoring avoid redundant calculations. Scoring also avoids
+work for design patterns unused by the requested Persons. Quadrature, continuous
+posterior integration and accuracy checks are unchanged.
+RSM and PCM marginal maximum likelihood calculations reuse response
+probabilities for repeated rating conditions on a shared quadrature grid.
+Integration and convergence settings are unchanged.
+Model comparisons reject stale or nonstationary MML solutions before expensive
+uncertainty calculations, while retaining the existing eligibility criteria.
+
+## Before reusing an older analysis
+
+**Installing 0.2.4 does not update saved calculations.** Corrections affect
+some fit statistics, bias/fair-score calculations, uncertainty and comparisons.
+Keep your original inputs, fitted objects and settings, then use the
+[updating guide](https://github.com/Ryuya-dot-com/mfrmr/blob/main/inst/NEWS-0.2.4-details.md#updating-saved-analyses) to identify
+which results need rebuilding. `help("mfrmr_workflow_methods")` explains the
+applicable checks; not every correction requires refitting.
+
+Simulation files also check the package implementation and numerical environment
+before loading or resuming a run. An implementation change can make an older
+file incompatible even when its stored numerical values remain readable.
+Retain the original package installation and environment to continue that run;
+use a new file path when recomputing after an update. The default
+`file_refit = "never"` rejects mismatches without replacing the saved file.
+
+Use `plot()` on result objects instead of retired standalone drawing helpers;
+`help("mfrmr_plot_migration")` lists replacements. Model comparisons now reject
+likelihood-ratio tests when the larger model omits terms from the smaller one;
+recreate affected comparisons from the existing fits.
+
+The detailed change record is also installed at
+`system.file("NEWS-0.2.4-details.md", package = "mfrmr")`.
+
 # mfrmr 0.2.3.1
 
-mfrmr 0.2.3.1 is a focused CRAN maintenance release. It does not change the
-public R API or the fitted-model contracts introduced in 0.2.3.
+mfrmr 0.2.3.1 was a focused CRAN maintenance release. It did not change the
+public R API or fitted-model contracts introduced in 0.2.3.
 
-* Fixed the additional link-time-optimization check by allowing every C++
-  translation unit to use R's configured `Rboolean` definition. This removes
-  the cross-translation-unit `Rboolean` and `R_UnwindProtect` one-definition-
-  rule warnings reported under GCC LTO.
-* Added a lightweight source contract that rejects local overrides of
-  `HAVE_ENUM_BASE_TYPE`, including overrides introduced through `Makevars`, so
-  cpp11 registration regeneration cannot silently recreate the mismatch.
-* Removed links to FACETS/Winsteps pages whose upstream TLS certificate had
-  expired while retaining the substantive model distinctions and references.
+* Corrected the compiled-header configuration used under link-time
+  optimization so all C++ translation units use R's configured `Rboolean`
+  definition.
+* Removed expired FACETS/Winsteps hyperlinks while retaining the substantive
+  model distinctions and bibliographic references.
 
 # mfrmr 0.2.3
 
@@ -34,9 +123,10 @@ before this release. No existing exported function has been removed.
   the fitted solution and the parameter both satisfy the relevant readiness
   checks. Optimizer- and Hessian-based quantities remain available as clearly
   labelled diagnostic evidence when formal inference is not supported.
-* Improved handling of extreme response patterns. Joint-maximum-likelihood
-  Person estimates can retain an unbounded primary status, while finite
-  adjusted displays remain explicitly separate. Prior-regularized marginal
+* Improved handling of extreme response patterns. Free JML Person estimates
+  remain infinite for all-minimum or all-maximum responses; finite optimizer
+  values are computational traces. Optional adjusted-score tables and plot
+  placements do not replace the fitted estimates. Prior-regularized marginal
   EAP estimates remain available but do not override a blocked source fit.
 * Added `gpcm_mml_quadrature_sensitivity()` for explicit same-data comparison of
   a fitted GPCM-MML result across quadrature grids. It reports changes in the
@@ -65,7 +155,8 @@ before this release. No existing exported function has been removed.
 * `print()` and `summary()` for fitted models now begin with a plain-language
   interpretation status, the availability of formal inference, the main reason
   for any hold, and a suggested next action.
-* Formal-inference reporting now distinguishes a successful fit gate from the
+* Formal-inference reporting now distinguishes satisfied fit-readiness
+  requirements from the
   separate precision contract. A fit-only summary does not claim formal
   inference until matching diagnostics support the standard-error,
   confidence-interval, and reliability basis.
@@ -89,9 +180,9 @@ before this release. No existing exported function has been removed.
 * FACETS table import retains the reported numeric text and displayed decimal
   precision so rounded output is not silently treated as hidden full-precision
   data.
-* The Infit-versus-measure pathway now has a regression-tested default: Infit
-  is on the horizontal axis and the fitted measure remains on the vertical
-  axis. GPCM category curves retain estimated step-facet slopes and now state
+* The Infit-versus-measure pathway now places Infit on the horizontal axis and
+  the fitted measure on the vertical axis by default. GPCM category curves
+  retain estimated step-facet slopes and now state
   explicitly that additive facet effects and interactions are fixed at zero.
   Multiple GPCM curve groups are shown in separate panels with category
   legends instead of as unlabelled overlaid traces.
@@ -136,21 +227,14 @@ before this release. No existing exported function has been removed.
 * Clarified that `maxit` is a prespecified computational ceiling rather than a
   result-selection control. Iteration-limited fits now direct users to keep the
   specification fixed, follow a prespecified ceiling sequence, and withhold
-  interpretation until the numerical-readiness gate passes.
+  interpretation until the numerical-readiness criteria are satisfied.
 
 * Replaced blanket `\dontrun{}` and `@examplesIf interactive()` guards with
   checkable examples or `\donttest{}` blocks. Only the two workflows that need
   separately generated ConQuest files remain `\dontrun{}`, and only the local
-  Shiny viewer remains interactive-only. The release-readiness review now
-  enforces that allowlist and flags CRAN-side package workload above ten
-  minutes, based on ordinary examples, `donttest` examples, tests, and vignette
-  rebuilding. Other top-level check components remain visible as diagnostics
-  but do not inflate that package-controlled threshold.
-
-- Added one authoritative repository roadmap and aligned release metadata and
-  validation notes with the accepted 0.2.2 boundary. External numerical
-  comparison and calibrated MML joint-stationarity gates are explicitly 0.2.3
-  work rather than retroactive 0.2.2 requirements.
+  Shiny viewer remains interactive-only. This makes most examples executable
+  while keeping workflows that require separately generated files clearly
+  marked.
 - Corrected bounded-GPCM score-side delta-method uncertainty to use the
   expected-score derivative `ScoreSlope * Var`. `ScoreSideLogitSE` remains the
   logit-side component SE, while `ScoreSideSE` and its interval columns now
@@ -175,15 +259,14 @@ before this release. No existing exported function has been removed.
 - `as_kable.apa_table(format = "pipe")` now appends an APA note once after the
   complete Markdown table. Previously the vectorized append could repeat the
   same note after every rendered table line.
-- Added the package hex sticker to the README and pkgdown-standard
-  `man/figures/logo.png` location, while retaining the editable SVG source.
+- Added the package hex sticker.
 - Tightened the FACETS positioning contract against the current 64-bit 4.5.1
   software target: coverage rows describe package-native surfaces, not
   external numerical equivalence, and mixed models, multiple scales,
   threshold anchoring, and fixed-calibration scoring remain outside 0.2.2.
 - Corrected the `interrater_agreement_table()` documentation: `ExpectedExact`
   is computed from fitted category-probability vectors, not marginal-frequency
-  chance agreement. A focused regression test now guards that definition.
+  chance agreement.
 - Clarified that exact Person-by-facet duplicate rows are retained but place
   Data readiness under review; legitimate repeated ratings should carry a
   distinguishing event or occasion facet.
@@ -202,7 +285,7 @@ before this release. No existing exported function has been removed.
   objective, terminal gradient, maximum parameter change, evaluations, and
   elapsed time; the best non-worsening stage is retained rather than assuming
   that stricter controls improve every fit monotonically.
-- Direct, hybrid, and EM MML engines now apply the same terminal-gradient gate
+- Direct, hybrid, and EM MML engines now apply the same terminal-gradient check
   to `InferenceReady`. EM relative log-likelihood convergence remains visible
   as an engine-specific stopping condition but no longer overrides the common
   numerical-readiness contract.
@@ -220,9 +303,8 @@ before this release. No existing exported function has been removed.
   replay. The portable `reltol` setting is mapped to L-BFGS-B `factr` and
   `pgtol`; actual stage controls are recorded alongside the requested and
   selected-stage settings.
-- Per-fit workspaces are local to one optimization and are discarded with the
-  fit evaluator. They are not global, are not shared across parallel fits,
-  and are not stored as large probability arrays in the returned fit object.
+- Repeated likelihood calculations reuse work within each fit without
+  enlarging saved fit objects or sharing cached values across parallel fits.
 - Measurement-graph component detection now avoids repeated row-wise lookups
   while preserving the established subset labels and ordering. This reduces
   first-fit overhead for larger long-format rating designs.
@@ -281,8 +363,8 @@ before this release. No existing exported function has been removed.
   compact output. Without a roster, structural missingness is reported as not
   assessed rather than inferred from a hypothetical complete crossing.
 - `list_mfrmr_data(details = TRUE)` now explains the design and intended role
-  of every bundled synthetic dataset. Fixed-seed generators for the compact
-  examples are tracked in the public source repository. Combined-study
+  of every bundled synthetic dataset. The compact examples can be regenerated
+  with fixed seeds. Combined-study
   objects now explain that relabeling prevents identifier collisions but does
   not establish a common scale without an explicit anchor/linking design.
 - Precomputed vignette tables now follow the same successful operational MML
@@ -293,7 +375,7 @@ before this release. No existing exported function has been removed.
 
 - The public default remains `reltol = 1e-9` for the initial optimizer stage;
   bounded polishing is invoked only when `reltol <= 1e-9` and code zero
-  precedes the terminal-gradient gate. The fitted object records requested and
+  precedes the terminal-gradient check. The fitted object records requested and
   selected-stage controls for replay. Model specification, design,
   identification, and inferential assumptions remain separate review
   questions.
@@ -327,18 +409,6 @@ before this release. No existing exported function has been removed.
   and avoids presenting a generic facet as a rater.
 - Latent regression rejects a non-person-centered parameterization that would
   confound the population intercept with the measurement scale.
-- CRAN checks now exercise the complete introductory workflow once and
-  use the exact README/default MML controls rather than a reduced quadrature
-  setting. They retain lightweight compatibility/backend/artifact contracts.
-  Repeated
-  estimation, detailed plotting, simulation, and broad regression coverage
-  remain in the complete local and GitHub Actions suite.
-- A repository-level first-use workflow stress protocol covers linked, sparse,
-  disconnected, shared-link, PCM, bounded-GPCM, extreme-score, separation,
-  missing-code, and weighted scenarios across deterministic seeds. It keeps
-  expectation matching separate from actual report readiness and is excluded
-  from routine CRAN checks.
-
 ## Interpretation and compatibility boundaries
 
 - Optimizer code zero is no longer treated as sufficient evidence of a clean
@@ -355,16 +425,15 @@ before this release. No existing exported function has been removed.
   `normalize_conquest_overlap_exports()` reads those files, reconstructs the
   sum-constrained item location, trims fixed-width person identifiers, and
   prepares them for `review_conquest_overlap()`.
-- A matched 31-node run with ConQuest 5.47.5 Demonstration Version is recorded
-  in the public source repository's validation record (excluded from the
-  installed CRAN package) for the documented binary, item-only, one-covariate
-  MML overlap case. The result supports that narrow handoff and is not a claim
-  of general numerical equivalence.
+- The documented binary, item-only, one-covariate MML handoff was compared in
+  a matched 31-node run with ConQuest 5.47.5 Demonstration Version. The result
+  supports that narrow handoff and is not a claim of general numerical
+  equivalence.
 - `export_mfrm_results()` now labels every preset as a potentially identifying
   analysis archive, warns before writing unless the risk is explicitly
   acknowledged, and records privacy status in its summary, HTML index, and
   written-files manifest. Fit-level `export_mfrm_bundle()` archives follow the
-  same warning and metadata contract, and the lower-level `export_mfrm()` CSV
+  same warning and metadata contract, and the lower-level `export_mfrm_tables()` CSV
   writer now records per-file handling metadata. ConQuest overlap bundles
   likewise warn on file export and include an artifact-level privacy inventory
   for response, covariate, and case-EAP files.

@@ -23,6 +23,18 @@ fit_for_marginal_fit_tests <- function(model = c("RSM", "PCM", "GPCM")) {
   list(data = dat, fit = fit)
 }
 
+test_that("native-encoded Unicode identifiers survive marginal diagnostics", {
+  skip_if_not(isTRUE(l10n_info()[["UTF-8"]]))
+  dat <- load_mfrmr_data("example_operational")
+  dat$Rater <- paste0("\u8a55\u4fa1\u8005_", dat$Rater)
+  Encoding(dat$Rater) <- "unknown"
+  fit <- fit_mfrm(dat, "Person", c("Rater", "Criterion"), "Score", method = "MML")
+  diag <- diagnose_mfrm(fit, residual_pca = "none", diagnostic_mode = "both")
+  expect_true(isTRUE(diag$marginal_fit$pairwise$available))
+  expect_setequal(as.character(fit$prep$data$Rater), enc2utf8(dat$Rater))
+  expect_gt(nrow(diag$marginal_fit$pairwise$pair_stats), 0L)
+})
+
 test_that("strict marginal fit diagnostics are available for MML RSM, PCM, and GPCM", {
   for (model in c("RSM", "PCM", "GPCM")) {
     obj <- fit_for_marginal_fit_tests(model)
@@ -72,6 +84,8 @@ test_that("strict marginal fit diagnostics are available for MML RSM, PCM, and G
       "not_available"
     )
 
+    expected_groups <- if (model == "RSM") "Common" else obj$fit$config$facet_levels[[obj$fit$config$step_facet]]
+    expect_setequal(diag$marginal_fit$step_or_scale$summary_stats$StepFacet, expected_groups)
     overall_cells <- diag$marginal_fit$overall$cell_stats
     expect_equal(
       sum(overall_cells$ObservedCount, na.rm = TRUE),
@@ -101,7 +115,7 @@ test_that("strict marginal fit diagnostics are available for MML RSM, PCM, and G
     expect_match(printed, "Strict marginal fit", fixed = TRUE)
     expect_match(printed, "Strict pairwise local dependence", fixed = TRUE)
     expect_match(printed, "Strict marginal guidance", fixed = TRUE)
-    expect_match(printed, "not_available", fixed = TRUE)
+    expect_false(grepl("not_available|screening_only|limited_information_inspired", printed))
 
     rs <- mfrmr::rating_scale_table(obj$fit, diagnostics = diag)
     expect_true(all(c(

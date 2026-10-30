@@ -1,7 +1,7 @@
 # Tests for hierarchical structure / small-sample review helpers (0.1.6).
 # Cross-refs:
 #  * `detect_facet_nesting()` - entropy-based classification
-#  * `facet_small_sample_review()` - Linacre (1994) bands
+#  * `facet_small_sample_review()` - retained-rating-count screening bands
 #  * `compute_facet_icc()` - lme4 variance components (Suggests)
 #  * `compute_facet_design_effect()` - Kish (1965) design effect
 #  * `analyze_hierarchical_structure()` - bundle report
@@ -46,7 +46,7 @@ test_that("detect_facet_nesting flags crossed designs as Crossed", {
   expect_true(any(pairs$Direction == "crossed"))
 })
 
-test_that("facet_small_sample_review classifies Linacre bands correctly", {
+test_that("facet_small_sample_review classifies rating-count bands", {
   toy <- load_mfrmr_data("example_core")
   fit <- suppressMessages(suppressWarnings(
     fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
@@ -71,6 +71,58 @@ test_that("fit$summary carries FacetSampleSizeFlag", {
   expect_true(is.finite(suppressWarnings(
     as.integer(fit$summary$FacetMinLevelN[1])
   )))
+})
+
+test_that("the worst sample-size band reflects the least-observed level", {
+  # Counts isolate the descriptive aggregation from estimation.
+  fit <- readRDS(test_path("fixtures", "mml-comparison-intervals.rds"))$RSM$fit
+  rows <- split(seq_len(nrow(fit$prep$data)), fit$prep$data$Rater)
+  counts <- c(3L, 15L, 40L, 60L)
+  fit$prep$data <- fit$prep$data[unlist(Map(head, rows, counts)), ]
+  review <- facet_small_sample_review(fit)
+  rater <- review$table[review$table$Facet == "Rater", ]
+  expect_identical(rater$SampleCategory, c("sparse", "marginal", "standard", "strong"))
+  expect_identical(review$facet_summary$WorstCategory[review$facet_summary$Facet == "Rater"], "sparse")
+  expect_equal(review$facet_summary$MinN[review$facet_summary$Facet == "Rater"], 3)
+})
+
+test_that("count thresholds are ordered and reject invalid specifications", {
+  fit <- readRDS(test_path("fixtures", "mml-comparison-intervals.rds"))$RSM$fit
+  thresholds <- c(sparse = 10, marginal = 30, standard = 50)
+  reordered <- facet_small_sample_review(fit, thresholds = thresholds[c(3, 1, 2)])
+  expect_identical(reordered$thresholds, as.list(thresholds))
+  expect_identical(vapply(c(9, 10, 29, 30, 49, 50), .ha_sample_classify,
+    character(1), thresholds = thresholds),
+    c("sparse", "marginal", "marginal", "standard", "standard", "strong"))
+  for (invalid in list(
+    c(sparse = 30, marginal = 10, standard = 50),
+    c(sparse = 10, marginal = 10, standard = 50),
+    c(sparse = 0, marginal = 30, standard = 50),
+    c(sparse = NA_real_, marginal = 30, standard = 50),
+    c(sparse = 10, marginal = 30, standard = Inf),
+    c(sparse = "10", marginal = "30", standard = "50"),
+    c(sparse = 10, sparse = 30, standard = 50),
+    thresholds[-1], c(thresholds, extra = 100)
+  )) {
+    expect_error(facet_small_sample_review(fit, thresholds = invalid), "thresholds")
+  }
+})
+
+test_that("count reviews preserve their denominator and interpretation notes", {
+  fit <- readRDS(test_path("fixtures", "mml-comparison-intervals.rds"))$RSM$fit
+  # Alter weights only to isolate the documented descriptive count, not a fit.
+  fit$prep$data$Weight <- 5
+  review <- facet_small_sample_review(fit)
+  rater <- review$table[review$table$Facet == "Rater", ]
+  expect_equal(rater$N, as.integer(table(fit$prep$data$Rater)))
+  expect_true(all(rater$N > length(unique(fit$prep$data$Person))))
+  expect_output(summary(review), "do not establish precision")
+  expect_output(print(review), "retained rating rows")
+  path <- tempfile(fileext = ".pdf")
+  grDevices::pdf(path)
+  on.exit({ grDevices::dev.off(); unlink(path) }, add = TRUE)
+  plotted <- plot(review, top_n = 2)
+  expect_identical(attr(plotted, "notes"), review$notes)
 })
 
 test_that("analyze_hierarchical_structure returns a bundle", {
@@ -131,8 +183,16 @@ test_that("reporting_checklist surfaces hierarchical audit rows", {
   ))
   chk <- reporting_checklist(fit, diagnostics = diag)
   items <- chk$checklist$Item
-  expect_true("Facet sample-size adequacy" %in% items)
+  expect_true("Facet rating-count screening" %in% items)
   expect_true("Hierarchical structure review" %in% items)
+  # Isolate report availability from the count flag's descriptive severity.
+  fit$summary$FacetSampleSizeFlag <- "sparse"
+  fit$summary$FacetMinLevelN <- 3L
+  sparse <- reporting_checklist(fit, diagnostics = diag)$checklist
+  row <- sparse[sparse$Item == "Facet rating-count screening", ]
+  expect_true(row$Available)
+  expect_match(row$Detail, "retained rows per level = 3")
+  expect_match(row$NextAction, "not evidence of adequate sample size")
 })
 
 test_that("build_mfrm_manifest carries hierarchical_review table", {

@@ -48,12 +48,52 @@ far from the expected category at a given theta) are highlighted
 with a heavy border so the visual reads as a Rasch-convention
 Guttman scalogram.
 }
+\section{Migration in 0.2.4}{
+
+This renderer is internal. Use the corresponding \code{plot()} route in
+\link{mfrmr_plot_migration}; the former exported name is no longer available.
+}
+
+\section{Session plot defaults}{
+
+Set \code{options(mfrmr.plot_preset = "publication")} to choose a session default
+for plotting functions that expose the common \code{preset} argument. The
+supported values are \code{"standard"}, \code{"publication"}, \code{"compact"} and
+\code{"monochrome"}. Precedence is an explicit call argument, then the session
+option, then \code{"standard"}. For example, \code{preset = "standard"} overrides
+a session set to \code{"monochrome"}. Explicit \code{preset = NULL} retains the
+earlier package-default behavior; it does not read the session option.
+Invalid session values cause an error only when that option is needed.
+
+The category-curve, data-quality, fit-review, connectivity and network
+routes of \code{plot()} for report bundles use the same option through \code{...}.
+Plots without a common \code{preset} argument, including extended-model plots
+with their own \code{palette} controls, keep their own settings. This option
+selects a preset, not a universal theme or a guarantee that all renderers
+implement every appearance control identically.
+
+New plot payloads retain the resolved preset for supported saved-data
+rendering. Converting an existing payload with \code{\link[=as_ggplot]{as_ggplot()}} uses its saved
+appearance, even after the session option changes. A call that creates a
+new plot from a fit or statistical result uses the current default.
+For a reproducible script, supply \code{preset} explicitly or set the option in
+that script. Saving only the fitted model does not save a session option.
+No global ggplot theme is changed.
+
+Restore previous settings with \code{old <- options(mfrmr.plot_preset = "monochrome")} followed by \code{options(old)}. Use
+\code{options(mfrmr.plot_preset = NULL)} to remove the option. The preset changes
+appearance, not estimates, confidence levels or diagnostic thresholds.
+}
+
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 30)
-p <- plot_guttman_scalogram(fit, draw = FALSE)
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("plot_guttman_scalogram", run.dontrun = TRUE)
+\dontrun{
+# Saved synthetic JML/RSM analysis of example_core.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "core-jml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+p <- plot(fit, type = "guttman", draw = FALSE)
 dim(p$data$matrix)
 # Look for: a clean monotone "staircase" of higher scores in the
 #   upper-right triangle and lower scores in the lower-left, once
@@ -65,7 +105,8 @@ dim(p$data$matrix)
 \seealso{
 \code{\link[=unexpected_response_table]{unexpected_response_table()}} for the case-level review of
 the cells flagged in the overlay;
-\code{\link[=plot_rater_agreement_heatmap]{plot_rater_agreement_heatmap()}} for a complementary rater-pair
+\link[=plot.mfrm_fit]{plot(x, type = "agreement", view = "heatmap")} for a complementary rater-pair
 view of the same residual structure;
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} for the underlying diagnostics bundle.
 }
+\keyword{internal}

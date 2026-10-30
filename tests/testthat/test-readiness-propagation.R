@@ -31,6 +31,7 @@ make_unified_readiness_fixture <- function(
     mfrmr:::bind_mfrm_preparation_notes(list())
   }
   prep <- list(
+    data = data.frame(Person = c("P1", "P2"), Weight = c(1, 1)),
     facet_names = "Rater",
     levels = list(Person = c("P1", "P2"), Rater = c("R1", "R2")),
     preparation_notes = notes
@@ -290,8 +291,11 @@ test_that("PCM readiness propagates without upgrading numerical holds", {
   })
 
   for (pair in pairs) {
-    expect_identical(pair$ready$readiness$fit$FitReadiness, "ready")
-    expect_true(pair$ready$readiness$fit$InferenceReady)
+    boundary_available <- pair$ready$summary$Method == "MML" ||
+      requireNamespace("lpSolve", quietly = TRUE)
+    expect_identical(pair$ready$readiness$fit$FitReadiness,
+                     if (boundary_available) "ready" else "review")
+    expect_identical(pair$ready$readiness$fit$InferenceReady, boundary_available)
     expect_identical(pair$blocked$readiness$fit$FitReadiness, "blocked")
     expect_false(pair$blocked$readiness$fit$InferenceReady)
     expect_match(

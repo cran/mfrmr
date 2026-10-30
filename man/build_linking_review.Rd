@@ -2,6 +2,7 @@
 % Please edit documentation in R/api-advanced.R
 \name{build_linking_review}
 \alias{build_linking_review}
+\alias{summary.mfrm_linking_review}
 \title{Build a linking-review synthesis object}
 \usage{
 build_linking_review(
@@ -10,6 +11,8 @@ build_linking_review(
   chain = NULL,
   top_n = 10
 )
+
+\method{summary}{mfrm_linking_review}(object, digits = 3, top_n = 10, ...)
 }
 \arguments{
 \item{anchor_review}{Optional output from \code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}}.}
@@ -18,11 +21,21 @@ build_linking_review(
 
 \item{chain}{Optional output from \code{\link[=build_equating_chain]{build_equating_chain()}}.}
 
-\item{top_n}{Maximum number of linking-risk rows to highlight in summary
-outputs. The full object keeps the full risk tables.}
+\item{top_n}{For \code{build_linking_review()}: Maximum number of linking-risk rows to highlight in summary
+outputs. The full object keeps the full risk tables.
+
+For \code{summary()}: Number of top linking-risk rows to keep in the compact summary.}
+
+\item{object}{Output from \code{\link[=build_linking_review]{build_linking_review()}}.}
+
+\item{digits}{Number of digits for printed numeric values.}
+
+\item{...}{Reserved for generic compatibility.}
 }
 \value{
 An object of class \code{mfrm_linking_review}.
+
+For \code{summary()}: An object of class \code{summary.mfrm_linking_review}.
 }
 \description{
 Build a linking-review synthesis object
@@ -42,6 +55,11 @@ into one operational review surface with:
 The helper keeps the current conservative interpretation policy:
 anchor drift and screened links are operational review tools, not automatic
 proofs of scale equivalence or score comparability.
+It also does not verify source-fit readiness, cross-wave element identity,
+invariance, or the external assumptions behind group anchors; these must be
+established before promoting the synthesized review.
+
+\code{summary()} method: Summarize a linking-review object
 }
 \section{Recommended input route}{
 
@@ -59,7 +77,7 @@ Use existing package-native outputs in this order:
 \item \code{overview}: which evidence sources were supplied and the current review status.
 \item \code{top_linking_risks}: primary operational triage table.
 \item \code{group_view_index}: stable wave/link/facet/source-family grouping routes.
-\item \code{plot_map}: which existing plotting helper should be used next.
+\item \code{plot_map}: which plotting function to use for each result.
 \item \code{reporting_map}: what is covered here versus which manuscript-oriented
 helper should be used separately.
 }
@@ -67,21 +85,24 @@ helper should be used separately.
 
 \section{GPCM boundary}{
 
-This helper is currently intended for the documented \code{RSM} / \code{PCM} linking
-workflow. If the supplied drift/chain sources resolve to bounded \code{GPCM},
-the helper stops with a package-level message rather than silently implying
-support.
+This helper summarizes the documented \code{RSM} / \code{PCM} linking workflow.
+When supplied drift/chain sources resolve to \code{GPCM}, it retains an explicitly
+exploratory review and marks that scope as \code{supported_with_caveat}.
+This does not establish score interchangeability, invariance or a common
+scale across administrations.
 }
 
 \examples{
-\donttest{
+# Long-running workflow; run explicitly when needed.
+# example("build_linking_review", run.dontrun = TRUE)
+\dontrun{
 # Deliberately linked teaching waves: common labels below represent the
 # same rater and criterion identities by construction.
 toy <- load_mfrmr_data("example_core")
 people <- unique(toy$Person)
-# Two balanced 12-Person waves retain every Rater and Criterion.
-d1 <- toy[toy$Person \%in\% people[1:12], , drop = FALSE]
-d2 <- toy[toy$Person \%in\% people[13:24], , drop = FALSE]
+# Two balanced 24-Person waves retain every Rater and Criterion.
+d1 <- toy[toy$Person \%in\% people[1:24], , drop = FALSE]
+d2 <- toy[toy$Person \%in\% people[25:48], , drop = FALSE]
 fit1 <- fit_mfrm(d1, "Person", c("Rater", "Criterion"), "Score",
                  method = "MML", quad_points = 7, maxit = 30)
 fit2 <- fit_mfrm(d2, "Person", c("Rater", "Criterion"), "Score",
@@ -97,5 +118,7 @@ review$group_view_index
 }
 \seealso{
 \code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}}, \code{\link[=detect_anchor_drift]{detect_anchor_drift()}},
-\code{\link[=build_equating_chain]{build_equating_chain()}}, \code{\link[=plot_anchor_drift]{plot_anchor_drift()}}, \link{mfrmr_linking_and_dff}
+\code{\link[=build_equating_chain]{build_equating_chain()}}, \link[=plot.mfrm_anchor_drift]{plot(x)}, \link{mfrmr_linking_and_dff}
+
+\code{\link[=build_linking_review]{build_linking_review()}}
 }

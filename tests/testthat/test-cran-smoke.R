@@ -70,7 +70,7 @@ test_that("CRAN smoke covers the primary MML review and export route", {
   expect_s3_class(facets_summary$results, "mfrm_results")
   expect_identical(
     fit_summary$decision$Interpretation,
-    "Fit gates passed; formal precision review required"
+    "Fit-readiness requirements satisfied; formal precision review required"
   )
   expect_identical(fit_summary$decision$FormalInference, "No")
   expect_identical(fit_summary$decision$FitReadiness, "ready")
@@ -128,7 +128,7 @@ test_that("CRAN smoke covers the primary MML review and export route", {
   output_dir <- tempfile("mfrmr-cran-smoke-")
   on.exit(unlink(output_dir, recursive = TRUE, force = TRUE), add = TRUE)
   expect_warning(
-    written <- export_mfrm(
+    written <- export_mfrm_tables(
       fit,
       diagnostics = diagnostics,
       output_dir = output_dir,
@@ -141,6 +141,14 @@ test_that("CRAN smoke covers the primary MML review and export route", {
   expect_true(all(file.exists(written$Path)))
   expect_true(all(!written$Deidentified))
   expect_true(all(!written$ShareableWithoutReview))
+  # Exercise the default archive route, including absence of optional predictions.
+  bundle <- export_mfrm_bundle(
+    fit, diagnostics = diagnostics, output_dir = file.path(output_dir, "archive"),
+    acknowledge_sensitive = TRUE
+  )
+  expect_s3_class(bundle, "mfrm_export_bundle")
+  expect_true(all(file.exists(bundle$written_files$Path)))
+  expect_false(bundle$privacy_notice$Deidentified)
 })
 
 test_that("the executable fit_mfrm example remains short and inference-ready", {
@@ -182,7 +190,7 @@ test_that("the canonical PCM first-use route separates coordinates from freedom"
   sizes <- mfrmr:::build_param_sizes(fit$config)
 
   expect_identical(fit_summary$decision$Interpretation,
-                   "Fit gates passed; formal precision review required")
+                   "Fit-readiness requirements satisfied; formal precision review required")
   expect_identical(fit_summary$decision$FormalInference, "No")
   expect_match(
     fit_summary$decision$NextAction,
@@ -194,3 +202,61 @@ test_that("the canonical PCM first-use route separates coordinates from freedom"
   expect_identical(nrow(fit$slopes), 0L)
   expect_null(sizes$log_slopes)
 })
+
+test_that("public adaptive fits use one objective for likelihood, gradient, covariance and EAP", {
+  # GPCM exercises free slopes and category-specific steps in the live Hessian route.
+  models <- if (isTRUE(as.logical(Sys.getenv("NOT_CRAN", "false")))) c("RSM", "PCM", "GPCM") else "GPCM"
+  for (model in models) {
+    fixture <- adaptive_api_fixture(model)
+    fit <- fixture$fit
+    config <- fit$config
+    order <- config$estimation_control$quad_points
+    expect_equal(order, if (isTRUE(as.logical(Sys.getenv("NOT_CRAN", "false")))) 31L else 15L)
+    sizes <- mfrmr:::build_param_sizes(config)
+    idx <- mfrmr:::build_indices(fit$prep, config$step_facet, config$slope_facet,
+                                 config$interaction_specs)
+    evaluate <- mfrmr:::mfrmr_make_adaptive_mml_evaluator(idx, config, sizes, order)
+    expected <- evaluate(fit$opt$par)
+    expect_identical(fit$summary$MMLIntegration, "adaptive")
+    displayed <- paste(capture.output(print(summary(fit))), collapse = "\n")
+    displayed <- gsub("[[:space:]]+", " ", displayed)
+    expect_match(displayed, paste0("Integration: adaptive Gauss-Hermite, q=", order), fixed = TRUE)
+    expect_match(fit$summary$IntegrationEvaluationId, paste0("aghq_normal_v1:q=", order), fixed = TRUE)
+    expect_lt(abs(fit$summary$LogLik + expected$value), 1e-8)
+    expect_lt(abs(fit$summary$TerminalGradientSupNorm - max(abs(expected$gradient))), 1e-8)
+    # GPCM covers the general live Hessian route in ordinary checks.
+    # The complete suite also verifies the RSM and PCM special cases.
+    if (model == "GPCM" || isTRUE(as.logical(Sys.getenv("NOT_CRAN", "false")))) {
+      covariance <- mfrmr:::compute_mml_parameter_covariance(fit)
+      hessian <- stats::optimHess(fit$opt$par, function(x) evaluate(x)$value,
+                                 function(x) evaluate(x)$gradient)
+      expect_lt(max(abs(covariance$hessian - hessian)), 1e-7)
+    }
+    review <- mfrmr:::mfrmr_adaptive_quadrature_review(
+      idx, config, mfrmr:::expand_params(fit$opt$par, sizes, config),
+      mfrmr:::gauss_hermite_normal(order), fit$prep$levels$Person, order
+    )
+    person <- fit$facets$person
+    expect_equal(nrow(person), nrow(review))
+    index <- match(person$Person, review$Person)
+    expect_false(anyNA(index))
+    expect_lt(max(abs(person$Estimate - review$AdaptiveEAP[index])), 1e-9)
+    expected_categories <- mfrmr:::compute_mml_expected_category_diagnostics(fit)
+    expect_lt(abs(sum(expected_categories$posterior_bundle$person_bundle$log_marginal) -
+                    fit$summary$LogLik), 1e-8)
+    if (model == "GPCM") {
+      boundary <- config$boundary_audit$gpcm_slope_boundary
+      expect_identical(boundary$state, "not_evaluated_adaptive_quadrature")
+      expect_false(boundary$fixed_quadrature_certificate)
+      audit <- config$estimability_audit
+      expect_identical(audit$mml_observed_pattern_score$status, "not_evaluated_adaptive_quadrature")
+      expect_identical(audit$mml_all_pattern_information$status, "not_evaluated_adaptive_quadrature")
+      expect_identical(audit$nonlinear_local_estimability$state, "not_evaluated")
+      expect_identical(audit$nonlinear_local_estimability$reason_codes,
+                       "adaptive_quadrature_probability_map_not_validated")
+      expect_identical(audit$nonlinear_local_estimability$probability_model_scope,
+                       "implemented_adaptive_quadrature_objective")
+    }
+  }
+})
+

@@ -83,6 +83,17 @@ to manuscript appendix artifacts. It accepts the same reporting objects that
 \code{\link[=build_summary_table_bundle]{build_summary_table_bundle()}} supports, exports their table bundles as CSV,
 and optionally assembles a lightweight HTML appendix page.
 
+Inspect \code{written_files} for the actual file paths. An analysis table whose
+name conflicts with bundle metadata (for example, \code{overview}) is retained
+with a \code{table_} prefix, with a numeric suffix if needed for uniqueness.
+Metadata keeps its existing filename; the analysis table is also retained
+in HTML. Summary rounding follows \code{digits}; retain the source R object for
+full-precision reuse.
+ZIP archives contain only files written by this call. With \code{overwrite = TRUE} an existing ZIP is replaced after the new archive is built and checked;
+obsolete members are not carried forward. If ZIP creation fails, any older
+ZIP is retained, \code{summary$ZipWritten} is zero and \code{notes} explains the
+failure. Other files in the destination folder are left in place.
+
 Fit-level caveats are exported through the \code{analysis_caveats} role, and
 pre-fit score-support caveats are exported through the
 \code{score_category_caveats} role. Both roles are classified as diagnostics, so
@@ -94,10 +105,10 @@ precision-review role so fit, ZSTD, separation/reliability/strata, and
 package review thresholds can be reported without turning them into
 universal recovery criteria.
 Fit-measure and FACETS fit-review summaries keep df/ZSTD sensitivity and
-optional external FACETS matching tables in the same precision-review lane.
+optional external FACETS matching tables in the same precision-review section.
 
 Parameter-recovery studies can be exported by passing
-\code{\link[=evaluate_mfrm_recovery]{evaluate_mfrm_recovery()}} or \code{\link[=assess_mfrm_recovery]{assess_mfrm_recovery()}} output directly. The
+\code{\link[=simulate_mfrm_recovery]{simulate_mfrm_recovery()}} or \code{\link[=assess_mfrm_recovery]{assess_mfrm_recovery()}} output directly. The
 exported bundle keeps the ADEMP-style simulation basis, recovery metrics,
 replication status, adequacy checklist, thresholds, and next actions in
 separate appendix-ready tables.
@@ -123,11 +134,14 @@ workflows.
 }
 
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 30)
-diag <- diagnose_mfrm(fit, residual_pca = "none")
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("export_summary_appendix", run.dontrun = TRUE)
+\dontrun{
+# Saved synthetic JML/RSM analysis of example_core.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "core-jml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+diag <- example_fit$diagnostics
 appendix <- export_summary_appendix(
   list(fit = fit, diagnostics = diag),
   output_dir = tempdir(),

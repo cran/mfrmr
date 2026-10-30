@@ -1,165 +1,149 @@
 #' Analyze practical equivalence within a facet
 #'
-#' @param fit Output from [fit_mfrm()].
-#' @param diagnostics Optional output from [diagnose_mfrm()]. When `NULL`,
-#'   diagnostics are computed with `residual_pca = "none"`.
-#' @param facet Character scalar naming the non-person facet to evaluate. If
-#'   `NULL`, the function prefers a rater-like facet and otherwise uses the
-#'   first model facet.
-#' @param equivalence_bound Practical-equivalence bound in logits. Default
-#'   `0.5` is a moderate bound intended as a starting point, not a
-#'   universal threshold. The TOST/ROPE result depends on both the bound
-#'   *and* the per-level standard errors, so in small or high-variance
-#'   designs the test may fail to reject non-equivalence simply because
-#'   the SEs are wide. Choose `equivalence_bound` based on the smallest
-#'   difference that would be practically meaningful in your assessment
-#'   context (commonly 0.3 to 0.5 logits for rater-mediated designs) and
-#'   check `$summary` for per-level SE magnitude before drawing
-#'   conclusions.
-#' @param ci_level Confidence level used for the forest-style interval
-#'   view. Default `0.95`.
-#' @param conf_level Deprecated alias for `ci_level`, retained for
-#'   backward compatibility. Supplying a non-`NULL` value overrides
-#'   `ci_level` and emits a one-time deprecation warning.
-#'   Default `0.95`.
+#' @param fit Output from [fit_mfrm()]. Requires an inference-ready MML fit
+#'   with unregularized observed-information covariance and estimable contrasts.
+#' @param diagnostics Optional matching output from [diagnose_mfrm()]. Supplied
+#'   diagnostics must retain all target-facet levels, model-based SEs and
+#'   ordinary-inference eligibility. Estimates and covariance are always taken
+#'   from `fit`; supplying diagnostics cannot override its restrictions.
+#'   Fixed levels instead require their fixed-value labels and absent sampling SEs.
+#' @param facet Character scalar naming a non-person facet. When `NULL`, a
+#'   rater-like facet is preferred, otherwise the first model facet is used.
+#' @param equivalence_bound Positive practical-equivalence bound in logits.
+#'   The default `0.5` is not a universal threshold. Choose the smallest
+#'   practically meaningful difference for the intended use before inspecting
+#'   the equivalence results.
+#' @param ci_level Confidence level for level and grand-mean-deviation intervals
+#'   (default `0.95`). Pairwise TOST always uses alpha 0.05 and 90% intervals.
+#' @param conf_level Deprecated alias for `ci_level`; when supplied it takes
+#'   precedence and emits a lifecycle deprecation warning.
 #'
 #' @details
-#' This function tests whether facet elements (e.g., raters) are similar
-#' enough to be treated as practically interchangeable, rather than merely
-#' testing whether they differ significantly.  This is the key distinction
-#' from a standard chi-square heterogeneity test: absence of evidence
-#' for difference is not evidence of equivalence.
+#' Pair differences use the full constrained covariance from the MML observed
+#' information: \eqn{\mathrm{Var}(A-B) = \mathrm{Var}(A) + \mathrm{Var}(B) -
+#' 2\mathrm{Cov}(A,B)}. No model is refitted. JML, inference-ineligible fits,
+#' missing or regularized covariance, and singular contrast covariance stop
+#' with an error. Levels with fixed or unavailable contrasts are not silently
+#' dropped. Known anchors are treated as fixed; their uncertainty is excluded.
+#' Non-unit observation weights are inference-ineligible, including weights
+#' normalized to mean one. Older bundles must retain the current readiness
+#' contract as well as the covariance basis before they can be displayed.
+#' A numerically verified inverse of ill-conditioned information is retained
+#' with a warning, not silently treated as strong evidence. When applicable,
+#' `cautions`, `information_review` and table column `InferenceCaution` preserve
+#' that warning through summaries and plots. Numerical verification does not
+#' establish the accuracy of the normal or chi-square approximations.
 #'
-#' The function uses existing facet estimates and their standard errors
-#' from `diagnostics$measures`; no re-estimation is performed.
+#' The heterogeneity table uses a joint Wald chi-square test of equality of
+#' the facet levels. Non-significant heterogeneity is neither necessary nor
+#' sufficient for practical equivalence. `FixedChiSq`, `FixedDF`, and
+#' `FixedProb` retain their column names but use this joint contrast test.
+#' Separation and reliability remain descriptive summaries.
 #'
-#' The bundle combines four complementary views:
+#' `GrandMean` is the equally weighted mean of the facet estimates. For each
+#' deviation from that mean, uncertainty includes the covariance with the
+#' estimated mean. `ROPEPct` is the mass of its normal confidence distribution
+#' inside the practical bound; it is descriptive, not a Bayesian posterior
+#' probability or a separate equivalence decision.
 #'
-#' 1. **Fixed chi-square test**: tests \eqn{H_0}: all element measures
-#'    are equal.  A non-significant result is *necessary but not
-#'    sufficient* for interchangeability. It is reported as context, not
-#'    as direct evidence of equivalence.
-#'
-#' 2. **Pairwise TOST (Two One-Sided Tests)**: for each pair of
-#'    elements, tests whether the difference falls within
-#'    \eqn{\pm}`equivalence_bound`.  The TOST procedure (Schuirmann,
-#'    1987) rejects the null hypothesis of *non-equivalence* when both
-#'    one-sided tests are significant at level \eqn{\alpha}.  A pair is
-#'    declared "Equivalent" when the TOST p-value < 0.05.
-#'
-#' 3. **BIC-based Bayes-factor heuristic**: an approximate screening
-#'    tool (not full Bayesian inference) that compares the evidence for
-#'    a common-facet model (all elements equal) against a heterogeneity
-#'    model (elements differ) via
-#'    \eqn{\mathrm{BF}_{01} \approx \exp((\mathrm{BIC}_{H_1} -
-#'    \mathrm{BIC}_{H_0}) / 2)} (Kass & Raftery, 1995).  Values > 3
-#'    favour the common-facet model; < 1/3 favour heterogeneity.
-#'
-#' 4. **ROPE-style grand-mean proximity**: the proportion of each
-#'    element's normal-approximation confidence distribution that falls
-#'    within \eqn{\pm}`equivalence_bound` of the weighted grand mean.
-#'    This is a descriptive proximity summary, not a Bayesian ROPE
-#'    decision rule around a prespecified null value.
-#'
-#' **Choosing `equivalence_bound`**: the default of 0.5 logits is a
-#' moderate criterion.  For high-stakes certification, 0.3 logits may
-#' be appropriate; for exploratory or low-stakes contexts, 1.0 logits
-#' may suffice.  The bound should reflect the smallest difference that
-#' would be practically meaningful in your application.
+#' The former BIC/Bayes-factor heuristic is unavailable: a Wald statistic is
+#' not a fitted likelihood comparison. For compatibility, `BF01` is `NA` and
+#' `BF01Label` states why no value is supplied.
 #'
 #' @section What this analysis means:
-#' `analyze_facet_equivalence()` is a practical-interchangeability screen. It
-#' asks whether facet levels are close enough, under a user-defined logit
-#' bound, to be treated as practically similar for the current use case.
+#' The analysis asks whether differences between facet levels fall within a
+#' prespecified practical bound under the fitted model. These are asymptotic
+#' normal-approximation tests; numerical eligibility does not establish
+#' finite-sample coverage or adequacy of the rating design.
 #'
 #' @section What this analysis does not justify:
-#' - A non-significant chi-square result is not evidence of equivalence.
-#' - Forest/ROPE displays are descriptive and do not replace the pairwise TOST
-#'   decision rule.
-#' - The BIC-based Bayes-factor summary is a heuristic screen, not a full
-#'   Bayesian equivalence analysis.
-#'
-#' @section Interpreting output:
-#' Start with `summary$Decision`, which is a conservative summary of the
-#' pairwise TOST results. Then use the remaining tables as context:
-#' - `chi_square`: is there broad heterogeneity in the facet?
-#' - `pairwise`: which specific pairs meet the practical-equivalence bound?
-#' - `rope` / `forest`: how close is each level to the facet grand mean?
-#'
-#' Smaller `equivalence_bound` values make the criterion stricter. If the
-#' decision is `"partial_pairwise_equivalence"`, that means some pairwise
-#' contrasts satisfy the practical-equivalence bound but not all of them do.
+#' A non-significant difference is not evidence of equivalence. Pairwise
+#' conclusions are unadjusted for multiplicity: selecting some positive pairs
+#' does not provide family-wise error control for that selected set. Estimated
+#' linking or anchor uncertainty, population transport, and model
+#' misspecification require separate evaluation.
 #'
 #' @section Decision rule:
-#' The final `Decision` is a pairwise TOST summary rather than a global
-#' equivalence proof. If all pairwise contrasts satisfy the practical-
-#' equivalence bound, the facet is labeled `"all_pairs_equivalent"`. If at
-#' least one, but not all, pairwise contrasts are equivalent, the facet is
-#' labeled `"partial_pairwise_equivalence"`. If no pairwise contrasts meet the
-#' practical-equivalence bound, the facet is labeled
-#' `"no_pairwise_equivalence_established"`. The chi-square, Bayes-factor, and
-#' grand-mean proximity summaries are reported as descriptive context.
+#' Each pair uses two one-sided normal tests at alpha 0.05. `Equivalent` is
+#' true when both tests reject non-equivalence, equivalently when its 90%
+#' interval lies strictly inside the bound. `Decision` summarizes all pairs
+#' as `"all_pairs_equivalent"`, `"partial_pairwise_equivalence"`, or
+#' `"no_pairwise_equivalence_established"`. No pair may be omitted from the
+#' all-pairs summary. Heterogeneity and ROPE summaries do not change this rule.
+#' The all-pairs conclusion is an intersection-union decision: if any pair is
+#' truly outside the bound, declaring all pairs equivalent requires falsely
+#' passing that pair's test. Its asymptotic type-I error is therefore at most
+#' alpha when each pair's approximation is valid. This does not provide
+#' simultaneous confidence intervals or error control for selected pairs.
+#'
+#' @section Interpreting output:
+#' Start with `summary$Decision` and examine the corresponding `pairwise`
+#' differences, SEs and intervals. A negative result can reflect imprecision
+#' or a material difference. `chi_square` addresses exact equality, while
+#' `rope` and `forest` describe proximity to the facet mean.
 #'
 #' @section How to read the main outputs:
-#' - `summary`: one-row pairwise-TOST decision summary and aggregate context.
-#' - `pairwise`: pair-level TOST detail; use this for the primary inferential
-#'   read.
-#' - `chi_square`: broad heterogeneity screen.
-#' - `rope` / `forest`: level-wise proximity to the weighted grand mean.
+#' - `summary`: pairwise decision, covariance basis and multiplicity convention.
+#' - `pairwise`: differences, covariance-aware SEs, 90% intervals and TOST tests.
+#' - `chi_square`: joint Wald heterogeneity test and descriptive separation.
+#' - `rope` / `forest`: `Measure`, marginal `SE` and `CI_Lower`/`CI_Upper`, plus
+#'   `Deviation`, `DeviationSE` and `DeviationCI_Lower`/`DeviationCI_Upper` for
+#'   the difference from the estimated facet mean. `Fixed` marks an anchored
+#'   or constraint-fixed location: its conditional marginal `SE` is zero and
+#'   its marginal interval is absent. Its deviation from an estimated mean,
+#'   or contrast with an estimated level, can still have nonzero uncertainty.
+#'   The forest plot displays these deviations, not the anchored locations.
+#'   No uncertainty in supplied anchor values is propagated.
+#' - `CIReason`, `DeviationCIReason`, and pairwise `CI90Reason` distinguish
+#'   `"available"`, `"fixed"`, `"numerical_resolution"` (the requested width
+#'   rounds away), and `"outside_numeric_range"`. Unavailable endpoints are
+#'   `NA`; estimates and SEs remain. `ROPEStatus = "unavailable"` means the
+#'   deviation interval could not be displayed, not that it is inside the bound.
+#'   The fixed-alpha TOST p-values do not depend on the display `ci_level`.
 #'
 #' @section Recommended next step:
-#' If the result is borderline or high-stakes, re-run the analysis with a
-#' tighter or looser `equivalence_bound`, then inspect `pairwise` and
-#' [plot_facet_equivalence()] before deciding how strongly to claim
-#' interchangeability.
+#' Review numerical integration and the model's uncertainty assumptions before
+#' interpreting a borderline result. Sensitivity to another practical bound
+#' should be reported transparently, without selecting a bound to obtain a
+#' desired decision.
 #'
 #' @section Typical workflow:
-#' 1. Fit a model with [fit_mfrm()].
-#' 2. Run `analyze_facet_equivalence()` for the facet you want to screen.
-#' 3. Read `summary` and `chi_square` first.
-#' 4. Use [plot_facet_equivalence()] to inspect which levels drive the result.
+#' 1. Fit and review an MML model with [fit_mfrm()].
+#' 2. Prespecify the practical bound and run `analyze_facet_equivalence()`.
+#' 3. Read `summary` and `pairwise`.
+#' 4. Use [plot(x, type = "facet_equivalence")][plot.mfrm_fit] for descriptive grand-mean proximity.
 #'
 #' @section Output:
-#' The returned bundle has class `mfrm_facet_equivalence` and includes:
-#' - `summary`: one-row overview with convergent decision
-#' - `chi_square`: fixed chi-square / separation summary
-#' - `pairwise`: pairwise TOST detail table
-#' - `rope`: element-wise ROPE probabilities around the weighted grand mean
-#' - `forest`: element-wise estimate, confidence interval, and ROPE status
-#' - `settings`: applied facet and threshold settings
+#' A bundle with `summary`, `chi_square`, `pairwise`, `rope`, `forest`, and
+#' `settings`. Older bundles without the current inference/covariance basis
+#' must be recomputed before using `summary()`, `print()`, or plotting.
 #'
 #' @return A named list with class `mfrm_facet_equivalence`.
-#' @seealso [facets_chisq_table()], [fair_average_table()], [plot_facet_equivalence()]
-#'
+#' @seealso [facets_chisq_table()], [fair_average_table()], [plot(x, type = "facet_equivalence")][plot.mfrm_fit]
 #' @concept confidence intervals
 #' @concept facet equivalence
 #' @concept reporting workflow
-#'
 #' @references
-#' Kass, R. E., & Raftery, A. E. (1995). Bayes factors. *Journal of the
-#' American Statistical Association, 90*(430), 773-795.
-#'
 #' Schuirmann, D. J. (1987). A comparison of the two one-sided tests
 #' procedure and the power approach for assessing the equivalence of
 #' average bioavailability. *Journal of Pharmacokinetics and
 #' Biopharmaceutics, 15*(6), 657-680.
-#'
 #' @examples
-#' \donttest{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-#'                 method = "JML", maxit = 30)
+#'                 method = "MML", quad_points = 31, maxit = 150)
 #' eq <- analyze_facet_equivalence(fit, facet = "Rater")
 #' eq$summary[, c("Facet", "Elements", "Decision", "MeanROPE")]
 #' head(eq$pairwise[, c("ElementA", "ElementB", "Equivalent")])
-#' }
 #' @export
+#' @order 1
 analyze_facet_equivalence <- function(fit,
                                       diagnostics = NULL,
                                       facet = NULL,
                                       equivalence_bound = 0.5,
                                       ci_level = 0.95,
                                       conf_level = NULL) {
+  stop_if_product_slopes(fit, "analyze_facet_equivalence()")
   if (!inherits(fit, "mfrm_fit")) {
     stop("`fit` must be an mfrm_fit object from fit_mfrm().", call. = FALSE)
   }
@@ -187,90 +171,107 @@ analyze_facet_equivalence <- function(fit,
     stop("`ci_level` must be a single number between 0 and 1.", call. = FALSE)
   }
 
-  if (is.null(diagnostics)) {
-    diagnostics <- diagnose_mfrm(fit, residual_pca = "none")
+  if (!identical(fit$config$method, "MML") || !mfrm_inference_ready(fit)) {
+    stop("Facet equivalence requires an inference-ready MML fit; ordinary inference is unavailable for this fit.",
+         call. = FALSE)
   }
-  if (!is.list(diagnostics) || is.null(diagnostics$measures)) {
-    stop("`diagnostics` must include `measures`, typically from diagnose_mfrm().", call. = FALSE)
-  }
-
-  measures <- as.data.frame(diagnostics$measures, stringsAsFactors = FALSE)
-  if (nrow(measures) == 0) {
-    stop("`diagnostics$measures` is empty.", call. = FALSE)
-  }
-  if (!all(c("Facet", "Estimate", "SE") %in% names(measures))) {
-    stop("`diagnostics$measures` must contain Facet, Estimate, and SE columns.", call. = FALSE)
+  if (!is.null(diagnostics)) {
+    mfrm_results_validate_diagnostics_identity(
+      fit, diagnostics, helper = "analyze_facet_equivalence()"
+    )
+    if (!isTRUE(diagnostics$precision_profile$SupportsFormalInference)) {
+      stop("Supplied diagnostics do not support ordinary inference.", call. = FALSE)
+    }
   }
 
-  facet_names <- as.character(fit$config$facet_names %||% character(0))
-  if (length(facet_names) == 0 && "Facet" %in% names(measures)) {
-    facet_names <- unique(as.character(measures$Facet))
+  facet_names <- as.character(fit$config$facet_names)
+  if (is.null(facet)) {
+    facet <- infer_default_rater_facet(facet_names) %||% facet_names[1]
   }
-  if (length(facet_names) == 0) {
-    stop("No non-person facets are available for equivalence analysis.", call. = FALSE)
-  }
-
-  if (is.null(facet) || !nzchar(as.character(facet[1]))) {
-    rater_guess <- infer_default_rater_facet(facet_names)
-    facet <- if (!is.null(rater_guess) && nzchar(rater_guess)) rater_guess else facet_names[1]
-  } else {
-    facet <- as.character(facet[1])
-  }
-  if (!facet %in% facet_names) {
+  if (length(facet) != 1L || is.na(facet) || !facet %in% facet_names) {
     stop("`facet` must be one of: ", paste(facet_names, collapse = ", "), ".", call. = FALSE)
   }
-
-  facet_df <- measures[as.character(measures$Facet) == facet, , drop = FALSE]
-  if (nrow(facet_df) < 2) {
+  spec <- fit$config$facet_specs[[facet]]
+  labels <- as.character(spec$levels)
+  n_elem <- length(labels)
+  if (n_elem < 2L) {
     stop("Facet '", facet, "' has fewer than 2 estimated levels.", call. = FALSE)
   }
-
-  label_col <- if ("Level" %in% names(facet_df)) {
-    "Level"
-  } else if ("Element" %in% names(facet_df)) {
-    "Element"
-  } else {
-    NULL
-  }
-  if (is.null(label_col)) {
-    facet_df$Level <- paste0(facet, "_", seq_len(nrow(facet_df)))
-    label_col <- "Level"
+  facet_df <- fit$facets$others[fit$facets$others$Facet == facet, , drop = FALSE]
+  idx <- match(labels, as.character(facet_df$Level))
+  est <- as.numeric(facet_df$Estimate[idx])
+  if (anyNA(idx) || anyDuplicated(facet_df$Level) || !all(is.finite(est))) {
+    stop("Complete finite facet estimates are required; no levels may be dropped.", call. = FALSE)
   }
 
-  facet_df$Estimate <- suppressWarnings(as.numeric(facet_df$Estimate))
-  facet_df$SE <- suppressWarnings(as.numeric(facet_df$SE))
-  facet_df <- facet_df[is.finite(facet_df$Estimate) & is.finite(facet_df$SE) & facet_df$SE > 0, , drop = FALSE]
-  if (nrow(facet_df) < 2) {
-    stop("Facet '", facet, "' does not have at least 2 levels with finite Estimate and SE values.", call. = FALSE)
+  # Always derive uncertainty from this fit, never from supplied SE columns.
+  covariance <- compute_mml_parameter_covariance(fit)
+  if (!identical(covariance$status, "ok") || is.null(covariance$cov)) {
+    stop("Facet equivalence requires unregularized MML observed-information covariance.", call. = FALSE)
+  }
+  slice <- covariance$param_slices[[facet]]
+  jac <- constraint_jacobian(spec)
+  fixed <- if (ncol(jac)) rowSums(abs(jac)) == 0 else rep(TRUE, n_elem)
+  facet_cov <- symmetrize_matrix(
+    jac %*% covariance$cov[slice, slice, drop = FALSE] %*% t(jac)
+  )
+  contrasts <- cbind(diag(n_elem - 1L), -1)
+  contrast_rank <- qr(contrasts %*% jac)$rank
+  if (contrast_rank < n_elem - 1L) {
+    stop("All facet contrasts must be independent under the model constraints; fixed or unidentified contrasts cannot be tested.",
+         call. = FALSE)
+  }
+  contrast_cov <- contrasts %*% facet_cov %*% t(contrasts)
+  contrast_chol <- tryCatch(chol(contrast_cov), error = function(e) NULL)
+  if (!all(is.finite(facet_cov)) || is.null(contrast_chol)) {
+    stop("All facet contrasts must have positive-definite covariance; fixed or unidentified contrasts cannot be tested.",
+         call. = FALSE)
+  }
+  se <- covariance_diag_se(facet_cov)
+  if (!all(is.finite(se))) {
+    stop("Facet covariance has invalid marginal variances.", call. = FALSE)
+  }
+  if (!is.null(diagnostics)) {
+    rows <- diagnostics$measures[diagnostics$measures$Facet == facet, , drop = FALSE]
+    row_idx <- match(labels, as.character(rows$Level))
+    if (!all(c("Level", "SE", "SupportsFormalInference") %in% names(rows)) ||
+        nrow(rows) != n_elem || anyNA(row_idx) || anyDuplicated(rows$Level) ||
+        !isTRUE(all(rows$SupportsFormalInference[row_idx[!fixed]])) ||
+        !isTRUE(all.equal(as.numeric(rows$SE[row_idx[!fixed]]), se[!fixed], tolerance = 1e-8,
+                          check.attributes = FALSE)) ||
+        (any(fixed) && !("Fixed" %in% names(rows) &&
+          all(rows$Fixed[row_idx[fixed]] %in% TRUE) && all(is.na(rows$SE[row_idx[fixed]]))))) {
+      stop("Supplied facet diagnostics must contain all levels with matching model-based SEs and ordinary-inference eligibility for estimated levels, and fixed-value labels for constants.",
+           call. = FALSE)
+    }
   }
 
-  labels <- as.character(facet_df[[label_col]])
-  est <- as.numeric(facet_df$Estimate)
-  se <- as.numeric(facet_df$SE)
-  weights <- 1 / (se ^ 2)
-  grand_mean <- stats::weighted.mean(est, w = weights)
-
-  n_elem <- length(est)
-  df_chi <- n_elem - 1
-  chi2_val <- sum(weights * (est - grand_mean) ^ 2)
-  p_chi <- if (df_chi > 0) stats::pchisq(chi2_val, df = df_chi, lower.tail = FALSE) else NA_real_
-  sep_sd <- if (n_elem > 1) stats::sd(est) else NA_real_
+  grand_mean <- mean(est)
+  centering <- diag(n_elem) - 1 / n_elem
+  deviation_se <- covariance_diag_se(centering %*% facet_cov %*% t(centering))
+  df_chi <- n_elem - 1L
+  standardized <- forwardsolve(t(contrast_chol), contrasts %*% est)
+  chi2_val <- sum(standardized ^ 2)
+  p_chi <- stats::pchisq(chi2_val, df = df_chi, lower.tail = FALSE)
+  sep_sd <- stats::sd(est)
   rmse <- sqrt(mean(se ^ 2))
-  true_sd <- sqrt(max((sep_sd %||% NA_real_) ^ 2 - rmse ^ 2, 0))
-  separation <- if (is.finite(rmse) && rmse > 0) true_sd / rmse else NA_real_
-  reliability <- if (is.finite(separation)) separation ^ 2 / (1 + separation ^ 2) else NA_real_
+  true_sd <- sqrt(max(sep_sd ^ 2 - rmse ^ 2, 0))
+  separation <- if (rmse > 0) true_sd / rmse else NA_real_
+  reliability <- separation ^ 2 / (1 + separation ^ 2)
 
-  n_obs <- suppressWarnings(as.numeric(fit$prep$n_obs %||% NA_real_))
-  bic_diff <- if (is.finite(n_obs) && n_obs > 1 && is.finite(chi2_val) && is.finite(df_chi)) {
-    chi2_val - df_chi * log(n_obs)
-  } else {
-    NA_real_
-  }
-  bf01 <- if (is.finite(bic_diff)) exp(max(min(-bic_diff / 2, 700), -700)) else NA_real_
-  bf_label <- classify_equivalence_bf(bf01)
-
-  z_ci <- stats::qnorm(1 - (1 - conf_level) / 2)
+  z_ci <- stats::qnorm((1 - conf_level) / 2, lower.tail = FALSE)
   z_tost <- stats::qnorm(0.95)
+  interval <- function(estimate, se, z, fixed = rep(FALSE, length(estimate))) {
+    lower <- estimate - z * se
+    upper <- estimate + z * se
+    reason <- rep("available", length(estimate))
+    reason[!is.finite(lower) | !is.finite(upper)] <- "outside_numeric_range"
+    unresolved <- reason == "available" & !(lower < estimate & upper > estimate)
+    reason[unresolved] <- "numerical_resolution"
+    reason[fixed] <- "fixed"
+    lower[reason != "available"] <- upper[reason != "available"] <- NA_real_
+    list(lower = lower, upper = upper, reason = reason)
+  }
   pair_idx <- utils::combn(seq_len(n_elem), 2)
   pairwise_tbl <- if (is.null(dim(pair_idx))) {
     data.frame()
@@ -279,20 +280,21 @@ analyze_facet_equivalence <- function(fit,
       i <- pair_idx[1, k]
       j <- pair_idx[2, k]
       diff <- est[i] - est[j]
-      se_diff <- sqrt(se[i] ^ 2 + se[j] ^ 2)
-      if (!is.finite(se_diff) || se_diff <= 0) return(NULL)
+      se_diff <- sqrt(facet_cov[i, i] + facet_cov[j, j] - 2 * facet_cov[i, j])
       z_lower <- (diff + equivalence_bound) / se_diff
       z_upper <- (diff - equivalence_bound) / se_diff
       p_lower <- stats::pnorm(z_lower, lower.tail = FALSE)
       p_upper <- stats::pnorm(z_upper, lower.tail = TRUE)
       p_tost <- max(p_lower, p_upper)
+      ci <- interval(diff, se_diff, z_tost)
       data.frame(
         ElementA = labels[i],
         ElementB = labels[j],
         Diff = diff,
         SE_Diff = se_diff,
-        CI90_Lower = diff - z_tost * se_diff,
-        CI90_Upper = diff + z_tost * se_diff,
+        CI90_Lower = ci$lower,
+        CI90_Upper = ci$upper,
+        CI90Reason = ci$reason,
         P_Lower = p_lower,
         P_Upper = p_upper,
         P_TOST = p_tost,
@@ -307,30 +309,47 @@ analyze_facet_equivalence <- function(fit,
   n_pairs <- nrow(pairwise_tbl)
   n_equiv <- if (n_pairs > 0) sum(pairwise_tbl$Equivalent, na.rm = TRUE) else 0L
 
+  marginal_ci <- interval(est, se, z_ci, fixed)
+  deviation_ci <- interval(est - grand_mean, deviation_se, z_ci)
   rope_tbl <- data.frame(
     Element = labels,
+    Fixed = fixed,
     Measure = est,
     Deviation = est - grand_mean,
     SE = se,
-    CI_Lower = est - z_ci * se,
-    CI_Upper = est + z_ci * se,
+    DeviationSE = deviation_se,
+    DeviationCI_Lower = deviation_ci$lower,
+    DeviationCI_Upper = deviation_ci$upper,
+    DeviationCIReason = deviation_ci$reason,
+    CI_Lower = marginal_ci$lower,
+    CI_Upper = marginal_ci$upper,
+    CIReason = marginal_ci$reason,
     stringsAsFactors = FALSE
   )
-  rope_tbl$ROPEPct <- 100 * (
-    stats::pnorm(equivalence_bound, mean = rope_tbl$Deviation, sd = rope_tbl$SE) -
-      stats::pnorm(-equivalence_bound, mean = rope_tbl$Deviation, sd = rope_tbl$SE)
-  )
-  lower_bound <- grand_mean - equivalence_bound
-  upper_bound <- grand_mean + equivalence_bound
+  rope_tbl$ROPEPct <- 100 * vapply(seq_len(n_elem), function(i) {
+    # Reflection avoids subtracting two lower-tail probabilities near one.
+    center <- abs(rope_tbl$Deviation[i]); sd <- rope_tbl$DeviationSE[i]
+    upper <- stats::pnorm(equivalence_bound, center, sd)
+    mass <- upper - stats::pnorm(-equivalence_bound, center, sd)
+    if (mass < upper * 1e-6) {
+      # Integrate on a fixed domain when a narrow band loses CDF precision.
+      half_width <- equivalence_bound / sd
+      mass <- half_width * stats::integrate(function(t)
+        stats::dnorm(half_width * t - center / sd), -1, 1,
+        rel.tol = 1e-10, abs.tol = 0)$value
+    }
+    mass
+  }, numeric(1))
   rope_tbl$ROPEStatus <- ifelse(
-    rope_tbl$CI_Lower >= lower_bound & rope_tbl$CI_Upper <= upper_bound,
+    rope_tbl$DeviationCI_Lower >= -equivalence_bound & rope_tbl$DeviationCI_Upper <= equivalence_bound,
     "inside",
     ifelse(
-      rope_tbl$CI_Lower > upper_bound | rope_tbl$CI_Upper < lower_bound,
+      rope_tbl$DeviationCI_Lower > equivalence_bound | rope_tbl$DeviationCI_Upper < -equivalence_bound,
       "outside",
       "overlap"
     )
   )
+  rope_tbl$ROPEStatus[rope_tbl$DeviationCIReason != "available"] <- "unavailable"
 
   mean_rope <- if (nrow(rope_tbl) > 0) mean(rope_tbl$ROPEPct, na.rm = TRUE) else NA_real_
   all_pairs_equivalent <- n_pairs > 0L && n_equiv == n_pairs
@@ -350,6 +369,7 @@ analyze_facet_equivalence <- function(fit,
     FixedChiSq = chi2_val,
     FixedDF = df_chi,
     FixedProb = p_chi,
+    TestBasis = "Wald test of joint facet contrasts",
     Separation = separation,
     Reliability = reliability,
     stringsAsFactors = FALSE
@@ -364,12 +384,15 @@ analyze_facet_equivalence <- function(fit,
     PairwiseComparisons = n_pairs,
     PairwiseEquivalent = n_equiv,
     PairwiseEquivalentPct = if (n_pairs > 0) 100 * n_equiv / n_pairs else NA_real_,
-    BF01 = bf01,
-    BF01Label = bf_label,
+    BF01 = NA_real_,
+    BF01Label = "Unavailable: requires fitted likelihood comparison",
     MeanROPE = mean_rope,
     AllPairsEquivalent = all_pairs_equivalent,
     AnyPairEquivalent = any_pair_equivalent,
     PairwiseDecisionBasis = "pairwise_tost_summary",
+    InferenceReady = TRUE,
+    CovarianceBasis = "mml_observed_information_contrasts",
+    MultiplicityAdjustment = "none",
     Decision = decision,
     stringsAsFactors = FALSE
   )
@@ -383,29 +406,48 @@ analyze_facet_equivalence <- function(fit,
     settings = list(
       facet = facet,
       equivalence_bound = equivalence_bound,
-      ci_level = conf_level
+      ci_level = conf_level,
+      mean_basis = "equal_weight_facet_mean",
+      contrast_rank = contrast_rank,
+      readiness_contract_version = mfrmr_readiness_contract_version(),
+      covariance_basis = "mml_observed_information_contrasts"
     )
   )
+  if (any(c(pairwise_tbl$CI90Reason, rope_tbl$CIReason,
+            rope_tbl$DeviationCIReason) %in% c("numerical_resolution", "outside_numeric_range"))) {
+    out$notes <- "Some interval endpoints are unavailable at the requested numeric precision; inspect CIReason, DeviationCIReason and CI90Reason. Estimates, SEs and the fixed-alpha TOST remain separate from display intervals."
+  }
+  cautions <- mfrm_mml_information_caution(covariance)
+  if (length(cautions)) {
+    out$cautions <- cautions
+    out$information_review <- covariance$solution_information$inverse_review
+    for (name in c("summary", "chi_square", "pairwise", "rope", "forest")) {
+      out[[name]]$InferenceCaution <- paste(cautions, collapse = " ")
+    }
+    warning(paste(cautions, collapse = " "), call. = FALSE)
+  }
   as_mfrm_bundle(out, "mfrm_facet_equivalence")
 }
 
-classify_equivalence_bf <- function(bf01) {
-  if (!is.finite(bf01)) return("Not available")
-  if (bf01 > 100) return("Extreme evidence for common-facet model")
-  if (bf01 > 30) return("Very strong evidence for common-facet model")
-  if (bf01 > 10) return("Strong evidence for common-facet model")
-  if (bf01 > 3) return("Moderate evidence for common-facet model")
-  if (bf01 > 1) return("Anecdotal evidence for common-facet model")
-  if (bf01 > (1 / 3)) return("Anecdotal evidence for heterogeneity")
-  if (bf01 > (1 / 10)) return("Moderate evidence for heterogeneity")
-  "Strong evidence for heterogeneity"
+validate_facet_equivalence_bundle <- function(x) {
+  if (!isTRUE(x$summary$InferenceReady) ||
+      !identical(x$settings$readiness_contract_version,
+                 mfrmr_readiness_contract_version()) ||
+      !identical(x$settings$contrast_rank, x$summary$Elements - 1L) ||
+      !identical(x$settings$covariance_basis, "mml_observed_information_contrasts") ||
+      !identical(x$summary$CovarianceBasis, "mml_observed_information_contrasts")) {
+    stop("This equivalence bundle lacks the current inference and covariance basis. Recompute it with analyze_facet_equivalence() from an eligible MML fit.",
+         call. = FALSE)
+  }
+  invisible(x)
 }
 
 #' Plot facet-equivalence results
 #'
-#' @param x Output from [analyze_facet_equivalence()] or [fit_mfrm()].
-#' @param diagnostics Optional output from [diagnose_mfrm()] when `x` is an
-#'   `mfrm_fit` object.
+#' @param x Output from [analyze_facet_equivalence()] or an eligible MML
+#'   [fit_mfrm()] object. Legacy equivalence bundles must be recomputed.
+#' @param diagnostics Optional matching output from [diagnose_mfrm()] when
+#'   `x` is an `mfrm_fit` object.
 #' @param facet Facet to analyze when `x` is an `mfrm_fit` object.
 #' @param type Plot type: `"forest"` (default) or `"rope"`.
 #' @param draw If `TRUE` (default), draw the plot. If `FALSE`, return the
@@ -413,56 +455,48 @@ classify_equivalence_bf <- function(bf01) {
 #' @param ... Additional graphical arguments passed to base plotting functions.
 #'
 #' @details
-#' `plot_facet_equivalence()` is a visual companion to
-#' [analyze_facet_equivalence()]. It does not recompute the equivalence
-#' analysis; it only reshapes and displays the returned results.
+#' Fit inputs use the same eligibility checks as [analyze_facet_equivalence()].
+#' Bundle inputs display the already calculated results. Both routes require
+#' the current inference and covariance basis, including when `draw = FALSE`.
 #'
 #' @section Plot types:
-#' - `"forest"` places each level on the logit scale with its confidence
-#'   interval and shades the practical-equivalence region around the weighted
-#'   grand mean.
-#' - `"rope"` shows the percentage of each level's uncertainty mass that falls
-#'   inside the ROPE.
+#' - `"forest"` shows each level's deviation from the equally weighted facet
+#'   mean, with covariance-aware deviation intervals and the practical region
+#'   around zero. The raw marginal measure intervals remain in the data table.
+#' - `"rope"` shows the normal confidence-distribution mass within that region.
 #'
 #' @section Interpreting output:
-#' In the **forest plot**, the shaded band marks the ROPE
-#' (\eqn{\pm}`equivalence_bound` around the weighted grand mean).
-#' Levels whose entire confidence interval lies inside this band are
-#' close to the facet grand mean under this descriptive screen. Levels whose
-#' interval extends outside the band are more displaced from the facet average.
-#' Overlapping intervals between two elements suggest they are not
-#' reliably separable, but overlap alone does not establish formal
-#' equivalence---use the TOST results for that.
-#'
-#' In the **ROPE bar chart**, each bar shows the proportion of the
-#' element's normal-approximation distribution that falls inside the
-#' ROPE-style grand-mean proximity.  Values > 95\% indicate that most of
-#' the element's normal-approximation uncertainty falls near the facet
-#' average; 50--95\% is indeterminate; < 50\% suggests the element is
-#' meaningfully displaced from that average.
+#' Both plots describe grand-mean proximity. Colors in the forest plot indicate
+#' whether the deviation interval is inside, outside, or overlaps the practical
+#' region. Neither plot establishes pairwise equivalence or a Bayesian
+#' probability. Read the pairwise TOST results for pair-specific conclusions.
 #'
 #' @section Typical workflow:
-#' 1. Run [analyze_facet_equivalence()].
-#' 2. Start with `type = "forest"` to see the facet on the logit scale.
-#' 3. Switch to `type = "rope"` when you want a ranking of levels by
-#'    grand-mean proximity.
+#' 1. Run [analyze_facet_equivalence()] with a prespecified practical bound.
+#' 2. Use `type = "forest"` to inspect deviations and their uncertainty.
+#' 3. Use `type = "rope"` for a descriptive proximity view.
 #'
-#' @return Invisibly returns the plotting data. If `draw = FALSE`, the plotting
-#'   data are returned without drawing.
+#' @return Invisibly returns the plotting data and inference/covariance basis.
+#'   With `draw = FALSE`, returns the data without drawing.
 #' @seealso [analyze_facet_equivalence()]
 #' @concept confidence intervals
 #' @concept facet equivalence
 #' @concept visual diagnostics
 #' @examples
-#' \donttest{
+#' # Supplementary workflow: run explicitly to keep routine checks brief.
+#' # example("plot_facet_equivalence", run.dontrun = TRUE)
+#' \dontrun{
 #' toy <- load_mfrmr_data("example_core")
 #' fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-#'                 method = "JML", maxit = 30)
+#'                 method = "MML", quad_points = 31, maxit = 150)
 #' eq <- analyze_facet_equivalence(fit, facet = "Rater")
-#' pdat <- plot_facet_equivalence(eq, type = "forest", draw = FALSE)
+#' pdat <- plot(eq, type = "facet_equivalence", view = "forest", draw = FALSE)
 #' c(pdat$facet, pdat$type)
 #' }
-#' @export
+#' @keywords internal
+#' @section Migration in 0.2.4:
+#' This renderer is internal. Use the corresponding `plot()` route in
+#' [mfrmr_plot_migration]; the former exported name is no longer available.
 plot_facet_equivalence <- function(x,
                                    diagnostics = NULL,
                                    facet = NULL,
@@ -481,6 +515,8 @@ plot_facet_equivalence <- function(x,
     stop("`x` must be output from analyze_facet_equivalence() or fit_mfrm().", call. = FALSE)
   }
 
+  validate_facet_equivalence_bundle(x)
+
   forest_df <- as.data.frame(x$forest %||% data.frame(), stringsAsFactors = FALSE)
   settings <- x$settings %||% list()
   summary_tbl <- as.data.frame(x$summary %||% data.frame(), stringsAsFactors = FALSE)
@@ -493,77 +529,95 @@ plot_facet_equivalence <- function(x,
     facet = as.character(settings$facet %||% summary_tbl$Facet[1] %||% ""),
     grand_mean = suppressWarnings(as.numeric(summary_tbl$GrandMean[1] %||% NA_real_)),
     equivalence_bound = suppressWarnings(as.numeric(settings$equivalence_bound %||% summary_tbl$EquivalenceBound[1] %||% NA_real_)),
-    type = type
+    type = type,
+    title = paste0(as.character(settings$facet), ": deviation from facet mean"),
+    note = paste(c("Mean-deviation intervals do not establish pairwise equivalence.",
+      x$notes, x$cautions), collapse = " "),
+    cautions = x$cautions,
+    information_review = x$information_review,
+    inference_ready = TRUE,
+    covariance_basis = settings$covariance_basis
   )
   if (!isTRUE(draw)) {
     return(out)
   }
 
-  old_par <- graphics::par(no.readonly = TRUE)
-  on.exit(graphics::par(old_par), add = TRUE)
   dots <- list(...)
 
   if (identical(type, "forest")) {
-    ord <- order(forest_df$Measure, decreasing = FALSE, na.last = TRUE)
+    ord <- order(forest_df$Deviation, decreasing = FALSE, na.last = TRUE)
     forest_df <- forest_df[ord, , drop = FALSE]
     ypos <- seq_len(nrow(forest_df))
     cols <- ifelse(
       forest_df$ROPEStatus == "inside",
       "#2E8B57",
-      ifelse(forest_df$ROPEStatus == "outside", "#C0392B", "#D68910")
+      ifelse(forest_df$ROPEStatus == "outside", "#C0392B",
+        ifelse(forest_df$ROPEStatus == "unavailable", "grey50", "#D68910"))
     )
-    xlim <- range(c(forest_df$CI_Lower, forest_df$CI_Upper,
-                    out$grand_mean - out$equivalence_bound,
-                    out$grand_mean + out$equivalence_bound), finite = TRUE)
+    xlim <- range(c(forest_df$Deviation, forest_df$DeviationCI_Lower, forest_df$DeviationCI_Upper,
+                    -out$equivalence_bound, out$equivalence_bound), finite = TRUE)
     do.call(graphics::plot, c(list(
-      x = forest_df$Measure,
+      x = forest_df$Deviation,
       y = ypos,
       xlim = xlim,
       yaxt = "n",
       ylab = "",
-      xlab = "Measure (logits)",
-      main = paste0(out$facet, ": facet equivalence"),
+      xlab = "Deviation from facet mean (logits)",
+      main = "",
       pch = 19,
       col = cols
     ), dots))
     graphics::axis(2, at = ypos, labels = forest_df$Element, las = 2)
     graphics::rect(
-      xleft = out$grand_mean - out$equivalence_bound,
+      xleft = -out$equivalence_bound,
       ybottom = 0.5,
-      xright = out$grand_mean + out$equivalence_bound,
+      xright = out$equivalence_bound,
       ytop = nrow(forest_df) + 0.5,
       border = NA,
       col = grDevices::adjustcolor("#2E8B57", alpha.f = 0.12)
     )
-    graphics::abline(v = out$grand_mean, lty = 2, col = "gray40")
-    graphics::segments(forest_df$CI_Lower, ypos, forest_df$CI_Upper, ypos, col = cols, lwd = 2)
-    graphics::points(forest_df$Measure, ypos, pch = 19, col = cols)
+    graphics::abline(v = 0, lty = 2, col = "gray40")
+    graphics::segments(forest_df$DeviationCI_Lower, ypos, forest_df$DeviationCI_Upper, ypos, col = cols, lwd = 2)
+    graphics::points(forest_df$Deviation, ypos, pch = 19, col = cols)
   } else {
     ord <- order(forest_df$ROPEPct, decreasing = TRUE, na.last = TRUE)
     forest_df <- forest_df[ord, , drop = FALSE]
-    cols <- ifelse(
-      forest_df$ROPEPct >= 95,
-      "#2E8B57",
-      ifelse(forest_df$ROPEPct < 50, "#C0392B", "#D68910")
-    )
+    cols <- "#4477AA"
     mids <- graphics::barplot(
       height = forest_df$ROPEPct,
       names.arg = forest_df$Element,
       las = 2,
       ylim = c(0, 100),
       col = cols,
-      ylab = "% in ROPE",
-      main = paste0(out$facet, ": ROPE probabilities"),
+      ylab = "Normal reference mass within bound (%)",
+      main = "",
       ...
     )
-    graphics::abline(h = c(50, 80, 95), lty = c(3, 3, 2), col = c("gray60", "gray60", "gray40"))
     out$bar_midpoints <- mids
   }
 
   invisible(out)
 }
 
+#' @rdname analyze_facet_equivalence
+#' @details `plot()` method: Plot a saved facet-equivalence analysis
+#' @param x A result from [analyze_facet_equivalence()].
+#' @param ... Use `type = "forest"` (default) for deviations and intervals or
+#'   `type = "rope"` for normal confidence-distribution mass. Other controls
+#'   are described in [plot_facet_equivalence()].
+#' @details For `plot()`: When an interval cannot be represented at the requested numeric precision,
+#' the forest retains its estimate as a grey point without a whisker. Inspect
+#' `data$DeviationCIReason` and `note` in the returned payload for the reason.
+#' This does not change the pairwise TOST decision stored in the analysis.
+#' @return For `plot()`: The existing equivalence plot payload and inference restrictions.
+#'   Grand-mean proximity does not establish pairwise equivalence.
+#' @seealso [mfrmr_plot_migration]
 #' @export
 plot.mfrm_facet_equivalence <- function(x, ...) {
-  plot_facet_equivalence(x, ...)
+  args <- list(...)
+  if (identical(args$type, "facet_equivalence")) {
+    args$type <- NULL
+    args <- .mfrm_plot_rename(args, "view", "type")
+  }
+  .mfrm_plot_call(plot_facet_equivalence, x, args)
 }

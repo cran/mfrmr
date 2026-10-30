@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>How often does a rater screen give the right warning?</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">How often does a rater screen give the
+right warning?</h1>
+
+
+
+<p>An assessment coordinator wants to use fit statistics when giving
+feedback to raters. Before choosing a warning rule, two questions
+matter: how often does it warn about a rater whose ratings follow the
+intended model, and how often does it detect a specified departure? A
+difference in severity alone is not such a departure. A consistently
+strict rater can fit a model that estimates severity.</p>
+<p><code>mfrm_screening_performance()</code> summarizes flags against
+<strong>known simulation truth</strong>. It accepts outcomes from your
+own generators, fitting methods and screening rules. It does not
+determine which rule is appropriate or label real raters as good or bad.
+In an actual assessment, unobserved rater quality cannot be supplied as
+known truth simply by accepting the screen’s own verdict.</p>
+<div id="keep-failed-and-incomplete-trials-in-the-planned-roster" class="section level2">
+<h2>Keep failed and incomplete trials in the planned roster</h2>
+<p>Declare the conditions, independent replications and targets before
+running the study. <code>Affected = TRUE</code> means a target has the
+particular departure the screen is meant to detect. Put different
+designs or methods in separate conditions. Within each condition, keep
+the same targets and truth labels.</p>
+<p>This small invented example has two unaffected raters and four
+planned trials:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>roster <span class="ot">&lt;-</span> <span class="fu">expand.grid</span>(<span class="at">Condition =</span> <span class="st">&quot;Null&quot;</span>, <span class="at">Replicate =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>,</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>                     <span class="at">Target =</span> <span class="fu">c</span>(<span class="st">&quot;R1&quot;</span>, <span class="st">&quot;R2&quot;</span>), <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>roster<span class="sc">$</span>Affected <span class="ot">&lt;-</span> <span class="cn">FALSE</span></span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>results <span class="ot">&lt;-</span> roster[<span class="fu">c</span>(<span class="st">&quot;Condition&quot;</span>, <span class="st">&quot;Replicate&quot;</span>, <span class="st">&quot;Target&quot;</span>)]</span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>results<span class="sc">$</span>Flag <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="cn">FALSE</span>, <span class="cn">TRUE</span>, <span class="cn">FALSE</span>, <span class="cn">NA</span>, <span class="cn">FALSE</span>, <span class="cn">NA</span>, <span class="cn">FALSE</span>, <span class="cn">NA</span>)</span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>performance <span class="ot">&lt;-</span> <span class="fu">mfrm_screening_performance</span>(roster, results,</span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a>  <span class="at">rule =</span> <span class="st">&quot;Infit or Outfit outside [0.5, 1.5]; both raters; no exclusion/refit&quot;</span>)</span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a><span class="fu">summary</span>(performance)<span class="sc">$</span>by_family</span></code></pre></div>
+<p>The family event is <strong>at least one unaffected rater
+flagged</strong> in a trial. Trials 1 and 3 are complete negatives.
+Trial 2 is a known positive because R1 was flagged, even though R2 is
+unavailable. Trial 4 is unresolved. Thus the conditional rate is 1/3,
+with 3 available outcomes out of 4 planned trials. The realized
+proportion over all four trials lies between 1/4 and 2/4. Those latter
+bounds describe unresolved outcomes; they are not confidence intervals.
+Omitting a result row also leaves it unavailable. Removing it from the
+roster would incorrectly change the intended experiment.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">plot</span>(performance)</span></code></pre></div>
+<p>Blue whiskers are exact binomial Monte Carlo intervals, conditional
+on known outcomes. The gray segment describes unresolved outcomes. The
+right column shows available/planned events. A completely unavailable
+condition has no point estimate. Use
+<code>plot(performance, scope = &quot;target&quot;)</code> for individual rater
+rates, or <code>metric = &quot;detection&quot;</code> for affected targets when
+the roster includes them.
+<code>plot_data(plot(performance, draw = FALSE))$table</code> supplies
+the unrounded values.</p>
+</div>
+<div id="connect-simulated-ratings-to-a-declared-screen" class="section level2">
+<h2>Connect simulated ratings to a declared screen</h2>
+<p>This runnable example fits six small datasets generated without rater
+misfit. It demonstrates the workflow, <strong>not</strong> an adequately
+precise accuracy study. The band below is an explicit illustrative
+choice, not a universal diagnostic threshold. The model allows rater
+severity differences under this null.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>spec <span class="ot">&lt;-</span> <span class="fu">build_mfrm_sim_spec</span>(<span class="at">n_person =</span> <span class="dv">60</span>, <span class="at">n_rater =</span> <span class="dv">4</span>, <span class="at">n_criterion =</span> <span class="dv">3</span>,</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>                           <span class="at">raters_per_person =</span> <span class="dv">2</span>, <span class="at">assignment =</span> <span class="st">&quot;rotating&quot;</span>)</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>planned <span class="ot">&lt;-</span> <span class="fu">expand.grid</span>(<span class="at">Condition =</span> <span class="st">&quot;Rotating null&quot;</span>, <span class="at">Replicate =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">6</span>,</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>                       <span class="at">Target =</span> <span class="fu">sprintf</span>(<span class="st">&quot;R%02d&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>),</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>                       <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>planned<span class="sc">$</span>Affected <span class="ot">&lt;-</span> <span class="cn">FALSE</span></span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>observed <span class="ot">&lt;-</span> planned[<span class="fu">c</span>(<span class="st">&quot;Condition&quot;</span>, <span class="st">&quot;Replicate&quot;</span>, <span class="st">&quot;Target&quot;</span>)]</span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>observed<span class="sc">$</span>Flag <span class="ot">&lt;-</span> <span class="cn">NA</span></span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>observed<span class="sc">$</span>FitReady <span class="ot">&lt;-</span> <span class="cn">FALSE</span></span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>observed<span class="sc">$</span>Message <span class="ot">&lt;-</span> <span class="st">&quot;&quot;</span></span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a>observed<span class="sc">$</span>Infit <span class="ot">&lt;-</span> observed<span class="sc">$</span>Outfit <span class="ot">&lt;-</span> <span class="cn">NA_real_</span></span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a>observed<span class="sc">$</span>InfitZSTD <span class="ot">&lt;-</span> observed<span class="sc">$</span>OutfitZSTD <span class="ot">&lt;-</span> <span class="cn">NA_real_</span></span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a></span>
+<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">6</span>) {</span>
+<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a>  rows <span class="ot">&lt;-</span> <span class="fu">which</span>(observed<span class="sc">$</span>Replicate <span class="sc">==</span> i)</span>
+<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a>  messages <span class="ot">&lt;-</span> <span class="fu">character</span>()</span>
+<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a>  <span class="fu">tryCatch</span>(<span class="fu">withCallingHandlers</span>({</span>
+<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a>    ratings <span class="ot">&lt;-</span> <span class="fu">simulate_mfrm_data</span>(<span class="at">sim_spec =</span> spec, <span class="at">seed =</span> <span class="dv">700</span> <span class="sc">+</span> i)</span>
+<span id="cb3-19"><a href="#cb3-19" tabindex="-1"></a>    fit <span class="ot">&lt;-</span> <span class="fu">fit_mfrm</span>(ratings, <span class="st">&quot;Person&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;Rater&quot;</span>, <span class="st">&quot;Criterion&quot;</span>), <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb3-20"><a href="#cb3-20" tabindex="-1"></a>                    <span class="at">model =</span> <span class="st">&quot;RSM&quot;</span>, <span class="at">quad_points =</span> <span class="dv">31</span>, <span class="at">maxit =</span> <span class="dv">200</span>)</span>
+<span id="cb3-21"><a href="#cb3-21" tabindex="-1"></a>    observed<span class="sc">$</span>FitReady[rows] <span class="ot">&lt;-</span> <span class="fu">isTRUE</span>(fit<span class="sc">$</span>summary<span class="sc">$</span>InferenceReady[<span class="dv">1</span>])</span>
+<span id="cb3-22"><a href="#cb3-22" tabindex="-1"></a>    diagnostic <span class="ot">&lt;-</span> <span class="fu">diagnose_mfrm</span>(fit, <span class="at">residual_pca =</span> <span class="st">&quot;none&quot;</span>)</span>
+<span id="cb3-23"><a href="#cb3-23" tabindex="-1"></a>    raters <span class="ot">&lt;-</span> diagnostic<span class="sc">$</span>measures[diagnostic<span class="sc">$</span>measures<span class="sc">$</span>Facet <span class="sc">==</span> <span class="st">&quot;Rater&quot;</span>, ]</span>
+<span id="cb3-24"><a href="#cb3-24" tabindex="-1"></a>    raters <span class="ot">&lt;-</span> raters[<span class="fu">match</span>(observed<span class="sc">$</span>Target[rows], raters<span class="sc">$</span>Level), ]</span>
+<span id="cb3-25"><a href="#cb3-25" tabindex="-1"></a>    observed[rows, <span class="fu">c</span>(<span class="st">&quot;Infit&quot;</span>, <span class="st">&quot;Outfit&quot;</span>, <span class="st">&quot;InfitZSTD&quot;</span>, <span class="st">&quot;OutfitZSTD&quot;</span>)] <span class="ot">&lt;-</span></span>
+<span id="cb3-26"><a href="#cb3-26" tabindex="-1"></a>      raters[<span class="fu">c</span>(<span class="st">&quot;Infit&quot;</span>, <span class="st">&quot;Outfit&quot;</span>, <span class="st">&quot;InfitZSTD&quot;</span>, <span class="st">&quot;OutfitZSTD&quot;</span>)]</span>
+<span id="cb3-27"><a href="#cb3-27" tabindex="-1"></a>    outside <span class="ot">&lt;-</span> <span class="cf">function</span>(x) <span class="fu">ifelse</span>(<span class="fu">is.finite</span>(x), x <span class="sc">&lt;</span> .<span class="dv">5</span> <span class="sc">|</span> x <span class="sc">&gt;</span> <span class="fl">1.5</span>, <span class="cn">NA</span>)</span>
+<span id="cb3-28"><a href="#cb3-28" tabindex="-1"></a>    observed<span class="sc">$</span>Flag[rows] <span class="ot">&lt;-</span> <span class="fu">outside</span>(raters<span class="sc">$</span>Infit) <span class="sc">|</span> <span class="fu">outside</span>(raters<span class="sc">$</span>Outfit)</span>
+<span id="cb3-29"><a href="#cb3-29" tabindex="-1"></a>  }, <span class="at">warning =</span> <span class="cf">function</span>(w) {</span>
+<span id="cb3-30"><a href="#cb3-30" tabindex="-1"></a>    messages <span class="ot">&lt;&lt;-</span> <span class="fu">c</span>(messages, <span class="fu">conditionMessage</span>(w))</span>
+<span id="cb3-31"><a href="#cb3-31" tabindex="-1"></a>    <span class="fu">invokeRestart</span>(<span class="st">&quot;muffleWarning&quot;</span>)</span>
+<span id="cb3-32"><a href="#cb3-32" tabindex="-1"></a>  }), <span class="at">error =</span> <span class="cf">function</span>(e) {</span>
+<span id="cb3-33"><a href="#cb3-33" tabindex="-1"></a>    messages <span class="ot">&lt;&lt;-</span> <span class="fu">c</span>(messages, <span class="fu">conditionMessage</span>(e))</span>
+<span id="cb3-34"><a href="#cb3-34" tabindex="-1"></a>  })</span>
+<span id="cb3-35"><a href="#cb3-35" tabindex="-1"></a>  observed<span class="sc">$</span>Message[rows] <span class="ot">&lt;-</span> <span class="fu">paste</span>(<span class="fu">unique</span>(messages), <span class="at">collapse =</span> <span class="st">&quot; | &quot;</span>)</span>
+<span id="cb3-36"><a href="#cb3-36" tabindex="-1"></a>}</span>
+<span id="cb3-37"><a href="#cb3-37" tabindex="-1"></a></span>
+<span id="cb3-38"><a href="#cb3-38" tabindex="-1"></a>screen <span class="ot">&lt;-</span> <span class="fu">mfrm_screening_performance</span>(planned, observed,</span>
+<span id="cb3-39"><a href="#cb3-39" tabindex="-1"></a>  <span class="at">rule =</span> <span class="fu">paste</span>(<span class="st">&quot;Infit OR Outfit outside [0.5, 1.5]; all four observed raters;&quot;</span>,</span>
+<span id="cb3-40"><a href="#cb3-40" tabindex="-1"></a>               <span class="st">&quot;computable descriptive screens retained; no exclusion/refit&quot;</span>))</span>
+<span id="cb3-41"><a href="#cb3-41" tabindex="-1"></a>screen<span class="sc">$</span>by_target</span>
+<span id="cb3-42"><a href="#cb3-42" tabindex="-1"></a>screen<span class="sc">$</span>by_family[screen<span class="sc">$</span>by_family<span class="sc">$</span>Targets <span class="sc">&gt;</span> <span class="dv">0</span>, ]</span>
+<span id="cb3-43"><a href="#cb3-43" tabindex="-1"></a><span class="fu">unique</span>(observed[<span class="fu">c</span>(<span class="st">&quot;Replicate&quot;</span>, <span class="st">&quot;FitReady&quot;</span>, <span class="st">&quot;Message&quot;</span>)])</span></code></pre></div>
+<p>R’s logical <code>|</code> retains an available positive when the
+other index is missing; one negative plus one missing index remains
+unknown. We record numerical readiness separately from computability.
+This example retains computable descriptive screens; an inferential
+procedure may require a stricter rule. Specify that rule in advance and
+preserve unavailable outcomes when it fails.</p>
+<p>Six datasets are six independent replications, even though each
+contains four correlated raters. The any-rater rate therefore has a
+denominator of six, not 24. With zero flags in six replications, the
+exact 95% upper Monte Carlo bound is about 46%. A reported Monte Carlo
+standard error of zero at a boundary is not evidence of certainty. More
+replications narrow simulation uncertainty; they cannot fix an
+inappropriate generator or screening rule.</p>
+<p>To evaluate sensitivity, add a prespecified alternative that
+generates the departure of interest and mark its affected targets.
+Inconsistency, Rater-by-Group differential functioning and
+Rater-by-Criterion interaction are different alternatives. The existing
+<code>evaluate_mfrm_signal_detection()</code> specializes in
+Group-by-Criterion DIF and Rater-by-Criterion interaction bias; it does
+not implement a general Rater-by-Group accuracy study.</p>
+</div>
+<div id="compare-thresholds-without-refitting-the-models" class="section level2">
+<h2>Compare thresholds without refitting the models</h2>
+<p>Retain the actual mean squares, not just a yes/no warning. The
+following profiles are declared comparisons, not an ordered scale of
+model quality. The final asymmetric band is a published heuristic for
+judged performance; its label does not make it a validated rater cutoff
+for every assessment.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>bands <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>  <span class="at">Profile =</span> <span class="fu">c</span>(<span class="st">&quot;0.5-1.5&quot;</span>, <span class="st">&quot;0.7-1.3&quot;</span>, <span class="st">&quot;0.8-1.2&quot;</span>, <span class="st">&quot;0.4-1.2&quot;</span>),</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  <span class="at">Lower =</span> <span class="fu">c</span>(.<span class="dv">5</span>, .<span class="dv">7</span>, .<span class="dv">8</span>, .<span class="dv">4</span>), <span class="at">Upper =</span> <span class="fu">c</span>(<span class="fl">1.5</span>, <span class="fl">1.3</span>, <span class="fl">1.2</span>, <span class="fl">1.2</span>)</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>)</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>sensitivity <span class="ot">&lt;-</span> <span class="fu">mfrm_screening_sensitivity</span>(planned, observed, bands,</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>  <span class="at">rule =</span> <span class="st">&quot;Ordinary RSM MML; EAP plug-in residuals; all raters; no exclusion/refit&quot;</span>)</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="fu">subset</span>(sensitivity<span class="sc">$</span>by_family, Targets <span class="sc">&gt;</span> <span class="dv">0</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">plot</span>(sensitivity, <span class="at">direction =</span> <span class="fu">c</span>(<span class="st">&quot;underfit&quot;</span>, <span class="st">&quot;overfit&quot;</span>))</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">plot</span>(sensitivity, <span class="at">style =</span> <span class="st">&quot;curves&quot;</span>, <span class="at">direction =</span> <span class="fu">c</span>(<span class="st">&quot;underfit&quot;</span>, <span class="st">&quot;overfit&quot;</span>))</span></code></pre></div>
+<p>The intervals describe Monte Carlo uncertainty across independent
+simulated datasets; six trials leave considerable uncertainty.
+Thresholds applied to the same ratings are paired, so comparing their
+interval overlap is not a paired test. <code>statistic = &quot;infit&quot;</code>
+and <code>&quot;outfit&quot;</code> allow separate index comparisons. Use
+<code>quantity = &quot;unavailable&quot;</code> to inspect unresolved family
+events, and <code>metric = &quot;detection&quot;</code> when the roster includes
+affected targets. All-trial bounds and complete counts remain in the
+source tables.</p>
+<p><code>palette = &quot;mono&quot;</code> avoids reliance on colour.
+<code>show_title = FALSE</code> and <code>show_notes = FALSE</code>
+suppress annotations; <code>title</code>, <code>caption</code>,
+<code>text_scale</code> and <code>point_size</code> customize
+presentation. Tile percentages supplement shading, and curves use
+distinct symbols and line types. The returned plot data include a text
+alternative. With ggplot2 installed, use
+<code>as_ggplot(plot(sensitivity, draw = FALSE))</code> for further
+styling. If labels are hidden for a crowded figure, provide the retained
+table alongside it.</p>
+</div>
+<div id="distinguish-low-mean-squares-from-zstd-only-warnings" class="section level2">
+<h2>Distinguish low mean squares from ZSTD-only warnings</h2>
+<p><code>fit_measures_table()</code> now uses mean squares for its
+default directional labels. It retains all ZSTD columns, flags
+additional ZSTD-only evidence in <code>ZSTDOnly</code>, and makes the
+earlier combined rule available explicitly:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>review <span class="ot">&lt;-</span> <span class="fu">fit_measures_table</span>(fit, <span class="at">flag_basis =</span> <span class="st">&quot;mnsq&quot;</span>)</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>combined_review <span class="ot">&lt;-</span> <span class="fu">fit_measures_table</span>(fit, <span class="at">flag_basis =</span> <span class="st">&quot;mnsq_or_zstd&quot;</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>combined_study <span class="ot">&lt;-</span> <span class="fu">mfrm_screening_sensitivity</span>(planned, observed, bands,</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>  <span class="at">rule =</span> <span class="st">&quot;Same saved residuals; engine ZSTD; no exclusion/refit&quot;</span>, <span class="at">zstd_cut =</span> <span class="dv">2</span>)</span></code></pre></div>
+<p>Changing the mean-square band under the combined rule need not change
+a ZSTD-only warning. ZSTD depends on sample size and on the df
+convention. Its approximate transformation is not a calibrated 5% test
+after estimating parameters or screening many raters. Compare the
+magnitude of the mean square, the number of ratings, the residual basis
+and the substantive consequence. A low mean square means lower residual
+variability than predicted. This use of <strong>overfit</strong> does
+not mean machine-learning overfitting, poor rater quality or misconduct.
+It may reflect redundancy, dependence or fitting effects; it does not
+identify their cause. Review large mean squares and the data first, and
+do not automatically remove a consistent rater to make an index closer
+to one.</p>
+<p>The distinction between discrepancy magnitude and standardized
+significance follows <a href="https://www.rasch.org/rmt/rmt171n.htm">Linacre (2003)</a>. The
+bands summarized by <a href="https://www.rasch.org/rmt/rmt83b.htm">Wright and Linacre
+(1994)</a> are contextual heuristics originally discussed for item fit,
+not universal error-controlled rater thresholds.</p>
+</div>
+<div id="check-the-mathematical-target-before-interpreting-a-threshold" class="section level2">
+<h2>Check the mathematical target before interpreting a threshold</h2>
+<p>For unit-weight ratings, let <span class="math inline">\(p_{ik}\)</span> be the declared model probability
+of category score <span class="math inline">\(k\)</span>, <span class="math inline">\(\mu_i=\sum_k k p_{ik}\)</span>, <span class="math inline">\(V_i=\sum_k(k-\mu_i)^2 p_{ik}\)</span> and <span class="math inline">\(e_i=y_i-\mu_i\)</span>. Then</p>
+<p><span class="math display">\[\mathrm{Outfit}=\frac{1}{n}\sum_i\frac{e_i^2}{V_i},\qquad
+\mathrm{Infit}=\frac{\sum_i e_i^2}{\sum_i V_i}.\]</span></p>
+<p>For fixed correct probabilities with positive variances, each
+expected squared residual is <span class="math inline">\(V_i\)</span>,
+giving a reference expectation of one. That calculation does not
+establish the sampling distribution after estimating the model and
+Person scores from the same responses. Ordinary MML diagnostics here use
+plug-in EAP Person estimates. Parameter fitting and shrinkage can shift
+the residual summaries; response dependence also changes uncertainty.
+Engine and fourth-moment df conventions do not repair an incorrect
+residual target.</p>
+<p>For an extended model integrating latent effects, the predictive
+variance must retain both terms in the law of total variance: <span class="math inline">\(V_i=E[\mathrm{Var}(Y_i\mid
+b)]+\mathrm{Var}(E[Y_i\mid b])\)</span>, with expectations taken over
+the specified latent distribution. Integrating only conditional
+variance, or substituting rater modes, generally gives a different
+statistic. Moreover, using the same responses to obtain the latent
+posterior and to check fit does not give the ordinary mean-square
+reference distribution. The threshold workflow above evaluates
+ordinary-model screens; it does not authorize those bands for the
+extended-model posterior-predictive diagnostics.</p>
+</div>
+<div id="design-an-accuracy-study-around-the-feedback-decision" class="section level2">
+<h2>Design an accuracy study around the feedback decision</h2>
+<ol style="list-style-type: decimal">
+<li>State the departure, intended warning and consequences of false
+warnings. If a procedure selects or excludes raters and refits, evaluate
+that entire procedure, including its effects on scores and
+intervals.</li>
+<li>Specify nulls and alternatives, rater counts, rubric categories,
+ability distributions and rating assignments. Compare assignments at
+matched rating budgets when asking about connectivity. Keep planned
+nonassignment separate from missing scores on assigned ratings.</li>
+<li>Fix thresholds and the comparison family before examining outcomes.
+One rater’s false-flag rate does not control the probability of any
+false flag among many raters. A union of several diagnostics changes the
+procedure.</li>
+<li>Retain all planned trials, errors and unavailable results. Choose
+the number of replications for the precision needed, and report Monte
+Carlo uncertainty. If conditions share simulated data, compare them with
+paired outcomes rather than pretending that their estimated rates are
+independent.</li>
+</ol>
+<p>The tables retain full precision. Save the result and its original
+inputs with <code>saveRDS(screen, &quot;screening-study.rds&quot;)</code>; use
+<code>write.csv(screen$by_family, &quot;screening-family.csv&quot;, row.names = FALSE)</code>
+for a table. These commands write to your working directory. The stored
+rule records your description; it cannot verify when that rule was
+chosen.</p>
+</div>
+<div id="evidence-and-limits" class="section level2">
+<h2>Evidence and limits</h2>
+<p>A bounded comparison used 120 persons, six fixed raters, three
+criteria and four score categories. Each person was assigned two raters:
+720 planned ratings and 120 ratings per rater. A rotating cycle linked
+all raters through repeated overlap. A weak-bridge design kept the same
+workloads but linked two panels through only two persons. Both designs
+used the same 100 independent latent and response draws per scenario.
+The screen was the union of Infit and Outfit outside [0.5, 1.5], with no
+rater exclusion or refitting.</p>
+<table>
+<colgroup>
+<col width="20%" />
+<col width="26%" />
+<col width="26%" />
+<col width="26%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Generating scenario</th>
+<th align="right">Any unaffected rater flagged: rotating</th>
+<th align="right">Any unaffected rater flagged: weak bridge</th>
+<th align="right">Detection of affected R6: rotating / weak bridge</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Normal population, no inconsistency</td>
+<td align="right">0/100</td>
+<td align="right">0/100</td>
+<td align="right">Not applicable</td>
+</tr>
+<tr class="even">
+<td>Each R6 response replaced by a uniform category with probability
+0.5</td>
+<td align="right">0/100</td>
+<td align="right">0/100</td>
+<td align="right">6/100 / 2/100</td>
+</tr>
+<tr class="odd">
+<td>Assignment by ability rank, no inconsistency</td>
+<td align="right">0/100</td>
+<td align="right">0/100</td>
+<td align="right">Not applicable</td>
+</tr>
+<tr class="even">
+<td>20% of assigned scores missing completely at random</td>
+<td align="right">0/100</td>
+<td align="right">1/100</td>
+<td align="right">Not applicable</td>
+</tr>
+<tr class="odd">
+<td>20% missing, favoring generated scores of zero</td>
+<td align="right">0/100</td>
+<td align="right">0/100</td>
+<td align="right">Not applicable</td>
+</tr>
+</tbody>
+</table>
+<p>For the contaminated R6, exact 95% Monte Carlo intervals are
+2.23–12.60% in the rotating design and 0.24–7.04% with weak bridges. The
+paired difference is minus 4 percentage points (MCSE 2.81 points); this
+small comparison does not establish a general ordering of designs. Each
+0/100 false-flag result has a 3.62% upper bound; 1/100 has an interval
+of 0.03–5.45%. These are pointwise intervals, not simultaneous
+protection across conditions.</p>
+<p>All 6,000 target screens were computable. Three of the 1,000 fits
+required category-support review, all under score-dependent missingness:
+two rotating and one weak-bridge fit. Their descriptive screens were
+retained according to the declared rule; their availability is not
+evidence of inference readiness. The missingness scenarios retain 576
+observed ratings each. Score-dependent missingness selected exactly 144
+assigned scores without replacement, with fourfold selection weight for
+generated zeros. Fits used observed scores only. Ability-linked
+assignment retained the same overall normal ability draws but changed
+their distribution across panels. These are nulls for rater
+inconsistency, not assertions that all analysis assumptions remain
+correct.</p>
+<p><strong>The low detection rates are a limitation of this screen under
+the specified alternative.</strong> Rare false warnings do not make a
+screen useful when it misses most contaminated raters. An absence of
+flags cannot certify rater quality. The study does not qualify other
+thresholds, contamination strengths, rater counts, PCM/GPCM models,
+disconnected designs, differential rater functioning, post-selection
+inference or missing-score imputation. Thresholds were not retuned to
+these outcomes. The study reused 200 unchanged pre-selection screens and
+fitted the other 800 datasets; the reused results are not extra
+independent replications.</p>
+</div>
+<div id="stress-test-thresholds-sample-size-and-low-side-warnings" class="section level2">
+<h2>Stress-test thresholds, sample size and low-side warnings</h2>
+<p>A further bounded study compared five declared bands, Infit and
+Outfit separately and jointly, and mean-square-only versus
+mean-square-or-ZSTD rules. Each condition used 100 independent
+replications, categories 0–3, three criteria and an ordinary fixed-rater
+RSM fitted by MML with 61 quadrature points. Abilities were generated
+from the assumed standard normal population. Rater severities were
+equally spaced from -0.8 to 0.8, criterion effects were (-0.3, 0, 0.3),
+and the shared adjacent steps were (-1, 0, 1). The study retained
+computable descriptive screens without excluding fits that required
+inference review. It did not remove raters or refit after screening.</p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Condition</th>
+<th>Persons / raters</th>
+<th>Generating feature</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Small crossed null</td>
+<td>60 / 6</td>
+<td>Every person rated by every rater</td>
+</tr>
+<tr class="even">
+<td>Short sparse null</td>
+<td>60 / 6</td>
+<td>Two raters per person, rotating overlap</td>
+</tr>
+<tr class="odd">
+<td>Large sparse null</td>
+<td>600 / 6</td>
+<td>Same six ratings per person; more persons per rater</td>
+</tr>
+<tr class="even">
+<td>Twelve-rater null</td>
+<td>120 / 12</td>
+<td>Two raters per person, rotating overlap</td>
+</tr>
+<tr class="odd">
+<td>Heavy MCAR null</td>
+<td>120 / 6</td>
+<td>Exactly 60% of the 720 assigned scores missing at random</td>
+</tr>
+<tr class="even">
+<td>Random R6</td>
+<td>120 / 6</td>
+<td>Each R6 response independently replaced by a uniform category with
+probability 0.5</td>
+</tr>
+<tr class="odd">
+<td>Predictable R6</td>
+<td>120 / 6</td>
+<td>Each R6 response replaced by its model-modal category with
+probability 0.75</td>
+</tr>
+<tr class="even">
+<td>Local dependence</td>
+<td>120 / 6</td>
+<td>A normal Person-by-rater effect with SD 1 shared across three
+criteria</td>
+</tr>
+<tr class="odd">
+<td>Disconnected null</td>
+<td>120 / 6</td>
+<td>Two rater panels with no common persons; common criteria and
+ability-population assumption retained</td>
+</tr>
+</tbody>
+</table>
+<p>Except for the crossed condition, each person was assigned two raters
+and three criteria. Nonassigned cells were absent, not imputed. The
+nulls permit severity differences. The disconnected condition is null
+for rater response inconsistency; it does not qualify cross-panel
+interpretation when the assumed ability distributions differ. Local
+dependence affects all raters and cannot be interpreted as identifying
+one bad rater.</p>
+<p>The following are <strong>any-unaffected-rater overfit
+rates</strong>, not individual-rater probabilities. Mean squares use
+[0.5, 1.5]; the combined rule also uses engine ZSTD at or below -2 for
+the low-side flag.</p>
+<table>
+<thead>
+<tr class="header">
+<th>Null condition</th>
+<th align="right">Mean squares only</th>
+<th align="right">Mean squares or ZSTD</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Small crossed</td>
+<td align="right">0/100</td>
+<td align="right">44/100</td>
+</tr>
+<tr class="even">
+<td>Short sparse</td>
+<td align="right">1/100</td>
+<td align="right">59/100</td>
+</tr>
+<tr class="odd">
+<td>Large sparse</td>
+<td align="right">0/100</td>
+<td align="right">100/100</td>
+</tr>
+<tr class="even">
+<td>Twelve raters</td>
+<td align="right">1/100</td>
+<td align="right">88/100</td>
+</tr>
+<tr class="odd">
+<td>Heavy MCAR</td>
+<td align="right">24/100</td>
+<td align="right">92/100</td>
+</tr>
+<tr class="even">
+<td>Disconnected panels</td>
+<td align="right">0/100</td>
+<td align="right">93/100</td>
+</tr>
+</tbody>
+</table>
+<p>Thus ZSTD-only additions can produce frequent low-side warnings even
+under the generating null. The fourth-moment df convention did not
+resolve this: its corresponding rates were 48%, 71%, 100%, 96%, 96% and
+96%. Mean-square-only screening also remained unreliable in the
+heavy-missingness condition. For 24/100, the exact pointwise 95% Monte
+Carlo interval is 16.02–33.57%; for 0/100 it is 0–3.62%, and for 100/100
+it is 96.38–100%. None is a universal error guarantee.</p>
+<p>Narrowing a band improved detection of the random-category departure
+but also increased low-side false flags. The R6 detection rates were 2%,
+11%, 39% and 65% under [0.5,1.5], [0.6,1.4], [0.7,1.3] and [0.8,1.2].
+Under [0.4,1.2], random-category detection was also 65%, but detection
+of the specified predictable-response departure fell to 18%, compared
+with 65% under [0.5,1.5]. No single band was selected as best from these
+outcomes. The chosen departure, the cost of false feedback and the
+observation design all matter.</p>
+<p>All 900 fits were numerically ready and all 6,000 target screens were
+computable, while 159 fits required inference review. Computability is
+not inferential eligibility. Independent reconstruction from
+observation-level residuals agreed with the reported mean squares to
+within <span class="math inline">\(2.6\times10^{-15}\)</span>.
+Nevertheless, in the large sparse null, the average fitted Infit/Outfit
+was 0.832/0.806, versus 1.001/1.001 using the generating parameters. In
+the heavy MCAR null, the corresponding values were 0.704/0.689 versus
+1.002/1.004. The formulas can therefore be implemented correctly while a
+reference rule centered at one is unsuitable for the fitted residuals.
+This comparison does not isolate every contribution of estimation,
+shrinkage and short Person records; it establishes the need to validate
+the actual diagnostic procedure.</p>
+<p>The previous matched-budget study also supplied 800 saved
+raw-statistic fits for threshold sensitivity without refitting. Two
+other cells retained only yes/no flags, so their 200 trials remain
+unavailable for new thresholds; the old flags cannot reconstruct unknown
+mean squares. These reanalyses are not new independent replications. The
+stress results do not qualify JML, other models, arbitrary sample sizes,
+extended-model posterior diagnostics, or automatic rater exclusion.</p>
+<p>The Monte Carlo reporting principles follow Morris, White and
+Crowther (2019), <a href="https://doi.org/10.1002/sim.8086">Using
+simulation studies to evaluate statistical methods</a>. Rater misfit and
+differential functioning should be distinguished when designing an
+evaluation; see Wind and Guo (2019), <a href="https://doi.org/10.1177/0013164419834613">Exploring the Combined
+Effects of Rater Misfit and Differential Rater Functioning in
+Performance Assessments</a>. Incomplete assignments are also part of the
+design question; see Wind and Jones (2019), <a href="https://doi.org/10.1111/jedm.12201">The Effects of Incomplete
+Rating Designs in Combination With Rater Effects</a>.</p>
+<p>A warning supports review of rubric use, shared rating examples and
+design coverage. It does not establish that a particular rater should be
+removed, that training will help, or that an imputation method repairs
+selective nonresponse. Conditions outside an evaluated generator remain
+unqualified.</p>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

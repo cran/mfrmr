@@ -11,121 +11,6 @@
 # Functions here are internal (no @export); they are called from
 # `evaluate_mfrm_design()` and the surrounding orchestration helpers.
 
-simulation_structural_design_contract <- function(sim_spec = NULL, facet_names = NULL) {
-  structural_facet_table <- if (is.null(facet_names)) {
-    simulation_structural_facet_table(sim_spec)
-  } else {
-    simulation_structural_facet_table(facet_names = facet_names)
-  }
-  structural_design_template <- if (is.null(facet_names)) {
-    simulation_structural_design_template(sim_spec)
-  } else {
-    simulation_structural_design_template(facet_names = facet_names)
-  }
-
-  alias_source <- if (!is.null(sim_spec)) {
-    sim_spec
-  } else if (!is.null(facet_names)) {
-    list(facet_names = simulation_validate_output_facet_names(facet_names))
-  } else {
-    NULL
-  }
-
-  facet_axes <- structural_facet_table |>
-    dplyr::transmute(
-      input_key = .data$structural_facet_key,
-      facet = .data$facet,
-      facet_kind = .data$facet_kind,
-      axis_class = .data$design_axis_class,
-      level_count = .data$level_count,
-      canonical_design_variable = .data$current_planning_count_variable,
-      public_design_alias = .data$current_planning_count_alias,
-      current_planner_role_supported = .data$current_planner_role_supported,
-      arbitrary_facet_design_candidate = .data$arbitrary_facet_design_candidate
-    )
-
-  assignment_axis <- list(
-    current_planning_count_variable = "raters_per_person",
-    current_planning_count_alias = unname(simulation_design_variable_aliases(alias_source)[["raters_per_person"]]),
-    design_input_key = "assignment",
-    axis_class = "assignment_count",
-    depends_on_input_key = as.character(facet_axes$input_key[match("facet_level_count", facet_axes$axis_class)] %||% "rater"),
-    depends_on_canonical_design_variable = as.character(
-      facet_axes$canonical_design_variable[match("facet_level_count", facet_axes$axis_class)] %||% "n_rater"
-    ),
-    depends_on_public_design_alias = as.character(
-      facet_axes$public_design_alias[match("facet_level_count", facet_axes$axis_class)] %||% "n_rater"
-    )
-  )
-
-  schema <- list(
-    schema_contract = "arbitrary_facet_design_schema",
-    schema_stage = "deterministic_review",
-    facet_axes = facet_axes,
-    assignment_axis = assignment_axis,
-    input_keys = c(as.character(facet_axes$input_key), assignment_axis$design_input_key),
-    canonical_design_variables = c(
-      as.character(facet_axes$canonical_design_variable),
-      assignment_axis$current_planning_count_variable
-    ),
-    default_design = structural_design_template,
-    note = paste(
-      "Deterministic design-schema object for the named-facet structural review,",
-      "bundling stable facet-count axes and the assignment axis in one",
-      "machine-readable contract."
-    )
-  )
-  schema$grid_semantics <- simulation_structural_design_grid_semantics(schema)
-  schema
-}
-
-simulation_structural_design_grid_semantics <- function(design_schema) {
-  design_schema <- simulation_coerce_structural_design_schema(design_schema)
-  facet_axes <- design_schema$facet_axes
-  assignment_axis <- design_schema$assignment_axis
-  assignment_var <- as.character(
-    assignment_axis$current_planning_count_variable %||% "raters_per_person"
-  )
-  assignment_key <- as.character(
-    assignment_axis$design_input_key %||% "assignment"
-  )
-  canonical_columns <- c(
-    "design_id",
-    as.character(facet_axes$canonical_design_variable),
-    assignment_var
-  )
-  public_columns <- c(
-    "design_id",
-    as.character(facet_axes$public_design_alias),
-    as.character(assignment_axis$current_planning_count_alias)
-  )
-  branch_columns <- c(
-    "design_id",
-    as.character(facet_axes$input_key),
-    assignment_key
-  )
-
-  list(
-    semantics_contract = "arbitrary_facet_design_grid_semantics",
-    semantics_stage = as.character(design_schema$schema_stage %||% "deterministic_review"),
-    id_variable = "design_id",
-    canonical_columns = canonical_columns,
-    public_columns = public_columns,
-    branch_columns = branch_columns,
-    feasibility_rule = paste0(
-      assignment_var,
-      " <= ",
-      as.character(assignment_axis$depends_on_canonical_design_variable %||% "n_rater")
-    ),
-    row_meaning = paste(
-      "Each row is one deterministic structural-design condition formed by",
-      "crossing facet-count axes and the assignment axis after applying the",
-      "current feasibility rule."
-    ),
-    default_id_prefix = "F"
-  )
-}
-
 simulation_coerce_structural_design_schema <- function(structural_design_schema) {
   required_fields <- c(
     "schema_contract",
@@ -505,65 +390,6 @@ simulation_build_structural_design_grid_from_contract <- function(grid_contract,
   built
 }
 
-simulation_materialize_structural_design_grid <- function(x,
-                                                      design = NULL,
-                                                      id_prefix = NULL) {
-  grid_contract <- NULL
-
-  if (is.list(x) &&
-      identical(x$contract %||% "", "arbitrary_facet_design_grid_contract")) {
-    grid_contract <- x
-  }
-
-  if (is.null(grid_contract) && is.list(x)) {
-    nested <- x$structural_design_grid_contract %||%
-      x$grid_contract %||%
-      x$structural_design_schema %||%
-      x$planning_schema %||%
-      x$settings$planning_schema %||%
-      x$sim_spec$planning_schema %||%
-      x$ademp$data_generating_mechanism$planning_schema %||%
-      NULL
-    if (is.list(nested)) {
-      grid_contract <- simulation_coerce_structural_design_grid_contract(nested)
-    }
-  }
-
-  if (is.null(grid_contract)) {
-    schema <- tryCatch(
-      simulation_object_planning_schema(x),
-      error = function(e) NULL
-    )
-    if (is.list(schema) && is.list(schema$structural_design_grid_contract)) {
-      grid_contract <- schema$structural_design_grid_contract
-    }
-  }
-
-  if (is.null(grid_contract)) {
-    schema <- tryCatch(
-      simulation_planning_schema(x),
-      error = function(e) NULL
-    )
-    if (is.list(schema) && is.list(schema$structural_design_grid_contract)) {
-      grid_contract <- schema$structural_design_grid_contract
-    }
-  }
-
-  if (is.null(grid_contract)) {
-    stop(
-      "`x` is not a valid planning object, planning schema, sim spec, or ",
-      "structural-design grid contract.",
-      call. = FALSE
-    )
-  }
-
-  simulation_build_structural_design_grid_from_contract(
-    grid_contract = grid_contract,
-    design = design,
-    id_prefix = id_prefix
-  )
-}
-
 simulation_structural_design_grid_bundle <- function(x,
                                                  design = NULL,
                                                  id_prefix = NULL) {
@@ -725,28 +551,6 @@ simulation_materialize_structural_design_grid_bundle <- function(x,
     design = design,
     id_prefix = id_prefix
   )
-}
-
-simulation_structural_design_grid_view <- function(x,
-                                               view = c("canonical", "public", "design"),
-                                               design = NULL,
-                                               id_prefix = NULL) {
-  view <- match.arg(view)
-  grid_bundle <- simulation_materialize_structural_design_grid_bundle(
-    x = x,
-    design = design,
-    id_prefix = id_prefix
-  )
-
-  if (!isTRUE(grid_bundle$grid_available) || !is.data.frame(grid_bundle[[view]])) {
-    stop(
-      "The requested `", view, "` structural-design grid view is not currently ",
-      "available from this deterministic bundle.",
-      call. = FALSE
-    )
-  }
-
-  grid_bundle[[view]]
 }
 
 simulation_structural_design_grid_context <- function(x,
@@ -1127,23 +931,10 @@ simulation_structural_design_grid_recommendation <- function(x,
   )
 }
 
-simulation_structural_design_grid_table <- function(x,
-                                                design = NULL,
-                                                prefer = NULL,
-                                                view = c("public", "canonical", "design"),
-                                                id_prefix = NULL) {
+simulation_structural_design_grid_table <- function(recommendation,
+                                                view = c("public", "canonical", "design")) {
   view <- match.arg(view)
-  grid_summary <- simulation_structural_design_grid_summary(
-    x = x,
-    design = design,
-    id_prefix = id_prefix
-  )
-  recommendation <- simulation_structural_design_grid_recommendation(
-    x = x,
-    design = design,
-    prefer = prefer,
-    id_prefix = id_prefix
-  )
+  grid_summary <- recommendation$grid_summary
 
   if (!isTRUE(grid_summary$grid_available)) {
     return(list(
@@ -1202,25 +993,12 @@ simulation_structural_design_grid_table <- function(x,
   )
 }
 
-simulation_structural_design_grid_plot_payload <- function(x,
-                                                       design = NULL,
+simulation_structural_design_grid_plot_payload <- function(recommendation,
                                                        x_var = NULL,
                                                        group_var = NULL,
-                                                       prefer = NULL,
-                                                       view = c("public", "canonical", "design"),
-                                                       id_prefix = NULL) {
+                                                       view = c("public", "canonical", "design")) {
   view <- match.arg(view)
-  grid_summary <- simulation_structural_design_grid_summary(
-    x = x,
-    design = design,
-    id_prefix = id_prefix
-  )
-  recommendation <- simulation_structural_design_grid_recommendation(
-    x = x,
-    design = design,
-    prefer = prefer,
-    id_prefix = id_prefix
-  )
+  grid_summary <- recommendation$grid_summary
   axis_table <- tibble::as_tibble(grid_summary$axis_table)
 
   if (!isTRUE(grid_summary$grid_available)) {
@@ -1255,7 +1033,6 @@ simulation_structural_design_grid_plot_payload <- function(x,
     ))
   }
 
-  lookup <- simulation_structural_design_axis_lookup(axis_table)
   varying <- as.character(grid_summary$varying_canonical)
   canonical_default_x <- if (length(varying) > 0L) varying[[1]] else as.character(axis_table$canonical_design_variable[[1]])
   x_canonical <- if (is.null(x_var)) {
@@ -1425,67 +1202,45 @@ simulation_structural_design_report_bundle <- function(x,
     return(cached)
   }
 
-  grid_summary <- simulation_structural_design_grid_summary(
-    x = x,
-    design = design,
-    id_prefix = id_prefix
-  )
   recommendation <- simulation_structural_design_grid_recommendation(
     x = x,
     design = design,
     prefer = prefer,
     id_prefix = id_prefix
   )
+  grid_summary <- recommendation$grid_summary
   tables <- list(
     canonical = simulation_structural_design_grid_table(
-      x = x,
-      design = design,
-      prefer = prefer,
-      view = "canonical",
-      id_prefix = id_prefix
+      recommendation = recommendation,
+      view = "canonical"
     ),
     public = simulation_structural_design_grid_table(
-      x = x,
-      design = design,
-      prefer = prefer,
-      view = "public",
-      id_prefix = id_prefix
+      recommendation = recommendation,
+      view = "public"
     ),
     design = simulation_structural_design_grid_table(
-      x = x,
-      design = design,
-      prefer = prefer,
-      view = "design",
-      id_prefix = id_prefix
+      recommendation = recommendation,
+      view = "design"
     )
   )
   plots <- list(
     canonical = simulation_structural_design_grid_plot_payload(
-      x = x,
-      design = design,
+      recommendation = recommendation,
       x_var = x_var,
       group_var = group_var,
-      prefer = prefer,
-      view = "canonical",
-      id_prefix = id_prefix
+      view = "canonical"
     ),
     public = simulation_structural_design_grid_plot_payload(
-      x = x,
-      design = design,
+      recommendation = recommendation,
       x_var = x_var,
       group_var = group_var,
-      prefer = prefer,
-      view = "public",
-      id_prefix = id_prefix
+      view = "public"
     ),
     design = simulation_structural_design_grid_plot_payload(
-      x = x,
-      design = design,
+      recommendation = recommendation,
       x_var = x_var,
       group_var = group_var,
-      prefer = prefer,
-      view = "design",
-      id_prefix = id_prefix
+      view = "design"
     )
   )
 
@@ -2841,32 +2596,22 @@ simulation_structural_design_compact_review <- function(x,
   mode <- match.arg(mode)
   surface <- match.arg(surface)
 
-  grid_summary <- simulation_structural_design_grid_summary(
-    x = x,
-    design = design,
-    id_prefix = id_prefix
-  )
   grid_recommendation <- simulation_structural_design_grid_recommendation(
     x = x,
     design = design,
     prefer = prefer,
     id_prefix = id_prefix
   )
+  grid_summary <- grid_recommendation$grid_summary
   grid_table <- simulation_structural_design_grid_table(
-    x = x,
-    design = design,
-    prefer = prefer,
-    view = view,
-    id_prefix = id_prefix
+    recommendation = grid_recommendation,
+    view = view
   )
   plot_payload <- simulation_structural_design_grid_plot_payload(
-    x = x,
-    design = design,
+    recommendation = grid_recommendation,
     x_var = x_var,
     group_var = group_var,
-    prefer = prefer,
-    view = view,
-    id_prefix = id_prefix
+    view = view
   )
   report_consumer <- simulation_structural_design_report_consume(
     x = x,
@@ -5223,14 +4968,12 @@ structural_design_review_plot_index_from_bundle <- function(plot_index) {
 #' @seealso [summary.mfrm_design_evaluation()]
 #' @noRd
 #' @examples
-#' \donttest{
 #' spec <- build_mfrm_sim_spec(
 #'   design = list(person = 16, rater = 3, criterion = 2, assignment = 2),
 #'   assignment = "rotating"
 #' )
 #' active <- spec$planning_schema$structural_design_review
 #' summary(active)
-#' }
 #' @export
 summary.mfrm_structural_design_review <- function(object,
                                                      digits = 3,
@@ -5606,14 +5349,12 @@ print_compact_structural_design_review_summary <- function(x,
 #' @return A plotting-data object of class `mfrm_plot_data`.
 #' @noRd
 #' @examples
-#' \donttest{
 #' spec <- build_mfrm_sim_spec(
 #'   design = list(person = 16, rater = 3, criterion = 2, assignment = 2),
 #'   assignment = "rotating"
 #' )
 #' active <- spec$planning_schema$structural_design_review
 #' plot(active, type = "readiness_tiers", draw = FALSE)
-#' }
 #' @export
 plot.mfrm_structural_design_review <- function(x,
                                                   y = NULL,
@@ -5996,16 +5737,75 @@ simulation_structural_design_schema <- function(sim_spec = NULL, facet_names = N
   } else {
     simulation_structural_facet_table(facet_names = facet_names)
   }
-  structural_design_template <- if (is.null(facet_names)) {
-    simulation_structural_design_template(sim_spec)
-  } else {
-    simulation_structural_design_template(facet_names = facet_names)
+  facet_counts <- stats::setNames(
+    as.list(unname(structural_facet_table$level_count %||% rep(NA_integer_, nrow(structural_facet_table)))),
+    as.character(structural_facet_table$structural_facet_key)
+  )
+  assignment_value <- NA_integer_
+  if (is.null(facet_names) && !is.null(sim_spec)) {
+    assignment_value <- as.integer(sim_spec$raters_per_person %||% NA_integer_)
   }
-  design_schema <- if (is.null(facet_names)) {
-    simulation_structural_design_contract(sim_spec)
+  structural_design_template <- list(
+    facets = facet_counts,
+    assignment = assignment_value,
+    note = paste(
+      "Structural design metadata mirrors the named facet counts in",
+      "`design$facets` while keeping the assignment axis at the top level."
+    )
+  )
+  alias_source <- if (is.null(facet_names) && !is.null(sim_spec)) {
+    sim_spec
+  } else if (!is.null(facet_names)) {
+    list(facet_names = simulation_validate_output_facet_names(facet_names))
   } else {
-    simulation_structural_design_contract(facet_names = facet_names)
+    NULL
   }
+
+  facet_axes <- structural_facet_table |>
+    dplyr::transmute(
+      input_key = .data$structural_facet_key,
+      facet = .data$facet,
+      facet_kind = .data$facet_kind,
+      axis_class = .data$design_axis_class,
+      level_count = .data$level_count,
+      canonical_design_variable = .data$current_planning_count_variable,
+      public_design_alias = .data$current_planning_count_alias,
+      current_planner_role_supported = .data$current_planner_role_supported,
+      arbitrary_facet_design_candidate = .data$arbitrary_facet_design_candidate
+    )
+
+  assignment_axis <- list(
+    current_planning_count_variable = "raters_per_person",
+    current_planning_count_alias = unname(simulation_design_variable_aliases(alias_source)[["raters_per_person"]]),
+    design_input_key = "assignment",
+    axis_class = "assignment_count",
+    depends_on_input_key = as.character(facet_axes$input_key[match("facet_level_count", facet_axes$axis_class)] %||% "rater"),
+    depends_on_canonical_design_variable = as.character(
+      facet_axes$canonical_design_variable[match("facet_level_count", facet_axes$axis_class)] %||% "n_rater"
+    ),
+    depends_on_public_design_alias = as.character(
+      facet_axes$public_design_alias[match("facet_level_count", facet_axes$axis_class)] %||% "n_rater"
+    )
+  )
+
+  design_schema <- list(
+    schema_contract = "arbitrary_facet_design_schema",
+    schema_stage = "deterministic_review",
+    facet_axes = facet_axes,
+    assignment_axis = assignment_axis,
+    input_keys = c(as.character(facet_axes$input_key), assignment_axis$design_input_key),
+    canonical_design_variables = c(
+      as.character(facet_axes$canonical_design_variable),
+      assignment_axis$current_planning_count_variable
+    ),
+    default_design = structural_design_template,
+    note = paste(
+      "Deterministic design-schema object for the named-facet structural review,",
+      "bundling stable facet-count axes and the assignment axis in one",
+      "machine-readable contract."
+    )
+  )
+  design_schema <- simulation_coerce_structural_design_schema(design_schema)
   branch_schema <- list(
     design_review_contract = "structural_design_review",
     design_review_stage = "supported",
@@ -6156,7 +5956,7 @@ simulation_planning_constraints <- function(sim_spec = NULL) {
     lock_var <- if (identical(role, "criterion")) "n_criterion" else if (identical(role, "rater")) "n_rater" else NULL
     if (!is.null(lock_var)) {
       reasons[lock_var] <- paste0(
-        "The bounded `GPCM` specification stores slope values for `",
+        "The `GPCM` specification stores slope values for `",
         sim_spec$slope_facet,
         "` levels."
       )
@@ -6228,16 +6028,6 @@ simulation_planning_schema <- function(sim_spec = NULL, facet_names = NULL) {
   } else {
     simulation_facet_manifest(facet_names = facet_names)
   }
-  structural_facet_table <- if (is.null(facet_names)) {
-    simulation_structural_facet_table(sim_spec)
-  } else {
-    simulation_structural_facet_table(facet_names = facet_names)
-  }
-  structural_design_template <- if (is.null(facet_names)) {
-    simulation_structural_design_template(sim_spec)
-  } else {
-    simulation_structural_design_template(facet_names = facet_names)
-  }
   structural_design_schema <- if (is.null(facet_names)) {
     simulation_structural_design_schema(sim_spec)
   } else {
@@ -6256,8 +6046,8 @@ simulation_planning_schema <- function(sim_spec = NULL, facet_names = NULL) {
     structural_review_contract = scope$structural_review_contract,
     structural_review_stage = scope$structural_review_stage,
     structural_design_input_contract = scope$structural_design_input_contract,
-    structural_facet_table = structural_facet_table,
-    structural_design_template = structural_design_template,
+    structural_facet_table = structural_design_schema$facet_table,
+    structural_design_template = structural_design_schema$design_template,
     structural_design_schema = structural_design_schema,
     structural_design_preview = structural_design_schema$preview,
     structural_design_grid_semantics = structural_design_schema$grid_semantics,

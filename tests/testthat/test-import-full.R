@@ -137,7 +137,13 @@ test_that("import_tam_fit detects multi-facet fits", {
   imp <- import_tam_fit(tam_mfr, model = "RSM", compute_fit = FALSE)
   expect_s3_class(imp, "mfrm_imported_fit")
   expect_true(isTRUE(imp$source$multi_facet))
-  expect_gte(length(unique(imp$facets$others$Facet)), 1L)
+  expect_identical(unique(imp$facets$others$Facet), "DesignCell")
+  expect_identical(imp$facets$others$Level, as.character(tam_mfr$item$item))
+  expect_equal(nrow(imp$facets$others), nrow(tam_mfr$item))
+  expect_identical(imp$source$native_parameters, tam_mfr$xsi.facets)
+  expect_true(all(imp$facets$person$ResponseStatus == "observed"))
+  expect_equal(sum(imp$facets$person$NObserved), sum(tam_mfr$resp.ind))
+  expect_identical(imp$facets$person$Person, as.character(tam_mfr$person$pid))
 })
 
 # --- eRm person-parameter schemas ---------------------------------------
@@ -195,4 +201,28 @@ test_that("synthetic diagnostics has the slots downstream helpers expect", {
   expect_true(all(c("measures", "fit", "reliability", "facets_chisq",
                      "overall_fit") %in% names(diag)))
   expect_true("Person" %in% diag$measures$Facet)
+})
+
+test_that("imported marginal SEs do not create a joint facet test or incomplete reliability", {
+  measures <- data.frame(Facet = "Item", Level = paste0("I", 1:4),
+                         Estimate = c(-1, 0, 1, Inf), SE = c(.2, .2, .2, 100))
+  rel <- mfrmr:::.synthesize_reliability(measures)
+  expect_equal(rel$Reliability, .96)
+  expect_equal(rel$EstimateAvailable, 3L)
+  expect_equal(rel$SEAvailable, 3L)
+  expect_equal(rel$ExcludedEstimates, 1L)
+  expect_false(rel$SupportsFormalInference)
+  measures$SE[1] <- NA_real_
+  expect_true(is.na(mfrmr:::.synthesize_reliability(measures)$Reliability))
+  chi <- mfrmr:::.synthesize_chisq(measures)
+  expect_true(all(is.na(chi[c("FixedChiSq", "FixedDF", "FixedProb")])))
+  expect_false(chi$SupportsFormalInference)
+  expect_equal(chi$MeanMeasure, 0)
+  diag <- mfrmr:::.synthesize_imported_diagnostics(measures, data.frame(), "Item", 100L)
+  expect_false(diag$precision_profile$SupportsFormalInference)
+  stale <- diag
+  stale$facets_chisq$SupportsFormalInference <- NULL
+  expect_error(summary(stale), "Re-import the existing source-package fit", fixed = TRUE)
+  imported <- structure(list(diagnostics = diag), class = c("mfrm_imported_fit", "mfrm_fit"))
+  expect_error(run_qc_pipeline(imported, diag), "native mfrmr fit", fixed = TRUE)
 })

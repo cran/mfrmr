@@ -90,7 +90,7 @@ test_that("fair_average_table exercises per-facet paths", {
   # Plot for each facet
   expect_gt(length(fa$by_facet), 0L)
   for (facet_name in names(fa$by_facet)) {
-    expect_no_error(with_null_device(plot(fa, facet = facet_name, draw = TRUE)))
+    expect_no_error(with_null_device(plot(fa, facet = facet_name, metric = "FairZ", draw = TRUE)))
   }
 })
 

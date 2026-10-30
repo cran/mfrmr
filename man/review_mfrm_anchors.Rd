@@ -2,6 +2,8 @@
 % Please edit documentation in R/api-estimation.R
 \name{review_mfrm_anchors}
 \alias{review_mfrm_anchors}
+\alias{summary.mfrm_anchor_review}
+\alias{plot.mfrm_anchor_review}
 \title{Review and normalize anchor/group-anchor tables}
 \usage{
 review_mfrm_anchors(
@@ -20,7 +22,23 @@ review_mfrm_anchors(
   min_obs_per_element = 30,
   min_obs_per_category = 10,
   noncenter_facet = "Person",
-  dummy_facets = NULL
+  dummy_facets = NULL,
+  category_policy = NULL,
+  repeated_ratings = c("review", "independent"),
+  centering_scope = c("facet", "remainder", "anchor_origin")
+)
+
+\method{summary}{mfrm_anchor_review}(object, digits = 3, top_n = 10, ...)
+
+\method{plot}{mfrm_anchor_review}(
+  x,
+  y = NULL,
+  type = c("issue_counts", "facet_constraints", "level_observations"),
+  main = NULL,
+  palette = NULL,
+  label_angle = 45,
+  draw = TRUE,
+  ...
 )
 }
 \arguments{
@@ -32,10 +50,11 @@ review_mfrm_anchors(
 
 \item{score}{Column name for observed score.}
 
-\item{anchors}{Optional anchor table (Facet, Level, Anchor).}
+\item{anchors}{Optional direct-anchor table (Facet, Level, Anchor). Retained
+values are fixed during estimation.}
 
 \item{group_anchors}{Optional group-anchor table
-(Facet, Level, Group, GroupValue).}
+(Facet, Level, Group, GroupValue) defining group-mean constraints.}
 
 \item{weight}{Optional weight/frequency column name.}
 
@@ -43,7 +62,8 @@ review_mfrm_anchors(
 
 \item{rating_max}{Optional maximum category value.}
 
-\item{keep_original}{Keep original category values.}
+\item{keep_original}{Keep original category values.
+New code can instead use \code{category_policy = "preserve"}.}
 
 \item{missing_codes}{Optional. \code{NULL} (default) is a no-op;
 \code{TRUE} or \code{"default"} converts the FACETS / SPSS / SAS sentinel
@@ -51,8 +71,9 @@ set to \code{NA} on the score column before review while preserving person and
 facet identifiers. Supply a character vector to apply a custom code set
 across the person, facet, and score columns.}
 
-\item{min_common_anchors}{Minimum anchored levels per linking facet used in
-recommendations (default \code{5}).}
+\item{min_common_anchors}{Minimum directly anchored levels per non-Person
+facet used in the package count recommendation (default \code{5}). The function
+cannot verify that those levels have invariant cross-run identity.}
 
 \item{min_obs_per_element}{Minimum weighted observations per facet level used
 in recommendations (default \code{30}).}
@@ -60,63 +81,177 @@ in recommendations (default \code{30}).}
 \item{min_obs_per_category}{Minimum weighted observations per score category
 used in recommendations (default \code{10}).}
 
-\item{noncenter_facet}{One facet to leave non-centered.}
+\item{noncenter_facet}{One facet to leave non-centered. Other facets use
+\code{centering_scope}, as in \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
 \item{dummy_facets}{Facets to fix at zero.}
+
+\item{category_policy}{Optional explicit category choice: \code{"collapse"}
+maps gaps in the observed categories to consecutive scores;
+\code{"preserve"} keeps the intended ladder, declared with \code{rating_min} and
+\code{rating_max}. This changes the fitted category steps, not just labels.
+\code{NULL} (default) uses \code{keep_original}, whose default is \code{FALSE}
+(\code{"collapse"}). Supplying both choices is allowed only when they agree.
+Preservation does not estimate unsupported steps: fitting stops if a
+retained internal category has no observations. Use the same policy in
+\code{\link[=describe_mfrm_data]{describe_mfrm_data()}} and \code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}}.}
+
+\item{repeated_ratings}{Treatment of repeated Person-by-facet cells.
+\code{"review"} (default) retains the duplicate-cell warning and ordinary
+MML/JML input-review state. Use \code{"independent"} only to declare that the
+rows are distinct, conditionally independent rating events under the
+specified model. Every row and its weight are retained; this argument
+does not aggregate scores, add a facet, change the likelihood or establish
+independence from the data. Other input, numerical and inference checks
+still apply. The declaration is saved in preparation notes, configuration
+and replay settings. Corrected JML already requires conditionally
+independent repeated ratings; the argument records that assumption
+explicitly there. It is not supported by the two-family GPCM route.}
+
+\item{centering_scope}{\code{"facet"} (default) centers each declared facet across
+all its levels, including direct anchors and group totals. \code{"remainder"}
+reproduces the earlier convention that centers only levels outside direct
+and group constraints. For ordinary additive RSM/PCM JML,
+\code{"anchor_origin"} lets direct or group anchors replace centering on their facet;
+select an unanchored, active \code{noncenter_facet}. Other facets remain centered.
+This option excludes comparison-only fitting. None of
+these conventions changes the population model or category steps.
+Unsupported specialized routes reject an explicit setting.
+See \strong{Anchors and scale constraints}.}
+
+\item{object}{Output from \code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}}.}
+
+\item{digits}{Number of digits for numeric rounding.}
+
+\item{top_n}{Maximum rows shown in issue previews.}
+
+\item{...}{Reserved for generic compatibility.}
+
+\item{x}{Output from \code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}}.}
+
+\item{y}{Reserved for generic compatibility.}
+
+\item{type}{Plot type: \code{"issue_counts"}, \code{"facet_constraints"},
+or \code{"level_observations"}.}
+
+\item{main}{Optional title override.}
+
+\item{palette}{Optional named colors.}
+
+\item{label_angle}{X-axis label angle for bar plots.}
+
+\item{draw}{If \code{TRUE}, draw using base graphics.}
 }
 \value{
 A list of class \code{mfrm_anchor_review} with:
 \itemize{
-\item \code{anchors}: cleaned anchor table used by estimation
-\item \code{group_anchors}: cleaned group-anchor table used by estimation
-\item \code{facet_summary}: counts of levels, constrained levels, and free levels
+\item \code{anchors}: cleaned direct constraints used by estimation
+\item \code{group_anchors}: cleaned group-mean constraints used by estimation
+\item \code{centering_scope}: the reviewed \code{"facet"}, \code{"remainder"} or
+\code{"anchor_origin"} convention
+\item \code{facet_summary}: counts of levels inside/outside declared constraints,
+\code{Centered} indicating the declared centering constraint, and \code{OriginBasis}
+describing how the facet's origin is set
 \item \code{design_checks}: observation-count checks by level/category
 \item \code{thresholds}: active threshold settings used for recommendations
 \item \code{issue_counts}: issue-type counts
 \item \code{issues}: list of issue tables
 \item \code{recommendations}: package-native anchor guidance strings
 }
+
+For \code{summary()}: An object of class \code{summary.mfrm_anchor_review}.
+
+For \code{plot()}: A plotting-data object of class \code{mfrm_plot_data}.
 }
 \description{
 Review and normalize anchor/group-anchor tables
 }
 \details{
-\strong{Anchoring} (also called "fixing" or scale linking) constrains selected
-parameter estimates to pre-specified values, placing the current
-analysis on a previously established scale.  This is essential when
-comparing results across administrations, linking test forms, or
-monitoring rater drift over time.
+This helper reviews computational constraints. A \emph{direct anchor} fixes an
+individual parameter to a supplied value. A \emph{group anchor} constrains the
+mean of declared elements to a supplied target. A \emph{common-element link} is
+different: it is observed overlap among administrations or subsets. Direct
+or group constraints can transfer coordinates from a defensible reference,
+but they do not manufacture empirical overlap.
 
 This function applies the same preprocessing and key-resolution rules
 as \code{fit_mfrm()}, but returns a review object so constraints can be
-checked \emph{before} estimation.  Running the review first helps avoid
+checked \emph{before} estimation. Running the review first helps avoid
 estimation failures caused by misspecified or data-incompatible
-anchors.
+anchors. It does not inspect source-fit readiness or establish that labels
+denote the same invariant elements across runs. Those substantive checks
+remain the caller's responsibility.
+This review has no estimation-method argument. A clean table can still
+request an unsupported model combination: in particular, \code{fit_mfrm()}
+rejects Person direct/group anchors with MML. See the scale-constraint
+section of \code{\link[=fit_mfrm]{fit_mfrm()}} before using partial anchors.
 
 \strong{Anchor types:}
 \itemize{
 \item \emph{Direct anchors} fix individual element measures to specific logit
-values (e.g., Rater R1 anchored at 0.35 logits).
+values (e.g., Rater R01 anchored at 0.35 logits). Use internal coordinates,
+not values transformed for display with \code{Umean} or \code{Uscale}.
 \item \emph{Group anchors} constrain the mean of a set of elements to a
 target value, allowing individual elements to vary freely around
-that mean.
-\item When both types overlap for the same element, the direct anchor
-takes precedence.
+that mean. The target requires an external justification such as a
+defensible equal-mean or known-scale assumption.
+The mean is unweighted over declared levels, not over rating rows.
+\code{GroupValue} repeats one target per group. It is not a FACETS per-element
+contribution: values 0.2 and 1.0 in a native two-member group translate
+to 0.6 for both rows. See \code{\link[=fit_mfrm]{fit_mfrm()}} for group-origin centering and
+FACETS group 0 / extreme-exclusion differences.
+\item When both types include the same element, both constraints are retained:
+the direct anchor fixes that element and the group constraint still fixes
+the declared group mean. Incompatible combinations are rejected by the
+constraint/estimability checks.
 }
 
-\strong{Design checks} verify that each anchored element has at least
+\strong{Design checks} report whether each observed facet level has at least
 \code{min_obs_per_element} weighted observations (default 30) and each
 score category has at least \code{min_obs_per_category} (default 10).
-These thresholds follow standard Rasch sample-size recommendations
-(Linacre, 1994).
+These user-configurable counts are package screening recommendations, not
+universal adequacy thresholds and not tests of connectedness or invariance.
+
+\code{summary()} method: Summarize an anchor-review object
+
+For \code{summary()}: This summary provides a compact pre-estimation review of anchor and
+group-anchor specifications.
+
+\code{plot()} method: Plot an anchor-review object
+
+For \code{plot()}: Base-R visualization helper for anchor-review outputs.
 }
 \section{Interpreting output}{
 
 \itemize{
 \item \code{issue_counts}/\code{issues}: concrete data or specification problems.
-\item \code{facet_summary}: constraint coverage by facet.
-\item \code{design_checks}: whether anchor targets have enough observations.
+\item \code{facet_summary}: constraint coverage by facet. \code{FreeLevels} counts levels
+outside direct and group constraints, not free parameters. A group member
+may still vary, whereas centering removes a degree of freedom outside groups.
+\item \code{design_checks}: observation counts against the requested screening values.
 \item \code{recommendations}: action items before estimation.
+}
+
+
+For \code{summary()}:
+
+Recommended order:
+\itemize{
+\item \code{issue_counts}: primary triage table (non-zero issues first).
+\item \code{facet_summary}: anchored/grouped/free-level balance by facet.
+\item \code{level_observation_summary} and \code{category_counts}: sparse-cell diagnostics.
+\item \code{recommendations}: concrete remediation suggestions.
+}
+
+If \code{issue_counts} is non-empty, treat anchor constraints as provisional and
+resolve issues before final estimation.
+
+
+For \code{plot()}:
+\itemize{
+\item \code{"issue_counts"}: volume of each issue class.
+\item \code{"facet_constraints"}: anchored/grouped/free mix by facet.
+\item \code{"level_observations"}: observation support across levels.
 }
 }
 
@@ -127,29 +262,72 @@ These thresholds follow standard Rasch sample-size recommendations
 \item Run \code{review_mfrm_anchors(...)}.
 \item Resolve issues, then fit with \code{\link[=fit_mfrm]{fit_mfrm()}}.
 }
+
+
+For \code{summary()}:
+\enumerate{
+\item Run \code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}} with intended anchors/group anchors.
+\item Review \code{summary(review)} and recommendations.
+\item Revise anchor tables, then call \code{\link[=fit_mfrm]{fit_mfrm()}}.
+}
+
+
+For \code{plot()}:
+\enumerate{
+\item Run \code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}}.
+\item Start with \code{plot(review, type = "issue_counts")}.
+\item Inspect constraint and support plots before fitting.
+}
 }
 
 \examples{
-toy <- load_mfrmr_data("example_core")
-
-anchors <- data.frame(
-  Facet = c("Rater", "Rater"),
-  Level = c("R1", "R1"),
-  Anchor = c(0, 0.1),
-  stringsAsFactors = FALSE
-)
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("review_mfrm_anchors", run.dontrun = TRUE)
+\dontrun{
+ratings <- load_mfrmr_data("example_operational")
+# Illustrative external value, not an estimate supplied with this dataset.
+anchors <- data.frame(Facet = "Rater", Level = "R01", Anchor = 0.35)
 review <- review_mfrm_anchors(
-  data = toy,
+  data = ratings,
   person = "Person",
   facets = c("Rater", "Criterion"),
   score = "Score",
-  anchors = anchors
+  anchors = anchors,
+  rating_min = 1, rating_max = 4, category_policy = "preserve"
 )
+review$anchors                 # Check the retained value and matching ID.
 review$issue_counts
+review$recommendations         # Explains the selected centering convention.
+
+# A duplicate is a separate input problem: resolve it before fitting.
+duplicate <- rbind(anchors, transform(anchors, Anchor = 0.10))
+problem <- review_mfrm_anchors(
+  ratings, "Person", c("Rater", "Criterion"), "Score",
+  anchors = duplicate
+)
+problem$issues$duplicate_anchors
+# Normalization retains the last value; it does not decide which is correct.
+}
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("summary.mfrm_anchor_review", run.dontrun = TRUE)
+\dontrun{
+toy <- load_mfrmr_data("example_core")
+review <- review_mfrm_anchors(toy, "Person", c("Rater", "Criterion"), "Score")
 summary(review)
-p_review <- plot(review, draw = FALSE)
-p_review$data$plot
+}
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("plot.mfrm_anchor_review", run.dontrun = TRUE)
+\dontrun{
+toy <- load_mfrmr_data("example_core")
+review <- review_mfrm_anchors(toy, "Person", c("Rater", "Criterion"), "Score")
+p <- plot(review, draw = FALSE)
+}
 }
 \seealso{
-\code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=describe_mfrm_data]{describe_mfrm_data()}}, \code{\link[=make_anchor_table]{make_anchor_table()}}
+\code{\link[=fit_mfrm]{fit_mfrm()}}, \code{\link[=describe_mfrm_data]{describe_mfrm_data()}}, \code{\link[=make_anchor_table]{make_anchor_table()}},
+\link{mfrmr_linking_and_dff}
+
+\code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}}, \code{\link[=fit_mfrm]{fit_mfrm()}}
+
+\code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}}, \code{\link[=make_anchor_table]{make_anchor_table()}}
 }

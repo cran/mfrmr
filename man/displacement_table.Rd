@@ -17,7 +17,9 @@ displacement_table(
 \arguments{
 \item{fit}{Output from \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
-\item{diagnostics}{Optional output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.}
+\item{diagnostics}{Optional output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.
+Must match this fitted analysis; see \link{mfrmr_compatibility_layer} for
+migration of saved diagnostics.}
 
 \item{facets}{Optional subset of facets.}
 
@@ -62,7 +64,7 @@ in anchor assumptions.
 \enumerate{
 \item Run \code{displacement_table(fit, anchored_only = TRUE)} for anchor checks.
 \item Inspect \code{summary(disp)} then detailed rows.
-\item Visualize with \code{\link[=plot_displacement]{plot_displacement()}}.
+\item Visualize with \link[=plot.mfrm_fit]{plot(x, type = "displacement")}.
 }
 }
 
@@ -81,10 +83,22 @@ The \code{table} data.frame contains:
 }
 }
 
+\section{Saved-result reuse}{
+
+The returned \code{fit_identity} records the fitted analysis for reuse with
+reports and exports. Recreate older results from the saved fit and matching
+diagnostics using the original screening options; no model refit is needed.
+See \link{mfrmr_compatibility_layer} for migration instructions.
+}
+
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("displacement_table", run.dontrun = TRUE)
+\dontrun{
+# Saved synthetic JML/RSM analysis of example_core.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "core-jml.rds", package = "mfrmr"))
+fit <- example_fit$fit
 disp <- displacement_table(fit, anchored_only = FALSE)
 summary(disp)
 p_disp <- plot(disp, draw = FALSE)

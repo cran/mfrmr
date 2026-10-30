@@ -94,6 +94,60 @@ test_that("facet_interactions validates the current modeling boundary", {
   expect_error(base_call("Rater:Criterion", model = "GPCM"), "RSM")
 })
 
+test_that("interaction nesting preserves the population model and Person mapping", {
+  null <- list(
+    config = list(model = "RSM", method = "MML", person_col = "Person",
+      facet_cols = c("Rater", "Criterion", "Group"), score_col = "Score",
+      dummy_facets = "Group", facet_interactions = character(0),
+      population_spec = list(active = TRUE,
+        design_matrix = cbind('(Intercept)' = 1, GroupB = c(0, 0, 1, 1)),
+        design_columns = c("(Intercept)", "GroupB"), person_lookup = 1:4,
+        coefficients = c(0, .6), sigma2 = 1)),
+    prep = list(levels = list(Person = paste0("P", 1:4))))
+  alternative <- null
+  alternative$config$facet_interactions <- "Rater:Group"
+  alternative$config$population_spec$coefficients <- c(.1, .7)
+  alternative$config$population_spec$sigma2 <- .8
+  compare <- function(a, b) mfrmr:::audit_compare_mfrm_nesting(
+    list(a, b), labels = c("Null", "Interaction"))
+  expect_true(compare(null, alternative)$eligible)
+
+  # Preserve which covariates belong to each Person across stored row/column
+  # permutations; comparing matrix entries without that mapping is unsafe.
+  permuted <- alternative
+  order <- c(3L, 1L, 4L, 2L)
+  permuted$config$population_spec$design_matrix <-
+    alternative$config$population_spec$design_matrix[order, 2:1]
+  permuted$config$population_spec$design_columns <- c("GroupB", "(Intercept)")
+  permuted$prep$levels$Person <- rev(null$prep$levels$Person)
+  permuted$config$population_spec$person_lookup <- match(4:1, order)
+  expect_true(compare(null, permuted)$eligible)
+
+  changed <- alternative
+  changed$config$population_spec$design_matrix[, 2] <- c(0, 1, 0, 1)
+  expect_identical(compare(null, changed)$relation, "population_model_unverified")
+  expect_false(compare(null, changed)$eligible)
+  changed <- alternative
+  changed$config$population_spec$person_lookup <- rev(1:4)
+  expect_false(compare(null, changed)$eligible)
+  changed <- alternative
+  changed$config$population_spec$active <- FALSE
+  expect_false(compare(null, changed)$eligible)
+  expect_false(compare(changed, alternative)$eligible)
+  null$config$population_spec$active <- FALSE
+  expect_true(compare(null, changed)$eligible)
+
+  # Two incomplete active-population records must not match each other.
+  broken <- alternative
+  broken$config$population_spec$design_matrix <- NULL
+  broken_null <- broken
+  broken_null$config$facet_interactions <- character(0)
+  expect_false(compare(broken_null, broken)$eligible)
+  broken <- alternative
+  broken$config$population_spec$person_lookup[1] <- NA_integer_
+  expect_false(compare(alternative, broken)$eligible)
+})
+
 test_that("compare_mfrm recognizes additive-to-interaction nesting", {
   d <- mfrmr:::sample_mfrm_data(seed = 42)
 
@@ -149,7 +203,7 @@ test_that("compare_mfrm recognizes additive-to-interaction nesting", {
   )
 })
 
-test_that("interaction MML falls back from EM to direct optimization", {
+test_that("interaction MML uses its requested EM engine", {
   d <- mfrmr:::sample_mfrm_data(seed = 42)
 
   fit <- suppressMessages(suppressWarnings(fit_mfrm(
@@ -167,6 +221,7 @@ test_that("interaction MML falls back from EM to direct optimization", {
   )))
 
   expect_equal(fit$summary$MMLEngineRequested[1], "em")
-  expect_equal(fit$summary$MMLEngineUsed[1], "direct")
-  expect_match(fit$summary$MMLEngineDetail[1], "falling back to direct")
+  expect_equal(fit$summary$MMLEngineUsed[1], "em")
+  expect_false(fit$opt$mml_engine$Fallback)
+  expect_true(all(diff(fit$opt$ll_trace) >= -1e-10))
 })

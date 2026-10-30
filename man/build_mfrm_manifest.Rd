@@ -56,7 +56,7 @@ anchoring information, and which downstream outputs are currently available.
 Use \code{build_mfrm_manifest()} when you want a compact, machine-readable record
 of how an analysis was run. Compared with related helpers:
 \itemize{
-\item \code{\link[=export_mfrm]{export_mfrm()}} writes analysis tables only.
+\item \code{\link[=export_mfrm_tables]{export_mfrm_tables()}} writes analysis tables only.
 \item \code{build_mfrm_manifest()} records settings and available outputs.
 \item \code{\link[=build_mfrm_replay_script]{build_mfrm_replay_script()}} creates an executable R script.
 \item \code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}} writes a project-folder reproducibility bundle;
@@ -71,13 +71,15 @@ The returned bundle has class \code{mfrm_manifest} and includes:
 \itemize{
 \item \code{summary}: one-row analysis overview
 \item \code{readiness}, \code{readiness_components}, and \code{readiness_parameters}: the
-source fit's current readiness-contract record, its component review, and
-any parameter-level readiness rows
+fitted model's recorded numerical checks and restrictions on inference,
+overall and by component or parameter
 \item \code{environment}: package/R/platform metadata
 \item \code{model_settings}: key-value model settings table
 \item \code{source_columns}: key-value data-column table
 \item \code{estimation_control}: key-value optimizer settings table
-\item \code{anchor_summary}: facet-level anchor summary
+\item \code{anchor_summary}: facet-level anchor summary. \code{model_settings} separately
+records \code{centering_scope} and \code{noncenter_facet}; missing convention metadata
+in a native fit retains the legacy \code{"remainder"} interpretation
 \item \code{anchors}: machine-readable anchor table
 \item \code{hierarchical_review}: retained traceability table for hierarchical /
 small-sample design flags
@@ -99,14 +101,15 @@ the intended analysis. The \code{model_settings}, \code{source_columns}, and
 \code{estimation_control} tables are designed for reproducibility records and
 method write-up.
 \code{Converged} records the optimizer return-code decision; \code{InferenceReady}
-records the stricter readiness-contract decision. They need not agree.
-The \code{readiness} tables are provenance: they preserve the decision recorded
-for the source fit, including its contract version and reason codes. They do
-not make a subsequently replayed fit inference-ready; replay must recompute
-readiness from the replayed data and numerical result.
+records whether the fit passes the additional numerical checks required for
+inference. They need not agree; passing these checks does not establish model
+fit or the statistical adequacy of every interval method.
+The \code{readiness} tables preserve these checks for the original fitted model,
+including the check-format version and reason codes. Re-running the analysis
+must repeat the checks using the new fit; the saved records do not certify it.
 Active latent-regression fits also record their population-model provenance
 there, including the fitted scoring basis, stored \code{population_formula}, and
-person-level contract used by the fitted population model. When categorical
+person-level data requirements used by the fitted population model. When categorical
 background variables are expanded through \code{stats::model.matrix()},
 \code{population_xlevel_variables} and \code{population_contrast_variables} identify
 the variables whose fitted coding must be preserved for replay/scoring.
@@ -128,18 +131,32 @@ control over residual PCA.
 \code{\link[=export_mfrm_bundle]{export_mfrm_bundle()}}.
 }
 
-For bounded \code{GPCM} fits, the manifest is available with an explicit
+For \code{GPCM} fits, the manifest is available with an explicit
 \code{gpcm_boundary} table. It records supported direct diagnostics/reporting
 surfaces while keeping full FACETS score-side contract review blocked and
 routing design forecasting through its separate caveated capability row.
 }
 
+\section{Saved-result reuse}{
+
+Supplied screening results must describe this fitted analysis. Results from
+another fit or older results without identity metadata are refused. See
+\link{mfrmr_compatibility_layer} to recreate them from the saved fit and matching
+diagnostics without refitting the model.
+Supplied unit scores, plausible values and fit-derived forecasts must also
+match this calibration. A forecast created with \code{sim_spec} remains a separate
+scenario; its source is recorded without asserting a match to the fit.
+}
+
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 30)
-diag <- diagnose_mfrm(fit, residual_pca = "none")
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("build_mfrm_manifest", run.dontrun = TRUE)
+\dontrun{
+# Saved synthetic JML/RSM analysis of example_core.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "core-jml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+diag <- example_fit$diagnostics
 manifest <- build_mfrm_manifest(fit, diagnostics = diag)
 manifest$summary[, c("Model", "Method", "Observations", "Facets")]
 manifest$available_outputs[, c("Component", "Available")]

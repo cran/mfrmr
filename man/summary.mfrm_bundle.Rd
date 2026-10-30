@@ -93,7 +93,9 @@ benchmark check previews when summarizing \code{mfrm_reference_benchmark}.
 }
 
 \examples{
-\donttest{
+# Long-running workflow; run explicitly when needed.
+# example("summary.mfrm_bundle", run.dontrun = TRUE)
+\dontrun{
 toy_full <- load_mfrmr_data("example_core")
 toy_people <- unique(toy_full$Person)[1:12]
 toy <- toy_full[toy_full$Person \%in\% toy_people, , drop = FALSE]

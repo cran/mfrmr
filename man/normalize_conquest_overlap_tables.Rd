@@ -40,8 +40,8 @@ item identifier as exported or extracted by the user. \code{"auto"} tries
 aliases such as \code{ResponseVar}, \code{ItemID}, \code{Item}, and \code{Label}.}
 
 \item{conquest_item_estimate}{Column in \code{conquest_item_estimates} that stores
-item estimates. \code{"auto"} tries aliases such as \code{Estimate}, \code{Est}, and
-\code{Facility}.}
+item estimates. \code{"auto"} tries \code{Estimate} and \code{Est}. Other columns must
+be specified explicitly and converted to difficulty logits before review.}
 
 \item{conquest_case_person}{Column in \code{conquest_case_eap} that stores person
 IDs. \code{"auto"} tries conservative aliases such as \code{Person}, \code{PID}, and

@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Rating agreement and score comparisons</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Rating agreement and score comparisons</h1>
+
+
+
+<p>Two raters can rank responses identically while assigning different
+scores. This tutorial shows how to detect that distinction, match the
+right rating records, and retain the sample behind each coefficient. It
+uses small synthetic data and fits no measurement model. Run the code
+blocks in order with <code>mfrmr</code> installed. For importing your
+own CSV or fitting a model, start with the <a href="mfrmr-workflow.html">ordinary workflow</a>.</p>
+<div id="choose-the-question-before-the-coefficient" class="section level2">
+<h2>Choose the question before the coefficient</h2>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Your question</th>
+<th>Starting point</th>
+<th>What the result describes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Do two raters give similar category scores to the same
+responses?</td>
+<td><code>pairwise_kappa_table()</code></td>
+<td>Weighted agreement for each pair on its common complete units.</td>
+</tr>
+<tr class="even">
+<td>How much agreement is present across the panel?</td>
+<td><code>krippendorff_alpha_table()</code> or
+<code>gwet_ac2_table()</code></td>
+<td>A pooled coefficient under a stated distance/weighting and chance
+model. Their definitions differ.</td>
+</tr>
+<tr class="odd">
+<td>Does a score source agree with a chosen reference, track its
+variation, or shift its mean?</td>
+<td><code>score_comparison_table()</code></td>
+<td>QWK, correlation and standardized mean difference on aligned
+records. A reference is not automatically correct.</td>
+</tr>
+<tr class="even">
+<td>Which rater is stricter after accounting for the fitted facets?</td>
+<td><code>fit_mfrm()</code>, then individual estimates and
+diagnostics</td>
+<td>Model-adjusted severity. High rater separation reliability means
+distinguishable severities, not agreement.</td>
+</tr>
+<tr class="odd">
+<td>Does a rater tend to compress scores toward the middle?</td>
+<td><code>rater_centrality_table()</code></td>
+<td>Indirect RSM residual and/or rater-specific PCM threshold
+descriptions, with their source status.</td>
+</tr>
+<tr class="even">
+<td>How accurately do raters match supplied expert benchmark
+ratings?</td>
+<td><code>fit_rater_accuracy()</code></td>
+<td>A separate Rasch model of exact-match indicators; the benchmark and
+its alignment must be justified.</td>
+</tr>
+</tbody>
+</table>
+<p>This lesson works through the first three questions. A high
+correlation does not establish agreement, agreement does not establish
+benchmark accuracy, and a low Infit value alone does not diagnose
+centrality. For the distinction between observed agreement and
+model-based reporting, see <a href="mfrmr-reporting-and-apa.html">Reporting and APA</a>.</p>
+<p>The <a href="../reference/mfrmr_methods_reference.html#choose-an-agreement-target-and-keep-its-denominator">methods
+guide</a> also distinguishes the denominators and saving routes. In
+particular, <code>interrater_agreement_table()</code> reports
+model-implied expected exact agreement from fitted category
+probabilities; this is not the chance-agreement term used by kappa or
+AC2. Residual association answers another question: whether departures
+from the fitted model vary together. Neither raw agreement nor residual
+association alone establishes the other.</p>
+</div>
+<div id="identify-the-rated-unit" class="section level2">
+<h2>1. Identify the rated unit</h2>
+<p>Six people each complete two tasks, scored on the permitted
+categories <code>0, 1, 2, 3</code>. Rater R2 deliberately gives every
+response one category more than R1. R3 has a few different scores, one
+missing score and one absent row. These existing teaching data are
+included in mfrmr: <code>data()</code> loads the table, and the next
+line gives it the shorter name <code>ratings</code>. You do not need to
+construct scores or run a simulation before following this lesson.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(mfrmr)</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="fu">data</span>(<span class="st">&quot;mfrmr_example_agreement&quot;</span>, <span class="at">package =</span> <span class="st">&quot;mfrmr&quot;</span>)</span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>ratings <span class="ot">&lt;-</span> mfrmr_example_agreement</span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="fu">head</span>(ratings)</span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="co">#&gt;   Person Task Rater Score</span></span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a><span class="co">#&gt; 1    P01   T1    R1     0</span></span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a><span class="co">#&gt; 2    P01   T2    R1     1</span></span>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a><span class="co">#&gt; 3    P02   T1    R1     2</span></span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a><span class="co">#&gt; 4    P02   T2    R1     0</span></span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a><span class="co">#&gt; 5    P03   T1    R1     1</span></span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a><span class="co">#&gt; 6    P03   T2    R1     2</span></span>
+<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a><span class="fu">with</span>(ratings, <span class="fu">table</span>(Rater, Score, <span class="at">useNA =</span> <span class="st">&quot;ifany&quot;</span>))</span>
+<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a><span class="co">#&gt;      Score</span></span>
+<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a><span class="co">#&gt; Rater 0 1 2 3 &lt;NA&gt;</span></span>
+<span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a><span class="co">#&gt;    R1 4 4 4 0    0</span></span>
+<span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a><span class="co">#&gt;    R2 0 4 4 4    0</span></span>
+<span id="cb1-18"><a href="#cb1-18" tabindex="-1"></a><span class="co">#&gt;    R3 3 4 3 0    1</span></span></code></pre></div>
+<p>Here <strong>Person and Task together</strong> identify one response
+to be compared. <code>Person</code> alone would mix different tasks. If
+your data also distinguish rubric criteria or occasions, include those
+identifiers in <code>unit</code>, for example
+<code>c(&quot;Person&quot;, &quot;Task&quot;, &quot;Criterion&quot;, &quot;Occasion&quot;)</code>.</p>
+<p>There must be at most one row for each rater and unit:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>key <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Task&quot;</span>, <span class="st">&quot;Rater&quot;</span>)</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">anyDuplicated</span>(ratings[key]) <span class="sc">==</span> <span class="dv">0</span><span class="dt">L</span>)</span></code></pre></div>
+<p>An assertion failure means the key repeats. Check whether a task or
+occasion column is missing from the key, or whether a row was
+accidentally duplicated. Do not silently average or delete repeated
+ratings. The <code>unit</code> argument matches records; it does not fit
+separate Person and Task variance components.</p>
+<p>There are 35 input rows and 34 observed scores. The R3/P06/T2 row has
+an explicit missing score; R3/P02/T2 has no row. Neither is a score of
+zero. An absent row alone does not tell us whether a rating was
+unassigned or an assigned rating was never recorded; that requires the
+assignment roster.</p>
+</div>
+<div id="compare-pairs-on-their-shared-responses" class="section level2">
+<h2>2. Compare pairs on their shared responses</h2>
+<p>Declare the complete rubric even if some categories are unused by a
+rater. Quadratic weighting gives quadratic weighted kappa (QWK): a
+larger category disagreement receives a larger penalty.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>qwk <span class="ot">&lt;-</span> <span class="fu">pairwise_kappa_table</span>(</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>  ratings, <span class="at">rater =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">unit =</span> <span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Task&quot;</span>), <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>  <span class="at">categories =</span> <span class="dv">0</span><span class="sc">:</span><span class="dv">3</span>, <span class="at">weights =</span> <span class="st">&quot;quadratic&quot;</span></span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>)</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>qwk<span class="sc">$</span>table[, <span class="fu">c</span>(<span class="st">&quot;Rater1&quot;</span>, <span class="st">&quot;Rater2&quot;</span>, <span class="st">&quot;N&quot;</span>, <span class="st">&quot;Kappa&quot;</span>, <span class="st">&quot;Status&quot;</span>)]</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a><span class="co">#&gt;   Rater1 Rater2  N     Kappa    Status</span></span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a><span class="co">#&gt; 1     R1     R2 12 0.5714286 available</span></span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="co">#&gt; 2     R1     R3 10 0.8333333 available</span></span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a><span class="co">#&gt; 3     R2     R3 10 0.4545455 available</span></span></code></pre></div>
+<p><code>N</code> is the number of common complete units, not the number
+of people or input rows. R1/R2 uses all 12 responses. Each pair
+involving R3 uses 10. Each pair uses its own retained sample for both
+observed and expected agreement; the three coefficients do not
+automatically form a panel average or a ranking of rater quality.</p>
+<p>For numeric categories, linear and quadratic weights use the declared
+numeric spacing. With character categories they use positions in the
+supplied order. Choose this meaning from the rubric. Changing
+<code>c(0, 1, 2, 3)</code> to uneven numeric codes changes the weights;
+a larger resulting coefficient would not establish better agreement.</p>
+<p>Inspect exclusions before interpreting a coefficient.
+<code>Unit</code> is an index into <code>qwk$units</code>; attach the
+original identifiers to make the audit readable:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>pair_audit <span class="ot">&lt;-</span> <span class="fu">cbind</span>(qwk<span class="sc">$</span>cases, qwk<span class="sc">$</span>units[qwk<span class="sc">$</span>cases<span class="sc">$</span>Unit, , <span class="at">drop =</span> <span class="cn">FALSE</span>])</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="fu">subset</span>(pair_audit, <span class="sc">!</span>Included,</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>       <span class="at">select =</span> <span class="fu">c</span>(Person, Task, Rater1, Rater2,</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>                  Assigned1, Assigned2, Missing1, Missing2, Included))</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="co">#&gt;      Person Task Rater1 Rater2 Assigned1 Assigned2 Missing1 Missing2 Included</span></span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="co">#&gt; 4.1     P02   T2     R1     R3      TRUE     FALSE    FALSE    FALSE    FALSE</span></span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="co">#&gt; 12.1    P06   T2     R1     R3      TRUE      TRUE    FALSE     TRUE    FALSE</span></span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a><span class="co">#&gt; 4.2     P02   T2     R2     R3      TRUE     FALSE    FALSE    FALSE    FALSE</span></span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a><span class="co">#&gt; 12.2    P06   T2     R2     R3      TRUE      TRUE    FALSE     TRUE    FALSE</span></span></code></pre></div>
+<p><code>Assigned2 = FALSE</code> means that no input row exists for the
+second rater on that unit. <code>Assigned2 = TRUE</code> with
+<code>Missing2 = TRUE</code> means a row exists but its score is
+missing. These are observations about the supplied file, not proof that
+the planned assignment was complete.</p>
+</div>
+<div id="separate-agreement-correlation-and-mean-differences" class="section level2">
+<h2>3. Separate agreement, correlation and mean differences</h2>
+<p>Suppose R2 is the source under review and R1 is the comparison
+reference. Build the two score vectors by joining on the unit
+identifiers, not by assuming that two files have the same row order.
+<code>all = TRUE</code> retains unmatched units for the subsequent
+missing-pair audit instead of discarding them silently.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>scored <span class="ot">&lt;-</span> <span class="fu">subset</span>(ratings, Rater <span class="sc">==</span> <span class="st">&quot;R2&quot;</span>, <span class="at">select =</span> <span class="fu">c</span>(Person, Task, Score))</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>reference <span class="ot">&lt;-</span> <span class="fu">subset</span>(ratings, Rater <span class="sc">==</span> <span class="st">&quot;R1&quot;</span>, <span class="at">select =</span> <span class="fu">c</span>(Person, Task, Score))</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="fu">names</span>(reference)[<span class="dv">3</span>] <span class="ot">&lt;-</span> <span class="st">&quot;Reference&quot;</span></span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">anyDuplicated</span>(scored[<span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Task&quot;</span>)]) <span class="sc">==</span> <span class="dv">0</span><span class="dt">L</span>,</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>          <span class="fu">anyDuplicated</span>(reference[<span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Task&quot;</span>)]) <span class="sc">==</span> <span class="dv">0</span><span class="dt">L</span>)</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>aligned <span class="ot">&lt;-</span> <span class="fu">merge</span>(scored, reference, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Task&quot;</span>), <span class="at">all =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a></span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>comparison <span class="ot">&lt;-</span> <span class="fu">score_comparison_table</span>(</span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>  <span class="at">scores =</span> aligned<span class="sc">$</span>Score,</span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a>  <span class="at">reference =</span> aligned<span class="sc">$</span>Reference,</span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a>  <span class="at">categories =</span> <span class="dv">0</span><span class="sc">:</span><span class="dv">3</span></span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a>)</span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a>comparison<span class="sc">$</span>table[, <span class="fu">c</span>(<span class="st">&quot;N&quot;</span>, <span class="st">&quot;MeanScore&quot;</span>, <span class="st">&quot;MeanReference&quot;</span>, <span class="st">&quot;QWK&quot;</span>, <span class="st">&quot;Correlation&quot;</span>, <span class="st">&quot;SMD&quot;</span>)]</span>
+<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a><span class="co">#&gt;    N MeanScore MeanReference       QWK Correlation      SMD</span></span>
+<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a><span class="co">#&gt; 1 12         2             1 0.5714286           1 1.172604</span></span>
+<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a><span class="fu">mean</span>(aligned<span class="sc">$</span>Score <span class="sc">==</span> aligned<span class="sc">$</span>Reference) <span class="co"># Exact agreement for this complete pair</span></span>
+<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a><span class="co">#&gt; [1] 0</span></span></code></pre></div>
+<p>For these 12 responses, R2’s mean is 2 and R1’s mean is 1.
+Correlation is 1, yet exact agreement is 0 and QWK is about 0.571. R2
+tracks every score difference while consistently assigning one category
+more. Thus perfect correlation can coexist with systematic
+disagreement.</p>
+<p><code>SMD</code> is the mean difference divided by the selected score
+SD. Its default pooled-SD version is about +1.173 here; positive values
+mean the evaluated source scores higher. This example deliberately
+treats the 0-to-3 rubric codes as equally spaced for means and SMD.
+Check that score-scale interpretation for your application. SMD does not
+adjust for differing task/person assignment and is not an MFRM severity
+estimate. Both pooled-SD and reference-SD versions are retained in the
+table.</p>
+<p>The function does not align records, round continuous scores, or
+choose pass/fail criteria for you. For continuous source scores, pass
+the original values as <code>scores</code> and an explicitly categorized
+vector as <code>score_categories</code>; correlation and SMD use the
+original values, while QWK uses the category values. Document the
+categorization rule before evaluating the results.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>comparison<span class="sc">$</span>criteria[, <span class="fu">c</span>(<span class="st">&quot;Metric&quot;</span>, <span class="st">&quot;Value&quot;</span>, <span class="st">&quot;Threshold&quot;</span>, <span class="st">&quot;Status&quot;</span>, <span class="st">&quot;Reason&quot;</span>)]</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="co">#&gt;                   Metric     Value Threshold        Status</span></span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a><span class="co">#&gt; 1                    QWK 0.5714286        NA not_requested</span></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="co">#&gt; 2            Correlation 1.0000000        NA not_requested</span></span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a><span class="co">#&gt; 3         QWKDegradation        NA        NA   unavailable</span></span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="co">#&gt; 4 CorrelationDegradation        NA        NA   unavailable</span></span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a><span class="co">#&gt; 5            AbsoluteSMD 1.1726039        NA not_requested</span></span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a><span class="co">#&gt;                                        Reason</span></span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a><span class="co">#&gt; 1                     No threshold requested.</span></span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a><span class="co">#&gt; 2                     No threshold requested.</span></span>
+<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a><span class="co">#&gt; 3 Second reference ratings were not supplied.</span></span>
+<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a><span class="co">#&gt; 4 Second reference ratings were not supplied.</span></span>
+<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a><span class="co">#&gt; 5                     No threshold requested.</span></span>
+<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a>comparison_cases <span class="ot">&lt;-</span> <span class="fu">cbind</span>(aligned[<span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Task&quot;</span>)], comparison<span class="sc">$</span>cases)</span>
+<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a>comparison_cases</span>
+<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a><span class="co">#&gt;    Person Task Row Included MissingScore MissingReference</span></span>
+<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a><span class="co">#&gt; 1     P01   T1   1     TRUE        FALSE            FALSE</span></span>
+<span id="cb6-18"><a href="#cb6-18" tabindex="-1"></a><span class="co">#&gt; 2     P01   T2   2     TRUE        FALSE            FALSE</span></span>
+<span id="cb6-19"><a href="#cb6-19" tabindex="-1"></a><span class="co">#&gt; 3     P02   T1   3     TRUE        FALSE            FALSE</span></span>
+<span id="cb6-20"><a href="#cb6-20" tabindex="-1"></a><span class="co">#&gt; 4     P02   T2   4     TRUE        FALSE            FALSE</span></span>
+<span id="cb6-21"><a href="#cb6-21" tabindex="-1"></a><span class="co">#&gt; 5     P03   T1   5     TRUE        FALSE            FALSE</span></span>
+<span id="cb6-22"><a href="#cb6-22" tabindex="-1"></a><span class="co">#&gt; 6     P03   T2   6     TRUE        FALSE            FALSE</span></span>
+<span id="cb6-23"><a href="#cb6-23" tabindex="-1"></a><span class="co">#&gt; 7     P04   T1   7     TRUE        FALSE            FALSE</span></span>
+<span id="cb6-24"><a href="#cb6-24" tabindex="-1"></a><span class="co">#&gt; 8     P04   T2   8     TRUE        FALSE            FALSE</span></span>
+<span id="cb6-25"><a href="#cb6-25" tabindex="-1"></a><span class="co">#&gt; 9     P05   T1   9     TRUE        FALSE            FALSE</span></span>
+<span id="cb6-26"><a href="#cb6-26" tabindex="-1"></a><span class="co">#&gt; 10    P05   T2  10     TRUE        FALSE            FALSE</span></span>
+<span id="cb6-27"><a href="#cb6-27" tabindex="-1"></a><span class="co">#&gt; 11    P06   T1  11     TRUE        FALSE            FALSE</span></span>
+<span id="cb6-28"><a href="#cb6-28" tabindex="-1"></a><span class="co">#&gt; 12    P06   T2  12     TRUE        FALSE            FALSE</span></span>
+<span id="cb6-29"><a href="#cb6-29" tabindex="-1"></a><span class="co">#&gt;    MissingScoreCategory</span></span>
+<span id="cb6-30"><a href="#cb6-30" tabindex="-1"></a><span class="co">#&gt; 1                 FALSE</span></span>
+<span id="cb6-31"><a href="#cb6-31" tabindex="-1"></a><span class="co">#&gt; 2                 FALSE</span></span>
+<span id="cb6-32"><a href="#cb6-32" tabindex="-1"></a><span class="co">#&gt; 3                 FALSE</span></span>
+<span id="cb6-33"><a href="#cb6-33" tabindex="-1"></a><span class="co">#&gt; 4                 FALSE</span></span>
+<span id="cb6-34"><a href="#cb6-34" tabindex="-1"></a><span class="co">#&gt; 5                 FALSE</span></span>
+<span id="cb6-35"><a href="#cb6-35" tabindex="-1"></a><span class="co">#&gt; 6                 FALSE</span></span>
+<span id="cb6-36"><a href="#cb6-36" tabindex="-1"></a><span class="co">#&gt; 7                 FALSE</span></span>
+<span id="cb6-37"><a href="#cb6-37" tabindex="-1"></a><span class="co">#&gt; 8                 FALSE</span></span>
+<span id="cb6-38"><a href="#cb6-38" tabindex="-1"></a><span class="co">#&gt; 9                 FALSE</span></span>
+<span id="cb6-39"><a href="#cb6-39" tabindex="-1"></a><span class="co">#&gt; 10                FALSE</span></span>
+<span id="cb6-40"><a href="#cb6-40" tabindex="-1"></a><span class="co">#&gt; 11                FALSE</span></span>
+<span id="cb6-41"><a href="#cb6-41" tabindex="-1"></a><span class="co">#&gt; 12                FALSE</span></span></code></pre></div>
+<p><code>not_requested</code> means a statistic is available but no
+threshold was requested. <code>unavailable</code> means the statistic
+could not be computed; it does not mean zero agreement. Without a second
+reference, the two degradation statistics are unavailable. By default
+<code>screen = &quot;none&quot;</code>. The explicitly requested
+<code>&quot;williamson2012&quot;</code> screen uses numerical examples for an
+automated-scoring application; passing those thresholds is not a general
+validity certificate. See <code>?score_comparison_table</code> for the
+definitions and application limits.</p>
+<div id="add-a-second-reference-only-when-the-design-supplies-one" class="section level3">
+<h3>Add a second reference only when the design supplies one</h3>
+<p>If R3 is a defensible second reference, its agreement with R1 can
+supply a baseline. Here it illustrates the calculation, not expert
+authority.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>reference2 <span class="ot">&lt;-</span> <span class="fu">subset</span>(ratings, Rater <span class="sc">==</span> <span class="st">&quot;R3&quot;</span>, <span class="at">select =</span> <span class="fu">c</span>(Person, Task, Score))</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="fu">names</span>(reference2)[<span class="dv">3</span>] <span class="ot">&lt;-</span> <span class="st">&quot;Reference2&quot;</span></span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>aligned3 <span class="ot">&lt;-</span> <span class="fu">merge</span>(aligned, reference2, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Task&quot;</span>), <span class="at">all =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>with_baseline <span class="ot">&lt;-</span> <span class="fu">score_comparison_table</span>(</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>  <span class="at">scores =</span> aligned3<span class="sc">$</span>Score, <span class="at">reference =</span> aligned3<span class="sc">$</span>Reference,</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>  <span class="at">reference2 =</span> aligned3<span class="sc">$</span>Reference2, <span class="at">categories =</span> <span class="dv">0</span><span class="sc">:</span><span class="dv">3</span></span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>)</span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>with_baseline<span class="sc">$</span>table[, <span class="fu">c</span>(<span class="st">&quot;NInput&quot;</span>, <span class="st">&quot;N&quot;</span>, <span class="st">&quot;NExcluded&quot;</span>, <span class="st">&quot;QWK&quot;</span>, <span class="st">&quot;ReferenceQWK&quot;</span>, <span class="st">&quot;QWKDegradation&quot;</span>)]</span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a><span class="co">#&gt;   NInput  N NExcluded       QWK ReferenceQWK QWKDegradation</span></span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a><span class="co">#&gt; 1     12 10         2 0.5454545    0.8333333      0.2878788</span></span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a><span class="fu">cbind</span>(aligned3[<span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Task&quot;</span>)], with_baseline<span class="sc">$</span>cases)</span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a><span class="co">#&gt;    Person Task Row Included MissingScore MissingReference</span></span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a><span class="co">#&gt; 1     P01   T1   1     TRUE        FALSE            FALSE</span></span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a><span class="co">#&gt; 2     P01   T2   2     TRUE        FALSE            FALSE</span></span>
+<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a><span class="co">#&gt; 3     P02   T1   3     TRUE        FALSE            FALSE</span></span>
+<span id="cb7-16"><a href="#cb7-16" tabindex="-1"></a><span class="co">#&gt; 4     P02   T2   4    FALSE        FALSE            FALSE</span></span>
+<span id="cb7-17"><a href="#cb7-17" tabindex="-1"></a><span class="co">#&gt; 5     P03   T1   5     TRUE        FALSE            FALSE</span></span>
+<span id="cb7-18"><a href="#cb7-18" tabindex="-1"></a><span class="co">#&gt; 6     P03   T2   6     TRUE        FALSE            FALSE</span></span>
+<span id="cb7-19"><a href="#cb7-19" tabindex="-1"></a><span class="co">#&gt; 7     P04   T1   7     TRUE        FALSE            FALSE</span></span>
+<span id="cb7-20"><a href="#cb7-20" tabindex="-1"></a><span class="co">#&gt; 8     P04   T2   8     TRUE        FALSE            FALSE</span></span>
+<span id="cb7-21"><a href="#cb7-21" tabindex="-1"></a><span class="co">#&gt; 9     P05   T1   9     TRUE        FALSE            FALSE</span></span>
+<span id="cb7-22"><a href="#cb7-22" tabindex="-1"></a><span class="co">#&gt; 10    P05   T2  10     TRUE        FALSE            FALSE</span></span>
+<span id="cb7-23"><a href="#cb7-23" tabindex="-1"></a><span class="co">#&gt; 11    P06   T1  11     TRUE        FALSE            FALSE</span></span>
+<span id="cb7-24"><a href="#cb7-24" tabindex="-1"></a><span class="co">#&gt; 12    P06   T2  12    FALSE        FALSE            FALSE</span></span>
+<span id="cb7-25"><a href="#cb7-25" tabindex="-1"></a><span class="co">#&gt;    MissingScoreCategory MissingReference2</span></span>
+<span id="cb7-26"><a href="#cb7-26" tabindex="-1"></a><span class="co">#&gt; 1                 FALSE             FALSE</span></span>
+<span id="cb7-27"><a href="#cb7-27" tabindex="-1"></a><span class="co">#&gt; 2                 FALSE             FALSE</span></span>
+<span id="cb7-28"><a href="#cb7-28" tabindex="-1"></a><span class="co">#&gt; 3                 FALSE             FALSE</span></span>
+<span id="cb7-29"><a href="#cb7-29" tabindex="-1"></a><span class="co">#&gt; 4                 FALSE              TRUE</span></span>
+<span id="cb7-30"><a href="#cb7-30" tabindex="-1"></a><span class="co">#&gt; 5                 FALSE             FALSE</span></span>
+<span id="cb7-31"><a href="#cb7-31" tabindex="-1"></a><span class="co">#&gt; 6                 FALSE             FALSE</span></span>
+<span id="cb7-32"><a href="#cb7-32" tabindex="-1"></a><span class="co">#&gt; 7                 FALSE             FALSE</span></span>
+<span id="cb7-33"><a href="#cb7-33" tabindex="-1"></a><span class="co">#&gt; 8                 FALSE             FALSE</span></span>
+<span id="cb7-34"><a href="#cb7-34" tabindex="-1"></a><span class="co">#&gt; 9                 FALSE             FALSE</span></span>
+<span id="cb7-35"><a href="#cb7-35" tabindex="-1"></a><span class="co">#&gt; 10                FALSE             FALSE</span></span>
+<span id="cb7-36"><a href="#cb7-36" tabindex="-1"></a><span class="co">#&gt; 11                FALSE             FALSE</span></span>
+<span id="cb7-37"><a href="#cb7-37" tabindex="-1"></a><span class="co">#&gt; 12                FALSE              TRUE</span></span></code></pre></div>
+<p>All statistics now use the same 10 complete three-source responses.
+Adding R3 changes the sample even for the R2/R1 statistics, so do not
+interpret their change from the 12-response analysis as a change in
+scorer performance. <code>QWKDegradation</code> is
+<code>ReferenceQWK - QWK</code>: positive values mean less agreement
+with R1 than the R3/R1 baseline, and negative values mean more. Baseline
+agreement is itself sample-dependent; it does not establish either
+reference’s correctness.</p>
+</div>
+</div>
+<div id="describe-panel-agreement-under-a-declared-definition" class="section level2">
+<h2>4. Describe panel agreement under a declared definition</h2>
+<p>For a panel coefficient, compute the intended coefficient directly
+rather than averaging the pairwise kappas:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>alpha <span class="ot">&lt;-</span> <span class="fu">krippendorff_alpha_table</span>(</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>  ratings, <span class="at">rater =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">unit =</span> <span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Task&quot;</span>), <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  <span class="at">level =</span> <span class="st">&quot;ordinal&quot;</span>, <span class="at">categories =</span> <span class="dv">0</span><span class="sc">:</span><span class="dv">3</span></span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>)</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>ac2 <span class="ot">&lt;-</span> <span class="fu">gwet_ac2_table</span>(</span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>  ratings, <span class="at">rater =</span> <span class="st">&quot;Rater&quot;</span>, <span class="at">unit =</span> <span class="fu">c</span>(<span class="st">&quot;Person&quot;</span>, <span class="st">&quot;Task&quot;</span>), <span class="at">score =</span> <span class="st">&quot;Score&quot;</span>,</span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>  <span class="at">categories =</span> <span class="dv">0</span><span class="sc">:</span><span class="dv">3</span>, <span class="at">weights =</span> <span class="st">&quot;quadratic&quot;</span></span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>)</span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a>alpha<span class="sc">$</span>table[, <span class="fu">c</span>(<span class="st">&quot;Alpha&quot;</span>, <span class="st">&quot;Level&quot;</span>, <span class="st">&quot;Status&quot;</span>, <span class="st">&quot;PairableUnits&quot;</span>, <span class="st">&quot;PairableRatings&quot;</span>)]</span>
+<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a><span class="co">#&gt;       Alpha   Level    Status PairableUnits PairableRatings</span></span>
+<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a><span class="co">#&gt; 1 0.5666233 ordinal available            12              34</span></span>
+<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a>ac2<span class="sc">$</span>table[, <span class="fu">c</span>(<span class="st">&quot;AC&quot;</span>, <span class="st">&quot;Coefficient&quot;</span>, <span class="st">&quot;Status&quot;</span>, <span class="st">&quot;PairableUnits&quot;</span>, <span class="st">&quot;NonmissingRatings&quot;</span>)]</span>
+<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a><span class="co">#&gt;          AC Coefficient    Status PairableUnits NonmissingRatings</span></span>
+<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a><span class="co">#&gt; 1 0.6996106         AC2 available            12                34</span></span>
+<span id="cb8-15"><a href="#cb8-15" tabindex="-1"></a>alpha<span class="sc">$</span>unit_summary</span>
+<span id="cb8-16"><a href="#cb8-16" tabindex="-1"></a><span class="co">#&gt;    Unit AssignedRows NonmissingRatings MissingScores AbsentAssignments</span></span>
+<span id="cb8-17"><a href="#cb8-17" tabindex="-1"></a><span class="co">#&gt; 1     1            3                 3             0                 0</span></span>
+<span id="cb8-18"><a href="#cb8-18" tabindex="-1"></a><span class="co">#&gt; 2     2            3                 3             0                 0</span></span>
+<span id="cb8-19"><a href="#cb8-19" tabindex="-1"></a><span class="co">#&gt; 3     3            3                 3             0                 0</span></span>
+<span id="cb8-20"><a href="#cb8-20" tabindex="-1"></a><span class="co">#&gt; 4     4            2                 2             0                 1</span></span>
+<span id="cb8-21"><a href="#cb8-21" tabindex="-1"></a><span class="co">#&gt; 5     5            3                 3             0                 0</span></span>
+<span id="cb8-22"><a href="#cb8-22" tabindex="-1"></a><span class="co">#&gt; 6     6            3                 3             0                 0</span></span>
+<span id="cb8-23"><a href="#cb8-23" tabindex="-1"></a><span class="co">#&gt; 7     7            3                 3             0                 0</span></span>
+<span id="cb8-24"><a href="#cb8-24" tabindex="-1"></a><span class="co">#&gt; 8     8            3                 3             0                 0</span></span>
+<span id="cb8-25"><a href="#cb8-25" tabindex="-1"></a><span class="co">#&gt; 9     9            3                 3             0                 0</span></span>
+<span id="cb8-26"><a href="#cb8-26" tabindex="-1"></a><span class="co">#&gt; 10   10            3                 3             0                 0</span></span>
+<span id="cb8-27"><a href="#cb8-27" tabindex="-1"></a><span class="co">#&gt; 11   11            3                 3             0                 0</span></span>
+<span id="cb8-28"><a href="#cb8-28" tabindex="-1"></a><span class="co">#&gt; 12   12            3                 2             1                 0</span></span>
+<span id="cb8-29"><a href="#cb8-29" tabindex="-1"></a><span class="co">#&gt;    Included ObservedDisagreement</span></span>
+<span id="cb8-30"><a href="#cb8-30" tabindex="-1"></a><span class="co">#&gt; 1      TRUE           0.05204729</span></span>
+<span id="cb8-31"><a href="#cb8-31" tabindex="-1"></a><span class="co">#&gt; 2      TRUE           0.07626874</span></span>
+<span id="cb8-32"><a href="#cb8-32" tabindex="-1"></a><span class="co">#&gt; 3      TRUE           0.15844867</span></span>
+<span id="cb8-33"><a href="#cb8-33" tabindex="-1"></a><span class="co">#&gt; 4      TRUE           0.07807093</span></span>
+<span id="cb8-34"><a href="#cb8-34" tabindex="-1"></a><span class="co">#&gt; 5      TRUE           0.07626874</span></span>
+<span id="cb8-35"><a href="#cb8-35" tabindex="-1"></a><span class="co">#&gt; 6      TRUE           0.03243945</span></span>
+<span id="cb8-36"><a href="#cb8-36" tabindex="-1"></a><span class="co">#&gt; 7      TRUE           0.05204729</span></span>
+<span id="cb8-37"><a href="#cb8-37" tabindex="-1"></a><span class="co">#&gt; 8      TRUE           0.07626874</span></span>
+<span id="cb8-38"><a href="#cb8-38" tabindex="-1"></a><span class="co">#&gt; 9      TRUE           0.03243945</span></span>
+<span id="cb8-39"><a href="#cb8-39" tabindex="-1"></a><span class="co">#&gt; 10     TRUE           0.05204729</span></span>
+<span id="cb8-40"><a href="#cb8-40" tabindex="-1"></a><span class="co">#&gt; 11     TRUE           0.07626874</span></span>
+<span id="cb8-41"><a href="#cb8-41" tabindex="-1"></a><span class="co">#&gt; 12     TRUE           0.04865917</span></span></code></pre></div>
+<p>These coefficients are not interchangeable implementations of the
+same formula. Ordinal alpha uses distances based on the frequencies of
+pairable categories; it is not QWK with a different name. AC2 here uses
+quadratic category weights and a different chance-agreement model. The
+help pages document the detailed definitions; the following differences
+matter when reading incomplete panels:</p>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Feature</th>
+<th>Krippendorff’s alpha</th>
+<th>Gwet AC2 in this call</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Units with two or more observed ratings</td>
+<td>Supply observed and expected disagreement. Unequal rating counts
+affect unit contributions.</td>
+<td>Supply observed agreement, with equal weight per unit.</td>
+</tr>
+<tr class="even">
+<td>A unit with exactly one observed rating</td>
+<td>Does not enter the coefficient.</td>
+<td>Contributes to category proportions for expected agreement, but not
+observed agreement.</td>
+</tr>
+<tr class="odd">
+<td>Unused categories</td>
+<td>Do not alter ordinal pairable distances.</td>
+<td>Remain part of the declared category universe and can change
+expected agreement.</td>
+</tr>
+</tbody>
+</table>
+<p>The present example has at least two observed ratings on every unit.
+Use <code>$unit_summary</code> and <code>$cases</code> to establish that
+for your data. These functions do not correct selective assignment or
+missingness. Choosing whichever coefficient is largest after looking at
+the results changes the reporting question. Krippendorff’s alpha is also
+distinct from Cronbach’s internal- consistency alpha.</p>
+<p>If your question instead concerns scores on a meaningful interval
+scale, <code>pairwise_icc_table()</code> distinguishes absolute
+agreement from consistency and a single rating from the mean of two
+ratings. Numeric ordinal codes alone do not establish its interval-scale
+assumption. See <code>?pairwise_icc_table</code>; the function’s
+pairwise average-rating ICC concerns two ratings, not the average of a
+whole panel.</p>
+</div>
+<div id="see-the-disagreement-then-compare-the-coefficients" class="section level2">
+<h2>5. See the disagreement, then compare the coefficients</h2>
+<p>The following figures answer two different questions: where do
+matched scores fall, and how much weighted agreement does each pair
+show? They use the saved <code>qwk</code> result directly. They do not
+refit a model or estimate uncertainty. The optional <code>ggplot2</code>
+package is needed only for these figures; all preceding tables remain
+usable without it. For model-based figures such as Wright maps and
+category curves, use the <a href="mfrmr-visual-diagnostics.html">visual
+diagnostics guide</a>.</p>
+<div id="matched-score-counts" class="section level3">
+<h3>Matched-score counts</h3>
+<p>A plain scatterplot would hide repeated score combinations. Use the
+retained contingency counts instead: each circle’s area and printed
+number show how many matched responses occupy that cell. The dashed
+diagonal marks identical scores. Category indices in
+<code>$counts</code> are positions in <code>$categories</code>, not the
+rubric’s score values; use the category labels on the axes.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>can_plot <span class="ot">&lt;-</span> <span class="fu">requireNamespace</span>(<span class="st">&quot;ggplot2&quot;</span>, <span class="at">quietly =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>figures <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>selected_pair <span class="ot">&lt;-</span> <span class="fu">subset</span>(qwk<span class="sc">$</span>table, Rater1 <span class="sc">==</span> <span class="st">&quot;R1&quot;</span> <span class="sc">&amp;</span> Rater2 <span class="sc">==</span> <span class="st">&quot;R2&quot;</span>)</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>score_counts <span class="ot">&lt;-</span> <span class="fu">subset</span>(qwk<span class="sc">$</span>counts, Pair <span class="sc">==</span> selected_pair<span class="sc">$</span>Pair)</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>category_index <span class="ot">&lt;-</span> qwk<span class="sc">$</span>categories<span class="sc">$</span>CategoryIndex</span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>category_labels <span class="ot">&lt;-</span> qwk<span class="sc">$</span>categories<span class="sc">$</span>Category</span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a></span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a><span class="cf">if</span> (can_plot) {</span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a>  figures<span class="sc">$</span>score_counts <span class="ot">&lt;-</span> ggplot2<span class="sc">::</span><span class="fu">ggplot</span>(</span>
+<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a>    score_counts, ggplot2<span class="sc">::</span><span class="fu">aes</span>(<span class="at">x =</span> Category1, <span class="at">y =</span> Category2)</span>
+<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a>    ggplot2<span class="sc">::</span><span class="fu">geom_abline</span>(<span class="at">slope =</span> <span class="dv">1</span>, <span class="at">intercept =</span> <span class="dv">0</span>, <span class="at">linetype =</span> <span class="st">&quot;dashed&quot;</span>,</span>
+<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a>                        <span class="at">colour =</span> <span class="st">&quot;grey45&quot;</span>) <span class="sc">+</span></span>
+<span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a>    ggplot2<span class="sc">::</span><span class="fu">geom_point</span>(ggplot2<span class="sc">::</span><span class="fu">aes</span>(<span class="at">size =</span> N), <span class="at">shape =</span> <span class="dv">21</span>,</span>
+<span id="cb9-15"><a href="#cb9-15" tabindex="-1"></a>                        <span class="at">fill =</span> <span class="st">&quot;grey85&quot;</span>, <span class="at">colour =</span> <span class="st">&quot;grey30&quot;</span>) <span class="sc">+</span></span>
+<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a>    ggplot2<span class="sc">::</span><span class="fu">geom_text</span>(ggplot2<span class="sc">::</span><span class="fu">aes</span>(<span class="at">label =</span> N), <span class="at">size =</span> <span class="fl">3.5</span>) <span class="sc">+</span></span>
+<span id="cb9-17"><a href="#cb9-17" tabindex="-1"></a>    ggplot2<span class="sc">::</span><span class="fu">scale_size_area</span>(<span class="at">max_size =</span> <span class="dv">14</span>, <span class="at">guide =</span> <span class="st">&quot;none&quot;</span>) <span class="sc">+</span></span>
+<span id="cb9-18"><a href="#cb9-18" tabindex="-1"></a>    ggplot2<span class="sc">::</span><span class="fu">scale_x_continuous</span>(<span class="at">breaks =</span> category_index, <span class="at">labels =</span> category_labels) <span class="sc">+</span></span>
+<span id="cb9-19"><a href="#cb9-19" tabindex="-1"></a>    ggplot2<span class="sc">::</span><span class="fu">scale_y_continuous</span>(<span class="at">breaks =</span> category_index, <span class="at">labels =</span> category_labels) <span class="sc">+</span></span>
+<span id="cb9-20"><a href="#cb9-20" tabindex="-1"></a>    ggplot2<span class="sc">::</span><span class="fu">coord_equal</span>(<span class="at">xlim =</span> <span class="fu">range</span>(category_index) <span class="sc">+</span> <span class="fu">c</span>(<span class="sc">-</span><span class="fl">0.4</span>, <span class="fl">0.4</span>),</span>
+<span id="cb9-21"><a href="#cb9-21" tabindex="-1"></a>                        <span class="at">ylim =</span> <span class="fu">range</span>(category_index) <span class="sc">+</span> <span class="fu">c</span>(<span class="sc">-</span><span class="fl">0.4</span>, <span class="fl">0.4</span>)) <span class="sc">+</span></span>
+<span id="cb9-22"><a href="#cb9-22" tabindex="-1"></a>    ggplot2<span class="sc">::</span><span class="fu">labs</span>(<span class="at">x =</span> <span class="st">&quot;R1 score&quot;</span>, <span class="at">y =</span> <span class="st">&quot;R2 score&quot;</span>, <span class="at">title =</span> <span class="cn">NULL</span>, <span class="at">caption =</span> <span class="cn">NULL</span>) <span class="sc">+</span></span>
+<span id="cb9-23"><a href="#cb9-23" tabindex="-1"></a>    ggplot2<span class="sc">::</span><span class="fu">theme_classic</span>(<span class="at">base_size =</span> <span class="dv">12</span>)</span>
+<span id="cb9-24"><a href="#cb9-24" tabindex="-1"></a>  <span class="fu">print</span>(figures<span class="sc">$</span>score_counts)</span>
+<span id="cb9-25"><a href="#cb9-25" tabindex="-1"></a>}</span></code></pre></div>
+<p><img role="img" aria-label="R1 versus R2 score counts. Four responses occur at each of (0, 1), (1, 2) and (2, 3). All lie one category above the equal-score diagonal; none has identical scores." src="data:image/png;base64,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" alt="R1 versus R2 score counts. Four responses occur at each of (0, 1), (1, 2) and (2, 3). All lie one category above the equal-score diagonal; none has identical scores." /></p>
+<p>All 12 responses sit one category above the diagonal. This makes the
+systematic shift visible despite the correlation of 1. Blank cells mean
+no retained responses with that score combination; they do not identify
+missing ratings. The <code>$cases</code> audit remains the source for
+exclusions. R1 is the comparison reference here, not an established
+correct answer.</p>
+</div>
+<div id="pairwise-qwk-with-its-sample-size" class="section level3">
+<h3>Pairwise QWK with its sample size</h3>
+<p>Keep pairs in their original order and show each retained sample
+size. Sorting by QWK would invite a ranking even though the pairs can
+involve different responses. The zero line is the coefficient’s
+chance-agreement reference, not a quality threshold. There are no
+confidence intervals or quality bands.</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>pair_plot_data <span class="ot">&lt;-</span> qwk<span class="sc">$</span>table</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>pair_plot_data<span class="sc">$</span>PairLabel <span class="ot">&lt;-</span> <span class="fu">with</span>(pair_plot_data,</span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>  <span class="fu">paste0</span>(Rater1, <span class="st">&quot; / &quot;</span>, Rater2, <span class="st">&quot; (N = &quot;</span>, N, <span class="st">&quot;)&quot;</span>,</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>         <span class="fu">ifelse</span>(Status <span class="sc">==</span> <span class="st">&quot;available&quot;</span>, <span class="st">&quot;&quot;</span>, <span class="fu">paste0</span>(<span class="st">&quot;; &quot;</span>, Status))))</span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>pair_plot_data<span class="sc">$</span>PairLabel <span class="ot">&lt;-</span> <span class="fu">factor</span>(pair_plot_data<span class="sc">$</span>PairLabel,</span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>                                 <span class="at">levels =</span> <span class="fu">rev</span>(pair_plot_data<span class="sc">$</span>PairLabel))</span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a></span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a><span class="cf">if</span> (can_plot) {</span>
+<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a>  figures<span class="sc">$</span>pairwise_qwk <span class="ot">&lt;-</span> ggplot2<span class="sc">::</span><span class="fu">ggplot</span>(</span>
+<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a>    pair_plot_data, ggplot2<span class="sc">::</span><span class="fu">aes</span>(<span class="at">x =</span> Kappa, <span class="at">y =</span> PairLabel)</span>
+<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a>    ggplot2<span class="sc">::</span><span class="fu">geom_vline</span>(<span class="at">xintercept =</span> <span class="dv">0</span>, <span class="at">linetype =</span> <span class="st">&quot;dotted&quot;</span>, <span class="at">colour =</span> <span class="st">&quot;grey45&quot;</span>) <span class="sc">+</span></span>
+<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a>    ggplot2<span class="sc">::</span><span class="fu">geom_point</span>(<span class="at">data =</span> <span class="fu">subset</span>(pair_plot_data,</span>
+<span id="cb10-14"><a href="#cb10-14" tabindex="-1"></a>      Status <span class="sc">==</span> <span class="st">&quot;available&quot;</span> <span class="sc">&amp;</span> <span class="fu">is.finite</span>(Kappa)), <span class="at">size =</span> <span class="dv">3</span>) <span class="sc">+</span></span>
+<span id="cb10-15"><a href="#cb10-15" tabindex="-1"></a>    ggplot2<span class="sc">::</span><span class="fu">scale_y_discrete</span>(<span class="at">drop =</span> <span class="cn">FALSE</span>) <span class="sc">+</span></span>
+<span id="cb10-16"><a href="#cb10-16" tabindex="-1"></a>    ggplot2<span class="sc">::</span><span class="fu">expand_limits</span>(<span class="at">x =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">1</span>)) <span class="sc">+</span></span>
+<span id="cb10-17"><a href="#cb10-17" tabindex="-1"></a>    ggplot2<span class="sc">::</span><span class="fu">labs</span>(<span class="at">x =</span> <span class="st">&quot;Quadratic weighted kappa&quot;</span>, <span class="at">y =</span> <span class="cn">NULL</span>,</span>
+<span id="cb10-18"><a href="#cb10-18" tabindex="-1"></a>                  <span class="at">title =</span> <span class="cn">NULL</span>, <span class="at">caption =</span> <span class="cn">NULL</span>) <span class="sc">+</span></span>
+<span id="cb10-19"><a href="#cb10-19" tabindex="-1"></a>    ggplot2<span class="sc">::</span><span class="fu">theme_classic</span>(<span class="at">base_size =</span> <span class="dv">12</span>)</span>
+<span id="cb10-20"><a href="#cb10-20" tabindex="-1"></a>  <span class="fu">print</span>(figures<span class="sc">$</span>pairwise_qwk)</span>
+<span id="cb10-21"><a href="#cb10-21" tabindex="-1"></a>}</span></code></pre></div>
+<p><img role="img" aria-label="Pairwise quadratic weighted kappa: R1/R2, 0.571 on 12 responses; R1/R3, 0.833 on 10; R2/R3, 0.455 on 10. Points have no uncertainty bars. The vertical dotted line marks zero, not a pass threshold." src="data:image/png;base64,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X4cLIIAAAggggEAyBQhAk9nuBWvdqVOngvvZiQACCCCAAAIILIsAt+CXRY9zEUAAAQQQQAABBEoWIAAtmYwTEEAAAQQQQAABBJZFgAB0WfTq9NyffvrJLFy4sE5rR7UQQAABBBBAoNYCBKC1boEIXv+yyy4zw4YNi2DJKBICCCCAAAII1IMAk5DqoRXLXIe99trLtGzZssy5kh0CCCCAAAIIIPAfAQJQPglZArvuumvWNjYggAACCCCAAALlEuAWfLkkyQcBBBBAAAEEEEAglAABaCgmDkIAAQQQQAABBBAolwABaLkkyQcBBBBAAAEEEEAglAABaCimZB105ZVXmuHDhyer0tQWAQQQQAABBKomwCSkqlHH50Lt27c3rVu3jk+BKSkCCCCAAAIIxEqAADRWzVWdwvbu3bs6F+IqCCCAAAIIIJBIAW7BJ7LZqTQCCCCAAAIIIFA7AQLQ2tlzZQQQQAABBBBAIJECBKCJbHYqjQACCCCAAAII1E6AALR29pG98ogRI8zYsWMjWz4KhgACCCCAAALxFmASUrzbryKlnzVrlvnll18qkjeZIoAAAggggAACBKB8BrIEzjvvvKxtbEAAAQQQQAABBMolwC34ckmSDwIIIIAAAggggEAoAQLQUEwchAACCCCAAAIIIFAuAQLQckmSDwIIIIAAAggggEAoAQLQUEzJOuiFF14wr7/+erIqTW0RQAABBBBAoGoCBKBVo47PhcaPH29eeuml+BSYkiKAAAIIIIBArASYBR+r5qpOYQcMGGAaN+Zvk+pocxUEEEAAAQSSJ0AAmrw2L1rjFVdcsegxHIAAAggggAACCDRUgG6uhspxHgIIIIAAAggggECDBAhAG8TGSQgggAACCCCAAAINFSAAbahcHZ/3ySefmC+//LKOa0jVEEAAAQQQQKCWAgSgtdSP6LVvu+0288ADD0S0dBQLAQQQQAABBOIuwCSkuLdgBcrfp08f06xZswrkTJYIIIAAAggggIAxBKB8CrIENtpoo6xtbEAAAQQqLfDDDz8YPQjjm2++Me3btze77LKLWX755St9WfJHAIEaCBQNQH/88Ucza9asVNEaNWpkVl99ddO6devUtuCL33//3Xz00Udmww03DG7Oej1x4kSz2WabmZVWWilt34wZM9Le6zq6nq6bmTROca211srcnPX+008/NU2aNDFrr722ef/9993vli1bph2n7euss07ZvuwKOWSW++effzbvvvuu2WabbdLKxBsEEEAgCQL6vhw4cKC5+uqrTfPmzc3SpUvdWsSe55lrrrnGHH/88UlgoI4IJEvA/g9eMNmxgN5yyy3nbbDBBu5nvfXW82ww56277rretGnTss49//zzvR133DFre3CD/bLxOnbs6P3yyy/Bze61DTQ9G1SmrmcDVM/+Bexdd911qWPvuusuzwa4ng1gPZVnyJAhqX2ZL3St3XbbzZs3b563ePFiz7aud8ghh2Qe5q4xderUrO0N3ZDLoVC5d999d2/OnDkFL6f9Kv+VV15Z8Dh2IoAAAnESOPzww70VVljBfb/pOy74o+2XX355nKpDWRFAIISAKXaMAlAFhMH03Xffeb169UoLNOfPn+8dffTRXtOmTdO2B8/zX7/55ptez549/bdpvxWATpo0KbXtt99+84YPH+6+kL766ivP9hZ6q6yyijdlyhR3zMcff+zZ3kxv9uzZqXOCL0aOHOnZv6zdJj8AVQB9//33Bw8rWwCaz6FYuZ966invlFNOSStT5ptqBaCLFi3yfv3118zL8x4BBBAou8C4cePyBp9+IGp7RT17Z63s1yZDBBConUCDZsG3adPG2ADUfPbZZ/b74T9Jj29Usr2R/9lQ4L961viee+5Z4Ij/v8v2vprevXsb/db1vv76a3PeeeeZrbbayh3UqVMnd0v9mWee+f8n/d8rG7yaCy64wBx11FFp+/r162dssGdsr2hqu22C1Ovgi6efftrVSfUK/tggOnhY6nU+h2Ll7tGjhxk7dqz58MMPU3nV6sUll1xirr/++lpdnusigECCBIYOHWoWLlxYsMa6RX/HHXcUPIadCCAQL4GiY0BVnSVLlpiZM2e6mum1xlTaWyLmsMMOS9VWY3datGhhRowYkdqW74UC0JtvvjnfbmN7+lLX02vbA2rWXHNNs8MOO7ixoOeee27q3Ndee81o3crtt98+tc1/oXGVeqb5+uuv729yvzWeyA4fcEGo7QlN25f5RuNf33nnnczNpnPnzlnbtCGfgx0qYAqVW+Xs3r27kY0d7pDK+9lnnzW2Z9m917ioaiQFw5ljZKtxXa6BAALJE3j77beLVlqdCfquJyGAQP0IhApAFQRuscUWLhDVpCQFSBdffLGxYylTEgo+w6SffvrJ2Fvp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AgSgxY04AgEEEEAAAQQQQKCMAgSgZcSsl6xef/11884779RLdagHAggggAACCERMgElIEWuQKBTnwQcfNG3btjWbbbZZFIpDGRBAAAEEEECgzgQIQOusQctRnbPOOssstxwfjXJYkgcCCCCAAAIIZAsQZWSbJH5Lu3btEm8AAAIIIIAAAghUToAxoJWzJWcEEEAAAQQQQACBHAIEoDlQ2IQAAggggAACCCBQOQEC0MrZxjbnf//73+abb76JbfkpOAIIIIAAAghEW4AANNrtU5PSDR061Nxzzz01uTYXRQABBBBAAIH6F2ASUv23cck17NWrl2nRokXJ53ECAggggAACCCAQRoAANIxSwo7p2rVrwmpMdRFAAAEEEECgmgLcgq+mNtdCAAEEEEAAAQQQMASgfAgQQAABBBBAAAEEqipAAFpVbi6GAAIIIIAAAgggQADKZyBLYODAgea6667L2s4GBBBAAAEEEECgHAJMQiqHYp3lsdVWW5lWrVrVWa2oDgIIIIAAAghERYAANCotEaFy7L///hEqDUVBAAEEEEAAgXoT4BZ8vbUo9UEAAQQQQAABBCIuQAAa8QaieAgggAACCCCAQL0JEIDWW4tSHwQQQAABBBBAIOICBKARb6BaFG/YsGFm9OjRtbg010QAAQQQQACBBAgQgCagkUut4pIlS8zSpUtLPY3jEUAAAQQQQACBUALMgg/FlKyDTj311GRVmNoigAACCCCAQFUF6AGtKjcXQwABBBBAAAEEECAA5TOAAAIIIIAAAgggUFUBAtCqcnMxBBBAAAEEEEAAAQJQPgNZAo8//rh54YUXsrazAQEEEEAAAQQQKIcAAWg5FOssj5dfftlMnTq1zmpFdRBAAAEEEEAgKgLMgo9KS0SoHIMHD45QaSgKAggggAACCNSbAD2g9dai1AcBBBBAAAEEEIi4AAFoxBuI4iGAAAIIIIAAAvUmQABaby1KfRBAAAEEEEAAgYgLEIBGvIFqUbzp06ebDz74oBaX5poIIIAAAgggkAABJiEloJFLreLIkSNN27ZtzYYbbljqqRyPAAIIIIAAAggUFSAALUqUvAP0LPjlluOjkbyWp8YIIIAAAghUR4AoozrOsbpK+/btY1VeCosAAggggAAC8RJgDGi82ovSIoAAAgggkBiB+fPnmzfffNPMnDkzMXVOSkWLBqA//vijmTFjRurn/fffNz/88ENen99//z3UBJaJEyeaBQsWZOUTvJZef/3118bzvKzjtO2zzz4zul6x9Omnn5ovvvjC5aM8f/7556xTVK9FixZlbW/ohkIOKveSJUtSWas8r732Wuo9LxBAAAEEEEiygCbDbrfddma11VYzu+yyi9lggw3MGmusYTRHgVQnAjaQK5geeOABz44H9Gzju5/11lvPa9Kkibfuuut606ZNyzr3/PPP93bccces7cENNjjzOnbs6P3yyy/Bze51o0aNvLXWWit1vZVWWslbfvnlveuuuy517L333uuu37lzZ2/VVVf1nn322dS+zBe61m677ebNmzfPW7x4sSJZ75BDDsk8zF3DPn4ya3tDN+RyePHFF125Zad6jRs3LpX97rvv7s2ZMyf1PtcL7Vf5r7zyyly7y7btm2++8b7//vuy5UdGCCCAAAIIhBV47rnnvBYtWniKB/RvXvBH2/XvKyn+AuoVLJgUgCogDKbvvvvO69WrV1qgabvJvaOPPtpr2rRp2vbgef5r253u9ezZ03+b9lsfuEmTJqW2/fbbb97w4cPdB/Crr75ygdEqq6zivfHGG+4YBaNrrrlm6vjMF/avJW/gwIFusx+AKoC+//770w5VkFuOADSfg4JtBe8qj5Kur3r4QfhTTz3lnXLKKWllynxTrQBU/3Nfc801mZfnPQIIIIAAAhUVsHddvdatW6cFncEAVK8VhL7wwgsVLQeZV16g6C1429hZqU2bNsYGoO4WuL9zwIAB7uWQIUP8TXl/jx8/3uy555559wd3aDZ279693axs3bq2JK4LvkuXLu4wG3waGxCbX3/9NXiae22DV3PBBReYo446Km1fv379jA32jO0VTW1XvrnS008/bVSnzB+NScmV8jnodoINgM2hhx7qTpOf7b01yl+pR48eZuzYsebDDz9072v5n/3339907969lkXg2ggggAACCRQYNWpU2hC1XAS248ZcfvnluXaxLUYCoWbBa7yiPwBYrzWmUo1/2GGHpap69dVXG/tXiRkxYkRqW74XCkBvvvnmfLuN7elLXU+vbQ+oUaC5ww47GNtDauwtdTeO89ZbbzW33HKLufTSS02zZs2y8nv33XdN48aNzfrrr5+27/jjjzd2+IALQm1PZNq+zDezZs0y77zzTuZmY2//Z23ThnwOn3/+uenQoUPa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5yOAAAIIIIAAAjkFCEBzsiR749ixY82ECROSjUDtEUAAAQQQQKBiAsyCrxhtfDM+77zzTOPG/G0S3xak5AgggAACCERbgAA02u1Tk9K1adOmJtfloggggAACCCCQDAG6uZLRztQSAQQQQAABBBCIjAABaGSagoIggAAC+QU8z8u/kz0IIIBAzASKBqA//vijmTFjRurn/fffNz/88EPean755Zd59wV3TJw40SxYsCC4yb0OXkuvv/76a5Pri1fbPvvsM/P7779n5ZG54dNPPzVffPGFy0d5/vzzz5mHGNVr0aJFWdsbukHl+uCDD3KernIvWbIktU/lee2111Lva/1CVnInIYBAbQX0HXLQQQeZVq1amSZNmrhH5J588slm7ty5tS0YV0cAAQSWUaBoAPrUU0+ZzTff3BxwwAHuZ9999zWrrLKK6dixo3nzzTdTl7/77rvNRhttZP7yl7+Y9ddf3wwdOjS1L/OFgsejjjrKNGvWLHOX2XTTTc2ee+6Zut7GG29sVlhhBfPPf/4zdeyIESNMp06dzP77729WW20189xzz6X2Zb7QtU488UTTsmVL89tvv5lNNtnEHHvssZmHmS233NIF2Vk7GrhBj7M87rjj0s5+6aWXnFuPHj2c4fjx491+le2iiy6KzD8qN998sxk1alRa2XmDAALVFXj88cfd99IjjzxifvrpJ/cH9Lfffmtuv/129137zjvvVLdAXA0BBBAop4AN0AqmBx54wFtrrbXSjvnuu++8Xr16eTvuuKPbbnvwPBuUelOmTHHvP/74Y88GVd7s2bPTzvPf2MDV69mzp/827XejRo28SZMmpbbZoNEbPny47j15X331lff999+7a73xxhvumHvvvddbc801U8dnvhg5cqQ3cOBAt3nx4sUuH9uT4N1///1phy6//PLe1KlT07Y15M38+fO9o48+2mvatGnKR/n88ssv3nrrreepPEq6vsy0XckG+t4pp5ziXuf7z5w5c1z5r7zyynyHlGX722+/7X344YdlyYtMEECgdIGZM2d6LVq0cP+/67sv80ffk6uvvrpn79qUnjlnIIAAAhEQKNoDmivY1SxpG4C6W+Dar9u1Wrpnq622coerd3Lttdc2zzzzTK7TjXr+1MsZJi233HKmd+/eRr9169qaGRvEmS5durjTbfBpbEBsfv3116zs1ON5wQUX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BxxwgJk5c2YqDwX0cvSvqTawT00zW2yxhVl99dXNGWecYW699dasx7DqIQennXaaUQ9qp06dzPnnn58Ktk8//XR3/VdeecXlrUe5KunxsPpD4g9/+EOqruolDqZibRE8NtdruWsIh9pcr5UKtZP2q74q/9ChQ125VJ+//e1vzk77lcIco+Meeugh9whj1dE+iczYp4kZ/XFFQgABK2D/IichgAACkRKwAYNnb1cXLJMN0DwbXLhjbCDqHiFqg5u0cxo3buzdcMMNbpt90o+38soru3yHDx/uDRs2zNOjRvU1qMeSKumRpPYpT95f//pXT3mecMIJXrNmzdwxdhyjO8YGj96aa67ptW/f3jviiCO8K6+80iuWt32etmd7cl0+xx13nPfYY4+5vFq3bu0NHjzYvba9hJ4dWuDyvf32293x6623nmd7gt3+zP+ceuqp3iabbJLabMc/uvztLf3UtrFjx3o2YPfssAXPBpOuvjbw9AYMGODZwNyzzw737PO9vfnz57tznnrqKZfHJ5984t4PGjTIa9GihXfVVVe549UmehSr7SlNXcPernePerXBpCtz7969XR7+oz6Vpx7lqHLdcccd7lGwM2bMcPlqu9rixhtv9GyQ5jz9jMO0hX+s/ztYfpnr8bE2KPbssAd3SLF20kFqHzs217OBp/foo496o0aNco+xVbv7KcwxDzzwgHOwww88vR44cKB7vHGwzfz8+I1AEgUIQJPY6tQZgYgLrLXWWp4CmUKpV69enp2Y5A4JE4Da3jT3LPvPP/88la2eb60A9JZbbnHbdtttNxeUpQ6wLxQA6phgAKr3CqL8FCZvBUQ6T0GYn4IBqO0tc/vfeOMNf7f37LPPei1btvRsr1lqm/9C11R+//73v90m21vq6mcnEaUCStv76O26665uvwIpHa+g1E+2R9Tlr3OVggGcgvkmTZp4//3f/+326T+219k9GzwzAFUgqfr5ScGb2sdPMuzZs6f/1u1TwLlo0aLUNtur7co3bdo0ty1MW6RO/r8Xfvk/+ugj9/lRcG3HDqcOC9NOCi5l+O6776bOGzdunCvblClT3LYwx9je4rQ660TbO+3y0R8EJASSLsAtePuNTEIAgWgJ6DZ7mHGDukUcNun2p26/dujQwdjAx0yfPt0899xzxvaSpm7P2l43c+CBB6Zledhhh6W91xvdTt1o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" alt="Pairwise quadratic weighted kappa: R1/R2, 0.571 on 12 responses; R1/R3, 0.833 on 10; R2/R3, 0.455 on 10. Points have no uncertainty bars. The vertical dotted line marks zero, not a pass threshold." /></p>
+<p><code>expand_limits()</code> includes 0 and 1 without removing
+negative estimates. Unavailable pairs retain their labelled row and
+status, with no point; an unavailable value must not be drawn at zero.
+This example’s three estimates are all available. Read the values with
+the exclusion audit rather than as evidence that one rater is more
+accurate or less severe.</p>
+<p>These are custom ggplot recipes from
+<code>pairwise_kappa_table()</code> results, not new mfrmr plot methods.
+The existing <code>plot()</code> displays exact agreement or correlation
+from a fitted-model workflow, not QWK. Keep suggested titles and
+interpretation notes outside the drawing and save them with the source
+data:</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>figure_titles <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="at">score_counts =</span> <span class="st">&quot;Matched score counts for R1 and R2&quot;</span>,</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>                  <span class="at">pairwise_qwk =</span> <span class="st">&quot;Pairwise quadratic weighted agreement&quot;</span>)</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>figure_notes <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>  <span class="at">score_counts =</span> <span class="fu">c</span>(</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>    <span class="st">&quot;Circle area and printed counts describe common complete responses; the diagonal marks equal scores.&quot;</span>,</span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>    <span class="st">&quot;Blank cells are zero retained counts, not missing-rating indicators. Inspect qwk$cases for exclusions.&quot;</span>,</span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>    <span class="st">&quot;The reference is not assumed correct; observed score differences are not model-adjusted severity.&quot;</span></span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>  ),</span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>  <span class="at">pairwise_qwk =</span> <span class="fu">c</span>(qwk<span class="sc">$</span>notes,</span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>    <span class="st">&quot;N is pair-specific. The zero line is a chance reference, not an acceptance threshold; no intervals are shown.&quot;</span>)</span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>)</span>
+<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a>figure_titles</span>
+<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a><span class="co">#&gt;                            score_counts </span></span>
+<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a><span class="co">#&gt;    &quot;Matched score counts for R1 and R2&quot; </span></span>
+<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a><span class="co">#&gt;                            pairwise_qwk </span></span>
+<span id="cb11-16"><a href="#cb11-16" tabindex="-1"></a><span class="co">#&gt; &quot;Pairwise quadratic weighted agreement&quot;</span></span>
+<span id="cb11-17"><a href="#cb11-17" tabindex="-1"></a>figure_notes</span>
+<span id="cb11-18"><a href="#cb11-18" tabindex="-1"></a><span class="co">#&gt; $score_counts</span></span>
+<span id="cb11-19"><a href="#cb11-19" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Circle area and printed counts describe common complete responses; the diagonal marks equal scores.&quot;   </span></span>
+<span id="cb11-20"><a href="#cb11-20" tabindex="-1"></a><span class="co">#&gt; [2] &quot;Blank cells are zero retained counts, not missing-rating indicators. Inspect qwk$cases for exclusions.&quot;</span></span>
+<span id="cb11-21"><a href="#cb11-21" tabindex="-1"></a><span class="co">#&gt; [3] &quot;The reference is not assumed correct; observed score differences are not model-adjusted severity.&quot;     </span></span>
+<span id="cb11-22"><a href="#cb11-22" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb11-23"><a href="#cb11-23" tabindex="-1"></a><span class="co">#&gt; $pairwise_qwk</span></span>
+<span id="cb11-24"><a href="#cb11-24" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Both margins use the same common complete units as observed agreement.&quot;                                       </span></span>
+<span id="cb11-25"><a href="#cb11-25" tabindex="-1"></a><span class="co">#&gt; [2] &quot;Different pair cohorts affect comparability; pairwise kappas are not a panel coefficient.&quot;                    </span></span>
+<span id="cb11-26"><a href="#cb11-26" tabindex="-1"></a><span class="co">#&gt; [3] &quot;Agreement is distinct from reference accuracy, MFRM fit and separation reliability.&quot;                          </span></span>
+<span id="cb11-27"><a href="#cb11-27" tabindex="-1"></a><span class="co">#&gt; [4] &quot;No confidence intervals, tests, quality cutoffs or correction for selective missingness are supplied.&quot;        </span></span>
+<span id="cb11-28"><a href="#cb11-28" tabindex="-1"></a><span class="co">#&gt; [5] &quot;N is pair-specific. The zero line is a chance reference, not an acceptance threshold; no intervals are shown.&quot;</span></span></code></pre></div>
+</div>
+</div>
+<div id="save-the-evidence-and-state-the-answer" class="section level2">
+<h2>6. Save the evidence and state the answer</h2>
+<p>Keep the full results, matched identifiers and resolved settings
+together. CSV tables are useful for inspection, but a coefficient table
+alone loses the exclusion audit and interpretation notes.</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>analysis <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>  <span class="at">ratings =</span> ratings, <span class="at">qwk =</span> qwk, <span class="at">alpha =</span> alpha, <span class="at">ac2 =</span> ac2,</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>  <span class="at">aligned =</span> aligned, <span class="at">comparison =</span> comparison,</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>  <span class="at">aligned3 =</span> aligned3, <span class="at">with_baseline =</span> with_baseline,</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>  <span class="at">figures =</span> figures, <span class="at">figure_titles =</span> figure_titles, <span class="at">figure_notes =</span> figure_notes,</span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>  <span class="at">figure_data =</span> <span class="fu">list</span>(<span class="at">score_counts =</span> score_counts, <span class="at">pairwise_qwk =</span> pair_plot_data),</span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>  <span class="at">session =</span> <span class="fu">sessionInfo</span>()</span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>)</span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>output_dir <span class="ot">&lt;-</span> <span class="fu">tempfile</span>(<span class="st">&quot;rating-agreement-&quot;</span>)</span>
+<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a><span class="fu">dir.create</span>(output_dir)</span>
+<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a><span class="fu">saveRDS</span>(analysis, <span class="fu">file.path</span>(output_dir, <span class="st">&quot;analysis.rds&quot;</span>))</span>
+<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a><span class="fu">write.csv</span>(qwk<span class="sc">$</span>table, <span class="fu">file.path</span>(output_dir, <span class="st">&quot;pairwise-qwk.csv&quot;</span>), <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a><span class="fu">write.csv</span>(comparison<span class="sc">$</span>table, <span class="fu">file.path</span>(output_dir, <span class="st">&quot;score-comparison.csv&quot;</span>), <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb12-14"><a href="#cb12-14" tabindex="-1"></a><span class="fu">write.csv</span>(comparison_cases, <span class="fu">file.path</span>(output_dir, <span class="st">&quot;matched-cases.csv&quot;</span>), <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb12-15"><a href="#cb12-15" tabindex="-1"></a><span class="cf">if</span> (can_plot) {</span>
+<span id="cb12-16"><a href="#cb12-16" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">ggsave</span>(<span class="fu">file.path</span>(output_dir, <span class="st">&quot;score-counts.png&quot;</span>), figures<span class="sc">$</span>score_counts,</span>
+<span id="cb12-17"><a href="#cb12-17" tabindex="-1"></a>                 <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="fl">4.5</span>, <span class="at">units =</span> <span class="st">&quot;in&quot;</span>, <span class="at">dpi =</span> <span class="dv">150</span>)</span>
+<span id="cb12-18"><a href="#cb12-18" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">ggsave</span>(<span class="fu">file.path</span>(output_dir, <span class="st">&quot;pairwise-qwk.png&quot;</span>), figures<span class="sc">$</span>pairwise_qwk,</span>
+<span id="cb12-19"><a href="#cb12-19" tabindex="-1"></a>                 <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="fl">3.5</span>, <span class="at">units =</span> <span class="st">&quot;in&quot;</span>, <span class="at">dpi =</span> <span class="dv">150</span>)</span>
+<span id="cb12-20"><a href="#cb12-20" tabindex="-1"></a>}</span>
+<span id="cb12-21"><a href="#cb12-21" tabindex="-1"></a></span>
+<span id="cb12-22"><a href="#cb12-22" tabindex="-1"></a>restored <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="fu">file.path</span>(output_dir, <span class="st">&quot;analysis.rds&quot;</span>))</span>
+<span id="cb12-23"><a href="#cb12-23" tabindex="-1"></a>restored<span class="sc">$</span>comparison<span class="sc">$</span>table[, <span class="fu">c</span>(<span class="st">&quot;N&quot;</span>, <span class="st">&quot;QWK&quot;</span>, <span class="st">&quot;Correlation&quot;</span>, <span class="st">&quot;SMD&quot;</span>)]</span>
+<span id="cb12-24"><a href="#cb12-24" tabindex="-1"></a><span class="co">#&gt;    N       QWK Correlation      SMD</span></span>
+<span id="cb12-25"><a href="#cb12-25" tabindex="-1"></a><span class="co">#&gt; 1 12 0.5714286           1 1.172604</span></span>
+<span id="cb12-26"><a href="#cb12-26" tabindex="-1"></a>restored<span class="sc">$</span>qwk<span class="sc">$</span>notes</span>
+<span id="cb12-27"><a href="#cb12-27" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Both margins use the same common complete units as observed agreement.&quot;                               </span></span>
+<span id="cb12-28"><a href="#cb12-28" tabindex="-1"></a><span class="co">#&gt; [2] &quot;Different pair cohorts affect comparability; pairwise kappas are not a panel coefficient.&quot;            </span></span>
+<span id="cb12-29"><a href="#cb12-29" tabindex="-1"></a><span class="co">#&gt; [3] &quot;Agreement is distinct from reference accuracy, MFRM fit and separation reliability.&quot;                  </span></span>
+<span id="cb12-30"><a href="#cb12-30" tabindex="-1"></a><span class="co">#&gt; [4] &quot;No confidence intervals, tests, quality cutoffs or correction for selective missingness are supplied.&quot;</span></span>
+<span id="cb12-31"><a href="#cb12-31" tabindex="-1"></a><span class="co"># With ggplot2 installed: print(restored$figures$pairwise_qwk)</span></span></code></pre></div>
+<p><code>output_dir</code> contains the practice files. Use a new
+permanent study directory for work you want to retain, and keep the
+analysis script. Reopening the RDS does not recompute coefficients.
+Check identifiers before sharing real data. The saved figures, drawing
+data, suggested titles and notes remain together in
+<code>analysis.rds</code>; PNG files alone do not preserve that context.
+Redrawing a saved ggplot needs a compatible ggplot2 installation. The
+recorded session helps identify the version used.</p>
+<p>A concise description of the worked pair would be:</p>
+<blockquote>
+<p>On 12 matched person-by-task responses with declared categories 0
+through 3, R2 scored every response one category higher than R1.
+Correlation was 1.00, but exact agreement was 0% and quadratic weighted
+kappa was 0.571. These results describe the observed pair; they do not
+estimate model-adjusted severity or establish reference accuracy.</p>
+</blockquote>
+<p>For a real study, also report which records were excluded, the
+category weights or distance definition, the assignment design and why
+the chosen reference is suitable. These interfaces return descriptive
+point estimates, not confidence intervals or universal quality bands.
+Two tasks from one person are two matched response units here, not
+evidence of two independent people for subsequent sampling
+inference.</p>
+</div>
+<div id="when-a-result-needs-investigation" class="section level2">
+<h2>When a result needs investigation</h2>
+<table>
+<colgroup>
+<col width="50%" />
+<col width="50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>What you see</th>
+<th>How to investigate</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>A duplicate rater-unit error</td>
+<td>Check the composite key and distinguish accidental duplication from
+separate tasks, criteria or occasions.</td>
+</tr>
+<tr class="even">
+<td>Few common complete units</td>
+<td>Inspect <code>$cases</code> and the assignment roster. Different
+pairs can involve different samples. Do not fill absent scores with
+zero.</td>
+</tr>
+<tr class="odd">
+<td><code>NA</code> for kappa or alpha</td>
+<td>Read <code>Status</code>; there may be too few pairable observations
+or no expected disagreement. Do not replace an unavailable coefficient
+with 0 or 1.</td>
+</tr>
+<tr class="even">
+<td>A negative coefficient</td>
+<td>Retain it and inspect the rating table and definition. These
+functions do not truncate negative estimates to zero.</td>
+</tr>
+<tr class="odd">
+<td>AC2 differs from alpha or kappa</td>
+<td>Check the chance model, weighting, category universe and
+contributing units before attributing the difference to software.</td>
+</tr>
+<tr class="even">
+<td>Fewer records after adding <code>reference2</code></td>
+<td>Every comparison statistic uses complete records across all supplied
+vectors; inspect the new case audit.</td>
+</tr>
+<tr class="odd">
+<td>High rater separation reliability alongside low agreement</td>
+<td>Separation describes distinguishable model-adjusted severities; it
+is not an agreement coefficient. Low separation can reflect imprecision
+and does not prove agreement either.</td>
+</tr>
+</tbody>
+</table>
+<p>Use <code>?pairwise_kappa_table</code>,
+<code>?krippendorff_alpha_table</code>, <code>?gwet_ac2_table</code> and
+<code>?score_comparison_table</code> for formulas, argument details and
+references. For a broader question-to-function map, use
+<code>mfrmr_output_guide(&quot;feedback&quot;)</code>. Future pass/fail accuracy
+under an explicit rating plan is a different question; see
+<code>?classification_table</code> for its fixed-calibration assumptions
+and cut scales.</p>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

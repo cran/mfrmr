@@ -4,11 +4,10 @@
 # - Facet constraint building and expansion
 # - zstd_from_mnsq (both exact and Wilson-Hilferty)
 # - safe_cor / weighted_mean_safe / infer_default_rater_facet
-# - calc_step_order / category_warnings_text
+# - calc_step_order
 # - get_extreme_levels
 # - make_union_find / calc_subsets
 # - normalize_anchor_df / normalize_group_anchor_df
-# - read_flexible_table
 # - calc_reliability / calc_facets_chisq
 # - extract_anchor_tables
 # - resolve_pcm_step_facet / sanitize_noncenter_facet / sanitize_dummy_facets
@@ -196,31 +195,6 @@ test_that("calc_step_order handles NULL input", {
 })
 
 # ============================================================================
-# category_warnings_text
-# ============================================================================
-
-test_that("category_warnings_text returns warning messages", {
-  cwt <- mfrmr:::category_warnings_text
-  cat_tbl <- mfrmr:::calc_category_stats(.diag$obs, res = .fit)
-  text <- cwt(cat_tbl)
-  expect_true(is.character(text))
-  expect_true(nchar(text) > 0)
-})
-
-test_that("category_warnings_text with step_tbl checks ordering", {
-  cwt <- mfrmr:::category_warnings_text
-  cat_tbl <- mfrmr:::calc_category_stats(.diag$obs, res = .fit)
-  step_order <- mfrmr:::calc_step_order(.fit$steps)
-  text <- cwt(cat_tbl, step_tbl = step_order)
-  expect_true(is.character(text))
-})
-
-test_that("category_warnings_text with NULL returns no diagnostics message", {
-  text <- mfrmr:::category_warnings_text(NULL)
-  expect_true(grepl("No category diagnostics", text))
-})
-
-# ============================================================================
 # get_extreme_levels
 # ============================================================================
 
@@ -309,58 +283,19 @@ test_that("normalize_group_anchor_df handles NULL and missing columns", {
 })
 
 # ============================================================================
-# read_flexible_table
-# ============================================================================
-
-test_that("read_flexible_table reads tab-separated text", {
-  rft <- mfrmr:::read_flexible_table
-  text <- "A\tB\n1\t2\n3\t4"
-  result <- rft(text, NULL)
-  expect_true(is.data.frame(result))
-  expect_equal(nrow(result), 2)
-  expect_true(all(c("A", "B") %in% names(result)))
-})
-
-test_that("read_flexible_table reads comma-separated text", {
-  rft <- mfrmr:::read_flexible_table
-  text <- "A,B\n1,2\n3,4"
-  result <- rft(text, NULL)
-  expect_true(is.data.frame(result))
-  expect_equal(nrow(result), 2)
-})
-
-test_that("read_flexible_table reads semicolon-separated text", {
-  rft <- mfrmr:::read_flexible_table
-  text <- "A;B\n1;2\n3;4"
-  result <- rft(text, NULL)
-  expect_true(is.data.frame(result))
-  expect_equal(nrow(result), 2)
-})
-
-test_that("read_flexible_table handles empty and NULL input", {
-  rft <- mfrmr:::read_flexible_table
-  result_null <- rft(NULL, NULL)
-  expect_equal(nrow(result_null), 0)
-  result_empty <- rft("", NULL)
-  expect_equal(nrow(result_empty), 0)
-  result_spaces <- rft("   ", NULL)
-  expect_equal(nrow(result_spaces), 0)
-})
-
-# ============================================================================
 # resolve_pcm_step_facet / sanitize_noncenter_facet / sanitize_dummy_facets / build_facet_signs
 # ============================================================================
 
 test_that("resolve_pcm_step_facet resolves correctly", {
-  rpsf <- mfrmr:::resolve_pcm_step_facet
-  expect_null(rpsf("RSM", NULL, c("Rater", "Task")))
-  expect_equal(rpsf("PCM", NULL, c("Rater", "Task")), "Task")
+  rpsf <- mfrmr:::resolve_step_and_slope_facets
+  expect_null(rpsf("RSM", NULL, c("Rater", "Task"), slope_facet = NULL)$step_facet)
+  expect_equal(rpsf("PCM", NULL, c("Rater", "Task"), slope_facet = NULL)$step_facet, "Task")
   expect_warning(
-    expect_equal(rpsf("PCM", NULL, c("Rater", "Judge")), "Rater"),
+    expect_equal(rpsf("PCM", NULL, c("Rater", "Judge"), slope_facet = NULL)$step_facet, "Rater"),
     "set `step_facet` explicitly"
   )
-  expect_equal(rpsf("PCM", "Task", c("Rater", "Task")), "Task")
-  expect_error(rpsf("PCM", "Missing", c("Rater", "Task")), "not among")
+  expect_equal(rpsf("PCM", "Task", c("Rater", "Task"), slope_facet = NULL)$step_facet, "Task")
+  expect_error(rpsf("PCM", "Missing", c("Rater", "Task"), slope_facet = NULL)$step_facet, "not among")
 })
 
 test_that("sanitize_noncenter_facet returns valid facet or Person", {
@@ -491,7 +426,7 @@ test_that("count_facet_params counts free parameters", {
 })
 
 # ============================================================================
-# guess_col / truncate_label / facet_report_id
+# guess_col
 # ============================================================================
 
 test_that("guess_col finds matching column", {
@@ -500,21 +435,6 @@ test_that("guess_col finds matching column", {
   expect_equal(gc(cols, c("rater")), "Rater_Score")
   expect_equal(gc(cols, c("nonexistent")), cols[1])
   expect_equal(gc(character(0), "rater"), character(0))
-})
-
-test_that("truncate_label truncates long strings", {
-  tl <- mfrmr:::truncate_label
-  expect_equal(tl("short", 28), "short")
-  long <- paste(rep("x", 50), collapse = "")
-  result <- tl(long, 10)
-  expect_true(nchar(result) <= 13)  # allows for "..."
-})
-
-test_that("facet_report_id generates report ID", {
-  fri <- mfrmr:::facet_report_id
-  result <- fri("Rater")
-  expect_true(is.character(result))
-  expect_true(nchar(result) > 0)
 })
 
 # ============================================================================
@@ -538,14 +458,8 @@ test_that("category_prob_pcm returns valid probabilities", {
 })
 
 # ============================================================================
-# expected_score_table / compute_obs_table
+# compute_obs_table
 # ============================================================================
-
-test_that("expected_score_table produces a table from fit", {
-  est <- mfrmr:::expected_score_table(.fit)
-  expect_true(is.data.frame(est))
-  expect_true("Expected" %in% names(est))
-})
 
 test_that("compute_obs_table produces an observation table from fit", {
   obs_tbl <- mfrmr:::compute_obs_table(.fit)
@@ -554,24 +468,12 @@ test_that("compute_obs_table produces an observation table from fit", {
 })
 
 # ============================================================================
-# compute_prob_matrix / compute_scorefile / compute_residual_file
+# compute_prob_matrix
 # ============================================================================
 
 test_that("compute_prob_matrix returns a matrix-like structure", {
   pm <- mfrmr:::compute_prob_matrix(.fit)
   expect_true(!is.null(pm))
-})
-
-test_that("compute_scorefile produces a data frame", {
-  sf <- expect_no_warning(mfrmr:::compute_scorefile(.fit))
-  expect_true(is.data.frame(sf))
-  expect_true(nrow(sf) > 0)
-})
-
-test_that("compute_residual_file produces a data frame", {
-  rf <- mfrmr:::compute_residual_file(.fit)
-  expect_true(is.data.frame(rf))
-  expect_true(nrow(rf) > 0)
 })
 
 # ============================================================================
@@ -603,25 +505,6 @@ test_that("fit_mfrm works with MML method", {
   )
   expect_s3_class(fit_mml, "mfrm_fit")
   expect_equal(fit_mml$config$method, "MML")
-})
-
-# ============================================================================
-# ensure_positive_definite
-# ============================================================================
-
-test_that("ensure_positive_definite handles already positive definite matrix", {
-  epd <- mfrmr:::ensure_positive_definite
-  mat <- diag(3)
-  result <- epd(mat)
-  expect_equal(result, mat)
-})
-
-test_that("ensure_positive_definite attempts smoothing for non-PD matrix", {
-  epd <- mfrmr:::ensure_positive_definite
-  # Create a non-positive-definite matrix
-  mat <- matrix(c(1, 2, 2, 1), nrow = 2)
-  result <- epd(mat)
-  expect_true(is.matrix(result))
 })
 
 # ============================================================================

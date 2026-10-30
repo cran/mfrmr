@@ -75,7 +75,7 @@ The dashboard draws nine QC panels in a 3\eqn{\times}3 grid:\tabular{lll}{
 are available: \code{"strict"}, \code{"standard"} (default), and \code{"lenient"}.
 Use \code{thresholds} to override any profile value with named entries.
 
-For bounded \code{GPCM}, the dashboard now reuses the residual-based
+For \code{GPCM}, the dashboard now reuses the residual-based
 diagnostics stack and marks the fair-average panel unavailable rather
 than silently reusing the Rasch-only compatibility calculation.
 }
@@ -83,8 +83,8 @@ than silently reusing the Rasch-only compatibility calculation.
 
 This function draws a fixed 3\eqn{\times}3 panel grid (no \code{plot_type}
 argument).  For individual panel control, use the dedicated helpers:
-\code{\link[=plot_unexpected]{plot_unexpected()}}, \code{\link[=plot_fair_average]{plot_fair_average()}}, \code{\link[=plot_displacement]{plot_displacement()}},
-\code{\link[=plot_interrater_agreement]{plot_interrater_agreement()}}, \code{\link[=plot_facets_chisq]{plot_facets_chisq()}}.
+\link[=plot.mfrm_fit]{plot(x, type = "unexpected")}, \link[=plot.mfrm_fit]{plot(x, type = "fair_average")}, \link[=plot.mfrm_fit]{plot(x, type = "displacement")},
+\link[=plot.mfrm_fit]{plot(x, type = "agreement")}, \link[=plot.mfrm_fit]{plot(x, type = "facets_chisq")}.
 }
 
 \section{Interpreting output}{
@@ -106,44 +106,83 @@ current SE approximation.
 }
 
 Treat this dashboard as a screening layer; follow up with dedicated helpers
-(\code{plot_unexpected()}, \code{plot_displacement()}, \code{plot_interrater_agreement()},
-\code{plot_facets_chisq()}) for detailed diagnosis.
+(\code{plot()}, \code{plot()}, \code{plot()},
+\code{plot()}) for detailed diagnosis.
 }
 
 \section{Typical workflow}{
 
 \enumerate{
 \item Fit and diagnose model.
-\item Run \code{plot_qc_dashboard()} for one-page triage.
+\item Run \code{plot()} for one-page triage.
 \item Drill into flagged panels using dedicated functions.
 }
 }
 
-\examples{
-\donttest{
-# Build the plotting data without opening a graphics device.
-toy <- load_mfrmr_data("example_core")
-toy_small <- toy[toy$Person \%in\% unique(toy$Person)[1:3], ]
-fit_quick <- suppressWarnings(
-  fit_mfrm(toy_small, "Person", c("Rater", "Criterion"), "Score",
-           method = "JML", maxit = 3)
-)
-qc_quick <- plot_qc_dashboard(fit_quick, draw = FALSE)
-names(qc_quick$data)
+\section{Migration in 0.2.4}{
 
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
-qc <- plot_qc_dashboard(fit, draw = FALSE)
-qc$data$panels$Status
-# Look for: a row whose `Status` is "OK" for each panel that
-#   the run should support. "WARN" / "REVIEW" rows tell you which
-#   downstream helper to run next (e.g. `plot_unexpected()`,
-#   `plot_residual_pca()`); the dashboard is a triage screen, not
-#   a publication figure on its own.
-if (interactive()) {
-  plot_qc_dashboard(fit, rater_facet = "Rater")
+This renderer is internal. Use the corresponding \code{plot()} route in
+\link{mfrmr_plot_migration}; the former exported name is no longer available.
 }
+
+\section{Session plot defaults}{
+
+Set \code{options(mfrmr.plot_preset = "publication")} to choose a session default
+for plotting functions that expose the common \code{preset} argument. The
+supported values are \code{"standard"}, \code{"publication"}, \code{"compact"} and
+\code{"monochrome"}. Precedence is an explicit call argument, then the session
+option, then \code{"standard"}. For example, \code{preset = "standard"} overrides
+a session set to \code{"monochrome"}. Explicit \code{preset = NULL} retains the
+earlier package-default behavior; it does not read the session option.
+Invalid session values cause an error only when that option is needed.
+
+The category-curve, data-quality, fit-review, connectivity and network
+routes of \code{plot()} for report bundles use the same option through \code{...}.
+Plots without a common \code{preset} argument, including extended-model plots
+with their own \code{palette} controls, keep their own settings. This option
+selects a preset, not a universal theme or a guarantee that all renderers
+implement every appearance control identically.
+
+New plot payloads retain the resolved preset for supported saved-data
+rendering. Converting an existing payload with \code{\link[=as_ggplot]{as_ggplot()}} uses its saved
+appearance, even after the session option changes. A call that creates a
+new plot from a fit or statistical result uses the current default.
+For a reproducible script, supply \code{preset} explicitly or set the option in
+that script. Saving only the fitted model does not save a session option.
+No global ggplot theme is changed.
+
+Restore previous settings with \code{old <- options(mfrmr.plot_preset = "monochrome")} followed by \code{options(old)}. Use
+\code{options(mfrmr.plot_preset = NULL)} to remove the option. The preset changes
+appearance, not estimates, confidence levels or diagnostic thresholds.
+}
+
+\examples{
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("plot_qc_dashboard", run.dontrun = TRUE)
+\dontrun{
+library(mfrmr)
+
+# Saved synthetic MML/RSM analysis of example_operational.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "operational-mml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+
+# Use the diagnostics saved with this fit
+diagnostics <- example_fit$diagnostics
+
+# Read the interpretation status before reviewing the quality-control (QC) panels
+review <- summary(diagnostics)
+review$decision
+
+# Draw the dashboard and save its data
+qc <- plot(fit, type = "qc", diagnostics = diagnostics)
+
+# Inspect the counts behind the category panel
+qc$data$category_stats[, c("Category", "Count", "ExpectedCount")]
+# Use focused plots such as plot(diagnostics, type = "marginal_fit") to investigate a panel
 }
 }
 \seealso{
-\code{\link[=plot_unexpected]{plot_unexpected()}}, \code{\link[=plot_fair_average]{plot_fair_average()}}, \code{\link[=plot_displacement]{plot_displacement()}}, \code{\link[=plot_interrater_agreement]{plot_interrater_agreement()}}, \code{\link[=plot_facets_chisq]{plot_facets_chisq()}}, \code{\link[=build_visual_summaries]{build_visual_summaries()}}
+\link[=plot.mfrm_fit]{plot(x, type = "unexpected")}, \link[=plot.mfrm_fit]{plot(x, type = "fair_average")}, \link[=plot.mfrm_fit]{plot(x, type = "displacement")}, \link[=plot.mfrm_fit]{plot(x, type = "agreement")}, \link[=plot.mfrm_fit]{plot(x, type = "facets_chisq")}, \code{\link[=build_visual_summaries]{build_visual_summaries()}}
 }
+\keyword{internal}

@@ -163,7 +163,7 @@ test_that("print.summary.mfrm_bundle uses class-aware titles", {
   rs_sum <- summary(rs)
   out_rs <- paste(capture.output(print(rs_sum)), collapse = "\n")
   expect_match(out_rs, "mfrmr Rating Scale Summary", fixed = TRUE)
-  expect_match(out_rs, "Category/threshold summary", fixed = TRUE)
+  expect_match(out_rs, "Category coverage", fixed = TRUE)
 })
 
 test_that("data description and anchor review support summary and plot", {

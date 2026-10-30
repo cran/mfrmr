@@ -2,34 +2,100 @@
 % Please edit documentation in R/api-results.R
 \name{mfrm_report}
 \alias{mfrm_report}
-\title{Build report-ready output from \code{mfrm_results()}}
+\title{Build reports from measurement, G/D-study or residual results}
 \usage{
 mfrm_report(
   x,
-  style = c("qc", "apa", "validation", "reviewer", "technical"),
-  output = c("object", "markdown", "html", "tables")
+  style = c("qc", "apa", "validation", "reviewer", "technical", "rater"),
+  output = c("object", "markdown", "html", "tables"),
+  facet = NULL,
+  rater = NULL,
+  audience = c("rater", "researcher"),
+  label = NULL,
+  max_cases = 5,
+  interval = NULL,
+  intervals = NULL,
+  study_context = NULL
 )
 }
 \arguments{
-\item{x}{An \code{\link[=mfrm_results]{mfrm_results()}} object.}
+\item{x}{An \code{\link[=mfrm_results]{mfrm_results()}} object, a supported G/D-study or network result,
+or output from \code{\link[=estimate_bias]{estimate_bias()}}, \code{\link[=estimate_all_bias]{estimate_all_bias()}}, \code{\link[=review_mfrm_anchors]{review_mfrm_anchors()}},
+\code{\link[=build_linking_review]{build_linking_review()}} or \code{\link[=build_model_choice_review]{build_model_choice_review()}}.}
 
 \item{style}{Report emphasis. \code{"qc"} is the default first-screen report.
 \code{"apa"} emphasizes manuscript wording, \code{"validation"} emphasizes the
 validity-argument boundary, \code{"reviewer"} emphasizes reviewer response
-preparation, and \code{"technical"} emphasizes appendix/reproducibility routes.}
+preparation, and \code{"technical"} emphasizes appendix/reproducibility routes.
+\code{"rater"} creates a standalone individual feedback sheet from saved
+native additive RSM/PCM or two-family GPCM MML results; it requires
+\code{facet} and \code{rater}.}
 
-\item{output}{Return format: \code{"object"} for an \code{mfrm_report} object,
+\item{output}{Return format: \code{"object"} for an \code{mfrm_report} object
+(\code{mfrm_rater_feedback} when \code{style = "rater"}),
 \code{"markdown"} for a character scalar, \code{"html"} for a temporary HTML file,
 or \code{"tables"} for the report's named data-frame list.}
+
+\item{facet}{For \code{style = "rater"}, the fitted non-Person facet representing
+raters, for example \code{"Rater"}. It is not inferred from the column name.}
+
+\item{rater}{For \code{style = "rater"}, one character level of \code{facet}.}
+
+\item{audience}{For a rater sheet, \code{"rater"} gives plain-language guidance;
+\code{"researcher"} adds the model, estimator and diagnostic basis. Both use
+the same saved numerical values and omit source identifiers.}
+
+\item{label}{Optional recipient-facing label for a rater sheet. The default
+is \code{"Selected rater"}; even the selected source identifier is not copied.
+Any identifying information explicitly supplied here will be displayed.}
+
+\item{max_cases}{Maximum number of saved unexpected ratings in a rater
+sheet, ordered by absolute standardized residual. Default 5; use 0 to
+omit individual cases. This is not a misfit threshold.}
+
+\item{interval}{Optional name of a saved fixed-facet interval attachment in
+\code{x$facet_intervals} for an additive-model rater sheet, or a saved component
+slope interval in \code{x$gpcm_inference} for two-family GPCM. The attachment must contain the
+selected individual coefficient, not just a difference involving it.
+A single matching attachment is used automatically. Multiple matching
+attachments require an explicit choice. No interval is calculated here.}
+
+\item{intervals}{For a G/D-study only, saved \code{confint(x)} output or a list
+of such results. Source, design and target context are checked. \code{NULL}
+reports point estimates without intervals; logical values do not trigger
+computation. Old component intervals lacking source context must be
+recreated with the current \code{confint(g)}. This differs from singular
+\code{interval}, which selects an attachment for an individual rater sheet.}
+
+\item{study_context}{Optional named character vector of study declarations,
+for example \code{c(question = "...", rating_unit = "...", score_direction = "Higher means easier to understand", rubric = "1 = very difficult; 9 = very easy", transformation = "None", anchor_source = "...")}. Names must be unique;
+values must be nonmissing and nonblank. The same declaration can accompany
+separate measurement, G/D and feedback reports when their meanings match.
+It is retained in \verb{$study_context}, \verb{$tables$study_context}, Markdown, HTML
+and report appendix export. These are user declarations, not model-verified
+facts: they never recode data, reverse parameter signs, validate anchors
+or change eligibility. For a recipient-facing rater sheet, supply only
+context intended for that recipient; text is copied verbatim.}
 }
 \value{
 Depending on \code{output}, an \code{mfrm_report} object, a Markdown character
 scalar, an \code{mfrm_report_html} object, or a named list of data frames.
+For \code{style = "rater"}, object output has class \code{mfrm_rater_feedback} and
+contains \code{title}, \code{label}, \code{audience}, \code{review}, \code{guidance}, \code{notes},
+\code{tables} and \code{markdown}. It does not contain the original result object.
 }
 \description{
-\code{mfrm_report()} is a report-synthesis layer for an existing
-\code{\link[=mfrm_results]{mfrm_results()}} object. It does not refit the model, recompute diagnostics,
-or add new validity rules. Instead, it turns the comprehensive first-screen
+\code{mfrm_report()} connects existing measurement results, G/D-study results
+and residual exploration to tables, Markdown and HTML. It does not refit,
+recompute diagnostics or create new inferential support. Pass G/D-study
+and \code{\link[=mfrm_residual_network]{mfrm_residual_network()}} objects directly. Rater/halo networks and
+\code{\link[=fit_rater_network]{fit_rater_network()}} results also connect directly, retaining definitions,
+unavailable pairs, network fit, cluster-bootstrap contrasts and ERGM checks.
+Attach previously calculated
+G/D intervals explicitly. See the dedicated section below and the editable
+\code{templates/gtheory-report.Rmd}.
+
+For an \code{\link[=mfrm_results]{mfrm_results()}} object, it turns the comprehensive first-screen
 result into a first-screen table, section plan, claim-readiness table,
 report-gap table, report-index table, template-index table,
 fit-criteria table, result-specific fit evidence summaries,
@@ -38,7 +104,8 @@ bias/DFF reporting templates, misfit/pathway reporting templates,
 linking/anchor reporting templates, ZSTD-convention table,
 evidence-boundary table, next-action table, and optional Markdown or HTML
 report.
-The object and its table list retain the exact source-fit
+For \code{mfrm_results()} inputs, except for the individual rater sheet, the object and its
+table list retain the exact source-fit
 \verb{fit_readiness*} tables from \code{mfrm_results()}; report synthesis does not
 reinterpret or upgrade them. The \code{decision} table translates that same
 record into interpretation, formal-inference, reason, and next-action text.
@@ -59,6 +126,28 @@ when that reporting question is needed.
 }
 
 Report rows deliberately distinguish evidence from claims. The
+testlet and random-rater route is a smaller stored-result report: all
+supported styles (excluding \code{"rater"})
+retain numerical checks, data usage, interval meanings and supplied
+predictions/intervals. When saved scores include a scoring roster, the
+\code{scoring_roster} table preserves its rows, identifiers and omitted scores;
+testlet \code{scoring_blocks} separately summarizes observed blocks. Older
+results without a roster do not reconstruct one from calibration rows.
+It does not supply ordinary residual diagnostics or
+fit/APA wording templates; \code{template_index} is empty. See the model-specific
+section in \code{\link[=mfrm_results]{mfrm_results()}} for supported tables and plots.
+The \verb{Response residuals} row distinguishes an unsupplied saved
+\code{\link[=mfrm_response_diagnostics]{mfrm_response_diagnostics()}} result (\code{not_computed}) from a supplied result
+with no available observed-row results (\code{unavailable}) or results requiring review.
+If needed, compute these diagnostics separately for a numerically ready fit
+and attach them through \code{mfrm_results(fit, response_diagnostics = diagnostics)}.
+Available summaries remain descriptive (\code{caveat}): ordinary-model cutoffs
+do not apply, and they do not establish model adequacy. Report creation
+never computes the missing diagnostics. Older result bundles can be passed
+to \code{mfrm_report()} again to update the report; previously exported files
+retain their original text.
+
+For ordinary models, the
 \code{first_screen} table is the compact entry point: it gives an overall row and
 one row per major evidence area with status, readiness, main issue, next
 action, and primary route. The
@@ -99,11 +188,21 @@ stacks those columns across all
 template areas so report authors can review unsupported or caveated wording
 before opening the full template text. The \code{precision_reporting_templates}
 table does the same for separation, reliability, and strata using the
-stored precision review and \code{diagnostics$reliability}. The
+stored precision review and \code{diagnostics$reliability}. \code{precision_by_facet}
+preserves every stored facet row, original values, missing-value reasons and
+inference flags. Templates report model and fit-adjusted indices separately
+for each facet; they are not confidence bounds. Cross-facet ranges in the
+compatibility summary are not an overall reliability coefficient. A Person
+separation index computed with EAP/posterior SD is not posterior-variance EAP
+reliability; this report does not compute that different index.
+\code{fit_calculation_basis} identifies the recorded target of the MnSq tables,
+including EAP plug-in and imported source definitions. Missing metadata stays
+unrecorded. Rebuild reports from saved results to obtain these explanations;
+no re-estimation is needed. The
 \code{bias_reporting_templates} table is
 available when the source result was built with \code{include = "bias"} and keeps
 facet-level screens, interaction-bias contrasts, DFF follow-up, and fairness
-conclusions in separate lanes. The \code{misfit_reporting_templates} table is
+conclusions in separate sections. The \code{misfit_reporting_templates} table is
 available when the source result was built with \code{include = "misfit_review"}
 and keeps unexpected responses, displacement, pathway-map evidence, and
 case-review actions separate. The \code{linking_reporting_templates} table is
@@ -114,31 +213,281 @@ collapsed into a single pass/fail statement; bias screens are not treated
 as final fairness conclusions; pathway/misfit rows are case-review prompts;
 and drift/equating claims require multiple fitted forms or waves.
 }
-\examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-toy_small <- toy[toy$Person \%in\% unique(toy$Person)[1:6], , drop = FALSE]
-fit <- fit_mfrm(toy_small, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 30)
-res <- mfrm_results(fit, include = c("fit", "diagnostics", "tables"))
+\section{Anchor, bias and model-choice modules}{
 
-report <- mfrm_report(res, style = "qc")
-summary(report)
-report$first_screen
-report$report_index[, c("Area", "Readiness", "PrimaryTable",
-                        "TemplateTable", "PlotRoute")]
-report$template_index[, c("Area", "Topic", "BoundaryType",
-                          "ClaimStrength", "EvidenceRoute")]
-
-# Open detailed evidence only after the index points to it.
-fit_primary <- report$report_index$PrimaryTable[
-  report$report_index$Area == "Fit"
-][1]
-report$tables[[fit_primary]]
-
-mfrm_report(res, output = "markdown")
-mfrm_report(res, output = "html")
+Use \code{mfrm_report(review_mfrm_anchors(...))} before anchored fitting,
+\code{mfrm_report(build_linking_review(...))} for saved link evidence,
+\code{mfrm_report(estimate_bias(...))} for a prespecified interaction, and
+\code{mfrm_report(estimate_all_bias(...))} for a collection of exploratory screens.
+Collection reports keep every requested interaction in \code{tables$overview},
+all retained cells in \code{tables$bias_cells} with an \code{Interaction} key, failed
+pairs in \code{tables$errors}, and calculation settings/history and facet directions.
+Failed pairs remain visible even with \code{keep_errors = FALSE}; unavailable
+screens are not reported as negative results. No collection-wide multiplicity
+adjustment is added. Use
+\code{mfrm_report(build_model_choice_review(...))} for candidate-model roles
+and comparability. Reporting does not fit a new model, select new
+interaction cells, calculate a missing LRT or test anchor invariance.
+Full bias cells and anchor values remain alongside compact summaries;
+source objects and unavailable states are preserved. \code{style = "rater"}
+continues to require individual feedback from \code{mfrm_results()}.
+Supply \code{study_context} to keep rubric direction, transformations, anchor
+provenance and the question with the report. A shared declaration does not
+establish equivalence between a raw G-study score and a latent MFRM measure.
+See the editable \code{templates/assessment-review.Rmd} for separate modules
+using bundled data and a saved report archive.
 }
+
+\section{Planning and numerical review}{
+
+Pass \code{\link[=recommend_mfrm_design]{recommend_mfrm_design()}} results directly to preserve the planning
+target, threshold sources, all candidate designs and long criterion outcomes.
+Facet calibration reliability is not inter-rater agreement. Recommendations
+apply to the simulated conditions; no universal sample size is inferred.
+Main-effects \code{\link[=mfrm_d_study]{mfrm_d_study()}} results also enter directly. These reports
+preserve residual-scaling assumptions and unavailable coefficients separately
+from full interaction-component G-studies. Newly created projections retain
+source components and observed counts; missing historical metadata are
+labelled \code{not_recorded} without refitting. Intervals are unsupported for
+this approximation and for simulation recommendations.
+Native measurement reports include \code{numerical_review}: separate evidence
+and next actions for optimization, curvature, starts, integration and replay.
+This table neither reruns diagnostics nor changes inferential readiness.
+}
+
+\section{G/D-study and residual-exploration reports}{
+
+Saved Stan/brms summaries read by \code{\link[=read_mfrm_posterior]{read_mfrm_posterior()}} also enter this
+route directly. Reports retain their credible-interval level, fixed values,
+priors, model-data identity and sampling review. They do not calculate new
+intervals, native MML diagnostics, prior sensitivity or posterior predictions.
+
+Pass \code{\link[=mfrm_g_study]{mfrm_g_study()}}, \code{\link[=mfrm_d_study]{mfrm_d_study()}}, \code{\link[=mfrm_multivariate_d_compare]{mfrm_multivariate_d_compare()}}
+or \code{\link[=mfrm_residual_network]{mfrm_residual_network()}} output directly, without \code{mfrm_results()}.
+The non-rater styles all preserve the same complete domain-specific tables
+and interpretation notes. Report creation never refits, clusters or computes
+intervals. The overall review status asks for substantive study context;
+it is not a numerical convergence or formal-inference assessment.
+
+G/D tables retain observed counts separately from future plans, fixed
+score/composite weights, signed covariance components, component policy,
+G/Phi, universe/error variances, measurement SEM and unavailable states.
+Saved component or plan/contrast intervals retain their methods, assumptions
+and any separate interval center. Without supplied intervals the report
+explicitly states \code{not_requested}. Paired-delta comparisons have their own
+report, preserving their shared-source covariance and approximation.
+These are observed-score studies, not latent-trait fits or MFRM separation
+reliability. Brennan (2003) explains why coefficients should be accompanied
+by error variances; Jiang et al. (2022) emphasize uncertainty and studied
+design conditions. Their findings do not validate every interval method
+supplied here.
+
+Use \code{build_summary_table_bundle(report)} for all numerical and contextual
+tables, \code{apa_table(report, which = "coefficients")} for a selected D-study
+table, and \code{\link[=export_summary_appendix]{export_summary_appendix()}} for CSV/HTML. \code{summary(report)} keeps
+the full evidence tables in \code{evidence_tables}; \code{top_n} does not truncate
+them. Save the complete report/source with \code{saveRDS()} for replay.
+Source archives can contain participant identifiers and require sharing
+review. The installed editable template is located by
+\code{system.file("templates", "gtheory-report.Rmd", package = "mfrmr")}.
+
+Residual reports retain all nodes and pairs, overlap, threshold settings
+and cluster availability. They support exploratory review; they do not
+establish dimensions, rater quality, stable classes or causal relationships.
+See \code{\link[=mfrm_residual_network]{mfrm_residual_network()}} for unsupervised learning, validation and the
+distinct role of supervised random forests.
+}
+
+\section{Stored agreement in ordinary-model reports}{
+
+When diagnostics are present, the narrative and
+\code{tables$interrater_interpretation} distinguish observed agreement from the
+fitted-model expected baseline and from separation reliability.
+\code{tables$interrater_summary} retains the stored numerical summary unchanged.
+The denominator counts matched-context opportunities across rater pairs,
+not independent people. Unavailable values, zero matched opportunities and
+an absent stored summary are described explicitly; no missing agreement
+statistic is computed during reporting. Reports without diagnostics retain
+their existing component-status explanation rather than inventing values.
+These summaries share their interpretation with \code{\link[=build_apa_outputs]{build_apa_outputs()}}.
+See \code{\link[=interrater_agreement_table]{interrater_agreement_table()}} for calculations and matching conventions.
+Markdown and HTML contain the same explanation; export with
+\code{export_mfrm_results(res, include = "report")} to retain the summary and
+interpretation as CSV files as well. Existing saved APA drafts retain their
+original wording until regenerated with \code{\link[=build_apa_outputs]{build_apa_outputs()}} and the same
+saved fit/diagnostics. Regeneration does not refit the model.
+}
+
+\section{Two-family GPCM reports}{
+
+Reports retain all saved non-Person fitted locations, category steps and
+component slopes. Locations identify their centering constraint; steps
+identify their owner and level and are centered offsets, not standalone
+thresholds. Separately computed experimental location/contrast intervals from
+\code{\link[=mfrm_facet_intervals]{mfrm_facet_intervals()}} may be attached; step intervals remain unavailable. The Markdown view
+shows up to 20 rows per table with a notice; complete tables remain in
+\verb{$tables} and CSV exports. Report styles do not change inferential support.
+}
+
+\section{Corrected JML reports}{
+
+Results from an explicit \code{jml_correction_order} have an estimator-specific
+report of saved estimates, numerical status and RootSE interpretation.
+The report does not contain ordinary fit tests or structural confidence
+intervals. The \code{"rater"} style is unavailable for this estimator.
+Saved \code{\link[=mfrm_response_diagnostics]{mfrm_response_diagnostics()}} output adds conditional response means,
+probabilities and descriptive residual summaries, with unavailable indices
+and their reasons retained. These do not classify rater quality. See
+\code{\link[=mfrm_results]{mfrm_results()}} and the \strong{Corrected JML} section of \code{\link[=fit_mfrm]{fit_mfrm()}}.
+}
+
+\section{Individual rater sheets}{
+
+Use \code{mfrm_report(res, style = "rater", facet = "Rater", rater = "R01", output = "html")} to create a temporary HTML sheet. Open its \verb{$path}, review
+it, and copy that file to a permanent location for distribution. HTML is
+self-contained, includes print styling and category-use bars with numerical
+tables, and does not load external resources. Page count depends on content
+and browser print settings; this is not a PDF export API.
+After reviewing the sheet, use \code{file.copy(sheet$path, recipient_file)} to
+keep it at a chosen HTML path. To prepare sheets in a later session, save
+the complete \code{res} with \code{\link[base:saveRDS]{base::saveRDS()}} and reload it with \code{\link[base:readRDS]{base::readRDS()}}.
+The RDS file retains fitted data and identifiers for the analyst; it is not
+the recipient's sheet. Reloading and reporting reuse the saved analysis
+without updating it for new ratings.
+\code{output = "tables"} includes an \code{interpretation_notes} table with the
+overall review, audience-specific guidance and section explanations. Keep
+this table with the numerical tables when saving CSV files or sharing them.
+These explanations are the sheet's fixed, recipient-safe text; free-form
+notes from the source analysis are not copied. The same table is available
+in the sheet object's \verb{$tables}. HTML and Markdown show the explanations
+beside their sections, without duplicating them as another table.
+The \code{uncertainty} table retains \code{Available} and a recipient-safe \code{Reason},
+distinguishing constraint-fixed values, insufficient independent-cluster
+information, unusable variance/bounds and failed numerical/profile checks
+where the saved diagnostics identify the cause. If the interval is
+unavailable, both bounds are missing in the sheet, even when the analyst's
+saved result retains one computed endpoint. This does not mean zero
+uncertainty or an unbounded interval. The original saved analysis is
+unchanged; unidentified reasons direct the recipient to the analyst.
+Printing the sheet also shows interval availability and its explanation.
+Recreate sheets from saved \code{mfrm_results} objects to obtain these fields;
+reading an older sheet does not update its contents.
+
+The additive RSM/PCM sheet includes scoring tendency (severity), exposure, available saved
+fixed-facet uncertainty, ordinary Infit/Outfit, category use and selected
+unexpected ratings. Severity is oriented so that positive values mean lower
+expected scores. Its zero is the fitted model reference, not necessarily
+the average of the other raters; custom centering and anchors matter.
+Model scores and expected scores stay on the fitted category coding. The
+category table also shows the original numeric scores when a mapping exists.
+Exposure and category percentages count retained rows without weights;
+weight sums are reported separately. Neither is planned-design completion.
+
+Supply matching \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} output to \code{\link[=mfrm_results]{mfrm_results()}} to include fit
+and unexpected ratings. Attach \code{\link[=mfrm_facet_intervals]{mfrm_facet_intervals()}} output through
+\code{intervals = list(raters = ci)} for supported MML fixed-facet intervals.
+JML sheets can show saved descriptive diagnostics but do not gain formal
+fixed-facet intervals. Inspect the complete saved interval result and its
+numerical cautions before sharing; free-form cautions are not copied into
+the recipient's sheet. Missing sections explain the missing input. Ineligible
+source fits retain a prominent review notice. Severity is not rater quality,
+and no automatic misfit cutoff, exclusion decision or diagnostic accuracy
+claim is added. These sheets do not support one-family GPCM, fitted interactions,
+imported fits, testlet or shared-random-rater models; use their specific
+results and reports because their effects and diagnostics differ.
+
+For two-family GPCM MML, the same entry creates an experimental descriptive
+sheet. Select the modeled rater facet explicitly; either slope owner is
+supported. It separates the fitted location from the component slope,
+retains their distinct centering references, and reports category use,
+retained exposure and how many levels of the other facet were observed.
+Category-step offsets are shown only when this facet owns the steps. They
+are centered offsets, not standalone thresholds. This individual sheet does
+not display location or step intervals; use the analyst report for separately
+requested location intervals. A larger slope is not evidence of competence or accuracy.
+
+Attach saved \code{\link[=confint.mfrm_fit]{confint.mfrm_fit()}} output from \code{parm = "slopes"} through \code{intervals} in
+\code{\link[=mfrm_results]{mfrm_results()}} to include a matching experimental component-slope interval.
+\code{interval} chooses among named attachments; pointwise/Bonferroni meaning,
+profile/log-Wald method and unavailable bounds are retained. No location
+interval or test of rater differences is implied. Attach saved
+\code{\link[=mfrm_response_diagnostics]{mfrm_response_diagnostics()}} output through \code{response_diagnostics} for
+same-data posterior residual summaries and cases. The sheet counts saved,
+available, unresolved and not-included rows separately; a summary average
+is unavailable if any saved row for that recipient is unresolved. These
+residuals have no expectation-one reference or calibrated cutoff, exclude
+calibration uncertainty and do not predict independent future ratings.
+Creating or reopening a sheet does not fit, integrate, compute intervals
+or diagnose new responses. Inspect the complete analyst results before
+sharing a sheet; numerical convergence does not qualify feedback decisions.
+
+All four output formats use only selected numeric summaries and fixed
+explanatory text. They omit the source fit, Person identifiers, other rater
+identifiers, original row numbers, task labels and free-form source notes.
+Case numbers refer only to the displayed ordering. This prevents copying
+those identifier fields; it is not a guarantee against recognition from
+rating patterns, small groups or an explicitly supplied \code{label}. Review the
+content before sharing, and use \code{max_cases = 0} when cases are unnecessary.
+Distribute the standalone sheet, not the comprehensive results/export bundle,
+which retains the original analysis. Rater-specific arguments are rejected
+with other report styles, even when explicitly supplied as \code{NULL}.
+}
+
+\examples{
+# Long-running workflow; run explicitly when needed.
+# example("mfrm_report", run.dontrun = TRUE)
+\dontrun{
+# Load the package and example ratings
+library(mfrmr)
+ratings <- load_mfrmr_data("example_operational")
+
+# Fit these ratings; replace the data-loading line for your own analysis
+fit <- fit_mfrm(
+  data = ratings,
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  score = "Score",
+  rating_min = 1, rating_max = 4, category_policy = "preserve",
+  method = "MML",
+  model = "RSM"
+)
+
+# Build results, then turn them into a report
+res <- mfrm_results(fit)
+report <- mfrm_report(res)
+
+# Read the report and the issues to address
+summary(report, view = "reader")
+report$first_screen[, c("Area", "Status", "MainIssue", "NextAction")]
+report$fit_calculation_basis
+report$precision_by_facet[, c("Facet", "Levels", "Reliability",
+                              "RealReliability", "InputUncertaintyBasis")]
+contextual_report <- mfrm_report(res, study_context = c(
+  rating_unit = "One Person by Rater by Criterion rating",
+  score_direction = "Higher coded scores indicate more favorable performance",
+  rubric = "Synthetic example: permitted scores 1 to 4", transformation = "None"
+))
+contextual_report$tables$study_context
+
+# Select a recipient explicitly. Missing intervals are explained in the sheet.
+recipient <- as.character(fit$prep$levels$Rater[1])
+sheet <- mfrm_report(res, style = "rater", facet = "Rater",
+                     rater = recipient, output = "html", max_cases = 0)
+sheet$path
+# Review in a browser, then choose a permanent path for continuing work.
+recipient_file <- tempfile(fileext = ".html")
+stopifnot(file.copy(sheet$path, recipient_file, overwrite = FALSE))
+}
+}
+\references{
+Brennan, R. L. (2003). \emph{Coefficients and indices in generalizability theory}.
+CASMA Research Report No. 1, University of Iowa.
+\url{https://education.uiowa.edu/sites/education.uiowa.edu/files/2026-04/casma-research-report-1-archived.pdf}.
+
+Jiang, Z., Raymond, M., DiStefano, C., Shi, D., Liu, R., & Sun, J. (2022).
+A Monte Carlo study of confidence interval methods for generalizability
+coefficient. \emph{Educational and Psychological Measurement, 82}, 705--718.
+\doi{10.1177/00131644211033899}.
 }
 \seealso{
 \code{\link[=mfrm_results]{mfrm_results()}}, \code{\link[=export_mfrm_results]{export_mfrm_results()}},

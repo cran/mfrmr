@@ -67,7 +67,7 @@ test_that("print.summary.mfrm_bundle: fair_average", {
   fa <- fair_average_table(.fit, diagnostics = .diag)
   s <- summary(fa)
   out <- capture.output(print(s))
-  expect_true(any(grepl("Adjusted Score|Fair Average", out)))
+  expect_true(any(grepl("Adjusted Score|Fair Average", out, ignore.case = TRUE)))
 })
 
 # ---- displacement summary_kind ----

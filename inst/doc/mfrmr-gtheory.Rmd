@@ -1,0 +1,747 @@
+---
+title: "Plan an assessment with G theory"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Plan an assessment with G theory}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+is_cran_check <- !isTRUE(as.logical(Sys.getenv("NOT_CRAN", "false")))
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 7,
+  fig.height = 4.5, dev.args = list(bg = "white"), eval = !is_cran_check)
+```
+
+Would a speaking assessment benefit more from additional tasks or additional
+raters? A **G-study** estimates sources of variation in collected scores.
+A **D-study** uses those estimates to compare future plans you specify.
+This lesson follows that question through data, estimates, a figure, a paired
+comparison and saving the analysis. The later sections address other designs
+and method choices; they are not prerequisites for the first workflow.
+
+Choose the analysis that matches your question:
+
+| Question | Start here |
+| --- | --- |
+| How dependable is an observed score under a specified task/rater plan? | The G/D-study workflow below. No MFRM fit is needed. |
+| How do severity and ordered rubric categories relate to a latent trait? | The [measurement workflow](mfrmr-workflow.html), using appropriate ordered-response data. |
+| Which rating patterns deserve feedback or review? | The [agreement lesson](mfrmr-rating-agreement.html) and `mfrmr_output_guide("feedback")`. Agreement, severity and dependability answer different questions. |
+
+MFRM simulation is another planning option, not a reason to run both analyses
+automatically. It evaluates a fitted-score or diagnostic procedure under an
+explicit response generator; G theory directly targets the dependability of
+the observed mean or composite over stated sampling conditions. Simulating
+more facets does not by itself define that score, its error components or
+its generalization population. The current simulation planner also has a
+Person/rater-like/criterion-like role boundary, rather than arbitrary numbers
+of facets. Read the [workflow guide](../reference/mfrmr_workflow_methods.html#assessment-planning-and-external-features)
+for the assumptions, differences and circumstances in which one route suffices.
+
+## Define the score and the population
+
+Suppose a speaking assessment reports the equally weighted mean of Content
+and Organization scores. Tasks and raters are intended to be interchangeable
+with others from stated populations. The planned outcome is proficiency
+across those conditions, rather than performance on just one particular speech.
+Weights and the intended interpretation should be chosen before inspecting
+which plan has the highest coefficient.
+
+This route analyzes **numeric observed scores**, including a single score or
+fixed combinations of several scores. It does not transform rubric categories
+into interval-scale measurements or estimate latent dimensions. Explain why
+your numeric score coding and averaging are meaningful. Calling a facet
+*random* declares a generalization population; the software does not randomly
+assign raters or establish that this assumption is appropriate.
+
+## Is a criterion a facet or a score?
+
+Content and Organization can appear in the same rating sheet but play different
+statistical roles. Decide what will be reported and generalized before reshaping
+the sheet; long versus wide layout alone does not decide the model.
+
+| Intended interpretation | Role of criteria | Route and consequence |
+| --- | --- | --- |
+| One latent performance variable, adjusting for how demanding each criterion is | Criterion is a facet in an ordered-response MFRM | `fit_mfrm(..., facets = c("Rater", "Criterion"))`. PCM/GPCM may give criteria their own steps/slopes, but still use one Person variable. |
+| Content and Organization are named scores, or fixed parts of a declared composite | Each criterion is a fixed score component | `mfrm_g_study(..., scores = c("Content", "Organization"), rater = "Rater", task = "Task")`. Each source has a covariance matrix across scores. D-studies retain those relations in the declared composite or contrast. |
+| The criteria themselves are sampled, exchangeable conditions over which a single score should generalize | Criterion is a random measurement facet | A univariate G-study with `scores = "Score"` and a justified `facets` mapping. The current API supports at most two random measurement facets; Rater, Task and Criterion together exceed this route. |
+
+For two fixed scores and weights `w`, each source's composite variance is
+`t(w) %*% Sigma %*% w`, including cross-score covariance. Separate univariate
+analyses followed by averaging their reliability coefficients do not supply
+this result. The multivariate distinction follows
+[Brennan (2003), Section 6](https://education.uiowa.edu/sites/education.uiowa.edu/files/2026-04/casma-research-report-1-archived.pdf).
+Neither a covariance component nor a criterion-specific GPCM slope establishes
+another latent dimension.
+
+The input to `mfrm_d_study()` also matters: passing a G-study uses its full
+estimated component structure; passing an MFRM fit invokes the separate
+`mfrm_generalizability()` main-effects approximation with a combined-residual
+scaling rule. It does not recover the interaction covariance matrices of the
+multivariate workflow. For the planning question here, start from observed
+scores with `mfrm_g_study()`.
+
+Declare each score's units, endpoints and direction before choosing weights.
+If one score means ease and another means difficulty, their sum has a different
+meaning from a composite of two positively oriented qualities. Reverse-coding
+one score reverses its covariances with unreversed scores and can change
+composite precision. G/Phi being larger, and SEM smaller, concerns dependability
+of the declared score; it does not tell which end represents better performance.
+
+## Load ratings and inspect their design
+
+Use the bundled synthetic teaching data. One row is one Person–Rater–Task
+cell; Content and Organization are the two scores for that cell. The same
+raters score every person's work on every task: this is a **crossed** design.
+
+```{r crossed-data}
+library(mfrmr)
+data("mfrmr_example_gtheory_crossed", package = "mfrmr")
+ratings <- mfrmr_example_gtheory_crossed
+head(ratings)
+```
+
+These are fictional continuous scores generated with independent normal random
+effects, not empirical speech-contest records or ordered MFRM responses. For
+your own similarly structured data, replace the loading step with
+`ratings <- read.csv("ratings.csv")` and identify the corresponding columns.
+Do not create zero scores for unassigned or missing ratings. The default
+analysis requires a complete balanced crossing; duplicate cells or missing
+selected scores require attention rather than automatic averaging.
+
+```{r crossed-gstudy}
+g <- mfrm_g_study(ratings, scores = c("Content", "Organization"),
+  person = "Person", rater = "Rater", task = "Task")
+print(g, digits = 3)
+```
+
+The output identifies 40 persons, eight raters and six tasks in this source
+study. Check the counts, row exclusions and component diagnostics before
+interpreting results. A non-positive-semidefinite component matrix flags a
+problem with the estimated joint variance structure; it is retained for review.
+The flag is not a reason to silently replace a negative estimate with zero.
+
+## Inspect the sources of variation
+
+Compare the score components on shared axes. These are variances in squared
+score units, not percentages or reliability coefficients. Comparing their
+sizes across scores requires comparable score units.
+
+```{r crossed-score-components, fig.height=5, fig.alt="Two panels show the seven variance components for Content and Organization on shared axes. They include Person, Rater, Task, three two-way interactions and the highest interaction combined with residual."}
+components <- plot(g, score = c("Content", "Organization"), ncol = 2,
+  preset = "standard")
+```
+
+Person variation represents differences between people. Person-by-Rater
+variation means that rater differences vary across people; Rater-by-Task means
+that rater differences vary across tasks. There is one observation per cell,
+so the highest interaction and other residual variation are combined as
+**Person x Rater x Task + residual**. They are included, not estimated
+separately or assumed to be zero.
+
+The residual component is only one source of measurement error. Under this
+common crossed design, Person interactions and the combined residual contribute
+to relative error; rater/task-wide shifts additionally affect absolute score levels. Future
+counts reduce different error components in different ways. A component plot
+alone therefore does not identify the best plan. The exact divisors and
+composite-covariance formulas are in
+[`mfrm_d_study()`](../reference/mfrm_d_study.html).
+Use `plot_data(components, "table")` for the plotted values and
+`plot_data(components, "notes")` for their interpretation notes.
+
+## Compare feasible assessment plans
+
+Prespecify three plans with twelve ratings per person: two raters and six
+tasks, three and four, or four and three. Six tasks require more performances
+than three tasks; equal rating counts do not imply equal time, burden or cost.
+
+```{r crossed-plans}
+plans <- data.frame(Raters = c(2, 3, 4), Tasks = c(6, 4, 3))
+d <- mfrm_d_study(g, design_grid = plans,
+  weights = c(Content = .5, Organization = .5))
+s <- summary(d, intervals = TRUE, parm = c("G", "Phi"), assumption = "normal")
+print(s, digits = 3)
+```
+
+These are projections for **future complete plans**, not scores already
+observed under those plans. Read estimates and intervals with their method
+qualifications and any rows needing review. `assumption = "normal"` asserts
+independent normal random effects; it does not test the assumption.
+Here `parm` selects G and Phi to focus on dependability. To include both
+measurement SEM intervals as well, omit `parm` from the summary call.
+
+| Metric | Meaning | Favorable direction for the same score and population |
+| --- | --- | --- |
+| `G` | Dependability of relative ordering | Larger |
+| `Phi` | Dependability of absolute score levels, including task/rater-wide shifts | Larger |
+| `RelativeSEM` | Measurement error in score units for relative decisions | Smaller |
+| `AbsoluteSEM` | Measurement error in score units for absolute decisions | Smaller |
+
+Neither coefficient is a probability of a correct pass/fail decision or of
+identifying a contest winner. An interval around SEM describes uncertainty
+in population measurement error, not an interval for an individual's score.
+A more varied person population can have higher G without smaller SEM.
+
+For this balanced two-crossed-facet source, the default G/Phi intervals use an
+MLS approximation. It can return wide intervals, and `FormulaComplete = FALSE`
+flags conservatively retained regions where the underlying width formula is
+undefined. SEM uses a separate error-variance construction. Availability is
+not proof of accurate coverage. Keep the qualifications in `s$notes`; the
+full estimates and statuses are in `s$table`.
+
+## Explain which error sources change
+
+The same twelve ratings can produce different error because increasing raters
+and increasing tasks reduce different components. The next figure reuses the
+three plans and their equal-weight composite. Each color identifies a complete
+plan, and each point shows one source's contribution to its error variance.
+
+```{r crossed-error-components, fig.height=7, fig.alt="Relative and absolute error-variance contributions for three twelve-rating plans. Person-by-rater error falls with more raters; Person-by-task error rises when fewer tasks are used. The highest interaction and residual contribution is unchanged because the product of counts remains twelve."}
+errors <- plot(d, type = "error_components")
+plot_data(errors, "table") # Divisors, variance and covariance contributions.
+plot_data(errors, "totals") # Original totals, SEM, G/Phi and availability.
+```
+
+For example, Person-by-rater variance is divided by the number of raters,
+whereas Person-by-task variance is divided by the number of tasks. The
+highest interaction and residual share a component divided by their product.
+Absolute error additionally includes rater/task-wide shifts. The composite
+uses the full covariance matrices: `DiagonalContribution` retains weighted
+within-score variances, and `CovarianceContribution` retains cross-score terms.
+Their sum is the plotted `Contribution`.
+
+These contributions add to **error variance**, not SEM; SEM is the square
+root of the total. Negative estimates remain signed and are not interpreted
+as negative population variances. Read `totals` for any unavailable metric.
+This plot describes point projections without confidence intervals; it does
+not establish that one allocation is statistically better or less costly.
+For nested designs, the plot labels child counts **per parent**, and uses
+the corresponding nested divisors.
+
+## Read a planning curve
+
+For a curve, vary tasks while keeping raters fixed within each panel. The
+following grid reuses the same G-study and score weights. Its six combinations
+are different from the three equal-rating-count plans above.
+
+```{r crossed-panels, fig.height=4.5, fig.alt="Two panels show absolute dependability Phi for the same composite as task count increases. Each panel fixes two or four raters. Shaded regions are approximate 95 percent MLS intervals, not simultaneous confidence bands."}
+d_grid <- mfrm_d_study(g,
+  expand.grid(Raters = c(2, 4), Tasks = c(3, 6, 12)),
+  weights = c(Content = .5, Organization = .5))
+p <- plot(d_grid, metric = "Phi", x_var = "Tasks", panel_by = "Raters",
+  ncol = 2, intervals = TRUE, assumption = "normal", preset = "standard")
+```
+
+Within a panel, follow the curve to examine adding tasks. Across panels,
+compare the same task count to examine adding raters. More future ratings
+reduce projected error but do not add information to the source study.
+Ribbons connect intervals at requested counts; they do not evaluate intermediate
+plans or provide simultaneous confidence bands. Interval overlap is not a
+paired comparison of plans.
+
+The sparse grid above illustrates a few plans, not a software restriction.
+For every integer count in a feasible range, reuse the same G-study:
+
+```{r finer-planning-grid, eval=FALSE}
+d_fine <- mfrm_d_study(g,
+  expand.grid(Raters = c(2, 4), Tasks = 1:12),
+  weights = c(Content = .5, Organization = .5))
+plot(d_fine, metric = "Phi", x_var = "Tasks", panel_by = "Raters",
+  ncol = 2, preset = "standard")
+```
+
+This evaluates 24 specified plans, retaining two rater counts for readability.
+Using `Raters = 1:8` instead would evaluate 96 plans. It does not refit the
+G-study or improve the precision of its
+estimated components. Add `intervals = TRUE, assumption = "normal"` when
+pointwise ribbons answer the question. More plans can cost more for numerical
+interval methods and make a visually selected optimum unstable; examine
+feasible workload and uncertainty rather than maximizing a plotted coefficient.
+
+Use `preset = "monochrome"` for black-and-white output. To compare original
+scores, select `score = c("Content", "Organization")`; score colors also have
+distinct line types and point shapes. Optional panel and score selections are
+explained in [`plot(d)`](../reference/plot.mfrm_multivariate_d_study.html).
+No title or explanatory footnote is placed inside the figure. Read the saved
+notes with `plot_data(p, "notes")` and the exact values with `plot_data(p)`;
+preserve them when sharing the figure.
+
+## Ask about a change, not just two separate intervals
+
+The three equal-rating-count plans share the same estimated components.
+Use a paired procedure to ask how much a candidate improves on the first plan,
+rather than subtracting marginal interval endpoints or treating plans as
+independent. For this two-crossed-facet example, the existing paired delta
+method gives approximate intervals for G/Phi and SEM differences.
+
+```{r crossed-comparison}
+comparison <- mfrm_multivariate_d_compare(d, reference = 1,
+  assumption = "normal")
+print(comparison, digits = 3)
+```
+
+Each difference is the candidate minus the two-rater/six-task reference.
+Positive G/Phi and negative SEM favor the candidate. `SE` describes sampling
+uncertainty in the difference; it is not measurement SEM. An interval containing
+zero leaves the direction uncertain and does not establish equivalence.
+
+In these synthetic data, three raters and four tasks improve G by about 0.034,
+with an approximate 95% interval of [0.022, 0.046]. The corresponding Phi
+improvement is about 0.027, with an interval of [-0.014, 0.067]. Thus the data
+support improved relative ordering under the model, while the direction of
+the absolute-score change remains uncertain. Cost-effectiveness and the best
+plan for a different assessment do not follow from these results.
+
+These intervals are pointwise for prespecified comparisons. Small facet pools,
+component boundaries, nonnormal effects and uneven assignments can impair
+the approximation. Selecting a winner after inspecting many plans is not
+protected by these intervals. This paired delta method does not apply to
+one-facet or nested designs; see the branches below and the
+[comparison help](../reference/mfrm_multivariate_d_compare.html).
+
+## Save the result and know which operation to use
+
+| Operation | What it does | Does it calculate new intervals? |
+| --- | --- | --- |
+| `print(d)` | Displays source/future counts, score weights and point projections; returns `d` invisibly | No |
+| `summary(d)` | Returns the coefficient data frame | No |
+| `summary(d, intervals = TRUE, assumption = "normal")` | Collects supported intervals, methods, context and notes | Yes, explicitly |
+| `confint(d, parm = "Phi", assumption = "normal")` | Returns one metric's interval table with method attributes | Yes |
+| `print(s)` or `s$table` | Displays the saved summary or accesses its full data frame | No |
+| `plot(d)` | Draws point projections; returns plot data invisibly | No, unless `intervals = TRUE` is requested |
+| `plot(s$intervals$Phi)` | Draws a forest from the saved Phi intervals | No |
+| `saveRDS()` / `readRDS()` | Saves/reopens complete objects, including notes and diagnostics | No |
+
+`print(..., digits = 3)` changes display precision, not stored estimates.
+A summary list is not a new plotting input: use the D-study or its saved
+interval objects. To reuse intervals in a curve, pass them to
+`plot(d, metric = "Phi", intervals = s$intervals$Phi)`. The source, plans and
+weights must match; intervals for `d` cannot be attached to `d_grid`.
+
+Save the complete analysis, including the decision context. Full G-study
+objects include analyzed ratings and identifiers; choose an appropriate
+storage location. The temporary path below keeps this example runnable;
+replace it with a file in your project for lasting storage.
+
+```{r save-and-reopen}
+analysis <- list(study = d, summary = s, comparison = comparison, plot = p,
+  decisions = list(score = "Equal-weight Content/Organization mean",
+    comparison = "Twelve ratings per person; task burden and costs differ",
+    assumption = "Independent normal random effects"))
+result_file <- tempfile(fileext = ".rds")
+saveRDS(analysis, result_file)
+reopened <- readRDS(result_file)
+identical(reopened$summary, s)  # TRUE: the full summary was preserved.
+```
+
+In another session, load `mfrmr` and read that file. Reuse the plot's stored
+values with `as_ggplot(reopened$plot)` if ggplot2 is installed. A CSV of
+`s$table` is useful for a report, but loses the separate weights, notes and
+numerical diagnostics. Changing future counts requires a new D-study;
+changing the source data or model requires a new G-study.
+
+## Report the assessment-planning answer
+
+Use a compact Methods/Results structure, retaining the full analysis above:
+
+| Section | Content to supply | Existing output |
+| --- | --- | --- |
+| Question and score | Intended use, relative ordering or absolute decision, fixed score components, directions and weights | Study records; `d$weights` |
+| Source design | Population of persons and random conditions, crossing/nesting, planned and retained counts, missingness, estimator and negative-component policy | `g$design`, `g$data_usage`, `g$estimation`, component diagnostics |
+| Sources of variation | Relevant variances and cross-score covariances, uncertainty and combined residual terms | `g$components`, `plot(g)` and eligible `confint(g)` |
+| Future plans | Specified counts, score, G/Phi and relative/absolute SEM; assumptions and interval qualifications | `summary(d)` or saved `s$table`; planning and error-component plots |
+| Answer | Magnitude and uncertainty of the prespecified plan difference; workload/cost tradeoff and limits | Saved `mfrm_multivariate_d_compare()` result and the substantive interpretation |
+
+For example: "For [defined score and population], increasing [raters/tasks]
+from [a] to [b] changed projected [metric] by [estimate], with [method/level]
+interval [limits]. This projection assumes [design and model]; [cost or
+uncertainty] limits the recommendation." Use unavailable-result reasons when
+an interval cannot be reported. A larger source Person variance can increase
+G without reducing error; state SEM alongside coefficients when precision matters.
+
+Pass the saved results directly to the shared report API. The report preserves
+signed components, observed counts, future plans, fixed weights, G/Phi, error
+variances and SEM. Supplied intervals are checked against their source; omitted
+intervals remain explicitly not requested.
+
+```{r gtheory-report-route, eval=FALSE}
+report <- mfrm_report(d, intervals = s$intervals, style = "apa")
+bundle <- build_summary_table_bundle(report)
+apa_table(report, which = "coefficients")
+export_summary_appendix(bundle, output_dir = "planning-report")
+saveRDS(report, "planning-report/report.rds")
+
+# A complete editable manuscript starting point, using bundled data:
+template <- system.file("templates", "gtheory-report.Rmd", package = "mfrmr")
+file.copy(template, "gtheory-report.Rmd")
+rmarkdown::render("gtheory-report.Rmd")
+```
+
+If no intervals were computed, use `mfrm_report(d)`; reporting never starts a
+new uncertainty calculation. `mfrm_report(g, intervals = component_ci)` accepts
+current saved component intervals. `mfrm_report(comparison)` preserves a
+paired-delta comparison and its sampling covariance. The installed template
+joins these reports with component, planning and SEM figures, CSV/HTML and a
+complete RDS. Complete its rubric direction, sampling, decision and cost
+prompts before using the prose in a manuscript.
+
+Brennan's *Coefficients and Indices in Generalizability Theory* (2003, CASMA
+Research Report 1) motivates reporting error variances alongside coefficients.
+[Jiang et al. (2022)](https://doi.org/10.1177/00131644211033899) study uncertainty
+in G coefficients under specified designs. These sources support the reporting
+questions; they do not certify every current interval approximation.
+
+## Adapt the question to another setting
+
+The same role definitions can describe other judged performances. These are
+mappings of the analysis design, not additional empirical datasets or evidence
+that the method is valid in every domain.
+
+| Setting | Rated unit | Possible random measurement facets | Fixed score components |
+| --- | --- | --- | --- |
+| Speech assessment | A speaker across sampled performances | Rater and task | Content, organization or other justified rubric scores |
+| Music assessment | A performer across pieces | Judge and piece | Technique and expression |
+| Judged sport | An athlete across routines | Judge and routine | Technical and artistic scores under the scoring rules |
+
+Use the column-mapping arguments in
+[`mfrm_g_study()`](../reference/mfrm_g_study.html).
+Changing labels does not change the statistical design. This route supports
+one or two random measurement facets; several score columns are fixed
+components, not extra facets. Define whether the target is one particular
+performance or a person across performances. Keeping all pieces fixed, using
+different judges for each athlete, or studying a time trend changes the target
+or supported design. Race times and match outcomes do not automatically fit a
+judged-performance model. Annual speech-contest linking with common recordings
+also requires the separate [linking design](mfrmr-linking-and-dff.html).
+
+## Examine a construct claim
+
+Suppose the intended interpretation treats Content and Organization as related
+aspects of speaking performance. One expectation to specify before analyzing
+empirical data is **positive Person covariance**: speakers who tend to score
+higher on one criterion across the defined tasks and raters also tend to score
+higher on the other. Task or rater covariance would answer a different question.
+The synthetic data below illustrate how to examine that expectation, including
+an inconclusive result; they do not validate a speaking construct.
+
+Start with the Person matrix. Its diagonal contains variances; its
+off-diagonal entries are covariances, not correlations:
+
+```{r criterion-relations}
+g$components$Person
+```
+
+Inspect uncertainty and the other sources on one common axis. Here we explicitly
+choose the conservative normal-model enclosure: it preserves signed covariance
+and requires no simulation, but can be very wide with few facet levels. It is
+one documented method, not an automatically preferred choice for every study.
+
+```{r criterion-covariance, fig.height=4.5, fig.alt="One panel shows Content-Organization covariance estimates and conservative pointwise 95 percent intervals for all seven sources. Every interval includes zero; the Task and Rater intervals are much wider than the others. These are covariance units, not correlations or halo scores."}
+relations <- plot(g, type = "covariance", score = c("Content", "Organization"),
+  intervals = TRUE, method = "regression_region", assumption = "normal")
+```
+
+The full range stays visible. Use the table to read components whose bars
+are compressed by the widest intervals; the figure does not truncate them.
+
+```{r criterion-covariance-table}
+relation_intervals <- plot_data(relations, "intervals")[[1]]
+relation_intervals[, c("Source", "Estimate", "Lower", "Upper", "Status")]
+```
+
+The Person covariance is about **-0.088**, with a conservative interval of
+approximately **[-1.456, 1.048]**. These data and this method do not resolve a
+positive population relation. They also do not establish independence, a
+negative relation, or distinct latent dimensions. Every source interval here
+includes zero; an imprecise result should remain inconclusive.
+
+The positive Rater and Task point estimates describe shared shifts in the two
+scores across raters and tasks. They do not identify an impression spreading
+between criteria. Person-by-Rater and Person-by-Task terms describe shifts
+that depend on the person; the last component still combines the highest
+interaction and residual variation. Sampling uncertainty and the source model
+limit each interpretation. These are pointwise intervals, not a test comparing
+components or a simultaneous guarantee across them.
+
+A report could state: "The proposed positive relation between Content and
+Organization was unresolved by the Person covariance interval. The analysis
+does not establish separate dimensions or a rater-impression effect." For
+empirical data, add the relevant task/rubric evidence and, where required by
+the claim, evidence about scoring processes or external measures. Do not change
+the composite weights simply to make G/Phi larger. The
+[methods guide](../reference/mfrmr_methods_reference.html#use-results-as-evidence-about-a-construct)
+connects this reasoning to measurement diagnostics and feedback, and cites
+the *Standards* (2014, Standards 1.13--1.14) and Kane (2013).
+
+Retain the covariance figure and its full table with the same source:
+
+```{r save-criterion-evidence}
+analysis$criterion_relations <- relations
+saveRDS(analysis, result_file)
+reopened <- readRDS(result_file)
+identical(plot_data(reopened$criterion_relations, "intervals")[[1]],
+  relation_intervals)  # TRUE: intervals and their qualifications were retained.
+```
+
+## Other designs and uncertainty questions
+
+Read the branch that matches your data. The first workflow does not require
+running all of these analyses.
+
+### Common tasks without a rater facet
+
+The packaged mGENOVA example contains published synthetic scores V and W for
+ten persons and six common tasks. The future question below is whether doubling
+tasks changes absolute dependability of their fixed, equally weighted mean.
+
+```{r task-data}
+tasks <- read.csv(system.file("extdata", "mgenova-table12.csv", package = "mfrmr"))
+g_tasks <- mfrm_g_study(tasks, c("V", "W"), rater = NULL)
+d_tasks <- mfrm_d_study(g_tasks, data.frame(Tasks = c(6, 12)),
+  weights = c(V = .5, W = .5))
+change <- summary(d_tasks, intervals = TRUE, parm = "Phi", reference = 1,
+  assumption = "normal")
+print(change, digits = 3)
+```
+
+The change is twelve minus six tasks. This maps one shared generalized interval;
+its frequentist coverage remains approximate. With `parm = "G"`, the balanced
+one-facet normal model instead permits an exact F construction, whose mapped
+difference interval can be conservative. Neither method subtracts two marginal
+endpoints. For Person-by-Rater without tasks, set `task = NULL` instead.
+These different inference rules are detailed in
+[`confint(d)`](../reference/confint.mfrm_multivariate_d_study.html).
+
+### Different rater teams for each task
+
+All persons complete every task, but each task has its own team. In the bundled
+nested example, rater IDs are local to tasks: the Task–Rater pair identifies a
+rater. Increasing tasks while retaining three raters per task gives:
+
+```{r nested-intervals}
+data("mfrmr_example_gtheory_nested", package = "mfrmr")
+g_nested <- mfrm_g_study(mfrmr_example_gtheory_nested,
+  c("Content", "Organization"), nesting = c(Rater = "Task"))
+d_nested <- mfrm_d_study(g_nested,
+  data.frame(Raters = 3, Tasks = c(6, 12)),
+  weights = c(Content = .5, Organization = .5))
+s_nested <- summary(d_nested, intervals = TRUE, parm = "G",
+  assumption = "normal")
+print(s_nested, digits = 3)
+```
+
+`Raters = 3` means **three per task**, not three in total; six tasks use eighteen
+distinct raters. Both facets remain random. The default G/Phi construction
+requires retaining the source child count per parent. Changing it requires an
+explicit alternative, not silent reuse of the one-facet reduction. SEM and
+paired comparisons have their own restrictions. See the *Nested plans*
+section of [`confint(d)`](../reference/confint.mfrm_multivariate_d_study.html)
+for the reasoning, formulas and runnable examples.
+
+### Compare interval methods on one shared axis
+
+Use the *Choose the G-theory target and uncertainty* table in the
+[methods guide](../reference/mfrmr_methods_reference.html) to match your
+observed design and target to the available methods. Component intervals,
+coefficient intervals, SEM intervals and paired differences answer different
+questions. Incomplete data require an explicit choice, not a switch to a
+balanced-data formula.
+
+A method comparison asks how the same target and source look under different
+interval procedures. It does not establish which has reliable repeated-sample
+coverage. Here MLS is the balanced crossed default. Delta supplies a sampling
+SE and normal-reference interval for the same original coefficient. A conservative
+mean-square region is another explicit alternative requiring optional lpSolve;
+the help also describes approximate F and other choices.
+
+```{r crossed-interval-methods, fig.alt="One forest plot groups three future plans vertically. Adjacent rows compare selected interval methods for Phi on the same axis; color, shape and line type distinguish the methods."}
+methods <- c("mls", "delta")
+if (requireNamespace("lpSolve", quietly = TRUE))
+  methods <- c(methods, "mean_square_region")
+ci_methods <- confint(d, parm = "Phi", method = methods, assumption = "normal")
+plot(ci_methods)
+ci_methods[c("Scenario", "Method", "Estimate", "SE", "Lower", "Upper")]
+```
+
+The delta `SE` measures uncertainty in the coefficient, not measurement SEM.
+Other methods in this table do not supply that SE. Delta bounds can exceed
+`[0,1]`; the table and plot retain them to show the approximation's limitation.
+An SE formula does not by itself establish normal-reference coverage. The
+*Delta coefficient SEs and intervals* section of `confint(d)` explains the
+calculation, Almehrizi's (2021) crossed-design derivation and the limits of
+extending it to nested or incomplete sources.
+
+Increasing the number of persons and increasing the number of sampled raters
+answer different precision questions. With a fixed panel of random raters,
+more persons help measure that panel's differences, but do not supply more
+independent draws from the rater population. Uncertainty about positive
+rater-population variance, which enters Phi, need not vanish. A large person
+count alone therefore does not justify a delta normal interval for Phi.
+The exact one-facet F interval for G removes that nuisance component under
+its stated normal model. Increasing proposed future counts changes the
+measurement plan; it does not add information to the source study.
+
+To see why source information matters, retain only ten persons, two raters and
+four tasks from the same synthetic source. This is a deliberately less
+informative complete source, not a recommended way to shorten an analysis.
+The score and future plans remain the same.
+
+```{r crossed-small-source-intervals, fig.alt="The same Phi method comparison now uses a small complete source. Wide or unavailable intervals remain visible on the shared axis; the plot does not measure coverage."}
+small <- subset(ratings, Person %in% head(unique(Person), 10) &
+  Rater %in% head(unique(Rater), 2) & Task %in% head(unique(Task), 4))
+g_small <- mfrm_g_study(small, c("Content", "Organization"))
+d_small <- mfrm_d_study(g_small, plans,
+  weights = c(Content = .5, Organization = .5))
+ci_small <- confint(d_small, parm = "Phi", method = methods, assumption = "normal")
+plot(ci_small, preset = "monochrome")
+```
+
+Compare widths, unavailable rows and `attr(ci_small, "notes")`, not just the
+point estimates. Wide intervals are retained; missing intervals are not zero
+uncertainty. Differences between these two sources illustrate sensitivity,
+not a robustness or coverage study. The narrowest returned interval is not
+automatically preferable. The *Choosing a two-facet method* section of
+[`confint(d)`](../reference/confint.mfrm_multivariate_d_study.html) gives the
+mathematical assumptions, finite-sample evaluations and their limitations.
+
+### Incomplete data or unavailable results
+
+Use `method = "minque0"` explicitly for a supported identifiable incomplete
+source. It estimates components from the observed arrangement; it neither
+fills missing scores nor corrects selective missingness. `missing = "omit"`
+omits a row from every selected score if any selected score is missing. Inspect
+`g$data_usage` and `g$estimation$component_support`. A connected assignment is
+not enough to guarantee that all variance components are identifiable.
+
+Future D-study counts still describe complete balanced plans, not reliability
+of the original sparse roster. A coefficient may be unavailable because a raw
+variance estimate is negative while SEM or an interval remains available.
+Keep the point and interval statuses separate. Review the score definition,
+design and data quality; do not turn unavailable values into zeros.
+
+Normal-model component SEs are available through `vcov(g, assumption =
+"normal")`; inspect its `summary` attribute. Negative or unidentified sampling
+variances have unavailable SEs. This does not justify automatic estimate-plus-
+or-minus-1.96-SE intervals for each component. For G/Phi, explicit `method =
+"delta"` propagates the full component sampling covariance to the original
+coefficient and supplies a qualified normal-reference interval. Explicit
+experimental `method = "reml_profile"`
+intervals use a separate REML estimate: retain `Estimate` and `IntervalCenter`
+with their distinct labels. Finite-sample and boundary coverage, especially
+for incomplete sources, is not generally established. A completed numerical
+fit does not resolve those limitations. The help pages below contain the
+worked incomplete-data and profile examples.
+
+If the question concerns only the combined residual, `residual_contrast` is
+a separate option that avoids likelihood fitting. The following removes three
+ratings from the bundled data to illustrate an incomplete assignment:
+
+```{r incomplete-residual}
+observed <- ratings[-c(1, 8, 23), ]
+sparse_g <- mfrm_g_study(observed,
+  scores = c("Content", "Organization"), method = "minque0")
+residual_ci <- confint(sparse_g, parm = "Residual", score = "Content",
+  method = "residual_contrast", assumption = "normal")
+residual_ci[, c("Estimate", "IntervalCenter", "Lower", "Upper", "Status")]
+attr(residual_ci, "residual_projection")$df
+```
+
+`Estimate` is the original MINQUE result; `IntervalCenter` comes from removing
+all nonresidual effects. Under the independent normal residual model at this
+observed assignment, a chi-square pivot supplies the residual variance
+interval. This requires remaining residual degrees of freedom and does not
+correct selective missingness. Two-score residual covariance intervals are
+conservative and can be very wide. Other components, G/Phi and the SEMs of
+this two-facet example require their own methods. Use the same `method` in `plot(g, intervals = TRUE, ...)`
+to show the residual interval and keep other components visibly unavailable.
+The *Residual contrasts* section of the component interval help explains the
+calculation and limits.
+
+For a **one-facet** source, relative SEM depends only on the residual. Reuse
+the published synthetic task scores loaded above, with an illustrative subset
+of missing ratings. Here the planning question is how relative measurement
+error changes between six and twelve tasks:
+
+```{r incomplete-relative-sem}
+observed_tasks <- tasks[(tasks$Person + tasks$Task) %% 3 != 0, ]
+task_g <- mfrm_g_study(observed_tasks, "V", rater = NULL,
+  method = "minque0")
+task_d <- mfrm_d_study(task_g, data.frame(Tasks = c(6, 12)))
+sem_summary <- summary(task_d, intervals = TRUE, parm = "RelativeSEM",
+  method = "residual_contrast", assumption = "normal")
+print(sem_summary, digits = 3)
+sem_change <- confint(task_d, parm = "RelativeSEM", reference = 1,
+  method = "residual_contrast", assumption = "normal")
+sem_change[, c("Tasks", "Estimate", "IntervalCenter", "Lower", "Upper")]
+```
+
+A negative difference means less relative error with more tasks under the
+model; the interval describes the size of that reduction. Both plans use
+one source residual interval, preserving their dependence. The original
+MINQUE point and the projected center can differ. Absolute error also includes
+task variation, so this residual-only transformation does not supply its
+interval. The *Residual-contrast SEM* section of `confint(d)` explains the
+normal-model assumptions, units and unavailable cases. To show a ribbon, use
+the same method in `plot(task_d, type = "sem", metric = "RelativeSEM",
+intervals = TRUE, assumption = "normal")`.
+
+For relative reliability **G**, the same one-facet source also permits a
+spectral F interval. This additionally assumes normal Person effects. It
+removes the task effects and uses the remaining Person and residual variation;
+it does not fit another likelihood model. Ask how much relative reliability
+would increase from six to twelve tasks:
+
+```{r incomplete-relative-g, fig.alt="Relative G increases with task count. The shaded interval uses a normal-model spectral F pivot from incomplete source ratings. Its wide lower range shows source uncertainty; it is not the interval for the difference between plans."}
+g_change <- confint(task_d, parm = "G", reference = 1,
+  method = "spectral_f", assumption = "normal")
+g_change[, c("Tasks", "Estimate", "Lower", "Upper", "Status")]
+plot(task_d, metric = "G", intervals = TRUE, method = "spectral_f",
+  assumption = "normal")
+```
+
+The difference interval preserves dependence between the two plans. Positive
+values mean higher relative reliability; they do not settle whether extra tasks
+are worth their cost. The ribbon shows uncertainty in each plan's G, not the
+difference. The original MINQUE point is retained. Exact coverage under the
+normal model does not guarantee a useful width: small or sparse sources can
+leave considerable uncertainty. These intervals do not supply Phi or establish
+robustness to selective missingness. See *Spectral F intervals for one-facet G*
+in `confint(d)` for the derivation, literature and unavailable cases.
+
+## Where to find calculations, assumptions and references
+
+This lesson teaches a workflow. Use the relevant help page for mathematical
+details rather than trying every uncertainty method before your first analysis.
+Important design and interpretation limits still apply at the point of use.
+
+| Need | Help page and relevant section |
+| --- | --- |
+| Supported designs, missingness, ANOVA/MINQUE estimation | [`mfrm_g_study()`](../reference/mfrm_g_study.html) |
+| G/Phi/SEM definitions, composite covariance, crossed/nested divisors | [`mfrm_d_study()`](../reference/mfrm_d_study.html), *Calculation and interpretation limits* |
+| Basic functions, returned objects and saved interval summaries | [`summary(d)`](../reference/summary.mfrm_multivariate_d_study.html), *Choose the operation* |
+| Coefficient/SEM intervals, boundary states, method comparisons and coverage evidence | [`confint(d)`](../reference/confint.mfrm_multivariate_d_study.html), the named design/method sections |
+| Variance and signed covariance intervals | [`confint(g)`](../reference/confint.mfrm_multivariate_gstudy.html) |
+| Sampling covariance and component SEs | [`vcov(g)`](../reference/vcov.mfrm_multivariate_gstudy.html) |
+| Paired delta approximation and its applicability | [`mfrm_multivariate_d_compare()`](../reference/mfrm_multivariate_d_compare.html), *Calculation and source of the approximation* |
+
+The help pages retain formulas, full methodological references and numerical
+qualifications. The G/D framework follows Brennan (2001), *Generalizability
+Theory*, Chapters 9–11, and the *Manual for mGENOVA*, Table 12 and Appendix E.
+MINQUE follows Rao (1971). Their bibliographic details and the interval-method
+references are linked from those pages. The wider
+[methods guide](../reference/mfrmr_methods_reference.html) connects measurement,
+G theory and feedback. The older `mfrm_generalizability()` / `mfrm_d_study()`
+route has a simpler main-effects model with a combined-residual scaling rule;
+it is not interchangeable with the interaction decomposition taught here.
+
+In that main-effects route, a zero object variance estimate and positive
+error give a coefficient of zero; the error variance remains available.
+A zero total variance instead makes the coefficient undefined. Read the
+returned `GReason`/`PhiReason` and error-reason columns when quantities are
+missing. Separately, `variance_components$Identified` and
+`design$component_identification` describe whether the assignments separate
+the components. If two facets always occur together, their sum may be known
+without knowing the individual contributions. Equal planned counts can then
+use that sum, whereas unequal counts cannot. A boundary estimate is not itself
+proof of this confounding, and a numerically identified fit does not establish
+precise or unbiased estimates in a small sample.

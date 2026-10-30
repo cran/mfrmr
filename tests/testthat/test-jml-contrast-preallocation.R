@@ -199,7 +199,7 @@ test_that("two-rater sparse anchored PCM preserves full shared geometry", {
   expect_fit_contrast_identity(fit)
 })
 
-test_that("interaction RSM and bounded GPCM preserve full shared geometry", {
+test_that("interaction RSM and GPCM preserve full shared geometry", {
   skip_if_not_installed("lpSolve")
   rsm_data <- simulate_mfrm_data(
     n_person = 20,

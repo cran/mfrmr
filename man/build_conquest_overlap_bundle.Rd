@@ -12,7 +12,8 @@ build_conquest_overlap_bundle(
   overwrite = FALSE,
   quad_points = 7L,
   maxit = 40L,
-  reltol = 1e-09
+  reltol = 1e-09,
+  conquest_control = list()
 )
 }
 \arguments{
@@ -40,6 +41,12 @@ settings.}
 \item{reltol}{Relative convergence tolerance used when \code{fit = NULL}.
 Default \code{1e-9}. The fitted object's actual value is recorded in the
 returned summary and settings.}
+
+\item{conquest_control}{Named list of external calculation controls:
+\code{nodes = 31L}, \code{minnode = -6}, \code{maxnode = 6}, \code{p_nodes = 2000L},
+\code{seed = 2L}, \code{convergence = 1e-8}, \code{deviance_change = 1e-10}, and
+\code{iterations = 2000L}. These do not change the native fit. Nodes/range
+control calibration; \code{p_nodes} and \code{seed} control posterior approximation.}
 }
 \value{
 A named list with class \code{mfrm_conquest_overlap_bundle}.
@@ -55,25 +62,46 @@ narrow:
 \itemize{
 \item ordered-response \code{RSM} / \code{PCM} only;
 \item binary responses only;
-\item exactly one non-person facet, treated as the item facet;
-\item active latent-regression \code{MML};
+\item exactly one difficulty-oriented non-person facet, treated as the item
+facet, with unanchored sum-to-zero locations and default binary steps;
+\item active latent-regression \code{MML} with estimated residual variance; an
+explicitly fixed \code{population_sd} requires a separately matched model;
 \item exactly one numeric person covariate beyond the intercept;
-\item complete person-by-item rectangular data.
+\item complete person-by-item rectangular data with unit weights;
+\item no group anchors, dummy facets, interactions or shrinkage.
 }
+
+Unsupported settings are rejected before export; they are not silently
+converted to the template's model. Retained category support must be binary,
+even if a polytomous fit happens to have only two observed score values.
 
 The returned bundle standardizes the responses to \verb{\{0, 1\}}, pivots them to a
 one-row-per-person wide CSV, stores the corresponding person covariates, and
 records the \code{mfrmr} estimates that should be compared externally.
+The wide CSV uses safe person aliases and the covariate alias \code{X}.
+\code{person_map} and \code{covariate_map} preserve original labels and are exported
+alongside the data. \code{PersonDataVariable} and \code{CaseVariable} record the
+covariate columns in \code{person_data} and \code{mfrmr_case_eap}; \code{PopulationParameter}
+records its coefficient label in \code{mfrmr_population}. Suffixes avoid
+overwriting identifier, estimate or variance fields. Keep the bundle for reverse
+mapping of ConQuest exports.
+Aliases do not deidentify the bundle, which includes original person data.
+Older bundles without maps retain their original-ID convention.
 It also records the actual \code{mfrmr} optimizer controls, MML engine, terminal
 gradient, convergence status and severity, and inference-readiness decision.
-A fit that is not inference-ready remains available for convergence review,
-but its estimates should not be used for inferential comparison with
-ConQuest until the convergence issue is resolved and the model is refit.
-The generated ConQuest benchmark template fixes its parameter-change
+A fit that is not inference-ready remains available for descriptive
+numerical review. Inspect the source fit's readiness checks and supported
+inferential scope: lack of readiness need not mean optimizer failure, and
+convergence alone does not establish readiness. The comparison does not
+validate standard errors or confidence intervals.
+The generated ConQuest benchmark template defaults its parameter-change
 criterion at \code{1e-8}, deviance-change criterion at \code{1e-10}, and iteration
 ceiling at \code{2000}; these controls are written into the command, summary, and
 settings so a default stopping rule cannot masquerade as an objective
-discrepancy.
+discrepancy. External integration controls are independent of native
+\code{quad_points}: equal counts do not imply equal quadrature rules or precision.
+Check calibration refinement and range sensitivity separately from posterior
+scoring. Neither 31 nodes nor a fixed seed guarantees accuracy.
 
 The \code{conquest_command} component is a conservative starting template, not a
 guaranteed version-invariant automation. The \code{conquest_output_contract}
@@ -96,6 +124,34 @@ contain identifiers and person-level estimates. When files are written, the
 helper emits a warning and writes an artifact-level privacy notice. Apply the
 study's data-handling policy before sharing or moving any bundle file.
 }
+\section{Running ConQuest locally}{
+
+This function writes inputs; it does not launch or install ConQuest. Open
+the generated \code{.cqc} file in your local ConQuest installation and use its
+containing directory as the working directory, so the relative CSV paths
+resolve. A native command-line installation can also read that command file
+as standard input from the same directory. Check the ConQuest console for
+successful estimation and the requested exports before normalizing them.
+ConQuest is optional and is not needed for the package's examples or tests.
+
+ConQuest's EAP calculation uses Monte Carlo posterior integration with
+separate \code{p_nodes} and \code{seed} controls. The \code{estimate} command's quadrature
+node count does not set this posterior simulation budget. Record both
+controls when comparing Person scores; close calibration estimates do not
+imply identical EAPs. See the
+\href{https://conquestmanual.acer.org/s4-00.html}{ConQuest command reference},
+\code{set} and \code{show}. The template defaults to \code{p_nodes=2000} and \code{seed=2};
+these give reproducibility, not a guarantee of adequate scoring precision.
+Use \code{conquest_control} to increase the posterior integration budget when
+checking score accuracy, and retain the command with its outputs.
+The command begins with \code{reset;}, then sets \code{lconstraints=items} and
+\code{exit_on_error=yes}. Run it in a fresh ConQuest session: reset clears prior
+analysis settings and the output buffer. It fixes response codes to 0/1.
+The template uses \code{fit=no} and \code{stderr=quick}; it does not compare fit or
+full parameter-estimate covariance. \verb{export covariance} contains the
+population variance, not parameter-estimate sampling covariance.
+}
+
 \section{Comparison targets}{
 
 \itemize{
@@ -121,6 +177,8 @@ optimizer-control, and convergence-review fields
 \item \code{response_long}: long-format binary response data used by the bundle
 \item \code{response_wide}: wide CSV-ready response matrix for the ConQuest template
 \item \code{person_data}: one-row-per-person covariate table
+\item \code{person_map}: original Person labels and safe ConQuest PID aliases
+\item \code{covariate_map}: original covariate name and safe ConQuest variable alias
 \item \code{item_map}: mapping from exported response columns to original item levels
 \item \code{mfrmr_population}: fitted population-model coefficients plus \code{sigma2}
 \item \code{mfrmr_item_estimates}: fitted item estimates with centered values
@@ -135,8 +193,14 @@ and convergence state
 }
 
 \examples{
-\donttest{
-bundle <- build_conquest_overlap_bundle(quad_points = 3, maxit = 30)
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("build_conquest_overlap_bundle", run.dontrun = TRUE)
+\dontrun{
+# Synthetic latent-regression fit; the full regeneration recipe is
+# examples/measurement-fits.R in the package (31 nodes, maxit = 2000).
+fit <- readRDS(system.file("examples", "measurement-fits.rds",
+  package = "mfrmr", mustWork = TRUE))$conquest
+bundle <- build_conquest_overlap_bundle(fit = fit)
 bundle$summary[, c("Case", "Facet", "Covariate", "Persons", "Items")]
 summary(bundle)$mfrmr_fit_status
 summary(bundle)$conquest_command_scope

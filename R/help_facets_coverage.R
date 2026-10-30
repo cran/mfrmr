@@ -18,9 +18,10 @@
 #' - current model boundary: one ordered-categorical response-model family and
 #'   one observed score scale are used per fit; nominal and count-response
 #'   families, mixed families, multiple independent scales,
-#'   general threshold anchoring, and scoring from an imported versioned frozen
-#'   calibration are not part of the current public estimator; posterior
-#'   scoring from an existing fitted object is a separate current route;
+#'   general threshold anchoring, and importing FACETS or third-party frozen
+#'   calibrations are not part of the current public estimator; native portable
+#'   calibration is available within the scope of [mfrm_calibration_capabilities()],
+#'   and posterior scoring from an existing fitted object remains separate;
 #' - extension surface: native R tables, plot data, GPCM diagnostics,
 #'   network views, and G/D-study helpers are package extensions, not promises
 #'   of FACETS menu-level reproduction.
@@ -37,41 +38,7 @@
 #' facets_positioning_guide()
 #' @export
 facets_positioning_guide <- function() {
-  data.frame(
-    Topic = c(
-      "Estimation authority",
-      "Compatibility purpose",
-      "External FACETS comparison",
-      "Current model and calibration boundary",
-      "Reporting source of truth",
-      "Extension beyond FACETS"
-    ),
-    Position = c(
-      "mfrmr estimates are package-native; FACETS-style names do not mean that FACETS estimated the model.",
-      "FACETS-style wrappers, table labels, and files support transition, handoff, and report organization, not optimizer-level reproduction.",
-      "Numerical comparison requires an explicit external FACETS output table supplied by the user.",
-      "Each fit uses one ordered-categorical response-model family and one observed score scale; nominal and count-response families, mixed families, multiple independent scales, general threshold anchors, and scoring from an imported versioned frozen calibration are not current public capabilities. Positive observation weights act on row-level conditional ordered-rating contributions; they are not a general collapsed-person frequency-table interface and do not change the response family. Posterior scoring from an existing fitted object is a separate route.",
-      "Inference and reporting should be based on native fit, diagnostics, review, table, and plot-data objects.",
-      "GPCM, D-study, network, and reusable visualization data are extension routes rather than FACETS menu clones."
-    ),
-    RecommendedWording = c(
-      "The model was estimated with mfrmr; FACETS-style output names are used only to organize the report.",
-      "FACETS-style outputs were generated for handoff or reader familiarity; they are not evidence of FACETS numerical equivalence.",
-      "When external FACETS output is supplied, compare MnSq first and report df/ZSTD convention sensitivity separately.",
-      "Describe mfrmr as a native R RSM/PCM analysis, diagnostic, and reporting environment, not as a general FACETS operational-calibration replacement.",
-      "Report estimates, standard errors, fit summaries, and plots from documented mfrmr objects.",
-      "Use package-native extensions as additional evidence and label them as mfrmr analyses."
-    ),
-    PrimaryRoute = c(
-      "fit_mfrm(); diagnose_mfrm(); reporting_checklist()",
-      "facets_feature_coverage(); run_mfrm_facets(); facets_output_file_bundle()",
-      "read_facets_fit_table(); facets_fit_review(); fit_measures_table(df_sensitivity = TRUE)",
-      "fit_mfrm(); facets_feature_coverage(); mfrmr_output_guide()",
-      "build_summary_table_bundle(); build_visual_summaries(); plot_data()",
-      "gpcm_capability_matrix(); mfrm_d_study(); mfrm_network_analysis(); plot_data_components()"
-    ),
-    stringsAsFactors = FALSE
-  )
+  .mfrmr_table_facets_positioning_guide_data
 }
 
 #' FACETS-to-mfrmr term crosswalk
@@ -90,49 +57,7 @@ facets_positioning_guide <- function() {
 #' facets_term_crosswalk()
 #' @export
 facets_term_crosswalk <- function() {
-  data.frame(
-    FACETSTerm = c(
-      "Measure", "S.E.", "Infit MnSq", "Outfit MnSq", "ZSTD",
-      "Rating Scale=", "Table 6 Wright/variable map", "Graphfile=",
-      "Anchorfile=", "Positive="
-    ),
-    mfrmrTerm = c(
-      "Estimate (logits)", "SE", "Infit", "Outfit", "InfitZSTD / OutfitZSTD",
-      "model = \"RSM\" or \"PCM\"", "Wright map", "graph output table",
-      "anchor table", "facet orientation"
-    ),
-    mfrmrRoute = c(
-      "fit_measures_table(); summary(fit)",
-      "fit_measures_table(); plot(fit, type = \"wright\", show_ci = TRUE)",
-      "diagnose_mfrm(); fit_measures_table()",
-      "diagnose_mfrm(); fit_measures_table()",
-      "facets_fit_df_guide(); fit_measures_table(df_sensitivity = TRUE)",
-      "fit_mfrm(model = \"RSM\" or \"PCM\")",
-      "plot_wright_unified(); plot(fit, type = \"wright\")",
-      "facets_output_file_bundle(include = \"graph\")",
-      "make_anchor_table(); fit_mfrm(anchors = ...)",
-      "fit_mfrm(positive_facets = ...); plot_wright_unified()"
-    ),
-    Relationship = c(
-      "substantive counterpart", "substantive counterpart", "substantive counterpart",
-      "substantive counterpart", "convention-sensitive counterpart",
-      "model-setting crosswalk", "visual counterpart", "handoff-file counterpart",
-      "input-table counterpart", "orientation convention"
-    ),
-    Boundary = c(
-      "Numerical equality requires aligned model, estimator, identification, and supplied external FACETS output.",
-      "SE bases differ by estimator and element type; inspect method metadata.",
-      "Compare MnSq before standardized fit and document residual basis.",
-      "Compare MnSq before standardized fit and document residual basis.",
-      "df and Wilson-Hilferty conventions can change ZSTD without changing MnSq.",
-      "The package exposes documented RSM/PCM and bounded-GPCM routes, not a FACETS command parser.",
-      "FACETS-style rendering reproduces the ruler grammar, not optimizer-level numerical identity.",
-      "CSV/TSV handoff is package-native rather than fixed-field FACETS syntax.",
-      "The table is an R-native anchor contract, not a complete FACETS specification file.",
-      "Always report which facets use the positive orientation."
-    ),
-    stringsAsFactors = FALSE
-  )
+  .mfrmr_table_facets_term_crosswalk_data
 }
 
 #' FACETS-facing visual contract
@@ -145,55 +70,13 @@ facets_term_crosswalk <- function() {
 #'
 #' @return A data.frame with visual surface, status, first route, editable data
 #'   route, and claim-boundary columns.
-#' @seealso [plot_wright_unified()], [plot_data()], [facets_term_crosswalk()],
+#' @seealso [plot(x, type = "wright", view = "unified")][plot.mfrm_fit], [plot_data()], [facets_term_crosswalk()],
 #'   [facets_feature_coverage()]
 #' @examples
 #' facets_visual_contract()
 #' @export
 facets_visual_contract <- function() {
-  data.frame(
-    FACETSVisualSurface = c(
-      "Table 6 asterisk Wright ruler",
-      "Native Wright map with uncertainty",
-      "Table 8 rating-scale structure",
-      "Graphs: expected-score ICC/IRF",
-      "Bond-Fox fit pathway",
-      "DIF/bias visual review",
-      "Graphfile and R/Web handoff"
-    ),
-    Status = c(
-      "implemented_visual", "mfrmr_extension", "implemented",
-      "implemented", "implemented_extension", "partial", "partial"
-    ),
-    FirstMfrmrRoute = c(
-      "plot_wright_unified(fit, renderer = \"facets\")",
-      "plot_wright_unified(fit, renderer = \"native\", show_ci = TRUE)",
-      "rating_scale_table(); category_structure_report()",
-      "plot(fit, type = \"pathway\")",
-      "plot(fit, type = \"fit_pathway\", fit_stat = \"Infit\", include_person = TRUE, top_n_person = 12)",
-      "plot_bias_interaction()",
-      "facets_output_file_bundle(); plot_data(); as_ggplot()"
-    ),
-    EditableDataRoute = c(
-      "plot(..., draw = FALSE)$data$facets_style$ruler_rows",
-      "plot(..., draw = FALSE); plot_data(component = \"locations\")",
-      "rating_scale_table(); plot_data()",
-      "plot_data(type = \"pathway\")",
-      "plot_data(type = \"fit_pathway\")",
-      "plot_data(); bias_interaction_report()",
-      "facets_output_file_bundle(); plot_data_components()"
-    ),
-    ClaimBoundary = c(
-      "FACETS-style visual grammar; numerical comparison requires output from a documented FACETS version under aligned settings.",
-      "The SE/CI display is an mfrmr extension and should be retained for uncertainty interpretation.",
-      "Structured R output replaces FACETS line-printer artwork.",
-      "This is expected score over theta, not a measure-versus-fit pathway map.",
-      "This is a Bond-Fox-style mfrmr extension; it is not a standard FACETS Table 6 output.",
-      "Screening display only; it is not a final fairness conclusion.",
-      "Editable handoff is supported, but FACETS UI, Excel, and webpage behavior is not cloned."
-    ),
-    stringsAsFactors = FALSE
-  )
+  .mfrmr_table_facets_visual_contract_data
 }
 
 #' FACETS Feature Coverage Matrix
@@ -222,10 +105,12 @@ facets_visual_contract <- function() {
 #' curves. `mfrmr` intentionally prioritizes structured R tables and reusable
 #' plot data over exact FACETS line-printer output.
 #'
-#' The current software reference target is FACETS 64-bit 4.5.1 (July 2026).
-#' Bibliographic references retain the title and edition of the consulted
-#' manual rather than silently relabelling a 4.5.0 manual as 4.5.1. External
-#' numerical validation is a separate evidence contract.
+#' The executed comparison uses FACETS 64-bit 4.5.0. The online update history
+#' lists 4.5.3 (October 2026); current web help is not a version-pinned executable
+#' specification. In particular, Table 13 web df and executed df differ. The
+#' 4.5.1 history replaces the gtheory interface while its help still names
+#' gtheory; mfrmr's independent G-study does not depend on that menu. Numerical
+#' comparisons require their recorded executable version, design and estimand.
 #'
 #' Status meanings:
 #'
@@ -248,11 +133,39 @@ facets_visual_contract <- function() {
 #' - `StatisticalContract` records the package-native statistical scope and
 #'   never implies a FACETS-matched estimand.
 #' - `ValidationEvidence` records whether this table establishes matched
-#'   external numerical evidence. It currently does not; validation belongs to
-#'   a separate candidate-linked evidence contract.
+#'   external numerical evidence. It currently does not; that conclusion
+#'   requires a separate comparison using a matched model and estimand.
 #' - `OperationalStatus` records route availability. A package route being
 #'   available does not make `mfrmr` operationally interchangeable with
 #'   FACETS.
+#'
+#' For observed-score assessment planning, [mfrm_g_study()] and
+#' [mfrm_d_study()] support their documented univariate or
+#' multivariate component designs. The older [mfrm_generalizability()] /
+#' [mfrm_d_study()] pair has a different main-effects decomposition. Neither
+#' route reproduces the FACETS interface to the external `gtheory` package.
+#' For balanced ANOVA, [confint.mfrm_multivariate_gstudy()] adds component
+#' SEs/intervals for a score or fixed composite under normal random effects;
+#' two-score covariance intervals have explicit generalized and conservative
+#' choices with signed bounds. Explicit `reml_profile` variance and covariance intervals
+#' also accept MINQUE(0), with a separate REML center and no sampling SE;
+#' two-score covariance profiles fit a joint normal model and retain signed bounds.
+#' [vcov.mfrm_multivariate_gstudy()] separately supplies component sampling
+#' covariance/SEs for balanced ANOVA and identifiable MINQUE sources using
+#' normal product moments; these describe the original estimator, not REML.
+#' Individual G/Phi intervals from balanced two-crossed-facet sources default
+#' to approximate MLS null inversion. Undefined MLS widths are conservatively
+#' retained and flagged; numerical availability does not guarantee coverage.
+#' G/Phi and SEM have an explicit experimental `reml_profile` option for balanced or
+#' identifiable incomplete sources; the separate REML fit retains original
+#' ANOVA/MINQUE points and does not guarantee finite-sample or boundary coverage.
+#' With `reference`, it maps one shared profile interval for one-facet plans
+#' or nested plans with a common future child count, including incomplete sources.
+#' Balanced crossed G also accepts explicit experimental `score` intervals,
+#' retaining empty-set and numerical diagnostics; Phi is not supplied by this route.
+#' [mfrm_multivariate_d_compare()]
+#' supplies a separate, limited normal-theory paired-plan calculation. See
+#' `vignette("mfrmr-gtheory", package = "mfrmr")` for a runnable workflow.
 #'
 #' @return A data.frame with columns:
 #' - `FACETSArea`
@@ -334,22 +247,22 @@ facets_feature_coverage <- function(status = c("all", "implemented",
         "Convergence and replayed iteration evidence.",
         "Does not reproduce the complete FACETS iteration trace.", package_native_alternative),
     row("Output table", "Table 4: unexpected responses", "table4.htm",
-        "unexpected_response_table(); plot_unexpected()", "implemented",
+        "unexpected_response_table(); plot(x, type = \"unexpected\")", "implemented",
         "Case-level unexpected-response screening.",
         "Structured table and plots, not printer-identical FACETS output.", package_native_alternative),
     row("Output table", "Table 5: measurable data summary", "table5.htm",
-        "measurable_summary_table(); describe_mfrm_data()", "implemented",
+        "measurable_summary_table(); describe_mfrm_data()", "partial",
         "Facet coverage, category counts, and subset/connectivity checks.",
-        "Column order and text layout differ from FACETS.", package_native_alternative),
+        "Does not reproduce FACETS response moments, raw/residual variance and global Pearson summaries; this is substantive partial coverage.", package_native_alternative),
     row("Output table", "Table 6.0: all-facet Wright map rulers", "table6.htm",
-        "plot_wright_unified(renderer = \"facets\"); plot(fit, type = \"wright\")", "implemented",
+        "plot(renderer = \"facets\", type = \"wright\", view = \"unified\"); plot(fit, type = \"wright\")", "implemented",
         "Common-logit person/facet/threshold display with FACETS-style asterisk ruler or native SE/CI rendering.",
         "Visual correspondence does not establish numerical equivalence; compare output from a documented FACETS version under aligned settings.",
         package_native_alternative),
     row("Output table", "Table 6.0.0: disjoint element listing", "table6_0_0.htm",
-        "subset_connectivity_report()", "implemented",
-        "Disconnected subsets and facet-by-subset coverage.",
-        "Network-style graph is not the default display.", package_native_alternative),
+        "subset_connectivity_report()", "supported_with_caveat",
+        "Co-observation graph components and facet coverage, with the fitted identification audit.",
+        "These are not FACETS identification subsets; a single component can conceal confounded panels.", package_native_alternative),
     row("Output table", "Table 6.2: graphical facet statistics", "table6_2.htm",
         "facet_statistics_report(); plot(...)", "partial",
         "Facet statistics and visual summaries.",
@@ -363,7 +276,7 @@ facets_feature_coverage <- function(status = c("all", "implemented",
         "Rasch/FACETS-style separation, reliability, and chi-square summaries.",
         "Uses package-native structured output and documented df conventions; external numerical equivalence is not established.", package_native_alternative),
     row("Output table", "Table 7: agreement statistics", "table7agreementstatistics.htm",
-        "interrater_agreement_table(); rater_network_analysis(); rater_halo_network_analysis(); plot_interrater_agreement()", "supported_with_caveat",
+        "interrater_agreement_table(); rater_network_analysis(); rater_halo_network_analysis(); plot(x, type = \"agreement\")", "supported_with_caveat",
         "Raw-category observed agreement and model-probability expected agreement, plus pairwise rater-network, rater-by-criterion halo network, and rater-agreement views.",
         "The package does not translate category positions across multiple independent scales, apply FACETS agreement-based SE inflation, or establish external Table 7 parity.", package_native_alternative),
     row("Output table", "Table 8.1: dichotomous/binomial/Poisson statistics",
@@ -375,7 +288,7 @@ facets_feature_coverage <- function(status = c("all", "implemented",
         "table8_1ratingscale.htm",
         "rating_scale_table(); category_structure_report()", "supported_with_caveat",
         "Core category diagnostics and thresholds for one RSM scale or one PCM step facet on the package's shared observed score scale.",
-        "Multiple independent scales, scale-specific anchors or starting values, Thurstone thresholds, and FACETS text layout are not reproduced.", package_native_alternative),
+        "Multiple independent scales and scale-specific anchors/starting values are not reproduced. Cumulative boundaries are grid approximations; category residual fit is descriptive, with no unit-baseline ZSTD test.", package_native_alternative),
     row("Output table", "Table 8: scale-structure bar chart", "table8barchart.htm",
         "category_structure_report()", "partial",
         "Category structure and transition summaries.",
@@ -393,11 +306,11 @@ facets_feature_coverage <- function(status = c("all", "implemented",
         "Unexpected rows after the current bias-screening layer.",
         "Structured table replaces FACETS text layout.", package_native_alternative),
     row("Output table", "Table 11: bias-calculation counts", "table11.htm",
-        "bias_count_table()", "implemented",
-        "Response counts behind bias estimates.",
-        "Structured output replaces FACETS text layout.", package_native_alternative),
+        "bias_count_table()", "partial",
+        "Cell counts, logit shifts and separate baseline/remaining score residuals.",
+        "FACETS Table 11 response moments and variance decompositions are not supplied.", package_native_alternative),
     row("Output table", "Table 12: bias summary report", "table12.htm",
-        "summary(estimate_bias(...)); plot_bias_interaction()", "partial",
+        "summary(estimate_bias(...)); plot(x, type = \"bias\")", "partial",
         "Distributional and visual bias summaries are available.",
         "FACETS vertical frequency bar-chart is not reproduced exactly.", package_native_alternative),
     row("Output table", "Table 13: DIF/bias detail report", "table13.htm",
@@ -409,7 +322,7 @@ facets_feature_coverage <- function(status = c("all", "implemented",
         "Pairwise contrasts for two-way bias runs.",
         "Higher-order runs omit pairwise sections by design.", package_native_alternative),
     row("Output table", "DIF/bias Excel plot", "difbiasplot.htm",
-        "plot_bias_interaction(plot = ...)", "partial",
+        "plot(plot = ..., type = \"bias\")", "partial",
         "R-native scatter, heatmap, and facet-profile bias displays.",
         "Excel-specific output is not implemented.", external_format_alternative),
     row("R/Web plots", "Scatterplots and histograms from FACETS menus",
@@ -430,30 +343,30 @@ facets_feature_coverage <- function(status = c("all", "implemented",
         "Selected 3D/surface-ready plot data are available.",
         "No arbitrary FACETS X-Y-Z plot wrapper.", custom_r_alternative),
     row("R/Web plots", "Histogram: R Statistics", "histogramr.htm",
-        "plot_data(); plot(fit, type = \"wright\"); plot_qc_dashboard()", "partial",
+        "plot_data(); plot(fit, type = \"wright\"); plot(x, type = \"qc\")", "partial",
         "Several package outputs include histogram-like summaries.",
         "No general FACETS histogram menu clone.", custom_r_alternative),
     row("R/Web plots", "Generalizability Theory via R package gtheory", "gtheory.htm",
-        "mfrm_generalizability(); mfrm_d_study(); compute_facet_icc()", "supported_with_caveat",
-        "Observed univariate G-study variance components plus D-study projections with residual-scaling sensitivity and `IdentificationStatus` columns.",
-        "Package-native caveated G/D-study route; not a FACETS/gtheory UI clone, not multivariate/profile G-theory, and not suitable for high-stakes use when boundary or singular fits are reported.",
-        package_native_alternative),
+        "mfrm_g_study(); mfrm_d_study(); mfrm_multivariate_d_compare(); mfrm_generalizability(); mfrm_d_study()", "supported_with_caveat",
+        "Observed-score univariate/multivariate component models for supported crossed/nested designs, fixed score composites and D-study plans, with component/covariance plots, curves and paired normal-theory plan comparisons. The separate main-effects route retains residual-scaling sensitivity and IdentificationStatus columns.",
+        "Not a FACETS/gtheory UI clone or general multivariate/profile G-theory implementation. Incomplete source data do not authorize sparse future plans. Component SEs/intervals use balanced ANOVA and normal random effects for a score or fixed composite; two-score covariance intervals have explicit generalized and conservative choices with signed bounds. Explicit reml_profile component intervals also accept MINQUE(0), retaining original points and a separate REML center without supplying a sampling SE. Separately, vcov(g) supplies normal-model sampling covariance and SEs for original ANOVA/MINQUE components, including incomplete sources; product-moment correction retains negative or unidentified sampling variances and does not establish normal-reference intervals. Joint reml_profile covariance intervals also accept identifiable incomplete sources, with signed bounds, no sampling SE and unestablished finite-sample coverage. Balanced crossed G also accepts an explicit experimental score interval using extended nuisance parameters; empty numerical confidence sets and failed calculations have distinct diagnostics, with no Phi or paired-plan transfer. Explicit experimental reml_profile G/Phi and SEM intervals fit the used ratings under normal effects, preserving ANOVA/MINQUE points and reporting a separate REML IntervalCenter; finite-sample and boundary coverage are not guaranteed. With reference, the shared-profile transformation supplies G/Phi/SEM differences for one-facet plans or nested plans with a common future child count, including incomplete sources; the base approximation and numerical limitations remain. SEM intervals profile error variance before taking square roots and do not enumerate remote disconnected accepted regions. Plan-difference intervals have a separate normal-theory scope. Inspect negative components, metric-specific statuses and main-effects boundary/singularity flags.",
+        "Start with the G-theory vignette and declare the score, random facets and assignments. Use the main-effects adapter only for its different decomposition; use FACETS externally for its UI or other external-only options."),
     row("R/Web plots", "Connectivity network graph via igraph", "networkgraph.htm",
         "subset_connectivity_report(); mfrm_network_analysis(); rater_network_analysis(); rater_halo_network_analysis(); plot(..., type = \"network\")", "implemented",
-        "Facet-level co-observation network plus rater agreement/disagreement/severity-direction and halo networks with reusable node/edge tables.",
-        "R-native igraph analysis and display rather than FACETS menu output.", package_native_alternative),
+        "Separate facet-level co-observation, rater score-relation, and rater-by-criterion halo networks with reusable node/edge tables.",
+        "Co-observation connectedness does not establish full design rank; consult the retained identification audit. Response networks likewise do not establish a common scale. R-native igraph analysis and display rather than FACETS menu output.", package_native_alternative),
     row("Output file", "Specification settings file", "specificationfile.htm",
         "build_mfrm_manifest(); build_mfrm_replay_script()", "partial",
         "R-native reproducibility manifest and replay script.",
         "Does not write a FACETS command specification file.", package_native_alternative),
     row("Output file", "Anchor output file", "anchorfile.htm",
         "make_anchor_table(); export_mfrm_bundle(include = \"anchors\")", "implemented",
-        "Reusable anchor tables from fitted estimates.",
-        "Uses R/CSV tables rather than FACETS fixed syntax.", package_native_alternative),
+        "Candidate direct-anchor tables mechanically extracted from fitted estimates.",
+        "Export does not certify source readiness, cross-run identity, or invariance; uses R/CSV tables rather than FACETS fixed syntax.", package_native_alternative),
     row("Output file", "Graph plotting file", "graphoutputfile.htm",
-        "facets_output_file_bundle(include = \"graph\")", "implemented",
-        "Graphfile-style category curve output.",
-        "Command-level FACETS graph options are not fully mirrored.", package_native_alternative),
+        "facets_output_file_bundle(include = \"graph\"); read_facets_results(graph_file = ...); plot()", "implemented",
+        "Graphfile-style native output and separate import of reported category/expected-score curves.",
+        "Import supports named CSV/TSV and validated ASCII fixed-width headings, preserves source coding and availability, and does not align Graphfile and element coordinates or reconstruct a calibration. Command-level graph options are not fully mirrored.", package_native_alternative),
     row("Output file", "Output report file", "outputfile.htm",
         "export_summary_appendix(); build_fixed_reports()", "partial",
         "Structured appendix/report artifacts.",
@@ -463,10 +376,10 @@ facets_feature_coverage <- function(status = c("all", "implemented",
         "Standalone observation-level residual CSV/TSV output, residual tables, and residual visualizations are available.",
         "Uses package-native residual columns rather than exact FACETS fixed-field residual syntax.", package_native_alternative),
     row("Output file", "Score output file", "scorefile.htm",
-        "facets_output_file_bundle(include = \"score\"); read_facets_fit_table()",
+        "facets_output_file_bundle(include = \"score\"); read_facets_fit_table(); read_facets_results(); plot()",
         "partial",
-        "Score-side export/import is available for documented Rasch-family routes covered by package tests.",
-        "Bounded GPCM score-side equivalence is outside the documented scope.", package_native_alternative),
+        "Native observation-level score export and separate FACETS element-level import, including standalone source-measure and fit plots.",
+        "Export and import have different units/formats. Fixed imports require validated ASCII all-field headings; use named delimited columns for other layouts or non-ASCII labels. Imported results are descriptive, without external-calibration scoring or inferred joint uncertainty. GPCM score-side equivalence is outside scope.", package_native_alternative),
     row("Output file", "Simulated data file", "simulatedfile.htm",
         "simulate_mfrm_data(); build_mfrm_sim_spec()", "partial",
         "Simulation data and explicit simulation specifications.",
@@ -492,11 +405,11 @@ facets_feature_coverage <- function(status = c("all", "implemented",
         "Cumulative category-probability curve data, flipped direction data, and approximate .5 boundaries are available.",
         "R-native plot data replace FACETS graph-menu output.", package_native_alternative),
     row("Graph menu", "Test information function", "graphs.htm",
-        "compute_information(); plot_information(type = \"tif\")", "implemented",
+        "compute_information(); plot(type = \"tif\")", "implemented",
         "Design-weighted test/scale information curves.",
         "R-native information definition and plot data.", package_native_alternative),
     row("Graph menu", "Category information function", "graphs.htm",
-        "category_curves_report(); plot(..., type = \"category_information\"); compute_information(); plot_information(type = \"iif\")", "implemented",
+        "category_curves_report(); plot(..., type = \"category_information\"); compute_information(); plot(type = \"iif\")", "implemented",
         "Category-specific information contributions, total information curves, and facet/level contribution curves are available.",
         "R-native plot data replace FACETS graph-menu output.", package_native_alternative),
     row("Graph menu", "Conditional probability curves", "graphs.htm",
@@ -519,68 +432,68 @@ facets_feature_coverage <- function(status = c("all", "implemented",
         "Fit/score table import is supported.",
         "General raw FACETS report parsing is not implemented.", external_format_alternative),
     row("Current scope boundary",
-        "Versioned frozen-calibration import and operational scoring",
-        "mfrmr 0.2.3 public contract",
-        "none in 0.2.3", "not_implemented",
-        "No current public route imports a reusable versioned calibration bundle for operational scoring.",
-        "Posterior scoring from an existing fitted object is supported separately and is not a reusable frozen-calibration contract.",
-        "Use fitted-object posterior scoring for current analyses; retain frozen-calibration workflows for a later release."),
+        "FACETS or third-party frozen-calibration import",
+        "current mfrmr public contract",
+        "no external import; native route: mfrm_calibration_capabilities(); load_mfrm_calibration(); score_mfrm_calibration()", "not_implemented",
+        "Native mfrmr portable artifacts support fixed-standard-normal RSM/PCM MML, qualified estimated-normal GPCM MML and qualified reference-prior RSM/PCM or shared-owner GPCM JML; consult mfrm_calibration_capabilities() for scope and source checks.",
+        "No current route converts a FACETS or another program's calibration file into an mfrmr portable artifact; native artifact scoring does not establish transportability or external-program equivalence.",
+        "Use the native mfrmr calibration workflow for eligible fits; use a separately validated external workflow when third-party calibration import is required."),
     row("Current scope boundary",
         "General threshold or step anchors and starting-value import",
-        "mfrmr 0.2.3 public contract",
-        "none in 0.2.3", "not_implemented",
+        "current mfrmr public contract",
+        "not available in the current package", "not_implemented",
         "No current public route accepts general threshold or step anchors or a threshold starting-value contract.",
         "Element and group anchors do not make threshold ladders fixed or supply a general calibration-import schema.",
         "Use current element/group anchor routes only for their documented scope; retain threshold anchoring for a later release."),
     row("Current scope boundary",
         "Multiple observed scales and scale-specific PCM",
-        "mfrmr 0.2.3 public contract",
-        "none in 0.2.3", "not_implemented",
+        "current mfrmr public contract",
+        "not available in the current package", "not_implemented",
         "Each fit uses one observed score scale and one homogeneous response-model family.",
         "There is no per-observation ScaleId contract, scale-specific category map, or ragged scale-specific PCM threshold block.",
         "Fit supported single-scale designs separately; retain multi-scale and mixed-family workflows for a later release."),
     row("Current scope boundary",
         "Nominal/multinomial response models",
-        "mfrmr 0.2.3 public contract",
-        "none in 0.2.3", "not_implemented",
-        "The current RSM, PCM, and bounded-GPCM routes model ordered category probabilities only.",
+        "current mfrmr public contract",
+        "not available in the current package", "not_implemented",
+        "The current RSM, PCM, and GPCM routes model ordered category probabilities only.",
         "A category-probability vector that sums to one is not an unordered nominal-response or multinomial-logit model; category order enters every current likelihood.",
         "Use a nominal-response or multinomial-regression implementation externally when category order is not substantively defined."),
     row("Current scope boundary",
         "Binomial-trial and Poisson/count response models",
         "models.htm",
-        "none in 0.2.3", "not_implemented",
+        "not available in the current package", "not_implemented",
         "Binary ordered scores are available as the two-category special case of the current ordered-response kernel.",
         "Grouped binomial trials, Poisson counts, negative-binomial counts, and other count likelihoods are not implemented; integer scores are interpreted as ordered category codes.",
         "Use FACETS or another count-model implementation for an appropriate binomial-trial or Poisson estimand; do not relabel an ordered-category fit as a count model."),
     row("Observation weighting",
         "Row-frequency weights for ordered ratings",
-        "mfrmr 0.2.3 weight contract",
+        "current mfrmr weight contract",
         "fit_mfrm(weight = ...)", "supported_with_caveat",
         "A positive numeric observation weight multiplies that row's conditional ordered-category likelihood contribution and can represent a defensible row-replication weight.",
         "It is not a general collapsed-person frequency table: for MML, powering responses inside one Person pattern is not equivalent to replicating a complete Person pattern after marginalization. It also does not create a count-response family, model within-cell dependence, or make non-unit-weight fits eligible for the common information-criterion panel.",
         "Retain one distinguishable event per row when possible; preserve distinct Person response patterns, and report the exact likelihood-weight interpretation."),
     row("Current scope boundary",
         "Native multidimensional estimation and dimension-specific scores",
-        "mfrmr 0.2.3 public contract",
-        "none in 0.2.3", "not_implemented",
+        "current mfrmr public contract",
+        "not available in the current package", "not_implemented",
         "The current public estimator and score routes are unidimensional.",
         "Residual PCA is exploratory dimensionality evidence, not native multidimensional estimation or dimension-specific scoring.",
         "Use exploratory dimensionality diagnostics and external multidimensional software when a multidimensional estimator is required."),
     row("Current scope boundary",
         "Unrestricted GPCM",
-        "mfrmr 0.2.3 public contract",
-        "none for unrestricted GPCM in 0.2.3", "not_implemented",
-        "The current public GPCM route is bounded and requires slope_facet to equal step_facet.",
-        "Bounded GPCM support does not establish an unrestricted free-discrimination model family.",
-        "Use gpcm_capability_matrix() and the documented bounded-GPCM route; retain unrestricted GPCM for a later release."),
+        "current mfrmr public contract",
+        "not available for unrestricted GPCM", "not_implemented",
+        "JML requires slope_facet to equal step_facet; MML permits separate owners with one slope family.",
+        "GPCM support does not establish an unrestricted free-discrimination model family.",
+        "Use gpcm_capability_matrix() and the documented GPCM route; retain unrestricted GPCM for a later release."),
     row("Current scope boundary",
         "FACETS free-slope polytomous GPCM comparison",
         "t7menu.htm",
-        "none as a direct common-estimand lane", "not_implemented",
+        "none as a direct common-estimand comparison", "not_implemented",
         "FACETS PCM/JMLE can serve as the direct equal-discrimination comparison after the full estimation contract is aligned.",
-        "FACETS Table 7 Estimated Discrimination is a post-fit diagnostic that does not update other Rasch estimates, so it is not the jointly estimated bounded-GPCM slope from mfrmr.",
-        "Use FACETS for the matched PCM/JML lane or as a deliberately misspecified equal-discrimination control; use a genuinely slope-estimating program only after the GPCM kernel and identification are matched.")
+        "FACETS Table 7 Estimated Discrimination is a post-fit diagnostic that does not update other Rasch estimates, so it is not the jointly estimated GPCM slope from mfrmr.",
+        "Use FACETS for the matched PCM/JML comparison or as a deliberately misspecified equal-discrimination control; use a genuinely slope-estimating program only after the GPCM kernel and identification are matched.")
   ))
 
   row.names(out) <- NULL

@@ -2,27 +2,43 @@
 % Please edit documentation in R/api-hierarchical-audit.R
 \name{facet_small_sample_review}
 \alias{facet_small_sample_review}
-\title{Review per-facet-level sample adequacy}
+\alias{plot.mfrm_facet_sample_review}
+\title{Review rating counts for each facet level}
 \usage{
 facet_small_sample_review(
   fit,
   diagnostics = NULL,
   thresholds = c(sparse = 10, marginal = 30, standard = 50)
 )
+
+\method{plot}{mfrm_facet_sample_review}(
+  x,
+  top_n = NULL,
+  preset = c("standard", "publication", "compact", "monochrome"),
+  ...
+)
 }
 \arguments{
 \item{fit}{An \code{mfrm_fit} from \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
-\item{diagnostics}{Optional \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} output. When supplied,
-per-level \code{Infit}, \code{Outfit}, and \code{ModelSE} are added to the report.}
+\item{diagnostics}{Optional \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} output from the same \code{fit}.
+When supplied, per-level \code{Infit} and \code{Outfit} are added. \code{Estimate} and
+\code{SE} come from the fitted facet tables; unavailable SEs remain missing.}
 
 \item{thresholds}{Named numeric vector of count bands. Defaults are
-\code{c(sparse = 10, marginal = 30, standard = 50)}. These are adapted
-from Linacre (1994): the 30-level band preserves Linacre's
-approximately \verb{+-1.0 logit at 95\% CI} line, while the \code{sparse < 10}
-floor and the \code{standard = 50} watermark are mfrmr-specific screening
-choices below Linacre's 30-examinee minimum and between Linacre's
-30 and 100 thresholds.}
+\code{c(sparse = 10, marginal = 30, standard = 50)}. Supply exactly these
+three names with finite, positive values satisfying
+\verb{sparse < marginal < standard}; their order in the vector is immaterial.
+The defaults are package screening choices, not precision thresholds.}
+
+\item{x}{An \code{mfrm_facet_sample_review} object.}
+
+\item{top_n}{Optional integer; trim the y-axis to the \code{top_n}
+smallest level counts per facet. \code{NULL} (default) keeps all.}
+
+\item{preset}{One of \code{"standard"}, \code{"publication"}, \code{"compact"}, \code{"monochrome"}.}
+
+\item{...}{Reserved.}
 }
 \value{
 A list of class \code{mfrm_facet_sample_review} with:
@@ -30,41 +46,56 @@ A list of class \code{mfrm_facet_sample_review} with:
 \item \code{table}: one row per \verb{(Facet, Level)} with \code{N}, \code{Estimate}, \code{SE},
 \code{Infit}, \code{Outfit}, and \code{SampleCategory}.
 \item \code{summary}: counts of levels in each sample-size category, by facet.
-\item \code{facet_summary}: smallest observed level count per facet.
+\item \code{facet_summary}: count range and lowest count band per facet.
 \item \code{thresholds}: the applied count bands.
+\item \code{notes}: count definition and interpretation limits, also shown by
+\code{print()} and \code{summary()}.
 }
+
+For \code{plot()}: Invisibly, the data.frame used for the plot, with the review's
+interpretation limits in its \code{notes} attribute.
 }
 \description{
 Reports per-level observation counts, SE, and fit statistics for every
 level of every facet in a fitted MFRM model, and classifies each level
-as \code{"sparse"}, \code{"marginal"}, \code{"standard"}, or \code{"strong"} against the
-Linacre sample-size bands.
+as \code{"sparse"}, \code{"marginal"}, \code{"standard"}, or \code{"strong"} using
+configurable count bands. These labels identify levels to inspect;
+they do not establish measurement precision or sample adequacy.
 }
 \details{
-In mfrmr every facet is a fixed effect (see \code{?fit_mfrm}, "Fixed
-effects assumption"), so a level with very few ratings contributes an
-estimate with wide SE but no shrinkage toward the facet mean. This
-helper surfaces those levels up front so users can decide whether to
-drop them, pool them, or move to a hierarchical model outside mfrmr.
+\code{N} counts retained rating rows for a level in \code{fit$prep$data}, without
+summing observation weights. For a rater it counts ratings, not distinct
+examinees; for a person it counts that person's ratings. Repeated or
+dependent ratings need not supply independent information. Review the
+counts alongside targeting, connectedness, category use, the estimation
+method, and available uncertainty estimates before drawing conclusions.
+
+\code{plot()} method: Plot a facet sample-size review
+
+Per-level observation counts rendered as a horizontal bar chart
+coloured by the count band assigned in
+\code{\link[=facet_small_sample_review]{facet_small_sample_review()}}. Vertical dashed lines mark the
+sparse / marginal / standard thresholds so reviewers see where
+every facet level sits relative to the selected screening thresholds.
+Counts and colours do not establish measurement precision.
 }
 \section{Interpreting output}{
 
-\itemize{
-\item \code{"sparse"} (n < 10): level-level estimate is unstable; SE will be
-wide; consider combining with adjacent levels or treating as
-exploratory only.
-\item \code{"marginal"} (10 <= n < 30): below Linacre (1994) 95\% CI
-+-1.0 logit threshold; usable as screening only.
-\item \code{"standard"} (30 <= n < 50): meets baseline stability; reasonable
-for publication if fit statistics are acceptable.
-\item \code{"strong"} (n >= 50): well-targeted; facet estimate is robust.
-}
+With the default thresholds, the four labels mean only \code{N < 10},
+\verb{10 <= N < 30}, \verb{30 <= N < 50}, and \code{N >= 50}, respectively.
+\code{WorstCategory} is the lowest count band represented within a facet.
+Neither \code{"standard"} nor \code{"strong"} guarantees narrow intervals, correct
+coverage, good targeting, or suitability for publication. Do not pool or
+discard levels solely because of a count label.
 
-Because mfrmr has no shrinkage by default, sparse and marginal levels
-do not "borrow strength" from other levels. Jones and Wind (2018)
-report that rater estimates are particularly sensitive to thin
-linking; the \code{Facet = "Person"} row is usually less of a concern
-because the person prior integrates out the uncertainty.
+Linacre (1994) relates Rasch item/person precision to sample size under
+targeting and model assumptions. Those guidelines do not establish a
+precision guarantee for these raw many-facet rating counts. Jones and
+Wind (2018) study repeated ratings in incomplete designs and highlight
+examinee precision. Integrating over a population distribution in MML
+does not remove uncertainty in individual person scores. Interpret \code{SE}
+according to the fitted estimator; this count review adds no interval
+qualification or hierarchical model.
 }
 
 \section{Typical workflow}{
@@ -79,6 +110,37 @@ per facet. The \code{summary} table gives counts in each band.
 Methods section; \code{\link[=build_apa_outputs]{build_apa_outputs()}} already adds a sentence
 about the band when \code{fit$summary$FacetSampleSizeFlag} is set.
 }
+}
+
+\section{Session plot defaults}{
+
+Set \code{options(mfrmr.plot_preset = "publication")} to choose a session default
+for plotting functions that expose the common \code{preset} argument. The
+supported values are \code{"standard"}, \code{"publication"}, \code{"compact"} and
+\code{"monochrome"}. Precedence is an explicit call argument, then the session
+option, then \code{"standard"}. For example, \code{preset = "standard"} overrides
+a session set to \code{"monochrome"}. Explicit \code{preset = NULL} retains the
+earlier package-default behavior; it does not read the session option.
+Invalid session values cause an error only when that option is needed.
+
+The category-curve, data-quality, fit-review, connectivity and network
+routes of \code{plot()} for report bundles use the same option through \code{...}.
+Plots without a common \code{preset} argument, including extended-model plots
+with their own \code{palette} controls, keep their own settings. This option
+selects a preset, not a universal theme or a guarantee that all renderers
+implement every appearance control identically.
+
+New plot payloads retain the resolved preset for supported saved-data
+rendering. Converting an existing payload with \code{\link[=as_ggplot]{as_ggplot()}} uses its saved
+appearance, even after the session option changes. A call that creates a
+new plot from a fit or statistical result uses the current default.
+For a reproducible script, supply \code{preset} explicitly or set the option in
+that script. Saving only the fitted model does not save a session option.
+No global ggplot theme is changed.
+
+Restore previous settings with \code{old <- options(mfrmr.plot_preset = "monochrome")} followed by \code{options(old)}. Use
+\code{options(mfrmr.plot_preset = NULL)} to remove the option. The preset changes
+appearance, not estimates, confidence levels or diagnostic thresholds.
 }
 
 \examples{
@@ -96,18 +158,19 @@ strict <- facet_small_sample_review(
 strict$facet_summary
 }
 \references{
-Linacre, J. M. (2026). \emph{A User's Guide to FACETS, Version 4.5.0}.
-Winsteps.com.
-
 Linacre, J. M. (1994). Sample size and item calibration stability.
 \emph{Rasch Measurement Transactions, 7}(4), 328.
+\url{https://rasch.org/rmt/rmt74m.htm}
 
 Jones, E., & Wind, S. A. (2018). Using repeated ratings to improve
 measurement precision in incomplete rating designs. \emph{Journal of
 Applied Measurement, 19}(2), 148-161.
+PMID: 29894984.
 }
 \seealso{
 \code{\link[=detect_facet_nesting]{detect_facet_nesting()}}, \code{\link[=analyze_hierarchical_structure]{analyze_hierarchical_structure()}},
 \code{\link[=compute_facet_icc]{compute_facet_icc()}}, \code{\link[=compute_facet_design_effect]{compute_facet_design_effect()}},
 \code{\link[=reporting_checklist]{reporting_checklist()}}.
+
+\code{\link[=facet_small_sample_review]{facet_small_sample_review()}}.
 }

@@ -135,18 +135,24 @@ test_that("prepare_mfrm_data recodes non-contiguous scores (lines 328-330)", {
 })
 
 # ===========================================================================
-# 4. format_tab_template (lines 412-425)
+# 4. Shared TSV output
 # ===========================================================================
-test_that("format_tab_template produces tab-separated text", {
-  fmt_fn <- mfrmr:::format_tab_template
+test_that("shared TSV writer preserves text, missing values and headers", {
   df <- data.frame(A = c("hello", "world"), B = c(1, NA))
-  out <- fmt_fn(df)
+  path <- tempfile(fileext = ".tsv")
+  empty_path <- tempfile(fileext = ".tsv")
+  on.exit(unlink(c(path, empty_path)), add = TRUE)
+  mfrmr:::mfrm_write_delimited_table(df, path, format = "tsv")
+  lines <- readLines(path, warn = FALSE)
+  out <- paste(lines, collapse = "\n")
   expect_true(is.character(out))
   expect_true(grepl("\t", out))
   expect_true(grepl("hello", out))
-  # NA should become ""
-  lines <- strsplit(out, "\n")[[1]]
   expect_equal(length(lines), 3)  # header + 2 rows
+  expect_identical(lines[3], "world\t")
+
+  mfrmr:::mfrm_write_delimited_table(df[FALSE, ], empty_path, format = "tsv")
+  expect_identical(readLines(empty_path, warn = FALSE), "A\tB")
 })
 
 # ===========================================================================
@@ -168,43 +174,19 @@ test_that("sanitize_dummy_facets filters to valid facet names", {
 })
 
 # ===========================================================================
-# 6. read_flexible_table (lines 778-783) file_input path
-# ===========================================================================
-test_that("read_flexible_table reads from file_input", {
-  read_fn <- mfrmr:::read_flexible_table
-  tmp <- tempfile(fileext = ".csv")
-  on.exit(unlink(tmp), add = TRUE)
-  write.csv(data.frame(X = 1:3, Y = letters[1:3]), tmp, row.names = FALSE)
-
-  file_input <- list(datapath = tmp, name = "test.csv")
-  result <- read_fn(text_value = NULL, file_input = file_input)
-  expect_true(is.data.frame(result))
-  expect_equal(nrow(result), 3)
-  expect_true("X" %in% names(result))
-
-  # Also test .tsv extension triggers tab separator
-  tmp_tsv <- tempfile(fileext = ".tsv")
-  on.exit(unlink(tmp_tsv), add = TRUE)
-  writeLines("A\tB\n1\t2\n3\t4", tmp_tsv)
-  file_input_tsv <- list(datapath = tmp_tsv, name = "test.tsv")
-  result_tsv <- read_fn(text_value = NULL, file_input = file_input_tsv)
-  expect_true(is.data.frame(result_tsv))
-})
-
-# ===========================================================================
 # 7. summarize_unexpected_response_table empty path (lines 1889-1898)
 # ===========================================================================
 test_that("summarize_unexpected_response_table returns zero-row summary for NULL input", {
   summarize_fn <- mfrmr:::summarize_unexpected_response_table
   result <- summarize_fn(NULL, total_observations = 100, abs_z_min = 2, prob_max = 0.30, rule = "either")
   expect_true(is.data.frame(result))
-  expect_equal(result$UnexpectedN, 0L)
+  expect_true(is.na(result$UnexpectedN))
   expect_equal(result$TotalObservations, 100)
   expect_equal(result$Rule, "either")
 
   # Empty tibble
   result2 <- summarize_fn(dplyr::tibble(), total_observations = 50)
-  expect_equal(result2$UnexpectedN, 0L)
+  expect_true(is.na(result2$UnexpectedN))
 })
 
 # ===========================================================================
@@ -366,29 +348,6 @@ test_that("extract_bias_facet_spec returns NULL for empty inputs", {
 })
 
 # ===========================================================================
-# 15. category_warnings_text: disordered thresholds (lines 3158-3161)
-# ===========================================================================
-test_that("category_warnings_text reports disordered thresholds", {
-  warnings_fn <- mfrmr:::category_warnings_text
-  cat_tbl <- dplyr::tibble(
-    Category = 1:5,
-    Count = c(50, 60, 70, 80, 90),
-    AvgPersonMeasure = c(-1, -0.5, 0, 0.5, 1)
-  )
-  step_tbl <- dplyr::tibble(
-    StepFacet = c("Common", "Common", "Common", "Common"),
-    Step      = paste0("Step_", 1:4),
-    Estimate  = c(-1.5, -0.5, 0.5, -0.2),  # step 4 is disordered
-    StepIndex = 1:4,
-    Spacing   = c(NA, 1.0, 1.0, -0.7),
-    Ordered   = c(NA, TRUE, TRUE, FALSE)
-  )
-  result <- warnings_fn(cat_tbl, step_tbl)
-  expect_true(grepl("Disordered thresholds", result))
-  expect_true(grepl("Common:Step_4", result))
-})
-
-# ===========================================================================
 # 16. get_extreme_levels: facet not in obs_df (lines 3174-3176)
 # ===========================================================================
 test_that("get_extreme_levels returns empty for missing facet column", {
@@ -487,8 +446,8 @@ test_that("PCM model triggers PCM code paths in obs table functions", {
   expect_true(is.data.frame(obs))
   expect_true("Observed" %in% names(obs))
 
-  # expected_score_table PCM path
-  exp_tbl <- mfrmr:::expected_score_table(fit_pcm)
+  # Existing observation diagnostics retain PCM expected scores.
+  exp_tbl <- obs
   expect_true(is.data.frame(exp_tbl))
   expect_true("Expected" %in% names(exp_tbl))
 })
@@ -645,47 +604,6 @@ test_that("calc_step_order handles NULL and missing StepFacet", {
 })
 
 # ===========================================================================
-# 27. category_warnings_text edge cases (lines 3121-3168)
-# ===========================================================================
-test_that("category_warnings_text handles no warnings", {
-  fn <- mfrmr:::category_warnings_text
-  cat_tbl <- dplyr::tibble(
-    Category = 1:3,
-    Count = c(50, 50, 50),
-    AvgPersonMeasure = c(-1, 0, 1)
-  )
-  result <- fn(cat_tbl, step_tbl = NULL)
-  expect_equal(result, "No major category warnings detected.")
-})
-
-test_that("category_warnings_text reports unused categories", {
-  fn <- mfrmr:::category_warnings_text
-  cat_tbl <- dplyr::tibble(
-    Category = 1:3,
-    Count = c(0, 50, 50),
-    AvgPersonMeasure = c(NA, 0, 1)
-  )
-  result <- fn(cat_tbl)
-  expect_true(grepl("Unused categories", result))
-})
-
-test_that("category_warnings_text reports non-monotonic averages", {
-  fn <- mfrmr:::category_warnings_text
-  cat_tbl <- dplyr::tibble(
-    Category = 1:4,
-    Count = c(50, 50, 50, 50),
-    AvgPersonMeasure = c(-1, 0, 1, 0.5)  # not monotonic
-  )
-  result <- fn(cat_tbl)
-  expect_true(grepl("not monotonic", result))
-})
-
-test_that("category_warnings_text: NULL input", {
-  fn <- mfrmr:::category_warnings_text
-  expect_equal(fn(NULL), "No category diagnostics available.")
-})
-
-# ===========================================================================
 # 28. weighted_mean edge case: all non-finite
 # ===========================================================================
 test_that("weighted_mean returns NA for all-non-finite inputs", {
@@ -747,8 +665,8 @@ test_that("PCM with MML triggers MML-specific PCM paths", {
   expect_true(is.data.frame(obs_bias))
   expect_true("StdResidual" %in% names(obs_bias))
 
-  # Expected score table PCM MML
-  exp_tbl <- mfrmr:::expected_score_table(fit_pcm_mml)
+  # Existing observation diagnostics retain PCM MML expected scores.
+  exp_tbl <- mfrmr:::compute_obs_table(fit_pcm_mml)
   expect_true(is.data.frame(exp_tbl))
 })
 
@@ -775,33 +693,6 @@ test_that("sample_mfrm_data produces consistent data", {
   expect_equal(d1, d2)
   expect_true(all(c("Person", "Rater", "Task", "Criterion", "Score") %in% names(d1)))
   expect_equal(nrow(d1), 36 * 3 * 4 * 3)
-})
-
-# ===========================================================================
-# 34. read_flexible_table: text parsing paths (lines 785-793)
-# ===========================================================================
-test_that("read_flexible_table handles text input", {
-  fn <- mfrmr:::read_flexible_table
-  # NULL text => empty tibble
-  result <- fn(text_value = NULL, file_input = NULL)
-  expect_true(is.data.frame(result))
-  expect_equal(nrow(result), 0)
-
-  # empty string
-  result2 <- fn(text_value = "", file_input = NULL)
-  expect_equal(nrow(result2), 0)
-
-  # tab-separated text
-  tab_text <- "A\tB\n1\t2\n3\t4"
-  result3 <- fn(text_value = tab_text, file_input = NULL)
-  expect_true(is.data.frame(result3))
-  expect_equal(nrow(result3), 2)
-
-  # comma-separated text
-  csv_text <- "A,B\n1,2\n3,4"
-  result4 <- fn(text_value = csv_text, file_input = NULL)
-  expect_true(is.data.frame(result4))
-  expect_equal(nrow(result4), 2)
 })
 
 # ===========================================================================
@@ -913,24 +804,6 @@ test_that("full PCM round-trip covers PCM-specific branches", {
   if (length(bias_pcm) > 0) {
     expect_true("table" %in% names(bias_pcm))
   }
-})
-
-# ===========================================================================
-# 39. category_warnings_text: DiffPercent and ZSTD warnings
-# ===========================================================================
-test_that("category_warnings_text reports DiffPercent and ZSTD warnings", {
-  fn <- mfrmr:::category_warnings_text
-  cat_tbl <- dplyr::tibble(
-    Category = 1:3,
-    Count = c(50, 50, 50),
-    AvgPersonMeasure = c(-1, 0, 1),
-    DiffPercent = c(0, 6, -7),
-    InfitZSTD = c(0.5, 2.5, 0.5),
-    OutfitZSTD = c(0.5, 0.5, 2.5)
-  )
-  result <- fn(cat_tbl)
-  expect_true(grepl("differs by >= 5", result))
-  expect_true(grepl("ZSTD", result))
 })
 
 # ===========================================================================

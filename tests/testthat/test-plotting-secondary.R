@@ -43,6 +43,12 @@ test_that("plot_reliability_snapshot returns a tidy table", {
   expect_s3_class(p, "mfrm_plot_data")
   expect_true(is.data.frame(p$data$table))
   expect_true(all(c("Facet", "Metric", "Value") %in% names(p$data$table)))
+  expect_equal(nrow(p$data$reference_lines), 0L)
+  expect_match(p$data$caption, "severity differences, not agreement", fixed = TRUE)
+  expect_match(p$data$notes$Text, "Low rater values can also reflect imprecision", fixed = TRUE)
+  expected <- .diag$reliability$Reliability[
+    match(p$data$table$Facet, .diag$reliability$Facet)]
+  expect_equal(p$data$table$Value, as.numeric(expected))
 })
 
 test_that("plot_reliability_snapshot supports separation and strata metrics", {

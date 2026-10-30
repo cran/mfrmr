@@ -40,11 +40,10 @@ basis: \code{method = "MML"} fits evaluate residuals at shrunken EAP person
 measures, whereas FACETS evaluates them at JMLE estimates, so MnSq values
 themselves can differ before any standardization is applied; refit with
 \code{method = "JML"} when the comparison requires a JMLE-style residual basis.
-Second, small df: \code{mfrmr} returns \code{NA} ZSTD when \code{df < 1} because the
-Wilson-Hilferty transformation is numerically unstable there, while
-FACETS/Winsteps under \code{WHEXACT} can continue with a linear approximation,
-so sparse cells can show \code{NA} against a finite external value without
-indicating a fit difference.
+Second, small df: the explicit engine convention withholds ZSTD below
+df=1, whereas the default FACETS convention admits positive df and caps
+ZSTD at +/-9. Both FACETS WHEXACT choices use a cube root; NO omits q/3.
+Small-df availability differences require checking the selected convention.
 }
 \examples{
 facets_fit_df_guide()

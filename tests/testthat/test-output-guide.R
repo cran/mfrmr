@@ -1,3 +1,31 @@
+test_that("rater-feedback guidance separates uncertainty, misfit and known-truth accuracy", {
+  feedback <- mfrmr_output_guide("feedback")
+  expect_true(all(feedback$Scope == "feedback"))
+  expect_true(all(feedback$Question %in% mfrmr_output_guide()$Question))
+  expect_identical(names(feedback), names(mfrmr_output_guide("public")))
+  expect_identical(feedback$DecisionBoundary, feedback$Notes)
+  # Recommended calls must resolve; the guide must not invent a wrapper/API.
+  functions <- unique(unlist(regmatches(feedback$MainFunction,
+    gregexpr("[A-Za-z][A-Za-z0-9_.]*(?=\\()", feedback$MainFunction, perl = TRUE))))
+  for (name in functions) expect_true(is.function(get(name, mode = "function")))
+  fixed <- feedback[feedback$MainFunction == "mfrm_facet_intervals()", ]
+  expect_match(fixed$TypicalInput, "fixed-standard-normal RSM/PCM MML", fixed = TRUE)
+  expect_match(fixed$DecisionBoundary, "do not correct a biased estimate", fixed = TRUE)
+  ordinary <- feedback[feedback$MainFunction == "fit_measures_table()", ]
+  expect_match(ordinary$NextStep, "profile_summary_by_facet", fixed = TRUE)
+  expect_match(ordinary$DecisionBoundary, "does not estimate", fixed = TRUE)
+  extended <- feedback[feedback$MainFunction == "mfrm_response_diagnostics()", ]
+  expect_match(extended$DecisionBoundary, "No classic cutoffs", fixed = TRUE)
+  expect_match(extended$GPCMStatus, "corrected JML", fixed = TRUE)
+  expect_match(extended$DecisionBoundary, "Infit defined but Outfit unavailable", fixed = TRUE)
+  uncertainty <- feedback[grepl("mfrm_random_rater_intervals", feedback$MainFunction), ]
+  expect_match(uncertainty$NextStep, "parm = 'raters'", fixed = TRUE)
+  expect_match(uncertainty$DecisionBoundary, "unqualified for general coverage", fixed = TRUE)
+  accuracy <- feedback[grepl("mfrm_screening_performance", feedback$MainFunction), ]
+  expect_match(accuracy$TypicalInput, "known Affected", fixed = TRUE)
+  expect_match(accuracy$DecisionBoundary, "real-data flags alone cannot", fixed = TRUE)
+})
+
 test_that("mfrmr_output_guide returns a stable purpose-to-helper map", {
   guide <- mfrmr_output_guide()
 
@@ -31,6 +59,15 @@ test_that("mfrmr_output_guide returns a stable purpose-to-helper map", {
   expect_true(any(grepl("precision_review_report", guide$MainFunction, fixed = TRUE)))
   expect_true(any(grepl("build_summary_table_bundle", guide$MainFunction, fixed = TRUE)))
   expect_true(any(grepl("facets_output_file_bundle", guide$MainFunction, fixed = TRUE)))
+  bias <- guide[grepl("estimate_all_bias()", guide$MainFunction, fixed = TRUE), ]
+  expect_true(nrow(bias) > 0L)
+  expect_true(all(grepl("collection-wide", bias$DecisionBoundary, fixed = TRUE)))
+  expect_true(all(grepl("unavailable", bias$DecisionBoundary, fixed = TRUE)))
+  expect_true(all(grepl("plot(screens)", bias$NextStep, fixed = TRUE)))
+  plans <- mfrmr_output_guide("gtheory")
+  expect_match(plans$NextStep, "error_components", fixed = TRUE)
+  expect_match(plans$Notes, "confint.mfrm_multivariate_d_study", fixed = TRUE)
+  expect_match(plans$Notes, "IntervalCenter", fixed = TRUE)
 })
 
 test_that("mfrmr_output_guide supports focused scopes", {
@@ -59,19 +96,21 @@ test_that("mfrmr_output_guide supports focused scopes", {
   expect_identical(
     public$Question,
     c(
-      "1. Check score support and fit with explicit data roles",
-      "2. Check convergence and fitted-model settings",
-      "3. Build the comprehensive FACETS-organized review",
-      "4. Create the required native Wright map with SE or CI",
-      "5. Add optional FACETS-style and Infit pathway views",
-      "6. Review, report, and export the completed results"
+      "1. Check your rating data and fit the model",
+      "2. Read the fit summary and its recommended next step",
+      "3. Review estimates, fit and precision",
+      "4. Plot abilities and facet estimates with uncertainty",
+      "5. Add other maps when they answer your question",
+      "6. Read the report and save the reviewed results"
     )
   )
   expect_match(public$MainFunction[1], "describe_mfrm_data", fixed = TRUE)
+  expect_match(public$MainFunction[1], "rating_min", fixed = TRUE)
+  expect_match(public$MainFunction[1], "rating_max", fixed = TRUE)
   expect_match(public$MainFunction[1], 'method = "MML"', fixed = TRUE)
   expect_match(public$MainFunction[2], 'profile = "fit"', fixed = TRUE)
-  expect_match(public$MainFunction[3], 'profile = "facets"', fixed = TRUE)
-  expect_match(public$MainFunction[3], "review$results", fixed = TRUE)
+  expect_match(public$MainFunction[3], 'mfrm_results(fit)', fixed = TRUE)
+  expect_match(public$MainFunction[3], "summary(res)", fixed = TRUE)
   expect_match(public$MainFunction[4], 'renderer = "native"', fixed = TRUE)
   expect_match(public$MainFunction[4], "show_ci = TRUE", fixed = TRUE)
   expect_match(public$MainFunction[4], "top_n = Inf", fixed = TRUE)
@@ -169,7 +208,7 @@ test_that("mfrmr_output_guide supports focused scopes", {
   expect_true(nrow(response_time) >= 2L)
   expect_true(any(response_time$Scope == "reviews"))
   expect_true(any(response_time$Scope == "r"))
-  expect_true(any(grepl("plot_response_time_review",
+  expect_true(any(grepl("plot(timing",
                         response_time$MainFunction,
                         fixed = TRUE)))
   expect_true(any(grepl("speed-accuracy",
@@ -214,7 +253,7 @@ test_that("mfrmr_output_guide supports focused scopes", {
   expect_true(any(gpcm$Scope == "gpcm" &
                     grepl("gpcm_capability_matrix", gpcm$MainFunction, fixed = TRUE)))
   expect_true(any(gpcm$Scope == "gpcm" &
-                    grepl("gpcm_runtime_guard_coverage", gpcm$MainFunction, fixed = TRUE)))
+                    grepl("gpcm_capability_matrix(view = 'unavailable')", gpcm$MainFunction, fixed = TRUE)))
   expect_true(any(gpcm$ObjectRole == "unavailable-route alternatives"))
   expect_true(any(grepl("inspect the source object and help page",
                         gpcm$DecisionBoundary,
@@ -282,6 +321,16 @@ test_that("facets_feature_coverage separates implemented and unsupported FACETS 
                     coverage$Status == "supported_with_caveat" &
                     grepl("mfrm_d_study", coverage$mfrmrRoute, fixed = TRUE) &
                     grepl("IdentificationStatus", coverage$Capability, fixed = TRUE)))
+  gtheory <- subset(coverage, FACETSReference == "gtheory.htm")
+  expect_equal(nrow(gtheory), 1L)
+  expect_match(gtheory$mfrmrRoute, "mfrm_g_study()", fixed = TRUE)
+  expect_match(gtheory$mfrmrRoute, "mfrm_d_study()", fixed = TRUE)
+  expect_match(gtheory$Limitation, "Component SEs/intervals use balanced ANOVA", fixed = TRUE)
+  expect_match(gtheory$Limitation, "two-score covariance intervals have explicit generalized and conservative choices", fixed = TRUE)
+  expect_match(gtheory$Limitation, "Joint reml_profile covariance intervals also accept identifiable incomplete sources", fixed = TRUE)
+  expect_match(gtheory$Limitation, "experimental reml_profile G/Phi and SEM intervals", fixed = TRUE)
+  expect_match(gtheory$Limitation, "sparse future plans", fixed = TRUE)
+  expect_identical(gtheory$ValidationEvidence, "external_match_not_established")
   expect_true(any(grepl("Connectivity network graph", coverage$FACETSFeature, fixed = TRUE) &
                     coverage$Status == "implemented" &
                     grepl("mfrm_network_analysis", coverage$mfrmrRoute, fixed = TRUE) &
@@ -314,10 +363,10 @@ test_that("facets_feature_coverage separates implemented and unsupported FACETS 
   expect_true(all(missing$Status == "not_implemented"))
 })
 
-test_that("facets_feature_coverage keeps future 0.2.3 routes fail closed", {
+test_that("facets_feature_coverage separates native calibration from unsupported routes", {
   coverage <- facets_feature_coverage()
   future_features <- c(
-    "Versioned frozen-calibration import and operational scoring",
+    "FACETS or third-party frozen-calibration import",
     "General threshold or step anchors and starting-value import",
     "Multiple observed scales and scale-specific PCM",
     "Nominal/multinomial response models",
@@ -340,12 +389,18 @@ test_that("facets_feature_coverage keeps future 0.2.3 routes fail closed", {
   expect_true(all(future$ValidationEvidence == "not_applicable"))
   expect_true(all(future$OperationalStatus == "blocked"))
   expect_true(any(
-    future$FACETSFeature == "Versioned frozen-calibration import and operational scoring" &
-      grepl("existing fitted object", future$Limitation, fixed = TRUE)
+    future$FACETSFeature == "FACETS or third-party frozen-calibration import" &
+      grepl("Native mfrmr portable", future$Capability, fixed = TRUE) &
+      grepl("FACETS or another program", future$Limitation, fixed = TRUE)
   ))
+  expect_false(any(vapply(
+    coverage,
+    function(x) any(grepl("0.2.3", x, fixed = TRUE)),
+    logical(1)
+  )))
   expect_true(any(
     future$FACETSFeature == "Unrestricted GPCM" &
-      grepl("bounded", future$Capability, fixed = TRUE)
+      grepl("requires slope_facet to equal step_facet", future$Capability, fixed = TRUE)
   ))
   expect_true(any(
     future$FACETSFeature == "Nominal/multinomial response models" &
@@ -359,7 +414,7 @@ test_that("facets_feature_coverage keeps future 0.2.3 routes fail closed", {
   expect_true(any(
     future$FACETSFeature == "FACETS free-slope polytomous GPCM comparison" &
       grepl("post-fit diagnostic", future$Limitation, fixed = TRUE) &
-      grepl("PCM/JML lane", future$Alternative, fixed = TRUE)
+      grepl("PCM/JML comparison", future$Alternative, fixed = TRUE)
   ))
 })
 
@@ -417,7 +472,7 @@ test_that("facets_positioning_guide prevents FACETS numerical-clone wording", {
   expect_true(any(grepl("not as a general FACETS operational-calibration replacement",
                         guide$RecommendedWording,
                         fixed = TRUE)))
-  expect_true(any(grepl("imported versioned frozen calibration",
+  expect_true(any(grepl("importing FACETS or third-party frozen calibrations",
                         guide$Position,
                         fixed = TRUE)))
   expect_true(any(grepl("existing fitted object",
@@ -478,7 +533,7 @@ test_that("mfrmr_output_guide gives FACETS, ConQuest, and R user pathways", {
   expect_true(any(grepl("make_anchor_table", facets$MainFunction, fixed = TRUE)))
   expect_true(any(grepl("group_anchors", facets$MainFunction, fixed = TRUE)))
   expect_true(any(grepl("detect_anchor_drift", facets$MainFunction, fixed = TRUE)))
-  expect_true(any(grepl("plot_anchor_drift", facets$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("plot(drift", facets$MainFunction, fixed = TRUE)))
   expect_true(any(grepl("fit_measures_table", facets$MainFunction, fixed = TRUE)))
   expect_true(any(grepl("facets_fit_df_guide", facets$MainFunction, fixed = TRUE)))
   expect_true(any(grepl("df_sensitivity", facets$MainFunction, fixed = TRUE)))
@@ -488,8 +543,8 @@ test_that("mfrmr_output_guide gives FACETS, ConQuest, and R user pathways", {
   expect_true(any(grepl("estimate_bias", facets$MainFunction, fixed = TRUE)))
   expect_true(any(grepl("bias_interaction_report", facets$MainFunction, fixed = TRUE)))
   expect_true(any(grepl("bias_pairwise_report", facets$MainFunction, fixed = TRUE)))
-  expect_true(any(grepl("plot_bias_interaction", facets$MainFunction, fixed = TRUE)))
-  expect_true(any(grepl("plot_wright_unified", facets$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("plot(bias", facets$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("view = \"unified\"", facets$MainFunction, fixed = TRUE)))
   expect_true(any(grepl("type = \"wright\"", facets$MainFunction, fixed = TRUE)))
   expect_true(any(grepl("data_quality_report", facets$MainFunction, fixed = TRUE)))
   expect_true(any(grepl("write_mfrm_residual_file", facets$MainFunction, fixed = TRUE)))
@@ -516,9 +571,9 @@ test_that("mfrmr_output_guide gives FACETS, ConQuest, and R user pathways", {
   expect_true(any(grepl("mfrmr_interval_guide", r_path$MainFunction, fixed = TRUE)))
   expect_true(any(grepl("plot_long", r_path$MainFunction, fixed = TRUE)))
   expect_true(any(grepl("type = \"pathway\"", r_path$MainFunction, fixed = TRUE)))
-  expect_true(any(grepl("plot_bias_interaction", r_path$MainFunction, fixed = TRUE)))
-  expect_true(any(grepl("plot_information", r_path$MainFunction, fixed = TRUE)))
-  expect_true(any(grepl("plot_response_time_review", r_path$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("plot(bias", r_path$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("plot(info", r_path$MainFunction, fixed = TRUE)))
+  expect_true(any(grepl("plot(timing", r_path$MainFunction, fixed = TRUE)))
   expect_true(any(grepl("plot_data_components", r_path$NextStep, fixed = TRUE)))
   expect_true(any(grepl("mfrmr_interval_guide", r_path$NextStep, fixed = TRUE)))
   expect_true(any(grepl("pathway_long", r_path$NextStep, fixed = TRUE)))
@@ -655,25 +710,25 @@ test_that("plot_data extracts reusable payloads and selected components", {
 
   info <- compute_information(fit, theta_points = 21)
   sem_long <- plot_data(
-    plot_information(info, type = "sem", draw = FALSE),
+    plot(info, type = "sem", draw = FALSE),
     component = "plot_long"
   )
   expect_s3_class(sem_long, "data.frame")
   expect_true(any(sem_long$ValueName == "ConditionalSEM"))
-  sem_components <- plot_data_components(plot_information(info, type = "sem", draw = FALSE))
+  sem_components <- plot_data_components(plot(info, type = "sem", draw = FALSE))
   expect_true(any(sem_components$Component == "conditional_sem"))
 
   bias <- suppressWarnings(suppressMessages(
     estimate_bias(fit, diag, facet_a = "Rater", facet_b = "Criterion", max_iter = 1)
   ))
   bias_long <- plot_data(
-    plot_bias_interaction(bias, plot = "heatmap", draw = FALSE),
+    plot(bias, type = "heatmap", draw = FALSE),
     component = "plot_long"
   )
   expect_s3_class(bias_long, "data.frame")
   expect_true(any(bias_long$Layer == "heatmap_cell"))
   bias_components <- plot_data_components(
-    plot_bias_interaction(bias, plot = "heatmap", draw = FALSE)
+    plot(bias, type = "heatmap", draw = FALSE)
   )
   expect_true(any(bias_components$Component == "flag_summary" &
                     bias_components$Role == "summary_or_guidance"))

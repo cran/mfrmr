@@ -41,22 +41,21 @@ public_documentation_files <- function(pkg_root) {
   ))
 }
 
-test_that("the public guide starts from data, fit, summary, and required Wright output", {
+test_that("the public guide starts from data, fit, plot, and summary", {
   pkg_root <- documentation_source_root()
   testthat::skip_if(is.na(pkg_root), "source documentation files are not available")
   readme <- paste(readLines(file.path(pkg_root, "README.md"), warn = FALSE),
                   collapse = "\n")
 
-  data_pos <- regexpr("dat <- load_mfrmr_data", readme, fixed = TRUE)[1]
+  data_pos <- regexpr("ratings <- load_mfrmr_data", readme, fixed = TRUE)[1]
   fit_pos <- regexpr("fit <- fit_mfrm", readme, fixed = TRUE)[1]
-  summary_pos <- regexpr("fit_summary <- summary", readme, fixed = TRUE)[1]
-  wright_pos <- regexpr("required native wright map", tolower(readme),
-                        fixed = TRUE)[1]
+  plot_pos <- regexpr("plot(fit)", readme, fixed = TRUE)[1]
+  summary_pos <- regexpr("results <- summary(fit)", readme, fixed = TRUE)[1]
 
-  expect_true(all(c(data_pos, fit_pos, summary_pos, wright_pos) > 0L))
+  expect_true(all(c(data_pos, fit_pos, plot_pos, summary_pos) > 0L))
   expect_lt(data_pos, fit_pos)
-  expect_lt(fit_pos, summary_pos)
-  expect_lt(summary_pos, wright_pos)
+  expect_lt(fit_pos, plot_pos)
+  expect_lt(plot_pos, summary_pos)
   expect_match(readme, "method = \"MML\"", fixed = TRUE)
 })
 
@@ -66,13 +65,16 @@ test_that("FACETS positioning distinguishes native estimates from visual emulati
   readme <- paste(readLines(file.path(pkg_root, "README.md"), warn = FALSE),
                   collapse = "\n")
 
-  readme_flat <- gsub("[[:space:]]+", " ", readme)
-  expect_match(readme_flat, "keeps uncertainty visible", fixed = TRUE)
-  expect_match(readme, "FACETS-style", fixed = TRUE)
-  expect_true(grepl("asterisk", tolower(readme), fixed = TRUE))
-  expect_true(grepl("rubric", tolower(readme), fixed = TRUE))
-  expect_true(grepl("does not reproduce a facets run", tolower(readme),
-                    fixed = TRUE))
+  expect_match(readme, "mfrmr-facets-migration.html", fixed = TRUE)
+  guide <- paste(readLines(file.path(pkg_root, "vignettes", "mfrmr-facets-migration.Rmd"),
+    warn = FALSE), collapse = "\n")
+  text <- gsub("[[:space:]]+", " ", paste(readme, guide))
+  expect_match(guide, "mfrmr uncertainty estimates", fixed = TRUE)
+  expect_match(guide, "FACETS-style", fixed = TRUE)
+  expect_true(grepl("asterisk", tolower(guide), fixed = TRUE))
+  expect_true(grepl("rubric", tolower(guide), fixed = TRUE))
+  expect_match(text, paste("Neither renderer implies that FACETS performed the estimation",
+    "or that the two programs are numerically equivalent."), fixed = TRUE)
   expect_false(grepl("FACETS produced the estimates", readme, fixed = TRUE))
   expect_false(grepl("complete facets reproduction", tolower(readme),
                      fixed = TRUE))
@@ -93,8 +95,6 @@ test_that("public documentation does not advertise later-release routes as curre
     "supports multiple independent rating scales",
     "supports general threshold anchors",
     "supports threshold anchoring",
-    "supports versioned frozen calibration",
-    "supports a versioned frozen calibration",
     "supports native multidimensional estimation",
     "provides native multidimensional estimation"
   )
@@ -108,8 +108,14 @@ test_that("public documentation does not advertise later-release routes as curre
 
   expect_identical(hits, character(0))
   expect_match(flat, "one observed score scale", fixed = TRUE)
-  expect_match(flat, "imported versioned frozen-calibration bundle", fixed = TRUE)
-  expect_match(flat, "posterior scoring from an existing fitted object is a separate", fixed = TRUE)
+  portable <- tolower(gsub("[[:space:]]+", " ", paste(readLines(file.path(
+    pkg_root, "vignettes", "mfrmr-portable-calibration.Rmd"), warn = FALSE), collapse = "\n")))
+  expect_match(portable, "portable workflow is deliberately narrower than fitted-object scoring", fixed = TRUE)
+  expect_true(grepl(
+    "estimated-population rsm/pcm and latent regression remain fitted-object-only",
+    portable, fixed = TRUE
+  ))
+  expect_match(portable, "portable calibration are different objects", fixed = TRUE)
 })
 
 test_that("public estimator vocabulary keeps JMLE as an input alias only", {
@@ -129,7 +135,7 @@ test_that("public estimator vocabulary keeps JMLE as an input alias only", {
     encoding = "UTF-8"
   ), collapse = "\n")
 
-  expect_match(fit_help, 'method = c("MML", "JML", "JMLE")', fixed = TRUE)
+  expect_match(fit_help, 'method = c("MML", "JML", "JMLE", "CML")', fixed = TRUE)
   expect_match(fit_help, '"JMLE"} is accepted as a', fixed = TRUE)
   expect_match(package_help, '"JMLE"} as a backward-compatible alias', fixed = TRUE)
   expect_false(grepl('method = "MMLE"', public_text, fixed = TRUE))
@@ -205,6 +211,10 @@ test_that("CRAN-facing documentation excludes development-process language", {
   blocked <- c(
     "release evidence map",
     "release-readiness",
+    "repository roadmap",
+    "repository-level",
+    "validation record",
+    "CRAN checks",
     "pre-release status",
     "checked locally",
     "regression fixture",
@@ -236,28 +246,45 @@ test_that("CRAN-facing documentation excludes development-process language", {
     "predeclared deterministic challenge",
     "roadmap_only",
     "schema-only future branch",
-    "future-branch active planning scaffold"
+    "future-branch active planning scaffold",
+    "regression-tested default",
+    "focused regression test",
+    "test code mechanics",
+    "0.2.3 evidence map",
+    "repository audit",
+    "candidate-linked evidence contract",
+    "optional local execution",
+    "for final evidence",
+    "executable examples shorten package checks",
+    "keeps CRAN example time short",
+    "reproducible analysis, package checks",
+    "documents, tests, and reproducible analyses"
   )
-
-  # NEWS is an immutable historical record once a release is submitted. Keep
-  # the exact 0.2.2 wording visible without allowing the same process language
-  # to leak into current guides or future release notes.
-  historical_news_allowlist <-
-    "Shiny viewer remains interactive-only. The release-readiness review now"
 
   hits <- character(0)
   for (path in names(docs)) {
     lines <- docs[[path]]
     for (phrase in blocked) {
       idx <- grep(tolower(phrase), tolower(lines), fixed = TRUE)
-      if (identical(basename(path), "NEWS.md") && length(idx) > 0L) {
-        idx <- idx[trimws(lines[idx]) != historical_news_allowlist]
-      }
       if (length(idx) > 0L) {
         hits <- c(hits, paste0(path, ":", idx, ": ", trimws(lines[idx])))
       }
     }
     idx <- grep("\\bP[0-9]+[a-z]\\b", lines, perl = TRUE)
+    if (length(idx) > 0L) {
+      hits <- c(hits, paste0(path, ":", idx, ": ", trimws(lines[idx])))
+    }
+    idx <- grep(
+      "\\b(lane|lanes|gate|gates|preflight)\\b",
+      lines, ignore.case = TRUE, perl = TRUE
+    )
+    if (length(idx) > 0L) {
+      hits <- c(hits, paste0(path, ":", idx, ": ", trimws(lines[idx])))
+    }
+    idx <- grep(
+      "(CORE-[0-9]+|OPT-[0-9]+|Draft[.][0-9]+|(?<![[:alnum:]-])G[0-9](?![[:alnum:]]))",
+      lines, perl = TRUE
+    )
     if (length(idx) > 0L) {
       hits <- c(hits, paste0(path, ":", idx, ": ", trimws(lines[idx])))
     }
@@ -292,6 +319,19 @@ test_that("the shipped source excludes development-stage contract names", {
   source_files <- source_files[
     basename(source_files) != "test-documentation-terminology.R"
   ]
+  ignore_path <- file.path(pkg_root, ".Rbuildignore")
+  if (file.exists(ignore_path)) {
+    ignore <- readLines(ignore_path, warn = FALSE)
+    ignore <- ignore[nzchar(ignore) & !startsWith(trimws(ignore), "#")]
+    relative <- substring(
+      normalizePath(source_files, winslash = "/", mustWork = FALSE),
+      nchar(normalizePath(pkg_root, winslash = "/", mustWork = TRUE)) + 2L
+    )
+    ignored <- vapply(relative, function(path) {
+      any(vapply(ignore, grepl, logical(1), x = path, perl = TRUE))
+    }, logical(1))
+    source_files <- source_files[!ignored]
+  }
   bad_file_names <- grep(
     "coverage-(push|boost|gaps)|final-coverage|remaining-coverage",
     basename(source_files),
@@ -314,7 +354,21 @@ test_that("the shipped source excludes development-stage contract names", {
     "coverage-boost",
     "coverage-gaps",
     "final-coverage",
-    "remaining-coverage"
+    "remaining-coverage",
+    "P1z compactification",
+    "P2b lexicographic-limit",
+    "P2c parameter",
+    "P2d finite-sequence",
+    "P2e contract",
+    "P2e oracle",
+    "P2e flag",
+    "P2f global-existence",
+    "P2g source contract",
+    "P2g scope",
+    "P2h binary",
+    "P2i fixture",
+    "P2i envelope",
+    "P2j face chart"
   )
   hits <- character(0)
   for (path in names(source_text)) {

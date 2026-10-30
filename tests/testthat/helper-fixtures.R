@@ -8,12 +8,11 @@
 #
 # Each helper is deterministic and fast (the JML toy fit takes
 # well under a second on example_core / example_bias). Caching
-# inside the helpers avoids paying that cost more than once when
+# fitted models avoids paying that cost more than once when
 # multiple tests in the same session ask for the same fixture.
 
-# Internal cache, scoped to a list so concurrent test files do not
-# collide. We deliberately do not export this; tests should call
-# the public helpers below.
+# Internal fit cache. Diagnostics are computed from the supplied fit so
+# changes to its estimates or readiness cannot reuse another fit's results.
 .mfrmr_test_cache <- new.env(parent = emptyenv())
 
 # Repository-only integration fixtures occasionally need the development
@@ -29,6 +28,13 @@
          call. = FALSE)
   }
   invisible(asNamespace("mfrmr"))
+}
+
+.mfrmr_test_skip_unless_version <- function(version) {
+  testthat::skip_if_not(
+    identical(as.character(utils::packageVersion("mfrmr")), version),
+    paste("Historical source-bound replay requires mfrmr", version)
+  )
 }
 
 # Muffle only warnings that a test has explicitly classified as unrelated
@@ -90,18 +96,11 @@ make_toy_diagnostics <- function(fit = NULL,
                                  diagnostic_mode = "legacy",
                                  residual_pca = "none") {
   if (is.null(fit)) fit <- make_toy_fit()
-  key <- .cache_key("diag", attr(fit, "config")$method %||% "JML",
-                    diagnostic_mode, residual_pca)
-  if (exists(key, envir = .mfrmr_test_cache, inherits = FALSE)) {
-    return(get(key, envir = .mfrmr_test_cache, inherits = FALSE))
-  }
-  diag <- suppressMessages(suppressWarnings(
+  suppressMessages(suppressWarnings(
     diagnose_mfrm(fit,
                   diagnostic_mode = diagnostic_mode,
                   residual_pca = residual_pca)
   ))
-  assign(key, diag, envir = .mfrmr_test_cache)
-  diag
 }
 
 #' Loads the toy data + fit + diagnostics into the calling test_that

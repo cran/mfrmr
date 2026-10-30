@@ -110,6 +110,7 @@ test_that("positive slope boundary takes precedence over a small gradient", {
 })
 
 test_that("competitive joint boundary also overrides a zero gradient", {
+  skip_if_not_installed("lpSolve")
   fit <- fit_jml_gpcm_terminal_gradient_fixture("joint")
   boundary <-
     fit$config$boundary_audit$gpcm_fixed_objective_classification
@@ -129,6 +130,7 @@ test_that("competitive joint boundary also overrides a zero gradient", {
 })
 
 test_that("scoped negatives allow retained-point first-order typing only", {
+  skip_if_not_installed("lpSolve")
   fit <- fit_jml_gpcm_terminal_gradient_fixture("negative")
   boundary <-
     fit$config$boundary_audit$gpcm_fixed_objective_classification

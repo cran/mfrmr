@@ -385,7 +385,7 @@ test_that("JML and MML facet estimates are highly correlated", {
   }
   expect_identical(
     as.character(fit_jml$summary$FitReadiness[1]),
-    "ready_with_exclusions"
+    if (requireNamespace("lpSolve", quietly = TRUE)) "ready_with_exclusions" else "review"
   )
   expect_false(isTRUE(fit_jml$summary$InferenceReady[1]))
   expect_match(
@@ -507,7 +507,7 @@ test_that("binary scores are supported as ordered two-category responses", {
   expect_true(all(is.finite(fit_pcm$steps$Estimate)))
 })
 
-test_that("GPCM requires explicit and aligned step/slope facets", {
+test_that("GPCM requires explicit steps and JML requires aligned owners", {
   d <- mfrmr:::sample_mfrm_data(seed = 42)
 
   expect_error(
@@ -530,13 +530,44 @@ test_that("GPCM requires explicit and aligned step/slope facets", {
       c("Rater", "Task", "Criterion"),
       "Score",
       model = "GPCM",
-      method = "MML",
+      method = "JML",
       step_facet = "Criterion",
       slope_facet = "Task"
     ),
     "slope_facet == step_facet",
     fixed = TRUE
   )
+})
+
+test_that("ordinary GPCM slope scores preserve nearly tied large category terms", {
+  d <- expand.grid(Person = c("b", "a", "c"), Task = c("t1", "t2"), Rater = c("r1", "r2"))
+  d$Score <- ifelse(d$Rater == "r1", 1L, 2L)
+  d <- d[!(d$Person == "a" & d$Task == "t2" & d$Rater == "r2"), ]
+  rule <- list(nodes = c(-1,0,1), weights = c(.2,.5,.3))
+  for (method in c("JML", "MML")) {
+    prep <- prepare_mfrm_data(d, "Person", c("Task", "Rater"), "Score", rating_min = 0, rating_max = 2)
+    config <- build_estimation_config(prep, "GPCM", method, "Rater", "Rater",
+      weight_col = NULL, facet_signs = c(Task = -1, Rater = -1), positive_facets = character(),
+      noncenter_facet = "Rater", dummy_facets = character(), anchor_df = NULL, group_anchor_df = NULL)$config
+    sizes <- build_param_sizes(config); slices <- build_param_slices(sizes)
+    idx <- build_indices(prep, step_facet = "Rater", slope_facet = "Rater", gpcm_spec = config$gpcm_spec)
+    par <- numeric(sum(unlist(sizes))); par[slices$Rater] <- -1e12; par[slices$steps] <- -1e12 + 2
+    ev <- make_mfrm_direct_evaluator(method, make_param_cache(sizes, config, idx, is_mml = method == "MML"),
+      idx, config, sizes, rule)
+    # Independent adjacent-category reduction: category zero has negligible
+    # probability; p2/p1 = exp(theta + 2). JML holds every theta at zero, while
+    # MML integrates each Person's joint pattern using the supplied rule.
+    nodes <- if (method == "JML") 0 else rule$nodes
+    weights <- if (method == "JML") 1 else rule$weights
+    odds <- nodes + 2; p1 <- plogis(-odds); p2 <- plogis(odds)
+    expected <- sum(vapply(split(d, d$Person), function(rows) {
+      n1 <- sum(rows$Score == 1); n2 <- sum(rows$Score == 2)
+      lp <- n1 * log(p1) + n2 * log(p2)
+      posterior <- weights * exp(lp - max(lp)); posterior <- posterior / sum(posterior)
+      sum(posterior * odds * (n1 * p2 + n2 * p1))
+    }, numeric(1)))
+    expect_equal(ev$gradient(par)[slices$log_slopes], expected, tolerance = 1e-14)
+  }
 })
 
 test_that("GPCM core fits return positive discrimination tables", {

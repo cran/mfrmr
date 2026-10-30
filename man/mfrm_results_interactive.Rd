@@ -29,12 +29,12 @@ It asks the user to choose the person, score, optional weight, and facet
 columns, prints reproducible code for the selected roles, then fits the
 documented \code{RSM}/\code{MML} starting route before calling
 \code{\link[=mfrm_results]{mfrm_results()}}. Use explicit \code{\link[=fit_mfrm]{fit_mfrm()}} calls in scripts, Quarto
-documents, tests, and reproducible analyses.
+documents, batch workflows, and reproducible analyses.
 }
 \section{Why this helper is opt-in}{
 
 Interactive prompts are useful at the console but are unsafe defaults for
-reproducible analysis, package checks, batch scripts, and manuscripts. The
+reproducible analysis, unattended workflows, and manuscripts. The
 helper therefore prints replay code and leaves the scripted route explicit.
 }
 

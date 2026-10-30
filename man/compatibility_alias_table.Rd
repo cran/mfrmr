@@ -36,7 +36,7 @@ handoffs. It is meant to answer two questions quickly:
 \item Which package-native names should new code use instead?
 }
 
-Internal soft-deprecated helpers are deliberately excluded here. This table
+Non-exported soft-deprecated helpers are deliberately excluded here. This table
 is only for retained user-facing aliases that remain part of the public
 surface.
 }
@@ -57,5 +57,5 @@ compatibility_alias_table("columns")
 }
 \seealso{
 \link{mfrmr_compatibility_layer}, \code{\link[=run_mfrm_facets]{run_mfrm_facets()}}, \code{\link[=analyze_dff]{analyze_dff()}},
-\code{\link[=reporting_checklist]{reporting_checklist()}}, \code{\link[=fair_average_table]{fair_average_table()}}, \code{\link[=plot_fair_average]{plot_fair_average()}}
+\code{\link[=reporting_checklist]{reporting_checklist()}}, \code{\link[=fair_average_table]{fair_average_table()}}, \link[=plot.mfrm_fit]{plot(x, type = "fair_average")}
 }

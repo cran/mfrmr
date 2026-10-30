@@ -27,6 +27,12 @@ test_that("build_model_choice_review bundles comparison and user guidance", {
   ))
 
   review <- build_model_choice_review(RSM = rsm_fit, GPCM = gpcm_fit)
+  report <- mfrm_report(review, study_context = c(question = "Sensitivity to criterion discrimination"))
+  expect_identical(report$tables$comparison_table, as.data.frame(review$comparison_table))
+  expect_identical(report$tables$model_roles, as.data.frame(review$model_roles))
+  expect_identical(report$tables$comparison_warnings$Warning, review$comparison_warnings)
+  expect_false(report$tables$overview$ICComparable)
+  expect_match(paste(report$notes, collapse = " "), "AIC rank alone")
 
   expect_s3_class(review, "mfrm_model_choice_review")
   expect_s3_class(review, "mfrm_bundle")
@@ -71,11 +77,11 @@ test_that("build_model_choice_review bundles comparison and user guidance", {
   ]
   route_areas <- c(
     FullAPARoute = "APA writer and fit-based export bundles",
-    ScoreSideExport = "Score-side scorefile export under bounded GPCM",
+    ScoreSideExport = "Score-side scorefile export under GPCM",
     LinkingSynthesis = "Operational linking synthesis",
     RecoveryChecks = "Direct simulation-spec generation and recovery",
-    FairAverage = "Fair-average semantics under bounded GPCM (slope-aware)",
-    BiasScreening = "Residual-bias screening under bounded GPCM",
+    FairAverage = "Fair-average semantics under GPCM (slope-aware)",
+    BiasScreening = "Residual-bias screening under GPCM",
     SummaryAppendix = "Checklist and summary-table appendix route"
   )
   for (field in names(route_areas)) {
@@ -84,7 +90,7 @@ test_that("build_model_choice_review bundles comparison and user guidance", {
     expect_identical(
       gpcm_route[[field]][1],
       capability$Status[idx],
-      info = paste("Stale bounded-GPCM downstream status for", field)
+      info = paste("Stale GPCM downstream status for", field)
     )
   }
   expect_identical(gpcm_route$FullAPARoute[1], "supported_with_caveat")
@@ -93,18 +99,18 @@ test_that("build_model_choice_review bundles comparison and user guidance", {
   expect_true(any(review$downstream_routes$FairAverage == "supported_with_caveat" &
     review$downstream_routes$Model == "GPCM"))
   expect_false(any(grepl(
-    "blocked for bounded GPCM|fit-based bundles remain RSM/PCM only",
+    "blocked for GPCM|fit-based bundles remain RSM/PCM only",
     review$route_map$Interpretation,
     fixed = FALSE
   )))
   expect_true(any(grepl("automatic operational-scoring decision", review$key_warnings, fixed = TRUE)))
   expect_true(any(grepl(
-    "requires optimizer or convergence review",
+    "IC solution checks are not satisfied",
     review$comparison_warnings,
     fixed = TRUE
   )))
   expect_true(any(grepl(
-    "screening/review-only",
+    "below q = 31",
     review$comparison_warnings,
     fixed = TRUE
   )))
@@ -122,6 +128,12 @@ test_that("build_model_choice_review bundles comparison and user guidance", {
     "report_templates", "route_map", "weighting_review_status"
   ) %in% names(sx)))
   expect_false("weighting_audit_status" %in% names(sx))
+  stale <- review
+  stale$model_roles$NumericalConvergence <- NULL
+  expect_error(summary(stale), "Recreate it with build_model_choice_review()", fixed = TRUE)
+  stale_summary <- sx
+  stale_summary$model_roles$NumericalConvergence <- NULL
+  expect_error(print(stale_summary), "no model refit is needed", fixed = TRUE)
   printed <- capture.output(print(sx))
   expect_true(any(grepl("Model Contracts and Readiness", printed, fixed = TRUE)))
   expect_true(any(grepl("Step parameters (reported values versus independent parameters)",
@@ -137,8 +149,9 @@ test_that("build_model_choice_review bundles comparison and user guidance", {
   expect_length(downstream_start, 1L)
   contract_lines <- printed[contract_start:(downstream_start - 1L)]
   expect_lte(max(nchar(contract_lines)), 80L)
+  expect_false(any(grepl("reference_plus_sensitivity_review|ICIntegrationTier|supported_with_caveat|gpcm_free_slope", printed)))
   expect_true(any(grepl("Comparison Warnings", printed, fixed = TRUE)))
-  expect_true(any(grepl("screening/review-only", printed, fixed = TRUE)))
+  expect_true(any(grepl("below q = 31", printed, fixed = TRUE)))
 
   bundle <- build_summary_table_bundle(review)
   expect_s3_class(bundle, "mfrm_summary_table_bundle")
@@ -185,7 +198,7 @@ test_that("build_model_choice_review bundles comparison and user guidance", {
   expect_length(warning_path, 1L)
   exported_warnings <- utils::read.csv(warning_path, stringsAsFactors = FALSE)
   expect_true(any(grepl(
-    "screening/review-only",
+    "below q = 31",
     exported_warnings$Warning,
     fixed = TRUE
   )))

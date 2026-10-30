@@ -122,7 +122,7 @@ test_that("compute_information supports PCM fits with custom step facet names", 
   expect_true(all(sort(unique(surface_plot$data$surface$Category)) == sort(as.character(fit$prep$rating_min:fit$prep$rating_max))))
 })
 
-test_that("compute_information supports bounded GPCM fits", {
+test_that("compute_information supports GPCM fits", {
   toy <- load_mfrmr_data("example_core")
   fit <- suppressWarnings(
     fit_mfrm(

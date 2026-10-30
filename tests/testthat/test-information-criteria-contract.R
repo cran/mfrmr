@@ -188,9 +188,8 @@ test_that("IC eligibility fails closed for JML, non-unit weights, and small-N SA
     mfrmr:::mfrm_ic_console_lines(as.data.frame(jml_contract)),
     collapse = " "
   )
-  expect_match(jml_text, "not eligible (descriptive_jml)", fixed = TRUE)
-  expect_match(jml_text, "Legacy descriptive AIC", fixed = TRUE)
-  expect_match(jml_text, "not part of the common MML ranking panel", fixed = TRUE)
+  expect_match(jml_text, "Information-criterion ranking is unavailable for JML", fixed = TRUE)
+  expect_false(grepl("descriptive_jml|Legacy descriptive AIC|Canonical", jml_text))
 
   small <- explicit
   small$data <- small$data[small$data$Person %in% paste0("P", 1:22), ]
@@ -412,6 +411,45 @@ test_that("fitted-object IC comparison audits weights, legacy state, and identit
     tolerance = 1e-8
   )
 
+  # Isolate ratio arithmetic from fitting: two negligible candidates can still
+  # have a finite relative weight even when both normalized weights round to zero.
+  local({
+    contract <- mfrmr:::mfrm_extract_fit_ic_contract(fit_unweighted)
+    local_mocked_bindings(mfrm_extract_fit_ic_contract = function(fit, ...) {
+      result <- contract
+      result$AIC <- fit$ratio_test_aic
+      result
+    })
+    candidates <- lapply(c(100, 1700, 1702), function(value) {
+      result <- fit_unweighted; result$ratio_test_aic <- value; result
+    })
+    cmp <- do.call(compare_mfrm, c(candidates, list(labels = c("A", "B", "C"))))
+    expect_identical(cmp$table$AkaikeWeight, c(1, 0, 0))
+    er <- cmp$evidence_ratios
+    expect_equal(er$LogEvidenceRatio, c(800, 801, 1))
+    expect_equal(er$EvidenceRatio[3], exp(1))
+    expect_true(all(is.na(er$EvidenceRatio[1:2])))
+    expect_identical(er$RatioReason, c("overflow", "overflow", "available"))
+    reversed <- do.call(compare_mfrm, c(rev(candidates), list(labels = c("C", "B", "A"))))
+    expect_equal(reversed$evidence_ratios$EvidenceRatio[1], exp(-1))
+    expect_identical(reversed$evidence_ratios$RatioReason, c("available", "underflow", "underflow"))
+    expect_identical(summary(cmp)$evidence_ratios, er)
+    expect_match(paste(capture.output(print(cmp)), collapse = "\n"),
+                 "overflow; log ratio = 800", fixed = TRUE)
+    expect_match(paste(capture.output(print(reversed)), collapse = "\n"),
+                 "underflow; log ratio = -801", fixed = TRUE)
+    small <- cmp
+    small$evidence_ratios$EvidenceRatio[3] <- exp(-100)
+    expect_match(paste(capture.output(print(small)), collapse = "\n"),
+                 format(signif(exp(-100), 3), trim = TRUE), fixed = TRUE)
+    extremes <- candidates[1:2]
+    extremes[[1]]$ratio_test_aic <- -1e308
+    extremes[[2]]$ratio_test_aic <- 1e308
+    large <- do.call(compare_mfrm, extremes)$evidence_ratios
+    expect_equal(large$LogEvidenceRatio, 1e308)
+    expect_identical(large$RatioReason, "overflow")
+  })
+
   constant_data <- data
   person_weight <- setNames(rep(c(1, 2), length.out = 24L), keep_persons)
   constant_data$AnalysisWeight <- person_weight[as.character(constant_data$Person)]
@@ -433,10 +471,16 @@ test_that("fitted-object IC comparison audits weights, legacy state, and identit
     fit_constant$summary[1, c("AIC", "BIC", "SABIC")],
     use.names = FALSE
   ))))
-  expect_warning(
-    constant_comparison <- compare_mfrm(A = fit_constant, B = fit_constant),
-    "not eligible for the common information-criterion panel"
+  warnings <- character()
+  constant_comparison <- withCallingHandlers(
+    compare_mfrm(A = fit_constant, B = fit_constant),
+    warning = function(w) {
+      warnings <<- c(warnings, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
   )
+  expect_true(any(grepl("cannot be ranked by information criteria", warnings)))
+  expect_true(any(grepl("IC solution checks are not satisfied", warnings)))
   expect_false(any(constant_comparison$table$ICComparable))
 
   varying_data <- data
@@ -466,7 +510,7 @@ test_that("fitted-object IC comparison audits weights, legacy state, and identit
   coarse_fit <- ic_test_ready(coarse_fit)
   expect_warning(
     coarse_comparison <- compare_mfrm(A = coarse_fit, B = coarse_fit),
-    "screening/review-only"
+    "unavailable at the supplied quadrature resolution"
   )
   expect_true(all(coarse_comparison$table$ICEligible))
   expect_false(any(coarse_comparison$table$ICSelectable))
@@ -492,7 +536,7 @@ test_that("fitted-object IC comparison audits weights, legacy state, and identit
   )] <- NULL
   expect_warning(
     legacy_comparison <- compare_mfrm(Current = fit_unweighted, Legacy = legacy),
-    "legacy, unknown, or incomplete"
+    "lacks current, complete information"
   )
   expect_false(any(legacy_comparison$table$ICComparable))
   expect_identical(

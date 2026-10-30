@@ -18,14 +18,17 @@ write_mfrm_residual_file(
 \item{fit}{Output from \code{\link[=fit_mfrm]{fit_mfrm()}}.}
 
 \item{diagnostics}{Optional output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}. Supplying it
-avoids recomputing observation diagnostics.}
+avoids recomputing observation diagnostics.
+Must match this fitted analysis; see \link{mfrmr_compatibility_layer} for
+migration of saved diagnostics.}
 
 \item{path}{Output file path.}
 
 \item{format}{File format: \code{"csv"} or \code{"tsv"}. If omitted, inferred from
 \code{path} when the extension is \code{.csv} or \code{.tsv}, otherwise \code{"csv"}.}
 
-\item{digits}{Rounding digits for numeric columns.}
+\item{digits}{Rounding digits for numeric columns. \code{ConditionalVariance}
+retains full precision so small positive variances are not exported as zero.}
 
 \item{overwrite}{If \code{FALSE}, existing files are not overwritten.}
 
@@ -43,20 +46,27 @@ The exported table is observation-level and model-native. It includes the
 observed score, expected score, residual, standardized residual, variance,
 score information, observed-category probability, and modeled person
 measure when those quantities are available.
+Current diagnostics also retain the primary Person estimate and diagnostic
+basis, the unthresholded \code{ConditionalVariance}, \code{PearsonAvailable},
+\code{ResponseStatus} and \code{ResponseReason}; see \code{\link[=diagnose_mfrm]{diagnose_mfrm()}} for their
+interpretation and the legacy small-variance cutoff.
 
 This writer is separate from \code{\link[=facets_output_file_bundle]{facets_output_file_bundle()}} because it is a
 direct analysis handoff rather than a legacy graph/score bundle.
 }
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 30)
-diag <- diagnose_mfrm(fit, residual_pca = "none")
+# Saved synthetic JML/RSM analysis of example_core.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "core-jml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+diag <- example_fit$diagnostics
 path <- tempfile(fileext = ".csv")
 out <- write_mfrm_residual_file(fit, diag, path, overwrite = TRUE)
-out$written_files
-}
+data.frame(
+  Component = out$written_files$Component,
+  File = basename(out$written_files$Path)
+)
+# Full paths remain in out$written_files$Path.
 }
 \seealso{
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}, \code{\link[=facets_output_file_bundle]{facets_output_file_bundle()}},

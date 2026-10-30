@@ -79,6 +79,14 @@ Preferred bundle API for interaction-bias diagnostics. The function can:
 \item use a precomputed bias object from \code{\link[=estimate_bias]{estimate_bias()}}, or
 \item estimate internally from \code{mfrm_fit} + facet specification.
 }
+
+Save the complete result with \code{\link[base:saveRDS]{base::saveRDS()}}; \code{plot(out, type = "scatter")}
+and \code{type = "ranked"} reuse its flags and thresholds. Rebuild the report
+from the saved bias estimates to change screening rules; conflicting
+plotting-time thresholds are rejected. Both views support \code{\link[=as_ggplot]{as_ggplot()}},
+including conditional bounds requested with \code{show_ci = TRUE}. Heatmaps,
+histograms and facet profiles use base graphics or custom \code{\link[=plot_data]{plot_data()}}
+graphics. Export the bundle's data frames with \code{\link[utils:write.csv]{utils::write.csv()}}.
 }
 \section{Interpreting output}{
 
@@ -90,7 +98,7 @@ Focus on ranked rows where multiple screening criteria converge:
 }
 
 The bundle is optimized for downstream \code{summary()} and
-\code{\link[=plot_bias_interaction]{plot_bias_interaction()}} views.
+\link[=plot.mfrm_fit]{plot(x, type = "bias")} views.
 }
 
 \section{Typical workflow}{
@@ -98,15 +106,19 @@ The bundle is optimized for downstream \code{summary()} and
 \enumerate{
 \item Run \code{\link[=estimate_bias]{estimate_bias()}} (or provide \code{mfrm_fit} here).
 \item Build \code{bias_interaction_report(...)}.
-\item Review \code{summary(out)} and visualize with \code{\link[=plot_bias_interaction]{plot_bias_interaction()}}.
+\item Review \code{summary(out)} and visualize with \link[=plot.mfrm_fit]{plot(x, type = "bias")}.
 }
 }
 
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_bias")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score", method = "JML", maxit = 30)
-diag <- diagnose_mfrm(fit, residual_pca = "none")
+# Supplementary workflow: run explicitly to keep routine checks brief.
+# example("bias_interaction_report", run.dontrun = TRUE)
+\dontrun{
+# Saved synthetic JML/RSM analysis of example_bias.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "bias-jml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+diag <- example_fit$diagnostics
 bias <- estimate_bias(fit, diag, facet_a = "Rater", facet_b = "Criterion", max_iter = 2)
 out <- bias_interaction_report(bias, top_n = 10)
 summary(out)
@@ -115,5 +127,5 @@ p_bi$data$plot
 }
 }
 \seealso{
-\code{\link[=estimate_bias]{estimate_bias()}}, \code{\link[=build_fixed_reports]{build_fixed_reports()}}, \code{\link[=plot_bias_interaction]{plot_bias_interaction()}}
+\code{\link[=estimate_bias]{estimate_bias()}}, \code{\link[=build_fixed_reports]{build_fixed_reports()}}, \link[=plot.mfrm_fit]{plot(x, type = "bias")}
 }

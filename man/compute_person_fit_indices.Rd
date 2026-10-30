@@ -2,9 +2,12 @@
 % Please edit documentation in R/api-person-fit.R
 \name{compute_person_fit_indices}
 \alias{compute_person_fit_indices}
+\alias{summary.mfrm_person_fit_indices}
 \title{Person fit indices: lz and Snijders-corrected lz*}
 \usage{
 compute_person_fit_indices(diagnostics, fit = NULL)
+
+\method{summary}{mfrm_person_fit_indices}(object, digits = 3, top_n = 10, include_person = FALSE, ...)
 }
 \arguments{
 \item{diagnostics}{Output from \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.}
@@ -12,24 +15,41 @@ compute_person_fit_indices(diagnostics, fit = NULL)
 \item{fit}{Optional \code{mfrm_fit} from \code{\link[=fit_mfrm]{fit_mfrm()}}. Required to decide
 whether the person estimates are JML/fixed-effect estimates for which
 the Snijders (2001) correction is computed. MML/EAP person scores
-return \code{NA} for \code{lz_star} with an explanatory status.}
+return \code{NA} for \code{lz_star} with an explanatory status. Supplied fit and
+diagnostics must identify the same analysis.}
+
+\item{object}{Output from \code{\link[=compute_person_fit_indices]{compute_person_fit_indices()}}.}
+
+\item{digits}{Number of digits used when printing numeric columns.}
+
+\item{top_n}{Number of review rows retained in \code{top_review}.}
+
+\item{include_person}{If \code{TRUE}, print person identifiers in the review
+preview. The default retains the rows in the returned object but suppresses
+identifiers from console output.}
+
+\item{...}{Unused.}
 }
 \value{
 A data frame of class \code{mfrm_person_fit_indices} with one row per
 Person and columns:
 \describe{
 \item{\code{Person}}{Person ID.}
-\item{\code{N}}{Number of contributing response opportunities.}
+\item{\code{TotalN}, \code{N}, \code{UnavailableN}}{Total responses, responses with
+valid probability and log-likelihood moments, and unavailable responses.
+An incomplete response set does not produce a person-fit statistic.}
 \item{\code{LogLik}}{Sum of log P(X = x | theta) under the fitted
 model. Computed from the per-observation category probability
 \code{PrObserved} (the model probability of the observed category),
 not from a Gaussian residual approximation.}
 \item{\code{lz}}{Drasgow et al. (1985) standardized log-likelihood,
-in its proper polytomous form.}
+in its polytomous form, treating each retained response once regardless
+of calibration weights. \code{lz_status} records computational availability.}
 \item{\code{lz_star}}{Snijders-corrected \verb{lz*} when the source fit used
 JML/fixed-effect person estimates, conditioning on the fitted
 non-person calibration, and the diagnostics include the required
-derivative terms; otherwise \code{NA}.}
+derivative terms. Numerical convergence, a finite person estimate and
+unit observation weights are required; otherwise \code{NA}.}
 \item{\code{lz_star_status}}{Status string for \code{lz_star}, such as
 \code{"computed_jml_conditional_calibration"}, \code{"fit_required"},
 \code{"not_applicable_eap"}, or \code{"insufficient_information"}.}
@@ -40,7 +60,8 @@ for each person, when available.}
 \item{\code{lz_flag_5pct}, \code{lz_flag_1pct}}{Logical flags for practical
 two-sided \code{lz} thresholds of \verb{|z| > 1.96} and \verb{|z| > 2.58}.}
 \item{\code{lz_star_flag_5pct}, \code{lz_star_flag_1pct}}{The same flags for
-\code{lz_star}, returned as \code{FALSE} when \code{lz_star} is unavailable.}
+\code{lz_star}. All index flags, including \code{ReportFlag}, remain \code{NA} when
+the corresponding statistic is unavailable.}
 \item{\code{ReportIndex}, \code{ReportValue}, \code{ReportFlagLevel},
 \code{ReportFlag}, \code{ReviewStatus}, \code{ReviewReason}, \code{ReportCaveat}}{Compact
 reporting columns. \code{ReportIndex} prefers \code{lz_star} when the Snijders
@@ -48,16 +69,27 @@ correction was computed; otherwise it falls back to \code{lz} with an
 explicit caveat.}
 }
 
-Under the conditional-independence assumption of the MFRM, \code{lz} is
-asymptotically standard normal. Practical reporting thresholds:
-|lz| > 1.96 flags a person at the 5\% level; |lz| > 2.58 at the
-1\% level. When
+The \verb{5pct} and \verb{1pct} flag names refer to standard-normal reference cutoffs:
+|lz| > 1.96 and |lz| > 2.58. Treat them as screening thresholds, not a
+guarantee of those false-positive rates for fitted person scores.
+Read \code{ReportCaveat} and \code{lz_star_status} with every flagged result. When
 \code{lz_star_status == "computed_jml_conditional_calibration"}, \code{lz_star}
 applies Snijders' estimated-ability correction for JML person estimates,
 conditional on the fitted non-person parameters. This does not propagate
 non-person calibration uncertainty. For MML/EAP person scores, use \code{lz}
 with its documented caveat rather than treating EAP scores as if they
-satisfied the Snijders estimating equation.
+satisfied the Snijders estimating equation. Positive and negative flags
+indicate more and less predictable patterns, respectively; neither alone
+establishes invalid responses or justifies exclusion. The implemented
+correction does not cover non-unit observation weights, even if normalized
+to mean one. No multiple-person error-rate control is provided.
+
+Small positive probabilities are used without a lower floor. Zero, invalid
+or missing observed probabilities make the person statistic unavailable.
+Missing derivative information withholds the correction for the whole person.
+With the matching fit supplied, older probability-moment diagnostics are
+refreshed from that fit without re-estimation. Otherwise recompute
+diagnostics first. Older saved person-fit tables/summaries must be rebuilt.
 
 Note: this implementation reads the model category probabilities
 directly from the diagnostics bundle. Earlier mfrmr releases used
@@ -70,12 +102,34 @@ not directly comparable across mfrmr releases; treat the values
 returned here as the polytomous statistic and re-evaluate any
 historical \verb{|lz| > 1.96} flagging that was based on the earlier
 approximation.
+
+For \code{summary()}: An object of class \code{summary.mfrm_person_fit_indices} with:
+\itemize{
+\item \code{overview}
+\item \code{status_summary}
+\item \code{report_index_summary}
+\item \code{lz_star_status_summary}
+\item \code{top_review}
+\item \code{caveats}
+\item \code{thresholds}
+\item \code{reporting_map}
+\item \code{notes}
+}
 }
 \description{
 Computes person-level fit statistics for an MFRM bundle, extending
 the Infit / Outfit / ZSTD columns that \code{diagnose_mfrm()$measures}
 already exposes with the standardized log-likelihood \code{lz} and, when
 justified by the person-estimation method, Snijders' \verb{lz*}.
+}
+\details{
+\code{summary()} method: Summarize person-fit indices
+
+\code{summary()} method: \code{summary()} for \code{\link[=compute_person_fit_indices]{compute_person_fit_indices()}} output gives a compact,
+report-ready reading order: first the number of persons and flags, then
+status counts, then the highest-priority review rows. The summary keeps
+\code{lz_star} availability visible so users do not silently treat uncorrected
+\code{lz} as Snijders-corrected output.
 }
 \section{References}{
 
@@ -98,21 +152,25 @@ person-fit statistics beyond dichotomous items.
 }
 
 \examples{
-\donttest{
-toy <- load_mfrmr_data("example_core")
-fit <- fit_mfrm(toy, "Person", c("Rater", "Criterion"), "Score",
-                method = "JML", maxit = 30)
-diag <- diagnose_mfrm(fit, residual_pca = "none",
-                      diagnostic_mode = "legacy")
-pf <- compute_person_fit_indices(diag, fit = fit)
-head(pf)
-summary(pf)
-# Look for: |lz| > 1.96 (5\% level) flags a person whose response
-#   pattern is statistically inconsistent with the model; > 2.58 is
-#   a 1\% flag. lz_star is populated for JML/fixed-effect person
-#   estimates and left NA for MML/EAP estimates. Use ReportIndex /
-#   ReviewStatus for a compact report-ready reading.
-}
+library(mfrmr)
+
+# Saved synthetic MML/RSM analysis of example_operational.
+# For your own data, fit a model first; see ?fit_mfrm.
+example_fit <- readRDS(system.file("examples", "operational-mml.rds", package = "mfrmr"))
+fit <- example_fit$fit
+
+# Use the diagnostics saved with this fit
+diagnostics <- example_fit$diagnostics
+
+# Screen for unusual person response patterns
+person_fit <- compute_person_fit_indices(diagnostics, fit = fit)
+head(person_fit[, c("Person", "N", "ReportIndex", "ReportValue", "ReviewStatus")])
+
+# Inspect flagged persons and the limitations of their reported index
+subset(person_fit, ReportFlag,
+       c("Person", "ReportValue", "ReviewReason", "ReportCaveat"))
+# With MML/EAP scores, lz_star is unavailable; lz is an uncorrected screening index
+# A flag alone does not establish invalid responses or justify excluding a person
 }
 \seealso{
 \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}

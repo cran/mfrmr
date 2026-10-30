@@ -132,6 +132,7 @@ test_that("estimate_bias rejects invalid fit object", {
 
 test_that("estimate_bias rejects invalid diagnostics object", {
   fake_fit <- structure(list(), class = c("mfrm_fit", "list"))
+  expect_error(estimate_bias(fake_fit, facet_a = "R", facet_b = "C"), "diagnostics.*required")
   expect_error(
     estimate_bias(fake_fit, list(), facet_a = "R", facet_b = "C"),
     "diagnose_mfrm"
@@ -139,10 +140,10 @@ test_that("estimate_bias rejects invalid diagnostics object", {
 })
 
 test_that("estimate_bias requires interaction facets specification", {
-  fake_fit <- structure(list(), class = c("mfrm_fit", "list"))
-  fake_diag <- list(obs = data.frame(x = 1))
+  fit <- make_toy_fit()
+  diagnostics <- make_toy_diagnostics(fit)
   expect_error(
-    estimate_bias(fake_fit, fake_diag),
+    estimate_bias(fit, diagnostics),
     "interaction_facets.*facet_a.*facet_b"
   )
 })
@@ -252,7 +253,7 @@ test_that("gauss_hermite_normal rejects n < 1", {
 
 test_that("resolve_pcm_step_facet rejects invalid step facet", {
   expect_error(
-    mfrmr:::resolve_pcm_step_facet("PCM", "Invalid", c("Rater", "Task")),
+    mfrmr:::resolve_step_and_slope_facets("PCM", "Invalid", c("Rater", "Task"), slope_facet = NULL)$step_facet,
     "step_facet.*Invalid.*not among.*Rater.*Task"
   )
 })
