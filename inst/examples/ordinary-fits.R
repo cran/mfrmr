@@ -19,8 +19,6 @@ ordinary_fit_examples <- function() {
     for (field in c("formula", "terms")) {
       if (!is.null(fit$population[[field]]))
         environment(fit$population[[field]]) <- baseenv()
-      if (!is.null(fit$config$population_spec[[field]]))
-        environment(fit$config$population_spec[[field]]) <- baseenv()
     }
     list(dataset = dataset, fit = fit,
       diagnostics = mfrmr::diagnose_mfrm(fit))

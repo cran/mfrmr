@@ -5,6 +5,62 @@
 #include "cpp11/declarations.hpp"
 #include <R_ext/Visibility.h>
 
+// fast_engine.cpp
+writable::list mfrm_cpp_fast_connectivity_spec(list ds);
+extern "C" SEXP _mfrmr_mfrm_cpp_fast_connectivity_spec(SEXP ds) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(mfrm_cpp_fast_connectivity_spec(cpp11::as_cpp<cpp11::decay_t<list>>(ds)));
+  END_CPP11
+}
+// fast_engine.cpp
+writable::list mfrm_cpp_fast_fit_spec(list ds, list ctrl_r);
+extern "C" SEXP _mfrmr_mfrm_cpp_fast_fit_spec(SEXP ds, SEXP ctrl_r) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(mfrm_cpp_fast_fit_spec(cpp11::as_cpp<cpp11::decay_t<list>>(ds), cpp11::as_cpp<cpp11::decay_t<list>>(ctrl_r)));
+  END_CPP11
+}
+// fast_engine.cpp
+writable::list mfrm_cpp_fast_wle(int n_person, int n_cat, integers person0, integers score0, doubles weight, doubles base_eta_obs, doubles_matrix<> step_cum_mat, integers step_group0, integers step_cat_min, integers step_cat_max);
+extern "C" SEXP _mfrmr_mfrm_cpp_fast_wle(SEXP n_person, SEXP n_cat, SEXP person0, SEXP score0, SEXP weight, SEXP base_eta_obs, SEXP step_cum_mat, SEXP step_group0, SEXP step_cat_min, SEXP step_cat_max) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(mfrm_cpp_fast_wle(cpp11::as_cpp<cpp11::decay_t<int>>(n_person), cpp11::as_cpp<cpp11::decay_t<int>>(n_cat), cpp11::as_cpp<cpp11::decay_t<integers>>(person0), cpp11::as_cpp<cpp11::decay_t<integers>>(score0), cpp11::as_cpp<cpp11::decay_t<doubles>>(weight), cpp11::as_cpp<cpp11::decay_t<doubles>>(base_eta_obs), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(step_cum_mat), cpp11::as_cpp<cpp11::decay_t<integers>>(step_group0), cpp11::as_cpp<cpp11::decay_t<integers>>(step_cat_min), cpp11::as_cpp<cpp11::decay_t<integers>>(step_cat_max)));
+  END_CPP11
+}
+// fast_engine.cpp
+writable::list mfrm_cpp_fast_batch_list(list dataset_specs, list ctrl_r, int n_threads);
+extern "C" SEXP _mfrmr_mfrm_cpp_fast_batch_list(SEXP dataset_specs, SEXP ctrl_r, SEXP n_threads) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(mfrm_cpp_fast_batch_list(cpp11::as_cpp<cpp11::decay_t<list>>(dataset_specs), cpp11::as_cpp<cpp11::decay_t<list>>(ctrl_r), cpp11::as_cpp<cpp11::decay_t<int>>(n_threads)));
+  END_CPP11
+}
+// fast_engine.cpp
+writable::list mfrm_cpp_fast_batch_warm_list(list dataset_specs, list ctrl_list, int n_threads);
+extern "C" SEXP _mfrmr_mfrm_cpp_fast_batch_warm_list(SEXP dataset_specs, SEXP ctrl_list, SEXP n_threads) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(mfrm_cpp_fast_batch_warm_list(cpp11::as_cpp<cpp11::decay_t<list>>(dataset_specs), cpp11::as_cpp<cpp11::decay_t<list>>(ctrl_list), cpp11::as_cpp<cpp11::decay_t<int>>(n_threads)));
+  END_CPP11
+}
+// fast_engine.cpp
+writable::list mfrm_cpp_fast_batch_shared_design(list base_ds, integers_matrix<> score_mat0, list ctrl_r, int n_threads);
+extern "C" SEXP _mfrmr_mfrm_cpp_fast_batch_shared_design(SEXP base_ds, SEXP score_mat0, SEXP ctrl_r, SEXP n_threads) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(mfrm_cpp_fast_batch_shared_design(cpp11::as_cpp<cpp11::decay_t<list>>(base_ds), cpp11::as_cpp<cpp11::decay_t<integers_matrix<>>>(score_mat0), cpp11::as_cpp<cpp11::decay_t<list>>(ctrl_r), cpp11::as_cpp<cpp11::decay_t<int>>(n_threads)));
+  END_CPP11
+}
+// fast_engine.cpp
+writable::list mfrm_cpp_fast_bias_pairwise(list ds, doubles theta, logicals theta_exclude, list beta_list, doubles_matrix<> step_cum_mat, integers pair_fa, integers pair_fb, bool facets_von_davier, doubles alpha_obs);
+extern "C" SEXP _mfrmr_mfrm_cpp_fast_bias_pairwise(SEXP ds, SEXP theta, SEXP theta_exclude, SEXP beta_list, SEXP step_cum_mat, SEXP pair_fa, SEXP pair_fb, SEXP facets_von_davier, SEXP alpha_obs) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(mfrm_cpp_fast_bias_pairwise(cpp11::as_cpp<cpp11::decay_t<list>>(ds), cpp11::as_cpp<cpp11::decay_t<doubles>>(theta), cpp11::as_cpp<cpp11::decay_t<logicals>>(theta_exclude), cpp11::as_cpp<cpp11::decay_t<list>>(beta_list), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(step_cum_mat), cpp11::as_cpp<cpp11::decay_t<integers>>(pair_fa), cpp11::as_cpp<cpp11::decay_t<integers>>(pair_fb), cpp11::as_cpp<cpp11::decay_t<bool>>(facets_von_davier), cpp11::as_cpp<cpp11::decay_t<doubles>>(alpha_obs)));
+  END_CPP11
+}
+// fast_engine.cpp
+writable::list mfrm_cpp_raju_welch_df(doubles se1, doubles n1, doubles se2, doubles n2, bool facets_von_davier);
+extern "C" SEXP _mfrmr_mfrm_cpp_raju_welch_df(SEXP se1, SEXP n1, SEXP se2, SEXP n2, SEXP facets_von_davier) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(mfrm_cpp_raju_welch_df(cpp11::as_cpp<cpp11::decay_t<doubles>>(se1), cpp11::as_cpp<cpp11::decay_t<doubles>>(n1), cpp11::as_cpp<cpp11::decay_t<doubles>>(se2), cpp11::as_cpp<cpp11::decay_t<doubles>>(n2), cpp11::as_cpp<cpp11::decay_t<bool>>(facets_von_davier)));
+  END_CPP11
+}
 // mml_backend.cpp
 writable::doubles_matrix<> mfrm_cpp_compute_p_geq(doubles_matrix<> probs);
 extern "C" SEXP _mfrmr_mfrm_cpp_compute_p_geq(SEXP probs) {
@@ -27,19 +83,131 @@ extern "C" SEXP _mfrmr_mfrm_cpp_pcm_logprob_bundle(SEXP score_k, SEXP person_int
   END_CPP11
 }
 // mml_backend.cpp
+writable::list mfrm_cpp_gpcm_logprob_bundle(integers score_k, integers person_int, doubles base_eta, doubles_matrix<> person_nodes, doubles_matrix<> step_cum_obs, doubles slope_obs, sexp weight, bool include_probs, bool include_linear_part);
+extern "C" SEXP _mfrmr_mfrm_cpp_gpcm_logprob_bundle(SEXP score_k, SEXP person_int, SEXP base_eta, SEXP person_nodes, SEXP step_cum_obs, SEXP slope_obs, SEXP weight, SEXP include_probs, SEXP include_linear_part) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(mfrm_cpp_gpcm_logprob_bundle(cpp11::as_cpp<cpp11::decay_t<integers>>(score_k), cpp11::as_cpp<cpp11::decay_t<integers>>(person_int), cpp11::as_cpp<cpp11::decay_t<doubles>>(base_eta), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(person_nodes), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(step_cum_obs), cpp11::as_cpp<cpp11::decay_t<doubles>>(slope_obs), cpp11::as_cpp<cpp11::decay_t<sexp>>(weight), cpp11::as_cpp<cpp11::decay_t<bool>>(include_probs), cpp11::as_cpp<cpp11::decay_t<bool>>(include_linear_part)));
+  END_CPP11
+}
+// mml_backend.cpp
+writable::list mfrm_cpp_mml_eval_bundle(int model_code, integers score_k, integers person_int, doubles base_eta, doubles_matrix<> person_nodes, doubles_matrix<> person_log_weights, doubles step_cum_rsm, doubles_matrix<> step_cum_mat, integers step_idx, doubles slopes, integers slope_idx, sexp weight, sexp external_obs_posterior, bool include_grad, bool pop_active, doubles_matrix<> pop_design_person, doubles quad_std_nodes, double sigma_pop);
+extern "C" SEXP _mfrmr_mfrm_cpp_mml_eval_bundle(SEXP model_code, SEXP score_k, SEXP person_int, SEXP base_eta, SEXP person_nodes, SEXP person_log_weights, SEXP step_cum_rsm, SEXP step_cum_mat, SEXP step_idx, SEXP slopes, SEXP slope_idx, SEXP weight, SEXP external_obs_posterior, SEXP include_grad, SEXP pop_active, SEXP pop_design_person, SEXP quad_std_nodes, SEXP sigma_pop) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(mfrm_cpp_mml_eval_bundle(cpp11::as_cpp<cpp11::decay_t<int>>(model_code), cpp11::as_cpp<cpp11::decay_t<integers>>(score_k), cpp11::as_cpp<cpp11::decay_t<integers>>(person_int), cpp11::as_cpp<cpp11::decay_t<doubles>>(base_eta), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(person_nodes), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(person_log_weights), cpp11::as_cpp<cpp11::decay_t<doubles>>(step_cum_rsm), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(step_cum_mat), cpp11::as_cpp<cpp11::decay_t<integers>>(step_idx), cpp11::as_cpp<cpp11::decay_t<doubles>>(slopes), cpp11::as_cpp<cpp11::decay_t<integers>>(slope_idx), cpp11::as_cpp<cpp11::decay_t<sexp>>(weight), cpp11::as_cpp<cpp11::decay_t<sexp>>(external_obs_posterior), cpp11::as_cpp<cpp11::decay_t<bool>>(include_grad), cpp11::as_cpp<cpp11::decay_t<bool>>(pop_active), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(pop_design_person), cpp11::as_cpp<cpp11::decay_t<doubles>>(quad_std_nodes), cpp11::as_cpp<cpp11::decay_t<double>>(sigma_pop)));
+  END_CPP11
+}
+// mml_backend.cpp
+writable::doubles mfrm_cpp_indexed_sum(doubles x, integers idx, int n_levels, double scale);
+extern "C" SEXP _mfrmr_mfrm_cpp_indexed_sum(SEXP x, SEXP idx, SEXP n_levels, SEXP scale) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(mfrm_cpp_indexed_sum(cpp11::as_cpp<cpp11::decay_t<doubles>>(x), cpp11::as_cpp<cpp11::decay_t<integers>>(idx), cpp11::as_cpp<cpp11::decay_t<int>>(n_levels), cpp11::as_cpp<cpp11::decay_t<double>>(scale)));
+  END_CPP11
+}
+// mml_backend.cpp
+writable::list mfrm_cpp_jml_eval_bundle(int model_code, integers score_k, integers person_int, int n_theta, doubles eta, doubles step_cum_rsm, doubles_matrix<> step_cum_mat, integers step_idx, doubles slopes, integers slope_idx, sexp weight, bool include_grad);
+extern "C" SEXP _mfrmr_mfrm_cpp_jml_eval_bundle(SEXP model_code, SEXP score_k, SEXP person_int, SEXP n_theta, SEXP eta, SEXP step_cum_rsm, SEXP step_cum_mat, SEXP step_idx, SEXP slopes, SEXP slope_idx, SEXP weight, SEXP include_grad) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(mfrm_cpp_jml_eval_bundle(cpp11::as_cpp<cpp11::decay_t<int>>(model_code), cpp11::as_cpp<cpp11::decay_t<integers>>(score_k), cpp11::as_cpp<cpp11::decay_t<integers>>(person_int), cpp11::as_cpp<cpp11::decay_t<int>>(n_theta), cpp11::as_cpp<cpp11::decay_t<doubles>>(eta), cpp11::as_cpp<cpp11::decay_t<doubles>>(step_cum_rsm), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(step_cum_mat), cpp11::as_cpp<cpp11::decay_t<integers>>(step_idx), cpp11::as_cpp<cpp11::decay_t<doubles>>(slopes), cpp11::as_cpp<cpp11::decay_t<integers>>(slope_idx), cpp11::as_cpp<cpp11::decay_t<sexp>>(weight), cpp11::as_cpp<cpp11::decay_t<bool>>(include_grad)));
+  END_CPP11
+}
+// mml_backend.cpp
+writable::list mfrm_cpp_adaptive_quad_basis(int model_code, int k_cat, integers persons, integers group_starts, integers group_rows, integers score_k, doubles weights, doubles base_eta, doubles step_cum_rsm, doubles_matrix<> step_cum_mat, integers step_idx, doubles slopes, integers slope_idx, doubles mu, double sigma, doubles quad_nodes, doubles log_quad_weights, doubles log_dnorm_quad_nodes, doubles_matrix<> init_nodes, doubles_matrix<> init_log_weights);
+extern "C" SEXP _mfrmr_mfrm_cpp_adaptive_quad_basis(SEXP model_code, SEXP k_cat, SEXP persons, SEXP group_starts, SEXP group_rows, SEXP score_k, SEXP weights, SEXP base_eta, SEXP step_cum_rsm, SEXP step_cum_mat, SEXP step_idx, SEXP slopes, SEXP slope_idx, SEXP mu, SEXP sigma, SEXP quad_nodes, SEXP log_quad_weights, SEXP log_dnorm_quad_nodes, SEXP init_nodes, SEXP init_log_weights) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(mfrm_cpp_adaptive_quad_basis(cpp11::as_cpp<cpp11::decay_t<int>>(model_code), cpp11::as_cpp<cpp11::decay_t<int>>(k_cat), cpp11::as_cpp<cpp11::decay_t<integers>>(persons), cpp11::as_cpp<cpp11::decay_t<integers>>(group_starts), cpp11::as_cpp<cpp11::decay_t<integers>>(group_rows), cpp11::as_cpp<cpp11::decay_t<integers>>(score_k), cpp11::as_cpp<cpp11::decay_t<doubles>>(weights), cpp11::as_cpp<cpp11::decay_t<doubles>>(base_eta), cpp11::as_cpp<cpp11::decay_t<doubles>>(step_cum_rsm), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(step_cum_mat), cpp11::as_cpp<cpp11::decay_t<integers>>(step_idx), cpp11::as_cpp<cpp11::decay_t<doubles>>(slopes), cpp11::as_cpp<cpp11::decay_t<integers>>(slope_idx), cpp11::as_cpp<cpp11::decay_t<doubles>>(mu), cpp11::as_cpp<cpp11::decay_t<double>>(sigma), cpp11::as_cpp<cpp11::decay_t<doubles>>(quad_nodes), cpp11::as_cpp<cpp11::decay_t<doubles>>(log_quad_weights), cpp11::as_cpp<cpp11::decay_t<doubles>>(log_dnorm_quad_nodes), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(init_nodes), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(init_log_weights)));
+  END_CPP11
+}
+// mml_backend.cpp
+writable::list mfrm_cpp_adaptive_mml_eval(int model_code, int k_cat, int p_dim, integers pat_person_ids, doubles pat_multiplicity, integers pat_row_starts, integers pat_obs_idx, integers score_k, doubles weights, doubles base_eta, doubles step_cum_rsm, doubles_matrix<> step_cum_mat, integers step_idx, doubles slopes, integers slope_idx, doubles mu, double sigma, doubles rule_nodes, doubles log_rule_weights, doubles log_dnorm_rule_nodes, integers cum_pat_col_starts, integers cum_active_col, integers cum_col_val_starts, integers cum_row_i, doubles cum_val_x, bool has_log_slopes, integers ls_pat_col_starts, integers ls_active_col, integers ls_col_val_starts, integers ls_row_i, doubles ls_val_x, integers beta_cols0, doubles_matrix<> pat_pop_design, int log_sigma2_col0, bool include_person_summaries);
+extern "C" SEXP _mfrmr_mfrm_cpp_adaptive_mml_eval(SEXP model_code, SEXP k_cat, SEXP p_dim, SEXP pat_person_ids, SEXP pat_multiplicity, SEXP pat_row_starts, SEXP pat_obs_idx, SEXP score_k, SEXP weights, SEXP base_eta, SEXP step_cum_rsm, SEXP step_cum_mat, SEXP step_idx, SEXP slopes, SEXP slope_idx, SEXP mu, SEXP sigma, SEXP rule_nodes, SEXP log_rule_weights, SEXP log_dnorm_rule_nodes, SEXP cum_pat_col_starts, SEXP cum_active_col, SEXP cum_col_val_starts, SEXP cum_row_i, SEXP cum_val_x, SEXP has_log_slopes, SEXP ls_pat_col_starts, SEXP ls_active_col, SEXP ls_col_val_starts, SEXP ls_row_i, SEXP ls_val_x, SEXP beta_cols0, SEXP pat_pop_design, SEXP log_sigma2_col0, SEXP include_person_summaries) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(mfrm_cpp_adaptive_mml_eval(cpp11::as_cpp<cpp11::decay_t<int>>(model_code), cpp11::as_cpp<cpp11::decay_t<int>>(k_cat), cpp11::as_cpp<cpp11::decay_t<int>>(p_dim), cpp11::as_cpp<cpp11::decay_t<integers>>(pat_person_ids), cpp11::as_cpp<cpp11::decay_t<doubles>>(pat_multiplicity), cpp11::as_cpp<cpp11::decay_t<integers>>(pat_row_starts), cpp11::as_cpp<cpp11::decay_t<integers>>(pat_obs_idx), cpp11::as_cpp<cpp11::decay_t<integers>>(score_k), cpp11::as_cpp<cpp11::decay_t<doubles>>(weights), cpp11::as_cpp<cpp11::decay_t<doubles>>(base_eta), cpp11::as_cpp<cpp11::decay_t<doubles>>(step_cum_rsm), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(step_cum_mat), cpp11::as_cpp<cpp11::decay_t<integers>>(step_idx), cpp11::as_cpp<cpp11::decay_t<doubles>>(slopes), cpp11::as_cpp<cpp11::decay_t<integers>>(slope_idx), cpp11::as_cpp<cpp11::decay_t<doubles>>(mu), cpp11::as_cpp<cpp11::decay_t<double>>(sigma), cpp11::as_cpp<cpp11::decay_t<doubles>>(rule_nodes), cpp11::as_cpp<cpp11::decay_t<doubles>>(log_rule_weights), cpp11::as_cpp<cpp11::decay_t<doubles>>(log_dnorm_rule_nodes), cpp11::as_cpp<cpp11::decay_t<integers>>(cum_pat_col_starts), cpp11::as_cpp<cpp11::decay_t<integers>>(cum_active_col), cpp11::as_cpp<cpp11::decay_t<integers>>(cum_col_val_starts), cpp11::as_cpp<cpp11::decay_t<integers>>(cum_row_i), cpp11::as_cpp<cpp11::decay_t<doubles>>(cum_val_x), cpp11::as_cpp<cpp11::decay_t<bool>>(has_log_slopes), cpp11::as_cpp<cpp11::decay_t<integers>>(ls_pat_col_starts), cpp11::as_cpp<cpp11::decay_t<integers>>(ls_active_col), cpp11::as_cpp<cpp11::decay_t<integers>>(ls_col_val_starts), cpp11::as_cpp<cpp11::decay_t<integers>>(ls_row_i), cpp11::as_cpp<cpp11::decay_t<doubles>>(ls_val_x), cpp11::as_cpp<cpp11::decay_t<integers>>(beta_cols0), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(pat_pop_design), cpp11::as_cpp<cpp11::decay_t<int>>(log_sigma2_col0), cpp11::as_cpp<cpp11::decay_t<bool>>(include_person_summaries)));
+  END_CPP11
+}
+// mml_backend.cpp
+writable::list mfrm_cpp_cml_esf(list features, doubles par, bool information);
+extern "C" SEXP _mfrmr_mfrm_cpp_cml_esf(SEXP features, SEXP par, SEXP information) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(mfrm_cpp_cml_esf(cpp11::as_cpp<cpp11::decay_t<list>>(features), cpp11::as_cpp<cpp11::decay_t<doubles>>(par), cpp11::as_cpp<cpp11::decay_t<bool>>(information)));
+  END_CPP11
+}
+// mml_backend.cpp
 writable::list mfrm_cpp_expected_category_bundle(list prob_list, doubles_matrix<> obs_posterior, bool include_p_geq);
 extern "C" SEXP _mfrmr_mfrm_cpp_expected_category_bundle(SEXP prob_list, SEXP obs_posterior, SEXP include_p_geq) {
   BEGIN_CPP11
     return cpp11::as_sexp(mfrm_cpp_expected_category_bundle(cpp11::as_cpp<cpp11::decay_t<list>>(prob_list), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(obs_posterior), cpp11::as_cpp<cpp11::decay_t<bool>>(include_p_geq)));
   END_CPP11
 }
+// mml_backend.cpp
+writable::list mfrm_cpp_testlet_kernel(doubles_matrix<> design_X, int ns, doubles par, doubles theta, doubles rule_nodes, doubles rule_weights, bool gradient, integers persons, integers person_block_ptr, integers block_entry_ptr, integers entry_cell, integers entry_count);
+extern "C" SEXP _mfrmr_mfrm_cpp_testlet_kernel(SEXP design_X, SEXP ns, SEXP par, SEXP theta, SEXP rule_nodes, SEXP rule_weights, SEXP gradient, SEXP persons, SEXP person_block_ptr, SEXP block_entry_ptr, SEXP entry_cell, SEXP entry_count) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(mfrm_cpp_testlet_kernel(cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(design_X), cpp11::as_cpp<cpp11::decay_t<int>>(ns), cpp11::as_cpp<cpp11::decay_t<doubles>>(par), cpp11::as_cpp<cpp11::decay_t<doubles>>(theta), cpp11::as_cpp<cpp11::decay_t<doubles>>(rule_nodes), cpp11::as_cpp<cpp11::decay_t<doubles>>(rule_weights), cpp11::as_cpp<cpp11::decay_t<bool>>(gradient), cpp11::as_cpp<cpp11::decay_t<integers>>(persons), cpp11::as_cpp<cpp11::decay_t<integers>>(person_block_ptr), cpp11::as_cpp<cpp11::decay_t<integers>>(block_entry_ptr), cpp11::as_cpp<cpp11::decay_t<integers>>(entry_cell), cpp11::as_cpp<cpp11::decay_t<integers>>(entry_count)));
+  END_CPP11
+}
+// mml_backend.cpp
+writable::list mfrm_cpp_marginal_pairwise_expectations(list prob_list, doubles_matrix<> obs_posterior, integers row_i, integers row_j, integers adj_col1, integers adj_col2);
+extern "C" SEXP _mfrmr_mfrm_cpp_marginal_pairwise_expectations(SEXP prob_list, SEXP obs_posterior, SEXP row_i, SEXP row_j, SEXP adj_col1, SEXP adj_col2) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(mfrm_cpp_marginal_pairwise_expectations(cpp11::as_cpp<cpp11::decay_t<list>>(prob_list), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(obs_posterior), cpp11::as_cpp<cpp11::decay_t<integers>>(row_i), cpp11::as_cpp<cpp11::decay_t<integers>>(row_j), cpp11::as_cpp<cpp11::decay_t<integers>>(adj_col1), cpp11::as_cpp<cpp11::decay_t<integers>>(adj_col2)));
+  END_CPP11
+}
+// mml_backend.cpp
+writable::list mfrm_cpp_posterior_person_score(int n_cat, doubles_matrix<> loc_draws, doubles_matrix<> cum_step_draws, doubles_matrix<> slope_draws, doubles mu_draws, doubles sigma_draws, integers_matrix<> row_loc_idx, doubles facet_signs, integers row_owner, integers row_slope_idx, integers row_y, integers person_row_starts, integers person_rows, doubles probs, doubles cut_scores, doubles score_values, doubles gl_nodes, doubles gl_weights, bool compute_predictive, bool keep_person_draws);
+extern "C" SEXP _mfrmr_mfrm_cpp_posterior_person_score(SEXP n_cat, SEXP loc_draws, SEXP cum_step_draws, SEXP slope_draws, SEXP mu_draws, SEXP sigma_draws, SEXP row_loc_idx, SEXP facet_signs, SEXP row_owner, SEXP row_slope_idx, SEXP row_y, SEXP person_row_starts, SEXP person_rows, SEXP probs, SEXP cut_scores, SEXP score_values, SEXP gl_nodes, SEXP gl_weights, SEXP compute_predictive, SEXP keep_person_draws) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(mfrm_cpp_posterior_person_score(cpp11::as_cpp<cpp11::decay_t<int>>(n_cat), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(loc_draws), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(cum_step_draws), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(slope_draws), cpp11::as_cpp<cpp11::decay_t<doubles>>(mu_draws), cpp11::as_cpp<cpp11::decay_t<doubles>>(sigma_draws), cpp11::as_cpp<cpp11::decay_t<integers_matrix<>>>(row_loc_idx), cpp11::as_cpp<cpp11::decay_t<doubles>>(facet_signs), cpp11::as_cpp<cpp11::decay_t<integers>>(row_owner), cpp11::as_cpp<cpp11::decay_t<integers>>(row_slope_idx), cpp11::as_cpp<cpp11::decay_t<integers>>(row_y), cpp11::as_cpp<cpp11::decay_t<integers>>(person_row_starts), cpp11::as_cpp<cpp11::decay_t<integers>>(person_rows), cpp11::as_cpp<cpp11::decay_t<doubles>>(probs), cpp11::as_cpp<cpp11::decay_t<doubles>>(cut_scores), cpp11::as_cpp<cpp11::decay_t<doubles>>(score_values), cpp11::as_cpp<cpp11::decay_t<doubles>>(gl_nodes), cpp11::as_cpp<cpp11::decay_t<doubles>>(gl_weights), cpp11::as_cpp<cpp11::decay_t<bool>>(compute_predictive), cpp11::as_cpp<cpp11::decay_t<bool>>(keep_person_draws)));
+  END_CPP11
+}
+// mml_backend.cpp
+writable::list mfrm_cpp_drift_mml_eval(doubles tilde_psi, integers person_ptr, integers r_obs0, integers x_obs0, integers loc_idx0, int n_loc_blocks, int R, int K, int u_tilde_offset, bool step_rater, doubles quad_nodes, doubles quad_weights, double D, bool need_hessian);
+extern "C" SEXP _mfrmr_mfrm_cpp_drift_mml_eval(SEXP tilde_psi, SEXP person_ptr, SEXP r_obs0, SEXP x_obs0, SEXP loc_idx0, SEXP n_loc_blocks, SEXP R, SEXP K, SEXP u_tilde_offset, SEXP step_rater, SEXP quad_nodes, SEXP quad_weights, SEXP D, SEXP need_hessian) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(mfrm_cpp_drift_mml_eval(cpp11::as_cpp<cpp11::decay_t<doubles>>(tilde_psi), cpp11::as_cpp<cpp11::decay_t<integers>>(person_ptr), cpp11::as_cpp<cpp11::decay_t<integers>>(r_obs0), cpp11::as_cpp<cpp11::decay_t<integers>>(x_obs0), cpp11::as_cpp<cpp11::decay_t<integers>>(loc_idx0), cpp11::as_cpp<cpp11::decay_t<int>>(n_loc_blocks), cpp11::as_cpp<cpp11::decay_t<int>>(R), cpp11::as_cpp<cpp11::decay_t<int>>(K), cpp11::as_cpp<cpp11::decay_t<int>>(u_tilde_offset), cpp11::as_cpp<cpp11::decay_t<bool>>(step_rater), cpp11::as_cpp<cpp11::decay_t<doubles>>(quad_nodes), cpp11::as_cpp<cpp11::decay_t<doubles>>(quad_weights), cpp11::as_cpp<cpp11::decay_t<double>>(D), cpp11::as_cpp<cpp11::decay_t<bool>>(need_hessian)));
+  END_CPP11
+}
+// reporting.cpp
+writable::list mfrm_cpp_row_predictions(doubles eta, doubles_matrix<> steps, integers group, integers lower, integers upper, double rating_min, doubles alpha, doubles theta, doubles offset, bool ability_only);
+extern "C" SEXP _mfrmr_mfrm_cpp_row_predictions(SEXP eta, SEXP steps, SEXP group, SEXP lower, SEXP upper, SEXP rating_min, SEXP alpha, SEXP theta, SEXP offset, SEXP ability_only) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(mfrm_cpp_row_predictions(cpp11::as_cpp<cpp11::decay_t<doubles>>(eta), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(steps), cpp11::as_cpp<cpp11::decay_t<integers>>(group), cpp11::as_cpp<cpp11::decay_t<integers>>(lower), cpp11::as_cpp<cpp11::decay_t<integers>>(upper), cpp11::as_cpp<cpp11::decay_t<double>>(rating_min), cpp11::as_cpp<cpp11::decay_t<doubles>>(alpha), cpp11::as_cpp<cpp11::decay_t<doubles>>(theta), cpp11::as_cpp<cpp11::decay_t<doubles>>(offset), cpp11::as_cpp<cpp11::decay_t<bool>>(ability_only)));
+  END_CPP11
+}
+// reporting.cpp
+writable::doubles mfrm_cpp_expected_agreement(list groups, doubles scores, doubles_matrix<> probs);
+extern "C" SEXP _mfrmr_mfrm_cpp_expected_agreement(SEXP groups, SEXP scores, SEXP probs) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(mfrm_cpp_expected_agreement(cpp11::as_cpp<cpp11::decay_t<list>>(groups), cpp11::as_cpp<cpp11::decay_t<doubles>>(scores), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(probs)));
+  END_CPP11
+}
 
 extern "C" {
 static const R_CallMethodDef CallEntries[] = {
-    {"_mfrmr_mfrm_cpp_compute_p_geq",            (DL_FUNC) &_mfrmr_mfrm_cpp_compute_p_geq,            1},
-    {"_mfrmr_mfrm_cpp_expected_category_bundle", (DL_FUNC) &_mfrmr_mfrm_cpp_expected_category_bundle, 3},
-    {"_mfrmr_mfrm_cpp_pcm_logprob_bundle",       (DL_FUNC) &_mfrmr_mfrm_cpp_pcm_logprob_bundle,       7},
-    {"_mfrmr_mfrm_cpp_rsm_logprob_bundle",       (DL_FUNC) &_mfrmr_mfrm_cpp_rsm_logprob_bundle,       7},
+    {"_mfrmr_mfrm_cpp_adaptive_mml_eval",              (DL_FUNC) &_mfrmr_mfrm_cpp_adaptive_mml_eval,              35},
+    {"_mfrmr_mfrm_cpp_adaptive_quad_basis",            (DL_FUNC) &_mfrmr_mfrm_cpp_adaptive_quad_basis,            20},
+    {"_mfrmr_mfrm_cpp_cml_esf",                        (DL_FUNC) &_mfrmr_mfrm_cpp_cml_esf,                         3},
+    {"_mfrmr_mfrm_cpp_compute_p_geq",                  (DL_FUNC) &_mfrmr_mfrm_cpp_compute_p_geq,                   1},
+    {"_mfrmr_mfrm_cpp_drift_mml_eval",                 (DL_FUNC) &_mfrmr_mfrm_cpp_drift_mml_eval,                 14},
+    {"_mfrmr_mfrm_cpp_expected_agreement",             (DL_FUNC) &_mfrmr_mfrm_cpp_expected_agreement,              3},
+    {"_mfrmr_mfrm_cpp_expected_category_bundle",       (DL_FUNC) &_mfrmr_mfrm_cpp_expected_category_bundle,        3},
+    {"_mfrmr_mfrm_cpp_fast_batch_list",                (DL_FUNC) &_mfrmr_mfrm_cpp_fast_batch_list,                 3},
+    {"_mfrmr_mfrm_cpp_fast_batch_shared_design",       (DL_FUNC) &_mfrmr_mfrm_cpp_fast_batch_shared_design,        4},
+    {"_mfrmr_mfrm_cpp_fast_batch_warm_list",           (DL_FUNC) &_mfrmr_mfrm_cpp_fast_batch_warm_list,            3},
+    {"_mfrmr_mfrm_cpp_fast_bias_pairwise",             (DL_FUNC) &_mfrmr_mfrm_cpp_fast_bias_pairwise,              9},
+    {"_mfrmr_mfrm_cpp_fast_connectivity_spec",         (DL_FUNC) &_mfrmr_mfrm_cpp_fast_connectivity_spec,          1},
+    {"_mfrmr_mfrm_cpp_fast_fit_spec",                  (DL_FUNC) &_mfrmr_mfrm_cpp_fast_fit_spec,                   2},
+    {"_mfrmr_mfrm_cpp_fast_wle",                       (DL_FUNC) &_mfrmr_mfrm_cpp_fast_wle,                       10},
+    {"_mfrmr_mfrm_cpp_gpcm_logprob_bundle",            (DL_FUNC) &_mfrmr_mfrm_cpp_gpcm_logprob_bundle,             9},
+    {"_mfrmr_mfrm_cpp_indexed_sum",                    (DL_FUNC) &_mfrmr_mfrm_cpp_indexed_sum,                     4},
+    {"_mfrmr_mfrm_cpp_jml_eval_bundle",                (DL_FUNC) &_mfrmr_mfrm_cpp_jml_eval_bundle,                12},
+    {"_mfrmr_mfrm_cpp_marginal_pairwise_expectations", (DL_FUNC) &_mfrmr_mfrm_cpp_marginal_pairwise_expectations,  6},
+    {"_mfrmr_mfrm_cpp_mml_eval_bundle",                (DL_FUNC) &_mfrmr_mfrm_cpp_mml_eval_bundle,                18},
+    {"_mfrmr_mfrm_cpp_pcm_logprob_bundle",             (DL_FUNC) &_mfrmr_mfrm_cpp_pcm_logprob_bundle,              7},
+    {"_mfrmr_mfrm_cpp_posterior_person_score",         (DL_FUNC) &_mfrmr_mfrm_cpp_posterior_person_score,         20},
+    {"_mfrmr_mfrm_cpp_raju_welch_df",                  (DL_FUNC) &_mfrmr_mfrm_cpp_raju_welch_df,                   5},
+    {"_mfrmr_mfrm_cpp_row_predictions",                (DL_FUNC) &_mfrmr_mfrm_cpp_row_predictions,                10},
+    {"_mfrmr_mfrm_cpp_rsm_logprob_bundle",             (DL_FUNC) &_mfrmr_mfrm_cpp_rsm_logprob_bundle,              7},
+    {"_mfrmr_mfrm_cpp_testlet_kernel",                 (DL_FUNC) &_mfrmr_mfrm_cpp_testlet_kernel,                 12},
     {NULL, NULL, 0}
 };
 }

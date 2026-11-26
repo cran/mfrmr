@@ -1,12 +1,8 @@
 citHeader("To cite mfrmr in publications, use:")
 
-release_date <- if (is.null(meta$Date) || !nzchar(meta$Date)) {
-  format(Sys.Date(), "%Y-%m-%d")
-} else {
-  meta$Date
-}
-year <- sub("-.*", "", release_date)
-if (!nzchar(year)) year <- format(Sys.Date(), "%Y")
+date_candidates <- c(meta[["Date/Publication"]], meta$Date)
+date_candidates <- date_candidates[!is.na(date_candidates) & grepl("^[0-9]{4}", date_candidates)]
+year <- if (length(date_candidates)) substr(date_candidates[1L], 1L, 4L) else format(Sys.Date(), "%Y")
 
 # DESCRIPTION URL may hold multiple comma-separated URLs; pick the first.
 desc_url <- if (is.null(meta$URL)) "" else meta$URL
@@ -18,5 +14,6 @@ bibentry(
   author = person("Ryuya", "Komuro"),
   year = year,
   note = paste("R package version", meta$Version),
+  doi = "10.32614/CRAN.package.mfrmr",
   url = first_url
 )

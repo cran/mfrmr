@@ -110,7 +110,7 @@ row-binding or prefixing identifiers alone does not create a common scale.
 \section{Typical workflow}{
 
 \enumerate{
-\item Inspect available datasets with \code{\link[=list_mfrmr_data]{list_mfrmr_data()}}.
+\item Inspect available datasets with \code{\link[=load_mfrmr_data]{load_mfrmr_data("list")}}.
 \item Load one dataset using \code{\link[=load_mfrmr_data]{load_mfrmr_data()}}.
 \item Fit and diagnose with \code{\link[=fit_mfrm]{fit_mfrm()}} and \code{\link[=diagnose_mfrm]{diagnose_mfrm()}}.
 }

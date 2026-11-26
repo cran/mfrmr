@@ -159,7 +159,7 @@ test_that("one-facet designs refuse incomplete cells and unavailable rater proje
 test_that("balanced multivariate ANOVA recovers cross-covariances and matches a QR reference", {
   f <- mvgt_fixture()
   g <- mfrm_g_study(f$data, c("Content", "Organization"))
-  expect_s3_class(g, "mfrm_multivariate_gstudy")
+  expect_s3_class(g, "mfrm_gtheory")
   expect_equal(g$components, f$components, tolerance = 1e-12)
   expect_true(all(g$component_diagnostics$PositiveSemidefinite))
   expect_equal(sum(g$degrees_of_freedom$DF), nrow(f$data) - 1)
@@ -175,7 +175,7 @@ test_that("balanced multivariate ANOVA recovers cross-covariances and matches a 
   }
   reference <- solve(ems, t(vapply(mp, as.vector, numeric(4))))
   expect_equal(unname(t(vapply(g$components, as.vector, numeric(4)))), unname(reference), tolerance = 1e-12)
-  expect_identical(summary(g), g$component_diagnostics)
+  expect_identical(summary(g)$component_diagnostics, g$component_diagnostics)
   expect_output(print(g), "highest-order interaction and residual are combined")
   # Row order and literal identifier column names do not change estimates.
   shuffled <- f$data[rev(seq_len(nrow(f$data))), ]
@@ -350,8 +350,8 @@ test_that("supplied mGENOVA matrices reproduce Appendix F D-study values", {
     score_scale = setNames(c(1, 1), scores),
     design = list(scores = scores, calculation_version = 1L,
       counts = c(Person = 50L, Rater = 2L, Task = 6L))),
-    class = "mfrm_multivariate_gstudy")
-  d <- mfrm_d_study(g, weights = c(Listening = 1, Writing = -1))
+    class = "mfrm_gtheory")
+  d <- .mfrm_d_study_moments(g, weights = c(Listening = 1, Writing = -1))
   expect_true(all(d$coefficients$Status == "Available"))
   # Printed values have five decimal places. Upper triangles of the manual's
   # output matrices contain correlations; lower triangles contain covariances.

@@ -21,8 +21,8 @@ Table 6,subset_connectivity_report,t6,summary,Subset|Criterion|Person|Rater|Task
 Table 6,subset_connectivity_report,t6,listing,Subset|Facet|LevelsN|Levels|Observations|ObservationPercent|Ruler
 Table 6,subset_connectivity_report,t6,nodes,Node|Component|Subset|Facet|Level
 Table 6,subset_connectivity_report,t6,edges,Subset|From|To|FromFacet|FromLevel|ToFacet|ToLevel|Weight
-Table 6.2,facet_statistics_report,t62,table,Metric|GlobalMin|GlobalMax|Ruler|Facet|Levels|Mean|SD|Min|Max
-Table 6.2,facet_statistics_report,t62,ranges,Metric|GlobalMin|GlobalMax
+Table 6.2,"mfrm_report(fit, type = 'facet_statistics')",t62,table,Metric|GlobalMin|GlobalMax|Ruler|Facet|Levels|Mean|SD|Min|Max
+Table 6.2,"mfrm_report(fit, type = 'facet_statistics')",t62,ranges,Metric|GlobalMin|GlobalMax
 Table 7,facets_chisq_table,t7chisq,table,Facet|Levels|MeanMeasure|SD|FixedChiSq|FixedDF|RandomVar|FixedProb|RandomChiSq|RandomDF|RandomProb|FixedFlag|RandomFlag
 Table 7,facets_chisq_table,t7chisq,summary,Facets|FixedSignificant|RandomSignificant|MeanRandomVar|MaxFixedChiSq|MaxRandomChiSq
 Table 7,interrater_agreement_table,t7agree,summary,RaterFacet|Raters|Pairs|Contexts|TotalPairs|ExactAgreements|ExpectedAgreements|ExactAgreement|ExpectedExactAgreement|AdjacentAgreement|MeanAbsDiff|MeanCorr|FlaggedPairs|FlaggedShare

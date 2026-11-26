@@ -246,7 +246,6 @@ if (getRversion() >= "2.15.1") {
     "Reference",
     "Est_From",
     "Est_To",
-    "Residual",
     "Link",
     "Diff",
     "Element",

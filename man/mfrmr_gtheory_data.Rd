@@ -53,5 +53,5 @@ summary(d)
 }
 \seealso{
 \code{\link[=mfrm_g_study]{mfrm_g_study()}}, \code{\link[=mfrm_d_study]{mfrm_d_study()}},
-\code{\link[=mfrm_multivariate_d_compare]{mfrm_multivariate_d_compare()}}, \code{\link[=load_mfrmr_data]{load_mfrmr_data()}}
+\code{\link[=load_mfrmr_data]{load_mfrmr_data()}}
 }

@@ -35,12 +35,12 @@ data("mfrmr_example_agreement", package = "mfrmr")
 ratings <- mfrmr_example_agreement
 head(ratings)
 with(ratings, table(Rater, Score, useNA = "ifany"))
-agreement <- pairwise_kappa_table(ratings, rater = "Rater",
+agreement <- interrater_agreement(ratings, rater = "Rater",
   unit = c("Person", "Task"), score = "Score", categories = 0:3)
 agreement$table
 # Each pair uses its own shared responses; inspect its denominator as well.
 }
 \seealso{
-\code{\link[=pairwise_kappa_table]{pairwise_kappa_table()}}, \code{\link[=krippendorff_alpha_table]{krippendorff_alpha_table()}},
-\code{\link[=gwet_ac2_table]{gwet_ac2_table()}}, \code{\link[=pairwise_icc_table]{pairwise_icc_table()}}, \code{\link[=load_mfrmr_data]{load_mfrmr_data()}}
+\code{\link[=interrater_agreement]{interrater_agreement()}},
+\code{\link[=load_mfrmr_data]{load_mfrmr_data()}}
 }

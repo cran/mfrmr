@@ -20,16 +20,17 @@ test_that("the public RSM route preserves shared polytomous thresholds", {
     Item = rep(c("A", "B", "C"), nrow(patterns)), Score = as.vector(t(patterns)))
   for (method in c("MML", "JML")) {
     fit <- fit_mfrm(d, "Person", "Item", "Score", method = method)
+    expect_s3_class(fit, "mfrm_fit")
     # All-low/all-high patterns are excluded by JML calibration. Preserve
     # that source restriction while checking the conditional arithmetic.
     if (method == "JML") expect_error(classification_table(fit,
-      data.frame(Item = c("A", "C")), 0, 2, c(-1, 0, 1)), "boundary_not_scoring_ready:has_exclusions")
+      data.frame(Item = c("A", "C")), 0, 2, c(-1, 0, 1)),
+      "boundary_not_scoring_ready:has_exclusions")
     x <- classification_table(fit, data.frame(Item = c("A", "C")), 0, 2, c(-1, 0, 1),
       readiness_policy = if (method == "JML") "review" else "error")
     expect_identical(x$source$ready, method == "MML")
-    params <- expand_params(fit$opt$par, build_param_sizes(fit$config), fit$config)
     expect_equal(x$calibration$cumulative_steps,
-      matrix(c(0, cumsum(params$steps)), 2, 3, byrow = TRUE))
+      matrix(c(0, cumsum(fit$steps$Estimate)), 2, 3, byrow = TRUE))
     for (i in 1:3) {
       ref <- classification_patterns(c(-1, 0, 1)[i], x$calibration$offsets, x$calibration$cumulative_steps)
       expect_equal(subset(x$probabilities, Point == i & Method == "lee_sum" & Category == 2)$Probability,
@@ -129,7 +130,7 @@ test_that("narrow normal bands retain probability before CDF and location cancel
     expect_equal(sum(x$rudner), 1, tolerance = 1e-14)
   }
   fit <- classification_fixture()[["PCM-MML-fixed"]]
-  plan <- expand.grid(lapply(fit$config$facet_levels, head, 2), stringsAsFactors = FALSE)
+  plan <- expand.grid(lapply(setNames(fit$encoding$facet_levels, fit$encoding$facets), head, 2), stringsAsFactors = FALSE)
   x <- classification_table(fit, plan, cut_scores = c(0, 1e-18), score_cuts = c(1, 2),
     theta = 0, theta_weights = 1, readiness_policy = "review")
   middle <- subset(x$probabilities, Method == "rudner_normal" & Category == 2)$Probability
@@ -171,9 +172,11 @@ test_that("native MML and JML plans retain their calibration and exact probabili
     expect_equal(nrow(x$marginal), 0L)
     expect_equal(nrow(x$classification_matrix), 0L)
     expect_true(all(is.na(x$population$Weight)))
-    p <- expand_params(fit$opt$par, build_param_sizes(fit$config), fit$config)
-    direct_offset <- -p$facets$Rater[match(plan$Rater, fit$config$facet_levels$Rater)] -
-      p$facets$Criterion[match(plan$Criterion, fit$config$facet_levels$Criterion)]
+    facet_value <- function(facet, ids) {
+      z <- fit$facets[fit$facets$Facet == facet, ]
+      z$Estimate[match(ids, z$Level)]
+    }
+    direct_offset <- -facet_value("Rater",plan$Rater) - facet_value("Criterion",plan$Criterion)
     expect_equal(unname(x$calibration$offsets), unname(direct_offset))
     for (i in 1:5) {
       ref <- classification_patterns(x$population$Theta[i], direct_offset, x$calibration$cumulative_steps)
@@ -226,14 +229,14 @@ test_that("population weights give auditable joint cells and preserve unavailabl
 
 test_that("classification tables retain source review separately from joint error probabilities", {
   fit <- classification_fixture()[[2]]
-  fit$config$estimability_audit$nonlinear_local_estimability$local_first_order_rank_deficient <- TRUE
+  fit$converged <- FALSE
   plan <- data.frame(Rater = "1", Criterion = c("1", "2"))
   local_mocked_bindings(fit_mfrm = function(...) stop("No refitting"), .package = "mfrmr")
   x <- classification_table(fit, plan, 0, 3, c(-1, 1), theta_weights = c(3, 1),
     readiness_policy = "review")
-  expect_identical(x$source$status, "review_only")
+  expect_identical(x$source$status, "review_required")
   for (name in c("table", "probabilities", "scores", "cuts", "marginal", "classification_matrix")) {
-    expect_true(all(x[[name]]$SourceStatus == "review_only"), info = name)
+    expect_true(all(x[[name]]$SourceStatus == "review_required"), info = name)
     csv <- tempfile(fileext = ".csv")
     write.csv(x[[name]], csv, row.names = FALSE)
     expect_identical(read.csv(csv)$SourceStatus, x[[name]]$SourceStatus)
@@ -264,11 +267,10 @@ test_that("plan mapping and score recoding never change model category sums", {
   plan <- data.frame(Rater = c("1", "2"), Criterion = c("1", "2"))
   original <- classification_table(fit, plan, 0, 3, 0)
   names(plan) <- c("Judge", "Task")
-  fit$prep$score_map$OriginalScore <- c(2, 5, 10, 20)
   recoded <- classification_table(fit, plan, 0, 3, 0, facets = c(Rater = "Judge", Criterion = "Task"))
   expect_equal(original$table, recoded$table)
   expect_equal(recoded$calibration$score_map$CategoryScore, 0:3)
-  expect_equal(recoded$calibration$score_map$OriginalScore, c(2, 5, 10, 20))
+  expect_equal(recoded$calibration$score_map$ObservedScore, 0:3)
 })
 
 test_that("public inputs and source eligibility fail explicitly", {
@@ -290,16 +292,16 @@ test_that("public inputs and source eligibility fail explicitly", {
   expect_error(run(p = transform(plan, Rater = NA_character_)), "nonmissing")
   expect_error(run(p = transform(plan, Rater = " ")), "nonblank")
   expect_error(run(facets = c(NA_character_, "Criterion")), "missing")
-  bad <- fit; bad$config$model <- "GPCM"
+  bad <- fit; bad$model <- "GPCM"
   expect_error(run(f = bad), "ordinary RSM/PCM")
-  bad <- fit; bad$config$interaction_specs <- list(list())
+  bad <- fit; bad$interactions <- data.frame(Interaction="Rater:Criterion")
   expect_error(run(f = bad), "without interactions")
-  bad <- fit; class(bad) <- c("mfrm_random_rater", class(bad))
-  expect_error(run(f = bad), "random effects")
-  bad <- fit; bad$opt$par[1] <- NA_real_
-  expect_error(run(f = bad, readiness_policy = "review"), "invalid")
+  bad <- fit; bad$schema_version <- NULL
+  expect_error(run(f = bad), "Refit older saved objects")
+  bad <- fit; bad$xi[1] <- NA_real_
+  expect_false(run(f = bad, readiness_policy = "review")$source$ready)
   review <- fit
-  review$config$estimability_audit$nonlinear_local_estimability$local_first_order_rank_deficient <- TRUE
+  review$converged <- FALSE
   expect_error(run(f = review), "not ready")
   x <- run(f = review, readiness_policy = "review")
   expect_false(x$source$ready)

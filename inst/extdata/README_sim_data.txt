@@ -1,7 +1,8 @@
 Synthetic example datasets
 ==========================
 
-All bundled datasets are synthetic long-format rating data. The compact
+Bundled datasets include synthetic long-format ratings, wide G-Study outcomes,
+and a planned assignment roster without scores. The compact
 examples and the Eckes and Jin (2021)-inspired designs are available as
 lazy-loaded R objects and through `load_mfrmr_data()`.
 
@@ -19,7 +20,7 @@ Access from R:
     mfrmr::load_mfrmr_data("combined_itercal")
 
     # Compare intended teaching roles before selecting a dataset:
-    mfrmr::list_mfrmr_data(details = TRUE)
+    mfrmr::load_mfrmr_data("list", details = TRUE)
 
     # Equivalent base-R form (the lazy-loaded objects are named ej2021_*):
     data("ej2021_study1", package = "mfrmr")

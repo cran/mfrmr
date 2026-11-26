@@ -5,42 +5,56 @@
 [![pkgdown](https://github.com/Ryuya-dot-com/mfrmr/actions/workflows/pkgdown.yaml/badge.svg)](https://github.com/Ryuya-dot-com/mfrmr/actions/workflows/pkgdown.yaml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-
-**Account for rater differences. Plan your assessment. Report the results.**
+**Account for rater differences. Plan your assessment. Diagnose rating quality.**
 
 The same performance can receive different scores from different raters.
-For speaking performances, essays and other rated work, `mfrmr` helps you:
+For speaking assessments, essays, clinical OSCEs, and other rubric-scored work, `mfrmr` connects three tasks:
 
-- **Measure performance:** estimate person ability while accounting for rater
-  severity and task or criterion difficulty.
-- **Plan ratings:** compare what adding raters or tasks would do to score precision.
-- **Explain results:** examine agreement and prepare tables, figures and reports
-  for researchers or raters.
+1. **Measurement models (`fit_mfrm()`, `fit_mfrm_drift()`, `mfrm_batch_fit()`):** estimate examinee ability while accounting for rater severity, task or criterion difficulty, step thresholds (`RSM`, `PCM`, and constrained hybrids), element covariates, and facet-specific discrimination via high-speed C++ `MML` (`EAP` and Warm's `WLE`), `JML`, `JML_jeffreys`, and `CML`.
+2. **G-Study and D-Study planning (`mfrm_g_study()`, `mfrm_d_study()`):** decompose observed-score variance across crossed or nested facets and multivariate composites (`ANOVA`, `MINQUE(0)`, and non-iterative Henderson Method 1 `urGENOVA`) to project generalizability ($G$), dependability ($\Phi$), and standard errors across candidate designs.
+3. **Rater feedback and decision support (`diagnose_mfrm()`, `fair_average_table()`, `estimate_bias()`, `analyze_dff()`, `classification_table()`, `interrater_agreement()`):** inspect `Infit`/`Outfit` `MnSq` and `ZSTD`, `ModelSE` vs `RealSE`, rubric-scale `Fair(M)`, FACETS 4.5.3 `RajuSA-Welch` pairwise bias contrasts, parallel split-element DFF, and cut-score classification accuracy.
 
-[![Three ggplot examples: rater severity with intervals, task/rater planning curves, and score-category probabilities. All use synthetic data.](man/figures/visual-gallery.png)](https://ryuya-dot-com.github.io/mfrmr/articles/visual-gallery.html)
+Use `mfrm_analysis()` to move from ratings to calibration, diagnostics, G-Study,
+D-Study, plots, and APA-style or rater-feedback reports in one package. Use
+`tidy()`, `glance()`, and `augment()` to extract analysis results for your own
+tables and plots. See the workflow vignette for a complete example.
 
-**[Explore the interactive gallery](https://ryuya-dot-com.github.io/mfrmr/articles/visual-gallery.html)**:
-inspect values, compare rating plans, and reuse the ggplot2 code in your report.
+The **Generalized Many-Facet Rasch Model (GMFRM)** follows the terminology of
+[Uto and Ueno (2020)](https://doi.org/10.1007/s41237-020-00115-7). It extends
+the constant-discrimination many-facet Rasch model by estimating discrimination,
+with either facet-specific steps (many-facet GPCM) or shared steps on a common
+rubric (many-facet RS-GPCM). Select it with `model = "GPCM"` (also accepted as `model = "GMFRM"`).
 
-## Install the version used here
+[![Three ggplot examples: rater severity with intervals, task/rater planning curves, and score-category probabilities. All use synthetic data.](man/figures/visual-gallery.png)](https://github.com/Ryuya-dot-com/mfrmr/blob/v0.3.2/vignettes/articles/mfrmr-assessment.Rmd)
 
-**These examples require the unreleased 0.2.4 candidate.** If the maintainer
-has supplied its `.tar.gz` archive, select it here:
+## Install and open tutorials
+
+Once version 0.3.2 is available on CRAN, use the standard installation:
 
 ```r
-install.packages(file.choose(), repos = NULL, type = "source")
+install.packages("mfrmr")
 ```
 
-Source installation requires R build tools. Keep the archive and checksum:
-different candidates share version `0.2.4`. Without the candidate, use
-`install.packages("mfrmr")` for the CRAN release and follow its installed
-tutorials via `browseVignettes("mfrmr")`; some features below will be unavailable.
+Until 0.3.2 is available from CRAN, install the GitHub source release below.
+Download [mfrmr_0.3.2.tar.gz](https://github.com/Ryuya-dot-com/mfrmr/releases/tag/v0.3.2)
+from GitHub Releases. Install the package dependencies and ensure that your
+R package compiler toolchain works. Run the following from the folder containing the file.
+
+```r
+install.packages("mfrmr_0.3.2.tar.gz", repos = NULL, type = "source")
+browseVignettes("mfrmr")
+```
+
+Read the [assessment guide](https://github.com/Ryuya-dot-com/mfrmr/blob/v0.3.2/vignettes/articles/mfrmr-assessment.Rmd)
+on GitHub. Its examples complement the two offline vignettes bundled with
+`mfrmr`.
+
+- `vignette("mfrmr-workflow", package = "mfrmr")`: A first analysis from ratings to a report, connectivity audit, RSM, PCM and GMFRM estimation, prediction, plots, and batch replications.
+- `vignette("mfrmr-gtheory", package = "mfrmr")`: Crossed, nested, and multivariate `G-Study` / `D-Study` planning.
 
 ## Try one assessment
 
-Start with synthetic data for **48 people, six raters and three criteria**.
-Each person is assigned two raters; 282 of 288 planned ratings are observed.
-Here, interpret 1 as lower performance and 4 as higher performance.
+Start with synthetic operational data for **48 people, six raters, and three criteria** (`Score` from 1 to 4, where 4 denotes higher performance). Each person is assigned two raters; 282 of 288 planned ratings are observed:
 
 ```r
 library(mfrmr)
@@ -54,104 +68,96 @@ head(ratings[c("Person", "Rater", "Criterion", "Score")], 3)
 | P001 | R01 | Organization | 2 |
 | P001 | R02 | Content | 4 |
 
-**One row is one observed rating.** Missing ratings are absent rows, not zeros.
-A *facet* is a source of variation: here, the rater and assessment criterion.
+**One row is one observed rating.** Missing assignments are absent rows, not zeros.
 
-Fit a rating-scale model (RSM), which uses shared category steps across criteria,
-by marginal maximum likelihood (MML). For your assessment, see the
-[model-choice guide](https://ryuya-dot-com.github.io/mfrmr/articles/mfrmr-model-choice.html).
+### 1. Audit connectivity and fit the measurement model
 
 ```r
-fit <- fit_mfrm(
-  ratings, person = "Person", facets = c("Rater", "Criterion"), score = "Score",
-  rating_min = 1, rating_max = 4, category_policy = "preserve",
-  method = "MML", model = "RSM"
+# Verify multi-facet graph connectivity before estimation
+conn <- check_mfrm_connectivity(
+  ratings,
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  score = "Score"
 )
+conn$connected
 
-analysis <- mfrm_results(fit, include = "publication")  # Gather diagnostics and tables
-check <- summary(analysis)
-check$decision[, c("FormalInference", "NextAction")]
+# Fit Rating Scale Model (RSM) via MML with Warm's (1989) WLE person scoring
+fit <- fit_mfrm(
+  ratings,
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  score = "Score",
+  model = "RSM",
+  method = "MML",
+  person_score = "WLE"
+)
+print(fit)
+fit$facets[, c("Facet", "Level", "ObsCount", "Estimate", "ModelSE", "RealSE", "FairM", "InfitMnSq")]
 ```
 
-Here, `FormalInference` is `Yes`: the implemented inference checks pass.
-If it is `No` for your data, follow `NextAction` before making inferential claims.
-Passing these checks does not establish construct validity.
-
-## Read the first figure
+Non-person facets carry negative sign (`Sign = -1`) by default so **higher rater estimates denote stricter (more severe) scoring** and **higher criterion estimates denote harder criteria**. Use standard S3 methods to extract intervals, covariances, and predictions under arbitrary conditions:
 
 ```r
-plot(fit, show_ci = FALSE)
+confint(fit, component = "facets", se_type = "real")
+predict(fit, newdata = data.frame(theta = c(-1, 0, 1), Rater = "R01", Criterion = "Content"))
 ```
 
-![Wright map from the synthetic example: person estimates on the left, rater and criterion locations in the middle, and shared category steps on the right; confidence intervals are not shown.](man/figures/readme-wright.png)
+### 2. Read the color-vision-safe `ggplot2` diagnostics
 
-Start with **Rater**: R01 is about −0.61 and R06 about +0.41 logits.
-Higher rater locations mean lower expected scores for the same person and
-criterion, so R06 is estimated to score more strictly. Zero is a centered
-reference, not a quality standard; point estimates alone do not establish
-a statistically significant difference. The IQR bars describe spread, not uncertainty.
-
-The left panel shows person estimates; other columns show criteria and category
-steps. See the [visual guide](https://ryuya-dot-com.github.io/mfrmr/articles/mfrmr-visual-diagnostics.html).
-State what high scores mean: *difficulty in understanding* and *ease of
-understanding* run in opposite directions.
-
-## Make a report and keep the analysis
+Every `plot()` method returns a customizable `ggplot` object using color-vision-safe `"okabe_ito"`, `"viridis"`, or strict grayscale `"monochrome"` palettes paired with distinct point `shape` and `linetype` encodings:
 
 ```r
-report <- mfrm_report(analysis, style = "apa", output = "html")
-browseURL(report$path)  # Open the draft report in your browser
-export_mfrm_results(analysis, output_dir = "assessment-export", preset = "starter")
+plot(fit, type = "wright", palette = "okabe_ito")
+plot(fit, type = "raters", palette = "monochrome")
+plot(fit, type = "category_curves", palette = "viridis")
 ```
 
-The report combines results, checks and draft wording; the export saves tables,
-available figures and a reloadable analysis. Open `assessment-export/index.html`
-to navigate the saved files. Add your study question, sampling,
-rubric and interpretation. Review person-level information before sharing.
+![Wright map from the synthetic example: person estimates on the left, rater and criterion locations in the middle, and shared category steps on the right.](man/figures/readme-wright.png)
 
-The [reporting guide](https://ryuya-dot-com.github.io/mfrmr/articles/mfrmr-reporting-and-apa.html)
-introduces three editable manuscript templates:
+### 3. Screen bias, DFF, and plan future designs (`G-Study` / `D-Study`)
 
-| Your question | Template |
+```r
+# FACETS 4.5.3 RajuSA-Welch 2-way local bias & pairwise contrasts
+bias <- estimate_bias(fit, interaction_facets = c("Rater", "Criterion"), df_method = "facets")
+head(bias$pairwise, 4)
+
+# Observed-score Generalizability & Decision Study (Henderson Method 1 / urGENOVA)
+gt <- mfrm_g_study(
+  ratings,
+  scores = "Score",
+  person = "Person",
+  facets = c("Rater", "Criterion"),
+  method = "urgenova"
+)
+mfrm_d_study(gt, design_grid = expand.grid(Rater = 1:4, Criterion = 2:4))
+confint(gt)
+```
+
+Before interpreting intervals or classification, inspect
+`summary(fit)$readiness`: optimizer convergence alone does not establish usable
+inference. Prediction SEs condition on the supplied or fitted person ability.
+For unbalanced G-Studies, intervals use a Gaussian plug-in covariance for the
+actual assignments and remain approximations; unidentified designs are rejected.
+See `?"mfrmr-s3-methods"` for these uncertainty definitions and `?fair_average_table`
+for comparisons under an explicit common reference panel.
+
+## Public API
+
+| Pillar | Entry points |
 | --- | --- |
-| Report a one-family GPCM analysis | `gpcm-report.Rmd`: measures, precision, fit, agreement and figures. |
-| Compare rater/task plans | `gtheory-report.Rmd`: sources of variation, plans and uncertainty. |
-| Review anchors, bias or model choice | `assessment-review.Rmd`: select the relevant modules. |
+| Data & connectivity | `load_mfrmr_data()`, `describe_mfrm_data()`, `check_mfrm_connectivity()`, `interrater_agreement()` |
+| Calibration, GMFRM, & linking | `fit_mfrm()`, `mfrm_batch_fit()`, `fit_mfrm_drift()`, `compare_mfrm()`, `apply_empirical_bayes_shrinkage()`, `make_anchor_table()`, `anchor_to_baseline()`, `detect_anchor_drift()` |
+| Diagnostics, bias, DFF, & cuts | `diagnose_mfrm()`, `fair_average_table()`, `compute_person_fit_indices()`, `compute_information()`, `classification_table()`, `estimate_bias()`, `analyze_dff()` |
+| G-Study & D-Study | `mfrm_g_study()`, `mfrm_d_study()` |
+| Analysis workflow | `mfrm_analysis()`, `mfrm_workflow()`, `step_mfrm_measure()`, `step_mfrm_gtheory()`, `step_mfrm_diagnose()` |
+| Tables & reporting | `tidy()`, `glance()`, `augment()`, `format_mfrm_table()`, `render_mfrm_report()` |
+| Standard S3 generics | `predict()`, `coef()`, `vcov()`, `confint()`, `anova()`, `plot()`, `summary()`, `print()`, `fitted()`, `residuals()`, `logLik()`, `AIC()`, `BIC()`, `nobs()`, `as.data.frame()` |
 
-Templates require R Markdown and Pandoc; the HTML report above does not.
-The guide distinguishes separation, Strata and reliability from observed
-agreement (Krippendorff's alpha and pairwise Cohen's kappa).
+## Scope and citation
 
-## Choose your next task
+Statistical fit indices (`Infit`/`Outfit`), severity estimates, and DFF contrasts support formative rater training, rubric clarification, and targeted second-scoring; they must not be used for automated high-stakes rater exclusion without qualitative review (Eckes, 2015). Observed-score $G$ and $\Phi$ decompose raw score variance (Brennan, 2001) and answer different questions from model-adjusted latent reliability.
 
-| Task | Guide |
-| --- | --- |
-| Use your own CSV | [Data-to-report workflow](https://ryuya-dot-com.github.io/mfrmr/articles/mfrmr-workflow.html) |
-| Plan the number of raters or tasks | [G-theory and assessment design](https://ryuya-dot-com.github.io/mfrmr/articles/mfrmr-gtheory.html) |
-| Review agreement and rater differences | [Agreement](https://ryuya-dot-com.github.io/mfrmr/articles/mfrmr-rating-agreement.html); [rater intervals](https://ryuya-dot-com.github.io/mfrmr/articles/mfrmr-facet-intervals.html) |
-| Check rating links; explore residual patterns | [Networks and reporting](https://ryuya-dot-com.github.io/mfrmr/articles/mfrmr-networks-and-reporting.html) |
-| Choose a model | [Model choice](https://ryuya-dot-com.github.io/mfrmr/articles/mfrmr-model-choice.html); [GPCM scope](https://ryuya-dot-com.github.io/mfrmr/articles/mfrmr-gpcm-scope.html) |
-| Reuse a calibration or move from other software | [Portable calibration](https://ryuya-dot-com.github.io/mfrmr/articles/mfrmr-portable-calibration.html); [FACETS migration](https://ryuya-dot-com.github.io/mfrmr/articles/mfrmr-facets-migration.html); `?build_conquest_overlap_bundle` |
-| Continue in Stan/brms and report saved estimates | [Model export](https://ryuya-dot-com.github.io/mfrmr/reference/export_mfrm_model.html); [return to figures and reports](https://ryuya-dot-com.github.io/mfrmr/reference/read_mfrm_posterior.html) |
+Use `citation("mfrmr")` and see [release notes](https://github.com/Ryuya-dot-com/mfrmr/releases/tag/v0.3.2) and [roadmap](https://github.com/Ryuya-dot-com/mfrmr/blob/v0.3.2/ROADMAP.md). Licensed under the [MIT License](https://opensource.org/licenses/MIT).
 
-In R, use `mfrmr_output_guide("beginner")` to choose an entry point.
-The public website may be older; `browseVignettes("mfrmr")` matches your installation.
-
-## Updating, scope and citation
-
-Installing a new version does not update saved calculations. Keep originals
-and follow [NEWS](NEWS.md) and **Updating saved analyses for 0.2.4** in
-`help("mfrmr_workflow_methods")`. For retired drawing helpers, see
-`help("mfrmr_plot_migration")`; `plot()` is the main entry point.
-
-Native measurement models use one ordered score scale and one latent person
-dimension. Two-family GPCM and other experimental routes have separate limits
-in the model guides. G/D studies concern variation in defined observed scores.
-The [roadmap](https://github.com/Ryuya-dot-com/mfrmr/blob/main/ROADMAP.md) separates current capabilities from future work.
-
-Use `citation("mfrmr")` and the methodological references in the relevant help.
-Licensed under the [MIT License](https://opensource.org/licenses/MIT).
-
-`mfrmr` has benefited from discussion and methodological input from
-[Dr. Atsushi Mizumoto](https://mizumot.com/) and
-[Dr. Taichi Yamashita](https://kugakujo.kansai-u.ac.jp/html/100000882_en.html).
+`mfrmr` has benefited from discussion and methodological input from Dr. Atsushi Mizumoto and Dr. Taichi Yamashita.

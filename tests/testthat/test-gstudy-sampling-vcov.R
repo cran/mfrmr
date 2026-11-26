@@ -60,7 +60,12 @@ test_that("balanced MINQUE and ANOVA sampling SEs match existing independent-MS 
     expect_equal(as.vector(x),as.vector(y),tolerance=1e-9)
     expect_equal(attr(y,'summary')$SE,ci$SE,tolerance=1e-9)
     a$data<-NULL
-    expect_identical(vcov(a,score=s,assumption='normal'),y)
+    replayed<-vcov(a,score=s,assumption='normal')
+    # This recomputes an SVD; only serialized replay requires bitwise equality.
+    expect_equal(replayed,y,tolerance=1e-12)
+    discrete<-c('moment_rank','moment_dimension','estimable','positive_semidefinite')
+    expect_identical(attr(replayed,'diagnostics')[discrete],attr(y,'diagnostics')[discrete])
+    expect_identical(attr(replayed,'summary')$SEStatus,attr(y,'summary')$SEStatus)
   }
 })
 

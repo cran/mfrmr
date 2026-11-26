@@ -1,8 +1,9 @@
 # Detailed changes in mfrmr 0.2.4
 
-This per-function record complements the concise release highlights in NEWS.
-For saved analyses, start with `help("mfrmr_workflow_methods")`; for reporting,
-use `vignette("mfrmr-reporting-and-apa")`.
+This historical record describes version 0.2.4. Function names and help topics
+below refer to that version and may be unavailable in later releases. For
+version 0.3.2, see the current NEWS, `help("mfrmr-package")`, and
+`vignette("mfrmr-workflow")`.
 
 Complete worked examples remain in each help topic. Short primary workflows run
 with `example("topic")`; supplementary workflows show an explicit
@@ -469,7 +470,7 @@ results. A wording or display correction alone does not require refitting.
   `read.csv(..., encoding = "UTF-8", check.names = FALSE)`.
 
 
-Unreleased release candidate. This version combines native many-facet RSM/PCM
+Version 0.2.4 combines native many-facet RSM/PCM
 conditional estimation, reusable calibration and new-Person scoring,
 external-feature clustering and multivariate G/D-studies, with corrections to
 uncertainty, subgroup comparisons and design planning.
